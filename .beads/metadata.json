@@ -2,6 +2,6 @@
   "database": "dolt",
   "backend": "dolt",
   "dolt_mode": "embedded",
-  "dolt_database": "beads_FREGMA",
+  "dolt_database": "beads_BARWISE",
   "project_id": "7b1f26bb-9d53-4d6f-a936-d02567666b9e"
 }
