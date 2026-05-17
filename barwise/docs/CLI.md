@@ -147,3 +147,50 @@ Provider auto-detection checks environment variables in order:
 When `--output` targets an existing `.orm.yaml` file, the command runs
 a non-interactive merge: additions and modifications are accepted,
 removals are rejected. Use `barwise diff` to review changes first.
+
+### query
+
+Run a deterministic symbolic query against an ORM model. Answers precise
+structural questions -- what entities exist, what fact types an entity
+participates in, what constraints apply, how two entities connect --
+without any LLM inference.
+
+```sh
+barwise query model.orm.yaml entities
+barwise query model.orm.yaml entity Customer
+barwise query model.orm.yaml fact-type "Customer places Order"
+barwise query model.orm.yaml fact-types-of Customer
+barwise query model.orm.yaml constraints-of Order
+barwise query model.orm.yaml subtypes-of Person transitive
+barwise query model.orm.yaml path Customer Product
+barwise query model.orm.yaml stats --json
+```
+
+The query is one line: a command keyword followed by arguments. Names
+containing spaces are double-quoted (the shell may quote them for you).
+
+Commands:
+
+| Command                               | Answers                                       |
+| ------------------------------------- | --------------------------------------------- |
+| `entities [entity\|value]`            | All object types, optionally filtered by kind |
+| `fact-types [<arity>]`                | All fact types, optionally filtered by arity  |
+| `constraints [<type>]`                | All constraints, optionally filtered by type  |
+| `entity <name>`                       | Full detail for one entity                    |
+| `fact-type <name>`                    | Full detail for one fact type                 |
+| `fact-types-of <entity>`              | Fact types an entity participates in          |
+| `related-to <entity>`                 | Entities sharing a fact type with the entity  |
+| `constraints-of <name>`               | Constraints touching an entity or fact type   |
+| `subtypes-of <entity> [transitive]`   | Direct (or transitive) subtypes               |
+| `supertypes-of <entity> [transitive]` | Direct (or transitive) supertypes             |
+| `mandatory-roles [<entity>]`          | Mandatory roles, optionally for one entity    |
+| `path <entityA> <entityB>`            | Shortest fact-type path between two entities  |
+| `stats`                               | Element counts for the model                  |
+
+Options:
+
+- `--json` -- output the structured `QueryResult` as JSON instead of
+  human-readable text
+
+A malformed query exits with code 1; a well-formed query against a
+missing element prints a "not found" message and exits 0.

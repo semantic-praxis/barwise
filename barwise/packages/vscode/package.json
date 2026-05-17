@@ -223,6 +223,10 @@
             "description": "Describe domain entities and constraints"
           },
           {
+            "name": "query",
+            "description": "Run a deterministic symbolic query against a model"
+          },
+          {
             "name": "import-model",
             "description": "Import model from DDL or OpenAPI"
           },
@@ -508,6 +512,34 @@
               "description": "Path to a generated artifact (e.g., DDL file). When provided, resolves through lineage to find the source model."
             }
           }
+        }
+      },
+      {
+        "name": "barwise_query_model",
+        "displayName": "Query Barwise Model",
+        "toolReferenceName": "barwiseQuery",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(search)",
+        "tags": [
+          "orm",
+          "query"
+        ],
+        "modelDescription": "Run a deterministic symbolic query against an ORM 2 model. Answers precise structural questions without LLM inference: list entities/fact-types/constraints, describe one entity or fact type, find an entity's fact types or related entities, navigate subtype hierarchies, list mandatory roles, find the connection path between two entities, or get model statistics. Prefer this over guessing model structure. If no source is provided, automatically uses the .orm.yaml file open in the editor.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "description": "File path to an .orm.yaml file. Omit to use the currently open .orm.yaml file."
+            },
+            "query": {
+              "type": "string",
+              "description": "Query DSL expression. Commands: entities [entity|value], fact-types [arity], constraints [type], entity <name>, fact-type <name>, fact-types-of <entity>, related-to <entity>, constraints-of <name>, subtypes-of <entity> [transitive], supertypes-of <entity> [transitive], mandatory-roles [entity], path <entityA> <entityB>, stats. Quote names with spaces, e.g. fact-type \"Customer places Order\"."
+            }
+          },
+          "required": [
+            "query"
+          ]
         }
       },
       {

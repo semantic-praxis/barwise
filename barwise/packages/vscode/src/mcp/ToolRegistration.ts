@@ -26,6 +26,7 @@ import {
   executeImportModel,
   executeLineageStatus,
   executeMerge,
+  executeQueryModel,
   executeSchema,
   executeValidate,
   executeVerbalize,
@@ -106,6 +107,11 @@ interface LineageStatusInput {
 interface ImpactAnalysisInput {
   source?: string;
   elementId: string;
+}
+
+interface QueryModelInput {
+  source?: string;
+  query: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -584,6 +590,30 @@ class ImpactAnalysisTool implements vscode.LanguageModelTool<ImpactAnalysisInput
 }
 
 // ---------------------------------------------------------------------------
+// query_model
+// ---------------------------------------------------------------------------
+
+class QueryModelTool implements vscode.LanguageModelTool<QueryModelInput> {
+  async invoke(
+    options: vscode.LanguageModelToolInvocationOptions<QueryModelInput>,
+    _token: vscode.CancellationToken,
+  ): Promise<vscode.LanguageModelToolResult> {
+    const source = resolveSourceParam(options.input.source);
+    const result = executeQueryModel(source, options.input.query);
+    return toToolResult(result);
+  }
+
+  async prepareInvocation(
+    options: vscode.LanguageModelToolInvocationPrepareOptions<QueryModelInput>,
+    _token: vscode.CancellationToken,
+  ): Promise<vscode.PreparedToolInvocation> {
+    return {
+      invocationMessage: `Querying Barwise model: ${options.input.query}`,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
@@ -626,6 +656,7 @@ export function registerLanguageModelTools(
       "barwise_describe_domain",
       new DescribeDomainTool(),
     ),
+    vscode.lm.registerTool("barwise_query_model", new QueryModelTool()),
     vscode.lm.registerTool("barwise_import_model", new ImportModelTool()),
     vscode.lm.registerTool("barwise_review_model", new ReviewModelTool()),
     vscode.lm.registerTool(

@@ -36,6 +36,7 @@ export { executeImport } from "./tools/import.js";
 export { executeImportModel } from "./tools/importModel.js";
 export { executeLineageStatus } from "./tools/lineageStatus.js";
 export { executeMerge } from "./tools/merge.js";
+export { executeQueryModel } from "./tools/queryModel.js";
 export { executeReview } from "./tools/review.js";
 export { executeSchema } from "./tools/schema.js";
 export { executeValidate } from "./tools/validate.js";

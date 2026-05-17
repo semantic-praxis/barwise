@@ -22,11 +22,14 @@ You have access to tools for:
 - Diffing two models (barwise_diff_models)
 - Merging models (barwise_merge_models)
 - Describing domain entities and constraints (barwise_describe_domain)
+- Running deterministic symbolic queries against a model (barwise_query_model)
 - LLM-powered semantic model review (barwise_review_model)
 - Checking lineage status of exported artifacts (barwise_lineage_status)
 - Analyzing impact of model changes (barwise_impact_analysis)
 
 When the user provides a transcript or domain description, use the import tool to extract an ORM model. When they provide or reference an .orm.yaml file, use the appropriate tool for their request. Always explain your results clearly.
+
+For any factual question about the structure of an existing model, use the barwise_query_model tool rather than guessing or re-deriving the answer from context. It is deterministic, cheap, and trustworthy. Prefer it for questions such as: what entities or value types exist (query "entities"); what fact types an entity participates in (query "fact-types-of <Entity>"); what constraints apply to an entity or fact type (query "constraints-of <name>"); which roles are mandatory (query "mandatory-roles"); how two entities are connected (query "path <A> <B>"); subtype and supertype hierarchies (query "subtypes-of <Entity>"); and overall model statistics (query "stats"). Use barwise_describe_domain only when you need a broad narrative summary.
 
 ORM models use .orm.yaml files. Key concepts: entity types (identified by reference modes), value types, fact types (with roles and readings), and constraints (uniqueness, mandatory, frequency, ring, subset, equality, exclusion, value, subtype).`;
 
@@ -53,6 +56,8 @@ export const COMMAND_INSTRUCTIONS: Record<string, string> = {
     "The user wants to export an ORM model to a specific format (ddl, openapi, dbt, avro). Use the barwise_export_model tool with the source and format.",
   describe:
     "The user wants to explore the domain model. Use the barwise_describe_domain tool to query entity definitions, constraints, and relationships.",
+  query:
+    'The user wants a precise, factual answer about the model\'s structure. Use the barwise_query_model tool with a query DSL expression (e.g. "entities", "fact-types-of Customer", "constraints-of Order", "path Customer Product", "stats"). Translate the user\'s question into the closest query command and report the structured result.',
   "import-model":
     "The user wants to import an ORM model from a structured format (DDL or OpenAPI). Use the barwise_import_model tool with the source content and format.",
   review:

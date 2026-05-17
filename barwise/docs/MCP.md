@@ -467,6 +467,66 @@ before saving.
 
 ---
 
+### query_model
+
+Run a deterministic symbolic query against an ORM model. Unlike
+`describe_domain` (a broad narrative summary), `query_model` answers one
+precise structural question with a typed result and no LLM inference. AI
+agents should prefer it over re-deriving answers from prior context.
+
+| Parameter | Type   | Required | Description                                 |
+| --------- | ------ | -------- | ------------------------------------------- |
+| `source`  | string | yes      | File path or inline YAML for the model      |
+| `query`   | string | yes      | A query DSL expression (see commands below) |
+
+The `query` is one line: a command keyword followed by arguments. Names
+containing spaces are double-quoted.
+
+| Command                               | Answers                                       |
+| ------------------------------------- | --------------------------------------------- |
+| `entities [entity\|value]`            | All object types, optionally filtered by kind |
+| `fact-types [<arity>]`                | All fact types, optionally filtered by arity  |
+| `constraints [<type>]`                | All constraints, optionally filtered by type  |
+| `entity <name>`                       | Full detail for one entity                    |
+| `fact-type <name>`                    | Full detail for one fact type                 |
+| `fact-types-of <entity>`              | Fact types an entity participates in          |
+| `related-to <entity>`                 | Entities sharing a fact type with the entity  |
+| `constraints-of <name>`               | Constraints touching an entity or fact type   |
+| `subtypes-of <entity> [transitive]`   | Direct (or transitive) subtypes               |
+| `supertypes-of <entity> [transitive]` | Direct (or transitive) supertypes             |
+| `mandatory-roles [<entity>]`          | Mandatory roles, optionally for one entity    |
+| `path <entityA> <entityB>`            | Shortest fact-type path between two entities  |
+| `stats`                               | Element counts for the model                  |
+
+**Returns** JSON:
+
+```json
+{
+  "query": "fact-types-of Customer",
+  "result": {
+    "kind": "fact-types",
+    "factTypes": [
+      {
+        "id": "ft-1",
+        "name": "Customer places Order",
+        "arity": 2,
+        "reading": "Customer places Order"
+      }
+    ]
+  },
+  "text": "Fact types:\n  Customer places Order  [arity 2]"
+}
+```
+
+The `result` field is a discriminated `QueryResult` (`kind` is one of
+`entities`, `fact-types`, `constraints`, `roles`, `entity-detail`,
+`fact-type-detail`, `path`, `stats`, or `not-found`). The `text` field
+is a human-readable rendering of the same result. A well-formed query
+against a missing element returns a `not-found` result; a malformed
+query string returns an `error` field instead.
+
+---
+
 ## Resources
 
 ### orm-schema://json-schema

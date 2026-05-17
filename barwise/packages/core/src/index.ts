@@ -279,6 +279,30 @@ export type {
 } from "./describe/index.js";
 export { describeDomain } from "./describe/index.js";
 
+// Symbolic model query API
+export {
+  formatQueryResult,
+  parseQuery,
+  QUERY_COMMANDS,
+  queryModel,
+  QueryParseError,
+  runQuery,
+  tokenizeQuery,
+} from "./query/index.js";
+export type {
+  ConstraintRef,
+  EntityDetail,
+  EntityRef,
+  FactTypeDetail,
+  FactTypeRef,
+  ModelQuery,
+  ModelQueryKind,
+  ModelStats,
+  PathStep,
+  QueryResult,
+  RoleRef,
+} from "./query/index.js";
+
 // Lineage
 export { generateDdlLineage, generateModelLineage } from "./lineage/generate.js";
 export type { AffectedArtifact, ImpactReport } from "./lineage/impact.js";

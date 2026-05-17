@@ -158,6 +158,36 @@ describe("ChatParticipant", () => {
     });
   });
 
+  describe("symbolic query integration", () => {
+    it("system prompt lists the query tool", () => {
+      expect(SYSTEM_PROMPT).toContain("barwise_query_model");
+    });
+
+    it("system prompt directs the agent to prefer deterministic queries", () => {
+      expect(SYSTEM_PROMPT).toContain("deterministic");
+      expect(SYSTEM_PROMPT.toLowerCase()).toContain("rather than guessing");
+    });
+
+    it("system prompt covers at least 5 deterministic query types", () => {
+      const queryCommands = [
+        "entities",
+        "fact-types-of",
+        "constraints-of",
+        "mandatory-roles",
+        "path",
+        "subtypes-of",
+        "stats",
+      ];
+      const covered = queryCommands.filter((cmd) => SYSTEM_PROMPT.includes(cmd));
+      expect(covered.length).toBeGreaterThanOrEqual(5);
+    });
+
+    it("query command instruction references the query tool", () => {
+      expect(COMMAND_INSTRUCTIONS).toHaveProperty("query");
+      expect(COMMAND_INSTRUCTIONS.query).toContain("barwise_query_model");
+    });
+  });
+
   describe("FOLLOWUP_SUGGESTIONS", () => {
     it("suggests validate, diagram, verbalize, schema, export, and review", () => {
       const commands = FOLLOWUP_SUGGESTIONS.map((s) => s.command);
