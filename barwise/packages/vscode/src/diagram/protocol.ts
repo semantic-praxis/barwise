@@ -10,8 +10,6 @@
  */
 import type { PositionedGraph } from "@barwise/diagram";
 
-export type { PositionedGraph };
-
 /** Active focus (hop-count) neighborhood state. */
 export interface DiagramFocusState {
   readonly entityId: string;
@@ -49,11 +47,11 @@ export type InboundMessage =
     readonly elementId: string;
     readonly elementKind: string;
   }
-  | { readonly type: "clearHighlight" };
+  | { readonly type: "clearHighlight"; };
 
 /** Messages sent from the webview to the extension host. */
 export type OutboundMessage =
-  | { readonly type: "ready" }
+  | { readonly type: "ready"; }
   | {
     readonly type: "nodeMoved";
     readonly nodeId: string;
@@ -61,12 +59,12 @@ export type OutboundMessage =
     readonly x: number;
     readonly y: number;
   }
-  | { readonly type: "toggleOrientation"; readonly nodeId: string }
-  | { readonly type: "saveLayout" }
-  | { readonly type: "selectElement"; readonly elementId: string | null }
-  | { readonly type: "focusEntity"; readonly nodeId: string; readonly hopCount: number }
-  | { readonly type: "clearFocus" }
-  | { readonly type: "saveView" }
-  | { readonly type: "showNeighbors"; readonly nodeId: string }
-  | { readonly type: "addGhostToView"; readonly nodeId: string }
-  | { readonly type: "clearGhosts" };
+  | { readonly type: "toggleOrientation"; readonly nodeId: string; }
+  | { readonly type: "saveLayout"; }
+  | { readonly type: "selectElement"; readonly elementId: string | null; }
+  | { readonly type: "focusEntity"; readonly nodeId: string; readonly hopCount: number; }
+  | { readonly type: "clearFocus"; }
+  | { readonly type: "saveView"; }
+  | { readonly type: "showNeighbors"; readonly nodeId: string; }
+  | { readonly type: "addGhostToView"; readonly nodeId: string; }
+  | { readonly type: "clearGhosts"; };

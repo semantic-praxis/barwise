@@ -8,12 +8,12 @@
  */
 import type { PositionedGraph } from "@barwise/diagram";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { DiagramMeta } from "../../src/diagram/protocol";
 import { BottomStrip } from "./components/BottomStrip";
 import { Inspector } from "./components/Inspector";
 import { TabPlaceholder } from "./components/TabPlaceholder";
 import { type TabKey, TopBar } from "./components/TopBar";
 import { DiagramCanvas } from "./diagram/DiagramCanvas";
-import type { DiagramMeta } from "../../src/diagram/protocol";
 import { onMessage, postMessage } from "./vscodeApi";
 
 /** Node id + its directly connected neighbours, for the highlight overlay. */

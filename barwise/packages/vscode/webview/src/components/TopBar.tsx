@@ -2,7 +2,7 @@
 
 export type TabKey = "diagram" | "verbalize" | "facts" | "yaml" | "ddl";
 
-const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
+const TABS: ReadonlyArray<{ key: TabKey; label: string; }> = [
   { key: "diagram", label: "Diagram" },
   { key: "verbalize", label: "Verbalization" },
   { key: "facts", label: "Fact Population" },

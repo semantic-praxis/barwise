@@ -12,7 +12,7 @@ const LABELS: Record<Exclude<TabKey, "diagram">, string> = {
   ddl: "SQL DDL",
 };
 
-export function TabPlaceholder(props: { tab: TabKey }): JSX.Element {
+export function TabPlaceholder(props: { tab: TabKey; }): JSX.Element {
   const label = props.tab === "diagram" ? "Diagram" : LABELS[props.tab];
   return (
     <div className="empty-state">

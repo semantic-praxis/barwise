@@ -7,15 +7,10 @@
  * bundle. Keep this file in sync with the source of truth.
  */
 
-// Role boxes (within fact type bars).
-export const ROLE_BOX_WIDTH = 36;
-export const ROLE_BOX_HEIGHT = 28;
-
 // Object type nodes.
 export const OT_CORNER_RADIUS = 6;
 
 // Fonts.
-export const FONT_FAMILY = "'Segoe UI', system-ui, sans-serif";
 export const FONT_SIZE_LABEL = 13;
 export const FONT_SIZE_REF_MODE = 10;
 export const FONT_SIZE_ALIAS = 9;
@@ -68,6 +63,3 @@ export const COLOR_ANNOTATION_STROKE = "#d97706";
 export const ANNOTATION_DASH = "4,3";
 export const ANNOTATION_MARKER_RADIUS = 5;
 export const COLOR_ANNOTATION_MARKER = "#d97706";
-
-/** Canvas background behind the diagram. */
-export const COLOR_CANVAS_BG = "#fafafa";

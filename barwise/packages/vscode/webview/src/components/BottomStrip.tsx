@@ -38,7 +38,7 @@ export function BottomStrip(props: BottomStripProps): JSX.Element {
   );
 }
 
-function Stat(props: { value: number; label: string }): JSX.Element {
+function Stat(props: { value: number; label: string; }): JSX.Element {
   return (
     <span className="bottomstrip-stat">
       <strong>{props.value}</strong> {props.label}

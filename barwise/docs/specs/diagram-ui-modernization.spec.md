@@ -128,7 +128,7 @@ inline styles are set via the DOM API and are not CSP-governed.
 ## Phased plan
 
 - **Phase 0 -- setup.** Spec, webview build wiring, typed protocol, React
-  scaffold. *(this PR)*
+  scaffold. _(this PR)_
 - **Phase 1 -- diagram pane at parity (the gate).** React shell hosting the
   diagram; reach feature parity with today's `DiagramPanel`: pan/zoom/drag,
   orientation toggle, save layout, focus/hop, named views, ghost neighbors,

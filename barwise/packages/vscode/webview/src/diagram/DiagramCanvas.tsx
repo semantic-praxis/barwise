@@ -65,7 +65,7 @@ export function DiagramCanvas(props: DiagramCanvasProps): JSX.Element {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
   const [drag, setDrag] = useState<DragState | null>(null);
-  const [dragDelta, setDragDelta] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  const [dragDelta, setDragDelta] = useState<{ dx: number; dy: number; }>({ dx: 0, dy: 0 });
   const pan = useRef<PanState | null>(null);
 
   const fit = useCallback(() => {
@@ -173,7 +173,7 @@ export function DiagramCanvas(props: DiagramCanvasProps): JSX.Element {
     };
   }, [drag, dragDelta, view.k, graph, onNodeMoved, onSelect]);
 
-  const hitNode = (target: EventTarget | null): { id: string; kind: string } | null => {
+  const hitNode = (target: EventTarget | null): { id: string; kind: string; } | null => {
     if (!(target instanceof Element)) return null;
     const g = target.closest<SVGGElement>("g[data-id][data-kind]");
     if (!g) return null;
@@ -271,14 +271,46 @@ function DiagramLegend(): JSX.Element {
     <div className="diagram-legend">
       <div className="diagram-legend-title">ORM 2</div>
       <LegendRow label="Entity type">
-        <rect x={1} y={2} width={20} height={11} rx={3} fill={t.COLOR_ENTITY_FILL} stroke={t.COLOR_ENTITY_STROKE} strokeWidth={1.3} />
+        <rect
+          x={1}
+          y={2}
+          width={20}
+          height={11}
+          rx={3}
+          fill={t.COLOR_ENTITY_FILL}
+          stroke={t.COLOR_ENTITY_STROKE}
+          strokeWidth={1.3}
+        />
       </LegendRow>
       <LegendRow label="Value type">
-        <ellipse cx={11} cy={7} rx={10} ry={5.5} fill={t.COLOR_VALUE_FILL} stroke={t.COLOR_VALUE_STROKE} strokeWidth={1.3} strokeDasharray="2,1.5" />
+        <ellipse
+          cx={11}
+          cy={7}
+          rx={10}
+          ry={5.5}
+          fill={t.COLOR_VALUE_FILL}
+          stroke={t.COLOR_VALUE_STROKE}
+          strokeWidth={1.3}
+          strokeDasharray="2,1.5"
+        />
       </LegendRow>
       <LegendRow label="Fact type">
-        <rect x={2} y={3} width={8} height={8} fill={t.COLOR_ROLE_FILL} stroke={t.COLOR_ROLE_STROKE} />
-        <rect x={12} y={3} width={8} height={8} fill={t.COLOR_ROLE_FILL} stroke={t.COLOR_ROLE_STROKE} />
+        <rect
+          x={2}
+          y={3}
+          width={8}
+          height={8}
+          fill={t.COLOR_ROLE_FILL}
+          stroke={t.COLOR_ROLE_STROKE}
+        />
+        <rect
+          x={12}
+          y={3}
+          width={8}
+          height={8}
+          fill={t.COLOR_ROLE_FILL}
+          stroke={t.COLOR_ROLE_STROKE}
+        />
       </LegendRow>
       <LegendRow label="Mandatory">
         <line x1={2} y1={7} x2={13} y2={7} stroke={t.COLOR_EDGE} strokeWidth={1.2} />
@@ -288,7 +320,7 @@ function DiagramLegend(): JSX.Element {
   );
 }
 
-function LegendRow(props: { label: string; children: React.ReactNode }): JSX.Element {
+function LegendRow(props: { label: string; children: React.ReactNode; }): JSX.Element {
   return (
     <div className="diagram-legend-row">
       <svg width={22} height={14}>{props.children}</svg>

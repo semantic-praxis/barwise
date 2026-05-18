@@ -15,7 +15,8 @@
       "entry": [
         "src/client/extension.ts",
         "src/server/OrmLanguageServer.ts",
-        "src/mcp/stdio-entry.ts"
+        "src/mcp/stdio-entry.ts",
+        "webview/src/main.tsx"
       ],
       "ignore": [
         ".vscode-test.mjs",

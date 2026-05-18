@@ -69,7 +69,9 @@ export function OrmDiagram(props: OrmDiagramProps): JSX.Element {
             orient="auto-start-reverse"
           >
             <path
-              d={`M 0 0 L ${t.SUBTYPE_ARROW_SIZE} ${t.SUBTYPE_ARROW_SIZE / 2} L 0 ${t.SUBTYPE_ARROW_SIZE} Z`}
+              d={`M 0 0 L ${t.SUBTYPE_ARROW_SIZE} ${
+                t.SUBTYPE_ARROW_SIZE / 2
+              } L 0 ${t.SUBTYPE_ARROW_SIZE} Z`}
               fill={t.COLOR_SUBTYPE}
             />
           </marker>
@@ -85,9 +87,7 @@ export function OrmDiagram(props: OrmDiagramProps): JSX.Element {
         />
       ))}
 
-      {graph.constraintEdges.map((ce, i) => (
-        <ConstraintEdge key={`ce-${i}`} edge={ce} />
-      ))}
+      {graph.constraintEdges.map((ce, i) => <ConstraintEdge key={`ce-${i}`} edge={ce} />)}
 
       {graph.subtypeEdges.map((se, i) => (
         <SubtypeEdge
@@ -533,7 +533,7 @@ function SubtypeEdge(props: {
   );
 }
 
-function ConstraintEdge(props: { edge: PositionedConstraintEdge }): JSX.Element | null {
+function ConstraintEdge(props: { edge: PositionedConstraintEdge; }): JSX.Element | null {
   const { edge } = props;
   if (edge.points.length < 2) return null;
   return (
@@ -602,7 +602,9 @@ function ConstraintNode(props: {
         <>
           <path d={`M ${cx - h} ${cy} L ${cx + h} ${cy}`} stroke={stroke} strokeWidth={sw} />
           <path
-            d={`M ${cx + h * 0.3} ${cy - h * 0.6} L ${cx + h} ${cy} L ${cx + h * 0.3} ${cy + h * 0.6}`}
+            d={`M ${cx + h * 0.3} ${cy - h * 0.6} L ${cx + h} ${cy} L ${cx + h * 0.3} ${
+              cy + h * 0.6
+            }`}
             stroke={stroke}
             strokeWidth={sw}
             fill="none"

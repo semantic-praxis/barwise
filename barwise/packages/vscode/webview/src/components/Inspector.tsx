@@ -78,10 +78,16 @@ function ObjectTypeDetail(props: {
   );
 }
 
-function FactTypeDetail(props: { node: PositionedFactTypeNode }): JSX.Element {
+function FactTypeDetail(props: { node: PositionedFactTypeNode; }): JSX.Element {
   const { node } = props;
   const arity = node.roles.length;
-  const arityLabel = arity === 1 ? "unary" : arity === 2 ? "binary" : arity === 3 ? "ternary" : `${arity}-ary`;
+  const arityLabel = arity === 1
+    ? "unary"
+    : arity === 2
+    ? "binary"
+    : arity === 3
+    ? "ternary"
+    : `${arity}-ary`;
   return (
     <div className="inspector-body">
       <Header kind="fact" name={node.name} />
@@ -102,14 +108,12 @@ function FactTypeDetail(props: { node: PositionedFactTypeNode }): JSX.Element {
           </div>
         ))}
       </Field>
-      {node.hasSpanningUniqueness && (
-        <Field label="Uniqueness">spanning all roles</Field>
-      )}
+      {node.hasSpanningUniqueness && <Field label="Uniqueness">spanning all roles</Field>}
     </div>
   );
 }
 
-function Header(props: { kind: string; name: string }): JSX.Element {
+function Header(props: { kind: string; name: string; }): JSX.Element {
   return (
     <div className="inspector-header">
       <span className="inspector-name">{props.name}</span>
@@ -118,7 +122,7 @@ function Header(props: { kind: string; name: string }): JSX.Element {
   );
 }
 
-function Field(props: { label: string; children: React.ReactNode }): JSX.Element {
+function Field(props: { label: string; children: React.ReactNode; }): JSX.Element {
   return (
     <div className="inspector-field">
       <div className="inspector-field-label">{props.label}</div>
