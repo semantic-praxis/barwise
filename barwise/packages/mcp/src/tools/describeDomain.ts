@@ -13,6 +13,83 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveSource } from "../helpers/resolve.js";
 
+/** Maximum array sizes before describe_domain truncates and reports it. */
+const MAX_ENTITIES = 25;
+const MAX_FACT_TYPES = 25;
+const MAX_CONSTRAINTS = 25;
+
+type DomainDescription = ReturnType<typeof describeDomain>;
+
+/**
+ * Shape a domain description into the structured fields returned to the
+ * caller, capping each array and reporting any truncation so a large
+ * model cannot flood the agent's context. Shared by the standard and
+ * lineage-aware execution paths.
+ */
+function shapeDescription(description: DomainDescription): Record<string, unknown> {
+  const truncation: Record<string, { shown: number; total: number; }> = {};
+
+  const entities = description.entityTypes.slice(0, MAX_ENTITIES).map((e) => ({
+    name: e.name,
+    definition: e.definition,
+    kind: e.kind,
+    referenceMode: e.referenceMode,
+  }));
+  if (description.entityTypes.length > MAX_ENTITIES) {
+    truncation.entities = {
+      shown: MAX_ENTITIES,
+      total: description.entityTypes.length,
+    };
+  }
+
+  const factTypes = description.factTypes.slice(0, MAX_FACT_TYPES).map((ft) => ({
+    name: ft.name,
+    arity: ft.arity,
+    primaryReading: ft.primaryReading,
+    involvedEntities: ft.involvedEntities,
+    constraintCount: ft.constraintCount,
+  }));
+  if (description.factTypes.length > MAX_FACT_TYPES) {
+    truncation.factTypes = {
+      shown: MAX_FACT_TYPES,
+      total: description.factTypes.length,
+    };
+  }
+
+  const constraints = description.constraints
+    .slice(0, MAX_CONSTRAINTS)
+    .map((c) => ({
+      type: c.type,
+      verbalization: c.verbalization,
+      affectedFactType: c.affectedFactType,
+    }));
+  if (description.constraints.length > MAX_CONSTRAINTS) {
+    truncation.constraints = {
+      shown: MAX_CONSTRAINTS,
+      total: description.constraints.length,
+    };
+  }
+
+  const shaped: Record<string, unknown> = { entities, factTypes, constraints };
+
+  if (description.populations) {
+    shaped.populations = description.populations.map((p) => ({
+      factTypeName: p.factTypeName,
+      description: p.description,
+      instanceCount: p.instanceCount,
+      sampleInstances: p.sampleInstances.slice(0, 3), // Limit to 3 for brevity
+    }));
+  }
+
+  if (Object.keys(truncation).length > 0) {
+    shaped.truncation = truncation;
+    shaped.note = "Some lists were truncated. Use query_model "
+      + "(entities / fact-types / constraints) for the full enumeration.";
+  }
+
+  return shaped;
+}
+
 export function registerDescribeDomainTool(server: McpServer): void {
   server.registerTool(
     "describe_domain",
@@ -78,35 +155,10 @@ export function executeDescribeDomain(
 
     // Return a structured JSON representation.
     // The summary is a human-readable string, and the other fields provide
-    // structured data for programmatic access.
+    // structured (and length-capped) data for programmatic access.
     const result = {
       summary: description.summary,
-      entities: description.entityTypes.map((e) => ({
-        name: e.name,
-        definition: e.definition,
-        kind: e.kind,
-        referenceMode: e.referenceMode,
-      })),
-      factTypes: description.factTypes.map((ft) => ({
-        name: ft.name,
-        arity: ft.arity,
-        primaryReading: ft.primaryReading,
-        involvedEntities: ft.involvedEntities,
-        constraintCount: ft.constraintCount,
-      })),
-      constraints: description.constraints.map((c) => ({
-        type: c.type,
-        verbalization: c.verbalization,
-        affectedFactType: c.affectedFactType,
-      })),
-      ...(description.populations && {
-        populations: description.populations.map((p) => ({
-          factTypeName: p.factTypeName,
-          description: p.description,
-          instanceCount: p.instanceCount,
-          sampleInstances: p.sampleInstances.slice(0, 3), // Limit to 3 for brevity
-        })),
-      }),
+      ...shapeDescription(description),
     };
 
     return {
@@ -209,32 +261,7 @@ function executeWithLineage(
           elementName: s.elementName,
         })),
       },
-      entities: description.entityTypes.map((e) => ({
-        name: e.name,
-        definition: e.definition,
-        kind: e.kind,
-        referenceMode: e.referenceMode,
-      })),
-      factTypes: description.factTypes.map((ft) => ({
-        name: ft.name,
-        arity: ft.arity,
-        primaryReading: ft.primaryReading,
-        involvedEntities: ft.involvedEntities,
-        constraintCount: ft.constraintCount,
-      })),
-      constraints: description.constraints.map((c) => ({
-        type: c.type,
-        verbalization: c.verbalization,
-        affectedFactType: c.affectedFactType,
-      })),
-      ...(description.populations && {
-        populations: description.populations.map((p) => ({
-          factTypeName: p.factTypeName,
-          description: p.description,
-          instanceCount: p.instanceCount,
-          sampleInstances: p.sampleInstances.slice(0, 3),
-        })),
-      }),
+      ...shapeDescription(description),
     };
 
     return {

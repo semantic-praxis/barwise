@@ -16,7 +16,10 @@ export function registerOrmModelResource(server: McpServer): void {
     {
       title: "ORM Model",
       description: "Returns the deserialized ORM model from a .orm.yaml file as JSON. "
-        + "Allows AI tools to inspect model contents without parsing YAML.",
+        + "Note: this returns the ENTIRE model and is unbounded -- a large model "
+        + "can consume a lot of context. For specific questions prefer the "
+        + "query_model tool, and for an overview prefer describe_domain; read this "
+        + "resource only when you genuinely need the full raw model.",
       mimeType: "application/json",
     },
     async (uri, variables) => {

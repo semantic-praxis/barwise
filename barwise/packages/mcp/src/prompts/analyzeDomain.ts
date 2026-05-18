@@ -4,6 +4,7 @@
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { CONTEXT_HYGIENE_GUIDANCE, MODELING_WORKFLOW_GUIDANCE } from "./guidance/guidance.js";
 
 export function registerAnalyzeDomainPrompt(server: McpServer): void {
   server.registerPrompt(
@@ -25,12 +26,11 @@ export function registerAnalyzeDomainPrompt(server: McpServer): void {
           role: "user" as const,
           content: {
             type: "text" as const,
-            text: "Analyze the following business domain transcript and identify:\n"
-              + "1. Entity types (things with identity)\n"
-              + "2. Value types (attributes)\n"
-              + "3. Fact types (relationships between entities/values)\n"
-              + "4. Constraints (uniqueness, mandatory, etc.)\n\n"
-              + "Then use the import_transcript tool to extract a formal ORM model.\n\n"
+            text: `${MODELING_WORKFLOW_GUIDANCE}\n\n${CONTEXT_HYGIENE_GUIDANCE}\n\n`
+              + "Analyze the following business domain transcript: identify "
+              + "entity types, value types, fact types, and constraints, then "
+              + "use the import_transcript tool to extract a formal ORM "
+              + "model.\n\n"
               + `Transcript:\n${transcript}`,
           },
         },

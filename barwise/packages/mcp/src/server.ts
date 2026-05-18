@@ -25,6 +25,13 @@ export function createServer(): McpServer {
   return server;
 }
 
+// Re-export the canonical guidance so other surfaces (e.g. the VS Code
+// chat participant) consume a single source of truth.
+export {
+  CONTEXT_HYGIENE_GUIDANCE,
+  MODELING_WORKFLOW_GUIDANCE,
+} from "./prompts/guidance/guidance.js";
+
 // Re-export execute functions for direct invocation (no MCP transport).
 export { resolveSource } from "./helpers/resolve.js";
 export { executeDescribeDomain } from "./tools/describeDomain.js";

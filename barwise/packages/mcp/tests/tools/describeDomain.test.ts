@@ -201,4 +201,34 @@ model:
       expect(parsed.factTypes).toHaveLength(0);
     });
   });
+
+  describe("truncation of large models", () => {
+    function modelWithEntities(n: number): string {
+      const types = Array.from(
+        { length: n },
+        (_, i) =>
+          `    - id: ot-${i}\n      name: Entity${i}\n`
+          + `      kind: entity\n      reference_mode: id${i}`,
+      ).join("\n");
+      return `orm_version: "1.0"\nmodel:\n  name: Big Model\n`
+        + `  object_types:\n${types}\n`;
+    }
+
+    it("does not truncate a model within the cap", () => {
+      const result = executeDescribeDomain(modelWithEntities(10));
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.entities).toHaveLength(10);
+      expect(parsed.truncation).toBeUndefined();
+    });
+
+    it("caps the entity array and reports truncation", () => {
+      const result = executeDescribeDomain(modelWithEntities(40));
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.entities).toHaveLength(25);
+      expect(parsed.truncation.entities).toEqual({ shown: 25, total: 40 });
+      expect(parsed.note).toContain("query_model");
+    });
+  });
 });

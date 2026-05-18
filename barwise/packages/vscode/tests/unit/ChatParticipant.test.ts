@@ -54,6 +54,11 @@ describe("ChatParticipant", () => {
         expect(SYSTEM_PROMPT).toContain(concept);
       }
     });
+
+    it("includes the shared context-hygiene guidance", () => {
+      expect(SYSTEM_PROMPT).toContain("Context-efficient use of the barwise tools");
+      expect(SYSTEM_PROMPT).toContain("write large artifacts to a file");
+    });
   });
 
   describe("COMMAND_INSTRUCTIONS", () => {

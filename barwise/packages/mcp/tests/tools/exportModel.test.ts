@@ -1,15 +1,30 @@
 /**
  * Tests for export_model MCP tool.
  *
- * Verifies that the tool dispatches to the correct format adapter
- * and handles errors appropriately.
+ * Verifies that the tool dispatches to the correct format adapter,
+ * handles errors appropriately, and bounds large output by spilling it
+ * to a file.
  */
 
 import { OrmYamlSerializer } from "@barwise/core";
-import { beforeEach, describe, expect, it } from "vitest";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import { executeExportModel } from "../../src/tools/exportModel.js";
 
 const _serializer = new OrmYamlSerializer();
+
+/** Resolve a tool result to its full text, reading the spill file if spilled. */
+function readResult(result: { content: Array<{ text: string; }>; }): string {
+  const text = result.content[0]!.text;
+  const m = text.match(/Full content written to: (.+)/);
+  return m ? readFileSync(m[1]!.trim(), "utf8") : text;
+}
+
+function isSpilled(result: { content: Array<{ text: string; }>; }): boolean {
+  return result.content[0]!.text.includes("Full content written to:");
+}
 
 describe("export_model tool", () => {
   const simpleModel = `
@@ -42,17 +57,19 @@ model:
           roles: [r-order-placed-by]
 `;
 
-  beforeEach(() => {
-    // The format registration happens on module load in exportModel.ts,
-    // so no explicit registration needed here.
+  // Inline-source exports spill into a cache dir under the cwd.
+  afterEach(() => {
+    rmSync(join(process.cwd(), ".barwise"), { recursive: true, force: true });
   });
 
   describe("DDL format", () => {
-    it("produces DDL output", () => {
+    it("produces DDL output inline", () => {
       const result = executeExportModel(simpleModel, "ddl");
 
       expect(result.content).toHaveLength(1);
       expect(result.content[0]!.type).toBe("text");
+      // DDL for a small model is below the inline limit.
+      expect(isSpilled(result)).toBe(false);
       expect(result.content[0]!.text).toContain("CREATE TABLE");
     });
 
@@ -61,7 +78,7 @@ model:
         annotate: true,
       });
 
-      expect(result.content[0]!.text).toContain("--");
+      expect(readResult(result)).toContain("--");
     });
   });
 
@@ -72,11 +89,7 @@ model:
       expect(result.content).toHaveLength(1);
       expect(result.content[0]!.type).toBe("text");
 
-      const text = result.content[0]!.text;
-      expect(text).toContain('"openapi": "3.0.0"');
-
-      // Verify it's valid JSON.
-      const spec = JSON.parse(text);
+      const spec = JSON.parse(readResult(result));
       expect(spec.openapi).toBe("3.0.0");
       expect(spec.components.schemas).toBeDefined();
     });
@@ -87,11 +100,36 @@ model:
         version: "2.0.0",
       });
 
-      const text = result.content[0]!.text;
-      const spec = JSON.parse(text);
-
+      const spec = JSON.parse(readResult(result));
       expect(spec.info.title).toBe("My API");
       expect(spec.info.version).toBe("2.0.0");
+    });
+
+    it("spills a large OpenAPI spec to a file", () => {
+      const result = executeExportModel(simpleModel, "openapi");
+
+      // The OpenAPI spec exceeds the inline byte limit.
+      expect(isSpilled(result)).toBe(true);
+      expect(result.content[0]!.text).toContain(".barwise");
+      expect(result.content[0]!.text).toContain("too large to return inline");
+    });
+
+    it("honors an explicit outputPath", () => {
+      const dir = mkdtempSync(join(tmpdir(), "barwise-export-"));
+      const dest = join(dir, "api.json");
+      try {
+        const result = executeExportModel(
+          simpleModel,
+          "openapi",
+          undefined,
+          dest,
+        );
+        expect(result.content[0]!.text).toContain(dest);
+        const spec = JSON.parse(readFileSync(dest, "utf8"));
+        expect(spec.openapi).toBe("3.0.0");
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     });
   });
 
@@ -158,7 +196,7 @@ model:
       const result = executeExportModel(simpleModel, "ddl");
 
       expect(result.content).toHaveLength(1);
-      expect(result.content[0]!.text).toContain("CREATE TABLE");
+      expect(readResult(result)).toContain("CREATE TABLE");
     });
 
     // File path testing requires actual file system interaction,

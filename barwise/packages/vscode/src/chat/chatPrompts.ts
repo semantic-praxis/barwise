@@ -4,6 +4,8 @@
  * dependencies so it can be unit-tested without the VS Code runtime.
  */
 
+import { CONTEXT_HYGIENE_GUIDANCE } from "@barwise/mcp";
+
 // ---------------------------------------------------------------------------
 // System prompt
 // ---------------------------------------------------------------------------
@@ -31,7 +33,11 @@ When the user provides a transcript or domain description, use the import tool t
 
 For any factual question about the structure of an existing model, use the barwise_query_model tool rather than guessing or re-deriving the answer from context. It is deterministic, cheap, and trustworthy. Prefer it for questions such as: what entities or value types exist (query "entities"); what fact types an entity participates in (query "fact-types-of <Entity>"); what constraints apply to an entity or fact type (query "constraints-of <name>"); which roles are mandatory (query "mandatory-roles"); how two entities are connected (query "path <A> <B>"); subtype and supertype hierarchies (query "subtypes-of <Entity>"); and overall model statistics (query "stats"). Use barwise_describe_domain only when you need a broad narrative summary.
 
-ORM models use .orm.yaml files. Key concepts: entity types (identified by reference modes), value types, fact types (with roles and readings), and constraints (uniqueness, mandatory, frequency, ring, subset, equality, exclusion, value, subtype).`;
+ORM models use .orm.yaml files. Key concepts: entity types (identified by reference modes), value types, fact types (with roles and readings), and constraints (uniqueness, mandatory, frequency, ring, subset, equality, exclusion, value, subtype).
+
+${CONTEXT_HYGIENE_GUIDANCE}
+
+(In this VS Code context the tools above are prefixed "barwise_", e.g. barwise_query_model and barwise_export_model.)`;
 
 // ---------------------------------------------------------------------------
 // Command instructions

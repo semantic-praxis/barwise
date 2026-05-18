@@ -6,6 +6,7 @@ import { getExporter, registerBuiltinFormats } from "@barwise/core";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveSource } from "../helpers/resolve.js";
+import { boundedTextResult } from "../helpers/response.js";
 
 // Register built-in formats (DDL, OpenAPI, etc.) with the unified registry.
 registerBuiltinFormats();
@@ -16,8 +17,9 @@ export function registerExportModelTool(server: McpServer): void {
     {
       title: "Export ORM Model",
       description: "Export an ORM 2 model to a specified format (ddl, openapi, etc.). "
-        + "Returns the exported artifact as text. Supports validation, annotations, "
-        + "and format-specific options.",
+        + "Supports validation, annotations, and format-specific options. Large "
+        + "artifacts are written to a file and the tool returns the file path plus "
+        + "a preview; pass outputPath to choose the destination.",
       inputSchema: {
         source: z
           .string()
@@ -26,6 +28,13 @@ export function registerExportModelTool(server: McpServer): void {
           .string()
           .describe(
             "Export format name (e.g., 'ddl', 'openapi'). Use list_formats to see available formats.",
+          ),
+        outputPath: z
+          .string()
+          .optional()
+          .describe(
+            "Optional destination file for the exported artifact. When the "
+              + "artifact is large it is always written to a file; this chooses where.",
           ),
         options: z
           .object({
@@ -53,16 +62,31 @@ export function registerExportModelTool(server: McpServer): void {
           ),
       },
     },
-    async ({ source, format, options }) => {
-      return executeExportModel(source, format, options);
+    async ({ source, format, options, outputPath }) => {
+      return executeExportModel(source, format, options, outputPath);
     },
   );
+}
+
+/** Map an export format to a sensible spill-file extension. */
+function extensionForFormat(format: string): string {
+  switch (format.toLowerCase()) {
+    case "ddl":
+    case "sql":
+      return "sql";
+    case "openapi":
+    case "avro":
+      return "json";
+    default:
+      return "txt";
+  }
 }
 
 export function executeExportModel(
   source: string,
   format: string,
   options?: Record<string, unknown>,
+  outputPath?: string,
 ): { content: Array<{ type: "text"; text: string; }>; } {
   const model = resolveSource(source);
 
@@ -90,11 +114,14 @@ export function executeExportModel(
     // Export using the format adapter.
     const result = exporter.export(model, options);
 
-    // Return the primary text output.
+    // Return the primary text output, spilling to a file when large.
     // For multi-file formats, the text field contains a combined view.
-    return {
-      content: [{ type: "text" as const, text: result.text }],
-    };
+    return boundedTextResult(result.text, {
+      kind: `export-${format}`,
+      source,
+      outputPath,
+      extension: extensionForFormat(format),
+    });
   } catch (error) {
     return {
       content: [

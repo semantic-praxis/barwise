@@ -6,6 +6,7 @@ import { generateDiagram } from "@barwise/diagram";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveSource } from "../helpers/resolve.js";
+import { boundedTextResult } from "../helpers/response.js";
 
 export function registerDiagramTool(server: McpServer): void {
   server.registerTool(
@@ -15,7 +16,8 @@ export function registerDiagramTool(server: McpServer): void {
       description:
         "DEPRECATED: Use export_model with format='svg' instead. This tool will be removed in a future version. "
         + "Generate an SVG diagram from an ORM 2 model. "
-        + "Returns the SVG markup as text.",
+        + "Large diagrams are written to a file and the tool returns the file path; "
+        + "do not expect raw SVG markup to be returned inline.",
       inputSchema: {
         source: z
           .string()
@@ -34,7 +36,9 @@ export async function executeDiagram(
   const model = resolveSource(source);
   const result = await generateDiagram(model);
 
-  return {
-    content: [{ type: "text" as const, text: result.svg }],
-  };
+  return boundedTextResult(result.svg, {
+    kind: "diagram",
+    source,
+    extension: "svg",
+  });
 }
