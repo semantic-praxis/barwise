@@ -30,6 +30,8 @@ export interface DiagramMeta {
   readonly hasUnsavedChanges: boolean;
   readonly focus: DiagramFocusState | null;
   readonly view: DiagramViewState | null;
+  /** Names of every saved layout in the model's `diagrams:` section. */
+  readonly availableViews: readonly string[];
 }
 
 /** Messages sent from the extension host to the webview. */
@@ -65,6 +67,7 @@ export type OutboundMessage =
   | { readonly type: "focusEntity"; readonly nodeId: string; readonly hopCount: number; }
   | { readonly type: "clearFocus"; }
   | { readonly type: "saveView"; }
+  | { readonly type: "loadView"; readonly viewName: string; }
   | { readonly type: "showNeighbors"; readonly nodeId: string; }
   | { readonly type: "addGhostToView"; readonly nodeId: string; }
   | { readonly type: "clearGhosts"; };

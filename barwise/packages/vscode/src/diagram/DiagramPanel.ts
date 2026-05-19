@@ -129,6 +129,10 @@ export class DiagramPanel {
         void this.saveView();
         break;
       }
+      case "loadView": {
+        this.applyNamedView(message.viewName);
+        break;
+      }
       case "selectElement": {
         // Selection is presentational; no host state to update yet.
         break;
@@ -462,12 +466,21 @@ export class DiagramPanel {
   }
 
   /**
-   * Load a saved diagram view by name.
+   * Load a saved diagram view by name (native-tree / command entry
+   * point).
    */
   static loadView(viewName: string): void {
-    const panel = DiagramPanel.currentPanel;
-    if (!panel || panel.disposed || !panel.model) return;
-    const layout = panel.model.getDiagramLayout(viewName);
+    DiagramPanel.currentPanel?.applyNamedView(viewName);
+  }
+
+  /**
+   * Apply a saved diagram view by name: filter to its elements, seed
+   * overrides from its layout, and clear any active focus / ghosts.
+   * Shared by the native command and the webview `loadView` message.
+   */
+  private applyNamedView(viewName: string): void {
+    if (this.disposed || !this.model) return;
+    const layout = this.model.getDiagramLayout(viewName);
     if (!layout) return;
 
     if (layout.elements && layout.elements.length > 0) {
@@ -476,35 +489,35 @@ export class DiagramPanel {
       const subtypeFactIds = new Set<string>();
 
       for (const name of layout.elements) {
-        const ot = panel.model.getObjectTypeByName(name);
+        const ot = this.model.getObjectTypeByName(name);
         if (ot) objectTypeIds.add(ot.id);
       }
 
-      for (const ft of panel.model.factTypes) {
+      for (const ft of this.model.factTypes) {
         const allPlayersIncluded = ft.roles.every((r) => objectTypeIds.has(r.playerId));
         if (allPlayersIncluded) factTypeIds.add(ft.id);
       }
 
-      for (const sf of panel.model.subtypeFacts) {
+      for (const sf of this.model.subtypeFacts) {
         if (objectTypeIds.has(sf.subtypeId) && objectTypeIds.has(sf.supertypeId)) {
           subtypeFactIds.add(sf.id);
         }
       }
 
-      panel.activeViewFilter = { objectTypeIds, factTypeIds, subtypeFactIds };
-      panel.activeViewName = viewName;
+      this.activeViewFilter = { objectTypeIds, factTypeIds, subtypeFactIds };
+      this.activeViewName = viewName;
     } else {
-      panel.activeViewFilter = undefined;
-      panel.activeViewName = viewName;
+      this.activeViewFilter = undefined;
+      this.activeViewName = viewName;
     }
 
-    panel.seedOverridesFromSavedLayout(panel.model, layout);
+    this.seedOverridesFromSavedLayout(this.model, layout);
 
-    panel.focusEntityId = undefined;
-    panel.hopCount = undefined;
-    panel.ghostObjectTypeIds.clear();
+    this.focusEntityId = undefined;
+    this.hopCount = undefined;
+    this.ghostObjectTypeIds.clear();
 
-    void panel.rerender(true);
+    void this.rerender(true);
   }
 
   /**
@@ -544,6 +557,7 @@ export class DiagramPanel {
       view: this.activeViewName
         ? { viewName: this.activeViewName, hasGhosts: this.ghostObjectTypeIds.size > 0 }
         : null,
+      availableViews: this.model?.diagramLayouts.map((d) => d.name) ?? [],
     };
   }
 

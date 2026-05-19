@@ -1,6 +1,7 @@
 /**
  * Right inspector pane: contextual detail for the selected diagram
- * element, read from the positioned graph.
+ * element, read from the positioned graph, plus the focus / neighbor
+ * affordances for the selected object type.
  */
 import type {
   PositionedFactTypeNode,
@@ -8,14 +9,23 @@ import type {
   PositionedNode,
   PositionedObjectTypeNode,
 } from "@barwise/diagram";
+import type { DiagramMeta } from "../../../src/diagram/protocol";
+
+const HOP_CHOICES = [1, 2, 3] as const;
 
 export interface InspectorProps {
   readonly node: PositionedNode | null;
   readonly graph: PositionedGraph | null;
+  readonly meta: DiagramMeta | null;
+  /** True when the selected node is a ghost-neighbor preview. */
+  readonly isGhost: boolean;
+  readonly onFocus: (nodeId: string, hopCount: number) => void;
+  readonly onShowNeighbors: (nodeId: string) => void;
+  readonly onAddToView: (nodeId: string) => void;
 }
 
 export function Inspector(props: InspectorProps): JSX.Element {
-  const { node, graph } = props;
+  const { node, graph, meta, isGhost, onFocus, onShowNeighbors, onAddToView } = props;
   if (!node) {
     return (
       <div className="inspector-body inspector-empty">
@@ -24,7 +34,17 @@ export function Inspector(props: InspectorProps): JSX.Element {
     );
   }
   if (node.kind === "object_type") {
-    return <ObjectTypeDetail node={node} graph={graph} />;
+    return (
+      <ObjectTypeDetail
+        node={node}
+        graph={graph}
+        meta={meta}
+        isGhost={isGhost}
+        onFocus={onFocus}
+        onShowNeighbors={onShowNeighbors}
+        onAddToView={onAddToView}
+      />
+    );
   }
   if (node.kind === "fact_type") {
     return <FactTypeDetail node={node} />;
@@ -41,8 +61,13 @@ export function Inspector(props: InspectorProps): JSX.Element {
 function ObjectTypeDetail(props: {
   node: PositionedObjectTypeNode;
   graph: PositionedGraph | null;
+  meta: DiagramMeta | null;
+  isGhost: boolean;
+  onFocus: (nodeId: string, hopCount: number) => void;
+  onShowNeighbors: (nodeId: string) => void;
+  onAddToView: (nodeId: string) => void;
 }): JSX.Element {
-  const { node, graph } = props;
+  const { node, graph, meta, isGhost, onFocus, onShowNeighbors, onAddToView } = props;
   const playsIn = graph
     ? graph.edges
       .filter((e) => e.sourceNodeId === node.id || e.targetNodeId === node.id)
@@ -59,7 +84,7 @@ function ObjectTypeDetail(props: {
   }
   return (
     <div className="inspector-body">
-      <Header kind={node.objectTypeKind} name={node.name} />
+      <Header kind={isGhost ? "neighbor" : node.objectTypeKind} name={node.name} />
       {node.referenceMode && <Field label="Reference mode">{node.referenceMode}</Field>}
       {node.aliases && node.aliases.length > 0 && (
         <Field label="Aliases">{node.aliases.join(", ")}</Field>
@@ -73,6 +98,65 @@ function ObjectTypeDetail(props: {
         <Field label={`Plays roles in (${factNames.size})`}>
           {[...factNames.values()].map((n, i) => <div key={i}>{n}</div>)}
         </Field>
+      )}
+      <ObjectTypeActions
+        node={node}
+        meta={meta}
+        isGhost={isGhost}
+        onFocus={onFocus}
+        onShowNeighbors={onShowNeighbors}
+        onAddToView={onAddToView}
+      />
+    </div>
+  );
+}
+
+function ObjectTypeActions(props: {
+  node: PositionedObjectTypeNode;
+  meta: DiagramMeta | null;
+  isGhost: boolean;
+  onFocus: (nodeId: string, hopCount: number) => void;
+  onShowNeighbors: (nodeId: string) => void;
+  onAddToView: (nodeId: string) => void;
+}): JSX.Element {
+  const { node, meta, isGhost, onFocus, onShowNeighbors, onAddToView } = props;
+  const activeHop = meta?.focus?.entityId === node.id ? meta.focus.hopCount : null;
+  const viewActive = meta?.view != null;
+
+  return (
+    <div className="inspector-actions">
+      <div className="inspector-field-label">Focus neighborhood</div>
+      <div className="inspector-hops">
+        {HOP_CHOICES.map((hop) => (
+          <button
+            type="button"
+            key={hop}
+            className={"inspector-hop" + (hop === activeHop ? " active" : "")}
+            title={`Focus on this entity and ${hop} ${hop === 1 ? "hop" : "hops"} out`}
+            onClick={() => onFocus(node.id, hop)}
+          >
+            {hop} {hop === 1 ? "hop" : "hops"}
+          </button>
+        ))}
+      </div>
+      {viewActive && isGhost && (
+        <button
+          type="button"
+          className="inspector-action"
+          onClick={() => onAddToView(node.id)}
+        >
+          Add to view
+        </button>
+      )}
+      {viewActive && !isGhost && (
+        <button
+          type="button"
+          className="inspector-action"
+          title="Preview entities adjacent to the current view as ghosts"
+          onClick={() => onShowNeighbors(node.id)}
+        >
+          Show neighbors
+        </button>
       )}
     </div>
   );
