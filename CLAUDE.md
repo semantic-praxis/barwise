@@ -7,6 +7,42 @@ architects. Includes a VS Code extension, CLI tool, and MCP server.
 Named after Jon Barwise, whose work on situation semantics
 provides the theoretical foundation for fact-based modeling.
 
+## Design Principles
+
+- **Orthogonality (primary).** Each component addresses one concern
+  and avoids hidden coupling to others. The package graph is one-way
+  (core has no internal deps); validation, verbalization, mapping,
+  diagram, and LLM live in separate modules. A change in one should
+  not force changes in unrelated ones.
+
+- **Composability (primary).** Capabilities are built from small,
+  well-defined pieces that combine cleanly. One `@barwise/core`
+  powers the CLI, MCP server, and VS Code extension; formats
+  register through a single `FormatDescriptor` registry; LLM
+  providers slot in via a factory. Prefer narrow primitives that
+  compose over wide ones that don't.
+
+- **Determinism in the core.** Validation, verbalization, mapping,
+  diff, and query are pure and deterministic -- same input, same
+  output. Non-determinism (LLM calls, network I/O, clocks) lives in
+  the outer packages (`llm`, `cli`, `mcp`, `vscode`). New
+  capabilities go in `core` only if they can preserve this; if they
+  cannot, they belong one layer out.
+
+- **Explicit over implicit.** Cross-domain references go through
+  declared context mappings; data products declare the domains they
+  compose; every `.orm.yaml` carries a `schemaVersion`; import and
+  export formats register through a named `FormatDescriptor` rather
+  than being auto-discovered. When in doubt, require declaration
+  instead of inference.
+
+- **DRY (secondary).** Remove duplication when it does not
+  compromise orthogonality or composability. A small amount of
+  parallel code in two packages is preferable to an abstraction
+  that couples them or forces one of them to bend its interface.
+  When DRY conflicts with the primary principles, the duplication
+  stays.
+
 ## Essential Context
 
 Read `barwise/docs/ARCHITECTURE.md` before making any changes. It
