@@ -149,18 +149,24 @@ Worst offenders, in order:
   interop, two-pass layout, collision resolution, subtype radial
   placement, and edge routing in one file. Suggested split:
   ElkInterop, EntityPlacementPass, FactTypePlacementPass,
-  PostAdjustments, EdgeRouter, CollisionResolver.
+  PostAdjustments, EdgeRouter, CollisionResolver. Unaffected by the
+  React front-end decision: layout runs host-side for every front
+  end (webview or local server), so this stays the top
+  decomposition target.
 - `llm/src/DraftModelParser.ts` (953) -- four-pass algorithm;
   decomposes naturally into one file per pass plus a provenance
   helper.
-- `vscode/src/diagram/DiagramPanel.ts` (898) -- extract the
-  position/orientation override logic into its own module.
+- `vscode/src/diagram/DiagramPanel.ts` (898) -- do NOT refactor in
+  place. Executing `diagram-presentation-contract.spec.md`
+  dissolves it: the diagram domain logic moves to a unit-testable
+  `DiagramSession` in `@barwise/diagram` and DiagramPanel becomes a
+  thin VS Code adapter. See A6.
 - `cli/src/commands/import.ts` (808) -- three subcommands
   (transcript, model, batch) in one file.
 - `vscode/src/mcp/ToolRegistration.ts` (671) -- 14 near-identical
   tool wrappers; could be data-driven from a metadata table.
-- `diagram/src/SvgRenderer.ts` (619) -- large but coherent; lowest
-  priority of this list.
+- `diagram/src/render/SvgRenderer.ts` (619) -- do NOT decompose;
+  candidate for retirement under the React-first decision. See A6.
 - `llm/src/ExtractionPrompt.ts` (561) -- consider extracting the
   constraint-inference rules.
 - `vscode/src/commands/ImportTranscriptCommand.ts` (538) --
@@ -219,6 +225,61 @@ or optional peer dependencies.
 - The format registry is a package-level singleton; tests must call
   `clearFormats()`. Acceptable, but worth noting if parallel test
   isolation ever becomes an issue.
+
+### A6. Diagram stack: consolidate on the React renderer
+
+- [ ] Priority: ___
+
+Decision context (June 2026 triage): the front end is React, not
+the legacy SVG-string panel. The webview-vs-local-server question
+is open. Inventory of the original implementation in that light:
+
+Keep (load-bearing for any front end):
+
+- `ModelToGraph`, `ElkLayoutEngine`, `DiagramGenerator`, and the
+  `PositionedGraph` type. Layout runs host-side in Node regardless
+  of front end (browser-side ELK was weighed and rejected in
+  `diagram-ui-modernization.spec.md`), and `PositionedGraph` IS the
+  presentation contract both front ends consume.
+- The `diagram-presentation-contract.spec.md` plan (DiagramSession
+  + DiagramPresentation + DiagramIntent). The local-server option
+  makes this MORE important, not less: the session is exactly the
+  seam a server front end attaches to. Webview vs server becomes a
+  choice of thin adapter (postMessage vs HTTP/WebSocket), not an
+  architecture fork. Execute this spec before any server work.
+
+Retire (after consolidation):
+
+- `diagram/src/render/SvgRenderer.ts` (619 lines). The repo now has
+  two parallel renderers of the same `PositionedGraph`:
+  SvgRenderer (static SVG for CLI `diagram`, MCP
+  `generate_diagram`, vscode ShowDiagramCommand) and the React
+  components (`webview/src/diagram/OrmDiagram.tsx`, 636 lines, the
+  interactive editor). The modernization spec called the split
+  deliberate, but it is a permanent parity tax: every notation
+  change must be implemented twice. End state: one renderer --
+  render static SVG headlessly from the same React components via
+  `react-dom/server` `renderToStaticMarkup` (they are pure
+  `PositionedGraph -> SVG`), and retire SvgRenderer.
+- The legacy inline-HTML webview is already gone (Phase 0/1).
+- `docs/Barwise.zip` design prototype has served its purpose
+  (see C4).
+
+Prerequisites for the consolidation:
+
+- Move the React diagram components out of
+  `packages/vscode/webview/` into a package with no VS Code
+  coupling (e.g. `packages/diagram-ui`), since cli/mcp cannot
+  depend on `barwise-vscode`. This revisits the modernization
+  spec's "no new monorepo node" decision, which was made under a
+  webview-only assumption; the local-server option also wants the
+  React app hosted outside the extension.
+- Unify theming: the webview themes via VS Code CSS variables, the
+  static export needs concrete colors. There are currently two
+  `theme.ts` files (`diagram/src/` and `vscode/webview/src/
+  diagram/`) -- collapse to one with a palette parameter.
+- Until consolidation: freeze SvgRenderer (no decomposition, no
+  new notation features added to only one renderer).
 
 ## Testing
 
