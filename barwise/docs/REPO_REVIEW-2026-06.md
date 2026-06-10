@@ -43,12 +43,17 @@ repo (including automated reviewers).
 Recommendation: delete `barwise/.github/workflows/` entirely, or
 replace its contents with a README pointing at the root workflows.
 
-### 2. Core violates its own purity principle
+### 2. Enforce the connector decision for I/O in core
 
 - [ ] Priority: ___
 
-"Determinism in the core" is a stated design pillar (no I/O, no
-clocks, no LLM in core), but:
+Decision context: I/O is done through format connectors registered
+in the `FormatDescriptor` registry. The findings below are not a
+question of whether the purity principle is right -- they are
+pre-connector leftovers from early work that should be migrated to
+the connector pattern. "Determinism in the core" (no I/O, no
+clocks, no LLM in core) remains the design pillar; these violate
+it:
 
 - `core/src/lineage/manifest.ts` calls `readFileSync`,
   `writeFileSync`, and `mkdirSync`.
@@ -61,12 +66,18 @@ clocks, no LLM in core), but:
   `DbtProjectImporter.ts`) and `serialization/ProjectLoader.ts`
   perform file I/O.
 
-Recommendation: either (a) move the I/O out -- inject file contents
-or a narrow reader interface and let CLI/MCP own the filesystem -- or
-(b) amend CLAUDE.md to explicitly exempt project loading, import,
-and lineage from the purity rule. Right now the documentation and
-the code disagree, and that ambiguity will guide future contributions
-badly.
+Recommendation:
+
+- Migrate the leftovers to the connector pattern: route dbt/sql
+  import I/O through their format connectors' boundary, move the
+  lineage manifest read/write to the tool layer (CLI/MCP), and
+  replace the `process.env` reads in DbtDialectDetector with an
+  explicit option passed in by the caller.
+- Document the connector convention. The term "connector" appears
+  in the beads backlog (OWL/SHACL, PG-Schema, reference-ontology
+  issues) but not in ARCHITECTURE.md or CLAUDE.md. Until the
+  convention is written down where contributors will see it, new
+  code will keep drifting the same way this leftover code did.
 
 ### 3. Coverage thresholds are never enforced
 
