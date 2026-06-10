@@ -124,15 +124,18 @@ counts with a phrase that does not rot ("full suite passing in CI").
 
 ### 5. Decide the MCP package's publishing story
 
-- [ ] Priority: ___
+- [x] Priority: resolved (June 2026 triage)
 
-`@barwise/mcp` is the only non-private package. It has a
+`@barwise/mcp` was the only non-private package, with a
 `prepublishOnly` bundle hook, repository metadata, and npm keywords
--- but no publish workflow exists anywhere (release-vsix.yml only
-builds the VSIX). The half-configured state is the worst option.
+-- but no publish workflow existed anywhere (release-vsix.yml only
+builds the VSIX).
 
-Recommendation: either add an npm-publish job triggered on release,
-or mark the package private until publishing is actually intended.
+Decision: keep it private for the time being; npm publishing is not
+planned in the near term. The package is now marked
+`"private": true` like the rest of the workspace. The
+`prepublishOnly` hook and repository metadata are retained so that
+un-privating it later is a one-line change.
 
 ## Architecture
 

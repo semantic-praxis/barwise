@@ -1,6 +1,7 @@
 {
   "name": "@barwise/mcp",
   "version": "1.5.0",
+  "private": true,
   "description": "MCP server for ORM 2 modeling capabilities",
   "type": "module",
   "main": "./dist/server.js",
