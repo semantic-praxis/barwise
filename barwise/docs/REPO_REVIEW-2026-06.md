@@ -78,6 +78,14 @@ Recommendation:
   issues) but not in ARCHITECTURE.md or CLAUDE.md. Until the
   convention is written down where contributors will see it, new
   code will keep drifting the same way this leftover code did.
+- Note that `@barwise/code-analysis` is the existing template for
+  this: it is a connector package outside core that registers its
+  TypeScript/Java/Kotlin importers into the FormatDescriptor
+  registry via `registerCodeFormats()`, keeping its I/O (LSP
+  sessions, repo scanning) out of core entirely. Future language
+  connectors (e.g. Python) and potentially the dbt/sql connectors
+  can follow the same shape, which would resolve the core purity
+  violations structurally rather than case by case.
 
 ### 3. Coverage thresholds are never enforced
 
@@ -100,7 +108,10 @@ code-analysis, and the vscode unit-test surface.
 
 - The dependency graph (CLAUDE.md "Dependency Graph") omits
   `@barwise/code-analysis` entirely. Actual deps: cli, mcp, and
-  vscode all depend on it.
+  vscode all depend on it. When adding it, describe it as a
+  connector package (it registers code importers into the
+  FormatDescriptor registry) so the graph also teaches the
+  connector convention from item 2.
 - "1,686 passing tests across 6 packages" is stale: there are 7
   packages and ~155 test files (~1,650+ cases and growing).
 - The package-specific CLAUDE.md list omits code-analysis (and
