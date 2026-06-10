@@ -241,8 +241,8 @@ Keep (load-bearing for any front end):
   of front end (browser-side ELK was weighed and rejected in
   `diagram-ui-modernization.spec.md`), and `PositionedGraph` IS the
   presentation contract both front ends consume.
-- The `diagram-presentation-contract.spec.md` plan (DiagramSession
-  + DiagramPresentation + DiagramIntent). The local-server option
+- The `diagram-presentation-contract.spec.md` plan (DiagramSession,
+  DiagramPresentation, DiagramIntent). The local-server option
   makes this MORE important, not less: the session is exactly the
   seam a server front end attaches to. Webview vs server becomes a
   choice of thin adapter (postMessage vs HTTP/WebSocket), not an
