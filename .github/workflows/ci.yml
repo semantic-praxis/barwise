@@ -13,6 +13,10 @@ concurrency:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22]
     defaults:
       run:
         working-directory: barwise
@@ -22,7 +26,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ matrix.node-version }}
           cache: npm
           cache-dependency-path: barwise/package-lock.json
 
@@ -47,3 +51,10 @@ jobs:
       - run: npm run circular
 
       - run: npm run fmt:check
+
+      # Reports known advisories without gating the build. There is an
+      # existing backlog of dependency vulnerabilities (mostly dev deps);
+      # dependabot opens PRs to chip away at it. Tighten to a blocking
+      # step once the backlog is cleared.
+      - run: npm audit --audit-level=high
+        continue-on-error: true
