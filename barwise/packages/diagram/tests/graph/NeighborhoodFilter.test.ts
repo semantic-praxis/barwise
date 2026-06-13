@@ -85,6 +85,23 @@ describe("computeNeighborhood", () => {
     expect(n.subtypeFactIds.has(sf.id)).toBe(true);
   });
 
+  it("traverses subtype relationships from a supertype to its subtypes", () => {
+    const model = new OrmModel({ name: "SupertypeTest" });
+    const parent = model.addObjectType({ name: "Animal", kind: "entity", referenceMode: "id" });
+    const child = model.addObjectType({ name: "Dog", kind: "entity", referenceMode: "id" });
+    const sf = model.addSubtypeFact({
+      subtypeId: child.id,
+      supertypeId: parent.id,
+      providesIdentification: true,
+    });
+
+    // Focus on the supertype: one hop must reach the subtype (the
+    // reverse direction from the subtype-to-supertype traversal).
+    const n = computeNeighborhood(model, parent.id, 1);
+    expect(n.objectTypeIds.has(child.id)).toBe(true);
+    expect(n.subtypeFactIds.has(sf.id)).toBe(true);
+  });
+
   it("handles hub entities (many connections)", () => {
     const model = new OrmModel({ name: "Hub" });
     const hub = model.addObjectType({ name: "Hub", kind: "entity", referenceMode: "id" });

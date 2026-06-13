@@ -417,4 +417,72 @@ describe("DiagramGenerator (end-to-end)", () => {
     expect(result.svg).toContain("Instructor teaches Course");
     expect(result.svg).toContain('data-kind="objectification"');
   });
+
+  describe("focus / neighborhood filtering", () => {
+    function chainModel() {
+      // A relates to B relates to C (3 entities, 2 binary fact types).
+      return new ModelBuilder("Chain")
+        .withEntityType("A", { referenceMode: "id" })
+        .withEntityType("B", { referenceMode: "id" })
+        .withEntityType("C", { referenceMode: "id" })
+        .withBinaryFactType("A relates to B", {
+          role1: { player: "A", name: "relates to" },
+          role2: { player: "B", name: "is related to by" },
+        })
+        .withBinaryFactType("B relates to C", {
+          role1: { player: "B", name: "relates to" },
+          role2: { player: "C", name: "is related to by" },
+        })
+        .build();
+    }
+
+    it("filters to the focus entity's neighborhood when focusEntityId is set", async () => {
+      const model = chainModel();
+      const aId = model.getObjectTypeByName("A")!.id;
+
+      const result = await generateDiagram(model, { focusEntityId: aId, hopCount: 1 });
+
+      // Unfiltered the chain has 5 nodes (3 OTs + 2 FTs); one hop from A
+      // keeps A, B, and the A-B fact type -- C and B-C are excluded.
+      expect(result.graph.nodes).toHaveLength(3);
+      expect(result.graph.nodes.filter((n) => n.kind === "object_type")).toHaveLength(2);
+      expect(result.graph.nodes.filter((n) => n.kind === "fact_type")).toHaveLength(1);
+    });
+
+    it("defaults to one hop when hopCount is omitted", async () => {
+      const model = chainModel();
+      const aId = model.getObjectTypeByName("A")!.id;
+
+      const result = await generateDiagram(model, { focusEntityId: aId });
+
+      // Same neighborhood as an explicit hopCount of 1.
+      expect(result.graph.nodes).toHaveLength(3);
+    });
+
+    it("does not filter when no focus entity is given", async () => {
+      const model = chainModel();
+
+      const result = await generateDiagram(model);
+
+      expect(result.graph.nodes).toHaveLength(5);
+    });
+  });
+
+  it("marks nodes listed in ghostNodeIds as ghosts in the SVG", async () => {
+    const model = new ModelBuilder("Ghosts")
+      .withEntityType("A", { referenceMode: "id" })
+      .withEntityType("B", { referenceMode: "id" })
+      .withBinaryFactType("A relates to B", {
+        role1: { player: "A", name: "relates to" },
+        role2: { player: "B", name: "is related to by" },
+      })
+      .build();
+    const bId = model.getObjectTypeByName("B")!.id;
+
+    const result = await generateDiagram(model, { ghostNodeIds: new Set([bId]) });
+
+    // B's group carries the ghost marker.
+    expect(result.svg).toContain('data-ghost="true"');
+    expect(result.svg).toContain(`data-id="${bId}"`);
+  });
 });
