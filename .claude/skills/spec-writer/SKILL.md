@@ -55,8 +55,8 @@ reviewer's time as more valuable than your own. Three rules follow:
    ADR-shaped -- state the options and the trade-off.
 6. **Edit.** The first draft gets the thinking down; the edit makes it
    worth reading. Run the passes in `editing.md` -- BLUF, brevity,
-   redundancy, voice -- then re-verify the survivors against the code.
-   No first draft is good enough to share.
+   redundancy, voice (scanning `llm-tics.md`) -- then re-verify the
+   survivors against the code. No first draft is good enough to share.
 7. **Spec before code.** Land the spec for review first; implement in
    separate PRs. Update the spec (and the REPO_REVIEW status line) when
    scope is discovered to differ from the brief.
