@@ -58,6 +58,7 @@ working in a package:
 - `barwise/packages/core/CLAUDE.md` -- metamodel, validation, verbalization, serialization, mapping
 - `barwise/packages/diagram/CLAUDE.md` -- diagram layout and SVG rendering
 - `barwise/packages/llm/CLAUDE.md` -- LLM transcript extraction
+- `barwise/packages/code-analysis/CLAUDE.md` -- code connector package; registers TypeScript/Java/Kotlin importers into the `FormatDescriptor` registry
 - `barwise/packages/cli/CLAUDE.md` -- CLI tool (validate, verbalize, schema, export, diagram, diff, import)
 - `barwise/packages/mcp/CLAUDE.md` -- MCP server (tools, resources, prompts)
 - `barwise/packages/vscode/CLAUDE.md` -- VS Code extension integration
@@ -66,22 +67,31 @@ working in a package:
 ## Dependency Graph
 
 ```
-@barwise/core          (no internal deps)
+@barwise/core               (no internal deps)
   ^
-  |--- @barwise/diagram  (core)
-  |--- @barwise/llm      (core)
-  |--- @barwise/cli      (core, diagram, llm)
-  |--- @barwise/mcp      (core, diagram, llm)
-  |--- barwise-vscode     (core, diagram, llm, mcp)
+  |--- @barwise/diagram         (core)
+  |--- @barwise/llm             (core)
+  |--- @barwise/code-analysis   (core)  -- connector package: registers
+  |                                        code importers into the
+  |                                        FormatDescriptor registry
+  |--- @barwise/cli             (core, diagram, llm, code-analysis)
+  |--- @barwise/mcp             (core, diagram, llm, code-analysis)
+  |--- barwise-vscode           (core, diagram, llm, code-analysis, mcp)
 ```
+
+`@barwise/code-analysis` is the template for the connector convention:
+a package outside `core` that keeps its own I/O (LSP sessions, repo
+scanning) and registers importers into the `FormatDescriptor` registry,
+rather than putting that I/O in `core`.
 
 Changes to `@barwise/core` can break all downstream packages. Run the
 full monorepo build and tests after modifying core's public API.
 
 ## Current State
 
-All phases are complete. The project has 1,686 passing tests across 6
-packages. The CLI tool (`barwise`) and MCP server (`barwise-mcp`) provide
+All phases are complete, with the full test suite passing in CI across
+all 7 packages (core, diagram, llm, code-analysis, cli, mcp, vscode).
+The CLI tool (`barwise`) and MCP server (`barwise-mcp`) provide
 the same capabilities as the VS Code extension for terminal and AI
 workflows. Import and export formats (DDL, OpenAPI) are managed through
 a unified format registry (`FormatDescriptor` in `core/src/format/`).

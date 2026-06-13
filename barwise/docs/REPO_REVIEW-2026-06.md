@@ -30,7 +30,12 @@ edge-of-system testing did not keep pace.
 
 ### 1. Two sets of CI workflows exist, and one is dead
 
-- [ ] Priority: ___
+- [x] Priority: P1 -- resolved in this PR (June 2026 triage)
+
+Resolution: deleted the dead nested `barwise/.github/` directory
+entirely (both `ci.yml` and `release-vsix.yml`), leaving the root
+`/.github/workflows/` as the single source of truth. This also
+addresses the inner-`.github/` half of C2.
 
 GitHub only executes workflows from the git root
 (`/.github/workflows/`). That copy is the comprehensive one (build,
@@ -45,7 +50,8 @@ replace its contents with a README pointing at the root workflows.
 
 ### 2. Enforce the connector decision for I/O in core
 
-- [ ] Priority: ___
+- [ ] Priority: P2 (recommended) -- needs a spec before code; connector
+      convention now documented in CLAUDE.md (June 2026 triage)
 
 Decision context: I/O is done through format connectors registered
 in the `FormatDescriptor` registry. The findings below are not a
@@ -89,7 +95,7 @@ Recommendation:
 
 ### 3. Coverage thresholds are never enforced
 
-- [ ] Priority: ___
+- [ ] Priority: P2 (recommended)
 
 core, diagram, and llm define vitest coverage thresholds
 (statements 90/94/78 respectively), but CI runs `npm run test`,
@@ -104,7 +110,14 @@ code-analysis, and the vscode unit-test surface.
 
 ### 4. CLAUDE.md has materially drifted
 
-- [ ] Priority: ___
+- [x] Priority: P1 -- resolved in this PR (June 2026 triage)
+
+Resolution: added `@barwise/code-analysis` to the dependency graph
+(described as a connector package) and to the package-specific CLAUDE.md
+list; replaced the stale "1,686 tests across 6 packages" with a
+non-rotting "full test suite passing in CI across all 7 packages"
+phrasing; and added `packages/code-analysis/src/` to the root `circular`
+madge script. (`packages/code-analysis/CLAUDE.md` already existed.)
 
 - The dependency graph (CLAUDE.md "Dependency Graph") omits
   `@barwise/code-analysis` entirely. Actual deps: cli, mcp, and
@@ -141,7 +154,7 @@ un-privating it later is a one-line change.
 
 ### A1. Break up the god files
 
-- [ ] Priority: ___
+- [ ] Priority: P3 (recommended) -- none urgent; ElkLayoutEngine first
 
 Worst offenders, in order:
 
@@ -177,7 +190,7 @@ will be expensive to fix.
 
 ### A2. No schema versioning / migration strategy
 
-- [ ] Priority: ___
+- [ ] Priority: P2 (recommended) -- add the version check before the format changes
 
 Every `.orm.yaml` carries a `schemaVersion`, but the serializer
 hardcodes `orm_version: "1.0"` and nothing checks or migrates
@@ -190,7 +203,7 @@ change.
 
 ### A3. Slim the core barrel export
 
-- [ ] Priority: ___
+- [ ] Priority: P3 (recommended)
 
 `core/src/index.ts` has ~81 exports mixing high-level APIs
 (ValidationEngine) with internals (NormaParseError, SchemaValidator).
@@ -200,7 +213,7 @@ what is actually public.
 
 ### A4. Decouple the LLM SDKs
 
-- [ ] Priority: ___
+- [ ] Priority: P2 (recommended) -- both SDKs ship to every downstream package
 
 `@barwise/llm` carries both `@anthropic-ai/sdk` and `openai` as hard
 runtime dependencies even though the factory selects one provider at
@@ -211,7 +224,7 @@ or optional peer dependencies.
 
 ### A5. Minor architecture items
 
-- [ ] Priority: ___
+- [ ] Priority: P3 (recommended)
 
 - `mcp/src/server.ts` hardcodes `SERVER_VERSION = "1.5.0"`. A sync
   test guards it, but reading package.json at build/bundle time
@@ -228,7 +241,7 @@ or optional peer dependencies.
 
 ### A6. Diagram stack: consolidate on the React renderer
 
-- [ ] Priority: ___
+- [ ] Priority: P2 (recommended) -- execute the presentation-contract spec first
 
 Decision context (June 2026 triage): the front end is React, not
 the legacy SVG-string panel. The webview-vs-local-server question
@@ -285,7 +298,7 @@ Prerequisites for the consolidation:
 
 ### T1. The webview React app has zero tests
 
-- [ ] Priority: ___
+- [ ] Priority: P2 (recommended) -- highest-risk untested surface
 
 Ten-plus interactive components (DiagramCanvas, OrmDiagram,
 Inspector, ContextBar, CommandPalette, ViewsMenu, TopBar,
@@ -300,7 +313,7 @@ details second.
 
 ### T2. Process boundaries are never exercised
 
-- [ ] Priority: ___
+- [ ] Priority: P2 (recommended)
 
 - The CLI is tested via an in-process `runCli()` helper
   (`cli/tests/helpers/run.ts`), never by spawning the `barwise`
@@ -315,7 +328,7 @@ all of these cheaply.
 
 ### T3. Validate examples/ in CI
 
-- [ ] Priority: ___
+- [ ] Priority: P2 (recommended) -- cheap; doubles as the CLI binary smoke test
 
 `barwise/examples/` (auction-project, dbt-import, models,
 transcripts) is not validated anywhere, so it will silently rot on
@@ -324,7 +337,7 @@ examples doubles as the CLI binary smoke test from T2.
 
 ### T4. Add property-based round-trip tests
 
-- [ ] Priority: ___
+- [ ] Priority: P3 (recommended)
 
 The YAML/DDL/NORMA round-trip suites are a real strength. They are
 also the ideal seam for `fast-check`: generate random valid models
@@ -334,7 +347,7 @@ fixtures miss.
 
 ### T5. SVG / diagram visual regression
 
-- [ ] Priority: ___
+- [ ] Priority: P3 (recommended)
 
 SvgRenderer has structural tests (XML shape, escaping) but nothing
 protects layout behavior. Pinned-SVG golden files, or screenshot
@@ -345,7 +358,7 @@ parameter changes.
 
 ### C1. CI gaps
 
-- [ ] Priority: ___
+- [ ] Priority: P2 (recommended)
 
 - Single Node version (20). engines says `>=20`; add 22 to a matrix.
 - No `npm audit` (or equivalent) step.
@@ -357,7 +370,7 @@ and the MCP bundle all gate merges, which is better than most repos.
 
 ### C2. The nested layout (`/barwise/barwise/`) is a recurring tax
 
-- [ ] Priority: ___
+- [ ] Priority: P3 (recommended) -- flattening deferred; inner `.github/` removal done in Top 5 #1
 
 It caused the husky workaround
 (`"prepare": "cd .. && husky barwise/.husky"`), the
@@ -369,7 +382,7 @@ source of truth.
 
 ### C3. ESLint + oxlint both run in CI
 
-- [ ] Priority: ___
+- [ ] Priority: P3 (recommended)
 
 Defensible (oxlint is nearly free), but verify the rule overlap is
 not double-reporting. If oxlint never catches anything ESLint does
@@ -377,7 +390,7 @@ not, it is a candidate to drop.
 
 ### C4. Clean up docs/
 
-- [ ] Priority: ___
+- [ ] Priority: P2 (recommended)
 
 Committed alongside current docs:
 
@@ -393,7 +406,7 @@ spec-before-development convention is clearly being followed.
 
 ### C5. Watch the alpha dependency
 
-- [ ] Priority: ___
+- [ ] Priority: P3 (recommended)
 
 `@vscode/chat-extension-utils` in the vscode package is pre-1.0.
 Pin it tightly and expect churn.
