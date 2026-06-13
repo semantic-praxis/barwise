@@ -674,6 +674,7 @@
     "clean": "rm -rf dist",
     "lint": "eslint src/",
     "test": "vitest run",
+    "test:coverage": "vitest run",
     "test:unit": "vitest run",
     "pretest:integration": "tsc -p tsconfig.test.json",
     "test:integration": "vscode-test"

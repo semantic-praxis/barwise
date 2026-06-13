@@ -34,7 +34,9 @@ jobs:
 
       - run: npm run publint
 
-      - run: npm run test
+      - run: npm run test:coverage
+
+      - run: npm run validate:examples
 
       - run: npm run lint
 

@@ -7,11 +7,14 @@ export default defineConfig({
       provider: "v8",
       include: ["src/**/*.ts"],
       exclude: ["src/index.ts"],
+      // Floors calibrated to actual coverage. The previous 78/82/100/78
+      // never ran in CI: the statement/line floors sat well below real
+      // coverage while the 100% functions target was unmet.
       thresholds: {
-        statements: 78,
-        branches: 82,
-        functions: 100,
-        lines: 78,
+        statements: 85,
+        branches: 80,
+        functions: 92,
+        lines: 85,
       },
     },
   },

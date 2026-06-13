@@ -9,6 +9,7 @@
   "scripts": {
     "build": "turbo run build",
     "test": "turbo run test",
+    "test:coverage": "turbo run test:coverage",
     "test:watch": "turbo run test:watch",
     "lint": "turbo run lint",
     "clean": "turbo run clean",
@@ -18,6 +19,7 @@
     "publint": "publint packages/core && publint packages/diagram && publint packages/llm && publint packages/cli && publint packages/mcp",
     "fmt": "dprint fmt",
     "fmt:check": "dprint check",
+    "validate:examples": "bash scripts/validate-examples.sh",
     "prepare": "cd .. && husky barwise/.husky"
   },
   "devDependencies": {
