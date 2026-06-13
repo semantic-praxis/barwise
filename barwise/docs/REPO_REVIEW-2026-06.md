@@ -224,7 +224,8 @@ what is actually public.
 
 ### A4. Decouple the LLM SDKs
 
-- [ ] Priority: P2 (recommended) -- both SDKs ship to every downstream package
+- [x] Priority: P2 -- resolved via lazy import (spec:
+  docs/specs/llm-sdk-decoupling.spec.md)
 
 `@barwise/llm` carries both `@anthropic-ai/sdk` and `openai` as hard
 runtime dependencies even though the factory selects one provider at
@@ -232,6 +233,16 @@ runtime. Every downstream package (cli, mcp, vscode) inherits both.
 
 Recommendation: lazy `import()` inside each provider implementation,
 or optional peer dependencies.
+
+RESOLVED: each provider now `import type`s its SDK and loads it via a
+dynamic `import()` on first completion (constructing the client lazily
+in a `getClient()` helper), so importing the package or the factory no
+longer pulls either SDK into memory until a provider actually runs. The
+SDKs stay regular `dependencies` because all packages are private and
+unpublished -- peer/optional deps would only shift install, which gives
+no realizable benefit here; the runtime saving is what mattered. Moving
+to optional peer deps is a clean follow-up if the packages are ever
+published.
 
 ### A5. Minor architecture items
 
