@@ -209,6 +209,9 @@ git log --oneline v1.2.0..HEAD
 
 - ALWAYS create a spec file before beginning development.  There should
   be a documented and reviewed plan to ensure the quality of work is high.
+  Use the `spec-writer` skill for the house spec format, the
+  design-principle framing, and the pre-flight checklist; specs live in
+  `barwise/docs/specs/`.
 - TypeScript strict mode. Base config in `barwise/tsconfig.base.json`
   uses NodeNext module resolution; the vscode package overrides to
   Bundler resolution for esbuild.
