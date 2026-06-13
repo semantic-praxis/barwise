@@ -18,12 +18,13 @@ not reimplement them.
 
 ## Design inputs
 
-- `barwise/docs/Barwise.zip` -- the Claude Design handoff bundle. Contains the
-  prototype (`docs/prototype/barwise-ui-prototype.html`, a 1.6 MB single-file
-  build) and its structured component sources (`shell.jsx`, `app.jsx`,
-  `diagram.jsx`, `inspector.jsx`, `panels.jsx`, `tree.jsx`, `tweaks.jsx`,
-  plus `autolayout.js` and `sample-model.js`). The `.jsx` files are the
-  readable design reference.
+- The Claude Design handoff bundle (formerly `barwise/docs/Barwise.zip`,
+  removed once the modernization shipped -- retrievable from git history).
+  It contained the prototype (`barwise-ui-prototype.html`, a 1.6 MB
+  single-file build) and its structured component sources (`shell.jsx`,
+  `app.jsx`, `diagram.jsx`, `inspector.jsx`, `panels.jsx`, `tree.jsx`,
+  `tweaks.jsx`, plus `autolayout.js` and `sample-model.js`). The `.jsx`
+  files were the readable design reference.
 - The prototype is a **visual mock**, not a functional reference. Its data
   model differs from `@barwise/core`'s metamodel, and its non-diagram surfaces
   are stubbed: `verbalize()` is a hardcoded lookup table, `renderYaml()`

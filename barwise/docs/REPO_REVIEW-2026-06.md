@@ -358,12 +358,19 @@ parameter changes.
 
 ### C1. CI gaps
 
-- [ ] Priority: P2 (recommended)
+- [x] Priority: P2 -- mostly resolved (June 2026 triage)
 
 - Single Node version (20). engines says `>=20`; add 22 to a matrix.
-- No `npm audit` (or equivalent) step.
+  RESOLVED: CI now runs a `[20, 22]` Node matrix.
+- No `npm audit` (or equivalent) step. RESOLVED: a non-blocking
+  `npm audit --audit-level=high` step now reports advisories. It is
+  `continue-on-error` because of an existing vulnerability backlog
+  (mostly dev deps); tighten to blocking once that is cleared.
 - No dependabot/renovate configuration for dependency updates.
-- No coverage reporting or artifact upload.
+  RESOLVED: `.github/dependabot.yml` covers npm (grouped) and the
+  GitHub Actions used by the workflows.
+- No coverage reporting or artifact upload. STILL OPEN: thresholds now
+  gate (Top 5 #3) but coverage reports are not uploaded as artifacts.
 
 The pipeline is otherwise strong -- knip, madge, dprint, publint,
 and the MCP bundle all gate merges, which is better than most repos.
@@ -390,13 +397,15 @@ not, it is a candidate to drop.
 
 ### C4. Clean up docs/
 
-- [ ] Priority: P2 (recommended)
+- [x] Priority: P2 -- resolved (June 2026 triage)
 
-Committed alongside current docs:
+RESOLVED: removed from the tree (all retrievable from git history); the
+`Barwise.zip` reference in `diagram-ui-modernization.spec.md` was updated
+to point at history. There were four `MILESTONE3_*.md` files, not three.
 
 - `docs/Barwise.zip` (~2 MB binary)
 - `docs/semantic_modeling_guidance.docx`
-- `docs/MILESTONE3_*.md` (3 historical files)
+- `docs/MILESTONE3_*.md` (4 historical files)
 - `docs/auction.orm` (~863 KB NORMA artifact, next to the YAML
   version)
 

@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # npm workspaces live under barwise/ (root manifest + lockfile).
+  - package-ecosystem: "npm"
+    directory: "/barwise"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      # Group routine updates so the backlog lands as a few PRs, not dozens.
+      production:
+        dependency-type: "production"
+        update-types: ["minor", "patch"]
+      development:
+        dependency-type: "development"
+        update-types: ["minor", "patch"]
+
+  # Keep the GitHub Actions used by the workflows current.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
