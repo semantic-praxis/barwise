@@ -5,11 +5,11 @@
  * mismatch, and the emitted version stays the single source of truth.
  */
 import { describe, expect, it } from "vitest";
-import { CURRENT_ORM_VERSION } from "../../src/serialization/schemaVersion.js";
 import {
   DeserializationError,
   OrmYamlSerializer,
 } from "../../src/serialization/OrmYamlSerializer.js";
+import { CURRENT_ORM_VERSION } from "../../src/serialization/schemaVersion.js";
 
 const serializer = new OrmYamlSerializer();
 

@@ -9,13 +9,13 @@ import { OrmModel } from "../model/OrmModel.js";
 import type { FactInstance, Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
+import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
 import {
   applyMigrations,
   CURRENT_ORM_VERSION,
   type MigrationPlan,
   planMigration,
 } from "./schemaVersion.js";
-import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
 
 /**
  * The shape of a parsed .orm.yaml document. This mirrors the JSON Schema
