@@ -243,7 +243,13 @@ export function registerImportCommand(program: Command): void {
             `Importing ORM model from dbt project: ${resolvedDir}\n`,
           );
 
-          const result = await format.parseAsync(resolvedDir, { modelName });
+          // The tool layer (not core) reads the environment for dbt
+          // dialect detection and passes it in explicitly.
+          const result = await format.parseAsync(resolvedDir, {
+            modelName,
+            dbtTargetType: process.env["DBT_TARGET_TYPE"] ?? process.env["DBT_ADAPTER"],
+            dbtProfilesHome: process.env["HOME"] ?? process.env["USERPROFILE"],
+          });
 
           // Serialize to YAML
           const serializer = new OrmYamlSerializer();
