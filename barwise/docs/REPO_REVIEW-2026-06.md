@@ -225,7 +225,7 @@ what is actually public.
 ### A4. Decouple the LLM SDKs
 
 - [x] Priority: P2 -- resolved via lazy import (spec:
-  docs/specs/llm-sdk-decoupling.spec.md)
+      docs/specs/llm-sdk-decoupling.spec.md)
 
 `@barwise/llm` carries both `@anthropic-ai/sdk` and `openai` as hard
 runtime dependencies even though the factory selects one provider at

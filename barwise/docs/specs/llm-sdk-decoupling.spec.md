@@ -16,7 +16,7 @@ top level:
 
 `providers/factory.ts` statically imports all three provider modules, so
 importing the factory (or the package barrel) evaluated every provider
-module and pulled *both* SDKs into memory -- even though the factory
+module and pulled _both_ SDKs into memory -- even though the factory
 selects exactly one provider at runtime. Every command paid that cost,
 including ones that never touch an LLM.
 
@@ -26,7 +26,7 @@ Load each SDK lazily with a dynamic `import()` on first use, and keep
 the SDKs as regular `dependencies`.
 
 The review offered two options: lazy `import()` or optional peer
-dependencies. Peer/optional dependencies would shift *installation* to
+dependencies. Peer/optional dependencies would shift _installation_ to
 the consumer, but the realizable benefit of that is install-size
 reduction for external consumers -- and all barwise packages are
 private and unpublished, so the SDKs are installed once in the monorepo
@@ -43,7 +43,7 @@ place to surface a clear "SDK not installed" error).
 In each provider:
 
 - Change the SDK import to `import type` (erased at compile time, so no
-  runtime `require`). The SDK is still referenced as a *type* (e.g.
+  runtime `require`). The SDK is still referenced as a _type_ (e.g.
   `private client?: Anthropic`, `Anthropic.Tool.InputSchema`).
 - Move client construction out of the constructor into a private
   `getClient()` that does `const { default: Ctor } = await
