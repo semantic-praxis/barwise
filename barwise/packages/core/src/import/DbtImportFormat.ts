@@ -17,7 +17,8 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseSqlFile } from "../sql/SqlCascadeParser.js";
-import { detectDbtDialect } from "./DbtDialectDetector.js";
+import type { SqlDialect } from "../sql/types.js";
+import { type DbtDialectOptions, detectDbtDialect } from "./DbtDialectDetector.js";
 import { importDbtProject } from "./DbtProjectImporter.js";
 import { compileDbtSql } from "./DbtSqlCompiler.js";
 import type { ImportFormat, ImportOptions, ImportResult } from "./types.js";
@@ -150,7 +151,14 @@ export class DbtImportFormat implements ImportFormat {
     }
 
     // SQL analysis: compile and parse SQL files for additional patterns.
-    const sqlPatternCount = this.analyzeSqlFiles(projectDir, warnings);
+    // Dialect-detection inputs come from the caller (the tool layer reads
+    // the environment), never from process.env in core.
+    const dialectOptions: DbtDialectOptions = {
+      dialect: options?.["dialect"] as SqlDialect | undefined,
+      targetType: options?.["dbtTargetType"] as string | undefined,
+      homeDir: options?.["dbtProfilesHome"] as string | undefined,
+    };
+    const sqlPatternCount = this.analyzeSqlFiles(projectDir, warnings, dialectOptions);
 
     // Convert report entries to warnings for the ImportResult interface.
     const reportWarnings = result.report.entries
@@ -178,9 +186,13 @@ export class DbtImportFormat implements ImportFormat {
    *
    * @returns Number of patterns found
    */
-  private analyzeSqlFiles(projectDir: string, warnings: string[]): number {
+  private analyzeSqlFiles(
+    projectDir: string,
+    warnings: string[],
+    dialectOptions: DbtDialectOptions,
+  ): number {
     try {
-      const dialect = detectDbtDialect(projectDir);
+      const dialect = detectDbtDialect(projectDir, dialectOptions);
       const compiledFiles = compileDbtSql(projectDir);
 
       if (compiledFiles.length === 0) {

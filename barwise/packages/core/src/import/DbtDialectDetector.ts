@@ -7,10 +7,15 @@
  *
  * Detection strategy (priority order):
  * 1. Explicit dialect option from the user
- * 2. DBT_TARGET_TYPE or DBT_ADAPTER environment variable
+ * 2. Target adapter type supplied by the caller (the tool layer reads
+ *    DBT_TARGET_TYPE / DBT_ADAPTER from the environment and passes it in)
  * 3. dbt_project.yml profile -> profiles.yml adapter type
  * 4. Installed dbt packages (dbt-snowflake, dbt-bigquery, etc.)
  * 5. Fall back to "ansi"
+ *
+ * This module stays deterministic: it never reads `process.env`. The
+ * environment-derived values are passed in as options by the caller,
+ * keeping ambient state at the tool boundary.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -31,29 +36,51 @@ const ADAPTER_TO_DIALECT: Record<string, SqlDialect> = {
 };
 
 /**
+ * Explicit inputs for dialect detection, supplied by the caller in place
+ * of ambient state. The tool layer (cli/mcp) reads the environment and
+ * populates these.
+ */
+export interface DbtDialectOptions {
+  /** User-provided dialect override (highest priority). */
+  readonly dialect?: SqlDialect;
+  /**
+   * dbt target adapter type, e.g. the value of the `DBT_TARGET_TYPE` or
+   * `DBT_ADAPTER` environment variable, read by the caller.
+   */
+  readonly targetType?: string;
+  /**
+   * Home directory used to locate `~/.dbt/profiles.yml`, e.g. the value
+   * of `HOME` / `USERPROFILE`, read by the caller. When omitted, only the
+   * project directory is searched for `profiles.yml`.
+   */
+  readonly homeDir?: string;
+}
+
+/**
  * Detect the SQL dialect for a dbt project.
  *
  * @param projectDir - Path to the dbt project root
- * @param explicitDialect - User-provided dialect override
+ * @param options - Explicit detection inputs (dialect override and
+ *   environment-derived values supplied by the caller)
  * @returns The detected SQL dialect
  */
 export function detectDbtDialect(
   projectDir: string,
-  explicitDialect?: SqlDialect,
+  options?: DbtDialectOptions,
 ): SqlDialect {
   // 1. Explicit override
-  if (explicitDialect) {
-    return explicitDialect;
+  if (options?.dialect) {
+    return options.dialect;
   }
 
-  // 2. Environment variables
-  const envDialect = detectFromEnv();
-  if (envDialect) {
-    return envDialect;
+  // 2. Caller-supplied target adapter type (from the environment)
+  const targetDialect = dialectFromTargetType(options?.targetType);
+  if (targetDialect) {
+    return targetDialect;
   }
 
   // 3. dbt_project.yml -> profiles.yml
-  const profileDialect = detectFromProfiles(projectDir);
+  const profileDialect = detectFromProfiles(projectDir, options?.homeDir);
   if (profileDialect) {
     return profileDialect;
   }
@@ -69,21 +96,22 @@ export function detectDbtDialect(
 }
 
 /**
- * Detect dialect from environment variables.
+ * Map a caller-supplied target adapter type to a dialect.
  */
-function detectFromEnv(): SqlDialect | undefined {
-  const targetType = process.env["DBT_TARGET_TYPE"] ?? process.env["DBT_ADAPTER"];
-  if (targetType) {
-    const normalized = targetType.toLowerCase().trim();
-    return ADAPTER_TO_DIALECT[normalized];
+function dialectFromTargetType(targetType?: string): SqlDialect | undefined {
+  if (!targetType) {
+    return undefined;
   }
-  return undefined;
+  return ADAPTER_TO_DIALECT[targetType.toLowerCase().trim()];
 }
 
 /**
  * Detect dialect from dbt_project.yml + profiles.yml.
  */
-function detectFromProfiles(projectDir: string): SqlDialect | undefined {
+function detectFromProfiles(
+  projectDir: string,
+  homeDir?: string,
+): SqlDialect | undefined {
   // Read dbt_project.yml to get the profile name
   const projectPath = join(projectDir, "dbt_project.yml");
   if (!existsSync(projectPath)) {
@@ -104,11 +132,10 @@ function detectFromProfiles(projectDir: string): SqlDialect | undefined {
   }
 
   // Look for profiles.yml in standard locations
-  const homedir = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "";
-  const profilePaths = [
-    join(projectDir, "profiles.yml"),
-    join(homedir, ".dbt", "profiles.yml"),
-  ];
+  const profilePaths = [join(projectDir, "profiles.yml")];
+  if (homeDir) {
+    profilePaths.push(join(homeDir, ".dbt", "profiles.yml"));
+  }
 
   for (const profilePath of profilePaths) {
     if (!existsSync(profilePath)) continue;

@@ -85,6 +85,12 @@ export async function executeImportModel(
   if (dialect) {
     options["dialect"] = dialect;
   }
+  if (format === "dbt") {
+    // The tool layer (not core) reads the environment for dbt dialect
+    // detection and passes it in explicitly.
+    options["dbtTargetType"] = process.env["DBT_TARGET_TYPE"] ?? process.env["DBT_ADAPTER"];
+    options["dbtProfilesHome"] = process.env["HOME"] ?? process.env["USERPROFILE"];
+  }
 
   // Route based on input kind
   let result;

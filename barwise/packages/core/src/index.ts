@@ -210,7 +210,7 @@ export { DbtMappingError, type DbtMapResult, mapDbtToOrm } from "./import/DbtToO
 export { annotateDbtYaml, type AnnotationOptions } from "./import/DbtYamlAnnotator.js";
 
 // Import format types
-export { detectDbtDialect } from "./import/DbtDialectDetector.js";
+export { type DbtDialectOptions, detectDbtDialect } from "./import/DbtDialectDetector.js";
 export { compileDbtSql, stubRenderJinja } from "./import/DbtSqlCompiler.js";
 export type { CompiledSqlFile } from "./import/DbtSqlCompiler.js";
 export type { ImportFormat, ImportOptions, ImportResult } from "./import/types.js";
