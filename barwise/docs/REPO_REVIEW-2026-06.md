@@ -51,7 +51,7 @@ replace its contents with a README pointing at the root workflows.
 ### 2. Enforce the connector decision for I/O in core
 
 - [ ] Priority: P2 (recommended) -- needs a spec before code; connector
-  convention now documented in CLAUDE.md (June 2026 triage)
+      convention now documented in CLAUDE.md (June 2026 triage)
 
 Decision context: I/O is done through format connectors registered
 in the `FormatDescriptor` registry. The findings below are not a
