@@ -53,10 +53,8 @@ reviewer's time as more valuable than your own. Three rules follow:
    the reviewer's call (package scope, where shared I/O lives,
    API shape). Recommend a default; do not silently decide. These are
    ADR-shaped -- state the options and the trade-off.
-6. **Edit.** The first draft gets the thinking down; the edit makes it
-   worth reading. Run the passes in `editing.md` -- BLUF, brevity,
-   redundancy, voice (scanning `llm-tics.md`) -- then re-verify the
-   survivors against the code. No first draft is good enough to share.
+6. **Edit.** Run the edit passes in `editing.md` (scanning `llm-tics.md`
+   during the voice pass) before the spec is shared.
 7. **Spec before code.** Land the spec for review first; implement in
    separate PRs. Update the spec (and the REPO_REVIEW status line) when
    scope is discovered to differ from the brief.
@@ -66,6 +64,8 @@ reviewer's time as more valuable than your own. Three rules follow:
 Status/Tracking header, then the sections that apply:
 
 - **Principle / Problem** -- what is wrong and which pillar it touches.
+- **Should we X?** (when the choice is non-obvious) -- reason it through
+  under a heading that states the resolution.
 - **Scope** -- in scope / out of scope, explicitly.
 - **Inventory** -- a table classifying what changes and the verdict.
 - **Target architecture** -- a fenced code block of the end state.

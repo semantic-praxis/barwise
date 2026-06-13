@@ -1,18 +1,17 @@
 # Editing a Spec
 
-The first draft gets the thinking down. The edit makes it worth the
+The first draft gets the thinking down; the edit makes it worth the
 reviewer's time. Treat them as separate passes: draft fast, then cut.
-No first draft is good enough to share -- editing is where the spec
-earns the reviewer's attention, not an optional polish.
+No first draft is good enough to share.
 
 ## The passes
 
 Run these in order over the draft. Each is one focused sweep, not a
 re-read.
 
-1. **BLUF -- lead with the answer.** Does each section's first sentence
-   carry its point? Could a reviewer get the decision from headings,
-   first sentences, and tables alone? If not, move the conclusion up.
+1. **BLUF.** Move any buried conclusion to the front of its section, so
+   the headings, first sentences, and tables carry the decision on their
+   own.
 2. **Brevity.** Cut every sentence that does not change a decision or an
    action. Throat-clearing intros, restated context, "as noted above,"
    transition filler -- gone.
@@ -28,8 +27,7 @@ re-read.
 6. **Accuracy.** Re-verify each surviving claim against the code.
    Cutting for brevity can quietly drop a caveat that was load-bearing.
 7. **Pre-flight.** Run the dprint markdown checklist in `SKILL.md`
-   (underscore emphasis, aligned tables, 6-space task-list continuation,
-   import sorting, no emoji).
+   before pushing.
 
 ## What never gets cut
 
@@ -40,9 +38,6 @@ Brevity serves the reviewer; it does not strip the substance they need:
 - The inventory, target architecture, and workstreams -- what a reviewer
   needs to judge feasibility and an implementer needs to act.
 - Concrete file paths, the blast radius, and the open decisions.
-
-For a spec, "brief" means no waste, not short. A spec that drops its
-inventory to save space is worse, not tighter.
 
 ## Read it cold
 
