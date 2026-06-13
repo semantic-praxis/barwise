@@ -10,6 +10,11 @@
       "outputs": [],
       "inputs": ["src/**", "tests/**"]
     },
+    "test:coverage": {
+      "dependsOn": ["build"],
+      "outputs": ["coverage/**"],
+      "inputs": ["src/**", "tests/**"]
+    },
     "test:watch": {
       "cache": false,
       "persistent": true
