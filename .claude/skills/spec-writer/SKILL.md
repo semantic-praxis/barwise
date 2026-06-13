@@ -55,9 +55,9 @@ reviewer's time as more valuable than your own. Three rules follow:
    ADR-shaped -- state the options and the trade-off.
 6. **Edit.** Run the edit passes in `editing.md` (scanning `llm-tics.md`
    during the voice pass) before the spec is shared.
-7. **Spec before code.** Land the spec for review first; implement in
-   separate PRs. Update the spec (and the REPO_REVIEW status line) when
-   scope is discovered to differ from the brief.
+7. **Clear the gate, then land.** Run the pre-push gate below, land the
+   spec for review, then implement in separate PRs. Revise the spec if
+   implementation reveals the scope differs from the brief.
 
 ## House structure
 
@@ -77,11 +77,12 @@ Status/Tracking header, then the sections that apply:
 For requirement statements, EARS phrasing keeps them testable:
 "When `<trigger>`, the system shall `<response>`."
 
-## Pre-flight checklist (before pushing)
+## Pre-push gate
 
-`dprint fmt:check` runs in CI but cannot be run locally here (the wasm
-plugin download is network-blocked). These markdown rules trip it every
-time, so check them by eye:
+STOP: do not push until every item below passes. `dprint fmt:check`
+enforces the formatting in CI but cannot run locally here (the wasm
+plugin download is network-blocked), so check it by eye. Skipping this
+gate has cost a CI round-trip on nearly every PR that skipped it.
 
 - **Emphasis uses underscores**, not asterisks: `_word_`, not `*word*`.
   (`**bold**` is fine.)
@@ -96,6 +97,5 @@ time, so check them by eye:
 - **No emoji** anywhere (project-wide rule).
 - Lines over 100 chars that dprint cannot break (long template literals)
   are fine; everything else stays under the width.
-
-Also: reference the REPO_REVIEW finding the spec resolves, and update
-its checkbox/status line when the spec lands.
+- **REPO_REVIEW link**: reference the finding the spec resolves, and
+  update its checkbox/status line when the spec lands.

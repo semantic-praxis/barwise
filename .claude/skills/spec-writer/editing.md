@@ -26,8 +26,7 @@ re-read.
    noun. Cut qualifiers. Replace jargon a new contributor would not know.
 6. **Accuracy.** Re-verify each surviving claim against the code.
    Cutting for brevity can quietly drop a caveat that was load-bearing.
-7. **Pre-flight.** Run the dprint markdown checklist in `SKILL.md`
-   before pushing.
+7. **Pre-push gate.** Clear the gate in `SKILL.md` before pushing.
 
 ## What never gets cut
 
