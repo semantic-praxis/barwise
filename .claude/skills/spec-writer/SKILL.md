@@ -11,6 +11,23 @@ create a spec file before beginning development"). Specs live at
 project's design principles, splits work into independently shippable
 steps, and surfaces the decisions that need a human call.
 
+## Write for the reviewer
+
+The Iron Imperative (from _Writing Without Bullshit_): treat the
+reviewer's time as more valuable than your own. Three rules follow:
+
+- **Lead with the answer (BLUF).** Each section's first sentence carries
+  its point; the heading states the resolution
+  (`## Should we X? (resolved: yes)`). A reviewer should get the
+  decision from headings, first sentences, and tables alone.
+- **Be decisive.** State claims directly; cut weasel words and hedging.
+  Quarantine genuine uncertainty to "Open decisions" -- the one place it
+  is honest.
+- **Concision, not word count.** A spec needs its inventory,
+  architecture, and workstreams; "brief" means no waste, not short.
+  Every section earns its place by changing what the reviewer decides or
+  the implementer does.
+
 ## Workflow
 
 1. **Ground it.** Read `barwise/docs/ARCHITECTURE.md`, the relevant
@@ -21,7 +38,7 @@ steps, and surfaces the decisions that need a human call.
 2. **Argue from principles.** Frame the problem and the resolution in
    terms of the stated principles: determinism in core, orthogonality
    and composability (primary), explicit over implicit, DRY (secondary).
-   The strongest specs this project has produced reason *from* these
+   The strongest specs this project has produced reason _from_ these
    (e.g. "no interop format is mandatory to core, so core should ship
    none").
 3. **Draft from the template.** Copy `template.spec.md` (in this skill
@@ -36,7 +53,11 @@ steps, and surfaces the decisions that need a human call.
    the reviewer's call (package scope, where shared I/O lives,
    API shape). Recommend a default; do not silently decide. These are
    ADR-shaped -- state the options and the trade-off.
-6. **Spec before code.** Land the spec for review first; implement in
+6. **Edit.** The first draft gets the thinking down; the edit makes it
+   worth reading. Run the passes in `editing.md` -- BLUF, brevity,
+   redundancy, voice -- then re-verify the survivors against the code.
+   No first draft is good enough to share.
+7. **Spec before code.** Land the spec for review first; implement in
    separate PRs. Update the spec (and the REPO_REVIEW status line) when
    scope is discovered to differ from the brief.
 
