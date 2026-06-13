@@ -86,6 +86,10 @@ export {
 } from "./serialization/MappingSerializer.js";
 export { DeserializationError, OrmYamlSerializer } from "./serialization/OrmYamlSerializer.js";
 export {
+  CURRENT_ORM_VERSION,
+  type OrmVersionMigration,
+} from "./serialization/schemaVersion.js";
+export {
   type LoadedProject,
   loadProject,
   ProjectLoadError,

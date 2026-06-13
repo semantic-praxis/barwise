@@ -9,6 +9,12 @@ import { OrmModel } from "../model/OrmModel.js";
 import type { FactInstance, Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
+import {
+  applyMigrations,
+  CURRENT_ORM_VERSION,
+  type MigrationPlan,
+  planMigration,
+} from "./schemaVersion.js";
 import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
 
 /**
@@ -126,6 +132,23 @@ export class DeserializationError extends Error {
 }
 
 /**
+ * Build a clear, actionable message for a document whose `orm_version`
+ * cannot be brought to the current version.
+ */
+function versionErrorMessage(
+  version: string,
+  plan: Extract<MigrationPlan, { ok: false; }>,
+): string {
+  const advice = {
+    newer: "the file was written by a newer barwise; upgrade barwise to read it.",
+    unknown: "no migration path is available; re-export from a compatible version.",
+    cycle: "the migration registry loops back on itself, which is a bug in barwise.",
+  };
+  const head = `Unsupported orm_version "${version}" (this build reads ${CURRENT_ORM_VERSION}):`;
+  return `${head} ${advice[plan.reason]}`;
+}
+
+/**
  * Serializes OrmModel instances to YAML strings and deserializes
  * YAML strings back to OrmModel instances.
  *
@@ -167,7 +190,12 @@ export class OrmYamlSerializer {
   deserialize(yaml: string, options?: { lenient?: boolean; }): OrmModel {
     const raw = parse(yaml) as unknown;
 
-    const result = this.validator.validateModel(raw);
+    // Bring older documents up to the current version before schema
+    // validation, and reject unsupported versions with a clear message
+    // rather than the schema's cryptic `const` mismatch.
+    const migrated = this.migrateToCurrentVersion(raw);
+
+    const result = this.validator.validateModel(migrated);
     if (!result.valid) {
       throw new DeserializationError(
         `YAML does not conform to orm-model schema: ${
@@ -177,15 +205,41 @@ export class OrmYamlSerializer {
       );
     }
 
-    const doc = raw as OrmYamlDocument;
+    const doc = migrated as OrmYamlDocument;
     return this.fromDocument(doc, options);
+  }
+
+  /**
+   * Migrate a freshly parsed document to {@link CURRENT_ORM_VERSION}.
+   *
+   * Documents already at the current version, and documents whose
+   * `orm_version` is missing or malformed, are passed through untouched
+   * so that schema validation reports those cases as it always has.
+   * A present-but-unsupported version throws a {@link DeserializationError}
+   * describing whether the file is too new or simply unreachable.
+   */
+  private migrateToCurrentVersion(raw: unknown): unknown {
+    if (typeof raw !== "object" || raw === null) {
+      return raw;
+    }
+    const doc = raw as Record<string, unknown>;
+    const version = doc.orm_version;
+    if (typeof version !== "string" || version === CURRENT_ORM_VERSION) {
+      return raw;
+    }
+
+    const plan = planMigration(version);
+    if (!plan.ok) {
+      throw new DeserializationError(versionErrorMessage(version, plan));
+    }
+    return applyMigrations(doc, plan.steps);
   }
 
   // -- Internal: model -> document --
 
   private toDocument(model: OrmModel): OrmYamlDocument {
     const doc: OrmYamlDocument = {
-      orm_version: "1.0",
+      orm_version: CURRENT_ORM_VERSION,
       model: {
         name: model.name,
       },

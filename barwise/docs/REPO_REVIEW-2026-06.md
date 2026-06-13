@@ -190,7 +190,7 @@ will be expensive to fix.
 
 ### A2. No schema versioning / migration strategy
 
-- [ ] Priority: P2 (recommended) -- add the version check before the format changes
+- [x] Priority: P2 -- resolved (spec: docs/specs/schema-versioning.spec.md)
 
 Every `.orm.yaml` carries a `schemaVersion`, but the serializer
 hardcodes `orm_version: "1.0"` and nothing checks or migrates
@@ -200,6 +200,17 @@ exist in the wild is much harder than adding a version check now.
 Recommendation: at minimum, reject unknown versions with a clear
 message; design the migration hook before the format needs to
 change.
+
+RESOLVED: a pure `serialization/schemaVersion.ts` holds the single
+source of truth (`CURRENT_ORM_VERSION`), a migration registry
+(`ORM_VERSION_MIGRATIONS`, empty today), and a pure planner
+(`planMigration`/`applyMigrations`). `OrmYamlSerializer.deserialize`
+now migrates an older document to the current version before schema
+validation, and rejects an unsupported version with a clear message
+(distinguishing "newer barwise" from "no migration path") instead of
+the schema's cryptic `const` mismatch. The serializer stamps
+`CURRENT_ORM_VERSION` on output. Versioning the project/mapping
+formats can follow the same pattern when needed.
 
 ### A3. Slim the core barrel export
 
