@@ -246,20 +246,32 @@ published.
 
 ### A5. Minor architecture items
 
-- [ ] Priority: P3 (recommended)
+- [x] Priority: P3 -- triaged (June 2026); the crypto inconsistency is
+      fixed, the rest are deliberate or deferred (see below)
 
 - `mcp/src/server.ts` hardcodes `SERVER_VERSION = "1.5.0"`. A sync
   test guards it, but reading package.json at build/bundle time
-  removes the error class entirely.
+  removes the error class entirely. KEEP AS IS: `server.ts` is bundled
+  into CJS by two separate esbuild configs (its own and the VS Code
+  extension's), where a runtime package.json read is unreliable. The
+  pinned constant plus the sync test (and an explanatory comment) is a
+  deliberate, adequate choice; the build-time-inject alternative would
+  have to be coordinated across both bundlers for marginal gain.
 - `core/src/model/FactType.ts:67` uses the global
   `crypto.randomUUID()` while `ModelElement.ts` imports from
-  `node:crypto`. Works on Node 20+, but should be consistent.
+  `node:crypto`. Works on Node 20+, but should be consistent. RESOLVED:
+  `FactType.ts` now imports `randomUUID` from `node:crypto`, matching
+  the stated convention and the rest of `model/`. It was the only such
+  deviation in the codebase.
 - Consider branded ID types
   (`type ElementId = string & { readonly __brand: unique symbol }`)
-  since all cross-references are plain string IDs today.
+  since all cross-references are plain string IDs today. DEFERRED: this
+  is a broad, invasive type change touching every ID field and
+  cross-reference -- worth its own spec, not a "minor" fix.
 - The format registry is a package-level singleton; tests must call
   `clearFormats()`. Acceptable, but worth noting if parallel test
-  isolation ever becomes an issue.
+  isolation ever becomes an issue. ACKNOWLEDGED: no action; the note
+  stands as guidance.
 
 ### A6. Diagram stack: consolidate on the React renderer
 
