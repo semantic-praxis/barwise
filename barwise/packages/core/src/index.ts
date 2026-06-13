@@ -99,6 +99,7 @@ export {
   type SchemaValidationResult,
   SchemaValidator,
 } from "./serialization/SchemaValidator.js";
+export { CURRENT_ORM_VERSION, type OrmVersionMigration } from "./serialization/schemaVersion.js";
 
 // Validation
 export { type Diagnostic, type DiagnosticSeverity } from "./validation/Diagnostic.js";
