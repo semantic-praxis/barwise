@@ -71,7 +71,8 @@ relocate too, for uniformity.
 | `DbtDialectDetector`                | `process.env` + `profiles.yml`           | `@barwise/dbt`; env as options         |
 | `SqlImportFormat`                   | `parse()` pure; `parseAsync()` scans dir | pure parse -> formats; dir scan -> dbt |
 | `lineage/manifest`                  | `readManifest`/`writeManifest`           | read/write -> tool layer; logic pure   |
-| `lineage/resolveArtifact`           | `existsSync` + traversal                 | move to tool layer                     |
+| `lineage/impact`, `staleness`       | read the manifest via `readManifest`     | signature -> manifest arg; pure        |
+| `lineage/resolveArtifact`           | `existsSync` + traversal                 | pure match in core; walk -> tool layer |
 | `serialization/ProjectLoader`       | walks/reads project files                | fs walk -> tool layer; assembly pure   |
 | `OrmProject.ExportFormat`           | hardcodes format names                   | -> registered-name `string`            |
 
@@ -124,7 +125,7 @@ Correctness-driven determinism fixes first (smallest blast radius
 first), then the orthogonality relocation. Each lands as its own PR and
 keeps the full suite green.
 
-### 1. `DbtDialectDetector`: env -> explicit options
+### 1. `DbtDialectDetector`: env -> explicit options (done: PR #112)
 
 Replace `process.env["DBT_TARGET_TYPE"]` / `DBT_ADAPTER` / `HOME` reads
 with fields on an explicit options object supplied by the caller. The
@@ -133,11 +134,30 @@ isolated determinism fix; lands before any package move.
 
 ### 2. Lineage manifest I/O -> tool layer
 
-Move `readManifest`/`writeManifest`/`resolveArtifact` (fs) out of
-`core/lineage` into the CLI/MCP lineage commands. Core keeps `hashModel`,
-`updateManifest`, `staleness`, and `impact` as pure functions over a
-manifest object. The CLI `lineage` command becomes: read manifest (tool)
--> compute (core) -> write manifest (tool).
+Make core's lineage layer pure and move the filesystem to the tool
+layer. This is larger than first briefed: besides `updateManifest`,
+both `analyzeImpact` and `checkStaleness` take a `dir` and read the
+manifest via `readManifest`. So three public signatures change from a
+`dir` to a manifest object:
+
+- `updateManifest(dir, entry, existing?)` -> `updateManifest(entry, existing?)` (pure merge).
+- `analyzeImpact(dir, elementId)` -> `analyzeImpact(manifest, elementId)`.
+- `checkStaleness(dir, model)` -> `checkStaleness(manifest, model)`.
+
+Core also loses `readManifest`, `writeManifest`, `resolveArtifact`, and
+`findOrmModel`. `resolveArtifact` splits: the pure path match stays in
+core (e.g. `resolveArtifactInManifest(manifest, path)`); the
+parent-directory walk moves to the tool layer. `hashModel` and the YAML
+serialize/parse of the manifest stay (pure).
+
+The tool layer (cli and mcp) gains thin fs wrappers -- read manifest,
+write manifest, walk for the artifact -- over the pure core helpers. The
+CLI `lineage` and `export` commands and the mcp `lineageStatus`,
+`impactAnalysis`, and `describeDomain` tools rewire to: read (tool) ->
+compute (core) -> write (tool).
+
+This is the largest determinism workstream and does not split cleanly:
+every caller depends on `readManifest`, so it leaves core in one step.
 
 ### 3. ProjectLoader fs -> tool layer
 
@@ -173,6 +193,11 @@ formats. This is the orthogonality step that makes every format pluggable.
   `@barwise/formats`). `loadProject` is reshaped. Every downstream import
   (`cli`, `mcp`, `vscode`) updates -- the one-way dependency graph makes
   the blast radius explicit and the build surfaces every site.
+- Lineage (workstream 2): three public functions change signature
+  (`updateManifest`, `analyzeImpact`, `checkStaleness`, all `dir` ->
+  manifest object) and four leave core (`readManifest`, `writeManifest`,
+  `resolveArtifact`, `findOrmModel`). The cli `lineage`/`export` and mcp
+  `lineageStatus`/`impactAnalysis`/`describeDomain` callers update.
 - Registration: `registerBuiltinFormats()` is replaced by
   `registerStandardFormats()` + `registerDbtFormats()` +
   `registerCodeFormats()`, composed by each tool. A format absent from
@@ -184,6 +209,12 @@ formats. This is the orthogonality step that makes every format pluggable.
 
 ## Open decisions (for review)
 
+- **Lineage fs wrappers (workstream 2).** The thin read/write/walk
+  wrappers are needed in both cli and mcp, which share no package.
+  Duplicate them over the pure core helpers (the project tolerates small
+  tool-layer duplication -- CLI `loadModel` vs MCP `resolveSource`), or
+  add a shared tool-io helper (a new node in the graph)? Recommend
+  duplicating: about 40 lines, no new package.
 - **SQL placement.** The pure SQL `parse(content)` fits `@barwise/formats`;
   its directory-scan path fits `@barwise/dbt` (warehouse-oriented). Split
   it that way, or keep all SQL in one package?
