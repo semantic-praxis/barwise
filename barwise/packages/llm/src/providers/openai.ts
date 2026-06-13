@@ -4,9 +4,14 @@
  * Uses OpenAI's structured output (response_format with json_schema)
  * to get structured JSON output conforming to the extraction response
  * schema.
+ *
+ * The SDK is loaded lazily (dynamic import on first use) so that
+ * importing this module -- or the provider factory -- does not pull
+ * `openai` into memory for callers that never select the OpenAI
+ * provider.
  */
 
-import OpenAI from "openai";
+import type OpenAI from "openai";
 import type { CompletionRequest, CompletionResponse, LlmClient } from "../LlmClient.js";
 
 export interface OpenAIClientOptions {
@@ -25,14 +30,24 @@ export interface OpenAIClientOptions {
  * response_format to constrain the output to the specified JSON shape.
  */
 export class OpenAILlmClient implements LlmClient {
-  private readonly client: OpenAI;
+  private client?: OpenAI;
+  private readonly apiKey?: string;
   private readonly model: string;
   private readonly maxTokens: number;
 
   constructor(options?: OpenAIClientOptions) {
-    this.client = new OpenAI({ apiKey: options?.apiKey });
+    this.apiKey = options?.apiKey;
     this.model = options?.model ?? "gpt-4o";
     this.maxTokens = options?.maxTokens ?? 8192;
+  }
+
+  /** Load the SDK and construct the underlying client on first use. */
+  private async getClient(): Promise<OpenAI> {
+    if (!this.client) {
+      const { default: OpenAICtor } = await import("openai");
+      this.client = new OpenAICtor({ apiKey: this.apiKey });
+    }
+    return this.client;
   }
 
   async complete(request: CompletionRequest): Promise<CompletionResponse> {
@@ -45,8 +60,9 @@ export class OpenAILlmClient implements LlmClient {
   private async completeText(
     request: CompletionRequest,
   ): Promise<CompletionResponse> {
+    const client = await this.getClient();
     const start = Date.now();
-    const response = await this.client.chat.completions.create({
+    const response = await client.chat.completions.create({
       model: this.model,
       max_tokens: this.maxTokens,
       messages: [
@@ -72,8 +88,9 @@ export class OpenAILlmClient implements LlmClient {
   private async completeStructured(
     request: CompletionRequest,
   ): Promise<CompletionResponse> {
+    const client = await this.getClient();
     const start = Date.now();
-    const response = await this.client.chat.completions.create({
+    const response = await client.chat.completions.create({
       model: this.model,
       max_tokens: this.maxTokens,
       messages: [

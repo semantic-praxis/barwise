@@ -3,9 +3,14 @@
  *
  * Uses Claude's tool_use capability to get structured JSON output
  * conforming to the extraction response schema.
+ *
+ * The SDK is loaded lazily (dynamic import on first use) so that
+ * importing this module -- or the provider factory -- does not pull
+ * `@anthropic-ai/sdk` into memory for callers that never select the
+ * Anthropic provider.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import type { CompletionRequest, CompletionResponse, LlmClient } from "../LlmClient.js";
 
 export interface AnthropicClientOptions {
@@ -24,16 +29,24 @@ export interface AnthropicClientOptions {
  * the output to the specified JSON shape.
  */
 export class AnthropicLlmClient implements LlmClient {
-  private readonly client: Anthropic;
+  private client?: Anthropic;
+  private readonly apiKey?: string;
   private readonly model: string;
   private readonly maxTokens: number;
 
   constructor(options?: AnthropicClientOptions) {
-    this.client = new Anthropic({
-      apiKey: options?.apiKey,
-    });
+    this.apiKey = options?.apiKey;
     this.model = options?.model ?? "claude-sonnet-4-5-20250929";
     this.maxTokens = options?.maxTokens ?? 8192;
+  }
+
+  /** Load the SDK and construct the underlying client on first use. */
+  private async getClient(): Promise<Anthropic> {
+    if (!this.client) {
+      const { default: AnthropicCtor } = await import("@anthropic-ai/sdk");
+      this.client = new AnthropicCtor({ apiKey: this.apiKey });
+    }
+    return this.client;
   }
 
   async complete(request: CompletionRequest): Promise<CompletionResponse> {
@@ -46,8 +59,9 @@ export class AnthropicLlmClient implements LlmClient {
   private async completeText(
     request: CompletionRequest,
   ): Promise<CompletionResponse> {
+    const client = await this.getClient();
     const start = Date.now();
-    const response = await this.client.messages.create({
+    const response = await client.messages.create({
       model: this.model,
       max_tokens: this.maxTokens,
       system: request.systemPrompt,
@@ -70,10 +84,11 @@ export class AnthropicLlmClient implements LlmClient {
   private async completeWithTool(
     request: CompletionRequest,
   ): Promise<CompletionResponse> {
+    const client = await this.getClient();
     const toolName = "extract_orm_model";
 
     const start = Date.now();
-    const response = await this.client.messages.create({
+    const response = await client.messages.create({
       model: this.model,
       max_tokens: this.maxTokens,
       system: request.systemPrompt,

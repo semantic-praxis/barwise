@@ -33,8 +33,23 @@ describe("OllamaLlmClient", () => {
   });
 
   describe("constructor", () => {
-    it("uses default baseUrl, model, and maxTokens", () => {
+    // The SDK client is constructed lazily on first complete(), so these
+    // tests trigger a completion before asserting how it was configured.
+    it("does not load the SDK until the first completion", () => {
       new OllamaLlmClient();
+
+      // The OpenAI SDK constructor must not have run yet.
+      expect(capturedConstructorArgs).toBeUndefined();
+    });
+
+    it("uses default baseUrl, model, and maxTokens", async () => {
+      const client = new OllamaLlmClient();
+
+      mockCreate.mockResolvedValueOnce({
+        choices: [{ message: { content: "hello" } }],
+      });
+
+      await client.complete({ systemPrompt: "sys", userMessage: "user" });
 
       expect(capturedConstructorArgs).toEqual({
         baseURL: "http://localhost:11434/v1",
@@ -42,34 +57,40 @@ describe("OllamaLlmClient", () => {
       });
     });
 
-    it("accepts custom baseUrl", () => {
-      new OllamaLlmClient({ baseUrl: "http://myserver:8080" });
+    it("accepts custom baseUrl", async () => {
+      const client = new OllamaLlmClient({ baseUrl: "http://myserver:8080" });
+
+      mockCreate.mockResolvedValueOnce({
+        choices: [{ message: { content: "hello" } }],
+      });
+
+      await client.complete({ systemPrompt: "sys", userMessage: "user" });
 
       expect(capturedConstructorArgs?.baseURL).toBe("http://myserver:8080/v1");
     });
 
-    it("uses default model when not specified", () => {
+    it("uses default model when not specified", async () => {
       const client = new OllamaLlmClient();
 
       mockCreate.mockResolvedValueOnce({
         choices: [{ message: { content: "hello" } }],
       });
 
-      void client.complete({ systemPrompt: "sys", userMessage: "user" });
+      await client.complete({ systemPrompt: "sys", userMessage: "user" });
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({ model: "llama3.1" }),
       );
     });
 
-    it("accepts custom model", () => {
+    it("accepts custom model", async () => {
       const client = new OllamaLlmClient({ model: "mistral" });
 
       mockCreate.mockResolvedValueOnce({
         choices: [{ message: { content: "hello" } }],
       });
 
-      void client.complete({ systemPrompt: "sys", userMessage: "user" });
+      await client.complete({ systemPrompt: "sys", userMessage: "user" });
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({ model: "mistral" }),

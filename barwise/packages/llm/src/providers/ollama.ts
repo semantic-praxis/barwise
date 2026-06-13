@@ -6,9 +6,14 @@
  *
  * Ollama runs models locally with no API key required, making it
  * the default fallback when no cloud provider keys are configured.
+ *
+ * The SDK is loaded lazily (dynamic import on first use) so that
+ * importing this module -- or the provider factory -- does not pull
+ * `openai` into memory for callers that never select the Ollama
+ * provider.
  */
 
-import OpenAI from "openai";
+import type OpenAI from "openai";
 import type { CompletionRequest, CompletionResponse, LlmClient } from "../LlmClient.js";
 
 export interface OllamaClientOptions {
@@ -28,15 +33,24 @@ export interface OllamaClientOptions {
  * same response_format mechanism.
  */
 export class OllamaLlmClient implements LlmClient {
-  private readonly client: OpenAI;
+  private client?: OpenAI;
+  private readonly baseURL: string;
   private readonly model: string;
   private readonly maxTokens: number;
 
   constructor(options?: OllamaClientOptions) {
-    const baseURL = (options?.baseUrl ?? "http://localhost:11434") + "/v1";
-    this.client = new OpenAI({ baseURL, apiKey: "ollama" });
+    this.baseURL = (options?.baseUrl ?? "http://localhost:11434") + "/v1";
     this.model = options?.model ?? "llama3.1";
     this.maxTokens = options?.maxTokens ?? 8192;
+  }
+
+  /** Load the SDK and construct the underlying client on first use. */
+  private async getClient(): Promise<OpenAI> {
+    if (!this.client) {
+      const { default: OpenAICtor } = await import("openai");
+      this.client = new OpenAICtor({ baseURL: this.baseURL, apiKey: "ollama" });
+    }
+    return this.client;
   }
 
   async complete(request: CompletionRequest): Promise<CompletionResponse> {
@@ -49,8 +63,9 @@ export class OllamaLlmClient implements LlmClient {
   private async completeText(
     request: CompletionRequest,
   ): Promise<CompletionResponse> {
+    const client = await this.getClient();
     const start = Date.now();
-    const response = await this.client.chat.completions.create({
+    const response = await client.chat.completions.create({
       model: this.model,
       max_tokens: this.maxTokens,
       messages: [
@@ -76,8 +91,9 @@ export class OllamaLlmClient implements LlmClient {
   private async completeStructured(
     request: CompletionRequest,
   ): Promise<CompletionResponse> {
+    const client = await this.getClient();
     const start = Date.now();
-    const response = await this.client.chat.completions.create({
+    const response = await client.chat.completions.create({
       model: this.model,
       max_tokens: this.maxTokens,
       messages: [

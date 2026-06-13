@@ -31,14 +31,14 @@ describe("OpenAILlmClient", () => {
   });
 
   describe("constructor", () => {
-    it("uses default model and maxTokens", () => {
+    it("uses default model and maxTokens", async () => {
       const client = new OpenAILlmClient();
       // Verify defaults are used when complete() is called.
       mockCreate.mockResolvedValueOnce({
         choices: [{ message: { content: "hello" } }],
       });
 
-      void client.complete({
+      await client.complete({
         systemPrompt: "sys",
         userMessage: "user",
       });
@@ -52,7 +52,7 @@ describe("OpenAILlmClient", () => {
       );
     });
 
-    it("accepts custom model and maxTokens", () => {
+    it("accepts custom model and maxTokens", async () => {
       const client = new OpenAILlmClient({
         model: "gpt-4o-mini",
         maxTokens: 4096,
@@ -62,7 +62,7 @@ describe("OpenAILlmClient", () => {
         choices: [{ message: { content: "hello" } }],
       });
 
-      void client.complete({
+      await client.complete({
         systemPrompt: "sys",
         userMessage: "user",
       });

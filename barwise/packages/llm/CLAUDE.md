@@ -7,10 +7,18 @@ ORM models using structured LLM output.
 ## Dependency Rule
 
 This package depends on `@barwise/core` (model types, serializers) and
-`@anthropic-ai/sdk` (Anthropic API client). It has ZERO dependencies
-on VS Code. The LLM integration is intentionally kept at the boundary
-of the system -- the core model and validation logic know nothing
-about LLMs.
+the provider SDKs `@anthropic-ai/sdk` and `openai` (the latter also
+powers the Ollama provider via its OpenAI-compatible API). It has ZERO
+dependencies on VS Code. The LLM integration is intentionally kept at
+the boundary of the system -- the core model and validation logic know
+nothing about LLMs.
+
+Each provider loads its SDK lazily (a dynamic `import()` on first use)
+and constructs the underlying client only when a completion is first
+requested, so importing this package -- or the provider factory -- does
+not pull either SDK into memory for callers that never run that
+provider. New providers added under `src/providers/` must follow the
+same pattern.
 
 `@barwise/diagram` is a devDependency only (used in integration tests).
 
