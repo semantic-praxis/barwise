@@ -6,8 +6,8 @@
  * OrmModel with high confidence (structured format, no heuristics).
  */
 
+import type { ImportFormat, ImportOptions, ImportResult } from "@barwise/core";
 import { importNormaXml, NormaImportError } from "./NormaXmlImporter.js";
-import type { ImportFormat, ImportOptions, ImportResult } from "./types.js";
 
 /**
  * NORMA XML import format: parses .orm XML files into ORM models.

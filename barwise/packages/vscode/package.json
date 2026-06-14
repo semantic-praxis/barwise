@@ -684,6 +684,7 @@
     "@barwise/core": "1.5.0",
     "@barwise/dbt": "1.5.0",
     "@barwise/diagram": "1.5.0",
+    "@barwise/formats": "1.5.0",
     "@barwise/llm": "1.5.0",
     "@barwise/mcp": "1.5.0",
     "@modelcontextprotocol/sdk": "^1.27.0",

@@ -16,10 +16,14 @@
  * LLM enrichment phase (not implemented here) can improve naming and add definitions.
  */
 
+import {
+  type ConceptualDataTypeName,
+  type ImportFormat,
+  type ImportOptions,
+  type ImportResult,
+  OrmModel,
+} from "@barwise/core";
 import { parse as parseYaml } from "yaml";
-import type { ConceptualDataTypeName } from "../model/ObjectType.js";
-import { OrmModel } from "../model/OrmModel.js";
-import type { ImportFormat, ImportOptions, ImportResult } from "./types.js";
 
 /**
  * A parsed OpenAPI schema object.

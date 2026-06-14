@@ -6,8 +6,8 @@
  * proper ExportResult structure.
  */
 import { describe, expect, it } from "vitest";
-import { DdlExportFormat } from "../../src/export/DdlExportFormat.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { DdlExportFormat } from "../src/DdlExportFormat.js";
+import { ModelBuilder } from "./helpers/ModelBuilder.js";
 
 const ddlFormat = new DdlExportFormat();
 

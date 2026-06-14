@@ -4,14 +4,14 @@
  * Verifies that NormaImportFormat correctly implements the ImportFormat
  * interface and integrates with the unified format registry.
  */
+import { clearFormats, getExporter, getImporter } from "@barwise/core";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
-import { normaFormat, registerBuiltinFormats } from "../../src/format/formats.js";
-import { clearFormats, getExporter, getImporter } from "../../src/format/registry.js";
-import { NormaImportFormat } from "../../src/import/NormaImportFormat.js";
-import { NormaImportError } from "../../src/import/NormaXmlImporter.js";
+import { NormaImportFormat } from "../src/NormaImportFormat.js";
+import { NormaImportError } from "../src/NormaXmlImporter.js";
+import { normaFormat, registerStandardFormats } from "../src/registration.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -95,8 +95,8 @@ describe("NormaImportFormat", () => {
       clearFormats();
     });
 
-    it("is discoverable via registerBuiltinFormats", () => {
-      registerBuiltinFormats();
+    it("is discoverable via registerStandardFormats", () => {
+      registerStandardFormats();
 
       const importer = getImporter("norma");
       expect(importer).toBeDefined();
@@ -104,7 +104,7 @@ describe("NormaImportFormat", () => {
     });
 
     it("is not listed as an exporter", () => {
-      registerBuiltinFormats();
+      registerStandardFormats();
 
       // norma is import-only; getExporter should not find it
       expect(getExporter("norma")).toBeUndefined();

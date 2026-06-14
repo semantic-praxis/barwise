@@ -181,11 +181,8 @@ export {
 } from "./verbalization/Verbalization.js";
 export { Verbalizer } from "./verbalization/Verbalizer.js";
 
-// Import (NORMA .orm XML)
-export { NormaImportFormat } from "./import/NormaImportFormat.js";
-export { NormaImportError } from "./import/NormaXmlImporter.js";
-
-// Import format interface (dbt connector lives in @barwise/dbt)
+// Import format interface (standard format connectors live in
+// @barwise/formats; the dbt connector in @barwise/dbt)
 export type { ImportFormat, ImportOptions, ImportResult } from "./import/types.js";
 
 // SQL analysis infrastructure
@@ -210,15 +207,12 @@ export type {
   ExportResult,
 } from "./export/types.js";
 
-// Unified format system (registry + descriptors)
-export {
-  avroFormat,
-  ddlFormat,
-  normaFormat,
-  openApiFormat,
-  registerBuiltinFormats,
-  sqlFormat,
-} from "./format/formats.js";
+// Population rendering capability (wrapped by the relocated DDL export
+// descriptor in @barwise/formats; also used by core's own renderDdl)
+export { renderPopulationAsSql } from "./export/populationRenderer.js";
+
+// Unified format system (registry only; descriptors register from
+// outside core via @barwise/formats, @barwise/dbt, @barwise/code-analysis)
 export {
   clearFormats,
   formatRegistry,

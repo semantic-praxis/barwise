@@ -8,15 +8,20 @@
  */
 
 import {
+  type AvroField,
+  type AvroSchema,
+  type AvroSchemaSet,
+  avroSchemaToJson,
   collectExportAnnotations,
   type ExportAnnotation,
-} from "../annotation/ExportAnnotationCollector.js";
-import { RelationalMapper } from "../mapping/RelationalMapper.js";
-import type { AvroField, AvroSchema, AvroSchemaSet } from "../mapping/renderers/avro.js";
-import { avroSchemaToJson, renderAvro } from "../mapping/renderers/avro.js";
-import type { OrmModel } from "../model/OrmModel.js";
-import { ValidationEngine } from "../validation/ValidationEngine.js";
-import type { ExportFormatAdapter, ExportOptions, ExportResult } from "./types.js";
+  type ExportFormatAdapter,
+  type ExportOptions,
+  type ExportResult,
+  type OrmModel,
+  RelationalMapper,
+  renderAvro,
+  ValidationEngine,
+} from "@barwise/core";
 
 /**
  * Apache Avro schema export format.

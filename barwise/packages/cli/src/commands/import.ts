@@ -14,9 +14,9 @@ import {
   getImporter,
   mergeAndValidate,
   OrmYamlSerializer,
-  registerBuiltinFormats,
 } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
+import { registerStandardFormats } from "@barwise/formats";
 import { createLlmClient, processTranscript } from "@barwise/llm";
 import type { ProviderName } from "@barwise/llm";
 import type { Command } from "commander";
@@ -26,8 +26,8 @@ import { readFile, writeOutput } from "../helpers/io.js";
 
 const serializer = new OrmYamlSerializer();
 
-// Register built-in formats (DDL, OpenAPI, etc.) with the unified registry.
-registerBuiltinFormats();
+// Register the standard formats (DDL, OpenAPI, Avro, SQL, NORMA).
+registerStandardFormats();
 // Register code-analysis formats (TypeScript, etc.)
 registerCodeFormats();
 // Register the dbt connector format.

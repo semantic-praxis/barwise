@@ -15,7 +15,7 @@
  *
  * We do not embed or redistribute any NORMA source code or XSD schemas.
  */
-import type { OrmModel } from "../model/OrmModel.js";
+import type { OrmModel } from "@barwise/core";
 import { mapNormaToOrm, NormaMappingError } from "./NormaToOrmMapper.js";
 import { NormaParseError, parseNormaXml } from "./NormaXmlParser.js";
 

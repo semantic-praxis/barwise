@@ -1,19 +1,11 @@
 /**
- * Tests for built-in format descriptors and registerBuiltinFormats.
+ * Tests for the standard format descriptors and registerStandardFormats.
  *
- * Verifies that all built-in descriptors (DDL, OpenAPI, Avro) are
- * correctly shaped and that registerBuiltinFormats populates the unified
- * registry. The dbt connector lives in @barwise/dbt and is tested there.
+ * Verifies that all standard descriptors (DDL, OpenAPI, Avro, SQL, NORMA)
+ * are correctly shaped and that registerStandardFormats populates the
+ * unified registry. The dbt connector lives in @barwise/dbt; code
+ * connectors in @barwise/code-analysis.
  */
-import { beforeEach, describe, expect, it } from "vitest";
-import {
-  avroFormat,
-  ddlFormat,
-  normaFormat,
-  openApiFormat,
-  registerBuiltinFormats,
-  sqlFormat,
-} from "../../src/format/formats.js";
 import {
   clearFormats,
   formatRegistry,
@@ -23,9 +15,18 @@ import {
   listExporters,
   listFormats,
   listImporters,
-} from "../../src/format/registry.js";
+} from "@barwise/core";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  avroFormat,
+  ddlFormat,
+  normaFormat,
+  openApiFormat,
+  registerStandardFormats,
+  sqlFormat,
+} from "../src/registration.js";
 
-describe("Built-in format descriptors", () => {
+describe("Standard format descriptors", () => {
   describe("ddlFormat", () => {
     it("has name 'ddl'", () => {
       expect(ddlFormat.name).toBe("ddl");
@@ -142,13 +143,13 @@ describe("Built-in format descriptors", () => {
   });
 });
 
-describe("registerBuiltinFormats", () => {
+describe("registerStandardFormats", () => {
   beforeEach(() => {
     clearFormats();
   });
 
-  it("registers all built-in formats", () => {
-    registerBuiltinFormats();
+  it("registers all standard formats", () => {
+    registerStandardFormats();
 
     expect(getFormat("ddl")).toBeDefined();
     expect(getFormat("openapi")).toBeDefined();
@@ -159,21 +160,21 @@ describe("registerBuiltinFormats", () => {
   });
 
   it("makes DDL available as both importer and exporter", () => {
-    registerBuiltinFormats();
+    registerStandardFormats();
 
     expect(getImporter("ddl")).toBeDefined();
     expect(getExporter("ddl")).toBeDefined();
   });
 
   it("makes OpenAPI available as both importer and exporter", () => {
-    registerBuiltinFormats();
+    registerStandardFormats();
 
     expect(getImporter("openapi")).toBeDefined();
     expect(getExporter("openapi")).toBeDefined();
   });
 
   it("populates both importer and exporter lists", () => {
-    registerBuiltinFormats();
+    registerStandardFormats();
 
     const importers = listImporters();
     const exporters = listExporters();
@@ -187,9 +188,9 @@ describe("registerBuiltinFormats", () => {
   });
 
   it("is idempotent -- safe to call multiple times", () => {
-    registerBuiltinFormats();
-    registerBuiltinFormats();
-    registerBuiltinFormats();
+    registerStandardFormats();
+    registerStandardFormats();
+    registerStandardFormats();
 
     expect(listFormats()).toHaveLength(5);
   });
@@ -198,8 +199,8 @@ describe("registerBuiltinFormats", () => {
     // Pre-register DDL manually.
     formatRegistry.register(ddlFormat);
 
-    // registerBuiltinFormats should skip DDL and register the rest.
-    registerBuiltinFormats();
+    // registerStandardFormats should skip DDL and register the rest.
+    registerStandardFormats();
 
     expect(listFormats()).toHaveLength(5);
     expect(getFormat("ddl")).toBe(ddlFormat);

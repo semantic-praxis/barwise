@@ -47,8 +47,8 @@ export function createKotlinFormat(sessionProvider?: LspSessionProvider): Format
 /**
  * Register all code-analysis format importers with the unified registry.
  *
- * Call this at tool startup (CLI main, MCP server init, etc.) after
- * registerBuiltinFormats(). Safe to call multiple times -- skips
+ * Call this at tool startup (CLI main, MCP server init, etc.) alongside
+ * registerStandardFormats(). Safe to call multiple times -- skips
  * formats that are already registered.
  */
 export function registerCodeFormats(sessionProvider?: LspSessionProvider): void {

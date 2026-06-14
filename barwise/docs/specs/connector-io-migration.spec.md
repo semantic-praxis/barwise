@@ -1,6 +1,6 @@
 # Connector I/O Migration: Restore Determinism in Core
 
-Status: Workstreams 1-4 landed; workstream 5 specified and ready
+Status: Complete -- all five workstreams landed; core ships no interop format
 Tracking: REPO_REVIEW-2026-06.md finding #2
 
 ## Principle
@@ -221,7 +221,7 @@ This workstream removes the dbt filesystem and subprocess I/O from core;
 the one I/O path left afterward is `SqlImportFormat`'s directory scan,
 which leaves in workstream 5.
 
-### 5. `@barwise/formats` package + retire builtins
+### 5. `@barwise/formats` package + retire builtins (done)
 
 Relocate the standard descriptors into a new `@barwise/formats` package
 with `registerStandardFormats()`, and delete `registerBuiltinFormats()`

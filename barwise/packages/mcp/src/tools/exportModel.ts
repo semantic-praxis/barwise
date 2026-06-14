@@ -2,15 +2,16 @@
  * export_model tool: exports an ORM model to a specified format.
  */
 
-import { getExporter, registerBuiltinFormats } from "@barwise/core";
+import { getExporter } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
+import { registerStandardFormats } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveSource } from "../helpers/resolve.js";
 import { boundedTextResult } from "../helpers/response.js";
 
-// Register built-in formats (DDL, OpenAPI, etc.) with the unified registry.
-registerBuiltinFormats();
+// Register the standard formats (DDL, OpenAPI, Avro, SQL, NORMA).
+registerStandardFormats();
 // Register the dbt connector format.
 registerDbtFormats();
 

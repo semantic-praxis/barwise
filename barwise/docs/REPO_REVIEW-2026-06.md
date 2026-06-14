@@ -50,13 +50,13 @@ replace its contents with a README pointing at the root workflows.
 
 ### 2. Enforce the connector decision for I/O in core
 
-- [ ] Priority: P2 -- implementation underway. Migration spec at
+- [x] Priority: P2 -- DONE. Migration spec at
       docs/specs/connector-io-migration.spec.md (five independently
-      shippable workstreams; resolves toward making all interop formats
-      pluggable so core ships none). Workstreams 1-4 have landed
-      (`@barwise/dbt` now owns the dbt connector); only workstream 5
-      (`@barwise/formats` + retire builtins) remains. Connector
-      convention is in CLAUDE.md. (June 2026)
+      shippable workstreams). All five landed: core now ships no interop
+      format -- the standard descriptors live in `@barwise/formats`, dbt
+      in `@barwise/dbt`, code importers in `@barwise/code-analysis`, and
+      `registerBuiltinFormats()` is retired. Connector convention is in
+      CLAUDE.md. (June 2026)
 
 Decision context: I/O is done through format connectors registered
 in the `FormatDescriptor` registry. The findings below are not a
