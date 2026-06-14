@@ -22,7 +22,32 @@ jobs:
         working-directory: barwise
 
     steps:
+      # fetch-depth: 0 so the docs-only detector below can diff the PR
+      # against its base commit.
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # A pull request that touches only Markdown still needs its prose
+      # formatting checked (dprint covers .md), but not build, test, or
+      # the linters. Detect that case and skip the heavy steps. Only
+      # applies to pull_request events; pushes to main always run the
+      # full pipeline. The job itself always runs, so the required check
+      # always reports a result.
+      - name: Detect docs-only pull request
+        id: changes
+        if: github.event_name == 'pull_request'
+        run: |
+          base='${{ github.event.pull_request.base.sha }}'
+          changed="$(git diff --name-only "$base" HEAD)"
+          echo "Changed files:"
+          echo "$changed"
+          if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qvE '\.md$'; then
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+            echo "Docs-only change -- skipping build, test, and lint steps."
+          else
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/setup-node@v6
         with:
@@ -30,26 +55,39 @@ jobs:
           cache: npm
           cache-dependency-path: barwise/package-lock.json
 
+      # npm ci runs unconditionally: dprint (used by fmt:check) is a dev
+      # dependency.
       - run: npm ci
 
       - run: npm run build
+        if: steps.changes.outputs.docs_only != 'true'
 
       - run: npm run --workspace=@barwise/mcp bundle
+        if: steps.changes.outputs.docs_only != 'true'
 
       - run: npm run publint
+        if: steps.changes.outputs.docs_only != 'true'
 
       - run: npm run test:coverage
+        if: steps.changes.outputs.docs_only != 'true'
 
       - run: npm run validate:examples
+        if: steps.changes.outputs.docs_only != 'true'
 
       - run: npm run lint
+        if: steps.changes.outputs.docs_only != 'true'
 
       - run: npm run knip
+        if: steps.changes.outputs.docs_only != 'true'
 
       - run: npm run oxlint
+        if: steps.changes.outputs.docs_only != 'true'
 
       - run: npm run circular
+        if: steps.changes.outputs.docs_only != 'true'
 
+      # Always runs: dprint also formats Markdown, so docs-only PRs are
+      # still gated on prose formatting.
       - run: npm run fmt:check
 
       # Reports known advisories without gating the build. There is an
@@ -57,4 +95,5 @@ jobs:
       # dependabot opens PRs to chip away at it. Tighten to a blocking
       # step once the backlog is cleared.
       - run: npm audit --audit-level=high
+        if: steps.changes.outputs.docs_only != 'true'
         continue-on-error: true
