@@ -20,8 +20,15 @@ src/
     GraphTypes.ts       Graph node/edge types (ObjectTypeNode, FactTypeNode, RoleBox)
     ModelToGraph.ts     Converts OrmModel into an OrmGraph
   layout/
-    LayoutTypes.ts      Positioned graph types with coordinates and dimensions
-    ElkLayoutEngine.ts  Runs ELK.js to compute node/edge positions
+    LayoutTypes.ts        Positioned graph types with coordinates and dimensions
+    ElkLayoutEngine.ts    Orchestrates the two-pass layout (the layoutGraph entry point)
+    ElkInterop.ts         Lazily constructs the shared ELK instance
+    EntityPlacement.ts    Pass 1: cluster-aware entity placement via ELK stress
+    ClusterDetection.ts   Louvain community detection (pure)
+    PostAdjustments.ts    Subtype radial fan + leaf value-type alignment
+    FactTypePlacement.ts  Pass 2: fact-type and constraint-node placement
+    EdgeRouting.ts        Edge routing, border-intersection geometry, viewBox bounds
+    CollisionResolver.ts  Coordinate normalization + overlap resolution (pure)
   render/
     theme.ts            Color/dimension constants (also via the ./theme subpath)
   session/

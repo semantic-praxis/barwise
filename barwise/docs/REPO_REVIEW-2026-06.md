@@ -159,19 +159,20 @@ un-privating it later is a one-line change.
 
 ### A1. Break up the god files
 
-- [ ] Priority: P3 (recommended) -- none urgent; ElkLayoutEngine first
-      (planned: `docs/specs/diagram-layout-decomposition.spec.md`)
+- [ ] Priority: P3 (recommended) -- ElkLayoutEngine DONE; other god
+      files remain
 
 Worst offenders, in order:
 
-- `diagram/src/layout/ElkLayoutEngine.ts` (1,812 lines) -- ELK
-  interop, two-pass layout, collision resolution, subtype radial
-  placement, and edge routing in one file. Suggested split:
-  ElkInterop, EntityPlacementPass, FactTypePlacementPass,
-  PostAdjustments, EdgeRouter, CollisionResolver. Unaffected by the
-  React front-end decision: layout runs host-side for every front
-  end (webview or local server), so this stays the top
-  decomposition target.
+- `diagram/src/layout/ElkLayoutEngine.ts` (1,812 lines) -- DONE (June
+  2026, spec `docs/specs/diagram-layout-decomposition.spec.md`). Split
+  into ElkInterop, EntityPlacement, ClusterDetection, PostAdjustments,
+  FactTypePlacement, EdgeRouting, and CollisionResolver, with
+  `layoutGraph` kept as a thin orchestrator and the public API
+  unchanged. The extracted pure units (cluster detection, routing
+  geometry, collision) are now directly unit-tested, and the diagram
+  coverage floors were raised (statements/lines 76 -> 82, branches
+  80 -> 82).
 - `llm/src/DraftModelParser.ts` (953) -- four-pass algorithm;
   decomposes naturally into one file per pass plus a provenance
   helper.
