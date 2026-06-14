@@ -7,6 +7,16 @@ import { describe, expect, it } from "vitest";
 import { resolveOpenModel } from "../../src/mcp/resolveModelSource.js";
 
 describe("resolveOpenModel", () => {
+  it("prefers a chat-referenced model above everything else", () => {
+    const resolved = resolveOpenModel({
+      referencedOrmFiles: ["/attached.orm.yaml"],
+      activeOrmFile: "/a.orm.yaml",
+      diagramModelPath: "/b.orm.yaml",
+      visibleOrmFiles: ["/c.orm.yaml"],
+    });
+    expect(resolved).toBe("/attached.orm.yaml");
+  });
+
   it("prefers the focused .orm.yaml editor", () => {
     const resolved = resolveOpenModel({
       activeOrmFile: "/a.orm.yaml",

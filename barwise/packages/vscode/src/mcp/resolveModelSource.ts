@@ -6,6 +6,8 @@
  */
 
 export interface OpenModelContext {
+  /** Paths of `.orm.yaml` files attached to the chat as references. */
+  readonly referencedOrmFiles?: readonly string[];
   /** Path of the focused editor, if it is an `.orm.yaml` file. */
   readonly activeOrmFile?: string;
   /** Path of the model shown in the open diagram panel, if any. */
@@ -15,13 +17,17 @@ export interface OpenModelContext {
 }
 
 /**
- * Resolve the open model path from editor/diagram context, in priority
- * order: the focused `.orm.yaml` editor, then the model shown in the open
- * diagram panel, then any visible `.orm.yaml` editor. The diagram fallback
- * is what lets a tool resolve a source when the diagram webview is the
- * focused surface (so `activeTextEditor` is undefined). Returns undefined
- * when nothing is open.
+ * Resolve the model path from chat/editor/diagram context, in priority
+ * order: a `.orm.yaml` attached as a chat reference (the user's most
+ * explicit intent), then the focused `.orm.yaml` editor, then the model
+ * shown in the open diagram panel, then any visible `.orm.yaml` editor.
+ * The diagram fallback is what lets a tool resolve a source when the
+ * diagram webview is the focused surface (so `activeTextEditor` is
+ * undefined). Returns undefined when nothing is available.
  */
 export function resolveOpenModel(ctx: OpenModelContext): string | undefined {
-  return ctx.activeOrmFile ?? ctx.diagramModelPath ?? ctx.visibleOrmFiles?.[0];
+  return ctx.referencedOrmFiles?.[0]
+    ?? ctx.activeOrmFile
+    ?? ctx.diagramModelPath
+    ?? ctx.visibleOrmFiles?.[0];
 }

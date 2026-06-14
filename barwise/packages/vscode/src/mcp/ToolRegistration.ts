@@ -33,9 +33,8 @@ import {
   resolveSource,
 } from "@barwise/mcp";
 import * as vscode from "vscode";
-import { DiagramPanel } from "../diagram/DiagramPanel.js";
 import { CopilotLlmClient } from "../llm/CopilotLlmClient.js";
-import { resolveOpenModel } from "./resolveModelSource.js";
+import { getOpenModelPath } from "./openModel.js";
 
 const serializer = new OrmYamlSerializer();
 
@@ -130,33 +129,8 @@ function toToolResult(
 }
 
 // ---------------------------------------------------------------------------
-// Helper: resolve the active .orm.yaml file path
+// Helper: resolve the source .orm.yaml file path
 // ---------------------------------------------------------------------------
-
-/**
- * Find the model the tools should act on when no explicit source is
- * given. Gathers the editor/diagram context and applies the shared
- * resolution policy: the focused .orm.yaml editor, then the model shown
- * in the open diagram panel, then any visible .orm.yaml editor. The
- * diagram fallback matters because a tool is often called while the
- * diagram webview -- not a text editor -- is focused, leaving
- * `activeTextEditor` undefined.
- */
-function getOpenModelPath(): string | undefined {
-  const active = vscode.window.activeTextEditor;
-  const activeOrmFile = active?.document.fileName.endsWith(".orm.yaml")
-    ? active.document.uri.fsPath
-    : undefined;
-  const visibleOrmFiles = vscode.window.visibleTextEditors
-    .map((e) => e.document)
-    .filter((d) => d.fileName.endsWith(".orm.yaml"))
-    .map((d) => d.uri.fsPath);
-  return resolveOpenModel({
-    activeOrmFile,
-    diagramModelPath: DiagramPanel.activeModelPath(),
-    visibleOrmFiles,
-  });
-}
 
 /**
  * Resolve a source parameter: use the provided value if non-empty,

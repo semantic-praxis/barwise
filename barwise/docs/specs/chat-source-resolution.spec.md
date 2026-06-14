@@ -1,6 +1,7 @@
 # Chat participant source resolution
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Implemented. WS1 (diagram/visible-editor fallback) and WS2
+(chat references) both landed.
 Tracking: bug -- `@barwise` chat fails with "No source provided and no
 .orm.yaml file is open" when the active panel is the diagram webview (or
 the model is attached as a chat reference rather than the focused editor)
