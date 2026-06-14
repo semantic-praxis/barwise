@@ -16,17 +16,19 @@ export default defineConfig({
         "src/session/contract.ts",
       ],
       // Floors calibrated to actual coverage with headroom for v8's
-      // run-to-run branch variance (CI measured 81.7%, local 82.6% -- the
-      // old 82 floor was too tight). Statements/lines are capped by
-      // ElkLayoutEngine (the A1 decomposition target); the well-covered
-      // SvgRenderer's coverage moved to @barwise/diagram-ui in the
-      // renderer-consolidation spec. Raising ElkLayoutEngine coverage and
-      // tightening these back up is follow-up work.
+      // run-to-run branch variance (CI runs ~1% below local). Local
+      // coverage after the ElkLayoutEngine decomposition (A1) is ~84%
+      // statements / ~85% branches / ~90% functions: the orchestrator and
+      // the extracted pure units (ClusterDetection, EdgeRouting,
+      // CollisionResolver) are well covered. The remaining cap is the
+      // two-level cluster-layout path in EntityPlacement.ts, which the
+      // mocked-ELK tests do not exercise; adding focused tests for it and
+      // tightening these further is follow-up work.
       thresholds: {
-        statements: 76,
-        branches: 80,
+        statements: 82,
+        branches: 82,
         functions: 88,
-        lines: 76,
+        lines: 82,
       },
     },
   },
