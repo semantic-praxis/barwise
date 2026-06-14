@@ -55,9 +55,16 @@ jobs:
           cache: npm
           cache-dependency-path: barwise/package-lock.json
 
-      # npm ci runs unconditionally: dprint (used by fmt:check) is a dev
-      # dependency.
+      # npm ci runs unconditionally: dprint (used by fmt:check below) is a
+      # dev dependency.
       - run: npm ci
+
+      # fmt:check runs first among the checks: it is the cheapest gate and
+      # historically the most common failure, and it needs only npm ci (not
+      # the build), so front-loading it fails a misformatted PR in seconds
+      # instead of after the build. It always runs -- dprint also formats
+      # Markdown, so docs-only PRs are still gated on prose formatting.
+      - run: npm run fmt:check
 
       - run: npm run build
         if: steps.changes.outputs.docs_only != 'true'
@@ -85,10 +92,6 @@ jobs:
 
       - run: npm run circular
         if: steps.changes.outputs.docs_only != 'true'
-
-      # Always runs: dprint also formats Markdown, so docs-only PRs are
-      # still gated on prose formatting.
-      - run: npm run fmt:check
 
       # Reports known advisories without gating the build. There is an
       # existing backlog of dependency vulnerabilities (mostly dev deps);
