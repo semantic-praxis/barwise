@@ -401,6 +401,7 @@ fixtures miss.
 ### T5. SVG / diagram visual regression
 
 - [ ] Priority: P3 (recommended)
+      (planned: `docs/specs/diagram-layout-aesthetics.spec.md`)
 
 SvgRenderer has structural tests (XML shape, escaping) but nothing
 protects layout behavior. Pinned-SVG golden files, or screenshot
