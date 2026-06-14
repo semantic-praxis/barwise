@@ -160,6 +160,7 @@ un-privating it later is a one-line change.
 ### A1. Break up the god files
 
 - [ ] Priority: P3 (recommended) -- none urgent; ElkLayoutEngine first
+      (planned: `docs/specs/diagram-layout-decomposition.spec.md`)
 
 Worst offenders, in order:
 
