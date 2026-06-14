@@ -6,6 +6,7 @@ import { analyzeImpact } from "@barwise/core";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { dirname, resolve } from "node:path";
 import { z } from "zod";
+import { readManifest } from "../helpers/lineageIo.js";
 
 export function registerImpactAnalysisTool(server: McpServer): void {
   server.registerTool(
@@ -43,7 +44,7 @@ export function executeImpactAnalysis(
     dir = process.cwd();
   }
 
-  const report = analyzeImpact(dir, elementId);
+  const report = analyzeImpact(readManifest(dir), elementId);
 
   return {
     content: [{ type: "text" as const, text: JSON.stringify(report, null, 2) }],

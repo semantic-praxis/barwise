@@ -324,9 +324,15 @@ export type {
 export { generateDdlLineage, generateModelLineage } from "./lineage/generate.js";
 export type { AffectedArtifact, ImpactReport } from "./lineage/impact.js";
 export { analyzeImpact } from "./lineage/impact.js";
-export { hashModel, readManifest, updateManifest, writeManifest } from "./lineage/manifest.js";
+export {
+  hashModel,
+  manifestPath,
+  parseManifest,
+  serializeManifest,
+  updateManifest,
+} from "./lineage/manifest.js";
 export type { ArtifactResolution } from "./lineage/resolveArtifact.js";
-export { findOrmModel, resolveArtifact } from "./lineage/resolveArtifact.js";
+export { resolveArtifactInManifest } from "./lineage/resolveArtifact.js";
 export type { StaleArtifact, StalenessReport } from "./lineage/staleness.js";
 export { checkStaleness } from "./lineage/staleness.js";
 export type {

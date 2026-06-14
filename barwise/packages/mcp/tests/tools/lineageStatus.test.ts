@@ -1,7 +1,7 @@
 /**
  * Tests for the lineage_status tool.
  */
-import { OrmYamlSerializer, writeManifest } from "@barwise/core";
+import { OrmYamlSerializer } from "@barwise/core";
 import type { LineageManifest } from "@barwise/core";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -10,6 +10,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeLineageStatus } from "../../src/tools/lineageStatus.js";
+import { writeManifest } from "../helpers/manifestFixture.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(__dirname, "../fixtures");

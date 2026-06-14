@@ -1,27 +1,10 @@
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { hashModel, writeManifest } from "../../src/lineage/manifest.js";
+import { describe, expect, it } from "vitest";
+import { hashModel } from "../../src/lineage/manifest.js";
 import { checkStaleness } from "../../src/lineage/staleness.js";
 import type { LineageManifest } from "../../src/lineage/types.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 describe("Staleness Detection", () => {
-  let tempDir: string;
-
-  beforeEach(() => {
-    // Create a unique temporary directory for each test
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "barwise-staleness-test-"));
-  });
-
-  afterEach(() => {
-    // Clean up the temporary directory
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
-  });
-
   it("should report no stale artifacts when model has not changed", () => {
     const model = new ModelBuilder("Test Model")
       .withEntityType("Customer", { referenceMode: "customer_id" })
@@ -52,9 +35,7 @@ describe("Staleness Detection", () => {
       ],
     };
 
-    writeManifest(tempDir, manifest);
-
-    const report = checkStaleness(tempDir, model);
+    const report = checkStaleness(manifest, model);
 
     expect(report.manifestFound).toBe(true);
     expect(report.staleArtifacts).toHaveLength(0);
@@ -93,15 +74,13 @@ describe("Staleness Detection", () => {
       ],
     };
 
-    writeManifest(tempDir, manifest);
-
     // Create a modified model
     const modifiedModel = new ModelBuilder("Test Model")
       .withEntityType("Customer", { referenceMode: "customer_id" })
       .withEntityType("Order", { referenceMode: "order_id" })
       .build();
 
-    const report = checkStaleness(tempDir, modifiedModel);
+    const report = checkStaleness(manifest, modifiedModel);
 
     expect(report.manifestFound).toBe(true);
     expect(report.staleArtifacts).toHaveLength(2);
@@ -124,7 +103,7 @@ describe("Staleness Detection", () => {
       .withEntityType("Customer", { referenceMode: "customer_id" })
       .build();
 
-    const report = checkStaleness(tempDir, model);
+    const report = checkStaleness(undefined, model);
 
     expect(report.manifestFound).toBe(false);
     expect(report.staleArtifacts).toHaveLength(0);
@@ -169,9 +148,7 @@ describe("Staleness Detection", () => {
       ],
     };
 
-    writeManifest(tempDir, manifest);
-
-    const report = checkStaleness(tempDir, modifiedModel);
+    const report = checkStaleness(manifest, modifiedModel);
 
     expect(report.manifestFound).toBe(true);
     expect(report.staleArtifacts).toHaveLength(1);
@@ -203,8 +180,6 @@ describe("Staleness Detection", () => {
       ],
     };
 
-    writeManifest(tempDir, manifest);
-
     const modifiedModel = new ModelBuilder("Test Model")
       .withEntityType("Customer", { referenceMode: "customer_id" })
       .withEntityType("Order", { referenceMode: "order_id" })
@@ -212,7 +187,7 @@ describe("Staleness Detection", () => {
 
     const newHash = hashModel(modifiedModel);
 
-    const report = checkStaleness(tempDir, modifiedModel);
+    const report = checkStaleness(manifest, modifiedModel);
 
     expect(report.staleArtifacts).toHaveLength(1);
 
@@ -236,9 +211,7 @@ describe("Staleness Detection", () => {
       exports: [],
     };
 
-    writeManifest(tempDir, manifest);
-
-    const report = checkStaleness(tempDir, model);
+    const report = checkStaleness(manifest, model);
 
     expect(report.manifestFound).toBe(true);
     expect(report.staleArtifacts).toHaveLength(0);

@@ -4,10 +4,11 @@
  * Lineage tracking and staleness detection.
  */
 
-import { analyzeImpact, checkStaleness, readManifest } from "@barwise/core";
+import { analyzeImpact, checkStaleness } from "@barwise/core";
 import type { Command } from "commander";
 import { dirname, resolve } from "node:path";
 import { loadModel } from "../helpers/io.js";
+import { readManifest } from "../helpers/lineageIo.js";
 
 export function registerLineageCommand(program: Command): void {
   const lineage = program
@@ -24,7 +25,7 @@ export function registerLineageCommand(program: Command): void {
       try {
         const model = loadModel(source);
         const dir = dirname(resolve(source));
-        const report = checkStaleness(dir, model);
+        const report = checkStaleness(readManifest(dir), model);
 
         if (opts.format === "json") {
           process.stdout.write(JSON.stringify(report, null, 2) + "\n");
@@ -84,7 +85,7 @@ export function registerLineageCommand(program: Command): void {
       async (source: string, opts: { element: string; format: string; }) => {
         try {
           const dir = dirname(resolve(source));
-          const report = analyzeImpact(dir, opts.element);
+          const report = analyzeImpact(readManifest(dir), opts.element);
 
           if (opts.format === "json") {
             process.stdout.write(JSON.stringify(report, null, 2) + "\n");

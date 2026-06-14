@@ -1,7 +1,7 @@
 /**
  * Tests for the lineage command group.
  */
-import { hashModel, writeManifest } from "@barwise/core";
+import { hashModel } from "@barwise/core";
 import type { LineageManifest } from "@barwise/core";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -10,6 +10,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadModel } from "../../src/helpers/io.js";
+import { writeManifest } from "../../src/helpers/lineageIo.js";
 import { runCli } from "../helpers/run.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

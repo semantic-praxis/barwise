@@ -6,6 +6,7 @@ import { checkStaleness } from "@barwise/core";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { dirname, resolve } from "node:path";
 import { z } from "zod";
+import { readManifest } from "../helpers/lineageIo.js";
 import { resolveSource } from "../helpers/resolve.js";
 
 export function registerLineageStatusTool(server: McpServer): void {
@@ -45,7 +46,7 @@ export function executeLineageStatus(
     dir = process.cwd();
   }
 
-  const report = checkStaleness(dir, model);
+  const report = checkStaleness(readManifest(dir), model);
 
   return {
     content: [{ type: "text" as const, text: JSON.stringify(report, null, 2) }],

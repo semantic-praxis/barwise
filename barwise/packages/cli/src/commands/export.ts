@@ -17,6 +17,7 @@ import type { Command } from "commander";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { loadModel } from "../helpers/io.js";
+import { readManifest, writeManifest } from "../helpers/lineageIo.js";
 
 // Register built-in formats (DDL, OpenAPI, etc.) with the unified registry.
 registerBuiltinFormats();
@@ -96,7 +97,7 @@ export function registerExportCommand(program: Command): void {
               modelHash,
               sources: result.lineage?.flatMap((l) => l.sources) ?? [],
             };
-            updateManifest(modelDir, entry);
+            writeManifest(modelDir, updateManifest(entry, readManifest(modelDir)));
           } else {
             // No --output: print to stdout.
             process.stdout.write(result.text);

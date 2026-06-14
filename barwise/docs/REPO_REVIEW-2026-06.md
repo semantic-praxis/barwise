@@ -53,8 +53,9 @@ replace its contents with a README pointing at the root workflows.
 - [ ] Priority: P2 -- implementation underway. Migration spec at
       docs/specs/connector-io-migration.spec.md (five independently
       shippable workstreams; resolves toward making all interop formats
-      pluggable so core ships none). Workstream 1 landed in PR #112.
-      Connector convention is in CLAUDE.md. (June 2026)
+      pluggable so core ships none). Workstreams 1 and 2 have landed;
+      3-5 remain (gated on the spec's open decisions). Connector
+      convention is in CLAUDE.md. (June 2026)
 
 Decision context: I/O is done through format connectors registered
 in the `FormatDescriptor` registry. The findings below are not a

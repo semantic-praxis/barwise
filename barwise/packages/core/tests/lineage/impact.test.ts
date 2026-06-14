@@ -1,26 +1,8 @@
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { analyzeImpact } from "../../src/lineage/impact.js";
-import { writeManifest } from "../../src/lineage/manifest.js";
 import type { LineageManifest } from "../../src/lineage/types.js";
 
 describe("Impact Analysis", () => {
-  let tempDir: string;
-
-  beforeEach(() => {
-    // Create a unique temporary directory for each test
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "barwise-impact-test-"));
-  });
-
-  afterEach(() => {
-    // Clean up the temporary directory
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
-  });
-
   it("should find all artifacts that depend on a changed element", () => {
     const customerEntityId = "entity-customer-123";
 
@@ -76,9 +58,7 @@ describe("Impact Analysis", () => {
       ],
     };
 
-    writeManifest(tempDir, manifest);
-
-    const report = analyzeImpact(tempDir, customerEntityId);
+    const report = analyzeImpact(manifest, customerEntityId);
 
     expect(report.changedElement).toBe(customerEntityId);
     expect(report.affectedArtifacts).toHaveLength(2);
@@ -123,16 +103,14 @@ describe("Impact Analysis", () => {
       ],
     };
 
-    writeManifest(tempDir, manifest);
-
-    const report = analyzeImpact(tempDir, unusedElementId);
+    const report = analyzeImpact(manifest, unusedElementId);
 
     expect(report.changedElement).toBe(unusedElementId);
     expect(report.affectedArtifacts).toHaveLength(0);
   });
 
   it("should return empty list when no manifest exists", () => {
-    const report = analyzeImpact(tempDir, "some-element-id");
+    const report = analyzeImpact(undefined, "some-element-id");
 
     expect(report.changedElement).toBe("some-element-id");
     expect(report.affectedArtifacts).toHaveLength(0);
@@ -218,28 +196,26 @@ describe("Impact Analysis", () => {
       ],
     };
 
-    writeManifest(tempDir, manifest);
-
     // Test EntityType relationship
-    const entityReport = analyzeImpact(tempDir, entityId);
+    const entityReport = analyzeImpact(manifest, entityId);
     expect(entityReport.affectedArtifacts[0].relationship).toContain("entity type Customer");
 
     // Test ValueType relationship
-    const valueReport = analyzeImpact(tempDir, valueTypeId);
+    const valueReport = analyzeImpact(manifest, valueTypeId);
     expect(valueReport.affectedArtifacts[0].relationship).toContain("value type Email");
 
     // Test FactType relationship
-    const factReport = analyzeImpact(tempDir, factTypeId);
+    const factReport = analyzeImpact(manifest, factTypeId);
     expect(factReport.affectedArtifacts[0].relationship).toContain(
       "fact type Customer places Order",
     );
 
     // Test Constraint relationship
-    const constraintReport = analyzeImpact(tempDir, constraintId);
+    const constraintReport = analyzeImpact(manifest, constraintId);
     expect(constraintReport.affectedArtifacts[0].relationship).toContain("constraint UC: Customer");
 
     // Test Role relationship
-    const roleReport = analyzeImpact(tempDir, roleId);
+    const roleReport = analyzeImpact(manifest, roleId);
     expect(roleReport.affectedArtifacts[0].relationship).toContain("role places");
   });
 
@@ -293,9 +269,7 @@ describe("Impact Analysis", () => {
       ],
     };
 
-    writeManifest(tempDir, manifest);
-
-    const report = analyzeImpact(tempDir, elementId);
+    const report = analyzeImpact(manifest, elementId);
 
     expect(report.affectedArtifacts).toHaveLength(3);
 

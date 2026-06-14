@@ -138,7 +138,7 @@ with fields on an explicit options object supplied by the caller. The
 tool layer reads the environment and passes it in. The smallest, most
 isolated determinism fix; lands before any package move.
 
-### 2. Lineage manifest I/O -> tool layer
+### 2. Lineage manifest I/O -> tool layer (done)
 
 Make core's lineage layer pure and move the filesystem to the tool
 layer. This is larger than first briefed: besides `updateManifest`,

@@ -1,7 +1,7 @@
 /**
  * Tests for the impact_analysis tool.
  */
-import { hashModel, OrmYamlSerializer, writeManifest } from "@barwise/core";
+import { hashModel, OrmYamlSerializer } from "@barwise/core";
 import type { LineageManifest } from "@barwise/core";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -10,6 +10,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeImpactAnalysis } from "../../src/tools/impactAnalysis.js";
+import { writeManifest } from "../helpers/manifestFixture.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(__dirname, "../fixtures");
