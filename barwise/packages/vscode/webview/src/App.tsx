@@ -8,6 +8,7 @@
  * affordances; the left model tree and the alternate tabs land later.
  */
 import type { PositionedGraph } from "@barwise/diagram";
+import { DiagramCanvas, type DiagramCanvasHandle } from "@barwise/diagram-ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DiagramMeta } from "../../src/diagram/protocol";
 import { buildCommands } from "./commands";
@@ -17,7 +18,6 @@ import { ContextBar } from "./components/ContextBar";
 import { Inspector } from "./components/Inspector";
 import { TabPlaceholder } from "./components/TabPlaceholder";
 import { type TabKey, TopBar } from "./components/TopBar";
-import { DiagramCanvas, type DiagramCanvasHandle } from "./diagram/DiagramCanvas";
 import { onMessage, postMessage } from "./vscodeApi";
 
 /** Node id + its directly connected neighbours, for the highlight overlay. */
