@@ -8,16 +8,15 @@ import {
   type PositionOverrides,
 } from "./layout/ElkLayoutEngine.js";
 import type { PositionedGraph } from "./layout/LayoutTypes.js";
-import { type RenderOptions, renderSvg } from "./render/SvgRenderer.js";
 
 /**
- * The result of diagram generation, containing both the SVG output
- * and the intermediate representations for further processing.
+ * The result of diagram generation: the positioned layout and the
+ * unpositioned graph. Rendering to SVG is a separate, presentation-layer
+ * step -- the CLI and MCP render the layout with `@barwise/diagram-ui`'s
+ * `renderDiagramSvg`, and the VS Code webview renders it interactively.
  */
 export interface DiagramResult {
-  /** The complete SVG document string. */
-  readonly svg: string;
-  /** The positioned graph (for hit testing, overlays, etc.). */
+  /** The positioned graph (for rendering, hit testing, overlays). */
   readonly layout: PositionedGraph;
   /** The unpositioned graph (for analysis). */
   readonly graph: OrmGraph;
@@ -35,15 +34,15 @@ export interface DiagramOptions extends ModelToGraphOptions {
   readonly focusEntityId?: string;
   /** Number of hops from the focus entity (1, 2, 3, ...). Requires focusEntityId. */
   readonly hopCount?: number;
-  /** Node IDs to render as ghost (preview) nodes in the SVG. */
-  readonly ghostNodeIds?: ReadonlySet<string>;
 }
 
 /**
- * Generate a complete ORM diagram from a model.
+ * Generate the positioned layout for an ORM diagram from a model.
  *
  * This is the main entry point for the diagram package. It runs the
- * full pipeline: model -> graph -> layout -> SVG.
+ * pipeline up to layout: model -> graph -> positioned layout. Turning
+ * the layout into SVG is a presentation-layer concern (see
+ * `DiagramResult`).
  */
 export async function generateDiagram(
   model: OrmModel,
@@ -66,9 +65,5 @@ export async function generateDiagram(
     options?.positionOverrides,
     options?.orientationOverrides,
   );
-  const renderOpts: RenderOptions | undefined = options?.ghostNodeIds
-    ? { ghostNodeIds: options.ghostNodeIds }
-    : undefined;
-  const svg = renderSvg(layout, renderOpts);
-  return { svg, layout, graph };
+  return { layout, graph };
 }

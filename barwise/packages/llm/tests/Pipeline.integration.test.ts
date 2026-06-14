@@ -159,13 +159,9 @@ describe("Full pipeline integration", () => {
         }
       });
 
-      // Step 5: Generate diagram.
-      it("generates a valid SVG diagram", async () => {
+      // Step 5: Lay out the diagram.
+      it("lays out the diagram", async () => {
         const diagram = await generateDiagram(model);
-
-        expect(diagram.svg).toBeTruthy();
-        expect(diagram.svg).toContain("<svg");
-        expect(diagram.svg).toContain("</svg>");
 
         // Should have positioned nodes (absorbed reference mode nodes
         // are excluded from the graph, so count may be less than total).
@@ -183,7 +179,6 @@ describe("Full pipeline integration", () => {
           resolve(outputDir, `${slug}.orm.yaml`),
           serializer.serialize(model),
         );
-        writeFileSync(resolve(outputDir, `${slug}.svg`), diagram.svg);
 
         const verbalizer = new Verbalizer();
         const verbalizations = verbalizer.verbalizeModel(model);

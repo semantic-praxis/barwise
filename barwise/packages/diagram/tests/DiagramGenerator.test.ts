@@ -1,20 +1,18 @@
 /**
  * Tests for the end-to-end diagram generator.
  *
- * generateDiagram takes an OrmModel and produces an SVG string plus
- * layout metadata, composing the ModelToGraph -> ElkLayoutEngine ->
- * SvgRenderer pipeline. These tests verify:
- *   - Valid SVG output for various model shapes
- *   - Correct node counts (one per object type + one per fact type)
- *   - Edge counts matching role counts
- *   - Layout dimensions are positive and reasonable
+ * generateDiagram takes an OrmModel and produces the positioned layout
+ * plus the unpositioned graph, composing ModelToGraph -> ElkLayoutEngine.
+ * These tests verify the structural output (node/edge counts, positions,
+ * neighborhood filtering, objectification flags). SVG rendering moved to
+ * @barwise/diagram-ui; its output is covered by renderDiagramSvg.test.
  */
 import { describe, expect, it } from "vitest";
 import { ModelBuilder } from "../../core/tests/helpers/ModelBuilder.js";
 import { generateDiagram } from "../src/DiagramGenerator.js";
 
 describe("DiagramGenerator (end-to-end)", () => {
-  it("generates a complete SVG from a model", async () => {
+  it("lays out a model into nodes and edges", async () => {
     const model = new ModelBuilder("Order Management")
       .withEntityType("Customer", { referenceMode: "customer_id" })
       .withEntityType("Order", { referenceMode: "order_number" })
@@ -28,17 +26,6 @@ describe("DiagramGenerator (end-to-end)", () => {
 
     const result = await generateDiagram(model);
 
-    // SVG should be a valid document.
-    expect(result.svg).toContain("<svg");
-    expect(result.svg).toContain("</svg>");
-
-    // Should contain the object type names.
-    expect(result.svg).toContain("Customer");
-    expect(result.svg).toContain("Order");
-
-    // Should contain the fact type name.
-    expect(result.svg).toContain("Customer places Order");
-
     // Layout should have positioned nodes.
     expect(result.layout.nodes).toHaveLength(3);
     expect(result.layout.edges).toHaveLength(2);
@@ -48,27 +35,6 @@ describe("DiagramGenerator (end-to-end)", () => {
     // Graph should be available.
     expect(result.graph.nodes).toHaveLength(3);
     expect(result.graph.edges).toHaveLength(2);
-  });
-
-  it("generates a diagram with value types", async () => {
-    const model = new ModelBuilder("Test")
-      .withEntityType("Customer", { referenceMode: "cid" })
-      .withValueType("Name")
-      .withBinaryFactType("Customer has Name", {
-        role1: { player: "Customer", name: "has" },
-        role2: { player: "Name", name: "is of" },
-        uniqueness: "role1",
-        mandatory: "role1",
-      })
-      .build();
-
-    const result = await generateDiagram(model);
-
-    // Should contain entity-style rendering (rounded rect).
-    expect(result.svg).toContain("Customer");
-    // Should contain value-style rendering (ellipse).
-    expect(result.svg).toContain("<ellipse");
-    expect(result.svg).toContain("Name");
   });
 
   it("generates a diagram for a model with multiple fact types", async () => {
@@ -115,7 +81,6 @@ describe("DiagramGenerator (end-to-end)", () => {
     const model = new ModelBuilder("Empty").build();
     const result = await generateDiagram(model);
 
-    expect(result.svg).toContain("<svg");
     expect(result.layout.nodes).toHaveLength(0);
     expect(result.layout.edges).toHaveLength(0);
   });
@@ -131,11 +96,6 @@ describe("DiagramGenerator (end-to-end)", () => {
 
     const result = await generateDiagram(model);
 
-    // SVG should contain all entity names.
-    expect(result.svg).toContain("Person");
-    expect(result.svg).toContain("Employee");
-    expect(result.svg).toContain("Manager");
-
     // Graph should have 3 nodes, 0 role edges, 2 subtype edges.
     expect(result.graph.nodes).toHaveLength(3);
     expect(result.graph.edges).toHaveLength(0);
@@ -146,10 +106,6 @@ describe("DiagramGenerator (end-to-end)", () => {
     for (const se of result.layout.subtypeEdges) {
       expect(se.points.length).toBeGreaterThanOrEqual(2);
     }
-
-    // SVG should contain subtype arrow marker.
-    expect(result.svg).toContain("subtype-arrow");
-    expect(result.svg).toContain('data-kind="subtype"');
   });
 
   it("generates a diagram with subtypes and fact types together", async () => {
@@ -177,12 +133,6 @@ describe("DiagramGenerator (end-to-end)", () => {
     // Layout should include both edge types.
     expect(result.layout.edges).toHaveLength(2);
     expect(result.layout.subtypeEdges).toHaveLength(1);
-
-    // SVG should contain both role edges and subtype arrows.
-    expect(result.svg).toContain('data-kind="subtype"');
-    expect(result.svg).toContain("Person");
-    expect(result.svg).toContain("Employee");
-    expect(result.svg).toContain("Name");
   });
 
   it("generates a diagram with external uniqueness constraints", async () => {
@@ -220,11 +170,6 @@ describe("DiagramGenerator (end-to-end)", () => {
     );
     expect(constraintNodes).toHaveLength(1);
     expect(result.layout.constraintEdges).toHaveLength(2);
-
-    // SVG should contain constraint rendering.
-    expect(result.svg).toContain('data-kind="constraint"');
-    expect(result.svg).toContain('data-kind="constraint-edge"');
-    expect(result.svg).toContain('stroke-dasharray="4,3"');
   });
 
   it("generates a diagram with exclusion constraints", async () => {
@@ -254,63 +199,6 @@ describe("DiagramGenerator (end-to-end)", () => {
     // Graph: 3 OTs + 2 FTs + 1 constraint = 6 nodes.
     expect(result.graph.nodes).toHaveLength(6);
     expect(result.graph.constraintEdges).toHaveLength(2);
-
-    // SVG should contain constraint rendering.
-    expect(result.svg).toContain('data-constraint-kind="exclusion"');
-    expect(result.svg).toContain('stroke-dasharray="4,3"');
-  });
-
-  it("generates a diagram with frequency and ring constraints", async () => {
-    const model = new ModelBuilder("FreqRing")
-      .withEntityType("Person", { referenceMode: "pid" })
-      .withBinaryFactType("Person is parent of Person", {
-        role1: { player: "Person", name: "is parent of" },
-        role2: { player: "Person", name: "is child of" },
-      })
-      .build();
-
-    const ft = model.getFactTypeByName("Person is parent of Person")!;
-    ft.addConstraint({
-      type: "frequency",
-      roleId: ft.roles[0]!.id,
-      min: 0,
-      max: 2,
-    });
-    ft.addConstraint({
-      type: "ring",
-      roleId1: ft.roles[0]!.id,
-      roleId2: ft.roles[1]!.id,
-      ringType: "irreflexive",
-    });
-
-    const result = await generateDiagram(model);
-
-    // SVG should contain frequency label and ring label.
-    expect(result.svg).toContain("0..2");
-    expect(result.svg).toContain("ir");
-  });
-
-  it("includes constraint markers in the SVG", async () => {
-    const model = new ModelBuilder("Constraints")
-      .withEntityType("Customer", { referenceMode: "cid" })
-      .withEntityType("Order", { referenceMode: "oid" })
-      .withBinaryFactType("Customer places Order", {
-        role1: { player: "Customer", name: "places" },
-        role2: { player: "Order", name: "is placed by" },
-        uniqueness: "both", // Both roles unique.
-        mandatory: "both", // Both roles mandatory.
-      })
-      .build();
-
-    const result = await generateDiagram(model);
-
-    // Uniqueness bars (blue fill).
-    const uniquenessBars = (result.svg.match(/#3a86c8/g) ?? []).length;
-    expect(uniquenessBars).toBeGreaterThanOrEqual(2);
-
-    // Mandatory dots (circles).
-    const mandatoryDots = (result.svg.match(/<circle/g) ?? []).length;
-    expect(mandatoryDots).toBeGreaterThanOrEqual(2);
   });
 
   it("generates a diagram with objectified fact types", async () => {
@@ -326,25 +214,6 @@ describe("DiagramGenerator (end-to-end)", () => {
       .build();
 
     const result = await generateDiagram(model);
-
-    // SVG should be a valid document.
-    expect(result.svg).toContain("<svg");
-    expect(result.svg).toContain("</svg>");
-
-    // Should contain all entity type names.
-    expect(result.svg).toContain("Student");
-    expect(result.svg).toContain("Course");
-    expect(result.svg).toContain("Enrollment");
-
-    // The objectified entity name label should be visible (not the
-    // fact type reading, which is suppressed for objectified facts).
-    expect(result.svg).toContain("Enrollment");
-
-    // Should render the objectification box.
-    expect(result.svg).toContain('data-kind="objectification"');
-
-    // The objectification box should use the entity stroke color.
-    expect(result.svg).toContain('stroke="#3a86c8"');
 
     // Graph should mark the fact type as objectified.
     const ftNode = result.graph.nodes.find((n) => n.kind === "fact_type");
@@ -410,12 +279,6 @@ describe("DiagramGenerator (end-to-end)", () => {
     if (normalFt?.kind === "fact_type") {
       expect(normalFt.name).toBe("Instructor teaches Course");
     }
-
-    // SVG should contain the non-objectified fact type name and the
-    // objectified entity name (objectified facts suppress the reading label).
-    expect(result.svg).toContain("Enrollment");
-    expect(result.svg).toContain("Instructor teaches Course");
-    expect(result.svg).toContain('data-kind="objectification"');
   });
 
   describe("focus / neighborhood filtering", () => {
@@ -466,23 +329,5 @@ describe("DiagramGenerator (end-to-end)", () => {
 
       expect(result.graph.nodes).toHaveLength(5);
     });
-  });
-
-  it("marks nodes listed in ghostNodeIds as ghosts in the SVG", async () => {
-    const model = new ModelBuilder("Ghosts")
-      .withEntityType("A", { referenceMode: "id" })
-      .withEntityType("B", { referenceMode: "id" })
-      .withBinaryFactType("A relates to B", {
-        role1: { player: "A", name: "relates to" },
-        role2: { player: "B", name: "is related to by" },
-      })
-      .build();
-    const bId = model.getObjectTypeByName("B")!.id;
-
-    const result = await generateDiagram(model, { ghostNodeIds: new Set([bId]) });
-
-    // B's group carries the ghost marker.
-    expect(result.svg).toContain('data-ghost="true"');
-    expect(result.svg).toContain(`data-id="${bId}"`);
   });
 });

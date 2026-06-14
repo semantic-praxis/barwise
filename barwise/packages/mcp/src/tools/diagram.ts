@@ -3,6 +3,7 @@
  */
 
 import { generateDiagram } from "@barwise/diagram";
+import { renderDiagramSvg } from "@barwise/diagram-ui/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveSource } from "../helpers/resolve.js";
@@ -36,7 +37,7 @@ export async function executeDiagram(
   const model = resolveSource(source);
   const result = await generateDiagram(model);
 
-  return boundedTextResult(result.svg, {
+  return boundedTextResult(renderDiagramSvg(result.layout), {
     kind: "diagram",
     source,
     extension: "svg",
