@@ -1,0 +1,92 @@
+name: Release
+
+# Builds the downloadable artifacts -- the VS Code extension (VSIX), the
+# standalone CLI bundle, and the MCP server bundle -- with a SHA-256
+# checksums file.
+#
+# Two triggers:
+#   - release: published  -> attach assets to that versioned release
+#   - push to main        -> rebuild and refresh the moving `edge`
+#                            pre-release, so a current download always
+#                            exists without a version tag per merge
+on:
+  release:
+    types: [published]
+  push:
+    branches: [main]
+
+# Edge builds for the same ref supersede each other; a versioned release
+# runs under its own tag ref and is never cancelled by an edge build.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: barwise
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: barwise/package-lock.json
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - run: npm run --workspace=@barwise/cli bundle
+
+      - run: npm run --workspace=@barwise/mcp bundle
+
+      - name: Package VSIX
+        working-directory: barwise/packages/vscode
+        run: npx @vscode/vsce package --no-dependencies
+
+      - name: Stage release assets
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            tag="${{ github.event.release.tag_name }}"
+            suffix="${tag#v}"
+          else
+            suffix="edge"
+          fi
+          mkdir -p release-assets
+          cp packages/cli/dist/bundle/index.cjs "release-assets/barwise-cli-${suffix}.cjs"
+          cp packages/mcp/dist/bundle/index.cjs "release-assets/barwise-mcp-${suffix}.cjs"
+          cp packages/vscode/*.vsix "release-assets/barwise-vscode-${suffix}.vsix"
+          # Glob only the assets so SHA256SUMS does not hash itself.
+          (cd release-assets && sha256sum *.cjs *.vsix > SHA256SUMS && ls -la)
+
+      - name: Upload to versioned release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            release-assets/* --clobber --repo "${{ github.repository }}"
+
+      - name: Refresh edge pre-release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete edge --cleanup-tag --yes \
+            --repo "${{ github.repository }}" || true
+          gh release create edge \
+            --prerelease \
+            --target "${{ github.sha }}" \
+            --title "Edge build (latest main)" \
+            --notes "Automatically built from commit ${{ github.sha }}. Unstable preview of the latest main -- not a tagged release. For a stable build, use the latest versioned release." \
+            --repo "${{ github.repository }}"
+          gh release upload edge release-assets/* --clobber \
+            --repo "${{ github.repository }}"

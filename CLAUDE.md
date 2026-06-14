@@ -218,8 +218,12 @@ gh release create v1.3.0 --title "v1.3.0" --generate-notes
 ```
 
 The `--generate-notes` flag auto-generates a changelog from merged PRs
-since the last tag. The `release-vsix.yml` workflow then builds and
-attaches the VS Code extension VSIX to the release.
+since the last tag. The `release.yml` workflow then builds and attaches
+the downloadable artifacts to the release: the VS Code extension
+(`.vsix`), the standalone CLI bundle (`barwise-cli-<ver>.cjs`), the MCP
+server bundle (`barwise-mcp-<ver>.cjs`), and a `SHA256SUMS` file. The
+same workflow also refreshes a rolling `edge` pre-release on every push
+to `main`, so a current download always exists between tagged releases.
 
 ### Review what changed since the last release
 
