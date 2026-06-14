@@ -2,15 +2,14 @@
  * Tests for splitModel: cutting a monolithic .orm.yaml into a
  * multi-domain project with suggested context mappings.
  */
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { ModelSplitError, splitModel } from "../../src/project/splitModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
-import { loadProject } from "../../src/serialization/ProjectLoader.js";
+import { assembleProject, type ProjectFiles } from "../../src/serialization/projectAssembly.js";
 import { projectRules } from "../../src/validation/rules/projectRules.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
 
@@ -50,36 +49,13 @@ model:
 `;
 
 describe("splitModel", () => {
-  const tmpDirs: string[] = [];
-
-  afterEach(() => {
-    for (const dir of tmpDirs.splice(0)) {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  function makeTmpDir(): string {
-    const dir = mkdtempSync(join(tmpdir(), "barwise-split-"));
-    tmpDirs.push(dir);
-    return dir;
-  }
-
-  /** Write a SplitResult to disk and return the manifest path. */
-  function materialize(
-    result: ReturnType<typeof splitModel>,
-    dir: string,
-  ): string {
-    mkdirSync(join(dir, "domains"), { recursive: true });
-    mkdirSync(join(dir, "mappings"), { recursive: true });
-    for (const domain of result.domains) {
-      writeFileSync(join(dir, domain.fileName), domain.yaml, "utf-8");
-    }
-    for (const mapping of result.mappings) {
-      writeFileSync(join(dir, mapping.fileName), mapping.yaml, "utf-8");
-    }
-    const manifestPath = join(dir, "project.orm-project.yaml");
-    writeFileSync(manifestPath, result.manifestYaml, "utf-8");
-    return manifestPath;
+  /** Assemble a SplitResult into a project via the pure assembler. */
+  function load(result: ReturnType<typeof splitModel>) {
+    const files: ProjectFiles = {
+      domains: new Map(result.domains.map((d) => [d.fileName, { content: d.yaml }])),
+      mappings: new Map(result.mappings.map((m) => [m.fileName, { content: m.yaml }])),
+    };
+    return assembleProject(result.manifestYaml, files);
   }
 
   it("rejects a config with fewer than two domains", () => {
@@ -145,9 +121,7 @@ describe("splitModel", () => {
       projectName: "Shop",
       domains: { crm: ["Customer"], billing: ["Invoice"] },
     });
-    const manifestPath = materialize(result, makeTmpDir());
-
-    const { project, problems } = loadProject(manifestPath);
+    const { project, problems } = load(result);
     expect(problems).toEqual([]);
 
     const engine = new ValidationEngine();
@@ -177,8 +151,7 @@ describe("splitModel", () => {
     const result = splitModel(modelYaml, config);
     expect(result.domains).toHaveLength(4);
 
-    const manifestPath = materialize(result, makeTmpDir());
-    const { project, problems } = loadProject(manifestPath);
+    const { project, problems } = load(result);
     expect(problems).toEqual([]);
 
     const engine = new ValidationEngine();

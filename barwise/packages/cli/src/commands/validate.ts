@@ -5,10 +5,11 @@
  * runs the validation engine, and prints diagnostics to stdout.
  */
 
-import { type Diagnostic, loadProject, projectRules, ValidationEngine } from "@barwise/core";
+import { type Diagnostic, projectRules, ValidationEngine } from "@barwise/core";
 import type { Command } from "commander";
 import { formatDiagnostics, formatDiagnosticsJson } from "../helpers/format.js";
 import { isProjectFile, loadModel } from "../helpers/io.js";
+import { loadProject } from "../helpers/projectLoader.js";
 
 interface ValidateOptions {
   format: string;

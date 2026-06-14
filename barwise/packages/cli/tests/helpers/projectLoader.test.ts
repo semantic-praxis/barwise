@@ -1,20 +1,22 @@
 /**
- * Tests for loadProject: resolving a .orm-project.yaml manifest and
- * every domain and mapping file it references.
+ * Tests for the CLI loadProject helper: the filesystem walk that reads a
+ * `.orm-project.yaml` manifest plus every domain and mapping file it
+ * references, then hands the contents to core's pure assembler.
  */
+import { ProjectLoadError, projectRules } from "@barwise/core";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadProject, ProjectLoadError } from "../../src/serialization/ProjectLoader.js";
-import { projectRules } from "../../src/validation/rules/projectRules.js";
+import { loadProject } from "../../src/helpers/projectLoader.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const manifestPath = resolve(
   __dirname,
+  "..",
   "fixtures",
-  "multi-domain",
+  "project",
   "project.orm-project.yaml",
 );
 

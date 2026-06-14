@@ -5,12 +5,12 @@
  * .orm-project.yaml manifest, generates one SVG per domain.
  */
 
-import { loadProject } from "@barwise/core";
 import { generateDiagram } from "@barwise/diagram";
 import type { Command } from "commander";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { isProjectFile, loadModel, writeOutput } from "../helpers/io.js";
+import { loadProject } from "../helpers/projectLoader.js";
 
 export function registerDiagramCommand(program: Command): void {
   program
