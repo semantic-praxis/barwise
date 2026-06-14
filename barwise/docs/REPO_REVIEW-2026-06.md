@@ -280,7 +280,12 @@ published.
 
 ### A6. Diagram stack: consolidate on the React renderer
 
-- [ ] Priority: P2 (recommended) -- execute the presentation-contract spec first
+- [ ] Priority: P2 (recommended) -- renderer-consolidation spec written
+      (docs/specs/diagram-renderer-consolidation.spec.md, four
+      workstreams: theme subpath, new @barwise/diagram-ui package,
+      headless react-dom/server renderer retiring SvgRenderer, ui tests).
+      The presentation-contract spec (DiagramSession) is independent and
+      can land in either order.
 
 Decision context (June 2026 triage): the front end is React, not
 the legacy SVG-string panel. The webview-vs-local-server question
