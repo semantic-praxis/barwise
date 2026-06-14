@@ -5,12 +5,7 @@
  */
 import type { ElkExtendedEdge, ElkNode } from "elkjs";
 import type { FactTypeNode, OrmGraph } from "../graph/GraphTypes.js";
-import {
-  FONT_SIZE_ALIAS,
-  OT_ALIAS_LINE_HEIGHT,
-  OT_HEIGHT,
-  OT_MIN_WIDTH,
-} from "../render/theme.js";
+import { FONT_SIZE_ALIAS, OT_ALIAS_LINE_HEIGHT, OT_HEIGHT, OT_MIN_WIDTH } from "../render/theme.js";
 import { detectClusters } from "./ClusterDetection.js";
 import { getElk } from "./ElkInterop.js";
 import type { Position, PositionedObjectTypeNode } from "./LayoutTypes.js";
