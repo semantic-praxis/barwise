@@ -59,6 +59,7 @@ working in a package:
 - `barwise/packages/diagram/CLAUDE.md` -- diagram layout and SVG rendering
 - `barwise/packages/llm/CLAUDE.md` -- LLM transcript extraction
 - `barwise/packages/code-analysis/CLAUDE.md` -- code connector package; registers TypeScript/Java/Kotlin importers into the `FormatDescriptor` registry
+- `barwise/packages/dbt/CLAUDE.md` -- dbt connector package; registers the dbt importer/exporter into the `FormatDescriptor` registry (owns its fs + subprocess I/O)
 - `barwise/packages/cli/CLAUDE.md` -- CLI tool (validate, verbalize, schema, export, diagram, diff, import)
 - `barwise/packages/mcp/CLAUDE.md` -- MCP server (tools, resources, prompts)
 - `barwise/packages/vscode/CLAUDE.md` -- VS Code extension integration
@@ -74,15 +75,20 @@ working in a package:
   |--- @barwise/code-analysis   (core)  -- connector package: registers
   |                                        code importers into the
   |                                        FormatDescriptor registry
-  |--- @barwise/cli             (core, diagram, llm, code-analysis)
-  |--- @barwise/mcp             (core, diagram, llm, code-analysis)
-  |--- barwise-vscode           (core, diagram, llm, code-analysis, mcp)
+  |--- @barwise/dbt             (core)  -- connector package: registers
+  |                                        the dbt importer/exporter; owns
+  |                                        its fs + subprocess I/O
+  |--- @barwise/cli             (core, diagram, llm, code-analysis, dbt)
+  |--- @barwise/mcp             (core, diagram, llm, code-analysis, dbt)
+  |--- barwise-vscode           (core, diagram, llm, code-analysis, dbt, mcp)
 ```
 
 `@barwise/code-analysis` is the template for the connector convention:
 a package outside `core` that keeps its own I/O (LSP sessions, repo
 scanning) and registers importers into the `FormatDescriptor` registry,
-rather than putting that I/O in `core`.
+rather than putting that I/O in `core`. `@barwise/dbt` follows the same
+convention for the dbt importer/exporter (project-directory scanning and
+the `dbt compile` subprocess), registering via `registerDbtFormats()`.
 
 Changes to `@barwise/core` can break all downstream packages. Run the
 full monorepo build and tests after modifying core's public API.
@@ -90,7 +96,8 @@ full monorepo build and tests after modifying core's public API.
 ## Current State
 
 All phases are complete, with the full test suite passing in CI across
-all 7 packages (core, diagram, llm, code-analysis, cli, mcp, vscode).
+all 8 packages (core, diagram, llm, code-analysis, dbt, cli, mcp,
+vscode).
 The CLI tool (`barwise`) and MCP server (`barwise-mcp`) provide
 the same capabilities as the VS Code extension for terminal and AI
 workflows. Import and export formats (DDL, OpenAPI) are managed through

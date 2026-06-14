@@ -6,8 +6,8 @@
  * multi-file output, and proper ExportResult structure.
  */
 import { describe, expect, it } from "vitest";
-import { DbtExportFormat } from "../../src/export/DbtExportFormat.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { DbtExportFormat } from "../src/DbtExportFormat.js";
+import { ModelBuilder } from "./helpers/ModelBuilder.js";
 
 const dbtFormat = new DbtExportFormat();
 

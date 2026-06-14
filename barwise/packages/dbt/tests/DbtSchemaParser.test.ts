@@ -5,7 +5,7 @@
  * dbt schema YAML into the intermediate DbtProjectDocument.
  */
 import { describe, expect, it } from "vitest";
-import { DbtParseError, parseDbtSchema } from "../../src/import/DbtSchemaParser.js";
+import { DbtParseError, parseDbtSchema } from "../src/DbtSchemaParser.js";
 
 describe("DbtSchemaParser", () => {
   describe("model parsing", () => {

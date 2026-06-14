@@ -3,6 +3,7 @@
  */
 
 import { getExporter, registerBuiltinFormats } from "@barwise/core";
+import { registerDbtFormats } from "@barwise/dbt";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveSource } from "../helpers/resolve.js";
@@ -10,6 +11,8 @@ import { boundedTextResult } from "../helpers/response.js";
 
 // Register built-in formats (DDL, OpenAPI, etc.) with the unified registry.
 registerBuiltinFormats();
+// Register the dbt connector format.
+registerDbtFormats();
 
 export function registerExportModelTool(server: McpServer): void {
   server.registerTool(

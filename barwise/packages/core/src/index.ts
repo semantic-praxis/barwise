@@ -185,37 +185,7 @@ export { Verbalizer } from "./verbalization/Verbalizer.js";
 export { NormaImportFormat } from "./import/NormaImportFormat.js";
 export { NormaImportError } from "./import/NormaXmlImporter.js";
 
-// Import (dbt project)
-export type {
-  DbtImportReport,
-  ReportCategory,
-  ReportEntry,
-  ReportSeverity,
-} from "./import/DbtImportReport.js";
-export { ReportBuilder } from "./import/DbtImportReport.js";
-export {
-  DbtImportError,
-  type DbtImportResult,
-  importDbtProject,
-} from "./import/DbtProjectImporter.js";
-export { DbtParseError, parseDbtSchema } from "./import/DbtSchemaParser.js";
-export type {
-  DbtColumn,
-  DbtCustomTest,
-  DbtModel,
-  DbtProjectDocument,
-  DbtSource,
-  DbtSourceTable,
-  DbtStandardTest,
-  DbtTest,
-} from "./import/DbtSchemaTypes.js";
-export { DbtMappingError, type DbtMapResult, mapDbtToOrm } from "./import/DbtToOrmMapper.js";
-export { annotateDbtYaml, type AnnotationOptions } from "./import/DbtYamlAnnotator.js";
-
-// Import format types
-export { type DbtDialectOptions, detectDbtDialect } from "./import/DbtDialectDetector.js";
-export { compileDbtSql, stubRenderJinja } from "./import/DbtSqlCompiler.js";
-export type { CompiledSqlFile } from "./import/DbtSqlCompiler.js";
+// Import format interface (dbt connector lives in @barwise/dbt)
 export type { ImportFormat, ImportOptions, ImportResult } from "./import/types.js";
 
 // SQL analysis infrastructure
@@ -243,7 +213,6 @@ export type {
 // Unified format system (registry + descriptors)
 export {
   avroFormat,
-  dbtFormat,
   ddlFormat,
   normaFormat,
   openApiFormat,

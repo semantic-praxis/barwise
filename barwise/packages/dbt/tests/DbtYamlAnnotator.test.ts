@@ -5,9 +5,9 @@
  * positions in dbt schema YAML files based on import report entries.
  */
 import { describe, expect, it } from "vitest";
-import type { DbtImportReport } from "../../src/import/DbtImportReport.js";
-import type { ReportEntry } from "../../src/import/DbtImportReport.js";
-import { annotateDbtYaml } from "../../src/import/DbtYamlAnnotator.js";
+import type { DbtImportReport } from "../src/DbtImportReport.js";
+import type { ReportEntry } from "../src/DbtImportReport.js";
+import { annotateDbtYaml } from "../src/DbtYamlAnnotator.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

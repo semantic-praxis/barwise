@@ -185,7 +185,7 @@ capability cannot leave core. The pure assembler serves both that test
 `LoadedProject.problems` merges the tool's read errors with the
 assembler's parse errors.
 
-### 4. `@barwise/dbt` connector package
+### 4. `@barwise/dbt` connector package (done)
 
 Move the entire dbt connector out of core: the whole `dbt`
 `FormatDescriptor` -- both `DbtImportFormat` and `DbtExportFormat` -- plus

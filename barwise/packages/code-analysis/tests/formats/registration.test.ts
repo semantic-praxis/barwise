@@ -58,7 +58,6 @@ describe("registerCodeFormats", () => {
     const names = allImporters.map((f) => f.name).sort();
     expect(names).toContain("ddl");
     expect(names).toContain("openapi");
-    expect(names).toContain("dbt");
     expect(names).toContain("sql");
     expect(names).toContain("typescript");
     expect(names).toContain("java");

@@ -9,6 +9,7 @@
 import { registerCodeFormats } from "@barwise/code-analysis";
 import { getImporter, OrmYamlSerializer, registerBuiltinFormats } from "@barwise/core";
 import type { ImportResult } from "@barwise/core";
+import { registerDbtFormats } from "@barwise/dbt";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
@@ -17,6 +18,7 @@ const serializer = new OrmYamlSerializer();
 // Ensure formats are registered.
 registerBuiltinFormats();
 registerCodeFormats();
+registerDbtFormats();
 
 /** Supported code languages for import. */
 export type CodeLanguage = "typescript" | "java" | "kotlin";

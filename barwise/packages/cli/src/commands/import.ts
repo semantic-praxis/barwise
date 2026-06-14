@@ -16,6 +16,7 @@ import {
   OrmYamlSerializer,
   registerBuiltinFormats,
 } from "@barwise/core";
+import { registerDbtFormats } from "@barwise/dbt";
 import { createLlmClient, processTranscript } from "@barwise/llm";
 import type { ProviderName } from "@barwise/llm";
 import type { Command } from "commander";
@@ -29,6 +30,8 @@ const serializer = new OrmYamlSerializer();
 registerBuiltinFormats();
 // Register code-analysis formats (TypeScript, etc.)
 registerCodeFormats();
+// Register the dbt connector format.
+registerDbtFormats();
 
 /**
  * Slugify a model name for use in output filenames.
