@@ -5,12 +5,7 @@
  * export formats (DDL, OpenAPI, etc.) by name.
  */
 
-import {
-  getExporter,
-  hashModel,
-  listExporters,
-  updateManifest,
-} from "@barwise/core";
+import { getExporter, hashModel, listExporters, updateManifest } from "@barwise/core";
 import type { ManifestExport } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
