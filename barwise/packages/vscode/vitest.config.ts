@@ -11,6 +11,7 @@ export default defineConfig({
       // exercised by the integration suite, not these unit tests.
       include: [
         "src/chat/ChatParticipant.ts",
+        "src/mcp/resolveModelSource.ts",
         "src/server/CompletionProvider.ts",
         "src/server/DiagnosticsProvider.ts",
         "src/server/HoverProvider.ts",

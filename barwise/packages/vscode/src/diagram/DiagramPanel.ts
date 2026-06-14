@@ -351,6 +351,15 @@ export class DiagramPanel {
   }
 
   /**
+   * The file path of the model shown in the open diagram panel, or
+   * undefined if no diagram is open. Lets the barwise tools resolve a
+   * source when the diagram webview -- not a text editor -- is focused.
+   */
+  static activeModelPath(): string | undefined {
+    return DiagramPanel.currentPanel?.filePath;
+  }
+
+  /**
    * Seed position/orientation overrides from a saved DiagramLayout so
    * subsequent drags only move the dragged entity (others are pinned).
    */
