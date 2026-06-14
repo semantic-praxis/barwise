@@ -6,6 +6,7 @@
  */
 
 import { generateDiagram } from "@barwise/diagram";
+import { renderDiagramSvg } from "@barwise/diagram-ui/server";
 import type { Command } from "commander";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -39,7 +40,7 @@ export function registerDiagramCommand(program: Command): void {
           } else {
             const model = loadModel(file);
             const result = await generateDiagram(model);
-            writeOutput(result.svg, opts.output);
+            writeOutput(renderDiagramSvg(result.layout), opts.output);
           }
         } catch (err) {
           process.stderr.write(`Error: ${(err as Error).message}\n`);
@@ -81,7 +82,7 @@ async function diagramDomain(
   }
 
   const result = await generateDiagram(domain.model);
-  writeOutput(result.svg, output);
+  writeOutput(renderDiagramSvg(result.layout), output);
 }
 
 /**
@@ -109,7 +110,7 @@ async function diagramProject(file: string, outputDir?: string): Promise<void> {
     if (!domain.model) continue;
     const result = await generateDiagram(domain.model);
     const outPath = join(outputDir, `${domain.context}.svg`);
-    writeFileSync(outPath, result.svg, "utf-8");
+    writeFileSync(outPath, renderDiagramSvg(result.layout), "utf-8");
     written.push(outPath);
   }
 

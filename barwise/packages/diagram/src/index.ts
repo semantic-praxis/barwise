@@ -36,10 +36,7 @@ export type {
   PositionedSubtypeEdge,
 } from "./layout/LayoutTypes.js";
 
-// SVG rendering.
-export { type RenderOptions, renderSvg } from "./render/SvgRenderer.js";
-
-// Theme constants.
+// Theme constants (also exposed via the ./theme subpath for renderers).
 export * as theme from "./render/theme.js";
 
 // Main entry point.
