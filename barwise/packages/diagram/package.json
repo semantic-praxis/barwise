@@ -1,6 +1,6 @@
 {
   "name": "@barwise/diagram",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "private": true,
   "description": "ORM diagram layout and SVG rendering (platform-independent)",
   "type": "module",
@@ -28,7 +28,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@barwise/core": "1.6.0",
+    "@barwise/core": "1.6.1",
     "elkjs": "^0.9.3"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 {
   "name": "@barwise/formats",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "private": true,
   "description": "Standard interop format descriptors for ORM models (DDL, OpenAPI, Avro, NORMA, SQL)",
   "type": "module",
@@ -24,7 +24,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@barwise/core": "1.6.0",
+    "@barwise/core": "1.6.1",
     "fast-xml-parser": "^5.4.1",
     "yaml": "^2.8.2"
   },

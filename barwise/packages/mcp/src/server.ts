@@ -17,7 +17,7 @@ import { registerTools } from "./tools/index.js";
 // extension), where neither `import.meta` nor a runtime package.json
 // read is reliable -- so this is pinned here and kept in sync with
 // package.json by the version-sync test in tests/server.test.ts.
-export const SERVER_VERSION = "1.6.0";
+export const SERVER_VERSION = "1.6.1";
 
 export function createServer(): McpServer {
   const server = new McpServer({
