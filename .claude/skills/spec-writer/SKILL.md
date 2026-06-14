@@ -100,6 +100,13 @@ gate has cost a CI round-trip on nearly every PR that skipped it.
   2 spaces.
 - **Imports/exports sort** by module specifier (external/bare before
   relative), case-insensitively; named members sort within `{ }`.
+- **Import line breaks are decided by width, not by eye.** dprint keeps a
+  named import on one line when its single-line form fits the width and
+  breaks to one member per line otherwise. Measure -- do not guess: build
+  the one-line form and count it (`awk '{print length}'`), since dprint
+  cannot run here. The recurring trap: after removing a member from a
+  multiline import, re-measure -- the remainder often now fits and must
+  collapse to one line.
 - **No emoji** anywhere (project-wide rule).
 - Lines over 100 chars that dprint cannot break (long template literals)
   are fine; everything else stays under the width.
