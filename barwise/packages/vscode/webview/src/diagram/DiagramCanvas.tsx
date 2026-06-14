@@ -6,6 +6,7 @@
  * `data-id` / `data-kind` attributes emitted by `OrmDiagram`.
  */
 import type { PositionedGraph } from "@barwise/diagram";
+import * as t from "@barwise/diagram/theme";
 import {
   forwardRef,
   useCallback,
@@ -16,7 +17,6 @@ import {
   useState,
 } from "react";
 import { OrmDiagram } from "./OrmDiagram";
-import * as t from "./theme";
 
 export interface DiagramCanvasProps {
   readonly graph: PositionedGraph;

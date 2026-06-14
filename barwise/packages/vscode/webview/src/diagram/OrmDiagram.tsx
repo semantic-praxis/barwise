@@ -23,7 +23,7 @@ import type {
   PositionedRoleBox,
   PositionedSubtypeEdge,
 } from "@barwise/diagram";
-import * as t from "./theme";
+import * as t from "@barwise/diagram/theme";
 
 export interface OrmDiagramProps {
   readonly graph: PositionedGraph;

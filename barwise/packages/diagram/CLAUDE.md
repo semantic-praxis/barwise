@@ -44,7 +44,10 @@ npx tsc --noEmit            # type-check only
   `DiagramResult` with the SVG string and metadata.
 - Layout is async because ELK.js uses a Web Worker internally.
 - Theme constants are centralized in `render/theme.ts`. Use them
-  instead of hardcoded values.
+  instead of hardcoded values. They are also exposed via the
+  `@barwise/diagram/theme` subpath export so UI renderers (the webview,
+  and the future `@barwise/diagram-ui`) share one source of truth
+  without importing the layout pipeline (and its `elkjs`).
 
 ## Testing
 

@@ -78,3 +78,6 @@ export const COLOR_ANNOTATION_STROKE = "#d97706";
 export const ANNOTATION_DASH = "4,3";
 export const ANNOTATION_MARKER_RADIUS = 5;
 export const COLOR_ANNOTATION_MARKER = "#d97706";
+
+// -- Interactive selection (used by the @barwise/diagram-ui renderer) --
+export const COLOR_SELECTION = "#0a84ff";
