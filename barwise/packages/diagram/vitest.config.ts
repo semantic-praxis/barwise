@@ -6,10 +6,15 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
-      // Exclude type-only modules: the barrel and the two pure
-      // type/interface files (no runtime code), which otherwise report
-      // as 0% and distort the metric for testable code.
-      exclude: ["src/index.ts", "src/graph/GraphTypes.ts", "src/layout/LayoutTypes.ts"],
+      // Exclude type-only modules: the barrel and the pure type/interface
+      // files (no runtime code), which otherwise report as 0% and distort
+      // the metric for testable code.
+      exclude: [
+        "src/index.ts",
+        "src/graph/GraphTypes.ts",
+        "src/layout/LayoutTypes.ts",
+        "src/session/contract.ts",
+      ],
       // Floors calibrated to actual coverage. Statements/lines are capped
       // by ElkLayoutEngine (the A1 decomposition target) and dropped when
       // the well-covered SvgRenderer moved to @barwise/diagram-ui (the

@@ -42,3 +42,12 @@ export * as theme from "./render/theme.js";
 // Main entry point.
 export { generateDiagram } from "./DiagramGenerator.js";
 export type { DiagramOptions, DiagramResult } from "./DiagramGenerator.js";
+
+// Interactive session + presentation contract.
+export type {
+  DiagramFocus,
+  DiagramIntent,
+  DiagramPresentation,
+  DiagramViewInfo,
+} from "./session/contract.js";
+export { DiagramSession } from "./session/DiagramSession.js";
