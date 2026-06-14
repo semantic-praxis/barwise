@@ -674,7 +674,7 @@
     "clean": "rm -rf dist",
     "lint": "eslint src/",
     "test": "vitest run",
-    "test:coverage": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:unit": "vitest run",
     "pretest:integration": "tsc -p tsconfig.test.json",
     "test:integration": "vscode-test"
@@ -700,6 +700,7 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@types/vscode": "^1.99.0",
+    "@vitest/coverage-v8": "^3.0.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.27.3",
