@@ -1,6 +1,6 @@
 {
   "name": "@barwise/code-analysis",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "private": true,
   "description": "LSP-based code analysis for ORM model extraction (TypeScript, Java, Kotlin)",
   "type": "module",
@@ -24,7 +24,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@barwise/core": "1.5.0"
+    "@barwise/core": "1.6.0"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
