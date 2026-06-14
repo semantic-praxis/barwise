@@ -50,11 +50,11 @@ replace its contents with a README pointing at the root workflows.
 
 ### 2. Enforce the connector decision for I/O in core
 
-- [ ] Priority: P2 -- designed; implementation pending. Migration spec
-      drafted at docs/specs/connector-io-migration.spec.md (five
-      independently shippable workstreams; resolves toward making all
-      interop formats pluggable so core ships none). Connector convention
-      is in CLAUDE.md. (June 2026)
+- [ ] Priority: P2 -- implementation underway. Migration spec at
+      docs/specs/connector-io-migration.spec.md (five independently
+      shippable workstreams; resolves toward making all interop formats
+      pluggable so core ships none). Workstream 1 landed in PR #112.
+      Connector convention is in CLAUDE.md. (June 2026)
 
 Decision context: I/O is done through format connectors registered
 in the `FormatDescriptor` registry. The findings below are not a

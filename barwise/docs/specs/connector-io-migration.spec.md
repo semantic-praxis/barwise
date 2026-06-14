@@ -39,20 +39,24 @@ Two refinements keep this honest:
   canonical persistence and stays in core, along with its JSON Schema.
   "All formats pluggable" governs the interop set (ddl, openapi, norma,
   avro, dbt, sql, code), not the native serializer.
-- **Some descriptors are thin wrappers over core capabilities.**
-  `DdlExportFormat` wraps core's `RelationalMapper` + `renderDdl()` --
-  that mapping logic _is_ core domain. Pluggability is about the
-  **registration/descriptor boundary**, not relocating all logic: a
-  formats package owns the descriptor and calls back into core for the
-  genuine capability, exactly as `code-analysis` depends on core for
-  model types.
+- **The export descriptors are thin wrappers over core capabilities.**
+  `DdlExportFormat`, `OpenApiExportFormat`, and `AvroExportFormat` all
+  wrap core's `RelationalMapper` and renderers (`renderDdl`,
+  `renderOpenApi`, `renderAvro`) -- that mapping logic _is_ core domain.
+  Pluggability is about the **registration/descriptor boundary**, not
+  relocating logic: the formats package owns the descriptor and calls
+  back into core for the capability, as `code-analysis` depends on core
+  for model types. The importers (norma XML, SQL `parse`) are
+  self-contained and move whole.
 
 This makes the dbt migration one instance of a general rule rather than
-a one-off carve-out. The cost is honest: relocating the pure formats is
-orthogonality polish, not a correctness need (they violate nothing), and
-core alone can no longer import or export until a formats package is
-registered -- irrelevant for this private monorepo, a minor ergonomic
-for any future external consumer of `@barwise/core`.
+a one-off carve-out. The cost is honest: relocating the standard
+descriptors is orthogonality polish, not a correctness need (they
+violate nothing), and core alone can no longer import or export until a
+formats package is registered -- irrelevant for this private monorepo, a
+minor ergonomic for any future external consumer of `@barwise/core`.
+Whether that polish earns a near-empty package is the workstream-5 open
+decision below.
 
 ## Inventory
 
@@ -71,14 +75,16 @@ relocate too, for uniformity.
 | `DbtDialectDetector`                | `process.env` + `profiles.yml`           | `@barwise/dbt`; env as options         |
 | `SqlImportFormat`                   | `parse()` pure; `parseAsync()` scans dir | pure parse -> formats; dir scan -> dbt |
 | `lineage/manifest`                  | `readManifest`/`writeManifest`           | read/write -> tool layer; logic pure   |
-| `lineage/resolveArtifact`           | `existsSync` + traversal                 | move to tool layer                     |
+| `lineage/impact`, `staleness`       | read the manifest via `readManifest`     | signature -> manifest arg; pure        |
+| `lineage/resolveArtifact`           | `existsSync` + traversal                 | pure match in core; walk -> tool layer |
 | `serialization/ProjectLoader`       | walks/reads project files                | fs walk -> tool layer; assembly pure   |
 | `OrmProject.ExportFormat`           | hardcodes format names                   | -> registered-name `string`            |
 
 `hashModel` (uses `node:crypto` hashing) is deterministic and pure --
-hashing is not I/O and stays. The DDL/relational-mapping capability
-(`RelationalMapper`, `renderDdl`) is core domain logic and stays; only
-the `ddl` descriptor that wraps it relocates.
+hashing is not I/O and stays. The relational-mapping capability
+(`RelationalMapper`, `renderDdl`/`renderOpenApi`/`renderAvro`) is core
+domain logic and stays; the export descriptors that wrap it relocate as
+thin shells.
 
 ## Target architecture
 
@@ -87,14 +93,15 @@ the `ddl` descriptor that wraps it relocates.
   - FormatDescriptor / ImportFormat / ExportFormatAdapter interfaces
   - the format registry
   - native .orm.yaml serialization + JSON Schema
-  - domain capabilities the descriptors wrap (relational mapping ->
-    renderDdl, etc.)
+  - domain capabilities the descriptors wrap (RelationalMapper,
+    renderDdl / renderOpenApi / renderAvro)
   - pure lineage logic: hashModel, updateManifest, staleness, impact
   - pure project assembly from already-read domain contents
   (no fs, no process.env, no subprocess)
 
 @barwise/formats        (NEW: standard interop descriptors)
-  - ddl (wraps core mapping), openapi, norma, avro, pure SQL parse
+  - ddl / openapi / avro: thin export shells over core renderers
+  - norma, SQL parse: self-contained importers
   - registerStandardFormats()
 
 @barwise/dbt            (NEW: warehouse connectors, the I/O ones)
@@ -124,7 +131,7 @@ Correctness-driven determinism fixes first (smallest blast radius
 first), then the orthogonality relocation. Each lands as its own PR and
 keeps the full suite green.
 
-### 1. `DbtDialectDetector`: env -> explicit options
+### 1. `DbtDialectDetector`: env -> explicit options (done: PR #112)
 
 Replace `process.env["DBT_TARGET_TYPE"]` / `DBT_ADAPTER` / `HOME` reads
 with fields on an explicit options object supplied by the caller. The
@@ -133,11 +140,30 @@ isolated determinism fix; lands before any package move.
 
 ### 2. Lineage manifest I/O -> tool layer
 
-Move `readManifest`/`writeManifest`/`resolveArtifact` (fs) out of
-`core/lineage` into the CLI/MCP lineage commands. Core keeps `hashModel`,
-`updateManifest`, `staleness`, and `impact` as pure functions over a
-manifest object. The CLI `lineage` command becomes: read manifest (tool)
--> compute (core) -> write manifest (tool).
+Make core's lineage layer pure and move the filesystem to the tool
+layer. This is larger than first briefed: besides `updateManifest`,
+both `analyzeImpact` and `checkStaleness` take a `dir` and read the
+manifest via `readManifest`. So three public signatures change from a
+`dir` to a manifest object:
+
+- `updateManifest(dir, entry, existing?)` -> `updateManifest(entry, existing?)` (pure merge).
+- `analyzeImpact(dir, elementId)` -> `analyzeImpact(manifest, elementId)`.
+- `checkStaleness(dir, model)` -> `checkStaleness(manifest, model)`.
+
+Core also loses `readManifest`, `writeManifest`, `resolveArtifact`, and
+`findOrmModel`. `resolveArtifact` splits: the pure path match stays in
+core (e.g. `resolveArtifactInManifest(manifest, path)`); the
+parent-directory walk moves to the tool layer. `hashModel` and the YAML
+serialize/parse of the manifest stay (pure).
+
+The tool layer (cli and mcp) gains thin fs wrappers -- read manifest,
+write manifest, walk for the artifact -- over the pure core helpers. The
+CLI `lineage` and `export` commands and the mcp `lineageStatus`,
+`impactAnalysis`, and `describeDomain` tools rewire to: read (tool) ->
+compute (core) -> write (tool).
+
+This is the largest determinism workstream and does not split cleanly:
+every caller depends on `readManifest`, so it leaves core in one step.
 
 ### 3. ProjectLoader fs -> tool layer
 
@@ -157,13 +183,15 @@ This removes the last I/O violators from core.
 
 ### 5. `@barwise/formats` package + retire builtins
 
-Relocate the pure descriptors (ddl, openapi, norma, avro, pure SQL parse)
-into `@barwise/formats` with `registerStandardFormats()`, and delete
-`registerBuiltinFormats()` from core. The `ddl` descriptor depends on
-core for `renderDdl`/`RelationalMapper`. Also de-hardcode
-`OrmProject.ExportFormat` from `"dbt" | "ddl" | "avro"` to a
-registered-name `string`, so the core metamodel no longer names specific
-formats. This is the orthogonality step that makes every format pluggable.
+Relocate the standard descriptors (ddl, openapi, norma, avro, pure SQL
+parse) into `@barwise/formats` with `registerStandardFormats()`, and
+delete `registerBuiltinFormats()` from core. The ddl/openapi/avro export
+descriptors depend on core for `RelationalMapper` and the renderers;
+they relocate as thin shells while the rendering capability stays in
+core. Also de-hardcode `OrmProject.ExportFormat` from
+`"dbt" | "ddl" | "avro"` to a registered-name `string`, so the core
+metamodel no longer names specific formats. Gated on the package
+go/no-go below; the de-hardcoding lands regardless.
 
 ## API and migration impact
 
@@ -173,6 +201,11 @@ formats. This is the orthogonality step that makes every format pluggable.
   `@barwise/formats`). `loadProject` is reshaped. Every downstream import
   (`cli`, `mcp`, `vscode`) updates -- the one-way dependency graph makes
   the blast radius explicit and the build surfaces every site.
+- Lineage (workstream 2): three public functions change signature
+  (`updateManifest`, `analyzeImpact`, `checkStaleness`, all `dir` ->
+  manifest object) and four leave core (`readManifest`, `writeManifest`,
+  `resolveArtifact`, `findOrmModel`). The cli `lineage`/`export` and mcp
+  `lineageStatus`/`impactAnalysis`/`describeDomain` callers update.
 - Registration: `registerBuiltinFormats()` is replaced by
   `registerStandardFormats()` + `registerDbtFormats()` +
   `registerCodeFormats()`, composed by each tool. A format absent from
@@ -184,6 +217,22 @@ formats. This is the orthogonality step that makes every format pluggable.
 
 ## Open decisions (for review)
 
+- **`@barwise/formats` go/no-go (workstream 5).** Verifying the wrapper
+  claim showed the export descriptors are ~3 thin shells over core's own
+  renderers, plus two self-contained importers. Does that earn a
+  separate package, or do the standard descriptors stay in core as the
+  one documented exception to "core ships no interop format"? The
+  orthogonality thesis favours the package; the thinness of the shells
+  makes the exception defensible, since the dbt and code connectors
+  already carry the pattern for the real I/O violators. Leaning toward
+  the exception. Either way, retiring `registerBuiltinFormats()` and
+  de-hardcoding `OrmProject.ExportFormat` still land.
+- **Lineage fs wrappers (workstream 2).** The thin read/write/walk
+  wrappers are needed in both cli and mcp, which share no package.
+  Duplicate them over the pure core helpers (the project tolerates small
+  tool-layer duplication -- CLI `loadModel` vs MCP `resolveSource`), or
+  add a shared tool-io helper (a new node in the graph)? Recommend
+  duplicating: about 40 lines, no new package.
 - **SQL placement.** The pure SQL `parse(content)` fits `@barwise/formats`;
   its directory-scan path fits `@barwise/dbt` (warehouse-oriented). Split
   it that way, or keep all SQL in one package?
