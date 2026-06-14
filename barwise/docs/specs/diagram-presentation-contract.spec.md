@@ -1,6 +1,8 @@
 # Diagram Presentation Contract
 
-Status: proposed
+Status: partially implemented -- steps 1-2 landed (the contract types and
+`DiagramSession` with unit tests live in `@barwise/diagram`); steps 3-5
+(rebuild `protocol.ts`, rewrite `DiagramPanel` as the adapter) pending.
 Owner: diagram / vscode
 Related: `diagram-ui-modernization.spec.md` -- resolves its open
 architecture question ("Resolved: a front-end-agnostic presentation
@@ -28,7 +30,7 @@ ORM/graph logic with `vscode.*` calls, `node:fs` I/O, and
 `webview.postMessage`. Consequences:
 
 - The contract cannot be consumed by anything that is not the VS Code
-  webview -- not `renderSvg`, not a CLI preview, not a unit test --
+  webview -- not a static render, not a CLI preview, not a unit test --
   without reaching through VS Code.
 - `DiagramPanel` works against the package dependency rule (CLAUDE.md):
   "Diagram generation logic stays in `@barwise/diagram`." Focus/hop
@@ -168,7 +170,7 @@ the contract types.
 
 - `DiagramSession` and the contract types live in `@barwise/diagram`.
   The change is additive: existing exports (`generateDiagram`,
-  `renderSvg`, `PositionedGraph`, ...) are untouched, so `@barwise/cli`
+  `PositionedGraph`, ...) are untouched, so `@barwise/cli`
   and `@barwise/mcp` are unaffected.
 - `@barwise/diagram` keeps its zero-VS-Code, zero-browser rule.
   `DiagramSession` depends only on `@barwise/core` and the existing

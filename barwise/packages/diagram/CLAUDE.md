@@ -24,9 +24,16 @@ src/
     ElkLayoutEngine.ts  Runs ELK.js to compute node/edge positions
   render/
     theme.ts            Color/dimension constants (also via the ./theme subpath)
+  session/
+    contract.ts         Serializable DiagramPresentation / DiagramIntent
+    DiagramSession.ts   Interactive diagram state (focus, views, ghosts) -> presentation
   DiagramGenerator.ts   Main entry point: model -> positioned layout
   index.ts              Public API
 ```
+
+`DiagramSession` holds the interactive-diagram state extracted from the
+VS Code `DiagramPanel` (the presentation-contract spec): platform-
+independent, unit-testable, with no VS Code / browser / fs dependency.
 
 ## Commands
 
