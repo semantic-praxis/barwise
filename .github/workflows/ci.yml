@@ -72,6 +72,15 @@ jobs:
       - run: npm run --workspace=@barwise/mcp bundle
         if: steps.changes.outputs.docs_only != 'true'
 
+      - run: npm run --workspace=@barwise/cli bundle
+        if: steps.changes.outputs.docs_only != 'true'
+
+      # Smoke-test the standalone CLI bundle so a broken bundle fails CI,
+      # not a release.
+      - name: Smoke-test CLI bundle
+        if: steps.changes.outputs.docs_only != 'true'
+        run: node packages/cli/dist/bundle/index.cjs --version
+
       - run: npm run publint
         if: steps.changes.outputs.docs_only != 'true'
 
