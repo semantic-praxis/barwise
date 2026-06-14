@@ -280,12 +280,15 @@ published.
 
 ### A6. Diagram stack: consolidate on the React renderer
 
-- [ ] Priority: P2 (recommended) -- renderer-consolidation spec written
-      (docs/specs/diagram-renderer-consolidation.spec.md, four
-      workstreams: theme subpath, new @barwise/diagram-ui package,
-      headless react-dom/server renderer retiring SvgRenderer, ui tests).
-      The presentation-contract spec (DiagramSession) is independent and
-      can land in either order.
+- [x] Priority: P2 -- DONE (June 2026). All four workstreams of
+      docs/specs/diagram-renderer-consolidation.spec.md landed: the
+      `@barwise/diagram/theme` subpath, the new `@barwise/diagram-ui`
+      package (OrmDiagram + DiagramCanvas moved out of the webview), the
+      headless `renderDiagramSvg` (react-dom/server) that retired
+      `SvgRenderer`, and the diagram-ui tests. There is now one renderer:
+      `OrmDiagram` renders interactively in the webview and headlessly to
+      static SVG for the CLI/MCP. The presentation-contract spec
+      (DiagramSession) remains independent and unstarted.
 
 Decision context (June 2026 triage): the front end is React, not
 the legacy SVG-string panel. The webview-vs-local-server question
@@ -342,14 +345,16 @@ Prerequisites for the consolidation:
 
 ### T1. The webview React app has zero tests
 
-- [ ] Priority: P2 (recommended) -- highest-risk untested surface
+- [ ] Priority: P2 (recommended) -- partly addressed; shell components remain
 
-Ten-plus interactive components (DiagramCanvas, OrmDiagram,
-Inspector, ContextBar, CommandPalette, ViewsMenu, TopBar,
-BottomStrip, ...) shipped in the diagram modernization with no test
-coverage. The webview message protocol
-(`vscode/src/diagram/protocol.ts`) is also untested. This is the
-highest-risk untested surface in the repo.
+The diagram renderers are now tested: `OrmDiagram` and the headless
+`renderDiagramSvg` have unit tests, and `DiagramCanvas`'s interactions
+(click, drag, double-click, the imperative handle) are tested in jsdom,
+all in `@barwise/diagram-ui` (A6 WS4). What remains untested is the
+webview app shell -- Inspector, ContextBar, CommandPalette, ViewsMenu,
+TopBar, BottomStrip, App -- and the webview message protocol
+(`vscode/src/diagram/protocol.ts`), which still has no jsdom/Testing
+Library setup in the `vscode` package.
 
 Recommendation: component tests (Testing Library) for the
 message-protocol handling and state transitions first; rendering

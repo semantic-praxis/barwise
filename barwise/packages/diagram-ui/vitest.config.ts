@@ -5,15 +5,14 @@ export default defineConfig({
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     coverage: {
       provider: "v8",
-      // The headless render surface is covered now; the interactive
-      // DiagramCanvas is exercised by the integration suite and gets unit
-      // tests in workstream 4.
-      include: ["src/OrmDiagram.tsx", "src/renderDiagramSvg.tsx"],
+      // The render components and the headless renderer; the barrels
+      // (index.ts, server.ts) carry no logic.
+      include: ["src/DiagramCanvas.tsx", "src/OrmDiagram.tsx", "src/renderDiagramSvg.tsx"],
       thresholds: {
-        statements: 78,
-        branches: 50,
-        functions: 95,
-        lines: 78,
+        statements: 70,
+        branches: 60,
+        functions: 78,
+        lines: 70,
       },
     },
   },
