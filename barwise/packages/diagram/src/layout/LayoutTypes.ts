@@ -133,3 +133,22 @@ export interface PositionedGraph {
   readonly width: number;
   readonly height: number;
 }
+
+/**
+ * Optional position overrides for entity nodes.
+ * Keys are entity node IDs, values are {x, y} positions.
+ * When provided, the layout engine uses these positions instead of
+ * computing them via ELK, then re-runs fact type placement and edge
+ * routing around the fixed positions.
+ */
+export interface PositionOverrides {
+  readonly [nodeId: string]: { readonly x: number; readonly y: number; };
+}
+
+/**
+ * Manual orientation overrides for fact type nodes.
+ * Keys are fact type node IDs, values are the desired orientation.
+ */
+export interface OrientationOverrides {
+  readonly [factTypeId: string]: "horizontal" | "vertical";
+}

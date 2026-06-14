@@ -40,7 +40,8 @@ vi.mock("elkjs", () => {
   };
 });
 
-const { layoutGraph, buildEntityElkGraph } = await import("../src/layout/ElkLayoutEngine.js");
+const { layoutGraph } = await import("../src/layout/ElkLayoutEngine.js");
+const { buildEntityElkGraph } = await import("../src/layout/EntityPlacement.js");
 
 // Helper to make a minimal binary fact type graph.
 function makeBinaryGraph(): OrmGraph {
