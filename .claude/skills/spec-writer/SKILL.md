@@ -30,11 +30,13 @@ reviewer's time as more valuable than your own. Three rules follow:
 
 ## Workflow
 
-1. **Ground it.** Read `barwise/docs/ARCHITECTURE.md`, the relevant
-   package `CLAUDE.md`, and the source the spec covers (a REPO_REVIEW
-   finding, the code to change). Verify claims against the code -- do
-   not design from assumptions. (E.g. "are these formats actually
-   pure?" / "does this function also read disk?" -- check first.)
+1. **Ground it, then frame it.** Read `barwise/docs/ARCHITECTURE.md`,
+   the relevant package `CLAUDE.md`, and the source the spec covers (a
+   REPO_REVIEW finding, the code to change). Verify claims against the
+   code; do not design from assumptions. For anything non-trivial, work
+   `sensemaking.md`: anchor the design in verified facts, hold two or
+   three alternatives, and test each against what the code should and
+   should not show before committing.
 2. **Argue from principles.** Frame the problem and the resolution in
    terms of the stated principles: determinism in core, orthogonality
    and composability (primary), explicit over implicit, DRY (secondary).
