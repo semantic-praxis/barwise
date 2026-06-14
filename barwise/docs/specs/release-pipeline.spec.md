@@ -87,8 +87,9 @@ packages/cli/
     bundle MCP    (npm run --workspace=@barwise/mcp bundle)
     stage assets + SHA256SUMS
     if release:  upload to that release's tag
-    if push:     move the `edge` tag to HEAD, recreate the `edge`
-                 pre-release, upload assets (clobbering)
+    if push:     refresh the `edge` pre-release assets in place; the
+                 `edge` tag is created once and never moved (a moving
+                 tag breaks contributors' `git pull`)
 
 ci.yml
     add "bundle CLI" next to the existing "bundle MCP" step, so the
@@ -129,10 +130,11 @@ script.
 Add the `push: [main]` trigger and a concurrency group that cancels an
 in-progress edge build when a newer merge lands. The build is shared with
 workstream 2; the upload branches on `github.event_name`: on a push,
-move the `edge` tag to `HEAD`, recreate the `edge` pre-release (so stale
-assets are dropped), and upload the `-edge` assets and checksums. The
-release body notes the source commit and that `edge` is an unstable build
-from the latest `main`. Depends on workstream 2.
+create the `edge` pre-release once (if absent) and otherwise refresh its
+`-edge` assets and checksums in place with `--clobber`. The `edge` tag is
+not moved -- a moving tag makes every contributor's `git pull` fail with
+"would clobber existing tag". The release body notes the real source
+commit even though the tag stays put. Depends on workstream 2.
 
 ### 4. Cut the overdue release
 

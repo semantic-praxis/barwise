@@ -75,18 +75,24 @@ jobs:
           gh release upload "${{ github.event.release.tag_name }}" \
             release-assets/* --clobber --repo "${{ github.repository }}"
 
+      # Refresh the edge assets in place. The `edge` tag is created once
+      # and never moved on later pushes: a moving tag makes every
+      # contributor's `git pull` fail with "would clobber existing tag".
+      # The downloadable bundles stay current; the release body records
+      # the real build commit even though the tag itself does not move.
       - name: Refresh edge pre-release
         if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete edge --cleanup-tag --yes \
-            --repo "${{ github.repository }}" || true
-          gh release create edge \
-            --prerelease \
-            --target "${{ github.sha }}" \
-            --title "Edge build (latest main)" \
-            --notes "Automatically built from commit ${{ github.sha }}. Unstable preview of the latest main -- not a tagged release. For a stable build, use the latest versioned release." \
-            --repo "${{ github.repository }}"
+          notes="Automatically built from commit ${{ github.sha }}. Unstable preview of the latest main -- not a tagged release. For a stable build, use the latest versioned release."
+          if gh release view edge --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release edit edge --prerelease --notes "$notes" \
+              --repo "${{ github.repository }}"
+          else
+            gh release create edge --prerelease --target "${{ github.sha }}" \
+              --title "Edge build (latest main)" --notes "$notes" \
+              --repo "${{ github.repository }}"
+          fi
           gh release upload edge release-assets/* --clobber \
             --repo "${{ github.repository }}"
