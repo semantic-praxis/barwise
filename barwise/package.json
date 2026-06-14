@@ -1,6 +1,6 @@
 {
   "name": "barwise",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "private": true,
   "description": "ORM 2 modeling tool for data engineers and architects",
   "workspaces": [
