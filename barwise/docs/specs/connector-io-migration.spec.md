@@ -165,13 +165,23 @@ compute (core) -> write (tool).
 This is the largest determinism workstream and does not split cleanly:
 every caller depends on `readManifest`, so it leaves core in one step.
 
-### 3. ProjectLoader fs -> tool layer
+### 3. ProjectLoader fs -> tool layer (done)
 
-Split `loadProject(path)` into (a) a tool-layer walk that finds and reads
-the `.orm-project.yaml` manifest and each domain/mapping file, and (b) a
-pure core assembler that builds the `OrmProject` from the already-read
-contents (reusing the existing serializers). Update the CLI `validate`
-and `diagram` commands.
+`loadProject(manifestPath)` reads the `.orm-project.yaml` manifest and
+then each domain and mapping file it references. Split it: a pure core
+assembler builds the `OrmProject` from already-read contents (reusing
+the existing serializers and collecting parse problems), and a
+tool-layer walk in the CLI reads the manifest plus the domain and
+mapping files. The CLI `validate` and `diagram` commands -- the only
+production callers (not mcp, not vscode) -- move to the tool-layer
+loader.
+
+The whole-loader-to-cli alternative is ruled out: core's own
+`splitModel.test` round-trips a split through `loadProject`, so the load
+capability cannot leave core. The pure assembler serves both that test
+(in-memory contents) and the CLI loader (contents read from disk).
+`LoadedProject.problems` merges the tool's read errors with the
+assembler's parse errors.
 
 ### 4. `@barwise/dbt` connector package
 
@@ -239,8 +249,6 @@ go/no-go below; the de-hardcoding lands regardless.
 - **dbt export.** `DbtExportFormat` (model -> text) is pure; it can sit in
   `@barwise/dbt` so that package owns the whole `dbt` `FormatDescriptor`,
   rather than splitting the dbt direction across packages. Confirm.
-- **ProjectLoader shape.** A pure assembler + tool-layer walk, vs moving
-  the whole loader to the tool layer.
 
 ## Risks and testing
 

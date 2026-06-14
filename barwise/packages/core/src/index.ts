@@ -86,10 +86,13 @@ export {
 } from "./serialization/MappingSerializer.js";
 export { DeserializationError, OrmYamlSerializer } from "./serialization/OrmYamlSerializer.js";
 export {
+  assembleProject,
   type LoadedProject,
-  loadProject,
+  type ProjectFile,
+  projectFilePaths,
+  type ProjectFiles,
   ProjectLoadError,
-} from "./serialization/ProjectLoader.js";
+} from "./serialization/projectAssembly.js";
 export {
   ProjectDeserializationError,
   ProjectSerializer,
