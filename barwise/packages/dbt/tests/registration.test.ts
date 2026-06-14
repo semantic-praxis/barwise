@@ -4,13 +4,7 @@
  * shape of the `dbt` descriptor and that `registerDbtFormats()` plugs
  * it into core's registry.
  */
-import {
-  clearFormats,
-  getExporter,
-  getFormat,
-  getImporter,
-  listFormats,
-} from "@barwise/core";
+import { clearFormats, getExporter, getFormat, getImporter, listFormats } from "@barwise/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDbtFormat, registerDbtFormats } from "../src/registration.js";
 

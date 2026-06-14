@@ -61,6 +61,6 @@ Lint is run from the repo root: `npm run lint`.
 
 ## Dependencies
 
-| Direction | Package         | What is used                                                        |
+| Direction | Package         | What is used                                                       |
 | --------- | --------------- | ------------------------------------------------------------------ |
 | Upstream  | `@barwise/core` | Model types, ImportFormat/ExportFormatAdapter, registry, renderDbt |
