@@ -3,7 +3,8 @@
  */
 
 import type { OrmModel } from "../model/OrmModel.js";
-import { hashModel, readManifest } from "./manifest.js";
+import { hashModel } from "./manifest.js";
+import type { LineageManifest } from "./types.js";
 
 /**
  * Information about a stale artifact.
@@ -27,16 +28,15 @@ export interface StalenessReport {
 /**
  * Check staleness by comparing current model hash against manifest.
  *
- * @param dir - Directory containing the .barwise/lineage.yaml manifest
+ * @param manifest - The lineage manifest (read by the caller), or
+ *   undefined when no manifest exists
  * @param model - Current ORM model to check against manifest
  * @returns Staleness report with stale and fresh artifacts
  */
 export function checkStaleness(
-  dir: string,
+  manifest: LineageManifest | undefined,
   model: OrmModel,
 ): StalenessReport {
-  const manifest = readManifest(dir);
-
   if (!manifest) {
     return {
       staleArtifacts: [],

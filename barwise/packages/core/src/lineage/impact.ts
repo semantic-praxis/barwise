@@ -2,7 +2,7 @@
  * Impact analysis: determine which artifacts depend on a changed model element.
  */
 
-import { readManifest } from "./manifest.js";
+import type { LineageManifest } from "./types.js";
 
 /**
  * Information about an artifact affected by a change.
@@ -25,19 +25,17 @@ export interface ImpactReport {
  * Analyze impact of changing a model element.
  *
  * Given a model element ID, find all exported artifacts that depend on it
- * by reading the lineage manifest and checking which artifacts reference
- * this element in their sources.
+ * by checking which artifacts reference this element in their sources.
  *
- * @param dir - Directory containing the .barwise/lineage.yaml manifest
+ * @param manifest - The lineage manifest (read by the caller), or
+ *   undefined when no manifest exists
  * @param elementId - ID of the changed element (entity, fact type, constraint, etc.)
  * @returns Impact report with affected artifacts
  */
 export function analyzeImpact(
-  dir: string,
+  manifest: LineageManifest | undefined,
   elementId: string,
 ): ImpactReport {
-  const manifest = readManifest(dir);
-
   if (!manifest) {
     return {
       changedElement: elementId,
