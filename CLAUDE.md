@@ -60,6 +60,7 @@ working in a package:
 - `barwise/packages/llm/CLAUDE.md` -- LLM transcript extraction
 - `barwise/packages/code-analysis/CLAUDE.md` -- code connector package; registers TypeScript/Java/Kotlin importers into the `FormatDescriptor` registry
 - `barwise/packages/dbt/CLAUDE.md` -- dbt connector package; registers the dbt importer/exporter into the `FormatDescriptor` registry (owns its fs + subprocess I/O)
+- `barwise/packages/formats/CLAUDE.md` -- standard interop connector package; registers the DDL/OpenAPI/Avro/NORMA/SQL descriptors into the `FormatDescriptor` registry
 - `barwise/packages/cli/CLAUDE.md` -- CLI tool (validate, verbalize, schema, export, diagram, diff, import)
 - `barwise/packages/mcp/CLAUDE.md` -- MCP server (tools, resources, prompts)
 - `barwise/packages/vscode/CLAUDE.md` -- VS Code extension integration
@@ -78,9 +79,12 @@ working in a package:
   |--- @barwise/dbt             (core)  -- connector package: registers
   |                                        the dbt importer/exporter; owns
   |                                        its fs + subprocess I/O
-  |--- @barwise/cli             (core, diagram, llm, code-analysis, dbt)
-  |--- @barwise/mcp             (core, diagram, llm, code-analysis, dbt)
-  |--- barwise-vscode           (core, diagram, llm, code-analysis, dbt, mcp)
+  |--- @barwise/formats         (core)  -- connector package: registers
+  |                                        the standard DDL/OpenAPI/Avro/
+  |                                        NORMA/SQL descriptors
+  |--- @barwise/cli             (core, diagram, llm, code-analysis, dbt, formats)
+  |--- @barwise/mcp             (core, diagram, llm, code-analysis, dbt, formats)
+  |--- barwise-vscode           (core, diagram, llm, code-analysis, dbt, formats, mcp)
 ```
 
 `@barwise/code-analysis` is the template for the connector convention:
@@ -89,6 +93,10 @@ scanning) and registers importers into the `FormatDescriptor` registry,
 rather than putting that I/O in `core`. `@barwise/dbt` follows the same
 convention for the dbt importer/exporter (project-directory scanning and
 the `dbt compile` subprocess), registering via `registerDbtFormats()`.
+`@barwise/formats` carries the standard interop descriptors (DDL,
+OpenAPI, Avro, NORMA, SQL) via `registerStandardFormats()`, so `core`
+ships no interop format at all -- only the registry, the format
+interfaces, and the native `.orm.yaml`.
 
 Changes to `@barwise/core` can break all downstream packages. Run the
 full monorepo build and tests after modifying core's public API.
@@ -96,13 +104,16 @@ full monorepo build and tests after modifying core's public API.
 ## Current State
 
 All phases are complete, with the full test suite passing in CI across
-all 8 packages (core, diagram, llm, code-analysis, dbt, cli, mcp,
-vscode).
+all 9 packages (core, diagram, llm, code-analysis, dbt, formats, cli,
+mcp, vscode).
 The CLI tool (`barwise`) and MCP server (`barwise-mcp`) provide
 the same capabilities as the VS Code extension for terminal and AI
-workflows. Import and export formats (DDL, OpenAPI) are managed through
-a unified format registry (`FormatDescriptor` in `core/src/format/`).
-NORMA XML import is functional with data type resolution, preferred
+workflows. Import and export formats register into a unified registry
+(`FormatDescriptor` in `core/src/format/`) from connector packages
+outside core: the standard DDL/OpenAPI/Avro/NORMA/SQL descriptors live
+in `@barwise/formats`, dbt in `@barwise/dbt`, and code importers in
+`@barwise/code-analysis`. Core itself ships no interop format. NORMA XML
+import is functional with data type resolution, preferred
 identifier support, external uniqueness constraints, and role-level
 value constraints.
 

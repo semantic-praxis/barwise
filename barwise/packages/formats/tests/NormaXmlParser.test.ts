@@ -6,7 +6,7 @@
  * mirror NORMA's documented format without embedding NORMA source.
  */
 import { describe, expect, it } from "vitest";
-import { NormaParseError, parseNormaXml } from "../../src/import/NormaXmlParser.js";
+import { NormaParseError, parseNormaXml } from "../src/NormaXmlParser.js";
 
 /** Minimal valid NORMA XML wrapper. */
 function wrap(body: string): string {

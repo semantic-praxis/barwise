@@ -3,16 +3,17 @@
  */
 
 import { registerCodeFormats } from "@barwise/code-analysis";
-import { getImporter, OrmYamlSerializer, registerBuiltinFormats } from "@barwise/core";
+import { getImporter, OrmYamlSerializer } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
+import { registerStandardFormats } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { readSource } from "../helpers/resolve.js";
 
 const serializer = new OrmYamlSerializer();
 
-// Register built-in formats (DDL, OpenAPI, dbt, sql, etc.) with the unified registry.
-registerBuiltinFormats();
+// Register the standard formats (DDL, OpenAPI, Avro, SQL, NORMA).
+registerStandardFormats();
 // Register code-analysis formats (TypeScript, etc.)
 registerCodeFormats();
 // Register the dbt connector format.

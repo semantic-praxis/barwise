@@ -7,13 +7,11 @@
  * core structure should be preserved.
  */
 
+import { openApiToJson, RelationalMapper, renderDdl, renderOpenApi } from "@barwise/core";
 import { describe, expect, it } from "vitest";
-import { DdlImportFormat } from "../../src/import/DdlImportFormat.js";
-import { OpenApiImportFormat } from "../../src/import/OpenApiImportFormat.js";
-import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
-import { renderDdl } from "../../src/mapping/renderers/ddl.js";
-import { openApiToJson, renderOpenApi } from "../../src/mapping/renderers/openapi.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { DdlImportFormat } from "../src/DdlImportFormat.js";
+import { OpenApiImportFormat } from "../src/OpenApiImportFormat.js";
+import { ModelBuilder } from "./helpers/ModelBuilder.js";
 
 describe("Round-trip tests", () => {
   describe("DDL round-trip", () => {

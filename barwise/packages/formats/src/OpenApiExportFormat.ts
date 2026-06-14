@@ -11,12 +11,15 @@
 import {
   collectExportAnnotations,
   type ExportAnnotation,
-} from "../annotation/ExportAnnotationCollector.js";
-import { RelationalMapper } from "../mapping/RelationalMapper.js";
-import { openApiToJson, renderOpenApi } from "../mapping/renderers/openapi.js";
-import type { OrmModel } from "../model/OrmModel.js";
-import { ValidationEngine } from "../validation/ValidationEngine.js";
-import type { ExportFormatAdapter, ExportOptions, ExportResult } from "./types.js";
+  type ExportFormatAdapter,
+  type ExportOptions,
+  type ExportResult,
+  openApiToJson,
+  type OrmModel,
+  RelationalMapper,
+  renderOpenApi,
+  ValidationEngine,
+} from "@barwise/core";
 
 /**
  * OpenAPI 3.0 export format.

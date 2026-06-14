@@ -5,10 +5,10 @@
  * integrates correctly with the registry.
  */
 
+import { clearFormats, formatRegistry, registerFormat } from "@barwise/core";
 import { beforeEach, describe, expect, it } from "vitest";
-import { openApiExportFormat } from "../../src/export/OpenApiExportFormat.js";
-import { clearFormats, formatRegistry, registerFormat } from "../../src/format/registry.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { openApiExportFormat } from "../src/OpenApiExportFormat.js";
+import { ModelBuilder } from "./helpers/ModelBuilder.js";
 
 describe("OpenApiExportFormat", () => {
   describe("adapter instance", () => {

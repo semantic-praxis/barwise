@@ -9,13 +9,18 @@
  * via explicit flags, file-level hints, or syntax probing.
  */
 
+import {
+  type ConceptualDataTypeName,
+  type ImportFormat,
+  type ImportOptions,
+  type ImportResult,
+  OrmModel,
+  parseSqlFile,
+  type SqlDialect,
+  type SqlPatternContext,
+} from "@barwise/core";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import type { ConceptualDataTypeName } from "../model/ObjectType.js";
-import { OrmModel } from "../model/OrmModel.js";
-import { parseSqlFile } from "../sql/SqlCascadeParser.js";
-import type { SqlDialect, SqlPatternContext } from "../sql/types.js";
-import type { ImportFormat, ImportOptions, ImportResult } from "./types.js";
 
 /**
  * Detect dialect from file-level hints in SQL content.

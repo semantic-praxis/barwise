@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OpenApiImportFormat } from "../../src/import/OpenApiImportFormat.js";
+import { OpenApiImportFormat } from "../src/OpenApiImportFormat.js";
 
 describe("OpenApiImportFormat", () => {
   const importer = new OpenApiImportFormat();

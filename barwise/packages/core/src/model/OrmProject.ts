@@ -7,8 +7,13 @@ import { type ProductConfig, ProductDependency } from "./ProductDependency.js";
 // Project Settings
 // ---------------------------------------------------------------------------
 
-/** Supported export formats. */
-export type ExportFormat = "dbt" | "ddl" | "avro";
+/**
+ * A registered export format name (e.g. "ddl", "openapi", "avro", "dbt").
+ * Core does not enumerate the formats -- they register from outside core
+ * through the `FormatDescriptor` registry -- so this is the format's
+ * registered name rather than a fixed union.
+ */
+export type ExportFormat = string;
 
 /**
  * Strategy for generating preferred identifier (primary key) columns

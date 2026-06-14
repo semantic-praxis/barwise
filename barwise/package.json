@@ -14,7 +14,7 @@
     "lint": "turbo run lint",
     "clean": "turbo run clean",
     "knip": "knip",
-    "circular": "madge --circular --extensions ts packages/core/src/ packages/diagram/src/ packages/llm/src/ packages/code-analysis/src/ packages/dbt/src/ packages/cli/src/ packages/mcp/src/ packages/vscode/src/",
+    "circular": "madge --circular --extensions ts packages/core/src/ packages/diagram/src/ packages/llm/src/ packages/code-analysis/src/ packages/dbt/src/ packages/formats/src/ packages/cli/src/ packages/mcp/src/ packages/vscode/src/",
     "oxlint": "oxlint packages/*/src/",
     "publint": "publint packages/core && publint packages/diagram && publint packages/llm && publint packages/cli && publint packages/mcp",
     "fmt": "dprint fmt",

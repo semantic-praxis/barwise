@@ -1,17 +1,16 @@
 {
-  "name": "@barwise/cli",
+  "name": "@barwise/formats",
   "version": "1.5.0",
   "private": true,
-  "description": "CLI tool for ORM 2 modeling",
+  "description": "Standard interop format descriptors for ORM models (DDL, OpenAPI, Avro, NORMA, SQL)",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
-  },
-  "bin": {
-    "barwise": "./dist/index.js"
   },
   "files": [
     "dist"
@@ -25,13 +24,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@barwise/code-analysis": "1.5.0",
     "@barwise/core": "1.5.0",
-    "@barwise/dbt": "1.5.0",
-    "@barwise/diagram": "1.5.0",
-    "@barwise/formats": "1.5.0",
-    "@barwise/llm": "1.5.0",
-    "commander": "^13.0.0"
+    "fast-xml-parser": "^5.4.1",
+    "yaml": "^2.8.2"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",

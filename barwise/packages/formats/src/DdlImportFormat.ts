@@ -17,9 +17,13 @@
  * here) can improve naming and add definitions.
  */
 
-import type { ConceptualDataTypeName } from "../model/ObjectType.js";
-import { OrmModel } from "../model/OrmModel.js";
-import type { ImportFormat, ImportOptions, ImportResult } from "./types.js";
+import {
+  type ConceptualDataTypeName,
+  type ImportFormat,
+  type ImportOptions,
+  type ImportResult,
+  OrmModel,
+} from "@barwise/core";
 
 /**
  * A parsed CREATE TABLE statement.

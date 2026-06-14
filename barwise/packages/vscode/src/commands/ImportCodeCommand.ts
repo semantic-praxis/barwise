@@ -7,16 +7,17 @@
  * analysis on known entities.
  */
 import { registerCodeFormats } from "@barwise/code-analysis";
-import { getImporter, OrmYamlSerializer, registerBuiltinFormats } from "@barwise/core";
+import { getImporter, OrmYamlSerializer } from "@barwise/core";
 import type { ImportResult } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
+import { registerStandardFormats } from "@barwise/formats";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
 const serializer = new OrmYamlSerializer();
 
 // Ensure formats are registered.
-registerBuiltinFormats();
+registerStandardFormats();
 registerCodeFormats();
 registerDbtFormats();
 

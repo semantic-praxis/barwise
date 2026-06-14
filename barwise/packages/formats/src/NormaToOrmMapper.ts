@@ -8,10 +8,13 @@
  * We do not embed or redistribute any NORMA source code or XSD schemas.
  * These mappings are derived from publicly documented format information.
  */
-import type { Constraint } from "../model/Constraint.js";
-import type { ConceptualDataTypeName, DataTypeDef } from "../model/ObjectType.js";
-import { OrmModel } from "../model/OrmModel.js";
-import type { RoleConfig } from "../model/Role.js";
+import {
+  type ConceptualDataTypeName,
+  type Constraint,
+  type DataTypeDef,
+  OrmModel,
+  type RoleConfig,
+} from "@barwise/core";
 import type {
   NormaConstraint,
   NormaDataType,

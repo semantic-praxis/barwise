@@ -9,19 +9,19 @@ import {
   getExporter,
   hashModel,
   listExporters,
-  registerBuiltinFormats,
   updateManifest,
 } from "@barwise/core";
 import type { ManifestExport } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
+import { registerStandardFormats } from "@barwise/formats";
 import type { Command } from "commander";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { loadModel } from "../helpers/io.js";
 import { readManifest, writeManifest } from "../helpers/lineageIo.js";
 
-// Register built-in formats (DDL, OpenAPI, etc.) with the unified registry.
-registerBuiltinFormats();
+// Register the standard formats (DDL, OpenAPI, Avro, SQL, NORMA).
+registerStandardFormats();
 // Register the dbt connector format.
 registerDbtFormats();
 
