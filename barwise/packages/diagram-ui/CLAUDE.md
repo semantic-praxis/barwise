@@ -44,9 +44,14 @@ src/
 ## Commands
 
 ```sh
-npx vitest run              # run tests (added in workstream 4)
+npx vitest run              # run tests
 npx tsc                     # build to dist (jsx: react-jsx)
 ```
+
+`OrmDiagram` and `renderDiagramSvg` are tested headlessly with
+`react-dom/server`; `DiagramCanvas`'s interactions (click, drag,
+double-click, the imperative handle) are tested in jsdom via Testing
+Library (`// @vitest-environment jsdom`).
 
 The build is `tsc` (not esbuild): it emits `dist/*.js` that the webview's
 esbuild bundles and that Node (CLI/MCP, workstream 3) imports. The
