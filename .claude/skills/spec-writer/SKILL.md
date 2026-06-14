@@ -50,7 +50,9 @@ reviewer's time as more valuable than your own. Three rules follow:
    independently shippable steps, ordered smallest-blast-radius first,
    each keeping the full suite green as its own PR. Note coupling that
    forces steps together (e.g. a function only one caller uses vs. one
-   five modules share).
+   five modules share). A later workstream is usually drafted before it
+   is grounded; mark its conclusions provisional until then (see
+   `sensemaking.md`), so an anticipated claim does not read as settled.
 5. **Surface open decisions.** End with the choices that are genuinely
    the reviewer's call (package scope, where shared I/O lives,
    API shape). Recommend a default; do not silently decide. These are
@@ -58,8 +60,10 @@ reviewer's time as more valuable than your own. Three rules follow:
 6. **Edit.** Run the edit passes in `editing.md` (scanning `llm-tics.md`
    during the voice pass) before the spec is shared.
 7. **Clear the gate, then land.** Run the pre-push gate below, land the
-   spec for review, then implement in separate PRs. Revise the spec if
-   implementation reveals the scope differs from the brief.
+   spec for review, then implement in separate PRs. Before implementing
+   each workstream, ground it again and verify or correct the
+   conclusions drafted ahead of time; revise the spec if the scope
+   differs from the brief.
 
 ## House structure
 

@@ -54,6 +54,22 @@ cases, blast radius -- and classify each tension:
 Commit to the frame with the fewest serious tensions. Carry the
 survivors into the spec's Open decisions and Risks; do not bury them.
 
+## Forward sections are provisional until grounded
+
+A multi-workstream spec is usually drafted in one pass, but each
+workstream is grounded just-in-time, before its own implementation. So
+the later sections state conclusions the evidence has not yet chosen --
+and confident prose makes them read as settled fact. Mark them: a claim
+drafted ahead of its grounding carries a "(provisional: not yet
+grounded)" note on the section or the claim, dropped only once the
+workstream is grounded and the claim verified or corrected.
+
+The cost of skipping this is a false anchor that survives every later
+read. (Workstream 5 was drafted as "a near-empty package of ~3 thin
+shells plus two importers"; grounding it before implementation found
+~11 files, and the confident undercount had read as fact across several
+revisions.)
+
 ## Tripwires
 
 Name the signals during implementation that should reopen the design --

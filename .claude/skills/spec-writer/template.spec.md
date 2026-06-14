@@ -46,13 +46,15 @@ beats prose here.>
 ## Workstreams (each independently shippable)
 
 <Ordered smallest-blast-radius first. Each is its own PR and keeps the
-full suite green. Note coupling that forces steps together.>
+full suite green. Note coupling that forces steps together. Mark any
+workstream drafted ahead of its grounding "(provisional: not yet
+grounded)" until you verify it; drop the marker when you do.>
 
 ### 1. <name>
 
 <What changes, why it is first, what it does and does not touch.>
 
-### 2. <name>
+### 2. <name> (provisional: not yet grounded)
 
 <...>
 
