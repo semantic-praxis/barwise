@@ -70,10 +70,10 @@ relocate too, for uniformity.
 | ----------------------------------- | ---------------------------------------- | -------------------------------------- |
 | ddl / openapi / norma / avro (pure) | none (text)                              | relocate to `@barwise/formats`         |
 | `DbtImportFormat` (`directory`)     | scans a dbt project dir                  | move to `@barwise/dbt`                 |
-| `DbtProjectImporter`                | fs over content parse                    | move to `@barwise/dbt`                 |
+| `DbtProjectImporter`                | pure (parses content)                    | `@barwise/dbt` for cohesion            |
 | `DbtSqlCompiler`                    | spawns `dbt compile`                     | move to `@barwise/dbt`                 |
-| `DbtDialectDetector`                | `process.env` + `profiles.yml`           | `@barwise/dbt`; env as options         |
-| `SqlImportFormat`                   | `parse()` pure; `parseAsync()` scans dir | pure parse -> formats; dir scan -> dbt |
+| `DbtDialectDetector`                | reads `profiles.yml` (env: PR #112)      | move to `@barwise/dbt`                 |
+| `SqlImportFormat`                   | `parse()` pure; `parseAsync()` scans dir | move whole to `@barwise/formats`       |
 | `lineage/manifest`                  | `readManifest`/`writeManifest`           | read/write -> tool layer; logic pure   |
 | `lineage/impact`, `staleness`       | read the manifest via `readManifest`     | signature -> manifest arg; pure        |
 | `lineage/resolveArtifact`           | `existsSync` + traversal                 | pure match in core; walk -> tool layer |
@@ -101,12 +101,14 @@ thin shells.
 
 @barwise/formats        (NEW: standard interop descriptors)
   - ddl / openapi / avro: thin export shells over core renderers
-  - norma, SQL parse: self-contained importers
+  - norma, SQL: self-contained importers (fs allowed outside core)
   - registerStandardFormats()
 
 @barwise/dbt            (NEW: warehouse connectors, the I/O ones)
-  - DbtImportFormat, DbtProjectImporter, DbtSqlCompiler,
-    DbtDialectDetector, the SQL directory-scan path
+  - the whole dbt FormatDescriptor: DbtImportFormat + DbtExportFormat,
+    plus DbtProjectImporter, DbtSqlCompiler, DbtDialectDetector, and
+    the dbt schema parser / mapper / report / annotator helpers
+  - depends on core for parseSqlFile and renderDbt
   - owns its fs + subprocess I/O
   - registerDbtFormats()
 
@@ -185,11 +187,38 @@ assembler's parse errors.
 
 ### 4. `@barwise/dbt` connector package
 
-Create the package, move the dbt/sql directory importers and the SQL
-directory-scan path into it, give it `registerDbtFormats()`, and register
-it from cli/mcp/vscode at startup -- exactly as `registerCodeFormats()`
-is wired today. `DbtSqlCompiler`'s `dbt compile` subprocess belongs here.
-This removes the last I/O violators from core.
+Move the entire dbt connector out of core: the whole `dbt`
+`FormatDescriptor` -- both `DbtImportFormat` and `DbtExportFormat` -- plus
+its supporting modules (`DbtProjectImporter`, `DbtSqlCompiler`,
+`DbtDialectDetector`, and the dbt schema parser, mapper, report, and YAML
+annotator). The I/O violators move for determinism: `DbtImportFormat`
+scans a project directory, `DbtSqlCompiler` spawns `dbt compile`, and
+`DbtDialectDetector` still reads `profiles.yml` (workstream 1 removed only
+its `process.env` reads). The pure helpers move with them for cohesion --
+nothing in core's domain logic imports a dbt module; only `import/`,
+`export/DbtExportFormat`, and the registry reference them.
+
+The package depends on core for two capabilities it does not own:
+`parseSqlFile` (the SQL cascade parser stays in core's pure `sql/`) and
+`renderDbt` plus `DbtExportAnnotator` (the dbt rendering capability stays
+in core's `mapping/`, like `renderDdl`). This is the descriptor boundary
+again: the package owns the descriptor and calls back into core for the
+capability.
+
+Wire `registerDbtFormats()` from the tool layer exactly as
+`registerCodeFormats()` is today -- at the cli `import`/`export`, mcp
+`importModel`/`exportModel`, and vscode `ImportCodeCommand` startup sites.
+Drop `dbtFormat` from core's `registerBuiltinFormats()` (which stays,
+shrunk, until workstream 5), and move vscode `ImportDbtCommand`'s direct
+`importDbtProject`/`annotateDbtYaml` imports to `@barwise/dbt` -- the only
+tool-layer code that imports a dbt symbol directly rather than through the
+registry.
+
+SQL is not in this workstream. `SqlImportFormat` is generic, not
+warehouse-specific, and moves whole to `@barwise/formats` in workstream 5.
+This workstream removes the dbt filesystem and subprocess I/O from core;
+the one I/O path left afterward is `SqlImportFormat`'s directory scan,
+which leaves in workstream 5.
 
 ### 5. `@barwise/formats` package + retire builtins
 
@@ -206,8 +235,8 @@ go/no-go below; the de-hardcoding lands regardless.
 ## API and migration impact
 
 - Public barrel exports move out of `@barwise/core`: `importDbtProject`,
-  `detectDbtDialect`, the dbt/sql `ImportFormat` classes (to
-  `@barwise/dbt`), and the standard format descriptors (to
+  `detectDbtDialect`, and `DbtImportFormat` (to `@barwise/dbt`), and the
+  standard format descriptors -- including `SqlImportFormat` (to
   `@barwise/formats`). `loadProject` is reshaped. Every downstream import
   (`cli`, `mcp`, `vscode`) updates -- the one-way dependency graph makes
   the blast radius explicit and the build surfaces every site.
@@ -243,12 +272,17 @@ go/no-go below; the de-hardcoding lands regardless.
   tool-layer duplication -- CLI `loadModel` vs MCP `resolveSource`), or
   add a shared tool-io helper (a new node in the graph)? Recommend
   duplicating: about 40 lines, no new package.
-- **SQL placement.** The pure SQL `parse(content)` fits `@barwise/formats`;
-  its directory-scan path fits `@barwise/dbt` (warehouse-oriented). Split
-  it that way, or keep all SQL in one package?
-- **dbt export.** `DbtExportFormat` (model -> text) is pure; it can sit in
-  `@barwise/dbt` so that package owns the whole `dbt` `FormatDescriptor`,
-  rather than splitting the dbt direction across packages. Confirm.
+- **SQL placement (resolved: one package, `@barwise/formats`).**
+  `SqlImportFormat` is one class whose pure `parse()` and fs `parseAsync()`
+  share `buildModelFromPatterns`, so splitting it across packages would
+  force duplicating or core-exporting that helper. fs is allowed outside
+  core, so the whole class moves to `@barwise/formats` (workstream 5), the
+  directory scan included. SQL is generic, not warehouse-specific, so it
+  does not belong in `@barwise/dbt`.
+- **dbt export (resolved: yes).** `DbtExportFormat` wraps core's
+  `renderDbt`, so `@barwise/dbt` owns the whole `dbt` descriptor (import
+  and export) while the renderer stays in core -- the same shell pattern
+  as the ddl/openapi/avro exporters.
 
 ## Risks and testing
 
