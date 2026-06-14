@@ -13,6 +13,7 @@
 
 import { sendChatParticipantRequest } from "@vscode/chat-extension-utils";
 import * as vscode from "vscode";
+import { getOpenModelPath, referencedOrmFiles } from "../mcp/openModel.js";
 import {
   COMMAND_INSTRUCTIONS,
   FOLLOWUP_SUGGESTIONS,
@@ -35,6 +36,17 @@ const handler: vscode.ChatRequestHandler = async (
 
   if (request.command && request.command in COMMAND_INSTRUCTIONS) {
     prompt += "\n\n" + COMMAND_INSTRUCTIONS[request.command];
+  }
+
+  // Resolve the model from the attached references, the open editor, or
+  // the open diagram, and tell the model to pass it as the tool source.
+  // Without this the tools only see the focused editor, which is
+  // undefined when the diagram webview or the chat panel is focused.
+  const modelPath = getOpenModelPath(referencedOrmFiles(request));
+  if (modelPath) {
+    prompt += `\n\nThe user's active ORM model is at \`${modelPath}\`. `
+      + "Pass this exact path as the `source` argument to barwise tools "
+      + "unless the user names a different file.";
   }
 
   const tools = vscode.lm.tools.filter((t) => t.tags.includes(TOOL_TAG));
