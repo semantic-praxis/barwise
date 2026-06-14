@@ -5,7 +5,15 @@
  * and stderr writes, and invokes parseAsync with the given args.
  */
 
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { createProgram } from "../../src/cli.js";
+
+// Mirror the bin entry: supply the real version so `--version` tests see
+// it (createProgram itself no longer reads package.json).
+const { version } = JSON.parse(
+  readFileSync(fileURLToPath(new URL("../../package.json", import.meta.url)), "utf8"),
+) as { version: string; };
 
 export interface RunResult {
   readonly stdout: string;
@@ -42,7 +50,7 @@ export async function runCli(args: string[]): Promise<RunResult> {
   }) as typeof process.stderr.write;
 
   try {
-    const program = createProgram();
+    const program = createProgram(version);
     // Prevent Commander from calling process.exit on errors.
     program.exitOverride();
     await program.parseAsync(["node", "barwise", ...args]);
