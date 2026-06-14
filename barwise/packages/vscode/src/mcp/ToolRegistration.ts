@@ -33,7 +33,9 @@ import {
   resolveSource,
 } from "@barwise/mcp";
 import * as vscode from "vscode";
+import { DiagramPanel } from "../diagram/DiagramPanel.js";
 import { CopilotLlmClient } from "../llm/CopilotLlmClient.js";
+import { resolveOpenModel } from "./resolveModelSource.js";
 
 const serializer = new OrmYamlSerializer();
 
@@ -132,29 +134,42 @@ function toToolResult(
 // ---------------------------------------------------------------------------
 
 /**
- * Returns the file path of the active editor if it is an .orm.yaml file.
- * Used as a fallback when tools don't receive an explicit source/base.
+ * Find the model the tools should act on when no explicit source is
+ * given. Gathers the editor/diagram context and applies the shared
+ * resolution policy: the focused .orm.yaml editor, then the model shown
+ * in the open diagram panel, then any visible .orm.yaml editor. The
+ * diagram fallback matters because a tool is often called while the
+ * diagram webview -- not a text editor -- is focused, leaving
+ * `activeTextEditor` undefined.
  */
-function getActiveOrmFile(): string | undefined {
-  const editor = vscode.window.activeTextEditor;
-  if (editor?.document.fileName.endsWith(".orm.yaml")) {
-    return editor.document.uri.fsPath;
-  }
-  return undefined;
+function getOpenModelPath(): string | undefined {
+  const active = vscode.window.activeTextEditor;
+  const activeOrmFile = active?.document.fileName.endsWith(".orm.yaml")
+    ? active.document.uri.fsPath
+    : undefined;
+  const visibleOrmFiles = vscode.window.visibleTextEditors
+    .map((e) => e.document)
+    .filter((d) => d.fileName.endsWith(".orm.yaml"))
+    .map((d) => d.uri.fsPath);
+  return resolveOpenModel({
+    activeOrmFile,
+    diagramModelPath: DiagramPanel.activeModelPath(),
+    visibleOrmFiles,
+  });
 }
 
 /**
  * Resolve a source parameter: use the provided value if non-empty,
- * otherwise fall back to the active .orm.yaml file. Throws if neither
- * is available.
+ * otherwise fall back to the open model (editor or diagram). Throws if
+ * neither is available.
  */
 function resolveSourceParam(source: string | undefined): string {
   if (source && source.trim().length > 0) return source;
-  const active = getActiveOrmFile();
-  if (active) return active;
+  const open = getOpenModelPath();
+  if (open) return open;
   throw new Error(
-    "No source provided and no .orm.yaml file is open in the editor. "
-      + "Please open an .orm.yaml file or provide a file path.",
+    "No source provided, and no .orm.yaml file is open or shown in a "
+      + "diagram. Open or attach an .orm.yaml file, or pass a file path.",
   );
 }
 
