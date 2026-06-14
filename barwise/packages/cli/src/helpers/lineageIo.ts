@@ -5,7 +5,12 @@
  * merge); the tool layer owns the actual file read and write.
  */
 
-import { type LineageManifest, manifestPath, parseManifest, serializeManifest } from "@barwise/core";
+import {
+  type LineageManifest,
+  manifestPath,
+  parseManifest,
+  serializeManifest,
+} from "@barwise/core";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
