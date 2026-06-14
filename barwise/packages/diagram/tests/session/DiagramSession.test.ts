@@ -4,8 +4,8 @@
  * DiagramPresentation -- the behavioral parity guard for logic that had
  * no coverage while it lived in the VS Code panel.
  */
-import { describe, expect, it } from "vitest";
 import type { OrmModel } from "@barwise/core";
+import { describe, expect, it } from "vitest";
 import { ModelBuilder } from "../../../core/tests/helpers/ModelBuilder.js";
 import { DiagramSession } from "../../src/session/DiagramSession.js";
 
