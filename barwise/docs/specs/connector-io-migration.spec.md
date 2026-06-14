@@ -1,6 +1,6 @@
 # Connector I/O Migration: Restore Determinism in Core
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Workstreams 1-4 landed; workstream 5 specified and ready
 Tracking: REPO_REVIEW-2026-06.md finding #2
 
 ## Principle
@@ -100,8 +100,9 @@ thin shells.
   (no fs, no process.env, no subprocess)
 
 @barwise/formats        (NEW: standard interop descriptors)
-  - ddl / openapi / avro: thin export shells over core renderers
-  - norma, SQL: self-contained importers (fs allowed outside core)
+  - ddl / openapi: importer + thin export shell over core renderers
+  - avro: thin export shell; norma: importer + its XML cluster
+  - sql: importer (whole, fs included -- allowed outside core)
   - registerStandardFormats()
 
 @barwise/dbt            (NEW: warehouse connectors, the I/O ones)
@@ -222,15 +223,38 @@ which leaves in workstream 5.
 
 ### 5. `@barwise/formats` package + retire builtins
 
-Relocate the standard descriptors (ddl, openapi, norma, avro, pure SQL
-parse) into `@barwise/formats` with `registerStandardFormats()`, and
-delete `registerBuiltinFormats()` from core. The ddl/openapi/avro export
-descriptors depend on core for `RelationalMapper` and the renderers;
-they relocate as thin shells while the rendering capability stays in
-core. Also de-hardcode `OrmProject.ExportFormat` from
-`"dbt" | "ddl" | "avro"` to a registered-name `string`, so the core
-metamodel no longer names specific formats. Gated on the package
-go/no-go below; the de-hardcoding lands regardless.
+Relocate the standard descriptors into a new `@barwise/formats` package
+with `registerStandardFormats()`, and delete `registerBuiltinFormats()`
+from core. What moves:
+
+- Export shells: `DdlExportFormat`, `OpenApiExportFormat`,
+  `AvroExportFormat` -- each wraps core's `RelationalMapper` and a
+  renderer (`renderDdl` / `renderOpenApi` / `renderAvro`), the same shell
+  pattern `DbtExportFormat` already follows in `@barwise/dbt`.
+- Importers: `DdlImportFormat`, `OpenApiImportFormat`, `SqlImportFormat`
+  (whole, fs included -- see SQL placement below), and
+  `NormaImportFormat` with its self-contained XML cluster
+  (`NormaXmlImporter`, `NormaXmlParser`, `NormaToOrmMapper`,
+  `NormaXmlTypes`).
+
+The rendering and parsing capabilities stay in core, and the relocated
+descriptors call back into them: `RelationalMapper`, `renderDdl` /
+`renderOpenApi` / `renderAvro`, `parseSqlFile`, and
+`renderPopulationAsSql` (used by `DdlExportFormat` _and_ by core's own
+`renderDdl`, so it stays in core and gains a public export). Only the
+registry consumes these descriptors today, so the move is mechanical and
+the build surfaces every site.
+
+Also de-hardcode `OrmProject.ExportFormat` from `"dbt" | "ddl" | "avro"`
+to a registered-name `string`, so the core metamodel no longer names
+specific formats; `ProjectSerializer` reads and writes the name as a
+plain string. This lands regardless.
+
+This is the last workstream. With the standard set relocated, core ships
+no interop format -- only the registry, the format interfaces, the native
+`.orm.yaml`, and the renderers/parsers the descriptors wrap. At the tool
+layer `registerBuiltinFormats()` becomes `registerStandardFormats()`,
+composed with `registerDbtFormats()` and `registerCodeFormats()`.
 
 ## API and migration impact
 
@@ -256,16 +280,17 @@ go/no-go below; the de-hardcoding lands regardless.
 
 ## Open decisions (for review)
 
-- **`@barwise/formats` go/no-go (workstream 5).** Verifying the wrapper
-  claim showed the export descriptors are ~3 thin shells over core's own
-  renderers, plus two self-contained importers. Does that earn a
-  separate package, or do the standard descriptors stay in core as the
-  one documented exception to "core ships no interop format"? The
-  orthogonality thesis favours the package; the thinness of the shells
-  makes the exception defensible, since the dbt and code connectors
-  already carry the pattern for the real I/O violators. Leaning toward
-  the exception. Either way, retiring `registerBuiltinFormats()` and
-  de-hardcoding `OrmProject.ExportFormat` still land.
+- **`@barwise/formats` go/no-go (workstream 5) (resolved: build it).**
+  An earlier count undersold the package as "~3 thin shells plus two
+  importers". The real set is ~11 source files -- 3 export shells, 4
+  importers, and the 5-file Norma XML cluster -- comparable in size to
+  `@barwise/dbt`. Workstream 4 proved the thin-shell move is mechanical
+  and removed the determinism objection, so the only remaining argument
+  for a core exception rested on that (false) near-empty premise. Keeping
+  the standard descriptors in core would also re-create the two-tier
+  builtin/connector split that the "all formats pluggable" section above
+  resolved to remove. So the standard set relocates to `@barwise/formats`
+  and core ships no interop format.
 - **Lineage fs wrappers (workstream 2).** The thin read/write/walk
   wrappers are needed in both cli and mcp, which share no package.
   Duplicate them over the pure core helpers (the project tolerates small
