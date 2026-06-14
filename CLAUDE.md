@@ -57,6 +57,7 @@ working in a package:
 
 - `barwise/packages/core/CLAUDE.md` -- metamodel, validation, verbalization, serialization, mapping
 - `barwise/packages/diagram/CLAUDE.md` -- diagram layout and SVG rendering
+- `barwise/packages/diagram-ui/CLAUDE.md` -- React renderer (interactive canvas; headless SVG in WS3) over the diagram `PositionedGraph`
 - `barwise/packages/llm/CLAUDE.md` -- LLM transcript extraction
 - `barwise/packages/code-analysis/CLAUDE.md` -- code connector package; registers TypeScript/Java/Kotlin importers into the `FormatDescriptor` registry
 - `barwise/packages/dbt/CLAUDE.md` -- dbt connector package; registers the dbt importer/exporter into the `FormatDescriptor` registry (owns its fs + subprocess I/O)
@@ -72,6 +73,9 @@ working in a package:
 @barwise/core               (no internal deps)
   ^
   |--- @barwise/diagram         (core)
+  |--- @barwise/diagram-ui      (diagram)  -- React renderer over the
+  |                                           PositionedGraph; no elkjs,
+  |                                           no VS Code
   |--- @barwise/llm             (core)
   |--- @barwise/code-analysis   (core)  -- connector package: registers
   |                                        code importers into the
@@ -84,7 +88,7 @@ working in a package:
   |                                        NORMA/SQL descriptors
   |--- @barwise/cli             (core, diagram, llm, code-analysis, dbt, formats)
   |--- @barwise/mcp             (core, diagram, llm, code-analysis, dbt, formats)
-  |--- barwise-vscode           (core, diagram, llm, code-analysis, dbt, formats, mcp)
+  |--- barwise-vscode           (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, mcp)
 ```
 
 `@barwise/code-analysis` is the template for the connector convention:
@@ -104,8 +108,8 @@ full monorepo build and tests after modifying core's public API.
 ## Current State
 
 All phases are complete, with the full test suite passing in CI across
-all 9 packages (core, diagram, llm, code-analysis, dbt, formats, cli,
-mcp, vscode).
+all 10 packages (core, diagram, diagram-ui, llm, code-analysis, dbt,
+formats, cli, mcp, vscode).
 The CLI tool (`barwise`) and MCP server (`barwise-mcp`) provide
 the same capabilities as the VS Code extension for terminal and AI
 workflows. Import and export formats register into a unified registry

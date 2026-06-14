@@ -16,7 +16,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { OrmDiagram } from "./OrmDiagram";
+import { OrmDiagram } from "./OrmDiagram.js";
 
 export interface DiagramCanvasProps {
   readonly graph: PositionedGraph;
@@ -104,10 +104,10 @@ export const DiagramCanvas = forwardRef<DiagramCanvasHandle, DiagramCanvasProps>
       });
     }, [graph]);
 
-    // Re-fit when a fresh model loads.
+    // Re-fit only when a fresh model loads (resetNonce), not on every
+    // change to `fit` -- by design, so user pan/zoom is not reset.
     useLayoutEffect(() => {
       fit();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [resetNonce]);
 
     // Clear any live drag offset once a fresh graph arrives from the host.
