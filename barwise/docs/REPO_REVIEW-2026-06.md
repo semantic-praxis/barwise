@@ -2,8 +2,8 @@
 
 Status: Draft for review and prioritization
 Scope: Architecture, testing, CI/tooling, documentation, and process
-across the full monorepo (7 packages: core, diagram, llm, cli, mcp,
-vscode, code-analysis).
+across the full monorepo (9 packages: core, diagram, llm, cli, mcp,
+vscode, code-analysis, dbt, formats).
 
 Each item has a checkbox and a Priority field to fill in during
 triage (e.g. P1/P2/P3, or "won't do"). Findings include file paths
@@ -100,18 +100,18 @@ Recommendation:
 
 ### 3. Coverage thresholds are never enforced
 
-- [ ] Priority: P2 (recommended)
+- [x] Priority: P2 -- DONE (June 2026)
 
-core, diagram, and llm define vitest coverage thresholds
-(statements 90/94/78 respectively), but CI runs `npm run test`,
-which does not collect coverage -- so the thresholds never gate a
-merge. cli, mcp, vscode, and code-analysis have no coverage
-configuration at all (vscode's vitest.config.ts has no coverage
-block).
+Resolution: CI now runs `npm run test:coverage` (not `npm run test`),
+so the thresholds gate every merge, and all nine packages carry them.
+core/diagram/llm already had thresholds; cli, mcp, code-analysis, dbt,
+and formats define them; and vscode now gates its unit-tested surface
+-- the LSP providers and the chat participant -- via a scoped coverage
+`include` (the webview, commands, and extension wiring are exercised by
+the integration suite, not these unit tests).
 
-Recommendation: run `test:coverage` in CI for packages that have
-thresholds; add at least modest thresholds to cli, mcp,
-code-analysis, and the vscode unit-test surface.
+Coverage reports are still not uploaded as CI artifacts (see C1); the
+thresholds gate regardless.
 
 ### 4. CLAUDE.md has materially drifted
 
@@ -350,29 +350,31 @@ Recommendation: component tests (Testing Library) for the
 message-protocol handling and state transitions first; rendering
 details second.
 
-### T2. Process boundaries are never exercised
+### T2. Process boundaries are partly exercised
 
-- [ ] Priority: P2 (recommended)
+- [ ] Priority: P2 (recommended) -- CLI binary now covered; MCP stdio + LSP remain
 
-- The CLI is tested via an in-process `runCli()` helper
-  (`cli/tests/helpers/run.ts`), never by spawning the `barwise`
-  binary -- shebang/entry-point regressions would not be caught.
-- The MCP server's stdio JSON-RPC transport is untested; tool
+- The CLI binary IS now spawned: the `validate:examples` step (T3)
+  runs `node packages/cli/dist/index.js validate` over the examples,
+  so shebang/entry-point regressions are caught. The in-process
+  `runCli()` helper (`cli/tests/helpers/run.ts`) still drives the
+  feature tests.
+- The MCP server's stdio JSON-RPC transport is still untested; tool
   handlers are invoked directly.
 - The LSP server providers are tested only with mocked connections.
 
-Recommendation: one small smoke-test suite that spawns each real
-binary (CLI, bundled MCP server) and runs a single command closes
-all of these cheaply.
+Recommendation: a small smoke test that spawns the bundled MCP server
+over stdio and runs one tool call closes the remaining gap cheaply.
 
 ### T3. Validate examples/ in CI
 
-- [ ] Priority: P2 (recommended) -- cheap; doubles as the CLI binary smoke test
+- [x] Priority: P2 -- DONE (June 2026)
 
-`barwise/examples/` (auction-project, dbt-import, models,
-transcripts) is not validated anywhere, so it will silently rot on
-API changes. A CI step running `barwise validate` across the
-examples doubles as the CLI binary smoke test from T2.
+Resolution: a `validate:examples` CI step runs
+`scripts/validate-examples.sh`, which spawns the built `barwise` CLI
+(`node packages/cli/dist/index.js validate`) over every model and
+project under `examples/`. This guards the examples against API drift
+and doubles as the CLI binary smoke test from T2.
 
 ### T4. Add property-based round-trip tests
 
