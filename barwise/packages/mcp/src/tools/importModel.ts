@@ -4,6 +4,7 @@
 
 import { registerCodeFormats } from "@barwise/code-analysis";
 import { getImporter, OrmYamlSerializer, registerBuiltinFormats } from "@barwise/core";
+import { registerDbtFormats } from "@barwise/dbt";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { readSource } from "../helpers/resolve.js";
@@ -14,6 +15,8 @@ const serializer = new OrmYamlSerializer();
 registerBuiltinFormats();
 // Register code-analysis formats (TypeScript, etc.)
 registerCodeFormats();
+// Register the dbt connector format.
+registerDbtFormats();
 
 export function registerImportModelTool(server: McpServer): void {
   server.registerTool(

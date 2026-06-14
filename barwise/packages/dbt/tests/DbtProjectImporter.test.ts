@@ -6,7 +6,7 @@
  * constraint mapping, description inference, and gap reporting.
  */
 import { describe, expect, it } from "vitest";
-import { DbtImportError, importDbtProject } from "../../src/import/DbtProjectImporter.js";
+import { DbtImportError, importDbtProject } from "../src/DbtProjectImporter.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures: jaffle-shop-style YAML

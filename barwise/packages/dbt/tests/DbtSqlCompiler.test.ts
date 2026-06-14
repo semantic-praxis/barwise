@@ -6,7 +6,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { compileDbtSql, stubRenderJinja } from "../../src/import/DbtSqlCompiler.js";
+import { compileDbtSql, stubRenderJinja } from "../src/DbtSqlCompiler.js";
 
 let testDir: string;
 

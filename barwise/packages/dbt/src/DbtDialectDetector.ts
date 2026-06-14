@@ -18,9 +18,9 @@
  * keeping ambient state at the tool boundary.
  */
 
+import type { SqlDialect } from "@barwise/core";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { SqlDialect } from "../sql/types.js";
 
 /**
  * Map dbt adapter names to Calcite SQL dialects.

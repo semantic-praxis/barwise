@@ -7,10 +7,8 @@
  */
 
 import { AvroExportFormat } from "../export/AvroExportFormat.js";
-import { DbtExportFormat } from "../export/DbtExportFormat.js";
 import { DdlExportFormat } from "../export/DdlExportFormat.js";
 import { OpenApiExportFormat } from "../export/OpenApiExportFormat.js";
-import { DbtImportFormat } from "../import/DbtImportFormat.js";
 import { DdlImportFormat } from "../import/DdlImportFormat.js";
 import { NormaImportFormat } from "../import/NormaImportFormat.js";
 import { OpenApiImportFormat } from "../import/OpenApiImportFormat.js";
@@ -38,16 +36,6 @@ export const openApiFormat: FormatDescriptor = {
   description: "OpenAPI 3.0 specification",
   importer: new OpenApiImportFormat(),
   exporter: new OpenApiExportFormat(),
-};
-
-/**
- * dbt format: bidirectional (import dbt project YAML, export dbt models).
- */
-export const dbtFormat: FormatDescriptor = {
-  name: "dbt",
-  description: "dbt project (schema YAML + SQL models)",
-  importer: new DbtImportFormat(),
-  exporter: new DbtExportFormat(),
 };
 
 /**
@@ -89,7 +77,6 @@ export function registerBuiltinFormats(): void {
   const builtins: readonly FormatDescriptor[] = [
     ddlFormat,
     openApiFormat,
-    dbtFormat,
     sqlFormat,
     normaFormat,
     avroFormat,

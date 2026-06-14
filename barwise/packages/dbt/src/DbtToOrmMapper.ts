@@ -20,9 +20,12 @@
  *   Phase 4: Apply descriptions (explicit or inferred)
  */
 
-import type { Constraint } from "../model/Constraint.js";
-import type { ConceptualDataTypeName, DataTypeDef } from "../model/ObjectType.js";
-import { OrmModel } from "../model/OrmModel.js";
+import {
+  type ConceptualDataTypeName,
+  type Constraint,
+  type DataTypeDef,
+  OrmModel,
+} from "@barwise/core";
 import type { DbtImportReport } from "./DbtImportReport.js";
 import { ReportBuilder } from "./DbtImportReport.js";
 import type { DbtColumn, DbtProjectDocument, DbtTest } from "./DbtSchemaTypes.js";

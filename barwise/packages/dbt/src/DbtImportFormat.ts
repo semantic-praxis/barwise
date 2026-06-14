@@ -14,14 +14,18 @@
  * and extracts JOIN, WHERE, CASE, and constraint patterns.
  */
 
+import {
+  type ImportFormat,
+  type ImportOptions,
+  type ImportResult,
+  parseSqlFile,
+  type SqlDialect,
+} from "@barwise/core";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { parseSqlFile } from "../sql/SqlCascadeParser.js";
-import type { SqlDialect } from "../sql/types.js";
 import { type DbtDialectOptions, detectDbtDialect } from "./DbtDialectDetector.js";
 import { importDbtProject } from "./DbtProjectImporter.js";
 import { compileDbtSql } from "./DbtSqlCompiler.js";
-import type { ImportFormat, ImportOptions, ImportResult } from "./types.js";
 
 /**
  * Recursively find all .yml and .yaml files under a directory.
@@ -106,7 +110,7 @@ export class DbtImportFormat implements ImportFormat {
         `No .yml/.yaml files found under "${searchDir}". `
           + "Ensure the path points to a dbt project directory.",
       );
-      const { OrmModel } = await import("../model/OrmModel.js");
+      const { OrmModel } = await import("@barwise/core");
       return {
         model: new OrmModel({ name: options?.modelName ?? "dbt Import" }),
         warnings,
@@ -134,7 +138,7 @@ export class DbtImportFormat implements ImportFormat {
         `Found ${yamlPaths.length} YAML file(s) but none contain dbt schema definitions `
           + "(models: or sources: top-level keys).",
       );
-      const { OrmModel } = await import("../model/OrmModel.js");
+      const { OrmModel } = await import("@barwise/core");
       return {
         model: new OrmModel({ name: options?.modelName ?? "dbt Import" }),
         warnings,

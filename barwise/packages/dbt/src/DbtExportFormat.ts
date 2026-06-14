@@ -7,13 +7,18 @@
  * - Multi-file ExportResult with individual model files
  */
 
-import { RelationalMapper } from "../mapping/RelationalMapper.js";
-import type { RelationalSchema, Table } from "../mapping/RelationalSchema.js";
-import { renderDbt } from "../mapping/renderers/dbt.js";
-import { annotateDbtExport } from "../mapping/renderers/DbtExportAnnotator.js";
-import type { OrmModel } from "../model/OrmModel.js";
-import { ValidationEngine } from "../validation/ValidationEngine.js";
-import type { ExportFormatAdapter, ExportOptions, ExportResult } from "./types.js";
+import {
+  annotateDbtExport,
+  type ExportFormatAdapter,
+  type ExportOptions,
+  type ExportResult,
+  type OrmModel,
+  RelationalMapper,
+  type RelationalSchema,
+  renderDbt,
+  type Table,
+  ValidationEngine,
+} from "@barwise/core";
 
 /**
  * dbt (data build tool) export format.

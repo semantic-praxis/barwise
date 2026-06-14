@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { importDbtProject } from "@barwise/core";
+ * import { importDbtProject } from "@barwise/dbt";
  *
  * const result = importDbtProject([
  *   fs.readFileSync("models/marts/customers.yml", "utf-8"),
@@ -19,7 +19,7 @@
  * ```
  */
 
-import { OrmModel } from "../model/OrmModel.js";
+import { OrmModel } from "@barwise/core";
 import type { DbtImportReport } from "./DbtImportReport.js";
 import { DbtParseError, parseDbtSchema } from "./DbtSchemaParser.js";
 import { DbtMappingError, mapDbtToOrm } from "./DbtToOrmMapper.js";

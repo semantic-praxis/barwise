@@ -6,8 +6,13 @@
  * an ORM model, annotates the original YAML files in place, and
  * opens the resulting .orm.yaml.
  */
-import { annotateDbtYaml, importDbtProject, OrmYamlSerializer } from "@barwise/core";
-import type { DbtImportReport, ReportEntry } from "@barwise/core";
+import { OrmYamlSerializer } from "@barwise/core";
+import {
+  annotateDbtYaml,
+  type DbtImportReport,
+  importDbtProject,
+  type ReportEntry,
+} from "@barwise/dbt";
 import * as path from "node:path";
 import * as vscode from "vscode";
 

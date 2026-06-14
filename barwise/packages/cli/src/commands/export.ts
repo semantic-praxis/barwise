@@ -13,6 +13,7 @@ import {
   updateManifest,
 } from "@barwise/core";
 import type { ManifestExport } from "@barwise/core";
+import { registerDbtFormats } from "@barwise/dbt";
 import type { Command } from "commander";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -21,6 +22,8 @@ import { readManifest, writeManifest } from "../helpers/lineageIo.js";
 
 // Register built-in formats (DDL, OpenAPI, etc.) with the unified registry.
 registerBuiltinFormats();
+// Register the dbt connector format.
+registerDbtFormats();
 
 export function registerExportCommand(program: Command): void {
   program
