@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./theme": {
+      "types": "./dist/render/theme.d.ts",
+      "default": "./dist/render/theme.js"
     }
   },
   "files": [
