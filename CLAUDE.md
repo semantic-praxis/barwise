@@ -184,6 +184,15 @@ All commands run from `barwise/`. The `--no-workspaces-update` flag
 prevents npm from resolving workspace dependencies against the public
 registry (these packages are not published).
 
+`--no-workspaces-update` also leaves each package's internal `@barwise/*`
+dependency refs at the previous version. Bump those to the new version
+too (a one-pass rewrite of the `@barwise/*` entries in every
+`packages/*/package.json`), then run `npm install` to refresh the
+lockfile -- otherwise `npm ci` fails trying to fetch the old version
+from the registry. Also bump the pinned `SERVER_VERSION` in
+`packages/mcp/src/server.ts` (a version-sync test asserts it matches
+package.json).
+
 The `barwise-vscode` extension has its own version (visible in the VS
 Code marketplace) which may differ from the library packages. The
 `npm version` command bumps each package relative to its current

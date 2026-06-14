@@ -1,6 +1,6 @@
 {
   "name": "@barwise/cli",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "private": true,
   "description": "CLI tool for ORM 2 modeling",
   "type": "module",
@@ -26,13 +26,13 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@barwise/code-analysis": "1.5.0",
-    "@barwise/core": "1.5.0",
-    "@barwise/dbt": "1.5.0",
-    "@barwise/diagram": "1.5.0",
-    "@barwise/diagram-ui": "1.5.0",
-    "@barwise/formats": "1.5.0",
-    "@barwise/llm": "1.5.0",
+    "@barwise/code-analysis": "1.6.0",
+    "@barwise/core": "1.6.0",
+    "@barwise/dbt": "1.6.0",
+    "@barwise/diagram": "1.6.0",
+    "@barwise/diagram-ui": "1.6.0",
+    "@barwise/formats": "1.6.0",
+    "@barwise/llm": "1.6.0",
     "commander": "^13.0.0"
   },
   "devDependencies": {
