@@ -21,10 +21,15 @@ let diagnosticsProvider: DiagnosticsProvider;
 let completionProvider: CompletionProvider;
 let hoverProvider: HoverProvider;
 
-connection.onInitialize((_params: InitializeParams): InitializeResult => {
+connection.onInitialize((params: InitializeParams): InitializeResult => {
+  const initOptions = (params.initializationOptions ?? {}) as {
+    showCounterexamplesOnHover?: boolean;
+  };
   diagnosticsProvider = new DiagnosticsProvider(connection);
   completionProvider = new CompletionProvider();
-  hoverProvider = new HoverProvider();
+  hoverProvider = new HoverProvider(
+    initOptions.showCounterexamplesOnHover ?? false,
+  );
 
   return {
     capabilities: {

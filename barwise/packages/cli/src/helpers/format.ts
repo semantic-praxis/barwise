@@ -2,7 +2,7 @@
  * Output formatting helpers for the CLI.
  */
 
-import type { Diagnostic, Verbalization } from "@barwise/core";
+import type { Counterexample, Diagnostic, Verbalization } from "@barwise/core";
 
 /**
  * Format diagnostics as human-readable text.
@@ -56,6 +56,21 @@ export function formatVerbalizations(verbalizations: readonly Verbalization[]): 
     }
   }
 
+  return lines.join("\n");
+}
+
+/**
+ * Format counterexamples as human-readable text.
+ */
+export function formatCounterexamples(
+  counterexamples: readonly Counterexample[],
+): string {
+  if (counterexamples.length === 0) return "";
+
+  const lines = ["Counterexamples (what the constraints rule out):"];
+  for (const c of counterexamples) {
+    lines.push(`  ${c.text}`);
+  }
   return lines.join("\n");
 }
 

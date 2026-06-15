@@ -32,8 +32,10 @@ export const SENSEMAKING_GUIDANCE = `Sensemaking while modeling (resist the firs
   and its key uniqueness and mandatory roles. Verify them against the
   domain; an early wrong anchor distorts every fact type built on it.
 - Expectancies: verbalize the model back and confirm it reads true to a
-  domain expert. Each constraint claims something cannot happen -- check
-  the model rules out what it should and still permits what it must.
+  domain expert. Each constraint claims something cannot happen -- pass
+  counterexamples=true to verbalize_model to see the minimal population it
+  forbids, and confirm the model rules out what it should while still
+  permitting what it must.
 - Rival framings: at genuine forks (attribute vs entity type, subtype vs
   role, binary vs objectified fact type), hold two or three candidate
   framings and let the domain decide rather than taking the first.

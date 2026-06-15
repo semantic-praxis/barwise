@@ -2,7 +2,7 @@
  * verbalize_model tool: generates FORML verbalizations for a model.
  */
 
-import { Verbalizer } from "@barwise/core";
+import { type Counterexample, generateCounterexamples, Verbalizer } from "@barwise/core";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveSource } from "../helpers/resolve.js";
@@ -35,10 +35,18 @@ export function registerVerbalizeTool(server: McpServer): void {
             "'full' (default) returns every reading; 'summary' returns "
               + "per-category counts and a short preview.",
           ),
+        counterexamples: z
+          .boolean()
+          .optional()
+          .describe(
+            "When true, append the minimal sample population each "
+              + "constraint forbids -- a probe to confirm the model rules "
+              + "out what it should.",
+          ),
       },
     },
-    async ({ source, factType, mode }) => {
-      return executeVerbalize(source, factType, mode);
+    async ({ source, factType, mode, counterexamples }) => {
+      return executeVerbalize(source, factType, mode, counterexamples);
     },
   );
 }
@@ -47,6 +55,7 @@ export function executeVerbalize(
   source: string,
   factType?: string,
   mode: "full" | "summary" = "full",
+  counterexamples = false,
 ): { content: Array<{ type: "text"; text: string; }>; } {
   const model = resolveSource(source);
   const verbalizer = new Verbalizer();
@@ -64,10 +73,13 @@ export function executeVerbalize(
       };
     }
     const verbalizations = verbalizer.verbalizeFactType(ft.id, model);
-    return boundedTextResult(verbalizations.map((v) => v.text).join("\n"), {
-      kind: "verbalization",
-      source,
-    });
+    let text = verbalizations.map((v) => v.text).join("\n");
+    if (counterexamples) {
+      text += renderCounterexamples(
+        generateCounterexamples(model).filter((c) => c.factTypeId === ft.id),
+      );
+    }
+    return boundedTextResult(text, { kind: "verbalization", source });
   }
 
   const verbalizations = verbalizer.verbalizeModel(model);
@@ -78,10 +90,21 @@ export function executeVerbalize(
     };
   }
 
-  return boundedTextResult(verbalizations.map((v) => v.text).join("\n"), {
-    kind: "verbalization",
-    source,
-  });
+  let text = verbalizations.map((v) => v.text).join("\n");
+  if (counterexamples) {
+    text += renderCounterexamples(generateCounterexamples(model));
+  }
+  return boundedTextResult(text, { kind: "verbalization", source });
+}
+
+/** Append a labeled block of counterexample readings, or nothing if none. */
+function renderCounterexamples(ces: readonly Counterexample[]): string {
+  if (ces.length === 0) return "";
+  const lines = ["", "", "Counterexamples (what the constraints rule out):"];
+  for (const c of ces) {
+    lines.push(`  ${c.text}`);
+  }
+  return lines.join("\n");
 }
 
 /** Build a compact, never-spilling digest of a model's verbalizations. */

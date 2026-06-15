@@ -43,6 +43,35 @@ describe("barwise verbalize", () => {
     expect(result.stdout).toContain("Customer");
   });
 
+  it("appends counterexamples with --counterexamples", async () => {
+    const result = await runCli([
+      "verbalize",
+      `${fixtures}/simple.orm.yaml`,
+      "--counterexamples",
+    ]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain(
+      "Counterexamples (what the constraints rule out):",
+    );
+    expect(result.stdout).toContain("Rules out:");
+  });
+
+  it("includes counterexamples in JSON output", async () => {
+    const result = await runCli([
+      "verbalize",
+      `${fixtures}/simple.orm.yaml`,
+      "--counterexamples",
+      "--format",
+      "json",
+    ]);
+    expect(result.exitCode).toBe(0);
+    const parsed = JSON.parse(result.stdout);
+    expect(parsed).toHaveProperty("verbalizations");
+    expect(parsed).toHaveProperty("counterexamples");
+    expect(Array.isArray(parsed.counterexamples)).toBe(true);
+    expect(parsed.counterexamples.length).toBeGreaterThan(0);
+  });
+
   it("reports error for nonexistent fact type", async () => {
     const result = await runCli([
       "verbalize",

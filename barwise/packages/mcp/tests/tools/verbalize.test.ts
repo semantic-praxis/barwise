@@ -57,6 +57,23 @@ describe("verbalize_model tool", () => {
     expect(text).not.toContain("Full content written to:");
   });
 
+  it("appends counterexamples when requested", () => {
+    const result = executeVerbalize(
+      `${fixtures}/simple.orm.yaml`,
+      undefined,
+      "full",
+      true,
+    );
+    const text = result.content[0]!.text;
+    expect(text).toContain("Counterexamples (what the constraints rule out):");
+    expect(text).toContain("Rules out:");
+  });
+
+  it("omits counterexamples by default", () => {
+    const result = executeVerbalize(`${fixtures}/simple.orm.yaml`);
+    expect(result.content[0]!.text).not.toContain("Counterexamples (");
+  });
+
   it("spills full output to a file when large", () => {
     process.env.BARWISE_MCP_INLINE_LIMIT = "50";
     const result = executeVerbalize(`${fixtures}/simple.orm.yaml`);

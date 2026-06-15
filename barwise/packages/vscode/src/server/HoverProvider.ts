@@ -1,4 +1,9 @@
-import { type OrmModel, OrmYamlSerializer, Verbalizer } from "@barwise/core";
+import {
+  generateCounterexamples,
+  type OrmModel,
+  OrmYamlSerializer,
+  Verbalizer,
+} from "@barwise/core";
 import type { TextDocument } from "vscode-languageserver-textdocument";
 import { Hover, type Position } from "vscode-languageserver/node.js";
 
@@ -11,6 +16,13 @@ import { Hover, type Position } from "vscode-languageserver/node.js";
 export class HoverProvider {
   private readonly serializer = new OrmYamlSerializer();
   private readonly verbalizer = new Verbalizer();
+
+  /**
+   * @param showCounterexamples When true, the hover includes a "Rules out"
+   *   section listing what each constraint forbids. Opt-in (default off)
+   *   via the `barwise.showCounterexamplesOnHover` setting.
+   */
+  constructor(private readonly showCounterexamples: boolean = false) {}
 
   provideHover(
     document: TextDocument,
@@ -65,6 +77,18 @@ export class HoverProvider {
         );
         for (const v of verbalizations) {
           lines.push(`- ${v.text}`);
+        }
+      }
+    }
+
+    // Counterexamples: what the object type's constraints rule out.
+    if (this.showCounterexamples && factTypes.length > 0) {
+      const ftIds = new Set(factTypes.map((ft) => ft.id));
+      const ces = generateCounterexamples(model).filter((c) => ftIds.has(c.factTypeId));
+      if (ces.length > 0) {
+        lines.push("", "**Rules out:**");
+        for (const c of ces) {
+          lines.push(`- ${c.text}`);
         }
       }
     }
