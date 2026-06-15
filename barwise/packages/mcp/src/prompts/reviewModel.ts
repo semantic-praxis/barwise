@@ -4,7 +4,7 @@
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { CONTEXT_HYGIENE_GUIDANCE } from "./guidance/guidance.js";
+import { CONTEXT_HYGIENE_GUIDANCE, SENSEMAKING_GUIDANCE } from "./guidance/guidance.js";
 
 export function registerReviewModelPrompt(server: McpServer): void {
   server.registerPrompt(
@@ -26,7 +26,7 @@ export function registerReviewModelPrompt(server: McpServer): void {
           role: "user" as const,
           content: {
             type: "text" as const,
-            text: `${CONTEXT_HYGIENE_GUIDANCE}\n\n`
+            text: `${SENSEMAKING_GUIDANCE}\n\n${CONTEXT_HYGIENE_GUIDANCE}\n\n`
               + `Review the ORM model at ${filePath} for quality:\n`
               + "1. Run validate_model to check for structural errors\n"
               + "2. Run verbalize_model (try mode='summary' first) to check "

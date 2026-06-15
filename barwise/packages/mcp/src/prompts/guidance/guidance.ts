@@ -1,5 +1,5 @@
 /**
- * Canonical modeling-workflow and context-hygiene guidance.
+ * Canonical modeling-workflow, sensemaking, and context-hygiene guidance.
  *
  * This is the single source of truth. It is surfaced through every
  * channel that can carry it: the MCP prompts (analyze-domain,
@@ -24,6 +24,23 @@ When analyzing a domain, identify entity types (things with identity),
 value types (attributes), fact types (relationships between objects),
 and constraints (uniqueness, mandatory, exclusion, ring, frequency,
 subset, equality, and so on).`;
+
+/** How to make sense of a domain before committing to a model. */
+export const SENSEMAKING_GUIDANCE = `Sensemaking while modeling (resist the first plausible model):
+- Anchors: name the few load-bearing facts the model rests on -- each
+  entity type's identification (reference mode / preferred identifier)
+  and its key uniqueness and mandatory roles. Verify them against the
+  domain; an early wrong anchor distorts every fact type built on it.
+- Expectancies: verbalize the model back and confirm it reads true to a
+  domain expert. Each constraint claims something cannot happen -- check
+  the model rules out what it should and still permits what it must.
+- Rival framings: at genuine forks (attribute vs entity type, subtype vs
+  role, binary vs objectified fact type), hold two or three candidate
+  framings and let the domain decide rather than taking the first.
+- Premortem: before calling a model done, ask how it is most likely
+  wrong -- a missing mandatory role, a missing uniqueness that lets a
+  fact fan out, an entity type that is really a value type, an
+  over-general fact type. Fix or record each.`;
 
 /** How to use the barwise tools without flooding the context window. */
 export const CONTEXT_HYGIENE_GUIDANCE = `Context-efficient use of the barwise tools:

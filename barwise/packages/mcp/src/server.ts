@@ -37,6 +37,7 @@ export function createServer(): McpServer {
 export {
   CONTEXT_HYGIENE_GUIDANCE,
   MODELING_WORKFLOW_GUIDANCE,
+  SENSEMAKING_GUIDANCE,
 } from "./prompts/guidance/guidance.js";
 
 // Re-export execute functions for direct invocation (no MCP transport).
