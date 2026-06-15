@@ -41,6 +41,11 @@ export function activate(context: vscode.ExtensionContext): void {
     documentSelector: [
       { scheme: "file", pattern: "**/*.orm.yaml" },
     ],
+    initializationOptions: {
+      showCounterexamplesOnHover: vscode.workspace
+        .getConfiguration("barwise")
+        .get<boolean>("showCounterexamplesOnHover", false),
+    },
   };
 
   client = new LanguageClient(

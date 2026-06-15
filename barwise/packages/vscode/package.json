@@ -175,6 +175,11 @@
           "type": "boolean",
           "default": true,
           "description": "Enable the built-in MCP server. When enabled, barwise ORM tools (validation, verbalization, schema generation, diagram, diff, merge, transcript import) are available to Copilot Chat and other MCP-aware AI tools."
+        },
+        "barwise.showCounterexamplesOnHover": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show, in hover tooltips, the minimal sample population each constraint rules out (a counterexample probe to confirm the model rules out what it should). Reload the window to apply."
         }
       }
     },

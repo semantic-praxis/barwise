@@ -5,9 +5,13 @@
  * for all fact types and constraints.
  */
 
-import { Verbalizer } from "@barwise/core";
+import { type Counterexample, generateCounterexamples, Verbalizer } from "@barwise/core";
 import type { Command } from "commander";
-import { formatVerbalizations, formatVerbalizationsJson } from "../helpers/format.js";
+import {
+  formatCounterexamples,
+  formatVerbalizations,
+  formatVerbalizationsJson,
+} from "../helpers/format.js";
 import { loadModel } from "../helpers/io.js";
 
 export function registerVerbalizeCommand(program: Command): void {
@@ -17,34 +21,79 @@ export function registerVerbalizeCommand(program: Command): void {
     .argument("<file>", "Path to .orm.yaml file")
     .option("--format <format>", "Output format (text or json)", "text")
     .option("--fact-type <name>", "Verbalize a specific fact type only")
-    .action(async (file: string, opts: { format: string; factType?: string; }) => {
-      try {
-        const model = loadModel(file);
-        const verbalizer = new Verbalizer();
+    .option(
+      "--counterexamples",
+      "Also show the minimal population each constraint rules out",
+    )
+    .action(
+      async (
+        file: string,
+        opts: { format: string; factType?: string; counterexamples?: boolean; },
+      ) => {
+        try {
+          const model = loadModel(file);
+          const verbalizer = new Verbalizer();
 
-        let verbalizations;
-        if (opts.factType) {
-          const ft = model.getFactTypeByName(opts.factType);
-          if (!ft) {
-            process.stderr.write(
-              `Error: Fact type "${opts.factType}" not found in model.\n`,
-            );
-            process.exitCode = 1;
-            return;
+          let verbalizations;
+          let factTypeId: string | undefined;
+          if (opts.factType) {
+            const ft = model.getFactTypeByName(opts.factType);
+            if (!ft) {
+              process.stderr.write(
+                `Error: Fact type "${opts.factType}" not found in model.\n`,
+              );
+              process.exitCode = 1;
+              return;
+            }
+            factTypeId = ft.id;
+            verbalizations = verbalizer.verbalizeFactType(ft.id, model);
+          } else {
+            verbalizations = verbalizer.verbalizeModel(model);
           }
-          verbalizations = verbalizer.verbalizeFactType(ft.id, model);
-        } else {
-          verbalizations = verbalizer.verbalizeModel(model);
-        }
 
-        if (opts.format === "json") {
-          process.stdout.write(formatVerbalizationsJson(verbalizations) + "\n");
-        } else {
-          process.stdout.write(formatVerbalizations(verbalizations) + "\n");
+          let counterexamples: readonly Counterexample[] = [];
+          if (opts.counterexamples) {
+            counterexamples = generateCounterexamples(model).filter(
+              (c) => factTypeId === undefined || c.factTypeId === factTypeId,
+            );
+          }
+
+          if (opts.format === "json") {
+            if (opts.counterexamples) {
+              process.stdout.write(
+                JSON.stringify(
+                  {
+                    verbalizations: verbalizations.map((v) => ({
+                      category: v.category,
+                      text: v.text,
+                      sourceElementId: v.sourceElementId,
+                    })),
+                    counterexamples: counterexamples.map((c) => ({
+                      factTypeId: c.factTypeId,
+                      constraintType: c.constraintType,
+                      text: c.text,
+                    })),
+                  },
+                  null,
+                  2,
+                ) + "\n",
+              );
+            } else {
+              process.stdout.write(
+                formatVerbalizationsJson(verbalizations) + "\n",
+              );
+            }
+          } else {
+            let out = formatVerbalizations(verbalizations);
+            if (counterexamples.length > 0) {
+              out += "\n\n" + formatCounterexamples(counterexamples);
+            }
+            process.stdout.write(out + "\n");
+          }
+        } catch (err) {
+          process.stderr.write(`Error: ${(err as Error).message}\n`);
+          process.exitCode = 1;
         }
-      } catch (err) {
-        process.stderr.write(`Error: ${(err as Error).message}\n`);
-        process.exitCode = 1;
-      }
-    });
+      },
+    );
 }

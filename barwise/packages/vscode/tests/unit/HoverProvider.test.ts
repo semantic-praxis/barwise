@@ -99,6 +99,30 @@ describe("HoverProvider", () => {
     });
   });
 
+  describe("counterexamples on hover", () => {
+    function hoverCustomer(p: HoverProvider): string | null {
+      const content = loadFixture("simple.orm.yaml");
+      const doc = makeDocument(content);
+      const lines = content.split("\n");
+      const nameLineIdx = lines.findIndex((l) => l.includes('name: "Customer"'));
+      const charIdx = lines[nameLineIdx]!.indexOf("Customer");
+      const hover = p.provideHover(doc, { line: nameLineIdx, character: charIdx + 2 });
+      return hover ? (hover.contents as { value: string; }).value : null;
+    }
+
+    it("omits the 'Rules out' section by default", () => {
+      const markdown = hoverCustomer(new HoverProvider());
+      expect(markdown).not.toBeNull();
+      expect(markdown!).not.toContain("Rules out");
+    });
+
+    it("includes the 'Rules out' section when enabled", () => {
+      const markdown = hoverCustomer(new HoverProvider(true));
+      expect(markdown).not.toBeNull();
+      expect(markdown!).toContain("**Rules out:**");
+    });
+  });
+
   describe("no hover", () => {
     it("returns null for an unknown word", () => {
       const content = loadFixture("simple.orm.yaml");
