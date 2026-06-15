@@ -73,6 +73,17 @@ rather than evidence against the leading one. Classify each tension:
 Commit to the frame with the fewest serious tensions. Carry the
 survivors into the spec's Open decisions and Risks; do not bury them.
 
+## Premortem -- fail it on paper first
+
+With a frame committed, run Klein's premortem before drafting: assume
+the design shipped and caused a problem, then say what the problem was.
+Imagining the failure as already real surfaces causes that "what could
+go wrong?" does not -- so reach for concrete stories (a caller broke,
+the migration stranded data, the abstraction leaked under the second
+use) rather than generic risk. Each cause it turns up has a home: a
+likely one becomes a Tripwire, an unresolved one an Open decision, a
+fatal one sends you back to reframe.
+
 ## Forward sections are provisional until grounded
 
 A multi-workstream spec is usually drafted in one pass, but each

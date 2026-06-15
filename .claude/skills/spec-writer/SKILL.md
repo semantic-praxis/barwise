@@ -75,6 +75,10 @@ Status/Tracking header, then the sections that apply:
 - **Scope** -- in scope / out of scope, explicitly.
 - **Inventory** -- a table classifying what changes and the verdict.
 - **Target architecture** -- a fenced code block of the end state.
+- **Alternatives considered** -- the rival designs the sensemaking pass
+  weighed and rejected, each with the reason it lost. Keeps the
+  discarded frames in the artifact, where a reviewer (or a later
+  implementer who trips a tripwire) looks first.
 - **Workstreams** -- the ordered, independently shippable steps.
 - **API and migration impact** -- what moves, what breaks, blast radius.
 - **Open decisions** -- the reviewer's calls, with a recommendation.
@@ -90,6 +94,11 @@ enforces the formatting in CI but cannot run locally here (the wasm
 plugin download is network-blocked), so check it by eye. Skipping this
 gate has cost a CI round-trip on nearly every PR that skipped it.
 
+- **Principle check** (content, not formatting): does the chosen design
+  conflict with any stated pillar -- determinism in core, orthogonality,
+  composability, explicit over implicit? A real conflict is an Open
+  decision to surface, never a silent trade-off. This is the guard
+  against principle drift under implementation pressure.
 - **Emphasis uses underscores**, not asterisks: `_word_`, not `*word*`.
   (`**bold**` is fine.)
 - **Tables are column-aligned** -- every cell in a column padded to the
