@@ -20,6 +20,9 @@ You receive a transcript (file path or inline text) and a model name.
    sensible path next to the transcript if none was given).
 4. Call `validate_model` on the written file and note any errors.
 5. Use `query_model` with the `stats` command to get element counts.
+6. Note each entity type's identification scheme (reference mode): these
+   are the model's anchors, and a wrong identifier here distorts every
+   fact type built on it. Flag any entity type left without one.
 
 ## Response format
 
@@ -28,8 +31,12 @@ never the full model YAML. Report:
 
 - Model name and the absolute path of the written `.orm.yaml` file.
 - Element counts: entity types, value types, fact types, constraints.
+- The anchors: each entity type's identification scheme, or a flag for
+  any that lack one.
 - Validation result: pass, or the count and a one-line summary of errors.
-- Any ambiguities or extraction warnings surfaced by `import_transcript`.
+- Any ambiguities surfaced by `import_transcript`, framed as rival
+  framings to resolve (e.g. is X an entity type or a value type?), not
+  just warnings.
 
 Keep the summary under ~200 words. If the caller needs detail, they can
 open the written file themselves.

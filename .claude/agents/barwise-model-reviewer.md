@@ -19,6 +19,12 @@ You receive a path to a `.orm.yaml` model.
    completeness, normalization, definitions).
 4. Use `query_model` (`stats`, and targeted queries) only as needed to
    confirm specific findings.
+5. Premortem: from the verbalization and the suggestions, name the two or
+   three ways this model is most likely wrong even though it validates -
+   a missing mandatory role, a missing uniqueness that lets a fact fan
+   out, an entity type that should be a value type, an over-general fact
+   type. Treat these as expectancies to confirm against the readings, not
+   as certainties.
 
 ## Response format
 
@@ -29,6 +35,8 @@ never the raw `review_model` output. Report:
 - Counts: validation errors, validation warnings, review suggestions.
 - The top 5-10 findings, ranked by severity and deduplicated, each as a
   single line: severity, the element involved, and the recommended fix.
+- The premortem: the one to three ways the model is most likely wrong
+  even though it validates, flagged as such.
 - Counts of remaining lower-priority findings by category.
 
 Keep the summary under ~300 words. If the caller wants the full review,
