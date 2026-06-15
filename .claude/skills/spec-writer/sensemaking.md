@@ -25,11 +25,24 @@ so verify them against the code, not memory. (Workstream 2 was miscoped
 from an unverified anchor -- the belief that staleness and impact were
 pure, when both read the manifest from disk.)
 
+Record the anchors you considered and set aside, too -- the facts that
+looked load-bearing but did not make the final three or four. A frame
+rarely breaks at random: it breaks because one anchor is invalidated,
+and the fastest way to reframe is to name the dead anchor, drop it, and
+rebuild from the ones held in reserve rather than from a cold start. An
+anchor spent on one frame resists reuse in another, so writing the
+discards down is what keeps them available when an expectancy fails.
+
 ## Hold two or three frames
 
-Resist the first plausible design. Sketch two or three candidate frames
-and keep them open until the evidence chooses. One frame is premature
-commitment; five is dilution.
+Sketch two or three candidate designs -- one frame is premature
+commitment, five is dilution -- but do not mistake this for keeping an
+open mind. The expert move is not suspended judgment; it is committing
+to a leading frame fast, with sharp expectancies (below), while holding
+the alternatives as live competitors -- including ones you do not yet
+believe -- ready to switch to the moment an expectancy is violated.
+Evidence gathered without a committed frame is unguided: the frame is
+what tells you which code is worth reading in the first place.
 
 ## Expectancies -- the test that catches miscopes
 
@@ -45,11 +58,17 @@ untested frame is how a spec ships the wrong scope.
 ## Stress test, then commit
 
 Before drafting, hunt for disconfirming evidence -- other callers, edge
-cases, blast radius -- and classify each tension:
+cases, blast radius. Disconfirmation is the unnatural direction; the
+brain reasons better from positive evidence, so the practical move is to
+elaborate the strongest competing frame and seek evidence _for it_,
+rather than evidence against the leading one. Classify each tension:
 
-- **Dismissible** -- explained within the frame.
+- **Dismissible** -- explained within the frame. This is the danger
+  bucket: explaining-away is how fixation hides, so a dismissal has to
+  be grounded against the code, not narrated.
 - **Concerning** -- absorbed with a tweak.
-- **Frame-breaking** -- the design has to change.
+- **Frame-breaking** -- an anchor is invalidated; the design has to
+  change.
 
 Commit to the frame with the fewest serious tensions. Carry the
 survivors into the spec's Open decisions and Risks; do not bury them.
