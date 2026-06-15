@@ -114,6 +114,13 @@ export { structuralRules } from "./validation/rules/structural.js";
 export { ValidationEngine } from "./validation/ValidationEngine.js";
 export { type ValidationRule } from "./validation/ValidationRule.js";
 
+// Counterexample
+export { type Counterexample } from "./counterexample/Counterexample.js";
+export {
+  generateCounterexampleForConstraint,
+  generateCounterexamples,
+} from "./counterexample/CounterexampleGenerator.js";
+
 // Mapping
 export { RelationalMapper, type RelationalMapperOptions } from "./mapping/RelationalMapper.js";
 export {
