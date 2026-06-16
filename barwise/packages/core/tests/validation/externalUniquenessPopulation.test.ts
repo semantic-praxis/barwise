@@ -98,6 +98,77 @@ function unInferableModel(): OrmModel {
   return m;
 }
 
+/**
+ * Room identified by Building + RoomNumber + Floor: three constrained
+ * roles, each in its own fact type, joined on the common Room. Arity is
+ * not the limit -- the inference handles one constrained role per fact
+ * type for any number of fact types.
+ */
+function nAryRoomModel(violate: boolean): OrmModel {
+  const m = new OrmModel({ name: "M" });
+  const room = ent(m, "Room", "room_id");
+  const building = ent(m, "Building", "building_id");
+  const roomNumber = val(m, "RoomNumber");
+  const floor = val(m, "Floor");
+  const inBuilding = binaryFact(
+    m,
+    "Room is in Building",
+    { player: room, name: "is in", id: "rb1" },
+    { player: building, name: "houses", id: "rb2" },
+  );
+  const hasNumber = binaryFact(
+    m,
+    "Room has RoomNumber",
+    { player: room, name: "has", id: "rn1" },
+    { player: roomNumber, name: "numbers", id: "rn2" },
+  );
+  const onFloor = binaryFact(
+    m,
+    "Room on Floor",
+    { player: room, name: "on", id: "rf1" },
+    { player: floor, name: "floors", id: "rf2" },
+  );
+  inBuilding.addConstraint({ type: "external_uniqueness", roleIds: ["rb2", "rn2", "rf2"] });
+  pop(m, inBuilding.id, { rb1: "R1", rb2: "B1" });
+  pop(m, hasNumber.id, { rn1: "R1", rn2: "101" });
+  pop(m, onFloor.id, { rf1: "R1", rf2: "2" });
+  pop(m, inBuilding.id, { rb1: "R2", rb2: "B1" });
+  pop(m, hasNumber.id, { rn1: "R2", rn2: "101" });
+  pop(m, onFloor.id, { rf1: "R2", rf2: violate ? "2" : "3" });
+  return m;
+}
+
+/**
+ * Constrained roles in two unrelated fact types (Person owns Car, Dept
+ * has Budget): no single common object joins them, so the inference skips
+ * even though the constrained values collide.
+ */
+function noCommonObjectModel(): OrmModel {
+  const m = new OrmModel({ name: "M" });
+  const person = ent(m, "Person", "person_id");
+  const car = ent(m, "Car", "vin");
+  const dept = ent(m, "Dept", "dept_code");
+  const budget = val(m, "Budget");
+  const owns = binaryFact(
+    m,
+    "Person owns Car",
+    { player: person, name: "owns", id: "o1" },
+    { player: car, name: "owned by", id: "o2" },
+  );
+  const hasBudget = binaryFact(
+    m,
+    "Dept has Budget",
+    { player: dept, name: "has", id: "hb1" },
+    { player: budget, name: "of", id: "hb2" },
+  );
+  owns.addConstraint({ type: "external_uniqueness", roleIds: ["o2", "hb2"] });
+  pop(m, owns.id, { o1: "P1", o2: "CAR1" });
+  pop(m, hasBudget.id, { hb1: "D1", hb2: "CAR1" });
+  pop(m, owns.id, { o1: "P2", o2: "CAR1" });
+  pop(m, hasBudget.id, { hb1: "D2", hb2: "CAR1" });
+  return m;
+}
+
 describe("external uniqueness population validation", () => {
   it("flags two common instances that share an identifying combination", () => {
     expect(flags(roomModel(true), "population/external-uniqueness-violation")).toBe(true);
@@ -109,5 +180,17 @@ describe("external uniqueness population validation", () => {
 
   it("skips when the join key cannot be inferred", () => {
     expect(flags(unInferableModel(), "population/external-uniqueness-violation")).toBe(false);
+  });
+
+  it("validates an n-ary external uniqueness (three fact types)", () => {
+    expect(flags(nAryRoomModel(true), "population/external-uniqueness-violation")).toBe(true);
+  });
+
+  it("passes an n-ary external uniqueness with distinct combinations", () => {
+    expect(flags(nAryRoomModel(false), "population/external-uniqueness-violation")).toBe(false);
+  });
+
+  it("skips when the constrained roles share no common object", () => {
+    expect(flags(noCommonObjectModel(), "population/external-uniqueness-violation")).toBe(false);
   });
 });
