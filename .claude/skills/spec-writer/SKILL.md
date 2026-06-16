@@ -67,7 +67,8 @@ reviewer's time as more valuable than your own. Three rules follow:
 
 ## House structure
 
-Status/Tracking header, then the sections that apply:
+A header block -- `Status`, `Created` and `Last-updated` (ISO
+`YYYY-MM-DD`), and `Tracking` -- then the sections that apply:
 
 - **Principle / Problem** -- what is wrong and which pillar it touches.
 - **Should we X?** (when the choice is non-obvious) -- reason it through
@@ -83,6 +84,24 @@ Status/Tracking header, then the sections that apply:
 - **API and migration impact** -- what moves, what breaks, blast radius.
 - **Open decisions** -- the reviewer's calls, with a recommendation.
 - **Risks and testing** / **Non-goals**.
+
+## Naming and dating
+
+The convention splits by document type, because specs are living and
+reviews are point-in-time:
+
+- **Specs** keep a stable, undated kebab name
+  (`barwise/docs/specs/<kebab-name>.spec.md`). A creation date in the
+  filename rots -- a spec edited months later still reads as "old" -- and
+  renaming breaks the path references in REPO_REVIEW and CLAUDE.md.
+  Instead, every spec carries `Created:` and `Last-updated:` header lines
+  (ISO `YYYY-MM-DD`); git is the authoritative history, the headers are
+  the at-a-glance version. Bump `Last-updated` whenever you revise.
+- **Point-in-time artifacts** -- a `REPO_REVIEW`, an architecture
+  snapshot -- carry a full `YYYY-MM-DD` in the filename
+  (`docs/REPO_REVIEW-2026-06-16.md`), since each is a dated record that
+  is never edited in place; the next review is a new file. Use the full
+  date, not just the month: more than one can land in a month.
 
 For requirement statements, EARS phrasing keeps them testable:
 "When `<trigger>`, the system shall `<response>`."
