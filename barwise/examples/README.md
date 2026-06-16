@@ -30,6 +30,21 @@ barwise project split docs/auction.orm.yaml \
 See [docs/ORM_PROJECT_GUIDE.md](../docs/ORM_PROJECT_GUIDE.md) for the
 full splitting workflow.
 
+## Output samples
+
+`output/` holds models extracted from the sample transcripts together
+with their verbalizations and diagnostics, as committed comparison
+artifacts: regenerating them across barwise versions shows how
+verbalization and validation evolve. Each output file is stamped with
+the barwise version that produced it, so version-to-version diffs are
+explicit.
+
+Regenerate them from the models in `output/` with:
+
+```sh
+npm run build && npm run regen:examples
+```
+
 ## Walkthrough
 
 This walkthrough uses `university-enrollment.md` but any transcript works.

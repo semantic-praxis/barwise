@@ -1,0 +1,16 @@
+# barwise 1.6.1 -- validate
+
+examples/output/clinic-appointments.orm.yaml: 0 error(s), 1 warning(s)
+
+  WARNING Fact type "Appointment has VisitReason" has no constraints. Most fact types need at least a uniqueness constraint.
+  INFO    Object type "ExamRoom" does not participate in any fact type.
+  INFO    Value type "Specialty" has no data type. The relational mapper will default to TEXT.
+  INFO    Value type "AppointmentDate" has no data type. The relational mapper will default to TEXT.
+  INFO    Value type "TimeSlot" has no data type. The relational mapper will default to TEXT.
+  INFO    Value type "VisitReason" has no data type. The relational mapper will default to TEXT.
+  INFO    Value type "AppointmentStatus" has no data type. The relational mapper will default to TEXT.
+  INFO    Value type "FollowUpNote" has no data type. The relational mapper will default to TEXT.
+  INFO    Entity type "Patient" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "Doctor" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "Appointment" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "ExamRoom" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.

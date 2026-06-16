@@ -1,0 +1,17 @@
+# barwise 1.6.1 -- validate
+
+examples/output/university-enrollment.orm.yaml: 0 error(s), 2 warning(s)
+
+  WARNING Fact type "Student enrolls in CourseOffering" has no constraints. Most fact types need at least a uniqueness constraint.
+  WARNING Fact type "Student receives LetterGrade for CourseOffering" has no constraints. Most fact types need at least a uniqueness constraint.
+  INFO    Value type "Title" has no data type. The relational mapper will default to TEXT.
+  INFO    Value type "CreditValue" has no data type. The relational mapper will default to TEXT.
+  INFO    Value type "MaxCapacity" has no data type. The relational mapper will default to TEXT.
+  INFO    Value type "StartDate" has no data type. The relational mapper will default to TEXT.
+  INFO    Value type "EndDate" has no data type. The relational mapper will default to TEXT.
+  INFO    Value type "LetterGrade" has no data type. The relational mapper will default to TEXT.
+  INFO    Entity type "Student" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "Course" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "CourseOffering" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "Instructor" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "Semester" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.

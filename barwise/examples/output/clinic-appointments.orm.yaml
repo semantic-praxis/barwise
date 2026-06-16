@@ -1,0 +1,236 @@
+orm_version: "1.0"
+model:
+  name: Clinic Appointments
+  object_types:
+    - id: 1b115837-7c87-47f8-b034-02876a30edfb
+      name: Patient
+      kind: entity
+      reference_mode: medical_record_number
+      definition: A person who receives medical care at the clinic, identified by a medical record number.
+    - id: e79c9725-9223-4709-8b5a-a6b2d57ae981
+      name: Doctor
+      kind: entity
+      reference_mode: provider_id
+      definition: A medical practitioner at the clinic, identified by a state-issued provider ID.
+    - id: ae84de8c-4b9f-4753-89d1-ac177b95fd4d
+      name: Appointment
+      kind: entity
+      reference_mode: confirmation_number
+      definition: A scheduled visit between a patient and a doctor, identified by a confirmation number.
+    - id: 3369fde5-0602-4aa3-988b-33ccb9e91ca1
+      name: ExamRoom
+      kind: entity
+      reference_mode: room_number
+      definition: A physical examination room at the clinic, identified by a room number.
+    - id: a9fa5fcf-1c07-4a27-81cb-e08c667b34d5
+      name: Specialty
+      kind: value
+      definition: The medical specialty of a doctor.
+      value_constraint:
+        values:
+          - cardiology
+          - dermatology
+          - family medicine
+          - orthopedics
+          - pediatrics
+    - id: fe9788a0-8277-4526-aed3-9dce5406130e
+      name: AppointmentDate
+      kind: value
+      definition: The calendar date of an appointment.
+    - id: bde116dd-f4a9-4547-976b-c840aa9a0999
+      name: TimeSlot
+      kind: value
+      definition: A half-hour time slot during clinic hours.
+      value_constraint:
+        values:
+          - 8:00
+          - 8:30
+          - 9:00
+          - 9:30
+          - 10:00
+          - 10:30
+          - 11:00
+          - 11:30
+          - 13:00
+          - 13:30
+          - 14:00
+          - 14:30
+          - 15:00
+          - 15:30
+          - 16:00
+          - 16:30
+    - id: a4adbf80-e5bc-45a1-b23c-df0ea91f98a2
+      name: VisitReason
+      kind: value
+      definition: Free-text reason for the appointment as described by the patient.
+    - id: f720505b-046a-436b-8703-e867ef086883
+      name: AppointmentStatus
+      kind: value
+      definition: The current status of an appointment in its lifecycle.
+      value_constraint:
+        values:
+          - scheduled
+          - checked-in
+          - in-progress
+          - completed
+          - cancelled
+          - no-show
+    - id: d61f5770-66a7-4946-9dd9-46a61c74c939
+      name: FollowUpNote
+      kind: value
+      definition: Free-text follow-up note attached to a completed appointment.
+  fact_types:
+    - id: 72669505-991d-4fd3-bcfd-2df28999e77a
+      name: Patient books Appointment
+      roles:
+        - id: f385e706-28d2-4c7a-8c2b-7428d792064f
+          player: 1b115837-7c87-47f8-b034-02876a30edfb
+          role_name: books
+        - id: 16c4c113-98a6-4819-8a28-fd59ef88fc98
+          player: ae84de8c-4b9f-4753-89d1-ac177b95fd4d
+          role_name: is booked by
+      readings:
+        - "{0} books {1}"
+        - "{1} is booked by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 16c4c113-98a6-4819-8a28-fd59ef88fc98
+        - type: mandatory
+          role: 16c4c113-98a6-4819-8a28-fd59ef88fc98
+    - id: 7f49891f-02d6-4229-85f8-20ec58ea3c9d
+      name: Appointment is with Doctor
+      roles:
+        - id: 77b45b9f-1c88-4a09-ba76-60aaace163a7
+          player: ae84de8c-4b9f-4753-89d1-ac177b95fd4d
+          role_name: is with
+        - id: ad535882-c9b4-4a69-8963-2ee57a736292
+          player: e79c9725-9223-4709-8b5a-a6b2d57ae981
+          role_name: sees
+      readings:
+        - "{0} is with {1}"
+        - "{1} sees {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 77b45b9f-1c88-4a09-ba76-60aaace163a7
+        - type: mandatory
+          role: 77b45b9f-1c88-4a09-ba76-60aaace163a7
+    - id: 1ce56142-54f9-4102-80cb-18e9f1d40f1b
+      name: Doctor has Specialty
+      roles:
+        - id: bbb8b06c-1c5b-40fc-bdd7-c7cf3032a456
+          player: e79c9725-9223-4709-8b5a-a6b2d57ae981
+          role_name: has
+        - id: b1adb3c0-b424-43d1-a9e0-35f164935981
+          player: a9fa5fcf-1c07-4a27-81cb-e08c667b34d5
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - bbb8b06c-1c5b-40fc-bdd7-c7cf3032a456
+        - type: mandatory
+          role: bbb8b06c-1c5b-40fc-bdd7-c7cf3032a456
+    - id: 7fb50cab-6397-43de-8ab7-efe2c8ae002a
+      name: Appointment is on AppointmentDate
+      roles:
+        - id: 68e41a47-eccc-49e2-9643-39f18ecef0df
+          player: ae84de8c-4b9f-4753-89d1-ac177b95fd4d
+          role_name: is on
+        - id: 33945336-7ead-45cc-a553-6918e6d4f332
+          player: fe9788a0-8277-4526-aed3-9dce5406130e
+          role_name: is of
+      readings:
+        - "{0} is on {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 68e41a47-eccc-49e2-9643-39f18ecef0df
+        - type: mandatory
+          role: 68e41a47-eccc-49e2-9643-39f18ecef0df
+    - id: 15b4fd5f-13dc-4548-9936-b5d4c034c199
+      name: Appointment is at TimeSlot
+      roles:
+        - id: ca8bb9d4-8049-4e08-807f-eec47afa303d
+          player: ae84de8c-4b9f-4753-89d1-ac177b95fd4d
+          role_name: is at
+        - id: 3454f2e1-eb5d-44df-b407-ee447bbbba3b
+          player: bde116dd-f4a9-4547-976b-c840aa9a0999
+          role_name: is of
+      readings:
+        - "{0} is at {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - ca8bb9d4-8049-4e08-807f-eec47afa303d
+        - type: mandatory
+          role: ca8bb9d4-8049-4e08-807f-eec47afa303d
+    - id: 5d85ab2a-538c-4ff1-b0ca-3338c34f1891
+      name: Appointment has VisitReason
+      roles:
+        - id: a540c940-ad5a-4788-a4e2-ea5a4d0e5594
+          player: ae84de8c-4b9f-4753-89d1-ac177b95fd4d
+          role_name: has
+        - id: b4f5e358-4817-4e57-a802-10a1c39d9ee9
+          player: a4adbf80-e5bc-45a1-b23c-df0ea91f98a2
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+    - id: 483f6a15-9c16-4c1e-8674-25a0dab324f4
+      name: Appointment has AppointmentStatus
+      roles:
+        - id: 40637661-0a9b-415b-a7aa-7f77654b48bd
+          player: ae84de8c-4b9f-4753-89d1-ac177b95fd4d
+          role_name: has
+        - id: 2d13578b-4736-4b91-8287-4e68a777d58a
+          player: f720505b-046a-436b-8703-e867ef086883
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 40637661-0a9b-415b-a7aa-7f77654b48bd
+        - type: mandatory
+          role: 40637661-0a9b-415b-a7aa-7f77654b48bd
+    - id: 9e6812dd-f2c1-4253-ba07-35d898a0bae7
+      name: Appointment has FollowUpNote
+      roles:
+        - id: 661800eb-9202-463e-a64d-522096eba1b0
+          player: ae84de8c-4b9f-4753-89d1-ac177b95fd4d
+          role_name: has
+        - id: 17d5b2b0-ec2f-4496-adc0-574e8a34b452
+          player: d61f5770-66a7-4946-9dd9-46a61c74c939
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 661800eb-9202-463e-a64d-522096eba1b0
+    - id: f5a6f425-874e-47e6-beca-81ddc757f437
+      name: Patient has primary Doctor
+      roles:
+        - id: cc1e48b2-c157-44dd-a4a2-dd033c502757
+          player: 1b115837-7c87-47f8-b034-02876a30edfb
+          role_name: has primary
+        - id: 236916bf-bf95-4a29-b824-05d68b64f515
+          player: e79c9725-9223-4709-8b5a-a6b2d57ae981
+          role_name: is primary doctor of
+      readings:
+        - "{0} has primary {1}"
+        - "{1} is primary doctor of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - cc1e48b2-c157-44dd-a4a2-dd033c502757
+        - type: mandatory
+          role: cc1e48b2-c157-44dd-a4a2-dd033c502757

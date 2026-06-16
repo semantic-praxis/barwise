@@ -1,0 +1,14 @@
+# barwise 1.6.1 -- verbalize
+
+Employee works in Department
+Department has Employee
+  Each Employee works in at most one Department.
+  Each Employee works in at least one Department.
+Manager manages Department
+Department is managed by Manager
+  Each Department is managed by at most one Manager.
+Department has DepartmentName
+DepartmentName is of Department
+  Each Department has at most one DepartmentName.
+Employee is a subtype of Person.
+Manager is a subtype of Employee.

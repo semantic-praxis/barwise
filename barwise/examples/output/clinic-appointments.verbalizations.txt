@@ -1,0 +1,35 @@
+# barwise 1.6.1 -- verbalize
+
+Patient books Appointment
+Appointment is booked by Patient
+  Each Appointment is booked by at most one Patient.
+  Each Appointment is booked by at least one Patient.
+Appointment is with Doctor
+Doctor sees Appointment
+  Each Appointment is with at most one Doctor.
+  Each Appointment is with at least one Doctor.
+Doctor has Specialty
+Specialty is of Doctor
+  Each Doctor has at most one Specialty.
+  Each Doctor has at least one Specialty.
+Appointment is on AppointmentDate
+AppointmentDate is of Appointment
+  Each Appointment is on at most one AppointmentDate.
+  Each Appointment is on at least one AppointmentDate.
+Appointment is at TimeSlot
+TimeSlot is of Appointment
+  Each Appointment is at at most one TimeSlot.
+  Each Appointment is at at least one TimeSlot.
+Appointment has VisitReason
+VisitReason is of Appointment
+Appointment has AppointmentStatus
+AppointmentStatus is of Appointment
+  Each Appointment has at most one AppointmentStatus.
+  Each Appointment has at least one AppointmentStatus.
+Appointment has FollowUpNote
+FollowUpNote is of Appointment
+  Each Appointment has at most one FollowUpNote.
+Patient has primary Doctor
+Doctor is primary doctor of Patient
+  Each Patient has primary at most one Doctor.
+  Each Patient has primary at least one Doctor.

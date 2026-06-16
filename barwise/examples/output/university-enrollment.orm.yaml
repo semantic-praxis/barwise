@@ -1,0 +1,221 @@
+orm_version: "1.0"
+model:
+  name: University Enrollment
+  object_types:
+    - id: 631f59fe-24e8-47f8-8647-fa59b848ac20
+      name: Student
+      kind: entity
+      reference_mode: student_number
+      definition: A person enrolled at the university, identified by a student number assigned at admission.
+    - id: b52527a4-33a5-418b-8e61-d554ba549342
+      name: Course
+      kind: entity
+      reference_mode: course_code
+      definition: A catalog entry representing an academic course, identified by a unique course code.
+    - id: cf2e6066-a43f-4ede-b3f1-592dd533c0ce
+      name: CourseOffering
+      kind: entity
+      reference_mode: offering_id
+      definition: A specific instance of a course offered in a particular semester.
+    - id: 26c32005-37c3-4211-a540-8f396759bca2
+      name: Instructor
+      kind: entity
+      reference_mode: employee_id
+      definition: A faculty member who teaches course offerings, identified by employee ID.
+    - id: c915cdab-d725-4e4d-91d8-d2f2630624c7
+      name: Semester
+      kind: entity
+      reference_mode: term_code
+      definition: An academic term during which course offerings take place, identified by a term code.
+    - id: 78fc7af3-e41b-4b9d-a29b-c6ca8b5e38d6
+      name: Title
+      kind: value
+      definition: The free-text name of a course.
+    - id: 7d17fff6-bb0a-4e95-84e6-152803135dfa
+      name: CreditValue
+      kind: value
+      definition: The number of credits a course is worth, expressed as a whole number.
+    - id: 69bd1e48-e683-4c3e-8239-41f3ea2a0419
+      name: MaxCapacity
+      kind: value
+      definition: The maximum number of students that can enroll in a course offering.
+    - id: 4f84fb1c-6116-49a6-9a65-3c7b804247b6
+      name: StartDate
+      kind: value
+      definition: The date a semester begins.
+    - id: 0771848f-1147-4943-be84-90e08e5cc598
+      name: EndDate
+      kind: value
+      definition: The date a semester ends.
+    - id: e6016666-183f-4ead-855c-b5e1a205ba0d
+      name: LetterGrade
+      kind: value
+      definition: A grade awarded to a student upon completion of a course offering.
+      value_constraint:
+        values:
+          - A
+          - B
+          - C
+          - D
+          - F
+  fact_types:
+    - id: 6164be0a-c0f0-4c2d-9085-c211ae5abf19
+      name: Student enrolls in CourseOffering
+      roles:
+        - id: b056c049-4f75-47eb-a9f8-fe363d3e9836
+          player: 631f59fe-24e8-47f8-8647-fa59b848ac20
+          role_name: enrolls in
+        - id: 00562324-139b-4729-8f30-a93f6f265b5b
+          player: cf2e6066-a43f-4ede-b3f1-592dd533c0ce
+          role_name: has enrolled
+      readings:
+        - "{0} enrolls in {1}"
+        - "{1} has enrolled {0}"
+    - id: c1c44f31-e713-44d9-bee6-151de36ced23
+      name: CourseOffering is of Course
+      roles:
+        - id: bfa50117-1a8e-4784-b2df-2d2a407768ee
+          player: cf2e6066-a43f-4ede-b3f1-592dd533c0ce
+          role_name: is of
+        - id: adc93923-e59c-49d1-a4ca-beb2df2d5b51
+          player: b52527a4-33a5-418b-8e61-d554ba549342
+          role_name: has offering
+      readings:
+        - "{0} is of {1}"
+        - "{1} has offering {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - bfa50117-1a8e-4784-b2df-2d2a407768ee
+        - type: mandatory
+          role: bfa50117-1a8e-4784-b2df-2d2a407768ee
+    - id: 19e0a794-aa91-4f6b-b830-c596d6e612bf
+      name: CourseOffering is in Semester
+      roles:
+        - id: 1ea33518-d3cf-4297-9115-2b366e079b4c
+          player: cf2e6066-a43f-4ede-b3f1-592dd533c0ce
+          role_name: is in
+        - id: e1f3e8e8-b90d-4a32-b79f-9c4d66035e09
+          player: c915cdab-d725-4e4d-91d8-d2f2630624c7
+          role_name: includes
+      readings:
+        - "{0} is in {1}"
+        - "{1} includes {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 1ea33518-d3cf-4297-9115-2b366e079b4c
+        - type: mandatory
+          role: 1ea33518-d3cf-4297-9115-2b366e079b4c
+    - id: 6308d150-6d22-485b-8a5b-2bae5053f2dd
+      name: Instructor teaches CourseOffering
+      roles:
+        - id: ff9f8862-3d9f-4429-8c76-60857dd91906
+          player: 26c32005-37c3-4211-a540-8f396759bca2
+          role_name: teaches
+        - id: 1dd67380-959a-4e0e-aadd-8ffceccc0a27
+          player: cf2e6066-a43f-4ede-b3f1-592dd533c0ce
+          role_name: is taught by
+      readings:
+        - "{0} teaches {1}"
+        - "{1} is taught by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 1dd67380-959a-4e0e-aadd-8ffceccc0a27
+        - type: mandatory
+          role: 1dd67380-959a-4e0e-aadd-8ffceccc0a27
+    - id: f88cb054-75da-4080-a576-82d7c323d32c
+      name: Course has Title
+      roles:
+        - id: b16be346-c946-46a8-9150-2ae599ea9bcc
+          player: b52527a4-33a5-418b-8e61-d554ba549342
+          role_name: has
+        - id: cd2ab936-e5d2-46c4-b113-7861b2c8f466
+          player: 78fc7af3-e41b-4b9d-a29b-c6ca8b5e38d6
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - b16be346-c946-46a8-9150-2ae599ea9bcc
+    - id: f6523b02-cec5-4503-8bc9-8e160785755e
+      name: Course has CreditValue
+      roles:
+        - id: 4ee31bad-5c54-4ae8-9a64-ae898680b818
+          player: b52527a4-33a5-418b-8e61-d554ba549342
+          role_name: has
+        - id: 73773235-e57e-4c2a-a593-9e4a4b9b1ac0
+          player: 7d17fff6-bb0a-4e95-84e6-152803135dfa
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 4ee31bad-5c54-4ae8-9a64-ae898680b818
+    - id: b7da3779-fab2-40d3-a239-d59ca4f72193
+      name: CourseOffering has MaxCapacity
+      roles:
+        - id: 6d08431d-477a-4226-95ac-17414069ef8d
+          player: cf2e6066-a43f-4ede-b3f1-592dd533c0ce
+          role_name: has
+        - id: 2dd3bc2c-57ea-48a2-8b10-126366554475
+          player: 69bd1e48-e683-4c3e-8239-41f3ea2a0419
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 6d08431d-477a-4226-95ac-17414069ef8d
+    - id: 7b61b736-40e6-459d-88fe-653bd02a5389
+      name: Semester has StartDate
+      roles:
+        - id: 3d0ed8ca-6d34-473e-9785-19e1bda05a4f
+          player: c915cdab-d725-4e4d-91d8-d2f2630624c7
+          role_name: has
+        - id: 2772a027-daf9-459d-af6b-2d21a86c7b32
+          player: 4f84fb1c-6116-49a6-9a65-3c7b804247b6
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 3d0ed8ca-6d34-473e-9785-19e1bda05a4f
+    - id: 133c2bb1-5a30-4f69-8b75-a0b8a03dc8c2
+      name: Semester has EndDate
+      roles:
+        - id: 859ade54-2f50-431e-a911-66852b65592c
+          player: c915cdab-d725-4e4d-91d8-d2f2630624c7
+          role_name: has
+        - id: 9afb2b85-a496-41e3-a768-ac22dcb54d64
+          player: 0771848f-1147-4943-be84-90e08e5cc598
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 859ade54-2f50-431e-a911-66852b65592c
+    - id: 813578be-da4c-4189-83bf-d3c351acc2c3
+      name: Student receives LetterGrade for CourseOffering
+      roles:
+        - id: 28fd5808-8dc7-4a23-b434-9c879388912d
+          player: 631f59fe-24e8-47f8-8647-fa59b848ac20
+          role_name: receives
+        - id: 4223ab4c-53e4-462a-b7ce-f4d478b87d9e
+          player: e6016666-183f-4ead-855c-b5e1a205ba0d
+          role_name: is received by
+        - id: 7b2f947d-51ed-4e75-97cd-b4e540e4dc05
+          player: cf2e6066-a43f-4ede-b3f1-592dd533c0ce
+          role_name: grades
+      readings:
+        - "{0} receives {1} for {2}"

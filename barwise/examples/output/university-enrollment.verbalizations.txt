@@ -1,0 +1,32 @@
+# barwise 1.6.1 -- verbalize
+
+Student enrolls in CourseOffering
+CourseOffering has enrolled Student
+CourseOffering is of Course
+Course has offering CourseOffering
+  Each CourseOffering is of at most one Course.
+  Each CourseOffering is of at least one Course.
+CourseOffering is in Semester
+Semester includes CourseOffering
+  Each CourseOffering is in at most one Semester.
+  Each CourseOffering is in at least one Semester.
+Instructor teaches CourseOffering
+CourseOffering is taught by Instructor
+  Each CourseOffering is taught by at most one Instructor.
+  Each CourseOffering is taught by at least one Instructor.
+Course has Title
+Title is of Course
+  Each Course has at most one Title.
+Course has CreditValue
+CreditValue is of Course
+  Each Course has at most one CreditValue.
+CourseOffering has MaxCapacity
+MaxCapacity is of CourseOffering
+  Each CourseOffering has at most one MaxCapacity.
+Semester has StartDate
+StartDate is of Semester
+  Each Semester has at most one StartDate.
+Semester has EndDate
+EndDate is of Semester
+  Each Semester has at most one EndDate.
+Student receives LetterGrade for CourseOffering

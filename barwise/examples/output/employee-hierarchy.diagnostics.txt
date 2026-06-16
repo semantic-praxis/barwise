@@ -1,0 +1,10 @@
+# barwise 1.6.1 -- validate
+
+examples/output/employee-hierarchy.orm.yaml: 0 error(s), 0 warning(s)
+
+  INFO    Object type "Person" does not participate in any fact type.
+  INFO    Value type "DepartmentName" has no data type. The relational mapper will default to TEXT.
+  INFO    Entity type "Person" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "Employee" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "Manager" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "Department" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
