@@ -1,1 +1,1 @@
-/home/user/barwise/barwise/examples/transcripts/clinic-appointments.orm.yaml: valid (0 errors, 0 warnings)
+<REPO>/examples/transcripts/clinic-appointments.orm.yaml: valid (0 errors, 0 warnings)

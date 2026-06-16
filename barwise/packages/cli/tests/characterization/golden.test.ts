@@ -19,15 +19,23 @@ const repoRoot = resolve(here, "../../../..");
 const goldenDir = join(here, "golden");
 const UPDATE = process.env.UPDATE_GOLDEN === "1";
 
+// Absolute paths leak into some output (validate prints the source path),
+// so normalize the repo root to a stable token; goldens stay machine-
+// independent across local and CI checkouts.
+function normalize(text: string): string {
+  return text.split(repoRoot).join("<REPO>");
+}
+
 function checkGolden(name: string, actual: string): void {
   const path = join(goldenDir, name);
+  const normalized = normalize(actual);
   if (UPDATE) {
     mkdirSync(goldenDir, { recursive: true });
-    writeFileSync(path, actual, "utf-8");
+    writeFileSync(path, normalized, "utf-8");
     return;
   }
   const expected = existsSync(path) ? readFileSync(path, "utf-8") : "<missing golden>";
-  expect(actual, `golden mismatch for ${name}; run UPDATE_GOLDEN=1 to refresh`).toBe(expected);
+  expect(normalized, `golden mismatch for ${name}; run UPDATE_GOLDEN=1 to refresh`).toBe(expected);
 }
 
 interface ModelFixture {
