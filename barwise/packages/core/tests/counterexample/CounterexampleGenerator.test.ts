@@ -5,7 +5,7 @@ import {
   generateCounterexamples,
 } from "../../src/counterexample/CounterexampleGenerator.js";
 import type { RingType } from "../../src/model/Constraint.js";
-import type { OrmModel } from "../../src/model/OrmModel.js";
+import { OrmModel } from "../../src/model/OrmModel.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
@@ -428,5 +428,197 @@ describe("cross-fact-type counterexamples", () => {
     const ce = generateCounterexampleForConstraint(eq, manages, model);
     expect(ce).toBeDefined();
     expect(forbids(model, ce!, "population/equality-violation")).toBe(true);
+  });
+});
+
+const RULE_BY_TYPE: Record<string, string> = {
+  internal_uniqueness: "population/uniqueness-violation",
+  value_constraint: "population/value-constraint-violation",
+  frequency: "population/frequency-violation",
+  ring: "population/ring-violation",
+  mandatory: "population/mandatory-violation",
+  disjunctive_mandatory: "population/disjunctive-mandatory-violation",
+  exclusion: "population/exclusion-violation",
+  exclusive_or: "population/exclusive-or-violation",
+  subset: "population/subset-violation",
+  equality: "population/equality-violation",
+  external_uniqueness: "population/external-uniqueness-violation",
+};
+
+interface RoleInit {
+  readonly player: string;
+  readonly role: string;
+  readonly id: string;
+}
+
+/**
+ * A model carrying many constraint types across several fact types, so a
+ * single generateCounterexamples call exercises the full dispatch.
+ */
+function buildConstraintRichModel(): OrmModel {
+  const m = new OrmModel({ name: "Constraint-rich" });
+  const ent = (name: string, ref: string) =>
+    m.addObjectType({ name, kind: "entity", referenceMode: ref });
+  const val = (name: string) => m.addObjectType({ name, kind: "value" });
+  const bf = (name: string, a: RoleInit, b: RoleInit) =>
+    m.addFactType({
+      name,
+      roles: [
+        { name: a.role, playerId: a.player, id: a.id },
+        { name: b.role, playerId: b.player, id: b.id },
+      ],
+      readings: ["{0} verb {1}"],
+    });
+
+  const person = ent("Person", "person_id");
+  const car = ent("Car", "vin");
+  const bus = ent("Bus", "bus_id");
+  const course = ent("Course", "course_code");
+  const dept = ent("Dept", "dept_code");
+  const room = ent("Room", "room_id");
+  const building = ent("Building", "building_code");
+  const personId = val("PersonId");
+  const phone = val("Phone");
+  const ticket = val("Ticket");
+  const rating = val("Rating");
+  const roomNumber = val("RoomNumber");
+
+  // internal uniqueness + spanning exclusion (drives / rides)
+  const drives = bf(
+    "Person drives Car",
+    { player: person.id, role: "drives", id: "d1" },
+    { player: car.id, role: "is driven by", id: "d2" },
+  );
+  bf(
+    "Person rides Bus",
+    { player: person.id, role: "rides", id: "r1" },
+    { player: bus.id, role: "is ridden by", id: "r2" },
+  );
+  drives.addConstraint({ type: "internal_uniqueness", roleIds: ["d1"] });
+  drives.addConstraint({ type: "exclusion", roleIds: ["d1", "r1"] });
+
+  // value constraint (role-level)
+  const carRating = bf(
+    "Car has Rating",
+    { player: car.id, role: "has", id: "cr1" },
+    { player: rating.id, role: "of", id: "cr2" },
+  );
+  carRating.addConstraint({ type: "value_constraint", roleId: "cr2", values: ["A", "B", "C"] });
+
+  // frequency
+  const hasTicket = bf(
+    "Person has Ticket",
+    { player: person.id, role: "has", id: "t1" },
+    { player: ticket.id, role: "of", id: "t2" },
+  );
+  hasTicket.addConstraint({ type: "frequency", roleId: "t1", min: 1, max: 3 });
+
+  // ring
+  const reports = bf(
+    "Person reports to Person",
+    { player: person.id, role: "reports to", id: "rp1" },
+    { player: person.id, role: "is reported to by", id: "rp2" },
+  );
+  reports.addConstraint({ type: "ring", roleId1: "rp1", roleId2: "rp2", ringType: "irreflexive" });
+
+  // mandatory (Person is anchored by its many other roles)
+  const hasPersonId = bf(
+    "Person has PersonId",
+    { player: person.id, role: "has", id: "pid1" },
+    { player: personId.id, role: "identifies", id: "pid2" },
+  );
+  hasPersonId.addConstraint({ type: "mandatory", roleId: "pid1" });
+
+  // disjunctive mandatory across two fact types
+  const home = bf(
+    "Person has HomePhone",
+    { player: person.id, role: "has", id: "hp1" },
+    { player: phone.id, role: "is home of", id: "hp2" },
+  );
+  bf(
+    "Person has MobilePhone",
+    { player: person.id, role: "has", id: "mp1" },
+    { player: phone.id, role: "is mobile of", id: "mp2" },
+  );
+  home.addConstraint({ type: "disjunctive_mandatory", roleIds: ["hp1", "mp1"] });
+
+  // subset (spanning)
+  const teaches = bf(
+    "Person teaches Course",
+    { player: person.id, role: "teaches", id: "te1" },
+    { player: course.id, role: "is taught by", id: "te2" },
+  );
+  bf(
+    "Person enrolled in Course",
+    { player: person.id, role: "enrolled in", id: "en1" },
+    { player: course.id, role: "enrolls", id: "en2" },
+  );
+  teaches.addConstraint({
+    type: "subset",
+    subsetRoleIds: ["te1", "te2"],
+    supersetRoleIds: ["en1", "en2"],
+  });
+
+  // equality (spanning)
+  const manages = bf(
+    "Person manages Dept",
+    { player: person.id, role: "manages", id: "mg1" },
+    { player: dept.id, role: "is managed by", id: "mg2" },
+  );
+  bf(
+    "Person works in Dept",
+    { player: person.id, role: "works in", id: "wk1" },
+    { player: dept.id, role: "employs", id: "wk2" },
+  );
+  manages.addConstraint({ type: "equality", roleIds1: ["mg1", "mg2"], roleIds2: ["wk1", "wk2"] });
+
+  // external uniqueness (Room by Building + RoomNumber)
+  const inBuilding = bf(
+    "Room is in Building",
+    { player: room.id, role: "is in", id: "rb1" },
+    { player: building.id, role: "houses", id: "rb2" },
+  );
+  bf(
+    "Room has RoomNumber",
+    { player: room.id, role: "has", id: "rn1" },
+    { player: roomNumber.id, role: "numbers", id: "rn2" },
+  );
+  inBuilding.addConstraint({ type: "external_uniqueness", roleIds: ["rb2", "rn2"] });
+
+  return m;
+}
+
+describe("model-wide round-trip completeness", () => {
+  it("every generated counterexample trips its own rule", () => {
+    const model = buildConstraintRichModel();
+    const ces = generateCounterexamples(model);
+
+    // A real spread of constraint types, so the guard fails loudly if a
+    // generator stops emitting.
+    const types = new Set(ces.map((c) => c.constraintType));
+    expect(types.size).toBeGreaterThanOrEqual(8);
+
+    for (const ce of ces) {
+      const expected = RULE_BY_TYPE[ce.constraintType];
+      expect(expected, `no rule mapped for ${ce.constraintType}`).toBeTruthy();
+
+      // Add this counterexample's forbidden populations, validate, then
+      // remove them, so each counterexample is checked in isolation.
+      const added: string[] = [];
+      for (const forbidden of ce.forbidden) {
+        const pop = model.addPopulation({ factTypeId: forbidden.factTypeId });
+        for (const inst of forbidden.instances) {
+          pop.addInstance({ roleValues: { ...inst.roleValues } });
+        }
+        added.push(pop.id);
+      }
+      const ruleIds = populationValidationRules(model).map((d) => d.ruleId);
+      for (const id of added) model.removePopulation(id);
+
+      expect(
+        ruleIds,
+        `${ce.constraintType} counterexample did not trip ${expected}`,
+      ).toContain(expected);
+    }
   });
 });
