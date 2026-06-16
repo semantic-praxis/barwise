@@ -18,7 +18,8 @@ import type { ExtractionResponse } from "./ExtractionTypes.js";
  *   framing at the highest-impact structural fork.
  */
 export function buildSystemPrompt(includeAlternatives = false): string {
-  const prompt = `You are an expert data modeler specializing in Object-Role Modeling (ORM 2). Your task is to analyze a business working session transcript and extract a structured ORM conceptual model.
+  const prompt =
+    `You are an expert data modeler specializing in Object-Role Modeling (ORM 2). Your task is to analyze a business working session transcript and extract a structured ORM conceptual model.
 
 ## ORM Concepts
 

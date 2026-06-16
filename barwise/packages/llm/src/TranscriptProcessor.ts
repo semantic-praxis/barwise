@@ -17,11 +17,7 @@ import {
   buildUserMessage,
   parseExtractionResponse,
 } from "./ExtractionPrompt.js";
-import type {
-  CandidateFraming,
-  DraftModelResult,
-  ExtractionResponse,
-} from "./ExtractionTypes.js";
+import type { CandidateFraming, DraftModelResult, ExtractionResponse } from "./ExtractionTypes.js";
 import type { LlmClient } from "./LlmClient.js";
 
 export interface ProcessorOptions {
