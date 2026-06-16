@@ -14,7 +14,7 @@ and integration suites verify each package in isolation, but they stop at
 the package boundary: the MCP tool tests call handler functions directly
 ("no transport needed"), and the CLI tests invoke the program in-process.
 Neither exercises the built bundle the way a user does, nor the seams a
-user actually hits -- real files, exit codes, stdout/stderr separation,
+user actually hits: real files, exit codes, stdout/stderr separation,
 and whether the _same model_ yields the _same answer_ on every surface.
 This plan covers that gap with a thin, real-use harness, and leans on
 explicit-over-implicit by declaring its corpus and its LLM-gating rather
@@ -39,8 +39,8 @@ In scope: a `barwise/test-plan/` directory holding `cli-checks.sh`,
 `README.md`; plus the config exclusions that keep this tooling dir out of
 the formatting, dead-code, and lint gates.
 
-Out of scope: wiring the scripts into `ci.yml` as a required check
-(they are written to be CI-capable -- non-zero on failure -- but adding a
+Out of scope: wiring the scripts into `ci.yml` as a required check (they
+are written to be CI-capable, exiting non-zero on failure, but adding a
 gate is a separate call); an automated VS Code Extension-Host harness;
 performance benchmarking; and any change to the validations themselves
 (those are specced in `external-uniqueness.spec.md`,
@@ -61,7 +61,7 @@ performance benchmarking; and any change to the validations themselves
 The shipped `examples/` corpus is reused unchanged, so the checks double
 as a regression test on the examples. The `validate --format json` output
 is a diagnostics _array_ (not an object) and `review_model` is
-LLM-powered -- both surfaced during grounding and shaped the assertions.
+LLM-powered; both surfaced during grounding and shaped the assertions.
 
 ## Target architecture
 
@@ -128,7 +128,7 @@ The manual walkthrough, the `dprint`/`knip` exclusions, and the README.
 - `test-plan/` sits outside the workspaces, so `build`, `test`, and the
   per-package `eslint` do not touch it; `dprint` and `knip` are told to
   skip it explicitly.
-- No downstream packages update -- the one-way dependency graph is
+- No downstream packages update; the one-way dependency graph is
   untouched.
 
 ## Open decisions (for review)
@@ -138,8 +138,8 @@ The manual walkthrough, the `dprint`/`knip` exclusions, and the README.
   bundles (extra build cost) and the LLM-gated steps need a provider
   secret. Revisit once the harness has shaken out real bugs.
 - **Where should `test-plan/` live?** A top-level tooling dir (chosen)
-  keeps it discoverable and surface-agnostic. The alternative -- per
-  package -- would fragment a cross-surface plan. Recommend keeping it
+  keeps it discoverable and surface-agnostic. The alternative, per
+  package, would fragment a cross-surface plan. Recommend keeping it
   top-level.
 - **LLM checks: skip or fail when no provider?** Chosen: skip (reported,
   not counted as failure), so the harness is green offline. Recommend
@@ -152,8 +152,7 @@ The manual walkthrough, the `dprint`/`knip` exclusions, and the README.
   checks are the only non-deterministic part and are opt-in.
 - Excluding `test-plan/` from `dprint` means its prose is not format-
   gated; acceptable for a tooling dir (precedent: `schemas/**`,
-  `scripts/**`), and the trade keeps a dir dprint cannot format here off
-  the CI critical path.
+  `scripts/**`).
 - Both scripts were run green against the current `main` build (CLI 26
   checks, MCP 16 checks, LLM steps skipped); `knip` stays clean with the
   ignore in place.
@@ -161,7 +160,7 @@ The manual walkthrough, the `dprint`/`knip` exclusions, and the README.
 ## Non-goals
 
 - No new product capability and no change to any validation rule.
-- No automated coverage of the VS Code surface -- it stays a manual
+- No automated coverage of the VS Code surface; it stays a manual
   checklist by design.
 - Not a replacement for the unit/integration suites; this is the
   real-use layer on top of them.
