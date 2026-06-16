@@ -32,10 +32,14 @@ export function generateModel(seed: number): OrmModel {
   const int = (min: number, max: number) => min + Math.floor(rng() * (max - min + 1));
 
   const model = new OrmModel({ name: `Gen-${seed}` });
-  const entities = Array.from({ length: int(2, 4) }, (_, i) =>
-    model.addObjectType({ name: `E${i}`, kind: "entity", referenceMode: `e${i}_id` }));
-  const values = Array.from({ length: int(1, 3) }, (_, i) =>
-    model.addObjectType({ name: `V${i}`, kind: "value" }));
+  const entities = Array.from(
+    { length: int(2, 4) },
+    (_, i) => model.addObjectType({ name: `E${i}`, kind: "entity", referenceMode: `e${i}_id` }),
+  );
+  const values = Array.from(
+    { length: int(1, 3) },
+    (_, i) => model.addObjectType({ name: `V${i}`, kind: "value" }),
+  );
   const objects = [...entities, ...values];
   const pick = <T>(arr: readonly T[]): T => arr[Math.floor(rng() * arr.length)]!;
 
