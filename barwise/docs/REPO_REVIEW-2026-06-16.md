@@ -78,7 +78,7 @@ and size, which is where the next expensive change lands.
 |      23 |   908 | vscode/.../diagram/DiagramPanel.ts                | A1/A6 -- dissolve to DiagramSession |
 |      13 |   896 | cli/src/commands/import.ts                        | A1 -- split 3 subcommands           |
 |      22 |   318 | core/src/index.ts                                 | A3 -- subpath exports               |
-|       6 |  1075 | core/.../validation/rules/populationValidation.ts | A1 -- decompose by rule             |
+|       6 |    85 | core/.../validation/rules/populationValidation.ts | DONE -- 1,074 -> 85                 |
 |       9 |   667 | core/.../serialization/OrmYamlSerializer.ts       | watch                               |
 |       9 |   661 | vscode/src/mcp/ToolRegistration.ts                | A1 -- data-driven table             |
 |       6 |   617 | llm/src/ExtractionPrompt.ts                       | A1 -- extract rules                 |
