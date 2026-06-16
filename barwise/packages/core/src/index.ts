@@ -281,6 +281,7 @@ export {
 } from "./query/index.js";
 export type {
   ConstraintRef,
+  EntityAnchors,
   EntityDetail,
   EntityRef,
   FactTypeDetail,

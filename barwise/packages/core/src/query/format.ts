@@ -101,6 +101,29 @@ export function formatQueryResult(result: QueryResult): string {
       return lines.join("\n");
     }
 
+    case "anchors": {
+      if (result.anchors.length === 0) return "Anchors: none";
+      const lines: string[] = [`Anchors (${result.anchors.length}):`];
+      for (const a of result.anchors) {
+        const flag = a.missingIdentifier ? "  [MISSING PREFERRED IDENTIFIER]" : "";
+        lines.push(`${a.entity}${flag}`);
+        if (a.referenceMode) {
+          lines.push(`  Reference mode: ${a.referenceMode}`);
+        }
+        if (a.preferredIdentifier) {
+          const ids = a.preferredIdentifier.identifierTypes.join(", ");
+          lines.push(
+            `  Preferred identifier: ${a.preferredIdentifier.factType}`
+              + (ids ? ` (${ids})` : ""),
+          );
+        }
+        if (a.mandatoryRoles.length > 0) {
+          lines.push(`  Mandatory in: ${a.mandatoryRoles.join(", ")}`);
+        }
+      }
+      return lines.join("\n");
+    }
+
     case "not-found":
       return result.message;
   }
