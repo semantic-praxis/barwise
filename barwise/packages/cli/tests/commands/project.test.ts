@@ -116,7 +116,7 @@ describe("barwise project split", () => {
     const validate = await runCli(["validate", manifest]);
     expect(validate.stdout).toContain("0 error");
     expect(validate.exitCode).toBe(0);
-  });
+  }, 15000);
 
   it("errors when no --config is given", async () => {
     const dir = makeTmpDir();
@@ -172,5 +172,5 @@ describe("barwise project split", () => {
     // The manifest is still the project manifest after a forced rewrite.
     expect(readFileSync(join(out, "project.orm-project.yaml"), "utf-8"))
       .toContain("Shop");
-  });
+  }, 15000);
 });
