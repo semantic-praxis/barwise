@@ -20,6 +20,7 @@
     "fmt": "dprint fmt",
     "fmt:check": "dprint check",
     "validate:examples": "bash scripts/validate-examples.sh",
+    "arch:triage": "node scripts/arch-triage.mjs",
     "prepare": "cd .. && husky barwise/.husky"
   },
   "devDependencies": {
