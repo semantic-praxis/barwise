@@ -296,6 +296,48 @@ describe("ConstraintVerbalizer", () => {
       expect(v[0]!.text).toContain("FirstName");
       expect(v[0]!.text).toContain("unique across fact types");
     });
+
+    it("resolves roles that live in other fact types (cross-fact-type)", () => {
+      // Room is identified by the combination of its Building and its
+      // RoomNumber -- the two constrained roles live in different fact
+      // types, so the verbalizer must resolve each one model-wide.
+      const model = new OrmModel({ name: "Test" });
+      const room = model.addObjectType({ name: "Room", kind: "entity", referenceMode: "room_id" });
+      const building = model.addObjectType({
+        name: "Building",
+        kind: "entity",
+        referenceMode: "building_code",
+      });
+      const roomNumber = model.addObjectType({ name: "RoomNumber", kind: "value" });
+
+      const inBuilding = model.addFactType({
+        name: "Room is in Building",
+        roles: [
+          { name: "is in", playerId: room.id, id: "rb1" },
+          { name: "houses", playerId: building.id, id: "rb2" },
+        ],
+        readings: ["{0} is in {1}", "{1} houses {0}"],
+        constraints: [
+          { type: "external_uniqueness", roleIds: ["rb2", "rn2"] },
+        ],
+      });
+      model.addFactType({
+        name: "Room has RoomNumber",
+        roles: [
+          { name: "has", playerId: room.id, id: "rn1" },
+          { name: "numbers", playerId: roomNumber.id, id: "rn2" },
+        ],
+        readings: ["{0} has {1}", "{1} numbers {0}"],
+      });
+
+      const v = verbalizer.verbalizeAll(inBuilding, model);
+      const text = v.find((x) => x.text.includes("combination of"))!.text;
+      expect(text).toContain("Building");
+      expect(text).toContain("RoomNumber");
+      // The RoomNumber role lives in the other fact type; its id must not
+      // leak into the reading as a fallback.
+      expect(text).not.toContain("rn2");
+    });
   });
 
   describe("multiple constraints", () => {

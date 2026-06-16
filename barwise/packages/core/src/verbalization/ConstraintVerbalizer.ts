@@ -1,6 +1,7 @@
 import type { Constraint } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
+import type { Role } from "../model/Role.js";
 import {
   buildVerbalization,
   kwSeg,
@@ -372,7 +373,9 @@ export class ConstraintVerbalizer {
     ];
 
     for (let i = 0; i < roleIds.length; i++) {
-      const role = factType.getRoleById(roleIds[i]!);
+      // External uniqueness spans fact types, so resolve each role
+      // model-wide rather than against the owner fact type alone.
+      const role = this.findRole(roleIds[i]!, factType, model);
       const ot = role ? model.getObjectType(role.playerId) : undefined;
       const name = ot?.name ?? role?.name ?? roleIds[i]!;
 
@@ -689,6 +692,25 @@ export class ConstraintVerbalizer {
       textSeg(factType.name),
       textSeg("."),
     ]);
+  }
+
+  /**
+   * Find a role by id model-wide: the owner fact type first, then any
+   * other fact type. External uniqueness names roles across fact types,
+   * so the owner-only `getRoleById` is not enough.
+   */
+  private findRole(
+    roleId: string,
+    factType: FactType,
+    model: OrmModel,
+  ): Role | undefined {
+    const local = factType.getRoleById(roleId);
+    if (local) return local;
+    for (const ft of model.factTypes) {
+      const role = ft.getRoleById(roleId);
+      if (role) return role;
+    }
+    return undefined;
   }
 
   private resolveCommonPlayer(
