@@ -13,12 +13,13 @@ import {
   diffModels,
   getImporter,
   mergeAndValidate,
+  type ModelDiffResult,
   OrmYamlSerializer,
 } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
 import { createLlmClient, processTranscript } from "@barwise/llm";
-import type { ProviderName } from "@barwise/llm";
+import type { CandidateFraming, ProviderName } from "@barwise/llm";
 import type { Command } from "commander";
 import { existsSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
@@ -489,6 +490,10 @@ export function registerImportCommand(program: Command): void {
     )
     .option("--name <name>", "Model name (defaults to filename)")
     .option("--no-annotate", "Skip TODO/NOTE annotations in output")
+    .option(
+      "--alternatives",
+      "Also report one alternative framing at the top structural fork",
+    )
     .action(
       async (
         file: string,
@@ -500,6 +505,7 @@ export function registerImportCommand(program: Command): void {
           baseUrl?: string;
           name?: string;
           annotate: boolean;
+          alternatives?: boolean;
         },
       ) => {
         try {
@@ -523,6 +529,7 @@ export function registerImportCommand(program: Command): void {
 
           const result = await processTranscript(transcript, client, {
             modelName,
+            alternatives: opts.alternatives,
           });
 
           // If --output targets an existing file, do a non-interactive merge.
@@ -603,6 +610,10 @@ export function registerImportCommand(program: Command): void {
             process.stderr.write(
               `${result.ambiguities.length} ambiguity(ies) detected.\n`,
             );
+          }
+          const altSection = formatAlternativeFramings(result.alternatives);
+          if (altSection) {
+            process.stderr.write(altSection + "\n");
           }
         } catch (err) {
           process.stderr.write(`Error: ${(err as Error).message}\n`);
@@ -814,4 +825,48 @@ export function registerImportCommand(program: Command): void {
         }
       },
     );
+}
+
+/**
+ * Render the alternative framings as a text section, or an empty string
+ * when there are none.
+ */
+export function formatAlternativeFramings(
+  alternatives: readonly CandidateFraming[] | undefined,
+): string {
+  if (!alternatives || alternatives.length === 0) return "";
+
+  const lines = ["Alternative framings:"];
+  for (const alt of alternatives) {
+    lines.push(`- ${alt.rationale}`);
+    lines.push(`  Resolves: ${alt.ambiguityDescription}`);
+    lines.push(`  ${summarizeDiff(alt.diff)}`);
+  }
+  return lines.join("\n");
+}
+
+/** A one-line summary of a diff: counts plus the changed element names. */
+function summarizeDiff(diff: ModelDiffResult): string {
+  let added = 0;
+  let removed = 0;
+  let modified = 0;
+  const changed: string[] = [];
+  for (const d of diff.deltas) {
+    const label = "name" in d ? d.name : d.term;
+    if (d.kind === "added") {
+      added += 1;
+      changed.push(label);
+    } else if (d.kind === "removed") {
+      removed += 1;
+    } else if (d.kind === "modified") {
+      modified += 1;
+      changed.push(label);
+    }
+  }
+  let names = "";
+  if (changed.length > 0) {
+    const shown = changed.slice(0, 6).join(", ");
+    names = ` (${shown}${changed.length > 6 ? ", ..." : ""})`;
+  }
+  return `Diff vs primary: ${added} added, ${modified} modified, ${removed} removed${names}`;
 }
