@@ -16,9 +16,11 @@ import { ModelBuilder } from "../helpers/ModelBuilder.js";
  * matching rule.
  */
 function forbids(model: OrmModel, ce: Counterexample, ruleId: string): boolean {
-  const pop = model.addPopulation({ factTypeId: ce.factTypeId });
-  for (const inst of ce.forbidden.instances) {
-    pop.addInstance({ roleValues: { ...inst.roleValues } });
+  for (const forbidden of ce.forbidden) {
+    const pop = model.addPopulation({ factTypeId: forbidden.factTypeId });
+    for (const inst of forbidden.instances) {
+      pop.addInstance({ roleValues: { ...inst.roleValues } });
+    }
   }
   return populationValidationRules(model).some((d) => d.ruleId === ruleId);
 }
@@ -51,7 +53,7 @@ describe("counterexample generation", () => {
     const ce = generateCounterexampleForConstraint(uc, ft, model);
     expect(ce).toBeDefined();
     expect(ce!.constraintType).toBe("internal_uniqueness");
-    expect(ce!.forbidden.instances).toHaveLength(2);
+    expect(ce!.forbidden[0]!.instances).toHaveLength(2);
     expect(forbids(model, ce!, "population/uniqueness-violation")).toBe(true);
   });
 
@@ -115,7 +117,7 @@ describe("counterexample generation", () => {
     const fc = ft.constraints.find((c) => c.type === "frequency")!;
 
     const ce = generateCounterexampleForConstraint(fc, ft, model);
-    expect(ce!.forbidden.instances).toHaveLength(4);
+    expect(ce!.forbidden[0]!.instances).toHaveLength(4);
     expect(forbids(model, ce!, "population/frequency-violation")).toBe(true);
   });
 
@@ -131,7 +133,7 @@ describe("counterexample generation", () => {
     const fc = ft.constraints.find((c) => c.type === "frequency")!;
 
     const ce = generateCounterexampleForConstraint(fc, ft, model);
-    expect(ce!.forbidden.instances).toHaveLength(1);
+    expect(ce!.forbidden[0]!.instances).toHaveLength(1);
     expect(forbids(model, ce!, "population/frequency-violation")).toBe(true);
   });
 
@@ -193,7 +195,7 @@ describe("generateCounterexamples (model-wide)", () => {
         role1: { player: "Customer", name: "places" },
         role2: { player: "Order", name: "is placed by" },
         uniqueness: "role2",
-        mandatory: "role2", // no counterexample yet -> skipped
+        mandatory: "role2", // Order has no other fact type to anchor -> skipped
       })
       .build();
 
@@ -217,5 +219,70 @@ describe("generateCounterexamples (model-wide)", () => {
       return generateCounterexamples(model).map((c) => c.text);
     };
     expect(readings()).toEqual(readings());
+  });
+});
+
+describe("cross-fact-type counterexamples", () => {
+  it("forbids a mandatory role the player never plays", () => {
+    const model = new ModelBuilder()
+      .withEntityType("Customer")
+      .withValueType("CustomerId")
+      .withEntityType("Order")
+      .withBinaryFactType("Customer has CustomerId", {
+        role1: { player: "Customer", name: "has" },
+        role2: { player: "CustomerId", name: "identifies" },
+      })
+      .withBinaryFactType("Customer places Order", {
+        role1: { player: "Customer", name: "places" },
+        role2: { player: "Order", name: "is placed by" },
+        mandatory: "role1",
+      })
+      .build();
+    const ft = model.getFactTypeByName("Customer places Order")!;
+    const mc = ft.constraints.find((c) => c.type === "mandatory")!;
+
+    const ce = generateCounterexampleForConstraint(mc, ft, model);
+    expect(ce).toBeDefined();
+    expect(ce!.constraintType).toBe("mandatory");
+    expect(forbids(model, ce!, "population/mandatory-violation")).toBe(true);
+  });
+
+  it("returns nothing for a mandatory role with no anchor fact type", () => {
+    const model = placesModel();
+    const ft = model.getFactTypeByName("Customer places Order")!;
+    ft.addConstraint({ type: "mandatory", roleId: "Customer places Order::role1" });
+    const mc = ft.constraints.find((c) => c.type === "mandatory")!;
+
+    expect(generateCounterexampleForConstraint(mc, ft, model)).toBeUndefined();
+  });
+
+  it("forbids a disjunctive mandatory the player satisfies for none", () => {
+    const model = new ModelBuilder()
+      .withEntityType("Person")
+      .withValueType("PersonId")
+      .withValueType("Phone")
+      .withBinaryFactType("Person has PersonId", {
+        role1: { player: "Person", name: "has" },
+        role2: { player: "PersonId", name: "identifies" },
+      })
+      .withBinaryFactType("Person has HomePhone", {
+        role1: { player: "Person", name: "has" },
+        role2: { player: "Phone", name: "is home of" },
+      })
+      .withBinaryFactType("Person has MobilePhone", {
+        role1: { player: "Person", name: "has" },
+        role2: { player: "Phone", name: "is mobile of" },
+      })
+      .build();
+    const home = model.getFactTypeByName("Person has HomePhone")!;
+    home.addConstraint({
+      type: "disjunctive_mandatory",
+      roleIds: ["Person has HomePhone::role1", "Person has MobilePhone::role1"],
+    });
+    const dc = home.constraints.find((c) => c.type === "disjunctive_mandatory")!;
+
+    const ce = generateCounterexampleForConstraint(dc, home, model);
+    expect(ce).toBeDefined();
+    expect(forbids(model, ce!, "population/disjunctive-mandatory-violation")).toBe(true);
   });
 });
