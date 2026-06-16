@@ -1,0 +1,109 @@
+orm_version: "1.0"
+
+model:
+  name: "Phase 2 Constraint Showcase"
+
+  object_types:
+    - id: "ot-person"
+      name: "Person"
+      kind: "entity"
+      reference_mode: "person_id"
+
+    - id: "ot-car"
+      name: "Car"
+      kind: "entity"
+      reference_mode: "vin"
+
+    - id: "ot-bus"
+      name: "Bus"
+      kind: "entity"
+      reference_mode: "bus_number"
+
+    - id: "ot-ticket"
+      name: "Ticket"
+      kind: "entity"
+      reference_mode: "ticket_id"
+
+  fact_types:
+    # Exclusive-or: each Person either drives a Car or rides a Bus but not both
+    - id: "ft-person-drives-car"
+      name: "Person drives Car"
+      roles:
+        - id: "r-person-drives"
+          player: "ot-person"
+          role_name: "drives"
+        - id: "r-car-driven-by"
+          player: "ot-car"
+          role_name: "is driven by"
+      readings:
+        - "{0} drives {1}"
+        - "{1} is driven by {0}"
+      constraints:
+        - type: "internal_uniqueness"
+          roles: ["r-person-drives"]
+        - type: "exclusive_or"
+          roles: ["r-person-drives", "r-person-rides"]
+
+    # The other side of the exclusive-or
+    - id: "ft-person-rides-bus"
+      name: "Person rides Bus"
+      roles:
+        - id: "r-person-rides"
+          player: "ot-person"
+          role_name: "rides"
+        - id: "r-bus-ridden-by"
+          player: "ot-bus"
+          role_name: "is ridden by"
+      readings:
+        - "{0} rides {1}"
+        - "{1} is ridden by {0}"
+      constraints:
+        - type: "internal_uniqueness"
+          roles: ["r-person-rides"]
+
+    # Subset: if a Person purchases a Ticket, that Person rides a Bus
+    - id: "ft-person-purchases-ticket"
+      name: "Person purchases Ticket"
+      roles:
+        - id: "r-person-purchases"
+          player: "ot-person"
+          role_name: "purchases"
+        - id: "r-ticket-purchased-by"
+          player: "ot-ticket"
+          role_name: "is purchased by"
+      readings:
+        - "{0} purchases {1}"
+        - "{1} is purchased by {0}"
+      constraints:
+        - type: "internal_uniqueness"
+          roles: ["r-ticket-purchased-by"]
+        - type: "mandatory"
+          role: "r-ticket-purchased-by"
+        - type: "subset"
+          subset_roles: ["r-person-purchases"]
+          superset_roles: ["r-person-rides"]
+
+    # Ring: Person is parent of Person (irreflexive + asymmetric)
+    - id: "ft-person-parent-of"
+      name: "Person is parent of Person"
+      roles:
+        - id: "r-parent"
+          player: "ot-person"
+          role_name: "is parent of"
+        - id: "r-child"
+          player: "ot-person"
+          role_name: "is child of"
+      readings:
+        - "{0} is parent of {1}"
+        - "{1} is child of {0}"
+      constraints:
+        - type: "internal_uniqueness"
+          roles: ["r-parent", "r-child"]
+        - type: "ring"
+          role_1: "r-parent"
+          role_2: "r-child"
+          ring_type: "irreflexive"
+        - type: "ring"
+          role_1: "r-parent"
+          role_2: "r-child"
+          ring_type: "asymmetric"

@@ -1,0 +1,96 @@
+orm_version: "1.0"
+
+# Exercises the external-uniqueness feature (WS4c): a Room is identified by
+# the combination of its Building and its RoomNumber -- two roles that live
+# in different fact types, joined on the common Room. The population below
+# is clean (every Room has a distinct Building + RoomNumber combination), so
+# `validate` reports 0 errors. To see the violation path, add a second Room
+# in the same Building with the same RoomNumber. To see the probe, run
+# `verbalize --counterexamples`; the external-uniqueness counterexample mints
+# two Rooms that collide on the combination.
+model:
+  name: "Room Identification (external uniqueness, VIOLATING)"
+
+  object_types:
+    - id: "ot-room"
+      name: "Room"
+      kind: "entity"
+      reference_mode: "room_id"
+    - id: "ot-building"
+      name: "Building"
+      kind: "entity"
+      reference_mode: "building_code"
+    - id: "ot-roomnumber"
+      name: "RoomNumber"
+      kind: "value"
+
+  fact_types:
+    - id: "ft-room-in-building"
+      name: "Room is in Building"
+      roles:
+        - id: "r-room-in"
+          player: "ot-room"
+          role_name: "is in"
+        - id: "r-building-houses"
+          player: "ot-building"
+          role_name: "houses"
+      readings:
+        - "{0} is in {1}"
+        - "{1} houses {0}"
+      constraints:
+        - type: "internal_uniqueness"
+          roles: ["r-room-in"]
+        # External uniqueness: Building + RoomNumber jointly identify a Room.
+        - type: "external_uniqueness"
+          roles: ["r-building-houses", "r-roomnumber-numbers"]
+
+    - id: "ft-room-has-number"
+      name: "Room has RoomNumber"
+      roles:
+        - id: "r-room-has"
+          player: "ot-room"
+          role_name: "has"
+        - id: "r-roomnumber-numbers"
+          player: "ot-roomnumber"
+          role_name: "numbers"
+      readings:
+        - "{0} has {1}"
+        - "{1} numbers {0}"
+      constraints:
+        - type: "internal_uniqueness"
+          roles: ["r-room-has"]
+
+  populations:
+    - id: "pop-rooms-in-buildings"
+      fact_type: "ft-room-in-building"
+      description: "Which building each room is in"
+      instances:
+        - id: "inst-rb-1"
+          role_values:
+            r-room-in: "R1"
+            r-building-houses: "B1"
+        - id: "inst-rb-2"
+          role_values:
+            r-room-in: "R2"
+            r-building-houses: "B1"
+        - id: "inst-rb-3"
+          role_values:
+            r-room-in: "R3"
+            r-building-houses: "B2"
+
+    - id: "pop-room-numbers"
+      fact_type: "ft-room-has-number"
+      description: "Each room's number (distinct within a building)"
+      instances:
+        - id: "inst-rn-1"
+          role_values:
+            r-room-has: "R1"
+            r-roomnumber-numbers: "101"
+        - id: "inst-rn-2"
+          role_values:
+            r-room-has: "R2"
+            r-roomnumber-numbers: "101"
+        - id: "inst-rn-3"
+          role_values:
+            r-room-has: "R3"
+            r-roomnumber-numbers: "101"

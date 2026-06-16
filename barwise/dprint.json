@@ -23,7 +23,8 @@
     "**/*.map.yaml",
     "**/*.orm-project.yaml",
     "**/package-lock.json",
-    "**/schemas/**"
+    "**/schemas/**",
+    "test-plan/**"
   ],
   "plugins": [
     "https://plugins.dprint.dev/typescript-0.93.4.wasm",
