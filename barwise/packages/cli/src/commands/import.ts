@@ -18,7 +18,7 @@ import {
 } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
-import { createLlmClient, processTranscript } from "@barwise/llm";
+import { buildReasoningTrail, createLlmClient, processTranscript } from "@barwise/llm";
 import type { CandidateFraming, ProviderName } from "@barwise/llm";
 import type { Command } from "commander";
 import { existsSync, readdirSync, statSync, writeFileSync } from "node:fs";
@@ -494,6 +494,10 @@ export function registerImportCommand(program: Command): void {
       "--alternatives",
       "Also report one alternative framing at the top structural fork",
     )
+    .option(
+      "--trail",
+      "Write a <model>.trail.json reasoning-trail sidecar (requires --output)",
+    )
     .action(
       async (
         file: string,
@@ -506,6 +510,7 @@ export function registerImportCommand(program: Command): void {
           name?: string;
           annotate: boolean;
           alternatives?: boolean;
+          trail?: boolean;
         },
       ) => {
         try {
@@ -591,6 +596,24 @@ export function registerImportCommand(program: Command): void {
           }
 
           writeOutput(output, opts.output);
+
+          if (opts.trail) {
+            if (opts.output) {
+              const trailPath = opts.output.endsWith(".orm.yaml")
+                ? opts.output.replace(/\.orm\.yaml$/, ".trail.json")
+                : `${opts.output}.trail.json`;
+              writeFileSync(
+                trailPath,
+                JSON.stringify(buildReasoningTrail(result), null, 2) + "\n",
+                "utf-8",
+              );
+              process.stderr.write(`Reasoning trail written to ${trailPath}.\n`);
+            } else {
+              process.stderr.write(
+                "Note: --trail requires --output; no trail written.\n",
+              );
+            }
+          }
 
           // Summary to stderr (so stdout stays clean for piping).
           const ots = result.model.objectTypes.length;
