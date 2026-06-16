@@ -179,6 +179,24 @@ export interface ExtractedPopulation {
 }
 
 /**
+ * An alternative framing of the domain: a full candidate model that takes
+ * the other side of a structural fork, plus why. Parsed and diffed against
+ * the primary model. Carries no nested ambiguities or alternatives.
+ */
+export interface ExtractionAlternative {
+  /** One sentence naming what this framing does differently. */
+  readonly rationale: string;
+  /** The ambiguity (fork) this framing resolves. */
+  readonly ambiguity_description: string;
+  readonly object_types: readonly ExtractedObjectType[];
+  readonly fact_types: readonly ExtractedFactType[];
+  readonly subtypes: readonly ExtractedSubtype[];
+  readonly inferred_constraints: readonly InferredConstraint[];
+  readonly objectified_fact_types?: readonly ExtractedObjectifiedFactType[];
+  readonly populations?: readonly ExtractedPopulation[];
+}
+
+/**
  * The complete structured response from the LLM extraction.
  * This is the JSON shape the LLM is instructed to produce.
  */
@@ -190,6 +208,8 @@ export interface ExtractionResponse {
   readonly objectified_fact_types?: readonly ExtractedObjectifiedFactType[];
   readonly populations?: readonly ExtractedPopulation[];
   readonly ambiguities: readonly Ambiguity[];
+  /** Alternative framings, present only when extraction requested them. */
+  readonly alternatives?: readonly ExtractionAlternative[];
 }
 
 // ---------------------------------------------------------------------------
@@ -241,6 +261,22 @@ export interface ObjectificationProvenance {
 }
 
 /**
+ * A parsed alternative framing: the rival model and its diff against the
+ * primary. Generation is non-deterministic (llm); the diff is
+ * deterministic (core).
+ */
+export interface CandidateFraming {
+  /** One sentence naming what this framing does differently. */
+  readonly rationale: string;
+  /** The ambiguity (fork) this framing resolves. */
+  readonly ambiguityDescription: string;
+  /** The rival model, parsed via the same path as the primary. */
+  readonly model: import("@barwise/core").OrmModel;
+  /** The diff of this framing against the primary model. */
+  readonly diff: import("@barwise/core").ModelDiffResult;
+}
+
+/**
  * The result of parsing an extraction response into an OrmModel.
  */
 export interface DraftModelResult {
@@ -258,6 +294,8 @@ export interface DraftModelResult {
   readonly objectificationProvenance: readonly ObjectificationProvenance[];
   /** Ambiguities identified by the LLM. */
   readonly ambiguities: readonly Ambiguity[];
+  /** Alternative framings, present only when extraction requested them. */
+  readonly alternatives?: readonly CandidateFraming[];
   /** Warnings generated during parsing (non-fatal issues). */
   readonly warnings: readonly string[];
   /** The model identifier that handled the extraction, if reported by the provider. */

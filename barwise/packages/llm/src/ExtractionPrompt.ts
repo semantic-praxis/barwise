@@ -13,9 +13,13 @@ import type { ExtractionResponse } from "./ExtractionTypes.js";
 
 /**
  * Build the system prompt for transcript extraction.
+ *
+ * @param includeAlternatives - When true, also ask for one alternative
+ *   framing at the highest-impact structural fork.
  */
-export function buildSystemPrompt(): string {
-  return `You are an expert data modeler specializing in Object-Role Modeling (ORM 2). Your task is to analyze a business working session transcript and extract a structured ORM conceptual model.
+export function buildSystemPrompt(includeAlternatives = false): string {
+  const prompt =
+    `You are an expert data modeler specializing in Object-Role Modeling (ORM 2). Your task is to analyze a business working session transcript and extract a structured ORM conceptual model.
 
 ## ORM Concepts
 
@@ -149,6 +153,18 @@ Analyze the transcript carefully and extract:
 - ALWAYS include length for text data types. Do not omit it.
 - NEVER emit a fact type that duplicates information already captured by other fact types in the model. Each relationship should be modeled exactly once.
 - Do NOT place is_preferred: true on non-identifier fact types. Only the fact type linking an entity to its identifying value type should have is_preferred.`;
+
+  if (!includeAlternatives) return prompt;
+
+  return prompt + `
+
+## Alternative framings
+
+After the primary extraction, review the ambiguities you flagged and pick the single most consequential STRUCTURAL fork -- one of: an attribute that could be a value type or its own entity type; a relationship that could be a subtype or a role; a binary fact type that could be objectified; or a choice between candidate identifiers. For that one fork only, produce an alternative framing in the "alternatives" array: a full model (object_types, fact_types, subtypes, inferred_constraints, and any objectified_fact_types or populations) that takes the OTHER side of the fork, plus:
+- rationale: one sentence naming what this framing does differently (e.g. "models Email as the preferred identifier instead of customer_id").
+- ambiguity_description: the description of the ambiguity this framing resolves.
+
+Produce AT MOST ONE alternative, and only when a genuine structural fork exists. If there is none, omit "alternatives" or leave it empty. Do NOT produce alternatives for mere cardinality or optionality questions -- those are constraint choices, not framings.`;
 }
 
 /**
@@ -177,9 +193,14 @@ Analyze this transcript and produce the structured extraction.`;
 
 /**
  * JSON Schema for the extraction response, used to constrain LLM output.
+ *
+ * @param includeAlternatives - When true, add an `alternatives` property
+ *   (an array of full candidate models with a rationale).
  */
-export function buildResponseSchema(): Record<string, unknown> {
-  return {
+export function buildResponseSchema(
+  includeAlternatives = false,
+): Record<string, unknown> {
+  const schema = {
     type: "object",
     properties: {
       object_types: {
@@ -503,6 +524,36 @@ export function buildResponseSchema(): Record<string, unknown> {
       "ambiguities",
     ],
   };
+
+  if (includeAlternatives) {
+    const props = schema.properties as Record<string, unknown>;
+    props["alternatives"] = {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          rationale: { type: "string" },
+          ambiguity_description: { type: "string" },
+          object_types: props["object_types"],
+          fact_types: props["fact_types"],
+          subtypes: props["subtypes"],
+          inferred_constraints: props["inferred_constraints"],
+          objectified_fact_types: props["objectified_fact_types"],
+          populations: props["populations"],
+        },
+        required: [
+          "rationale",
+          "ambiguity_description",
+          "object_types",
+          "fact_types",
+          "subtypes",
+          "inferred_constraints",
+        ],
+      },
+    };
+  }
+
+  return schema;
 }
 
 /**
@@ -537,6 +588,9 @@ export function parseExtractionResponse(json: unknown): ExtractionResponse {
   const ambiguities = Array.isArray(obj["ambiguities"])
     ? obj["ambiguities"]
     : [];
+  const alternatives = Array.isArray(obj["alternatives"])
+    ? (obj["alternatives"] as ExtractionResponse["alternatives"])
+    : undefined;
 
   return {
     object_types: objectTypes as ExtractionResponse["object_types"],
@@ -546,6 +600,7 @@ export function parseExtractionResponse(json: unknown): ExtractionResponse {
     objectified_fact_types: objectifiedFactTypes as ExtractionResponse["objectified_fact_types"],
     populations: populations as ExtractionResponse["populations"],
     ambiguities: ambiguities as ExtractionResponse["ambiguities"],
+    ...(alternatives ? { alternatives } : {}),
   };
 }
 
