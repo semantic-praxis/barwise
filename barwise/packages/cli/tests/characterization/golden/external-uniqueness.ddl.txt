@@ -1,0 +1,48 @@
+-- Table: room
+-- Source: Room (ot-room)
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE room (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  room_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  building_code TEXT,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  room_number TEXT,
+  PRIMARY KEY (room_id),
+  FOREIGN KEY (building_code) REFERENCES building (building_code)
+);
+
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE building (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  building_code TEXT NOT NULL,
+  PRIMARY KEY (building_code)
+);
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE room (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  room_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  building_code TEXT,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  room_number TEXT,
+  PRIMARY KEY (room_id),
+  FOREIGN KEY (building_code) REFERENCES building (building_code)
+);
+
+-- Table: building
+-- Source: Building (ot-building)
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE building (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  building_code TEXT NOT NULL,
+  PRIMARY KEY (building_code)
+);

@@ -1,0 +1,290 @@
+-- Table: person
+-- Source: Person (ot-person)
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE person (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  person_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  vin TEXT,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  bus_number TEXT,
+  PRIMARY KEY (person_id),
+  FOREIGN KEY (vin) REFERENCES car (vin),
+  FOREIGN KEY (bus_number) REFERENCES bus (bus_number)
+);
+
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE car (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  vin TEXT NOT NULL,
+  PRIMARY KEY (vin)
+);
+
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE bus (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  bus_number TEXT NOT NULL,
+  PRIMARY KEY (bus_number)
+);
+
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE ticket (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  ticket_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  person_id TEXT NOT NULL,
+  PRIMARY KEY (ticket_id),
+  FOREIGN KEY (person_id) REFERENCES person (person_id)
+);
+
+-- NOTE(barwise): Composite primary key (person_id, is_child_of_person_id). Individual unique tests are not generated.
+CREATE TABLE person_is_parent_of_person (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  person_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  is_child_of_person_id TEXT NOT NULL,
+  PRIMARY KEY (person_id, is_child_of_person_id),
+  FOREIGN KEY (person_id) REFERENCES person (person_id),
+  FOREIGN KEY (is_child_of_person_id) REFERENCES person (person_id)
+);
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE person (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  person_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  vin TEXT,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  bus_number TEXT,
+  PRIMARY KEY (person_id),
+  FOREIGN KEY (vin) REFERENCES car (vin),
+  FOREIGN KEY (bus_number) REFERENCES bus (bus_number)
+);
+
+-- Table: car
+-- Source: Car (ot-car)
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE car (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  vin TEXT NOT NULL,
+  PRIMARY KEY (vin)
+);
+
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE bus (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  bus_number TEXT NOT NULL,
+  PRIMARY KEY (bus_number)
+);
+
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE ticket (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  ticket_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  person_id TEXT NOT NULL,
+  PRIMARY KEY (ticket_id),
+  FOREIGN KEY (person_id) REFERENCES person (person_id)
+);
+
+-- NOTE(barwise): Composite primary key (person_id, is_child_of_person_id). Individual unique tests are not generated.
+CREATE TABLE person_is_parent_of_person (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  person_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  is_child_of_person_id TEXT NOT NULL,
+  PRIMARY KEY (person_id, is_child_of_person_id),
+  FOREIGN KEY (person_id) REFERENCES person (person_id),
+  FOREIGN KEY (is_child_of_person_id) REFERENCES person (person_id)
+);
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE person (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  person_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  vin TEXT,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  bus_number TEXT,
+  PRIMARY KEY (person_id),
+  FOREIGN KEY (vin) REFERENCES car (vin),
+  FOREIGN KEY (bus_number) REFERENCES bus (bus_number)
+);
+
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE car (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  vin TEXT NOT NULL,
+  PRIMARY KEY (vin)
+);
+
+-- Table: bus
+-- Source: Bus (ot-bus)
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE bus (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  bus_number TEXT NOT NULL,
+  PRIMARY KEY (bus_number)
+);
+
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE ticket (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  ticket_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  person_id TEXT NOT NULL,
+  PRIMARY KEY (ticket_id),
+  FOREIGN KEY (person_id) REFERENCES person (person_id)
+);
+
+-- NOTE(barwise): Composite primary key (person_id, is_child_of_person_id). Individual unique tests are not generated.
+CREATE TABLE person_is_parent_of_person (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  person_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  is_child_of_person_id TEXT NOT NULL,
+  PRIMARY KEY (person_id, is_child_of_person_id),
+  FOREIGN KEY (person_id) REFERENCES person (person_id),
+  FOREIGN KEY (is_child_of_person_id) REFERENCES person (person_id)
+);
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE person (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  person_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  vin TEXT,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  bus_number TEXT,
+  PRIMARY KEY (person_id),
+  FOREIGN KEY (vin) REFERENCES car (vin),
+  FOREIGN KEY (bus_number) REFERENCES bus (bus_number)
+);
+
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE car (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  vin TEXT NOT NULL,
+  PRIMARY KEY (vin)
+);
+
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE bus (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  bus_number TEXT NOT NULL,
+  PRIMARY KEY (bus_number)
+);
+
+-- Table: ticket
+-- Source: Ticket (ot-ticket)
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE ticket (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  ticket_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  person_id TEXT NOT NULL,
+  PRIMARY KEY (ticket_id),
+  FOREIGN KEY (person_id) REFERENCES person (person_id)
+);
+
+-- NOTE(barwise): Composite primary key (person_id, is_child_of_person_id). Individual unique tests are not generated.
+CREATE TABLE person_is_parent_of_person (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  person_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  is_child_of_person_id TEXT NOT NULL,
+  PRIMARY KEY (person_id, is_child_of_person_id),
+  FOREIGN KEY (person_id) REFERENCES person (person_id),
+  FOREIGN KEY (is_child_of_person_id) REFERENCES person (person_id)
+);
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE person (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  person_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  vin TEXT,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  bus_number TEXT,
+  PRIMARY KEY (person_id),
+  FOREIGN KEY (vin) REFERENCES car (vin),
+  FOREIGN KEY (bus_number) REFERENCES bus (bus_number)
+);
+
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE car (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  vin TEXT NOT NULL,
+  PRIMARY KEY (vin)
+);
+
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE bus (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  bus_number TEXT NOT NULL,
+  PRIMARY KEY (bus_number)
+);
+
+-- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+CREATE TABLE ticket (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  ticket_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  person_id TEXT NOT NULL,
+  PRIMARY KEY (ticket_id),
+  FOREIGN KEY (person_id) REFERENCES person (person_id)
+);
+
+-- Table: person_is_parent_of_person
+-- Source: Person is parent of Person (ft-person-parent-of)
+-- NOTE(barwise): Composite primary key (person_id, is_child_of_person_id). Individual unique tests are not generated.
+CREATE TABLE person_is_parent_of_person (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  person_id TEXT NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  is_child_of_person_id TEXT NOT NULL,
+  PRIMARY KEY (person_id, is_child_of_person_id),
+  FOREIGN KEY (person_id) REFERENCES person (person_id),
+  FOREIGN KEY (is_child_of_person_id) REFERENCES person (person_id)
+);

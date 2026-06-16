@@ -1,0 +1,46 @@
+Patient has MedicalRecordNumber
+MedicalRecordNumber identifies Patient
+  Each Patient has at most one MedicalRecordNumber.
+  Each MedicalRecordNumber identifies at most one Patient.
+  Each Patient has at least one MedicalRecordNumber.
+Doctor has ProviderId
+ProviderId identifies Doctor
+  Each Doctor has at most one ProviderId.
+  Each ProviderId identifies at most one Doctor.
+  Each Doctor has at least one ProviderId.
+Appointment has ConfirmationNumber
+ConfirmationNumber identifies Appointment
+  Each Appointment has at most one ConfirmationNumber.
+  Each ConfirmationNumber identifies at most one Appointment.
+  Each Appointment has at least one ConfirmationNumber.
+ExamRoom has RoomNumber
+RoomNumber identifies ExamRoom
+  Each ExamRoom has at most one RoomNumber.
+  Each RoomNumber identifies at most one ExamRoom.
+  Each ExamRoom has at least one RoomNumber.
+Doctor has Specialty
+Specialty is specialty of Doctor
+  Each Doctor has at most one Specialty.
+  Each Doctor has at least one Specialty.
+Appointment is for Patient with Doctor on AppointmentDate at TimeSlot
+  For each Appointment combination, at most one Patient and Doctor and AppointmentDate and TimeSlot applies.
+  Each Appointment must: Appointment is for Appointment with Appointment on Appointment at Appointment.
+  For each Patient, AppointmentDate and TimeSlot combination, at most one Appointment and Doctor applies.
+  For each Doctor, AppointmentDate and TimeSlot combination, at most one Appointment and Patient applies.
+Appointment has VisitReason
+VisitReason is reason for Appointment
+  Each Appointment has at most one VisitReason.
+Appointment has AppointmentStatus
+AppointmentStatus is status of Appointment
+  Each Appointment has at most one AppointmentStatus.
+  Each Appointment has at least one AppointmentStatus.
+Appointment has FollowUpNote
+FollowUpNote is for Appointment
+  Each Appointment has at most one FollowUpNote.
+  If Appointment then e013fc4a-a9bf-457c-862c-f2dadaa37ff3.
+Doctor is assigned to ExamRoom on AppointmentDate
+  For each Doctor and AppointmentDate combination, at most one ExamRoom applies.
+Patient has Doctor as primary doctor
+Doctor is primary doctor of Patient
+  Each Patient has at most one Doctor.
+  Each Patient has at least one Doctor.

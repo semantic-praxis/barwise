@@ -1,0 +1,502 @@
+-- Table: patient
+-- Source: Patient (04eaeae4-50c4-40ab-909b-b05f5215daee)
+-- Definition: A person who books appointments at the clinic, identified by a medical record number assigned at registration.
+-- NOTE(barwise): Definition available from ORM model: "A person who books appointments at the clinic, identified by a medical record..."
+CREATE TABLE patient (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  PRIMARY KEY (medical_record_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id)
+);
+
+-- NOTE(barwise): Definition available from ORM model: "A medical provider at the clinic, identified by a state-issued provider ID."
+CREATE TABLE doctor (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- NOTE(barwise): Value constraint available: ['cardiology', 'dermatology', 'family medicine', 'orthopedics', 'pediatrics']. Consider adding an accepted_values test.
+  specialty VARCHAR(30) NOT NULL,
+  PRIMARY KEY (provider_id)
+);
+
+-- NOTE(barwise): Definition available from ORM model: "A scheduled visit between a patient and a doctor, identified by a unique conf..."
+CREATE TABLE appointment (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  visit_reason VARCHAR(500),
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- NOTE(barwise): Value constraint available: ['scheduled', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show']. Consider adding an accepted_values test.
+  appointment_status VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  follow_up_note VARCHAR(500),
+  PRIMARY KEY (confirmation_number)
+);
+
+-- NOTE(barwise): Definition available from ORM model: "A physical examination room in the clinic, identified by a room number."
+CREATE TABLE exam_room (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  PRIMARY KEY (room_number)
+);
+
+-- NOTE(barwise): Composite primary key (confirmation_number, medical_record_number, provider_id). Individual unique tests are not generated.
+CREATE TABLE appointment_is_for_patient_with_doctor_on_appointment_date_at_time_slot (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  PRIMARY KEY (confirmation_number, medical_record_number, provider_id),
+  FOREIGN KEY (confirmation_number) REFERENCES appointment (confirmation_number),
+  FOREIGN KEY (medical_record_number) REFERENCES patient (medical_record_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id)
+);
+
+-- NOTE(barwise): Composite primary key (provider_id, room_number). Individual unique tests are not generated.
+CREATE TABLE doctor_is_assigned_to_exam_room_on_appointment_date (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  PRIMARY KEY (provider_id, room_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id),
+  FOREIGN KEY (room_number) REFERENCES exam_room (room_number)
+);
+-- NOTE(barwise): Definition available from ORM model: "A person who books appointments at the clinic, identified by a medical record..."
+CREATE TABLE patient (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  PRIMARY KEY (medical_record_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id)
+);
+
+-- Table: doctor
+-- Source: Doctor (0f321168-50ce-4b6f-accd-2a56cf810a2c)
+-- Definition: A medical provider at the clinic, identified by a state-issued provider ID.
+-- NOTE(barwise): Definition available from ORM model: "A medical provider at the clinic, identified by a state-issued provider ID."
+CREATE TABLE doctor (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- NOTE(barwise): Value constraint available: ['cardiology', 'dermatology', 'family medicine', 'orthopedics', 'pediatrics']. Consider adding an accepted_values test.
+  specialty VARCHAR(30) NOT NULL,
+  PRIMARY KEY (provider_id)
+);
+
+-- NOTE(barwise): Definition available from ORM model: "A scheduled visit between a patient and a doctor, identified by a unique conf..."
+CREATE TABLE appointment (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  visit_reason VARCHAR(500),
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- NOTE(barwise): Value constraint available: ['scheduled', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show']. Consider adding an accepted_values test.
+  appointment_status VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  follow_up_note VARCHAR(500),
+  PRIMARY KEY (confirmation_number)
+);
+
+-- NOTE(barwise): Definition available from ORM model: "A physical examination room in the clinic, identified by a room number."
+CREATE TABLE exam_room (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  PRIMARY KEY (room_number)
+);
+
+-- NOTE(barwise): Composite primary key (confirmation_number, medical_record_number, provider_id). Individual unique tests are not generated.
+CREATE TABLE appointment_is_for_patient_with_doctor_on_appointment_date_at_time_slot (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  PRIMARY KEY (confirmation_number, medical_record_number, provider_id),
+  FOREIGN KEY (confirmation_number) REFERENCES appointment (confirmation_number),
+  FOREIGN KEY (medical_record_number) REFERENCES patient (medical_record_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id)
+);
+
+-- NOTE(barwise): Composite primary key (provider_id, room_number). Individual unique tests are not generated.
+CREATE TABLE doctor_is_assigned_to_exam_room_on_appointment_date (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  PRIMARY KEY (provider_id, room_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id),
+  FOREIGN KEY (room_number) REFERENCES exam_room (room_number)
+);
+-- NOTE(barwise): Definition available from ORM model: "A person who books appointments at the clinic, identified by a medical record..."
+CREATE TABLE patient (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  PRIMARY KEY (medical_record_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id)
+);
+
+-- NOTE(barwise): Definition available from ORM model: "A medical provider at the clinic, identified by a state-issued provider ID."
+CREATE TABLE doctor (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- NOTE(barwise): Value constraint available: ['cardiology', 'dermatology', 'family medicine', 'orthopedics', 'pediatrics']. Consider adding an accepted_values test.
+  specialty VARCHAR(30) NOT NULL,
+  PRIMARY KEY (provider_id)
+);
+
+-- Table: appointment
+-- Source: Appointment (283bb11c-11a1-4564-aaa5-3393ffc81d94)
+-- Definition: A scheduled visit between a patient and a doctor, identified by a unique confirmation number.
+-- NOTE(barwise): Definition available from ORM model: "A scheduled visit between a patient and a doctor, identified by a unique conf..."
+CREATE TABLE appointment (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  visit_reason VARCHAR(500),
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- NOTE(barwise): Value constraint available: ['scheduled', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show']. Consider adding an accepted_values test.
+  appointment_status VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  follow_up_note VARCHAR(500),
+  PRIMARY KEY (confirmation_number)
+);
+
+-- NOTE(barwise): Definition available from ORM model: "A physical examination room in the clinic, identified by a room number."
+CREATE TABLE exam_room (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  PRIMARY KEY (room_number)
+);
+
+-- NOTE(barwise): Composite primary key (confirmation_number, medical_record_number, provider_id). Individual unique tests are not generated.
+CREATE TABLE appointment_is_for_patient_with_doctor_on_appointment_date_at_time_slot (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  PRIMARY KEY (confirmation_number, medical_record_number, provider_id),
+  FOREIGN KEY (confirmation_number) REFERENCES appointment (confirmation_number),
+  FOREIGN KEY (medical_record_number) REFERENCES patient (medical_record_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id)
+);
+
+-- NOTE(barwise): Composite primary key (provider_id, room_number). Individual unique tests are not generated.
+CREATE TABLE doctor_is_assigned_to_exam_room_on_appointment_date (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  PRIMARY KEY (provider_id, room_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id),
+  FOREIGN KEY (room_number) REFERENCES exam_room (room_number)
+);
+-- NOTE(barwise): Definition available from ORM model: "A person who books appointments at the clinic, identified by a medical record..."
+CREATE TABLE patient (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  PRIMARY KEY (medical_record_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id)
+);
+
+-- NOTE(barwise): Definition available from ORM model: "A medical provider at the clinic, identified by a state-issued provider ID."
+CREATE TABLE doctor (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- NOTE(barwise): Value constraint available: ['cardiology', 'dermatology', 'family medicine', 'orthopedics', 'pediatrics']. Consider adding an accepted_values test.
+  specialty VARCHAR(30) NOT NULL,
+  PRIMARY KEY (provider_id)
+);
+
+-- NOTE(barwise): Definition available from ORM model: "A scheduled visit between a patient and a doctor, identified by a unique conf..."
+CREATE TABLE appointment (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  visit_reason VARCHAR(500),
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- NOTE(barwise): Value constraint available: ['scheduled', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show']. Consider adding an accepted_values test.
+  appointment_status VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  follow_up_note VARCHAR(500),
+  PRIMARY KEY (confirmation_number)
+);
+
+-- Table: exam_room
+-- Source: ExamRoom (14837c15-141e-41fb-8774-4a118124e8f1)
+-- Definition: A physical examination room in the clinic, identified by a room number.
+-- NOTE(barwise): Definition available from ORM model: "A physical examination room in the clinic, identified by a room number."
+CREATE TABLE exam_room (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  PRIMARY KEY (room_number)
+);
+
+-- NOTE(barwise): Composite primary key (confirmation_number, medical_record_number, provider_id). Individual unique tests are not generated.
+CREATE TABLE appointment_is_for_patient_with_doctor_on_appointment_date_at_time_slot (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  PRIMARY KEY (confirmation_number, medical_record_number, provider_id),
+  FOREIGN KEY (confirmation_number) REFERENCES appointment (confirmation_number),
+  FOREIGN KEY (medical_record_number) REFERENCES patient (medical_record_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id)
+);
+
+-- NOTE(barwise): Composite primary key (provider_id, room_number). Individual unique tests are not generated.
+CREATE TABLE doctor_is_assigned_to_exam_room_on_appointment_date (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  PRIMARY KEY (provider_id, room_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id),
+  FOREIGN KEY (room_number) REFERENCES exam_room (room_number)
+);
+-- NOTE(barwise): Definition available from ORM model: "A person who books appointments at the clinic, identified by a medical record..."
+CREATE TABLE patient (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  PRIMARY KEY (medical_record_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id)
+);
+
+-- NOTE(barwise): Definition available from ORM model: "A medical provider at the clinic, identified by a state-issued provider ID."
+CREATE TABLE doctor (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- NOTE(barwise): Value constraint available: ['cardiology', 'dermatology', 'family medicine', 'orthopedics', 'pediatrics']. Consider adding an accepted_values test.
+  specialty VARCHAR(30) NOT NULL,
+  PRIMARY KEY (provider_id)
+);
+
+-- NOTE(barwise): Definition available from ORM model: "A scheduled visit between a patient and a doctor, identified by a unique conf..."
+CREATE TABLE appointment (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  visit_reason VARCHAR(500),
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- NOTE(barwise): Value constraint available: ['scheduled', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show']. Consider adding an accepted_values test.
+  appointment_status VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  follow_up_note VARCHAR(500),
+  PRIMARY KEY (confirmation_number)
+);
+
+-- NOTE(barwise): Definition available from ORM model: "A physical examination room in the clinic, identified by a room number."
+CREATE TABLE exam_room (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  PRIMARY KEY (room_number)
+);
+
+-- Table: appointment_is_for_patient_with_doctor_on_appointment_date_at_time_slot
+-- Source: Appointment is for Patient with Doctor on AppointmentDate at TimeSlot (a0831743-6a6a-4ad3-aa2a-80c2b3200d76)
+-- NOTE(barwise): Composite primary key (confirmation_number, medical_record_number, provider_id). Individual unique tests are not generated.
+CREATE TABLE appointment_is_for_patient_with_doctor_on_appointment_date_at_time_slot (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  PRIMARY KEY (confirmation_number, medical_record_number, provider_id),
+  FOREIGN KEY (confirmation_number) REFERENCES appointment (confirmation_number),
+  FOREIGN KEY (medical_record_number) REFERENCES patient (medical_record_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id)
+);
+
+-- NOTE(barwise): Composite primary key (provider_id, room_number). Individual unique tests are not generated.
+CREATE TABLE doctor_is_assigned_to_exam_room_on_appointment_date (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  PRIMARY KEY (provider_id, room_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id),
+  FOREIGN KEY (room_number) REFERENCES exam_room (room_number)
+);
+-- NOTE(barwise): Definition available from ORM model: "A person who books appointments at the clinic, identified by a medical record..."
+CREATE TABLE patient (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  PRIMARY KEY (medical_record_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id)
+);
+
+-- NOTE(barwise): Definition available from ORM model: "A medical provider at the clinic, identified by a state-issued provider ID."
+CREATE TABLE doctor (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- NOTE(barwise): Value constraint available: ['cardiology', 'dermatology', 'family medicine', 'orthopedics', 'pediatrics']. Consider adding an accepted_values test.
+  specialty VARCHAR(30) NOT NULL,
+  PRIMARY KEY (provider_id)
+);
+
+-- NOTE(barwise): Definition available from ORM model: "A scheduled visit between a patient and a doctor, identified by a unique conf..."
+CREATE TABLE appointment (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  visit_reason VARCHAR(500),
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- NOTE(barwise): Value constraint available: ['scheduled', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show']. Consider adding an accepted_values test.
+  appointment_status VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  follow_up_note VARCHAR(500),
+  PRIMARY KEY (confirmation_number)
+);
+
+-- NOTE(barwise): Definition available from ORM model: "A physical examination room in the clinic, identified by a room number."
+CREATE TABLE exam_room (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  PRIMARY KEY (room_number)
+);
+
+-- NOTE(barwise): Composite primary key (confirmation_number, medical_record_number, provider_id). Individual unique tests are not generated.
+CREATE TABLE appointment_is_for_patient_with_doctor_on_appointment_date_at_time_slot (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  confirmation_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  medical_record_number VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  PRIMARY KEY (confirmation_number, medical_record_number, provider_id),
+  FOREIGN KEY (confirmation_number) REFERENCES appointment (confirmation_number),
+  FOREIGN KEY (medical_record_number) REFERENCES patient (medical_record_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id)
+);
+
+-- Table: doctor_is_assigned_to_exam_room_on_appointment_date
+-- Source: Doctor is assigned to ExamRoom on AppointmentDate (8ece7c1e-ce10-4caa-a0bf-45af182c6028)
+-- NOTE(barwise): Composite primary key (provider_id, room_number). Individual unique tests are not generated.
+CREATE TABLE doctor_is_assigned_to_exam_room_on_appointment_date (
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  provider_id VARCHAR(20) NOT NULL,
+  -- TODO(barwise): No column description. Add one to the dbt YAML.
+  room_number VARCHAR(10) NOT NULL,
+  PRIMARY KEY (provider_id, room_number),
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id),
+  FOREIGN KEY (room_number) REFERENCES exam_room (room_number)
+);

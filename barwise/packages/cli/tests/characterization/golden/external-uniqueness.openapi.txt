@@ -1,0 +1,372 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Room Identification (external uniqueness)",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/room": {
+      "get": {
+        "summary": "List all Room resources",
+        "operationId": "listRoom",
+        "responses": {
+          "200": {
+            "description": "A list of Room resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Room"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a Room",
+        "operationId": "createRoom",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Room"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Room created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Room"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/room/{room_id}": {
+      "get": {
+        "summary": "Get a Room by ID",
+        "operationId": "getRoom",
+        "parameters": [
+          {
+            "name": "room_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A Room resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Room"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Room not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a Room",
+        "operationId": "updateRoom",
+        "parameters": [
+          {
+            "name": "room_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Room"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Room updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Room"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Room not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Room",
+        "operationId": "deleteRoom",
+        "parameters": [
+          {
+            "name": "room_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Room deleted"
+          },
+          "404": {
+            "description": "Room not found"
+          }
+        }
+      }
+    },
+    "/building": {
+      "get": {
+        "summary": "List all Building resources",
+        "operationId": "listBuilding",
+        "responses": {
+          "200": {
+            "description": "A list of Building resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Building"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a Building",
+        "operationId": "createBuilding",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Building"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Building created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Building"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/building/{building_code}": {
+      "get": {
+        "summary": "Get a Building by ID",
+        "operationId": "getBuilding",
+        "parameters": [
+          {
+            "name": "building_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A Building resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Building"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Building not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a Building",
+        "operationId": "updateBuilding",
+        "parameters": [
+          {
+            "name": "building_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Building"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Building updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Building"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Building not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Building",
+        "operationId": "deleteBuilding",
+        "parameters": [
+          {
+            "name": "building_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Building deleted"
+          },
+          "404": {
+            "description": "Building not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Room": {
+        "type": "object",
+        "properties": {
+          "room_id": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+              }
+            ]
+          },
+          "building_code": {
+            "$ref": "#/components/schemas/Building",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+              }
+            ]
+          },
+          "room_number": {
+            "type": "string",
+            "nullable": true,
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+              }
+            ]
+          }
+        },
+        "required": [
+          "room_id"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "todo",
+            "message": "No model description. Add a definition to the ORM entity type or edit the dbt YAML."
+          }
+        ]
+      },
+      "Building": {
+        "type": "object",
+        "properties": {
+          "building_code": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+              }
+            ]
+          }
+        },
+        "required": [
+          "building_code"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "todo",
+            "message": "No model description. Add a definition to the ORM entity type or edit the dbt YAML."
+          }
+        ]
+      }
+    }
+  }
+}

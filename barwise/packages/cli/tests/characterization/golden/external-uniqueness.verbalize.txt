@@ -1,0 +1,7 @@
+Room is in Building
+Building houses Room
+  Each Room is in at most one Building.
+  The combination of Building and RoomNumber is unique across fact types.
+Room has RoomNumber
+RoomNumber numbers Room
+  Each Room has at most one RoomNumber.

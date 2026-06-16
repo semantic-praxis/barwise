@@ -1,0 +1,1093 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Clinic Appointment Scheduling",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/patient": {
+      "get": {
+        "summary": "List all Patient resources",
+        "operationId": "listPatient",
+        "responses": {
+          "200": {
+            "description": "A list of Patient resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Patient"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a Patient",
+        "operationId": "createPatient",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Patient"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Patient created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Patient"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patient/{medical_record_number}": {
+      "get": {
+        "summary": "Get a Patient by ID",
+        "operationId": "getPatient",
+        "parameters": [
+          {
+            "name": "medical_record_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A Patient resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Patient"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Patient not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a Patient",
+        "operationId": "updatePatient",
+        "parameters": [
+          {
+            "name": "medical_record_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Patient"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Patient updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Patient"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Patient not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Patient",
+        "operationId": "deletePatient",
+        "parameters": [
+          {
+            "name": "medical_record_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Patient deleted"
+          },
+          "404": {
+            "description": "Patient not found"
+          }
+        }
+      }
+    },
+    "/doctor": {
+      "get": {
+        "summary": "List all Doctor resources",
+        "operationId": "listDoctor",
+        "responses": {
+          "200": {
+            "description": "A list of Doctor resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Doctor"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a Doctor",
+        "operationId": "createDoctor",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Doctor"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Doctor created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Doctor"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor/{provider_id}": {
+      "get": {
+        "summary": "Get a Doctor by ID",
+        "operationId": "getDoctor",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A Doctor resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Doctor"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Doctor not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a Doctor",
+        "operationId": "updateDoctor",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Doctor"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Doctor updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Doctor"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Doctor not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Doctor",
+        "operationId": "deleteDoctor",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Doctor deleted"
+          },
+          "404": {
+            "description": "Doctor not found"
+          }
+        }
+      }
+    },
+    "/appointment": {
+      "get": {
+        "summary": "List all Appointment resources",
+        "operationId": "listAppointment",
+        "responses": {
+          "200": {
+            "description": "A list of Appointment resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Appointment"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a Appointment",
+        "operationId": "createAppointment",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Appointment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Appointment created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appointment"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/appointment/{confirmation_number}": {
+      "get": {
+        "summary": "Get a Appointment by ID",
+        "operationId": "getAppointment",
+        "parameters": [
+          {
+            "name": "confirmation_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A Appointment resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appointment"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Appointment not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a Appointment",
+        "operationId": "updateAppointment",
+        "parameters": [
+          {
+            "name": "confirmation_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Appointment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Appointment updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appointment"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Appointment not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Appointment",
+        "operationId": "deleteAppointment",
+        "parameters": [
+          {
+            "name": "confirmation_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Appointment deleted"
+          },
+          "404": {
+            "description": "Appointment not found"
+          }
+        }
+      }
+    },
+    "/exam-room": {
+      "get": {
+        "summary": "List all ExamRoom resources",
+        "operationId": "listExamRoom",
+        "responses": {
+          "200": {
+            "description": "A list of ExamRoom resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExamRoom"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a ExamRoom",
+        "operationId": "createExamRoom",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExamRoom"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "ExamRoom created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExamRoom"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exam-room/{room_number}": {
+      "get": {
+        "summary": "Get a ExamRoom by ID",
+        "operationId": "getExamRoom",
+        "parameters": [
+          {
+            "name": "room_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A ExamRoom resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExamRoom"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ExamRoom not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a ExamRoom",
+        "operationId": "updateExamRoom",
+        "parameters": [
+          {
+            "name": "room_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExamRoom"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ExamRoom updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExamRoom"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ExamRoom not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a ExamRoom",
+        "operationId": "deleteExamRoom",
+        "parameters": [
+          {
+            "name": "room_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "ExamRoom deleted"
+          },
+          "404": {
+            "description": "ExamRoom not found"
+          }
+        }
+      }
+    },
+    "/appointment-is-for-patient-with-doctor-on-appointment-date-at-time-slot": {
+      "get": {
+        "summary": "List all AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot resources",
+        "operationId": "listAppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot",
+        "responses": {
+          "200": {
+            "description": "A list of AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot",
+        "operationId": "createAppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/appointment-is-for-patient-with-doctor-on-appointment-date-at-time-slot/{confirmation_number}": {
+      "get": {
+        "summary": "Get a AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot by ID",
+        "operationId": "getAppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot",
+        "parameters": [
+          {
+            "name": "confirmation_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot",
+        "operationId": "updateAppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot",
+        "parameters": [
+          {
+            "name": "confirmation_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot",
+        "operationId": "deleteAppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot",
+        "parameters": [
+          {
+            "name": "confirmation_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot deleted"
+          },
+          "404": {
+            "description": "AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot not found"
+          }
+        }
+      }
+    },
+    "/doctor-is-assigned-to-exam-room-on-appointment-date": {
+      "get": {
+        "summary": "List all DoctorIsAssignedToExamRoomOnAppointmentDate resources",
+        "operationId": "listDoctorIsAssignedToExamRoomOnAppointmentDate",
+        "responses": {
+          "200": {
+            "description": "A list of DoctorIsAssignedToExamRoomOnAppointmentDate resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DoctorIsAssignedToExamRoomOnAppointmentDate"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a DoctorIsAssignedToExamRoomOnAppointmentDate",
+        "operationId": "createDoctorIsAssignedToExamRoomOnAppointmentDate",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorIsAssignedToExamRoomOnAppointmentDate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "DoctorIsAssignedToExamRoomOnAppointmentDate created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorIsAssignedToExamRoomOnAppointmentDate"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor-is-assigned-to-exam-room-on-appointment-date/{provider_id}": {
+      "get": {
+        "summary": "Get a DoctorIsAssignedToExamRoomOnAppointmentDate by ID",
+        "operationId": "getDoctorIsAssignedToExamRoomOnAppointmentDate",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A DoctorIsAssignedToExamRoomOnAppointmentDate resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorIsAssignedToExamRoomOnAppointmentDate"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DoctorIsAssignedToExamRoomOnAppointmentDate not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a DoctorIsAssignedToExamRoomOnAppointmentDate",
+        "operationId": "updateDoctorIsAssignedToExamRoomOnAppointmentDate",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorIsAssignedToExamRoomOnAppointmentDate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "DoctorIsAssignedToExamRoomOnAppointmentDate updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorIsAssignedToExamRoomOnAppointmentDate"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DoctorIsAssignedToExamRoomOnAppointmentDate not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a DoctorIsAssignedToExamRoomOnAppointmentDate",
+        "operationId": "deleteDoctorIsAssignedToExamRoomOnAppointmentDate",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "DoctorIsAssignedToExamRoomOnAppointmentDate deleted"
+          },
+          "404": {
+            "description": "DoctorIsAssignedToExamRoomOnAppointmentDate not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Patient": {
+        "type": "object",
+        "properties": {
+          "medical_record_number": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              }
+            ]
+          },
+          "provider_id": {
+            "$ref": "#/components/schemas/Doctor",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              }
+            ]
+          }
+        },
+        "required": [
+          "medical_record_number",
+          "medical_record_number",
+          "provider_id"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Definition available from ORM model: \"A person who books appointments at the clinic, identified by a medical record...\""
+          }
+        ]
+      },
+      "Doctor": {
+        "type": "object",
+        "properties": {
+          "provider_id": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              }
+            ]
+          },
+          "specialty": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "note",
+                "message": "Value constraint available: ['cardiology', 'dermatology', 'family medicine', 'orthopedics', 'pediatrics']. Consider adding an accepted_values test."
+              }
+            ]
+          }
+        },
+        "required": [
+          "provider_id",
+          "provider_id",
+          "specialty"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Definition available from ORM model: \"A medical provider at the clinic, identified by a state-issued provider ID.\""
+          }
+        ]
+      },
+      "Appointment": {
+        "type": "object",
+        "properties": {
+          "confirmation_number": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              }
+            ]
+          },
+          "visit_reason": {
+            "type": "string",
+            "nullable": true,
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              }
+            ]
+          },
+          "appointment_status": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "note",
+                "message": "Value constraint available: ['scheduled', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show']. Consider adding an accepted_values test."
+              }
+            ]
+          },
+          "follow_up_note": {
+            "type": "string",
+            "nullable": true,
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              }
+            ]
+          }
+        },
+        "required": [
+          "confirmation_number",
+          "confirmation_number",
+          "appointment_status"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Definition available from ORM model: \"A scheduled visit between a patient and a doctor, identified by a unique conf...\""
+          }
+        ]
+      },
+      "ExamRoom": {
+        "type": "object",
+        "properties": {
+          "room_number": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              }
+            ]
+          }
+        },
+        "required": [
+          "room_number",
+          "room_number"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Definition available from ORM model: \"A physical examination room in the clinic, identified by a room number.\""
+          }
+        ]
+      },
+      "AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot": {
+        "type": "object",
+        "properties": {
+          "confirmation_number": {
+            "$ref": "#/components/schemas/Appointment",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              }
+            ]
+          },
+          "medical_record_number": {
+            "$ref": "#/components/schemas/Patient",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              }
+            ]
+          },
+          "provider_id": {
+            "$ref": "#/components/schemas/Doctor",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              }
+            ]
+          }
+        },
+        "required": [
+          "confirmation_number",
+          "medical_record_number",
+          "provider_id"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Composite primary key (confirmation_number, medical_record_number, provider_id). Individual unique tests are not generated."
+          }
+        ]
+      },
+      "DoctorIsAssignedToExamRoomOnAppointmentDate": {
+        "type": "object",
+        "properties": {
+          "provider_id": {
+            "$ref": "#/components/schemas/Doctor",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              }
+            ]
+          },
+          "room_number": {
+            "$ref": "#/components/schemas/ExamRoom",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              }
+            ]
+          }
+        },
+        "required": [
+          "provider_id",
+          "room_number"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Composite primary key (provider_id, room_number). Individual unique tests are not generated."
+          }
+        ]
+      }
+    }
+  }
+}

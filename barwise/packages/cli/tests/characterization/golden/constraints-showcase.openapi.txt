@@ -1,0 +1,897 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Phase 2 Constraint Showcase",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/person": {
+      "get": {
+        "summary": "List all Person resources",
+        "operationId": "listPerson",
+        "responses": {
+          "200": {
+            "description": "A list of Person resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Person"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a Person",
+        "operationId": "createPerson",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Person"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Person created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Person"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/person/{person_id}": {
+      "get": {
+        "summary": "Get a Person by ID",
+        "operationId": "getPerson",
+        "parameters": [
+          {
+            "name": "person_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A Person resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Person"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Person not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a Person",
+        "operationId": "updatePerson",
+        "parameters": [
+          {
+            "name": "person_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Person"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Person updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Person"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Person not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Person",
+        "operationId": "deletePerson",
+        "parameters": [
+          {
+            "name": "person_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Person deleted"
+          },
+          "404": {
+            "description": "Person not found"
+          }
+        }
+      }
+    },
+    "/car": {
+      "get": {
+        "summary": "List all Car resources",
+        "operationId": "listCar",
+        "responses": {
+          "200": {
+            "description": "A list of Car resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Car"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a Car",
+        "operationId": "createCar",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Car"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Car created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Car"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/car/{vin}": {
+      "get": {
+        "summary": "Get a Car by ID",
+        "operationId": "getCar",
+        "parameters": [
+          {
+            "name": "vin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A Car resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Car"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Car not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a Car",
+        "operationId": "updateCar",
+        "parameters": [
+          {
+            "name": "vin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Car"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Car updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Car"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Car not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Car",
+        "operationId": "deleteCar",
+        "parameters": [
+          {
+            "name": "vin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Car deleted"
+          },
+          "404": {
+            "description": "Car not found"
+          }
+        }
+      }
+    },
+    "/bus": {
+      "get": {
+        "summary": "List all Bus resources",
+        "operationId": "listBus",
+        "responses": {
+          "200": {
+            "description": "A list of Bus resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Bus"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a Bus",
+        "operationId": "createBus",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Bus"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Bus created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bus/{bus_number}": {
+      "get": {
+        "summary": "Get a Bus by ID",
+        "operationId": "getBus",
+        "parameters": [
+          {
+            "name": "bus_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A Bus resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bus"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bus not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a Bus",
+        "operationId": "updateBus",
+        "parameters": [
+          {
+            "name": "bus_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Bus"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bus updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bus"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bus not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Bus",
+        "operationId": "deleteBus",
+        "parameters": [
+          {
+            "name": "bus_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Bus deleted"
+          },
+          "404": {
+            "description": "Bus not found"
+          }
+        }
+      }
+    },
+    "/ticket": {
+      "get": {
+        "summary": "List all Ticket resources",
+        "operationId": "listTicket",
+        "responses": {
+          "200": {
+            "description": "A list of Ticket resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Ticket"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a Ticket",
+        "operationId": "createTicket",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Ticket"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Ticket created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ticket"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ticket/{ticket_id}": {
+      "get": {
+        "summary": "Get a Ticket by ID",
+        "operationId": "getTicket",
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A Ticket resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ticket"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ticket not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a Ticket",
+        "operationId": "updateTicket",
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Ticket"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ticket updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ticket"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ticket not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Ticket",
+        "operationId": "deleteTicket",
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Ticket deleted"
+          },
+          "404": {
+            "description": "Ticket not found"
+          }
+        }
+      }
+    },
+    "/person-is-parent-of-person": {
+      "get": {
+        "summary": "List all PersonIsParentOfPerson resources",
+        "operationId": "listPersonIsParentOfPerson",
+        "responses": {
+          "200": {
+            "description": "A list of PersonIsParentOfPerson resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PersonIsParentOfPerson"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a PersonIsParentOfPerson",
+        "operationId": "createPersonIsParentOfPerson",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonIsParentOfPerson"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "PersonIsParentOfPerson created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonIsParentOfPerson"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/person-is-parent-of-person/{person_id}": {
+      "get": {
+        "summary": "Get a PersonIsParentOfPerson by ID",
+        "operationId": "getPersonIsParentOfPerson",
+        "parameters": [
+          {
+            "name": "person_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A PersonIsParentOfPerson resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonIsParentOfPerson"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PersonIsParentOfPerson not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a PersonIsParentOfPerson",
+        "operationId": "updatePersonIsParentOfPerson",
+        "parameters": [
+          {
+            "name": "person_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonIsParentOfPerson"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "PersonIsParentOfPerson updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonIsParentOfPerson"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PersonIsParentOfPerson not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a PersonIsParentOfPerson",
+        "operationId": "deletePersonIsParentOfPerson",
+        "parameters": [
+          {
+            "name": "person_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "PersonIsParentOfPerson deleted"
+          },
+          "404": {
+            "description": "PersonIsParentOfPerson not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Person": {
+        "type": "object",
+        "properties": {
+          "person_id": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+              }
+            ]
+          },
+          "vin": {
+            "$ref": "#/components/schemas/Car",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+              }
+            ]
+          },
+          "bus_number": {
+            "$ref": "#/components/schemas/Bus",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+              }
+            ]
+          }
+        },
+        "required": [
+          "person_id"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "todo",
+            "message": "No model description. Add a definition to the ORM entity type or edit the dbt YAML."
+          }
+        ]
+      },
+      "Car": {
+        "type": "object",
+        "properties": {
+          "vin": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+              }
+            ]
+          }
+        },
+        "required": [
+          "vin"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "todo",
+            "message": "No model description. Add a definition to the ORM entity type or edit the dbt YAML."
+          }
+        ]
+      },
+      "Bus": {
+        "type": "object",
+        "properties": {
+          "bus_number": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+              }
+            ]
+          }
+        },
+        "required": [
+          "bus_number"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "todo",
+            "message": "No model description. Add a definition to the ORM entity type or edit the dbt YAML."
+          }
+        ]
+      },
+      "Ticket": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+              }
+            ]
+          },
+          "person_id": {
+            "$ref": "#/components/schemas/Person",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+              }
+            ]
+          }
+        },
+        "required": [
+          "ticket_id",
+          "person_id"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "todo",
+            "message": "No model description. Add a definition to the ORM entity type or edit the dbt YAML."
+          }
+        ]
+      },
+      "PersonIsParentOfPerson": {
+        "type": "object",
+        "properties": {
+          "person_id": {
+            "$ref": "#/components/schemas/Person",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+              }
+            ]
+          },
+          "is_child_of_person_id": {
+            "$ref": "#/components/schemas/Person",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add one to the dbt YAML."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+              }
+            ]
+          }
+        },
+        "required": [
+          "person_id",
+          "is_child_of_person_id"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Composite primary key (person_id, is_child_of_person_id). Individual unique tests are not generated."
+          }
+        ]
+      }
+    }
+  }
+}
