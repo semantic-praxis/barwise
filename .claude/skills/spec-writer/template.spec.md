@@ -1,7 +1,9 @@
 # <Title: what this change achieves>
 
 Status: Draft for review (design only -- no implementation in this PR)
-Tracking: REPO_REVIEW-2026-06.md finding #<n> (or: feature/issue link)
+Created: <YYYY-MM-DD>
+Last-updated: <YYYY-MM-DD>
+Tracking: REPO_REVIEW-<YYYY-MM-DD>.md finding #<n> (or: feature/issue link)
 
 ## Principle
 

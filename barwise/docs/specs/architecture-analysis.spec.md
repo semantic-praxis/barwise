@@ -1,6 +1,8 @@
 # Architecture analysis program: from one-off review to encoded discipline
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Phase B landed; Phase A WS3 (deep review) pending
+Created: 2026-06-16
+Last-updated: 2026-06-16
 Tracking: addresses the standing concern that rapid change is eroding
 architectural discipline. Operationalizes the manual audit captured in
 `REPO_REVIEW-2026-06.md` and the principles in the root `CLAUDE.md`.

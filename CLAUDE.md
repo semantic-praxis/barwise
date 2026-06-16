@@ -220,6 +220,15 @@ git tag -a "v$VER" -m "v$VER: brief description"
 git push origin main --tags
 ```
 
+A minor release is also the cadence point for the Phase A architecture
+review: run the deep assessment in
+`barwise/docs/specs/architecture-analysis.spec.md` (walk the scenario
+catalog in `docs/architecture-scenarios.md`, refresh the reflexion and
+hotspot snapshot via `npm run arch:triage`) and commit a new dated
+`docs/REPO_REVIEW-<YYYY-MM-DD>.md`. The continuous fitness functions
+(`npm run depcruise`, `npm run purity`) guard the structural pillars
+between releases; this review covers the judgment calls they cannot.
+
 ### Create a GitHub release
 
 ```bash
@@ -247,6 +256,12 @@ git log --oneline v1.2.0..HEAD
   Use the `spec-writer` skill for the house spec format, the
   design-principle framing, and the pre-flight checklist; specs live in
   `barwise/docs/specs/`.
+- Doc naming splits by type. Specs keep stable undated kebab names
+  (`docs/specs/<name>.spec.md`) and carry `Created:`/`Last-updated:`
+  header lines (ISO `YYYY-MM-DD`). Point-in-time artifacts -- a
+  `REPO_REVIEW`, an architecture snapshot -- carry a full `YYYY-MM-DD`
+  in the filename (`docs/REPO_REVIEW-2026-06-16.md`); the next one is a
+  new file, never an in-place edit.
 - TypeScript strict mode. Base config in `barwise/tsconfig.base.json`
   uses NodeNext module resolution; the vscode package overrides to
   Bundler resolution for esbuild.
