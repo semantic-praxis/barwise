@@ -1,9 +1,11 @@
 import {
+  isDisjunctiveMandatory,
   isEquality,
   isExclusion,
   isExclusiveOr,
   isFrequency,
   isInternalUniqueness,
+  isMandatoryRole,
   isRing,
   isSubset,
   isValueConstraint,
@@ -27,12 +29,16 @@ import type { Diagnostic } from "../Diagnostic.js";
  * - Subset violations: a tuple in the subset roles has no match in the superset roles.
  * - Equality violations: the tuple sets for both role sequences differ.
  * - Ring violations: reflexive relationship properties are violated.
+ * - Mandatory violations: an object instance exists somewhere but does not
+ *   play a role it is required to play.
+ * - Disjunctive mandatory violations: an object instance plays none of the
+ *   roles it is required to play at least one of.
  *
- * Note: Mandatory and disjunctive mandatory constraint validation is not
- * included here because it requires cross-fact-type population analysis
- * (knowing the full universe of entity instances). That is deferred to a
- * future enhancement. Exclusion, exclusive-or, subset, and equality
- * constraints that reference roles from other fact types are also skipped.
+ * Mandatory and disjunctive mandatory are checked against the object
+ * universe -- every value that appears in any role played by a type across
+ * all populations (a closed-world reading of the sample). Exclusion,
+ * exclusive-or, subset, and equality constraints whose roles span fact
+ * types are still skipped (a future enhancement).
  */
 export function populationValidationRules(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -46,7 +52,135 @@ export function populationValidationRules(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkSubsetViolations(model));
   diagnostics.push(...checkEqualityViolations(model));
   diagnostics.push(...checkRingViolations(model));
+  diagnostics.push(...checkMandatoryViolations(model));
+  diagnostics.push(...checkDisjunctiveMandatoryViolations(model));
 
+  return diagnostics;
+}
+
+/**
+ * The universe of an object type: every distinct value that appears in any
+ * role played by that type across all of the model's populations. This is
+ * the closed-world set of "instances that exist" for cross-fact-type
+ * mandatory checks.
+ */
+function buildObjectUniverse(model: OrmModel): Map<string, Set<string>> {
+  const universe = new Map<string, Set<string>>();
+  for (const pop of model.populations) {
+    const ft = model.getFactType(pop.factTypeId);
+    if (!ft) continue;
+    for (const inst of pop.instances) {
+      for (const role of ft.roles) {
+        const value = inst.roleValues[role.id];
+        if (value === undefined) continue;
+        let values = universe.get(role.playerId);
+        if (!values) {
+          values = new Set();
+          universe.set(role.playerId, values);
+        }
+        values.add(value);
+      }
+    }
+  }
+  return universe;
+}
+
+/** The set of values appearing in a given role across all populations. */
+function valuesPlayedInRole(model: OrmModel, roleId: string): Set<string> {
+  const values = new Set<string>();
+  for (const pop of model.populations) {
+    for (const inst of pop.instances) {
+      const value = inst.roleValues[roleId];
+      if (value !== undefined) values.add(value);
+    }
+  }
+  return values;
+}
+
+/**
+ * Mandatory constraints require every instance of the role's player type
+ * to play that role. An instance "exists" if it appears in any role across
+ * the model's populations (the object universe).
+ */
+function checkMandatoryViolations(model: OrmModel): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const universe = buildObjectUniverse(model);
+  if (universe.size === 0) return diagnostics;
+
+  for (const ft of model.factTypes) {
+    for (const c of ft.constraints) {
+      if (!isMandatoryRole(c)) continue;
+      const role = ft.getRoleById(c.roleId);
+      if (!role) continue;
+      const required = universe.get(role.playerId);
+      if (!required || required.size === 0) continue;
+
+      const played = valuesPlayedInRole(model, c.roleId);
+      for (const value of required) {
+        if (!played.has(value)) {
+          diagnostics.push({
+            severity: "error",
+            message: `Mandatory constraint on role "${c.roleId}" in fact type `
+              + `"${ft.name}" is violated: "${value}" appears in the model but `
+              + `does not play this mandatory role.`,
+            elementId: c.id ?? ft.id,
+            ruleId: "population/mandatory-violation",
+          });
+        }
+      }
+    }
+  }
+  return diagnostics;
+}
+
+/**
+ * Disjunctive mandatory constraints require every instance of the common
+ * player type to play at least one of the specified roles (which may span
+ * fact types).
+ */
+function checkDisjunctiveMandatoryViolations(model: OrmModel): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const universe = buildObjectUniverse(model);
+  if (universe.size === 0) return diagnostics;
+
+  const rolePlayer = new Map<string, string>();
+  for (const ft of model.factTypes) {
+    for (const role of ft.roles) {
+      rolePlayer.set(role.id, role.playerId);
+    }
+  }
+
+  for (const ft of model.factTypes) {
+    for (const c of ft.constraints) {
+      if (!isDisjunctiveMandatory(c)) continue;
+      const playerId = c.roleIds
+        .map((rid) => rolePlayer.get(rid))
+        .find((p) => p !== undefined);
+      if (playerId === undefined) continue;
+      const required = universe.get(playerId);
+      if (!required || required.size === 0) continue;
+
+      const playedSomewhere = new Set<string>();
+      for (const rid of c.roleIds) {
+        for (const value of valuesPlayedInRole(model, rid)) {
+          playedSomewhere.add(value);
+        }
+      }
+
+      for (const value of required) {
+        if (!playedSomewhere.has(value)) {
+          diagnostics.push({
+            severity: "error",
+            message: `Disjunctive mandatory constraint on roles `
+              + `[${c.roleIds.join(", ")}] is violated: "${value}" plays none `
+              + `of them.`,
+            elementId: c.id ?? ft.id,
+            ruleId: "population/disjunctive-mandatory-violation",
+          });
+        }
+      }
+    }
+  }
   return diagnostics;
 }
 
