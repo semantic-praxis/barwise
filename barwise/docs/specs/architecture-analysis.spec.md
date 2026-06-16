@@ -253,23 +253,35 @@ smell not a rule.
   `madge` dev dependency are removed in that same PR (the only deletion
   in the program).
 
-## Open decisions (for review)
+## Open decisions (resolved)
 
-- **Conformance tool: dependency-cruiser vs ESLint-only vs ArchUnitTS.**
-  Recommend dependency-cruiser as the single declarative artifact -- it
-  does direction rules, forbidden built-ins, and cycles in one config
-  that doubles as the documented reflexion model, and it lets `madge`
-  retire. ESLint `no-restricted-imports` is the fallback for the
-  core-purity half if depcruise proves heavy for the in-file checks.
-- **Retire `madge` or keep both.** Recommend retiring once the
-  depcruise cycle rule is proven equivalent on this repo (DRY). Keep
-  both for one release if reviewers want a belt-and-suspenders overlap.
-- **Cadence trigger for Phase A.** Recommend "every minor release"
+- **Conformance tool (resolved: dependency-cruiser).** Adopted as the
+  single declarative artifact for the dependency graph: `layer-<pkg>`
+  direction rules plus `no-circular`, in `.dependency-cruiser.cjs`,
+  resolved to source via `tsconfig.depcruise.json`. One refinement
+  surfaced in implementation: dependency-cruiser sees imports, not code
+  patterns, so it cannot check `process.env` / `Date.now` / `Math.random`
+  in core. The core-determinism gate (S-DET-1..3) is therefore a sibling
+  script, `scripts/check-core-purity.mjs`, not a depcruise rule -- each
+  pillar still lives in one artifact (depcruise owns orthogonality, the
+  script owns determinism).
+- **Retire `madge` (resolved: yes).** The `no-circular` rule replaces
+  `madge --circular`; `madge` and the `circular` npm script are removed.
+  WS2 proved the graph clean, so the depcruise gate landed blocking from
+  the first run with nothing to burn down.
+- **File-size budget (resolved: warn-only).** `scripts/check-file-size.mjs`
+  reports files over a threshold as a non-blocking CI step. Size is a
+  smell, not a rule; the warn list plus the WS2 hotspot ranking drive the
+  separately-specced A1 god-file work.
+- **Duplication scan (resolved: warn-only).** `jscpd` runs as a
+  non-blocking CI step. This is an advisory signal for S-DRY-1, not a
+  gate: gating duplication would push toward the cross-package coupling
+  DRY-as-secondary forbids, so the reviewer -- not CI -- weighs each
+  clone against the coupling its removal would create.
+- **Cadence trigger for Phase A (open).** Recommend "every minor release"
   (the project already treats releases as intentional acts), over a
-  per-PR or per-N-commits trigger. The reviewer owns this.
-- **File-size budget (WS6).** Recommend warn-only or omit entirely;
-  A1's god files are a known, separately-specced concern and a hard
-  size gate would fight legitimate large generated/cohesive files.
+  per-PR or per-N-commits trigger. Still the reviewer's call; deferred to
+  WS6.
 
 ## Risks and testing
 

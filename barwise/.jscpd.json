@@ -1,0 +1,15 @@
+{
+  "path": ["packages"],
+  "pattern": "packages/*/src/**/*.{ts,tsx}",
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/tests/**"
+  ],
+  "reporters": ["console"],
+  "min-lines": 15,
+  "min-tokens": 70,
+  "gitignore": true
+}

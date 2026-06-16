@@ -99,8 +99,25 @@ jobs:
       - run: npm run oxlint
         if: steps.changes.outputs.docs_only != 'true'
 
-      - run: npm run circular
+      # Architecture conformance gates (docs/specs/architecture-analysis.spec.md).
+      # depcruise enforces the one-way dependency graph and acyclicity
+      # (S-ORTH-1..4, replacing the former madge check); purity enforces
+      # determinism in core (S-DET-1..3). Both are blocking.
+      - run: npm run depcruise
         if: steps.changes.outputs.docs_only != 'true'
+
+      - run: npm run purity
+        if: steps.changes.outputs.docs_only != 'true'
+
+      # Warn-only architectural smells: large files and code duplication.
+      # Advisory signals for the periodic review, never gates (WS6).
+      - run: npm run filesize
+        if: steps.changes.outputs.docs_only != 'true'
+        continue-on-error: true
+
+      - run: npm run dup
+        if: steps.changes.outputs.docs_only != 'true'
+        continue-on-error: true
 
       # Reports known advisories without gating the build. There is an
       # existing backlog of dependency vulnerabilities (mostly dev deps);
