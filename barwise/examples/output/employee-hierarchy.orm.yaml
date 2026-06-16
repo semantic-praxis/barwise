@@ -1,0 +1,87 @@
+orm_version: "1.0"
+model:
+  name: Employee Hierarchy
+  object_types:
+    - id: a8e76038-b2e7-412a-88af-9c36d617a7db
+      name: Person
+      kind: entity
+      reference_mode: person_id
+      definition: Any individual tracked by the HR system.
+    - id: 1420f26a-841e-4a76-ab19-6a3469b9f2e2
+      name: Employee
+      kind: entity
+      reference_mode: employee_id
+      definition: A person who works for the company.
+    - id: 7286e307-4e48-42f4-bda2-add28b09757f
+      name: Manager
+      kind: entity
+      reference_mode: manager_id
+      definition: An employee who manages other employees.
+    - id: 4bac9494-efcd-4843-8674-690487c0a24c
+      name: Department
+      kind: entity
+      reference_mode: department_code
+      definition: An organizational unit within the company.
+    - id: c0430c28-ae2f-4233-8164-68b6b134e449
+      name: DepartmentName
+      kind: value
+      definition: The name of a department.
+  fact_types:
+    - id: a51c030b-edf0-48e7-bd74-c082b1195486
+      name: Employee works in Department
+      roles:
+        - id: c820fa12-9c69-4dbb-aef9-6d29244ef896
+          player: 1420f26a-841e-4a76-ab19-6a3469b9f2e2
+          role_name: works in
+        - id: 0bb61f2a-ad21-40d8-bae8-92cdca51c704
+          player: 4bac9494-efcd-4843-8674-690487c0a24c
+          role_name: has
+      readings:
+        - "{0} works in {1}"
+        - "{1} has {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - c820fa12-9c69-4dbb-aef9-6d29244ef896
+        - type: mandatory
+          role: c820fa12-9c69-4dbb-aef9-6d29244ef896
+    - id: 82cce7a5-850b-474e-85e3-0d27e8c2b6c7
+      name: Manager manages Department
+      roles:
+        - id: 2b09331b-1822-494a-9710-1f18db358150
+          player: 7286e307-4e48-42f4-bda2-add28b09757f
+          role_name: manages
+        - id: ffa01dcd-51be-4266-8a6a-696b7a932555
+          player: 4bac9494-efcd-4843-8674-690487c0a24c
+          role_name: is managed by
+      readings:
+        - "{0} manages {1}"
+        - "{1} is managed by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - ffa01dcd-51be-4266-8a6a-696b7a932555
+    - id: c16c5ee7-7b05-42fe-b7ea-7f97a4546df1
+      name: Department has DepartmentName
+      roles:
+        - id: 7967eb01-349f-4e53-a674-f5fcd7a04a54
+          player: 4bac9494-efcd-4843-8674-690487c0a24c
+          role_name: has
+        - id: ccc8f324-27c2-4a1f-8c81-ff25da10a403
+          player: c0430c28-ae2f-4233-8164-68b6b134e449
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 7967eb01-349f-4e53-a674-f5fcd7a04a54
+  subtype_facts:
+    - id: 730616c5-1e2c-4616-8950-f87add4dd671
+      subtype: 1420f26a-841e-4a76-ab19-6a3469b9f2e2
+      supertype: a8e76038-b2e7-412a-88af-9c36d617a7db
+      provides_identification: false
+    - id: aed57bf5-7d92-485a-9f42-ce2f04b322bc
+      subtype: 7286e307-4e48-42f4-bda2-add28b09757f
+      supertype: 1420f26a-841e-4a76-ab19-6a3469b9f2e2

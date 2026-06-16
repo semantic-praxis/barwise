@@ -1,0 +1,16 @@
+# barwise 1.6.1 -- verbalize
+
+Customer places Order
+Order is placed by Customer
+  Each Order is placed by at most one Customer.
+  Each Order is placed by at least one Customer.
+Order contains Product
+Product is contained in Order
+Order has OrderStatus
+OrderStatus is of Order
+  Each Order has at most one OrderStatus.
+  Each Order has at least one OrderStatus.
+Customer has Name
+Name is of Customer
+  Each Customer has at most one Name.
+  Each Customer has at least one Name.

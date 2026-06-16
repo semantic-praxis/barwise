@@ -1,0 +1,104 @@
+orm_version: "1.0"
+model:
+  name: Order Management
+  object_types:
+    - id: 0c371228-171d-4c8b-9fef-a12358ae401c
+      name: Customer
+      kind: entity
+      reference_mode: customer_id
+      definition: A person or organization that places orders in the CRM system.
+    - id: ce369736-90d5-4ba0-8a9b-23a1a2d065b3
+      name: Order
+      kind: entity
+      reference_mode: order_number
+      definition: A confirmed request by a customer for one or more products.
+    - id: 91bbaafa-9d0a-4284-b06e-81909270247f
+      name: Product
+      kind: entity
+      reference_mode: sku
+      definition: A product that can be ordered by customers.
+    - id: 0a3f4bc5-b1d6-47fb-b7be-018c11ef400c
+      name: OrderStatus
+      kind: value
+      definition: The current status of an order in the fulfillment pipeline.
+      value_constraint:
+        values:
+          - pending
+          - confirmed
+          - shipped
+          - delivered
+    - id: 13156648-e22b-4d2c-9108-54bf11aca028
+      name: Name
+      kind: value
+      definition: A customer's display name.
+      data_type:
+        name: text
+        length: 100
+  fact_types:
+    - id: 671bd779-5535-4444-a45d-ea6426910e40
+      name: Customer places Order
+      roles:
+        - id: b5e1cd21-d917-4c9c-8bb1-b3f317fc6955
+          player: 0c371228-171d-4c8b-9fef-a12358ae401c
+          role_name: places
+        - id: 5ac5a1b4-f240-4ac8-bccc-02ae68e6cbf6
+          player: ce369736-90d5-4ba0-8a9b-23a1a2d065b3
+          role_name: is placed by
+      readings:
+        - "{0} places {1}"
+        - "{1} is placed by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 5ac5a1b4-f240-4ac8-bccc-02ae68e6cbf6
+        - type: mandatory
+          role: 5ac5a1b4-f240-4ac8-bccc-02ae68e6cbf6
+    - id: f036b348-df8d-46e4-8665-86163a7b6dfa
+      name: Order contains Product
+      roles:
+        - id: 1682bcd5-9a55-4417-8afb-57f7fad24a81
+          player: ce369736-90d5-4ba0-8a9b-23a1a2d065b3
+          role_name: contains
+        - id: fe4463c2-b4f2-4e27-ace8-c19bf2561ac9
+          player: 91bbaafa-9d0a-4284-b06e-81909270247f
+          role_name: is contained in
+      readings:
+        - "{0} contains {1}"
+        - "{1} is contained in {0}"
+    - id: b84feeb1-5000-464b-afed-81e286605e10
+      name: Order has OrderStatus
+      roles:
+        - id: e7c9fd3e-7c4d-4c6f-a415-2b99d17aa19a
+          player: ce369736-90d5-4ba0-8a9b-23a1a2d065b3
+          role_name: has
+        - id: f1437524-841c-4666-96ab-df415acf9d6e
+          player: 0a3f4bc5-b1d6-47fb-b7be-018c11ef400c
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - e7c9fd3e-7c4d-4c6f-a415-2b99d17aa19a
+        - type: mandatory
+          role: e7c9fd3e-7c4d-4c6f-a415-2b99d17aa19a
+    - id: 6f5771f7-8d21-42b7-98ea-a07247463657
+      name: Customer has Name
+      roles:
+        - id: 9ee02cba-d56a-45fa-b1b2-34209490be87
+          player: 0c371228-171d-4c8b-9fef-a12358ae401c
+          role_name: has
+        - id: 80b718e4-9c44-434d-aa58-b52f114c1742
+          player: 13156648-e22b-4d2c-9108-54bf11aca028
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 9ee02cba-d56a-45fa-b1b2-34209490be87
+          is_preferred: true
+        - type: mandatory
+          role: 9ee02cba-d56a-45fa-b1b2-34209490be87

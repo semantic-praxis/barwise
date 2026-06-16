@@ -1,0 +1,8 @@
+# barwise 1.6.1 -- validate
+
+examples/output/order-management.orm.yaml: 0 error(s), 1 warning(s)
+
+  WARNING Fact type "Order contains Product" has no constraints. Most fact types need at least a uniqueness constraint.
+  INFO    Value type "OrderStatus" has no data type. The relational mapper will default to TEXT.
+  INFO    Entity type "Order" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "Product" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
