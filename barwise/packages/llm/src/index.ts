@@ -1,6 +1,7 @@
 // Extraction types
 export type {
   Ambiguity,
+  CandidateFraming,
   ConstraintProvenance,
   DraftModelResult,
   ElementProvenance,
@@ -9,6 +10,7 @@ export type {
   ExtractedObjectType,
   ExtractedRole,
   ExtractedSubtype,
+  ExtractionAlternative,
   ExtractionResponse,
   InferredConstraint,
   InferredConstraintType,
