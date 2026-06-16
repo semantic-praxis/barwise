@@ -285,4 +285,103 @@ describe("cross-fact-type counterexamples", () => {
     expect(ce).toBeDefined();
     expect(forbids(model, ce!, "population/disjunctive-mandatory-violation")).toBe(true);
   });
+
+  function drivesRidesModel(): OrmModel {
+    return new ModelBuilder()
+      .withEntityType("Person")
+      .withEntityType("Car")
+      .withEntityType("Bus")
+      .withBinaryFactType("Person drives Car", {
+        role1: { player: "Person", name: "drives" },
+        role2: { player: "Car", name: "is driven by" },
+      })
+      .withBinaryFactType("Person rides Bus", {
+        role1: { player: "Person", name: "rides" },
+        role2: { player: "Bus", name: "is ridden by" },
+      })
+      .build();
+  }
+
+  it("forbids a spanning exclusion (a value in two excluded roles)", () => {
+    const model = drivesRidesModel();
+    const drives = model.getFactTypeByName("Person drives Car")!;
+    drives.addConstraint({
+      type: "exclusion",
+      roleIds: ["Person drives Car::role1", "Person rides Bus::role1"],
+    });
+    const ec = drives.constraints.find((c) => c.type === "exclusion")!;
+
+    const ce = generateCounterexampleForConstraint(ec, drives, model);
+    expect(ce).toBeDefined();
+    expect(forbids(model, ce!, "population/exclusion-violation")).toBe(true);
+  });
+
+  it("forbids a spanning exclusive-or (a value in both roles)", () => {
+    const model = drivesRidesModel();
+    const drives = model.getFactTypeByName("Person drives Car")!;
+    drives.addConstraint({
+      type: "exclusive_or",
+      roleIds: ["Person drives Car::role1", "Person rides Bus::role1"],
+    });
+    const xor = drives.constraints.find((c) => c.type === "exclusive_or")!;
+
+    const ce = generateCounterexampleForConstraint(xor, drives, model);
+    expect(ce).toBeDefined();
+    expect(forbids(model, ce!, "population/exclusive-or-violation")).toBe(true);
+  });
+
+  it("forbids a spanning subset (a tuple with no superset match)", () => {
+    const model = new ModelBuilder()
+      .withEntityType("Person")
+      .withEntityType("Course")
+      .withBinaryFactType("Person teaches Course", {
+        role1: { player: "Person", name: "teaches" },
+        role2: { player: "Course", name: "is taught by" },
+      })
+      .withBinaryFactType("Person enrolled in Course", {
+        role1: { player: "Person", name: "is enrolled in" },
+        role2: { player: "Course", name: "enrolls" },
+      })
+      .build();
+    const teaches = model.getFactTypeByName("Person teaches Course")!;
+    teaches.addConstraint({
+      type: "subset",
+      subsetRoleIds: ["Person teaches Course::role1", "Person teaches Course::role2"],
+      supersetRoleIds: [
+        "Person enrolled in Course::role1",
+        "Person enrolled in Course::role2",
+      ],
+    });
+    const sc = teaches.constraints.find((c) => c.type === "subset")!;
+
+    const ce = generateCounterexampleForConstraint(sc, teaches, model);
+    expect(ce).toBeDefined();
+    expect(forbids(model, ce!, "population/subset-violation")).toBe(true);
+  });
+
+  it("forbids a spanning equality (a tuple present on one side only)", () => {
+    const model = new ModelBuilder()
+      .withEntityType("Person")
+      .withEntityType("Dept")
+      .withBinaryFactType("Person manages Dept", {
+        role1: { player: "Person", name: "manages" },
+        role2: { player: "Dept", name: "is managed by" },
+      })
+      .withBinaryFactType("Person works in Dept", {
+        role1: { player: "Person", name: "works in" },
+        role2: { player: "Dept", name: "employs" },
+      })
+      .build();
+    const manages = model.getFactTypeByName("Person manages Dept")!;
+    manages.addConstraint({
+      type: "equality",
+      roleIds1: ["Person manages Dept::role1", "Person manages Dept::role2"],
+      roleIds2: ["Person works in Dept::role1", "Person works in Dept::role2"],
+    });
+    const eq = manages.constraints.find((c) => c.type === "equality")!;
+
+    const ce = generateCounterexampleForConstraint(eq, manages, model);
+    expect(ce).toBeDefined();
+    expect(forbids(model, ce!, "population/equality-violation")).toBe(true);
+  });
 });
