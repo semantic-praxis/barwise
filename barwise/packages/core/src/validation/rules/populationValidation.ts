@@ -1,3 +1,4 @@
+import { inferExternalUniquenessJoin } from "../../externalUniqueness.js";
 import {
   isDisjunctiveMandatory,
   isEquality,
@@ -11,7 +12,6 @@ import {
   isSubset,
   isValueConstraint,
 } from "../../model/Constraint.js";
-import { inferExternalUniquenessJoin } from "../../externalUniqueness.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { FactInstance } from "../../model/Population.js";
 import type { Diagnostic } from "../Diagnostic.js";

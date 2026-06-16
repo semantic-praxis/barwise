@@ -1,3 +1,4 @@
+import { inferExternalUniquenessJoin } from "../externalUniqueness.js";
 import {
   type Constraint,
   type DisjunctiveMandatoryConstraint,
@@ -23,7 +24,6 @@ import {
   type SubsetConstraint,
   type ValueConstraint,
 } from "../model/Constraint.js";
-import { inferExternalUniquenessJoin } from "../externalUniqueness.js";
 import type { FactType } from "../model/FactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { Population } from "../model/Population.js";
