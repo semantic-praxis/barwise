@@ -37,6 +37,10 @@ export type { ConformanceCorrection, ConformanceResult } from "./ExtractionConfo
 // Model parser
 export { parseDraftModel } from "./DraftModelParser.js";
 
+// Reasoning trail
+export { buildReasoningTrail } from "./ReasoningTrail.js";
+export type { DiscardedFraming, ReasoningTrail, TrailAssumption } from "./ReasoningTrail.js";
+
 // Model context helper
 export { buildExistingModelContext } from "./ModelContext.js";
 
