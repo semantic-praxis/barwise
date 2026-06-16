@@ -1,0 +1,31 @@
+orm_version: "1.0"
+
+# Deliberately broken model for exercising error paths and exit codes.
+# The fact type's second role references player "ot-missing", which does not
+# exist (dangling object-type reference). The model parses against the schema
+# but fails semantic validation, so `validate` reports the error and exits 1,
+# and `verbalize` / `diagram` / export should fail gracefully, not crash.
+model:
+  name: "Deliberately Broken Model"
+
+  object_types:
+    - id: "ot-widget"
+      name: "Widget"
+      kind: "entity"
+      reference_mode: "widget_id"
+    - id: "ot-color"
+      name: "Color"
+      kind: "value"
+
+  fact_types:
+    - id: "ft-widget-has-color"
+      name: "Widget has Color"
+      roles:
+        - id: "r-widget-has"
+          player: "ot-widget"
+          role_name: "has"
+        - id: "r-color-of"
+          player: "ot-missing"
+          role_name: "is of"
+      readings:
+        - "{0} has {1}"

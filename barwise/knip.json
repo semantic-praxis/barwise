@@ -1,6 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@latest/schema.json",
   "ignoreExportsUsedInFile": true,
+  "ignore": ["test-plan/**"],
   "workspaces": {
     "packages/core": {
       "ignore": ["scripts/**"]
