@@ -58,6 +58,16 @@ describe("queryModel: anchors", () => {
     expect(anchors.map((a) => a.entity)).toEqual(["Customer"]);
   });
 
+  it("returns multiple entities sorted by name regardless of creation order", () => {
+    const model = new ModelBuilder("M")
+      .withEntityType("Zebra", { referenceMode: "zebra_id" })
+      .withEntityType("Apple", { referenceMode: "apple_id" })
+      .withEntityType("Mango", { referenceMode: "mango_id" })
+      .build();
+    const anchors = anchorsOf(runQuery(model, "anchors"));
+    expect(anchors.map((a) => a.entity)).toEqual(["Apple", "Mango", "Zebra"]);
+  });
+
   it("flags an entity whose identification is not formalized (no preferred id)", () => {
     const model = new ModelBuilder("M")
       .withEntityType("Order", { referenceMode: "order_number" })
