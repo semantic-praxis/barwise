@@ -253,7 +253,8 @@ packages/core/src/validation/
   rules/
     structural.ts
     constraintConsistency.ts
-    populationValidation.ts
+    populationValidation.ts  // orchestrator over the population/ families
+    population/              // one module per constraint family
     completenessWarnings.ts
   ValidationEngine.ts    // orchestrates rule sets, manages incremental state
 ```
