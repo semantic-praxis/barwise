@@ -1,35 +1,22 @@
 /**
  * Typed message protocol for the diagram webview.
  *
- * Shared by the extension host (`DiagramPanel`) and the React webview.
- * Replaces the legacy ad-hoc `{ command, nodeId, x, y }` messages.
- *
- * `PositionedGraph` is imported as a type only -- it is plain serializable
- * data, so it crosses `postMessage` unchanged, and the import is erased at
- * build time (the webview links no `@barwise/*` runtime code).
+ * Thin envelopes over the `@barwise/diagram` presentation contract: the
+ * host posts a `DiagramPresentation`'s data to the webview, and the
+ * webview posts back interaction messages the host maps to a
+ * `DiagramIntent`. The domain types (focus, view, graph) come from the
+ * contract so there is one source of truth; `fileName` is a host concept
+ * and lives only here.
  */
-import type { PositionedGraph } from "@barwise/diagram";
-
-/** Active focus (hop-count) neighborhood state. */
-export interface DiagramFocusState {
-  readonly entityId: string;
-  readonly entityName: string;
-  readonly hopCount: number;
-}
-
-/** Active named-view state. */
-export interface DiagramViewState {
-  readonly viewName: string;
-  readonly hasGhosts: boolean;
-}
+import type { DiagramFocus, DiagramViewInfo, PositionedGraph } from "@barwise/diagram";
 
 /** Diagram-level metadata sent alongside every graph update. */
 export interface DiagramMeta {
   readonly fileName: string;
   readonly modelName: string;
   readonly hasUnsavedChanges: boolean;
-  readonly focus: DiagramFocusState | null;
-  readonly view: DiagramViewState | null;
+  readonly focus: DiagramFocus | null;
+  readonly view: DiagramViewInfo | null;
   /** Names of every saved layout in the model's `diagrams:` section. */
   readonly availableViews: readonly string[];
 }
