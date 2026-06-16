@@ -22,7 +22,8 @@ src/
     export.ts           barwise export <file> --format <name>
     diagram.ts          barwise diagram <file>
     diff.ts             barwise diff <file1> <file2>
-    import.ts           barwise import transcript <file>
+    import.ts           barwise import (orchestrator over import/)
+    import/             one module per import subcommand + shared helpers
   helpers/
     io.ts               File I/O helpers (loadModel, writeModel)
     format.ts           Output formatting helpers (JSON, text)
