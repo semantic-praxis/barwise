@@ -1,11 +1,15 @@
 import {
   type Constraint,
+  type DisjunctiveMandatoryConstraint,
   type FrequencyConstraint,
   type InternalUniquenessConstraint,
+  isDisjunctiveMandatory,
   isFrequency,
   isInternalUniqueness,
+  isMandatoryRole,
   isRing,
   isValueConstraint,
+  type MandatoryRoleConstraint,
   type RingConstraint,
   type ValueConstraint,
 } from "../model/Constraint.js";
@@ -29,10 +33,10 @@ type RoleValues = Record<string, string>;
  * one. A counterexample is the minimal population a constraint forbids;
  * it is the deterministic inverse of population validation.
  *
- * Covers the intra-fact-type constraints whose violations a single
- * population can express: internal uniqueness, value, frequency, and
- * ring. Cross-fact-type constraints (mandatory, exclusion, subset, ...)
- * have no counterexample yet and are skipped.
+ * Covers the intra-fact-type constraints (internal uniqueness, value,
+ * frequency, ring) and the cross-fact-type mandatory and disjunctive
+ * mandatory. The remaining cross-fact-type constraints (spanning
+ * exclusion, subset, ...) have no counterexample yet and are skipped.
  */
 export function generateCounterexamples(model: OrmModel): Counterexample[] {
   const result: Counterexample[] = [];
@@ -64,6 +68,12 @@ export function generateCounterexampleForConstraint(
   }
   if (isRing(constraint)) {
     return forRing(constraint, factType, model);
+  }
+  if (isMandatoryRole(constraint)) {
+    return forMandatory(constraint, factType, model);
+  }
+  if (isDisjunctiveMandatory(constraint)) {
+    return forDisjunctive(constraint, factType, model);
   }
   return undefined;
 }
@@ -208,6 +218,103 @@ function forRing(
 }
 
 // ---------------------------------------------------------------------------
+// Cross-fact-type generators
+// ---------------------------------------------------------------------------
+
+/**
+ * Mandatory: an instance of the player type that exists (plays a role in
+ * another fact type) but never plays the mandatory role.
+ */
+function forMandatory(
+  mc: MandatoryRoleConstraint,
+  ft: FactType,
+  model: OrmModel,
+): Counterexample | undefined {
+  const role = ft.roles.find((r) => r.id === mc.roleId);
+  if (!role) return undefined;
+  const anchor = findAnchorRole(model, role.playerId, new Set([mc.roleId]));
+  if (!anchor) return undefined;
+
+  const value = mintValue(role, ft, model, 0);
+  const forbidden = anchorPopulation(anchor, value, model);
+  const reason = `a ${playerName(role, model)} that exists but never plays `
+    + `"${ft.name}"`;
+  const rendered = `${value} appears in ${anchor.ft.name} but not in ${ft.name}`;
+  return makeCrossCounterexample(ft, mc, [forbidden], reason, rendered);
+}
+
+/**
+ * Disjunctive mandatory: an instance of the common player type that plays
+ * none of the required roles.
+ */
+function forDisjunctive(
+  dc: DisjunctiveMandatoryConstraint,
+  ft: FactType,
+  model: OrmModel,
+): Counterexample | undefined {
+  const firstId = dc.roleIds[0];
+  if (firstId === undefined) return undefined;
+  const first = findRoleById(model, firstId);
+  if (!first) return undefined;
+  const anchor = findAnchorRole(model, first.role.playerId, new Set(dc.roleIds));
+  if (!anchor) return undefined;
+
+  const value = mintValue(first.role, first.ft, model, 0);
+  const forbidden = anchorPopulation(anchor, value, model);
+  const reason = `a ${playerName(first.role, model)} that plays none of the `
+    + `required roles`;
+  const rendered = `${value} appears in ${anchor.ft.name} but plays none of `
+    + `[${dc.roleIds.join(", ")}]`;
+  return makeCrossCounterexample(ft, dc, [forbidden], reason, rendered);
+}
+
+/** A single anchor role in some fact type, used to make an instance exist. */
+interface AnchorRole {
+  readonly ft: FactType;
+  readonly role: Role;
+}
+
+/** Find a role played by the type, excluding the given role ids. */
+function findAnchorRole(
+  model: OrmModel,
+  playerId: string,
+  excludeRoleIds: ReadonlySet<string>,
+): AnchorRole | undefined {
+  for (const ft of model.factTypes) {
+    for (const role of ft.roles) {
+      if (role.playerId === playerId && !excludeRoleIds.has(role.id)) {
+        return { ft, role };
+      }
+    }
+  }
+  return undefined;
+}
+
+/** Find the fact type and role for a role id. */
+function findRoleById(
+  model: OrmModel,
+  roleId: string,
+): AnchorRole | undefined {
+  for (const ft of model.factTypes) {
+    const role = ft.roles.find((r) => r.id === roleId);
+    if (role) return { ft, role };
+  }
+  return undefined;
+}
+
+/** A population that puts `value` in the anchor role, others minted apart. */
+function anchorPopulation(anchor: AnchorRole, value: string, model: OrmModel): Population {
+  const inst: RoleValues = {};
+  for (const r of anchor.ft.roles) {
+    inst[r.id] = r.id === anchor.role.id ? value : mintValue(r, anchor.ft, model, 1);
+  }
+  return new Population({
+    factTypeId: anchor.ft.id,
+    instances: [{ roleValues: inst }],
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Assembly
 // ---------------------------------------------------------------------------
 
@@ -223,11 +330,28 @@ function makeCounterexample(
     description: reason,
     instances: instances.map((roleValues) => ({ roleValues })),
   });
+  return makeCrossCounterexample(
+    ft,
+    constraint,
+    [forbidden],
+    reason,
+    renderInstances(instances, ft, model),
+  );
+}
+
+/** Assemble a Counterexample from a set of forbidden populations. */
+function makeCrossCounterexample(
+  ft: FactType,
+  constraint: Constraint,
+  forbidden: readonly Population[],
+  reason: string,
+  rendered: string,
+): Counterexample {
   const segments: VerbalizationSegment[] = [
     kwSeg("Rules out: "),
     textSeg(reason),
     textSeg(" -- e.g. "),
-    valSeg(renderInstances(instances, ft, model)),
+    valSeg(rendered),
   ];
   return {
     factTypeId: ft.id,
