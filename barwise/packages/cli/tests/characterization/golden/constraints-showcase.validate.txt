@@ -1,0 +1,11 @@
+<REPO>/test-plan/fixtures/constraints-showcase.orm.yaml: 0 error(s), 1 warning(s)
+
+  WARNING Internal uniqueness constraint in fact type "Person is parent of Person" spans all 2 roles. This means each complete fact can only appear once, which is often redundant.
+  INFO    Object type "Person" has no definition.
+  INFO    Object type "Car" has no definition.
+  INFO    Object type "Bus" has no definition.
+  INFO    Object type "Ticket" has no definition.
+  INFO    Entity type "Person" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "Car" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "Bus" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "Ticket" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.

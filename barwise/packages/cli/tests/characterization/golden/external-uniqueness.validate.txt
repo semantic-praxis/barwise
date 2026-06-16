@@ -1,0 +1,8 @@
+<REPO>/test-plan/fixtures/external-uniqueness.orm.yaml: 0 error(s), 0 warning(s)
+
+  INFO    Object type "Room" has no definition.
+  INFO    Object type "Building" has no definition.
+  INFO    Object type "RoomNumber" has no definition.
+  INFO    Value type "RoomNumber" has no data type. The relational mapper will default to TEXT.
+  INFO    Entity type "Room" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "Building" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.

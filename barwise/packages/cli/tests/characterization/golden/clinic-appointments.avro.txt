@@ -1,0 +1,159 @@
+# Patient.avsc
+{
+  "type": "record",
+  "name": "Patient",
+  "fields": [
+    {
+      "name": "medical_record_number",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.] [TODO(barwise): No column description. Add one to the dbt YAML.]"
+    },
+    {
+      "name": "medical_record_number",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.] [TODO(barwise): No column description. Add one to the dbt YAML.]"
+    },
+    {
+      "name": "provider_id",
+      "type": "string",
+      "doc": "[TODO(barwise): No column description. Add one to the dbt YAML.]"
+    }
+  ],
+  "doc": "[NOTE(barwise): Definition available from ORM model: \"A person who books appointments at the clinic, identified by a medical record...\"]"
+}
+
+---
+
+# Doctor.avsc
+{
+  "type": "record",
+  "name": "Doctor",
+  "fields": [
+    {
+      "name": "provider_id",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.] [TODO(barwise): No column description. Add one to the dbt YAML.]"
+    },
+    {
+      "name": "provider_id",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.] [TODO(barwise): No column description. Add one to the dbt YAML.]"
+    },
+    {
+      "name": "specialty",
+      "type": "string",
+      "doc": "[TODO(barwise): No column description. Add one to the dbt YAML.] [NOTE(barwise): Value constraint available: ['cardiology', 'dermatology', 'family medicine', 'orthopedics', 'pediatrics']. Consider adding an accepted_values test.]"
+    }
+  ],
+  "doc": "[NOTE(barwise): Definition available from ORM model: \"A medical provider at the clinic, identified by a state-issued provider ID.\"]"
+}
+
+---
+
+# Appointment.avsc
+{
+  "type": "record",
+  "name": "Appointment",
+  "fields": [
+    {
+      "name": "confirmation_number",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.] [TODO(barwise): No column description. Add one to the dbt YAML.]"
+    },
+    {
+      "name": "confirmation_number",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.] [TODO(barwise): No column description. Add one to the dbt YAML.]"
+    },
+    {
+      "name": "visit_reason",
+      "type": [
+        "null",
+        "string"
+      ],
+      "doc": "[TODO(barwise): No column description. Add one to the dbt YAML.]"
+    },
+    {
+      "name": "appointment_status",
+      "type": "string",
+      "doc": "[TODO(barwise): No column description. Add one to the dbt YAML.] [NOTE(barwise): Value constraint available: ['scheduled', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show']. Consider adding an accepted_values test.]"
+    },
+    {
+      "name": "follow_up_note",
+      "type": [
+        "null",
+        "string"
+      ],
+      "doc": "[TODO(barwise): No column description. Add one to the dbt YAML.]"
+    }
+  ],
+  "doc": "[NOTE(barwise): Definition available from ORM model: \"A scheduled visit between a patient and a doctor, identified by a unique conf...\"]"
+}
+
+---
+
+# ExamRoom.avsc
+{
+  "type": "record",
+  "name": "ExamRoom",
+  "fields": [
+    {
+      "name": "room_number",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.] [TODO(barwise): No column description. Add one to the dbt YAML.]"
+    },
+    {
+      "name": "room_number",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.] [TODO(barwise): No column description. Add one to the dbt YAML.]"
+    }
+  ],
+  "doc": "[NOTE(barwise): Definition available from ORM model: \"A physical examination room in the clinic, identified by a room number.\"]"
+}
+
+---
+
+# AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot.avsc
+{
+  "type": "record",
+  "name": "AppointmentIsForPatientWithDoctorOnAppointmentDateAtTimeSlot",
+  "fields": [
+    {
+      "name": "confirmation_number",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.]"
+    },
+    {
+      "name": "medical_record_number",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.]"
+    },
+    {
+      "name": "provider_id",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.]"
+    }
+  ],
+  "doc": "[NOTE(barwise): Composite primary key (confirmation_number, medical_record_number, provider_id). Individual unique tests are not generated.]"
+}
+
+---
+
+# DoctorIsAssignedToExamRoomOnAppointmentDate.avsc
+{
+  "type": "record",
+  "name": "DoctorIsAssignedToExamRoomOnAppointmentDate",
+  "fields": [
+    {
+      "name": "provider_id",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.]"
+    },
+    {
+      "name": "room_number",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.]"
+    }
+  ],
+  "doc": "[NOTE(barwise): Composite primary key (provider_id, room_number). Individual unique tests are not generated.]"
+}
