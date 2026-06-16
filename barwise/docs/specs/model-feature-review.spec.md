@@ -1,8 +1,35 @@
 # Model-feature review program
 
-Status: Draft for review (plan only -- no code or fix specs in this PR)
+Status: Review complete -- outcomes below
 Tracking: follow-up to the sensemaking program; complements the
 structural audit in `docs/REPO_REVIEW-2026-06.md`
+
+## Outcomes
+
+The review is complete. The high-uncertainty tier (workstreams 1-4)
+produced one behavior fix and three test guards/audits; the mature tier
+(5-10) was each found correct and adequately covered against its named
+risk -- no change needed. Workstreams 5-10 had a coverage-and-named-risk
+pass (rule-id coverage, schema/serializer sync, constructor invariants,
+per-area test density), not an exhaustive line audit; a deeper dive on any
+one is available on request.
+
+| WS | Area                        | Outcome                                                |
+| -- | --------------------------- | ------------------------------------------------------ |
+| 1  | Counterexamples             | Complete; added model-wide round-trip guard (#173)     |
+| 2  | External uniqueness         | Sound; n-ary confirmed, +2 tests, doc corrected (#174) |
+| 3  | Verbalization               | Bug fixed: cross-fact-type role resolution (#172)      |
+| 4  | Anchors + reasoning trail   | Deterministic; added ordering guard (#176)             |
+| 5  | Validation engine           | Clean -- all 52 rule ids have test coverage            |
+| 6  | Metamodel invariants        | Clean -- invariants guarded and densely tested         |
+| 7  | Serialization + schemas     | Clean -- discriminants in sync; round-trip dense       |
+| 8  | Relational mapping + export | Clean -- per-format suites and the format registry     |
+| 9  | Diff / merge + projects     | Clean -- ModelDiff 54, ModelMerge 29, projects covered |
+| 10 | Model-adjacent              | Clean -- lineage, describe, annotation all tested      |
+
+Deferred (not a fix): broader external-uniqueness shapes (a common object
+playing several non-constrained roles) stay unsupported and skip soundly;
+file an enhancement only if a real model needs them.
 
 ## Principle
 
