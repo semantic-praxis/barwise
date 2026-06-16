@@ -1,6 +1,6 @@
 # Architecture analysis program: from one-off review to encoded discipline
 
-Status: Phase B landed; Phase A WS3 (deep review) pending
+Status: Complete -- Phase A and Phase B landed; review cadence active
 Created: 2026-06-16
 Last-updated: 2026-06-16
 Tracking: addresses the standing concern that rapid change is eroding
