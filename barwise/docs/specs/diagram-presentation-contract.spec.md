@@ -1,8 +1,11 @@
 # Diagram Presentation Contract
 
-Status: partially implemented -- steps 1-2 landed (the contract types and
-`DiagramSession` with unit tests live in `@barwise/diagram`); steps 3-5
-(rebuild `protocol.ts`, rewrite `DiagramPanel` as the adapter) pending.
+Status: implemented -- the contract types and `DiagramSession` (steps
+1-2) and the `protocol.ts` rebuild + `DiagramPanel` adapter rewrite
+(steps 3-5) have all landed. `DiagramPanel` is now a ~420-line VS Code
+adapter (was ~900). Resolves REPO_REVIEW-2026-06-16 finding F1.
+Created: 2026-05-19
+Last-updated: 2026-06-16
 Owner: diagram / vscode
 Related: `diagram-ui-modernization.spec.md` -- resolves its open
 architecture question ("Resolved: a front-end-agnostic presentation
@@ -192,8 +195,8 @@ Each step keeps the monorepo build green.
 4. Rewrite `DiagramPanel` as the adapter; delete the migrated logic.
 5. Adjust the webview's type imports if type names changed (it already
    imports `PositionedGraph` and `DiagramMeta` as types).
-6. Full gate: monorepo build, test, lint, knip, oxlint, circular,
-   `dprint check`, and `tsc` for both vscode tsconfigs.
+6. Full gate: monorepo build, test, lint, knip, oxlint, depcruise,
+   purity, `dprint check`, and `tsc` for both vscode tsconfigs.
 
 ## Testing
 

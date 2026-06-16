@@ -35,7 +35,8 @@ src/
     ImportTranscriptCommand.ts orm.importTranscript -- LLM transcript extraction
     ImportCodeCommand.ts      orm.import -- TypeScript/Java/Kotlin code analysis
   diagram/
-    DiagramPanel.ts           VS Code Webview panel host for SVG diagrams
+    DiagramPanel.ts           Webview host; thin adapter over @barwise/diagram DiagramSession
+    protocol.ts               Webview message types (envelopes over the diagram contract)
   llm/
     CopilotLlmClient.ts      LlmClient implementation using GitHub Copilot chat API
   mcp/
