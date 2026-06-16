@@ -43,10 +43,12 @@ human, not CI, should answer.
 | DRY (secondary)               | 2         | 0                | 2      |
 | Total                         | 21        | 13               | 8      |
 
-Thirteen of the twenty-one scenarios are mechanically checkable. Today
-only two are actually gated (S-ORTH-4 cycles via `madge`, and the dead
-exports check that backstops several below via `knip`); the other
-eleven fitness-function scenarios are the Phase B backlog.
+Thirteen of the twenty-one scenarios are mechanically checkable. The six
+structural ones (S-ORTH-1..4, S-DET-1..3) are now gated by the Phase B
+fitness functions: `dependency-cruiser` (`.dependency-cruiser.cjs`) owns
+direction and cycles, and `scripts/check-core-purity.mjs` owns core
+determinism. The schema-version and validation scenarios are gated by
+their test suites; the rest stay advisory.
 
 ## Orthogonality (primary)
 
@@ -59,8 +61,8 @@ graph properties a tool reads straight from the imports.
 When `@barwise/core` is built, it shall import no other `@barwise/*`
 package.
 
-Guard: fitness function. Dependency-direction rule (forbid `core` ->
-`@barwise/(?!core)`). Not yet gated -- Phase B WS4.
+Guard: fitness function, _gated_ by `.dependency-cruiser.cjs` (rule
+`layer-core`): core's src may not import any other package's src.
 
 ### S-ORTH-2 -- connectors depend only on core
 
@@ -68,35 +70,36 @@ When a connector package (`diagram`, `llm`, `code-analysis`, `dbt`,
 `formats`) is built, it shall import only `@barwise/core`; `diagram-ui`
 shall import only `@barwise/diagram`.
 
-Guard: fitness function. Per-package allowed-dependency rule. Not yet
-gated -- Phase B WS4.
+Guard: fitness function, _gated_ by `.dependency-cruiser.cjs` (the
+per-package `layer-<pkg>` rules generated from the intended graph).
 
 ### S-ORTH-3 -- no connector depends on another connector
 
 When one connector package changes, no other connector package shall
 need to import from it.
 
-Guard: fitness function. The complement of S-ORTH-2: the direction rule
-forbids connector-to-connector edges, so this falls out of the same
-config. Not yet gated -- Phase B WS4.
+Guard: fitness function, _gated_. The complement of S-ORTH-2: the
+`layer-<pkg>` rules forbid connector-to-connector edges, so this falls
+out of the same `.dependency-cruiser.cjs` config.
 
 ### S-ORTH-4 -- no import cycles
 
 When any package is built, its internal modules shall contain no import
 cycles.
 
-Guard: fitness function, _already gated_. `madge --circular` in the
-`circular` npm script. Phase B WS4 folds this into the depcruise config
-so one tool owns both direction and cycles.
+Guard: fitness function, _gated_ by `.dependency-cruiser.cjs` (the
+`no-circular` rule). This replaced the former `madge --circular` check,
+so one tool now owns both direction and cycles.
 
 ### S-ORTH-5 -- one concern per module
 
 When a module is read, its responsibilities shall map to a single
 concern named by its package's `CLAUDE.md`.
 
-Guard: review. "One concern" is a semantic judgment a tool cannot make;
-the god-file inventory (REPO_REVIEW A1) is where this scenario is
-assessed. The hotspot triage (WS2) ranks the candidates.
+Guard: review, with a warn-only file-size signal
+(`scripts/check-file-size.mjs`). "One concern" is a semantic judgment a
+tool cannot make, so size never gates; the warn list plus the WS2 hotspot
+triage rank the candidates for the god-file work (REPO_REVIEW A1).
 
 ## Composability (primary)
 
@@ -150,18 +153,20 @@ spec review, not in CI.
 
 Validation, verbalization, mapping, diff, and query are pure and
 deterministic. Non-determinism (I/O, clocks, randomness, LLM, network)
-lives one layer out. This pillar is almost entirely a forbidden-import
-fitness function -- the cleanest automation target in the catalog, and
-the one REPO_REVIEW #2 showed regresses without a gate.
+lives one layer out. This pillar is the one REPO_REVIEW #2 showed
+regresses without a gate. Because some of it is code patterns
+(`process.env`, `Date.now`) rather than imports, dependency-cruiser
+cannot see it; the gate is `scripts/check-core-purity.mjs`, which owns
+all three scenarios below.
 
 ### S-DET-1 -- no I/O in core
 
 When `@barwise/core` source is compiled, it shall import none of
 `node:fs`, `node:child_process`, `node:os`, or any network module.
 
-Guard: fitness function. Forbidden-import rule over `core/src`. Not yet
-gated -- Phase B WS5. (REPO_REVIEW #2 fixed the leftovers by hand; this
-makes the fix non-regressable.)
+Guard: fitness function, _gated_ by `scripts/check-core-purity.mjs`.
+(REPO_REVIEW #2 fixed the leftovers by hand; this makes the fix
+non-regressable.)
 
 ### S-DET-2 -- no ambient randomness in core
 
@@ -169,18 +174,18 @@ When core code needs a unique identifier, it shall import `randomUUID`
 from `node:crypto`; it shall not call the global `crypto.*` or
 `Math.random`.
 
-Guard: fitness function. Forbid global `crypto`/`Math.random`; the
-`node:crypto` import is the one allowed source. Not yet gated -- Phase B
-WS5. (This is exactly the inconsistency REPO_REVIEW A5 fixed in
-`FactType.ts`.)
+Guard: fitness function, _gated_ by `scripts/check-core-purity.mjs`
+(forbids global `crypto.` and `Math.random`; the `node:crypto` import is
+the one allowed source). This is exactly the inconsistency REPO_REVIEW A5
+fixed in `FactType.ts`.
 
 ### S-DET-3 -- no clock or environment reads in core
 
 When core code runs, it shall not read wall-clock time (`Date.now`,
 `new Date()`) or `process.env`.
 
-Guard: fitness function. Forbidden-call/forbidden-import rule over
-`core/src`. Not yet gated -- Phase B WS5.
+Guard: fitness function, _gated_ by `scripts/check-core-purity.mjs`
+(forbids `Date.now`, `new Date()`, and `process.env` in `core/src`).
 
 ### S-DET-4 -- repeatable output
 
@@ -257,10 +262,11 @@ check. The connector packages (`registerStandardFormats()`,
 ## DRY (secondary)
 
 Duplication is removed only when it does not compromise orthogonality or
-composability; otherwise the duplication stays. This pillar has _no_
-fitness function by design -- an automated duplication gate would push
-toward exactly the coupling the pillar forbids. Both scenarios are
-deliberately _review_.
+composability; otherwise the duplication stays. This pillar has no
+_gating_ fitness function by design -- a blocking duplication gate would
+push toward exactly the coupling the pillar forbids. A duplication scan
+(`jscpd`) runs _warn-only_ as an advisory signal the reviewer weighs; it
+never fails CI. Both scenarios stay _review_.
 
 ### S-DRY-1 -- duplication removed only without new coupling
 
@@ -268,10 +274,11 @@ When duplication is found across packages, it shall be removed only if
 the shared abstraction does not introduce a dependency-graph edge that
 S-ORTH-1..3 forbid.
 
-Guard: review. The reviewer weighs the duplication against the coupling
-its removal would create. A duplication-detection tool is explicitly
-_not_ adopted: it would optimize for the secondary pillar at the
-primary pillars' expense.
+Guard: review, with a warn-only `jscpd` signal. The scan surfaces
+duplication candidates; the reviewer weighs each against the coupling its
+removal would create and removes only those that introduce no forbidden
+edge. The signal never gates -- gating it would optimize the secondary
+pillar at the primary pillars' expense.
 
 ### S-DRY-2 -- no abstraction that forces an interface to bend
 
