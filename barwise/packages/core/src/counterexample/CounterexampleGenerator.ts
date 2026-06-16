@@ -4,12 +4,14 @@ import {
   type EqualityConstraint,
   type ExclusionConstraint,
   type ExclusiveOrConstraint,
+  type ExternalUniquenessConstraint,
   type FrequencyConstraint,
   type InternalUniquenessConstraint,
   isDisjunctiveMandatory,
   isEquality,
   isExclusion,
   isExclusiveOr,
+  isExternalUniqueness,
   isFrequency,
   isInternalUniqueness,
   isMandatoryRole,
@@ -21,6 +23,7 @@ import {
   type SubsetConstraint,
   type ValueConstraint,
 } from "../model/Constraint.js";
+import { inferExternalUniquenessJoin } from "../externalUniqueness.js";
 import type { FactType } from "../model/FactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { Population } from "../model/Population.js";
@@ -43,8 +46,9 @@ type RoleValues = Record<string, string>;
  *
  * Covers the intra-fact-type constraints (internal uniqueness, value,
  * frequency, ring) and the cross-fact-type ones (mandatory, disjunctive
- * mandatory, exclusion, exclusive-or, subset, equality). External
- * uniqueness has no counterexample yet and is skipped.
+ * mandatory, exclusion, exclusive-or, subset, equality, external
+ * uniqueness). External uniqueness is skipped only when its join key
+ * cannot be inferred as a single clear common object type.
  */
 export function generateCounterexamples(model: OrmModel): Counterexample[] {
   const result: Counterexample[] = [];
@@ -94,6 +98,9 @@ export function generateCounterexampleForConstraint(
   }
   if (isEquality(constraint)) {
     return forEquality(constraint, factType, model);
+  }
+  if (isExternalUniqueness(constraint)) {
+    return forExternalUniqueness(constraint, factType, model);
   }
   return undefined;
 }
@@ -403,6 +410,58 @@ function forEquality(
   model: OrmModel,
 ): Counterexample | undefined {
   return forTupleAbsence(ft, eq, eq.roleIds1, eq.roleIds2, model);
+}
+
+/**
+ * External uniqueness: two distinct common-object instances that share the
+ * same identifying combination across the joined fact types. Skipped when
+ * the join key cannot be inferred as a single clear common object type.
+ */
+function forExternalUniqueness(
+  euc: ExternalUniquenessConstraint,
+  ft: FactType,
+  model: OrmModel,
+): Counterexample | undefined {
+  const join = inferExternalUniquenessJoin(euc.roleIds, model);
+  if (!join) return undefined;
+
+  const firstFt = join.factTypes[0];
+  if (!firstFt) return undefined;
+  const firstKeyRole = firstFt.roles.find((r) => r.id === join.keyRoleByFactType.get(firstFt.id));
+  if (!firstKeyRole) return undefined;
+  // The same common instance must appear under both values in every fact
+  // type, so mint the two keys once and reuse them across the join.
+  const common1 = mintValue(firstKeyRole, firstFt, model, 0);
+  const common2 = mintValue(firstKeyRole, firstFt, model, 1);
+
+  const forbidden: Population[] = [];
+  for (const jft of join.factTypes) {
+    const keyRoleId = join.keyRoleByFactType.get(jft.id)!;
+    const constrainedRoleId = join.constrainedRoleByFactType.get(jft.id)!;
+    const constrainedRole = jft.roles.find((r) => r.id === constrainedRoleId)!;
+    const shared = mintValue(constrainedRole, jft, model, 0);
+    const inst1: RoleValues = {};
+    const inst2: RoleValues = {};
+    for (const r of jft.roles) {
+      inst1[r.id] = mintValue(r, jft, model, 0);
+      inst2[r.id] = mintValue(r, jft, model, 0);
+    }
+    inst1[keyRoleId] = common1;
+    inst2[keyRoleId] = common2;
+    inst1[constrainedRoleId] = shared;
+    inst2[constrainedRoleId] = shared;
+    forbidden.push(
+      new Population({
+        factTypeId: jft.id,
+        instances: [{ roleValues: inst1 }, { roleValues: inst2 }],
+      }),
+    );
+  }
+
+  const reason = `two ${playerName(firstKeyRole, model)} instances sharing the same `
+    + `identifying combination`;
+  const rendered = `${common1} and ${common2} share the same combination`;
+  return makeCrossCounterexample(ft, euc, forbidden, reason, rendered);
 }
 
 /** A single anchor role in some fact type, used to make an instance exist. */
