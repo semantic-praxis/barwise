@@ -31,6 +31,7 @@ export const QUERY_COMMANDS: readonly string[] = [
   "subtypes-of",
   "supertypes-of",
   "mandatory-roles",
+  "anchors",
   "path",
   "stats",
 ];
@@ -160,6 +161,11 @@ export function parseQuery(text: string): ModelQuery {
       return args.length === 0
         ? { kind: "mandatory-roles" }
         : { kind: "mandatory-roles", entity: args[0]! };
+
+    case "anchors":
+      return args.length === 0
+        ? { kind: "anchors" }
+        : { kind: "anchors", entity: args[0]! };
 
     case "path": {
       if (args.length < 2) {

@@ -26,6 +26,7 @@ export type ModelQuery =
   | { readonly kind: "supertypes-of"; readonly entity: string; readonly transitive: boolean; }
   | { readonly kind: "mandatory-roles"; readonly entity?: string; }
   | { readonly kind: "path"; readonly from: string; readonly to: string; }
+  | { readonly kind: "anchors"; readonly entity?: string; }
   | { readonly kind: "model-stats"; };
 
 /** The `kind` discriminant of a {@link ModelQuery}. */
@@ -126,6 +127,33 @@ export interface ModelStats {
 }
 
 /**
+ * The anchors of a single entity type -- the load-bearing facts its
+ * identity rests on: its reference mode, its preferred-identifier
+ * uniqueness, and the fact types it must participate in.
+ */
+export interface EntityAnchors {
+  readonly entity: string;
+  /** The identification scheme (reference mode), if declared. */
+  readonly referenceMode?: string;
+  /** The preferred-identifier uniqueness constraint, if present. */
+  readonly preferredIdentifier?: {
+    /** The identifier fact type carrying the preferred uniqueness. */
+    readonly factType: string;
+    /** The object type(s) that identify the entity. */
+    readonly identifierTypes: readonly string[];
+  };
+  /** Names of fact types in which the entity plays a mandatory role. */
+  readonly mandatoryRoles: readonly string[];
+  /**
+   * True when the entity has no preferred-identifier uniqueness constraint
+   * -- its reference scheme is declared but not formalized into the model.
+   * (Entity types always have a reference mode, so this is the meaningful
+   * missing-anchor signal.)
+   */
+  readonly missingIdentifier: boolean;
+}
+
+/**
  * The deterministic result of evaluating a {@link ModelQuery}.
  * Discriminated by `kind`.
  *
@@ -147,6 +175,7 @@ export type QueryResult =
     readonly steps: readonly PathStep[];
   }
   | { readonly kind: "stats"; readonly stats: ModelStats; }
+  | { readonly kind: "anchors"; readonly anchors: readonly EntityAnchors[]; }
   | { readonly kind: "not-found"; readonly message: string; };
 
 /**

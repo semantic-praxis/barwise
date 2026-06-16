@@ -7,7 +7,7 @@
  * returns a `not-found` result rather than throwing.
  */
 
-import type { Constraint } from "../model/Constraint.js";
+import { type Constraint, isInternalUniqueness, isMandatoryRole } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
@@ -16,6 +16,7 @@ import type { Role } from "../model/Role.js";
 import { Verbalizer } from "../verbalization/Verbalizer.js";
 import type {
   ConstraintRef,
+  EntityAnchors,
   EntityRef,
   FactTypeRef,
   ModelQuery,
@@ -60,6 +61,8 @@ export function queryModel(model: OrmModel, query: ModelQuery): QueryResult {
       return ctx.mandatoryRoles(query.entity);
     case "path":
       return ctx.path(query.from, query.to);
+    case "anchors":
+      return ctx.anchors(query.entity);
     case "model-stats":
       return ctx.stats();
   }
@@ -393,6 +396,62 @@ class QueryContext {
       currentId = edge.prevId;
     }
     return steps;
+  }
+
+  anchors(entityName?: string): QueryResult {
+    let entities: readonly ObjectType[];
+    if (entityName !== undefined) {
+      const entity = this.findEntity(entityName);
+      if (!entity) return notFoundEntity(entityName);
+      if (entity.kind !== "entity") {
+        return {
+          kind: "not-found",
+          message: `"${entity.name}" is a value type and has no identification anchor.`,
+        };
+      }
+      entities = [entity];
+    } else {
+      entities = this.model.objectTypes.filter((ot) => ot.kind === "entity");
+    }
+
+    const anchors = entities
+      .map((e) => this.entityAnchors(e))
+      .sort((a, b) => a.entity.localeCompare(b.entity));
+    return { kind: "anchors", anchors };
+  }
+
+  /** Compute the identification anchors of a single entity type. */
+  private entityAnchors(entity: ObjectType): EntityAnchors {
+    let preferredIdentifier: EntityAnchors["preferredIdentifier"];
+    const mandatoryFactTypes = new Set<string>();
+
+    for (const ft of this.model.factTypesForObjectType(entity.id)) {
+      for (const c of ft.constraints) {
+        if (
+          preferredIdentifier === undefined
+          && isInternalUniqueness(c)
+          && c.isPreferred
+          && c.roleIds.some((rid) => ft.getRoleById(rid)?.playerId === entity.id)
+        ) {
+          const identifierTypes = ft.roles
+            .filter((r) => r.playerId !== entity.id)
+            .map((r) => this.model.getObjectType(r.playerId)?.name ?? r.playerId);
+          preferredIdentifier = { factType: ft.name, identifierTypes };
+        }
+        if (isMandatoryRole(c) && ft.getRoleById(c.roleId)?.playerId === entity.id) {
+          mandatoryFactTypes.add(ft.name);
+        }
+      }
+    }
+
+    const referenceMode = entity.referenceMode;
+    return {
+      entity: entity.name,
+      ...(referenceMode !== undefined ? { referenceMode } : {}),
+      ...(preferredIdentifier !== undefined ? { preferredIdentifier } : {}),
+      mandatoryRoles: [...mandatoryFactTypes].sort(),
+      missingIdentifier: preferredIdentifier === undefined,
+    };
   }
 
   stats(): QueryResult {

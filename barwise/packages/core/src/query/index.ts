@@ -29,6 +29,7 @@ export { formatQueryResult } from "./format.js";
 export { parseQuery, QUERY_COMMANDS, tokenizeQuery } from "./parse.js";
 export type {
   ConstraintRef,
+  EntityAnchors,
   EntityDetail,
   EntityRef,
   FactTypeDetail,
