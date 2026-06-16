@@ -359,6 +359,51 @@ describe("cross-fact-type counterexamples", () => {
     expect(forbids(model, ce!, "population/subset-violation")).toBe(true);
   });
 
+  function roomModel(): OrmModel {
+    return new ModelBuilder()
+      .withEntityType("Room")
+      .withEntityType("Building")
+      .withValueType("RoomNumber")
+      .withBinaryFactType("Room is in Building", {
+        role1: { player: "Room", name: "is in" },
+        role2: { player: "Building", name: "houses" },
+      })
+      .withBinaryFactType("Room has RoomNumber", {
+        role1: { player: "Room", name: "has" },
+        role2: { player: "RoomNumber", name: "numbers" },
+      })
+      .build();
+  }
+
+  it("forbids a shared combination for an external uniqueness", () => {
+    const model = roomModel();
+    const inBuilding = model.getFactTypeByName("Room is in Building")!;
+    inBuilding.addConstraint({
+      type: "external_uniqueness",
+      roleIds: ["Room is in Building::role2", "Room has RoomNumber::role2"],
+    });
+    const euc = inBuilding.constraints.find((c) => c.type === "external_uniqueness")!;
+
+    const ce = generateCounterexampleForConstraint(euc, inBuilding, model);
+    expect(ce).toBeDefined();
+    expect(ce!.constraintType).toBe("external_uniqueness");
+    expect(ce!.forbidden).toHaveLength(2);
+    expect(forbids(model, ce!, "population/external-uniqueness-violation")).toBe(true);
+  });
+
+  it("returns nothing for an external uniqueness with an un-inferable join", () => {
+    const model = roomModel();
+    const inBuilding = model.getFactTypeByName("Room is in Building")!;
+    // Both constrained roles share a fact type -> no single common object.
+    inBuilding.addConstraint({
+      type: "external_uniqueness",
+      roleIds: ["Room is in Building::role1", "Room is in Building::role2"],
+    });
+    const euc = inBuilding.constraints.find((c) => c.type === "external_uniqueness")!;
+
+    expect(generateCounterexampleForConstraint(euc, inBuilding, model)).toBeUndefined();
+  });
+
   it("forbids a spanning equality (a tuple present on one side only)", () => {
     const model = new ModelBuilder()
       .withEntityType("Person")

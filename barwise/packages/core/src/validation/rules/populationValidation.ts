@@ -1,8 +1,10 @@
+import { inferExternalUniquenessJoin } from "../../externalUniqueness.js";
 import {
   isDisjunctiveMandatory,
   isEquality,
   isExclusion,
   isExclusiveOr,
+  isExternalUniqueness,
   isFrequency,
   isInternalUniqueness,
   isMandatoryRole,
@@ -28,6 +30,8 @@ import type { Diagnostic } from "../Diagnostic.js";
  * - Exclusive-or violations: an object does not play exactly one of the roles.
  * - Subset violations: a tuple in the subset roles has no match in the superset roles.
  * - Equality violations: the tuple sets for both role sequences differ.
+ * - External uniqueness violations: two distinct common-object instances
+ *   share the same identifying combination across the joined fact types.
  * - Ring violations: reflexive relationship properties are violated.
  * - Mandatory violations: an object instance exists somewhere but does not
  *   play a role it is required to play.
@@ -38,8 +42,10 @@ import type { Diagnostic } from "../Diagnostic.js";
  * universe -- every value that appears in any role played by a type across
  * all populations (a closed-world reading of the sample). Exclusion,
  * exclusive-or, subset, and equality constraints whose roles span fact
- * types are checked too. External uniqueness remains unvalidated (its
- * cross-fact-type instance-join is a future enhancement).
+ * types are checked too. External uniqueness is checked by inferring the
+ * common-object join key and flagging two distinct common instances that
+ * share the same identifying combination; it is skipped when that join
+ * key cannot be inferred as a single clear object type.
  */
 export function populationValidationRules(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -59,6 +65,7 @@ export function populationValidationRules(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkSpanningExclusiveOrViolations(model));
   diagnostics.push(...checkSpanningSubsetViolations(model));
   diagnostics.push(...checkSpanningEqualityViolations(model));
+  diagnostics.push(...checkExternalUniquenessViolations(model));
 
   return diagnostics;
 }
@@ -973,6 +980,77 @@ function checkSpanningEqualityViolations(model: OrmModel): Diagnostic[] {
             elementId: c.id ?? ft.id,
             ruleId: "population/equality-violation",
           });
+        }
+      }
+    }
+  }
+  return diagnostics;
+}
+
+/**
+ * External uniqueness: the combination of constrained role values is unique
+ * per common object (the inferred join key). Two distinct common instances
+ * with the same combination violate it. Skips when the join key is not a
+ * single clear object type.
+ */
+function checkExternalUniquenessViolations(model: OrmModel): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  for (const ft of model.factTypes) {
+    for (const c of ft.constraints) {
+      if (!isExternalUniqueness(c)) continue;
+      const join = inferExternalUniquenessJoin(c.roleIds, model);
+      if (!join) continue;
+
+      // Per fact type: common-object value -> constrained value.
+      const constrainedByCommon = new Map<string, Map<string, string>>();
+      for (const jft of join.factTypes) {
+        const keyRole = join.keyRoleByFactType.get(jft.id)!;
+        const constrainedRole = join.constrainedRoleByFactType.get(jft.id)!;
+        const map = new Map<string, string>();
+        for (const pop of model.populations) {
+          if (pop.factTypeId !== jft.id) continue;
+          for (const inst of pop.instances) {
+            const common = inst.roleValues[keyRole];
+            const constrained = inst.roleValues[constrainedRole];
+            if (common !== undefined && constrained !== undefined) {
+              map.set(common, constrained);
+            }
+          }
+        }
+        constrainedByCommon.set(jft.id, map);
+      }
+
+      const commonValues = new Set<string>();
+      for (const map of constrainedByCommon.values()) {
+        for (const v of map.keys()) commonValues.add(v);
+      }
+
+      const seen = new Map<string, string>(); // combination tuple -> first common value
+      for (const common of commonValues) {
+        const parts: string[] = [];
+        let complete = true;
+        for (const jft of join.factTypes) {
+          const value = constrainedByCommon.get(jft.id)!.get(common);
+          if (value === undefined) {
+            complete = false;
+            break;
+          }
+          parts.push(value);
+        }
+        if (!complete) continue;
+
+        const tuple = parts.join("\0");
+        const first = seen.get(tuple);
+        if (first !== undefined && first !== common) {
+          diagnostics.push({
+            severity: "error",
+            message: `External uniqueness constraint is violated: "${common}" and `
+              + `"${first}" share the same combination [${parts.join(", ")}].`,
+            elementId: c.id ?? ft.id,
+            ruleId: "population/external-uniqueness-violation",
+          });
+        } else if (first === undefined) {
+          seen.set(tuple, common);
         }
       }
     }
