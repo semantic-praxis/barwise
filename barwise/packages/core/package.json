@@ -10,6 +10,42 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./annotation": {
+      "types": "./dist/annotation/index.d.ts",
+      "default": "./dist/annotation/index.js"
+    },
+    "./counterexample": {
+      "types": "./dist/counterexample/index.d.ts",
+      "default": "./dist/counterexample/index.js"
+    },
+    "./describe": {
+      "types": "./dist/describe/index.d.ts",
+      "default": "./dist/describe/index.js"
+    },
+    "./diff": {
+      "types": "./dist/diff/index.d.ts",
+      "default": "./dist/diff/index.js"
+    },
+    "./lineage": {
+      "types": "./dist/lineage/index.d.ts",
+      "default": "./dist/lineage/index.js"
+    },
+    "./mapping": {
+      "types": "./dist/mapping/index.d.ts",
+      "default": "./dist/mapping/index.js"
+    },
+    "./query": {
+      "types": "./dist/query/index.d.ts",
+      "default": "./dist/query/index.js"
+    },
+    "./sql": {
+      "types": "./dist/sql/index.d.ts",
+      "default": "./dist/sql/index.js"
+    },
+    "./verbalization": {
+      "types": "./dist/verbalization/index.d.ts",
+      "default": "./dist/verbalization/index.js"
     }
   },
   "files": [
