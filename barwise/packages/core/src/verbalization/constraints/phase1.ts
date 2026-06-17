@@ -13,7 +13,7 @@ import {
   type Verbalization,
   type VerbalizationSegment,
 } from "../Verbalization.js";
-import { extractPredicate, findRole } from "./helpers.js";
+import { extractPredicate } from "./sentence.js";
 
 export function verbalizeInternalUniqueness(
   roleIds: readonly string[],
@@ -275,7 +275,7 @@ export function verbalizeExternalUniqueness(
   for (let i = 0; i < roleIds.length; i++) {
     // External uniqueness spans fact types, so resolve each role
     // model-wide rather than against the owner fact type alone.
-    const role = findRole(roleIds[i]!, factType, model);
+    const role = model.findRole(roleIds[i]!);
     const ot = role ? model.getObjectType(role.playerId) : undefined;
     const name = ot?.name ?? role?.name ?? roleIds[i]!;
 

@@ -12,7 +12,7 @@ import {
   type Verbalization,
   type VerbalizationSegment,
 } from "../Verbalization.js";
-import { extractPredicate, resolveCommonPlayer } from "./helpers.js";
+import { extractPredicate, resolveCommonPlayer } from "./sentence.js";
 
 export function verbalizeDisjunctiveMandatory(
   roleIds: readonly string[],

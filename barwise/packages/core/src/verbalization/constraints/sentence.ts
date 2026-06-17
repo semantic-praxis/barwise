@@ -1,24 +1,10 @@
 /**
- * Shared helpers for constraint verbalization: role resolution and
- * binary-reading predicate extraction.
+ * FORML sentence parts for constraint verbalization: the subject entity
+ * a multi-role constraint is about (resolveCommonPlayer) and the predicate
+ * phrase between two roles of a binary reading (extractPredicate).
  */
 import type { FactType } from "../../model/FactType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
-import type { Role } from "../../model/Role.js";
-
-export function findRole(
-  roleId: string,
-  factType: FactType,
-  model: OrmModel,
-): Role | undefined {
-  const local = factType.getRoleById(roleId);
-  if (local) return local;
-  for (const ft of model.factTypes) {
-    const role = ft.getRoleById(roleId);
-    if (role) return role;
-  }
-  return undefined;
-}
 
 export function resolveCommonPlayer(
   roleIds: readonly string[],
