@@ -2,7 +2,9 @@
  * import_transcript tool: processes a transcript through LLM extraction.
  */
 
-import { annotateOrmYaml, type ModelDiffResult, OrmYamlSerializer } from "@barwise/core";
+import { OrmYamlSerializer } from "@barwise/core";
+import { annotateOrmYaml } from "@barwise/core/annotation";
+import type { ModelDiffResult } from "@barwise/core/diff";
 import { buildExistingModelContext, createLlmClient, processTranscript } from "@barwise/llm";
 import type { CandidateFraming, ProviderName } from "@barwise/llm";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";

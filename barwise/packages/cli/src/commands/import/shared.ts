@@ -1,5 +1,5 @@
 import { OrmYamlSerializer } from "@barwise/core";
-import type { ModelDiffResult } from "@barwise/core";
+import type { ModelDiffResult } from "@barwise/core/diff";
 import type { CandidateFraming } from "@barwise/llm";
 
 export const serializer = new OrmYamlSerializer();

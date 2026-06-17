@@ -5,7 +5,7 @@
  * entities, fact types, and constraints, with optional focus filtering.
  */
 
-import { describeDomain } from "@barwise/core";
+import { describeDomain } from "@barwise/core/describe";
 import type { Command } from "commander";
 import { loadModel } from "../helpers/io.js";
 

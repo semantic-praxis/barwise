@@ -9,17 +9,14 @@
  */
 
 import {
-  collectExportAnnotations,
-  type ExportAnnotation,
   type ExportFormatAdapter,
   type ExportOptions,
   type ExportResult,
-  openApiToJson,
   type OrmModel,
-  RelationalMapper,
-  renderOpenApi,
   ValidationEngine,
 } from "@barwise/core";
+import { collectExportAnnotations, type ExportAnnotation } from "@barwise/core/annotation";
+import { openApiToJson, RelationalMapper, renderOpenApi } from "@barwise/core/mapping";
 
 /**
  * OpenAPI 3.0 export format.

@@ -4,7 +4,8 @@
  * Lineage tracking and staleness detection.
  */
 
-import { analyzeImpact, checkStaleness } from "@barwise/core";
+import { checkStaleness } from "@barwise/core";
+import { analyzeImpact } from "@barwise/core/lineage";
 import type { Command } from "commander";
 import { dirname, resolve } from "node:path";
 import { loadModel } from "../helpers/io.js";

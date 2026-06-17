@@ -2,7 +2,8 @@
  * verbalize_model tool: generates FORML verbalizations for a model.
  */
 
-import { type Counterexample, generateCounterexamples, Verbalizer } from "@barwise/core";
+import { type Counterexample, generateCounterexamples } from "@barwise/core/counterexample";
+import { Verbalizer } from "@barwise/core/verbalization";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveSource } from "../helpers/resolve.js";

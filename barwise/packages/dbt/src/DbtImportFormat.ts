@@ -14,13 +14,8 @@
  * and extracts JOIN, WHERE, CASE, and constraint patterns.
  */
 
-import {
-  type ImportFormat,
-  type ImportOptions,
-  type ImportResult,
-  parseSqlFile,
-  type SqlDialect,
-} from "@barwise/core";
+import type { ImportFormat, ImportOptions, ImportResult } from "@barwise/core";
+import { parseSqlFile, type SqlDialect } from "@barwise/core/sql";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { type DbtDialectOptions, detectDbtDialect } from "./DbtDialectDetector.js";

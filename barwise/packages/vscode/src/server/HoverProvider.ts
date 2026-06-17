@@ -1,9 +1,6 @@
-import {
-  generateCounterexamples,
-  type OrmModel,
-  OrmYamlSerializer,
-  Verbalizer,
-} from "@barwise/core";
+import { type OrmModel, OrmYamlSerializer } from "@barwise/core";
+import { generateCounterexamples } from "@barwise/core/counterexample";
+import { Verbalizer } from "@barwise/core/verbalization";
 import type { TextDocument } from "vscode-languageserver-textdocument";
 import { Hover, type Position } from "vscode-languageserver/node.js";
 

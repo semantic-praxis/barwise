@@ -5,7 +5,8 @@
  * renders Avro schema files (.avsc), and writes them to a chosen
  * output directory.
  */
-import { avroSchemaToJson, OrmYamlSerializer, RelationalMapper, renderAvro } from "@barwise/core";
+import { OrmYamlSerializer } from "@barwise/core";
+import { avroSchemaToJson, RelationalMapper, renderAvro } from "@barwise/core/mapping";
 import * as path from "node:path";
 import * as vscode from "vscode";
 

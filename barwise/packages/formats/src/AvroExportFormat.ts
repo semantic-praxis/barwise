@@ -8,20 +8,21 @@
  */
 
 import {
-  type AvroField,
-  type AvroSchema,
-  type AvroSchemaSet,
-  avroSchemaToJson,
-  collectExportAnnotations,
-  type ExportAnnotation,
   type ExportFormatAdapter,
   type ExportOptions,
   type ExportResult,
   type OrmModel,
-  RelationalMapper,
-  renderAvro,
   ValidationEngine,
 } from "@barwise/core";
+import { collectExportAnnotations, type ExportAnnotation } from "@barwise/core/annotation";
+import {
+  type AvroField,
+  type AvroSchema,
+  type AvroSchemaSet,
+  avroSchemaToJson,
+  RelationalMapper,
+  renderAvro,
+} from "@barwise/core/mapping";
 
 /**
  * Apache Avro schema export format.

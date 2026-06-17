@@ -18,7 +18,7 @@
  * keeping ambient state at the tool boundary.
  */
 
-import type { SqlDialect } from "@barwise/core";
+import type { SqlDialect } from "@barwise/core/sql";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 

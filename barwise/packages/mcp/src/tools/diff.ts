@@ -2,7 +2,7 @@
  * diff_models tool: computes the diff between two ORM models.
  */
 
-import { diffModels } from "@barwise/core";
+import { diffModels } from "@barwise/core/diff";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveSource } from "../helpers/resolve.js";

@@ -8,7 +8,8 @@
  * the prompt construction, LLM call, response parsing, and model building.
  */
 
-import { diffModels, type OrmModel } from "@barwise/core";
+import type { OrmModel } from "@barwise/core";
+import { diffModels } from "@barwise/core/diff";
 import { parseDraftModel } from "./DraftModelParser.js";
 import { enforceConformance } from "./ExtractionConformance.js";
 import {

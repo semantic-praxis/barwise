@@ -2,7 +2,7 @@
  * impact_analysis tool: analyze impact of changing a model element.
  */
 
-import { analyzeImpact } from "@barwise/core";
+import { analyzeImpact } from "@barwise/core/lineage";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { dirname, resolve } from "node:path";
 import { z } from "zod";

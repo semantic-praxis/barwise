@@ -8,17 +8,19 @@
  */
 
 import {
-  annotateDbtExport,
   type ExportFormatAdapter,
   type ExportOptions,
   type ExportResult,
   type OrmModel,
+  ValidationEngine,
+} from "@barwise/core";
+import {
+  annotateDbtExport,
   RelationalMapper,
   type RelationalSchema,
   renderDbt,
   type Table,
-  ValidationEngine,
-} from "@barwise/core";
+} from "@barwise/core/mapping";
 
 /**
  * dbt (data build tool) export format.

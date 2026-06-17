@@ -4,7 +4,8 @@
  * Takes the active .orm.yaml, maps it to a relational schema,
  * renders CREATE TABLE DDL statements, and writes to a .sql file.
  */
-import { OrmYamlSerializer, RelationalMapper, renderDdl } from "@barwise/core";
+import { OrmYamlSerializer } from "@barwise/core";
+import { RelationalMapper, renderDdl } from "@barwise/core/mapping";
 import * as path from "node:path";
 import * as vscode from "vscode";
 

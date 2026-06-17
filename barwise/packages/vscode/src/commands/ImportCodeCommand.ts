@@ -7,8 +7,7 @@
  * analysis on known entities.
  */
 import { registerCodeFormats } from "@barwise/code-analysis";
-import { getImporter, OrmYamlSerializer } from "@barwise/core";
-import type { ImportResult } from "@barwise/core";
+import { getImporter, type ImportResult, OrmYamlSerializer } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
 import * as path from "node:path";

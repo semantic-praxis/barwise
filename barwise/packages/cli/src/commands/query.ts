@@ -7,8 +7,13 @@
  * their relationships.
  */
 
-import { formatQueryResult, parseQuery, QUERY_COMMANDS, queryModel } from "@barwise/core";
-import { QueryParseError } from "@barwise/core";
+import {
+  formatQueryResult,
+  parseQuery,
+  QUERY_COMMANDS,
+  queryModel,
+  QueryParseError,
+} from "@barwise/core/query";
 import type { Command } from "commander";
 import { loadModel } from "../helpers/io.js";
 

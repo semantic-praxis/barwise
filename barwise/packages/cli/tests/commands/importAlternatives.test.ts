@@ -2,7 +2,8 @@
  * Tests for the WS-C surfacing helper: rendering candidate framings (with
  * their diff against the primary) for the `import transcript` command.
  */
-import { diffModels, OrmModel } from "@barwise/core";
+import { OrmModel } from "@barwise/core";
+import { diffModels } from "@barwise/core/diff";
 import type { CandidateFraming } from "@barwise/llm";
 import { describe, expect, it } from "vitest";
 import { formatAlternativeFramings } from "../../src/commands/import.js";

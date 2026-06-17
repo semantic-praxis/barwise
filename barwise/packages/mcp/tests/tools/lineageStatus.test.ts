@@ -2,7 +2,7 @@
  * Tests for the lineage_status tool.
  */
 import { OrmYamlSerializer } from "@barwise/core";
-import type { LineageManifest } from "@barwise/core";
+import type { LineageManifest } from "@barwise/core/lineage";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import { dirname, resolve } from "node:path";

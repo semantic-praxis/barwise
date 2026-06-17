@@ -12,7 +12,7 @@
  * - Class hierarchies for subtype relationships
  */
 
-import { type ImportFormat, type ImportOptions, type ImportResult } from "@barwise/core";
+import type { ImportFormat, ImportOptions, ImportResult } from "@barwise/core";
 import { assembleJavaContext } from "../context/JvmContextAssembler.js";
 import { LspManager } from "../lsp/LspManager.js";
 import { defaultJavaConfig } from "../lsp/servers/java.js";

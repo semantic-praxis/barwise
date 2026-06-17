@@ -10,7 +10,7 @@ import {
   manifestPath,
   parseManifest,
   serializeManifest,
-} from "@barwise/core";
+} from "@barwise/core/lineage";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 

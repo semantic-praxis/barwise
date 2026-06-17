@@ -2,7 +2,7 @@
  * generate_schema tool: generates relational schema (DDL or JSON) from a model.
  */
 
-import { RelationalMapper, renderDdl } from "@barwise/core";
+import { RelationalMapper, renderDdl } from "@barwise/core/mapping";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveSource } from "../helpers/resolve.js";
