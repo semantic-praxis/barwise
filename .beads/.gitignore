@@ -14,6 +14,9 @@ daemon.*
 # Interactions log (runtime, not versioned)
 interactions.jsonl
 
+# Auto-import working file (runtime cache from bd import/bootstrap)
+.auto-import-issues.jsonl
+
 # Push state (runtime, per-machine)
 push-state.json
 
