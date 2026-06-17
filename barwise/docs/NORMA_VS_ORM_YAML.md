@@ -35,7 +35,7 @@ Halpin's own ecosystem -- and its XML carries layers barwise does not
 model: the ORM Abstraction Layer (`oial:`), the data-language
 intermediate, the conceptual-to-relational bridge
 (`ormtooial:` / `oialtocdb:`), and full diagram geometry. barwise reads
-NORMA as a *purely semantic* import and drops all of that. Most of what
+NORMA as a _purely semantic_ import and drops all of that. Most of what
 it drops is tool state or a derived artifact, not conceptual ORM: in
 barwise, mapping and DDL are recomputed deterministically from the
 conceptual model rather than persisted.
@@ -115,7 +115,7 @@ separate top-level element referenced by `ref`), and **readability**.
 
 ### Fidelity to the ORM 2 standard
 
-NORMA wins on raw coverage, by design. On the *conceptual* core of ORM 2
+NORMA wins on raw coverage, by design. On the _conceptual_ core of ORM 2
 the two are close to parity: both cover entity and value types, n-ary
 fact types, objectification, subtyping with exclusive/exhaustive
 partitions, and the Phase 1 and Phase 2 constraints (uniqueness
@@ -123,10 +123,10 @@ internal/external, mandatory, disjunctive mandatory, exclusion,
 exclusive-or, subset, equality, ring with all seven ring types,
 frequency, value).
 
-Where NORMA is more faithful to the *full* standard, most of the
+Where NORMA is more faithful to the _full_ standard, most of the
 difference is either tool state (diagram geometry) or a derived artifact
 (OIAL, the relational bridge) that barwise recomputes rather than
-stores. The genuine *conceptual* gaps -- value ranges, derived fact
+stores. The genuine _conceptual_ gaps -- value ranges, derived fact
 types, deontic modality, object cardinality, independent object types,
 join-path constraints -- are real and tracked; see
 [Known import gaps](#known-import-gaps).
@@ -158,7 +158,7 @@ barwise's native format is YAML rather than the standard's XML.
 
 barwise's core is pure and deterministic: validation, verbalization,
 relational mapping, diff, and query are same-input/same-output. Because
-mapping and DDL are *recomputed* from the conceptual model, they are
+mapping and DDL are _recomputed_ from the conceptual model, they are
 never stale and never need to be stored. NORMA instead persists those
 derived layers in the file, which is the right call for a stateful
 editor and the wrong call for a version-controlled, tool-composed
@@ -203,7 +203,7 @@ NORMA importer carries the construct into `.orm.yaml`.
 ## Known import gaps
 
 barwise's `.orm.yaml` is lossy by design relative to NORMA, but a few of
-those omissions are genuine *conceptual* ORM 2 constructs rather than
+those omissions are genuine _conceptual_ ORM 2 constructs rather than
 tool state. They were catalogued in an evidence-based audit tracked under
 epic **`barwise-5t9`**. The highest-impact item:
 
