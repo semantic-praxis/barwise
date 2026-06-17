@@ -41,34 +41,34 @@ export function resolveCommonPlayer(
  * fact type, given a subject role index and an object role index.
  */
 export function extractPredicate(
-factType: FactType,
-subjectIdx: number,
-objectIdx: number,
+  factType: FactType,
+  subjectIdx: number,
+  objectIdx: number,
 ): string {
-const subjectPlaceholder = `{${subjectIdx}}`;
-const objectPlaceholder = `{${objectIdx}}`;
+  const subjectPlaceholder = `{${subjectIdx}}`;
+  const objectPlaceholder = `{${objectIdx}}`;
 
-for (const reading of factType.readings) {
-  const t = reading.template;
-  const subjectPos = t.indexOf(subjectPlaceholder);
-  const objectPos = t.indexOf(objectPlaceholder);
-  if (
-    subjectPos >= 0
-    && objectPos >= 0
-    && subjectPos < objectPos
-  ) {
-    const start = subjectPos + subjectPlaceholder.length;
-    return t.slice(start, objectPos).trim();
+  for (const reading of factType.readings) {
+    const t = reading.template;
+    const subjectPos = t.indexOf(subjectPlaceholder);
+    const objectPos = t.indexOf(objectPlaceholder);
+    if (
+      subjectPos >= 0
+      && objectPos >= 0
+      && subjectPos < objectPos
+    ) {
+      const start = subjectPos + subjectPlaceholder.length;
+      return t.slice(start, objectPos).trim();
+    }
   }
-}
 
-const t = factType.readings[0]?.template ?? "";
-const p0 = t.indexOf("{");
-const p1 = t.indexOf("{", p0 + 1);
-if (p0 >= 0 && p1 >= 0) {
-  const end0 = t.indexOf("}", p0) + 1;
-  return t.slice(end0, p1).trim();
-}
+  const t = factType.readings[0]?.template ?? "";
+  const p0 = t.indexOf("{");
+  const p1 = t.indexOf("{", p0 + 1);
+  if (p0 >= 0 && p1 >= 0) {
+    const end0 = t.indexOf("}", p0) + 1;
+    return t.slice(end0, p1).trim();
+  }
 
-return "...";
+  return "...";
 }
