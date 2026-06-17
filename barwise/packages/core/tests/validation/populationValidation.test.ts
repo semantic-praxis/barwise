@@ -228,8 +228,8 @@ describe("populationValidationRules", () => {
 
       const diags = populationValidationRules(model);
       expect(diags).toHaveLength(2);
-      expect(diags.map((d) => d.message).join(" ")).toContain("\"0\"");
-      expect(diags.map((d) => d.message).join(" ")).toContain("\"11\"");
+      expect(diags.map((d) => d.message).join(" ")).toContain('"0"');
+      expect(diags.map((d) => d.message).join(" ")).toContain('"11"');
     });
 
     it("respects exclusive range bounds", () => {
