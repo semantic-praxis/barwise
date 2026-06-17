@@ -14,6 +14,7 @@ import {
   type DataTypeDef,
   OrmModel,
   type RoleConfig,
+  type ValueConstraintDef,
 } from "@barwise/core";
 import type {
   NormaConstraint,
@@ -28,6 +29,7 @@ import type {
   NormaSubsetConstraint,
   NormaUniquenessConstraint,
   NormaValueConstraint,
+  NormaValueConstraintInline,
 } from "./NormaXmlTypes.js";
 
 /**
@@ -39,6 +41,17 @@ export class NormaMappingError extends Error {
     super(message);
     this.name = "NormaMappingError";
   }
+}
+
+/** Map a NORMA inline value constraint to a core value-constraint definition. */
+function toValueConstraintDef(
+  vc: NormaValueConstraintInline | undefined,
+): ValueConstraintDef | undefined {
+  if (!vc) return undefined;
+  if (vc.values.length === 0 && (vc.ranges?.length ?? 0) === 0) return undefined;
+  return vc.ranges && vc.ranges.length > 0
+    ? { values: vc.values, ranges: vc.ranges }
+    : { values: vc.values };
 }
 
 /**
@@ -89,9 +102,7 @@ export function mapNormaToOrm(doc: NormaDocument): OrmModel {
       name: vt.name,
       kind: "value",
       definition: vt.definition,
-      valueConstraint: vt.valueConstraint && vt.valueConstraint.values.length > 0
-        ? { values: vt.valueConstraint.values }
-        : undefined,
+      valueConstraint: toValueConstraintDef(vt.valueConstraint),
       dataType: resolveDataType(vt.dataTypeRef, vt.dataTypeLength, vt.dataTypeScale, dataTypeById),
     });
     objectTypeIdMap.set(vt.id, ot.id);
@@ -430,6 +441,7 @@ function mapValueConstraint(
     type: "value_constraint",
     roleId,
     values: nc.values,
+    ...(nc.ranges && nc.ranges.length > 0 ? { ranges: nc.ranges } : {}),
   };
 }
 
@@ -605,7 +617,7 @@ function addRoleLevelValueConstraints(
   for (const nc of doc.constraints) {
     if (nc.type !== "value_constraint") continue;
     if (processedRefs.has(nc.id)) continue;
-    if (nc.values.length === 0) continue;
+    if (nc.values.length === 0 && (nc.ranges?.length ?? 0) === 0) continue;
 
     for (const roleRef of nc.roleRefs) {
       const ft = model.factTypes.find((f) => f.hasRole(roleRef));
@@ -619,6 +631,7 @@ function addRoleLevelValueConstraints(
           type: "value_constraint",
           roleId: roleRef,
           values: [...nc.values],
+          ...(nc.ranges && nc.ranges.length > 0 ? { ranges: [...nc.ranges] } : {}),
         });
       }
     }

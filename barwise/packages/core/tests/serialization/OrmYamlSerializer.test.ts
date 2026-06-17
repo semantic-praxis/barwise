@@ -76,6 +76,59 @@ describe("OrmYamlSerializer", () => {
       expect(yaml).toContain("- C");
     });
 
+    it("round-trips value constraints with ranges and open/exclusive bounds", () => {
+      const model = new OrmModel({ name: "Test" });
+      model.addObjectType({
+        name: "Age",
+        kind: "value",
+        valueConstraint: {
+          values: [],
+          ranges: [{ min: "18" }, { min: "0", max: "120", maxInclusive: false }],
+        },
+      });
+
+      const restored = serializer.deserialize(serializer.serialize(model));
+      expect(restored.objectTypes[0]!.valueConstraint).toEqual(
+        model.objectTypes[0]!.valueConstraint,
+      );
+    });
+
+    it("round-trips a role-level value constraint with a range", () => {
+      const model = new OrmModel({ name: "Test" });
+      const person = model.addObjectType({
+        name: "Person",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      const age = model.addObjectType({ name: "Age", kind: "value" });
+      model.addFactType({
+        name: "Person has Age",
+        roles: [
+          { name: "has", playerId: person.id, id: "r1" },
+          { name: "of", playerId: age.id, id: "r2" },
+        ],
+        readings: ["{0} has {1}", "{1} of {0}"],
+        constraints: [
+          {
+            type: "value_constraint",
+            roleId: "r2",
+            values: [],
+            ranges: [{ min: "18", max: "65" }],
+          },
+        ],
+      });
+
+      const restored = serializer.deserialize(serializer.serialize(model));
+      const c = restored.getFactTypeByName("Person has Age")!.constraints
+        .find((x) => x.type === "value_constraint");
+      expect(c).toMatchObject({
+        type: "value_constraint",
+        roleId: "r2",
+        values: [],
+        ranges: [{ min: "18", max: "65" }],
+      });
+    });
+
     it("serializes value types with data type", () => {
       const model = new OrmModel({ name: "Test" });
       model.addObjectType({

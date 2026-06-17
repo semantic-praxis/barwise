@@ -7,11 +7,32 @@ import { ModelElement } from "./ModelElement.js";
 export type ObjectTypeKind = "entity" | "value";
 
 /**
+ * A single allowed value range. A missing bound is open-ended (no lower or
+ * no upper limit). Bounds are inclusive unless the corresponding
+ * `*Inclusive` flag is `false`. Bounds are strings so the range is
+ * data-type agnostic (matching enumerated `values`); numeric comparison is
+ * applied when both a bound and the tested value parse as numbers.
+ */
+export interface ValueRange {
+  /** Lower bound; omit for an open-below range. */
+  readonly min?: string;
+  /** Upper bound; omit for an open-above range. */
+  readonly max?: string;
+  /** Whether the lower bound is inclusive (default true). */
+  readonly minInclusive?: boolean;
+  /** Whether the upper bound is inclusive (default true). */
+  readonly maxInclusive?: boolean;
+}
+
+/**
  * A value constraint restricts the allowed values for a value type or role.
- * Currently supports enumerated values. Range constraints can be added later.
+ * Supports enumerated values, value ranges (inclusive/exclusive, possibly
+ * open-ended), or both. A value satisfies the constraint if it equals one
+ * of `values` or falls within any of `ranges`.
  */
 export interface ValueConstraintDef {
   readonly values: readonly string[];
+  readonly ranges?: readonly ValueRange[];
 }
 
 /**
@@ -115,9 +136,10 @@ export class ObjectType extends ModelElement {
     if (
       this._valueConstraint
       && this._valueConstraint.values.length === 0
+      && (this._valueConstraint.ranges?.length ?? 0) === 0
     ) {
       throw new Error(
-        `Value constraint on "${this.name}" must have at least one value.`,
+        `Value constraint on "${this.name}" must have at least one value or range.`,
       );
     }
   }

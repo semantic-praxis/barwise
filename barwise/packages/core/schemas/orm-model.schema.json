@@ -120,9 +120,19 @@
         "required": ["reference_mode"]
       }
     },
+    "value_range_def": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min": { "type": "string", "description": "Lower bound; omit for open-below." },
+        "max": { "type": "string", "description": "Upper bound; omit for open-above." },
+        "min_inclusive": { "type": "boolean", "description": "Lower bound inclusive (default true)." },
+        "max_inclusive": { "type": "boolean", "description": "Upper bound inclusive (default true)." }
+      },
+      "anyOf": [{ "required": ["min"] }, { "required": ["max"] }]
+    },
     "value_constraint_def": {
       "type": "object",
-      "required": ["values"],
       "additionalProperties": false,
       "properties": {
         "values": {
@@ -130,8 +140,15 @@
           "items": { "type": "string" },
           "minItems": 1,
           "description": "Enumerated allowed values."
+        },
+        "ranges": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/value_range_def" },
+          "minItems": 1,
+          "description": "Allowed value ranges (inclusive/exclusive, possibly open-ended)."
         }
-      }
+      },
+      "anyOf": [{ "required": ["values"] }, { "required": ["ranges"] }]
     },
     "data_type_def": {
       "type": "object",
@@ -251,10 +268,17 @@
               "type": "array",
               "items": { "type": "string" },
               "minItems": 1,
-              "description": "Allowed values."
+              "description": "Allowed enumerated values."
+            },
+            "ranges": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/value_range_def" },
+              "minItems": 1,
+              "description": "Allowed value ranges (inclusive/exclusive, possibly open-ended)."
             }
           },
-          "required": ["type", "values"],
+          "required": ["type"],
+          "anyOf": [{ "required": ["values"] }, { "required": ["ranges"] }],
           "additionalProperties": false
         },
         {
