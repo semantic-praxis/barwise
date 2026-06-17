@@ -131,6 +131,20 @@ types, deontic modality, object cardinality, independent object types,
 join-path constraints -- are real and tracked; see
 [Known import gaps](#known-import-gaps).
 
+### NORMA's schema vs NORMA's tooling
+
+A cited review of the ORM 2 reference (Halpin & Morgan; Halpin's papers)
+against NORMA found that `ORM2Core.xsd` is a faithful, near-superset
+realization of the book -- so the metamodel itself misses little. The
+genuine shortfalls are in NORMA's _tooling_ completeness, in two spots:
+deontic modality (NORMA tags a single main modal operator and does not
+handle nested or compound modal formulae) and formal derivation rules
+(rich formal-rule entry was historically "under development"). For those
+two constructs barwise should design against the book, not NORMA's
+implementation, so it does not inherit NORMA's limits. ORM 2's _method_
+layer -- CSDP, schema transformations, Rmap -- is algorithms over models,
+not metamodel constructs, so "missing" does not apply to it.
+
 ### Human and LLM authoring
 
 This is where `.orm.yaml` pulls clearly ahead, and it is the reason
