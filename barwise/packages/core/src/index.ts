@@ -47,6 +47,7 @@ export {
   type ObjectTypeConfig,
   type ObjectTypeKind,
   type ValueConstraintDef,
+  type ValueRange,
 } from "./model/ObjectType.js";
 export { OrmModel, type OrmModelConfig } from "./model/OrmModel.js";
 export {

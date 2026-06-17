@@ -2,6 +2,10 @@
  * ORM constraint types (Phase 1 and Phase 2).
  */
 
+import type { ValueRange } from "./ObjectType.js";
+
+export type { ValueRange };
+
 // ---------------------------------------------------------------------------
 // Phase 1 constraints
 // ---------------------------------------------------------------------------
@@ -74,9 +78,11 @@ export interface ExternalUniquenessConstraint {
  * Value constraint.
  *
  * Restricts the allowed values for a value type or a specific role.
- * Currently supports enumerated values.
+ * Supports enumerated values, value ranges (inclusive/exclusive, possibly
+ * open-ended), or both. A value satisfies the constraint if it equals one
+ * of `values` or falls within any of `ranges`.
  *
- * Example: "Rating must be one of: A, B, C, D, F"
+ * Example: "Rating must be one of: A, B, C, D, F" or "Age must be >= 18".
  */
 export interface ValueConstraint {
   readonly type: "value_constraint";
@@ -84,8 +90,10 @@ export interface ValueConstraint {
   readonly id?: string;
   /** The role id this constraint applies to (if role-level). */
   readonly roleId?: string;
-  /** Allowed values. */
+  /** Allowed enumerated values. */
   readonly values: readonly string[];
+  /** Allowed value ranges. */
+  readonly ranges?: readonly ValueRange[];
 }
 
 // ---------------------------------------------------------------------------

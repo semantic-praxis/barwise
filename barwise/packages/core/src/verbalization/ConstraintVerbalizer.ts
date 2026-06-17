@@ -20,7 +20,7 @@ import type { Verbalization } from "./Verbalization.js";
 
 /**
  * Verbalizes ORM constraints using FORML sentence patterns. The
- * per-constraint logic lives in ./constraints/{phase1,phase2,helpers}.
+ * per-constraint logic lives in ./constraints/{phase1,phase2,sentence}.
  */
 export class ConstraintVerbalizer {
   /**
@@ -58,6 +58,7 @@ export class ConstraintVerbalizer {
         return verbalizeValueConstraint(
           constraint.roleId,
           constraint.values,
+          constraint.ranges,
           factType,
           model,
         );
