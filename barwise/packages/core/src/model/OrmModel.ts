@@ -4,6 +4,7 @@ import { FactType, type FactTypeConfig } from "./FactType.js";
 import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
 import { ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
 import { Population, type PopulationConfig } from "./Population.js";
+import type { Role } from "./Role.js";
 import { SubtypeFact, type SubtypeFactConfig } from "./SubtypeFact.js";
 
 /**
@@ -152,6 +153,19 @@ export class OrmModel {
   /** Look up a fact type by name. */
   getFactTypeByName(name: string): FactType | undefined {
     return this.factTypes.find((ft) => ft.name === name);
+  }
+
+  /**
+   * Find a role by id anywhere in the model. A role belongs to a single
+   * fact type, but a constraint (e.g. external uniqueness) can reference
+   * roles across fact types, so resolution is model-wide.
+   */
+  findRole(id: string): Role | undefined {
+    for (const ft of this.factTypes) {
+      const role = ft.getRoleById(id);
+      if (role) return role;
+    }
+    return undefined;
   }
 
   /**
