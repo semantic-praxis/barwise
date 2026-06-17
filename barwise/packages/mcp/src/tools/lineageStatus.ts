@@ -2,7 +2,7 @@
  * lineage_status tool: check staleness of exported artifacts.
  */
 
-import { checkStaleness } from "@barwise/core";
+import { checkStaleness } from "@barwise/core/lineage";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { dirname, resolve } from "node:path";
 import { z } from "zod";

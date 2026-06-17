@@ -1,8 +1,9 @@
 # Core subpath exports: slim the barrel
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Complete -- WS1 (subpaths + exports map), WS2 (consumer
+migration), and WS3 (slim the root barrel, 318 -> 143 lines) have landed.
 Created: 2026-06-16
-Last-updated: 2026-06-16
+Last-updated: 2026-06-17
 Tracking: REPO_REVIEW-2026-06-16 finding F2 (originally A3 in the June
 2026 review)
 
