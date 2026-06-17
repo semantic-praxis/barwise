@@ -376,6 +376,12 @@ mapping is nearly lossless.
   own layouts)
 - NORMA extensions and custom annotations are not imported
 - Some rare constraint patterns may produce import warnings
+- Value ranges and open-ended bounds are not yet imported (only
+  enumerated values), tracked in `barwise-5t9.1`
+
+For a full conceptual comparison of NORMA XML and `.orm.yaml` -- design
+intent, a coverage matrix, and the known import gaps -- see
+[NORMA XML vs `.orm.yaml`](NORMA_VS_ORM_YAML.md).
 
 ---
 
