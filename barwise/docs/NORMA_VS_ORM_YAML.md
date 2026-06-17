@@ -196,6 +196,10 @@ NORMA importer carries the construct into `.orm.yaml`.
 | Join-path set/ring constraints        | Yes       | No            | No             |
 | Default values                        | Yes       | No            | No             |
 | Multi-role frequency                  | Yes       | No            | No             |
+| Value-comparison constraints          | Yes       | No            | No             |
+| Model / element notes                 | Yes       | No            | No             |
+| Modeler queries / subqueries          | Yes       | No            | No             |
+| Dynamic (state-transition) rules      | Yes       | No            | No             |
 | Diagram geometry                      | Yes       | Separate file | No (by design) |
 
 ---
@@ -218,6 +222,14 @@ Other tracked conceptual gaps: derived fact types and derivation rules
 constraints (`5t9.4`), independent object types (`5t9.5`), set-comparison
 and ring constraints over join paths (`5t9.6`), default values
 (`5t9.7`), and multi-role frequency constraints (`5t9.8`).
+
+A later pass cross-referenced the authoritative `ORM2Core.xsd` schema (in
+`ormsolutions/NORMA`) against the metamodel, catching constructs the
+import-grounded audit could not see because the importer never references
+them: value-comparison constraints (`5t9.9`), the role-path / join-rule
+model that underpins join constraints, derivation, and queries
+(`5t9.10`), modeler-defined queries and subqueries (`5t9.11`), model and
+element notes (`5t9.12`), and dynamic state-transition rules (`5t9.13`).
 
 Note: the import summary in `IMPORT_EXPORT.md` describes the NORMA
 mapping as "nearly lossless." That holds for the common conceptual core,
