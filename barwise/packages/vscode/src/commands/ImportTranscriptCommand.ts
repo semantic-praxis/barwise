@@ -1,11 +1,12 @@
+import { type OrmModel, OrmYamlSerializer, ProjectSerializer } from "@barwise/core";
+import { annotateOrmYaml } from "@barwise/core/annotation";
 import {
-  annotateOrmYaml,
+  type BreakingLevel,
   diffModels,
   mergeAndValidate,
-  OrmYamlSerializer,
-  ProjectSerializer,
-} from "@barwise/core";
-import type { BreakingLevel, ModelDelta, OrmModel, SynonymCandidate } from "@barwise/core";
+  type ModelDelta,
+  type SynonymCandidate,
+} from "@barwise/core/diff";
 import { AnthropicLlmClient, processTranscript } from "@barwise/llm";
 import type { DraftModelResult, LlmClient } from "@barwise/llm";
 import * as path from "node:path";

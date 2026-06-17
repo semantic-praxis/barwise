@@ -2,7 +2,9 @@
  * Output formatting helpers for the CLI.
  */
 
-import type { Counterexample, Diagnostic, Verbalization } from "@barwise/core";
+import type { Diagnostic } from "@barwise/core";
+import type { Counterexample } from "@barwise/core/counterexample";
+import type { Verbalization } from "@barwise/core/verbalization";
 
 /**
  * Format diagnostics as human-readable text.

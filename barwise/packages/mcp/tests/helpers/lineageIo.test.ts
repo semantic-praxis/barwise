@@ -3,7 +3,7 @@
  * the parent-directory walk for artifact resolution, and locating the
  * source model file.
  */
-import type { LineageManifest } from "@barwise/core";
+import type { LineageManifest } from "@barwise/core/lineage";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";

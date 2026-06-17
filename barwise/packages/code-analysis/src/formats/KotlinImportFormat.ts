@@ -12,7 +12,7 @@
  * - JPA/Hibernate annotations (same as Java)
  */
 
-import { type ImportFormat, type ImportOptions, type ImportResult } from "@barwise/core";
+import type { ImportFormat, ImportOptions, ImportResult } from "@barwise/core";
 import { assembleKotlinContext } from "../context/JvmContextAssembler.js";
 import { LspManager } from "../lsp/LspManager.js";
 import { defaultKotlinConfig } from "../lsp/servers/kotlin.js";

@@ -6,8 +6,12 @@
  * (e.g., a fact type referencing an object type the LLM didn't extract).
  */
 
-import { OrmModel } from "@barwise/core";
-import type { ConceptualDataTypeName, DataTypeDef, RingType } from "@barwise/core";
+import {
+  type ConceptualDataTypeName,
+  type DataTypeDef,
+  OrmModel,
+  type RingType,
+} from "@barwise/core";
 import type {
   ConstraintProvenance,
   DraftModelResult,

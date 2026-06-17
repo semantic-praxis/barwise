@@ -2,8 +2,7 @@
  * validate_model tool: validates an ORM model and returns diagnostics.
  */
 
-import { ValidationEngine } from "@barwise/core";
-import type { Diagnostic } from "@barwise/core";
+import { type Diagnostic, ValidationEngine } from "@barwise/core";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveSource } from "../helpers/resolve.js";

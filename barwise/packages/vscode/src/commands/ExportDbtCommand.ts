@@ -5,7 +5,8 @@
  * dbt artifacts (schema.yml + model SQL files), writes them into a
  * target dbt project directory, and runs the export annotator.
  */
-import { annotateDbtExport, OrmYamlSerializer, RelationalMapper, renderDbt } from "@barwise/core";
+import { OrmYamlSerializer } from "@barwise/core";
+import { annotateDbtExport, RelationalMapper, renderDbt } from "@barwise/core/mapping";
 import * as path from "node:path";
 import * as vscode from "vscode";
 

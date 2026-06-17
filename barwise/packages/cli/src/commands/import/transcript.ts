@@ -1,4 +1,5 @@
-import { annotateOrmYaml, diffModels, mergeAndValidate } from "@barwise/core";
+import { annotateOrmYaml } from "@barwise/core/annotation";
+import { diffModels, mergeAndValidate } from "@barwise/core/diff";
 import { buildReasoningTrail, createLlmClient, processTranscript } from "@barwise/llm";
 import type { ProviderName } from "@barwise/llm";
 import type { Command } from "commander";

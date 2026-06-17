@@ -14,7 +14,7 @@
  * formatting, comments, and whitespace.
  */
 
-import { formatBarwiseComment, stripBarwiseComments } from "@barwise/core";
+import { formatBarwiseComment, stripBarwiseComments } from "@barwise/core/annotation";
 import type { DbtImportReport, ReportEntry } from "./DbtImportReport.js";
 
 // ---------------------------------------------------------------------------

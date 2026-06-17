@@ -8,7 +8,7 @@
  *    source model and relevant ORM elements.
  */
 
-import { describeDomain } from "@barwise/core";
+import { describeDomain } from "@barwise/core/describe";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { findOrmModel, resolveArtifact } from "../helpers/lineageIo.js";

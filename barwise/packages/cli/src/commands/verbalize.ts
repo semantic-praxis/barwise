@@ -5,7 +5,8 @@
  * for all fact types and constraints.
  */
 
-import { type Counterexample, generateCounterexamples, Verbalizer } from "@barwise/core";
+import { type Counterexample, generateCounterexamples } from "@barwise/core/counterexample";
+import { Verbalizer } from "@barwise/core/verbalization";
 import type { Command } from "commander";
 import {
   formatCounterexamples,

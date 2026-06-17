@@ -5,7 +5,9 @@
  * They use hand-crafted .orm fixture files that mirror the documented NORMA
  * XML format without embedding any NORMA source code.
  */
-import { RelationalMapper, renderDdl, ValidationEngine, Verbalizer } from "@barwise/core";
+import { ValidationEngine } from "@barwise/core";
+import { RelationalMapper, renderDdl } from "@barwise/core/mapping";
+import { Verbalizer } from "@barwise/core/verbalization";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

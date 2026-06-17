@@ -1,8 +1,7 @@
 /**
  * Tests for the lineage command group.
  */
-import { hashModel } from "@barwise/core";
-import type { LineageManifest } from "@barwise/core";
+import { hashModel, type LineageManifest } from "@barwise/core/lineage";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import { dirname, resolve } from "node:path";

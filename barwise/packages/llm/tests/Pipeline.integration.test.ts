@@ -16,7 +16,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { OrmYamlSerializer, ValidationEngine, Verbalizer } from "@barwise/core";
+import { OrmYamlSerializer, ValidationEngine } from "@barwise/core";
+import { Verbalizer } from "@barwise/core/verbalization";
 import { generateDiagram } from "@barwise/diagram";
 import { parseExtractionFromJson } from "../src/TranscriptProcessor.js";
 

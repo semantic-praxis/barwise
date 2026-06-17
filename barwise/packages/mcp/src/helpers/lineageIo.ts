@@ -12,7 +12,7 @@ import {
   manifestPath,
   parseManifest,
   resolveArtifactInManifest,
-} from "@barwise/core";
+} from "@barwise/core/lineage";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, parse, resolve } from "node:path";
 

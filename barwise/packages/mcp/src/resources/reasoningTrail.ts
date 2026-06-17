@@ -6,7 +6,8 @@
  * so the resource is always useful.
  */
 
-import { OrmYamlSerializer, queryModel } from "@barwise/core";
+import { OrmYamlSerializer } from "@barwise/core";
+import { queryModel } from "@barwise/core/query";
 import type { ReasoningTrail } from "@barwise/llm";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";

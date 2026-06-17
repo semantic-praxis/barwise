@@ -5,7 +5,7 @@
  * and prints DDL or JSON to stdout.
  */
 
-import { RelationalMapper, renderDdl } from "@barwise/core";
+import { RelationalMapper, renderDdl } from "@barwise/core/mapping";
 import type { Command } from "commander";
 import { loadModel } from "../helpers/io.js";
 import { writeOutput } from "../helpers/io.js";

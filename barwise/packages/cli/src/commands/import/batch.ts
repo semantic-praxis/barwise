@@ -1,4 +1,4 @@
-import { annotateOrmYaml } from "@barwise/core";
+import { annotateOrmYaml } from "@barwise/core/annotation";
 import { createLlmClient, processTranscript } from "@barwise/llm";
 import type { ProviderName } from "@barwise/llm";
 import type { Command } from "commander";

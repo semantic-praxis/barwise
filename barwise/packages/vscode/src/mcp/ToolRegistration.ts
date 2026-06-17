@@ -9,7 +9,8 @@
  * except import_transcript which uses CopilotLlmClient directly.
  */
 
-import { annotateOrmYaml, OrmYamlSerializer } from "@barwise/core";
+import { OrmYamlSerializer } from "@barwise/core";
+import { annotateOrmYaml } from "@barwise/core/annotation";
 import {
   AnthropicLlmClient,
   buildExistingModelContext,

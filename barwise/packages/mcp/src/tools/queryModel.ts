@@ -9,8 +9,13 @@
  * tool over guessing model structure from prior context.
  */
 
-import { formatQueryResult, parseQuery, QUERY_COMMANDS, queryModel } from "@barwise/core";
-import { QueryParseError } from "@barwise/core";
+import {
+  formatQueryResult,
+  parseQuery,
+  QUERY_COMMANDS,
+  queryModel,
+  QueryParseError,
+} from "@barwise/core/query";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveSource } from "../helpers/resolve.js";

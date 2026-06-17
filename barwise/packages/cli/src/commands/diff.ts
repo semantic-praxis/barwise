@@ -4,8 +4,7 @@
  * Computes the diff between two ORM models and prints the deltas.
  */
 
-import { diffModels } from "@barwise/core";
-import type { ModelDelta, SynonymCandidate } from "@barwise/core";
+import { diffModels, type ModelDelta, type SynonymCandidate } from "@barwise/core/diff";
 import type { Command } from "commander";
 import { loadModel } from "../helpers/io.js";
 

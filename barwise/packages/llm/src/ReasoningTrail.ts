@@ -8,7 +8,8 @@
  * model (core); the rest comes from the import-time `DraftModelResult`.
  */
 
-import { type EntityAnchors, type ModelDiffResult, queryModel } from "@barwise/core";
+import type { ModelDiffResult } from "@barwise/core/diff";
+import { type EntityAnchors, queryModel } from "@barwise/core/query";
 import type { DraftModelResult } from "./ExtractionTypes.js";
 
 /** A rival framing that was considered and set aside. */

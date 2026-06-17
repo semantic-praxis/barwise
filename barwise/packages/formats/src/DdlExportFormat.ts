@@ -8,17 +8,14 @@
  */
 
 import {
-  collectExportAnnotations,
-  type ExportAnnotation,
   type ExportFormatAdapter,
   type ExportOptions,
   type ExportResult,
   type OrmModel,
-  RelationalMapper,
-  renderDdl,
-  renderPopulationAsSql,
   ValidationEngine,
 } from "@barwise/core";
+import { collectExportAnnotations, type ExportAnnotation } from "@barwise/core/annotation";
+import { RelationalMapper, renderDdl, renderPopulationAsSql } from "@barwise/core/mapping";
 
 /**
  * DDL (SQL CREATE TABLE) export format.

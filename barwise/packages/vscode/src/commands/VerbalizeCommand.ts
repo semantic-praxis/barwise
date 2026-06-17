@@ -1,4 +1,5 @@
-import { OrmYamlSerializer, Verbalizer } from "@barwise/core";
+import { OrmYamlSerializer } from "@barwise/core";
+import { Verbalizer } from "@barwise/core/verbalization";
 import * as vscode from "vscode";
 
 /**

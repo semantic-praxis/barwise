@@ -6,7 +6,7 @@
  * set up fixtures.
  */
 
-import { type LineageManifest, manifestPath, serializeManifest } from "@barwise/core";
+import { type LineageManifest, manifestPath, serializeManifest } from "@barwise/core/lineage";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 

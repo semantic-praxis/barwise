@@ -1,7 +1,7 @@
 /**
  * Tests for the CLI lineage manifest filesystem I/O.
  */
-import type { LineageManifest } from "@barwise/core";
+import type { LineageManifest } from "@barwise/core/lineage";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

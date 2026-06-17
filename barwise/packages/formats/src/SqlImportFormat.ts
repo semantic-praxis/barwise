@@ -15,10 +15,8 @@ import {
   type ImportOptions,
   type ImportResult,
   OrmModel,
-  parseSqlFile,
-  type SqlDialect,
-  type SqlPatternContext,
 } from "@barwise/core";
+import { parseSqlFile, type SqlDialect, type SqlPatternContext } from "@barwise/core/sql";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 

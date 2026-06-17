@@ -2,7 +2,8 @@
  * Tests for the WS-C surfacing helper: rendering candidate framings (with
  * their diff against the primary) as a trailing section.
  */
-import { diffModels, OrmModel } from "@barwise/core";
+import { OrmModel } from "@barwise/core";
+import { diffModels } from "@barwise/core/diff";
 import type { CandidateFraming } from "@barwise/llm";
 import { describe, expect, it } from "vitest";
 import { formatAlternativeFramings } from "../../src/tools/import.js";
