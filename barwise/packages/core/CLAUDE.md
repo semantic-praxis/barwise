@@ -23,11 +23,20 @@ src/
   verbalization/  FORML verbalization of fact types and constraints
   mapping/        Relational mapper (ORM -> tables/columns/keys) and DDL renderer
   diff/           Model diffing and three-way merge
-  index.ts        Public API -- all exports go through here
+  index.ts        Root public API: foundational only (model, serialization,
+                  validation, format registry, import/export types)
 
 schemas/          JSON Schema definitions (orm-model, context-mapping, orm-project)
 tests/            Mirrors src/ structure; see testing section below
 ```
+
+The capability modules are exposed as package subpath exports, not from
+the root barrel: `@barwise/core/mapping`, `/diff`, `/verbalization`,
+`/counterexample`, `/sql`, `/annotation`, `/lineage`, `/describe`, and
+`/query`. Each has a `src/<name>/index.ts` barrel listed in
+`package.json` `exports`. Import a capability from its subpath; import
+the metamodel, serializers, validation, and the format registry from the
+root. (Spec: `docs/specs/core-subpath-exports.spec.md`.)
 
 ## Commands
 

@@ -273,7 +273,7 @@ export interface CandidateFraming {
   /** The rival model, parsed via the same path as the primary. */
   readonly model: import("@barwise/core").OrmModel;
   /** The diff of this framing against the primary model. */
-  readonly diff: import("@barwise/core").ModelDiffResult;
+  readonly diff: import("@barwise/core/diff").ModelDiffResult;
 }
 
 /**
