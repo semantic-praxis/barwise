@@ -4,7 +4,7 @@ import type { Definition } from "../model/Definition.js";
 import type { DiagramLayout } from "../model/DiagramLayout.js";
 import type { FactType } from "../model/FactType.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
-import type { ConceptualDataTypeName, ObjectType } from "../model/ObjectType.js";
+import type { ConceptualDataTypeName, ObjectType, ValueRange } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
 import type { FactInstance, Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
@@ -44,6 +44,73 @@ interface OrmYamlDocument {
   };
 }
 
+interface OrmYamlValueRange {
+  min?: string;
+  max?: string;
+  min_inclusive?: boolean;
+  max_inclusive?: boolean;
+}
+
+interface OrmYamlValueConstraintBody {
+  values?: string[];
+  ranges?: OrmYamlValueRange[];
+}
+
+/** Serialize model value ranges to the YAML shape, omitting default bounds. */
+function serializeValueRanges(
+  ranges: readonly ValueRange[],
+): OrmYamlValueRange[] {
+  return ranges.map((r) => {
+    const out: OrmYamlValueRange = {};
+    if (r.min !== undefined) out.min = r.min;
+    if (r.max !== undefined) out.max = r.max;
+    if (r.minInclusive === false) out.min_inclusive = false;
+    if (r.maxInclusive === false) out.max_inclusive = false;
+    return out;
+  });
+}
+
+/** Parse YAML value ranges back to the model shape. */
+function deserializeValueRanges(
+  ranges: readonly OrmYamlValueRange[],
+): ValueRange[] {
+  return ranges.map((r) => {
+    const out: {
+      min?: string;
+      max?: string;
+      minInclusive?: boolean;
+      maxInclusive?: boolean;
+    } = {};
+    if (r.min !== undefined) out.min = r.min;
+    if (r.max !== undefined) out.max = r.max;
+    if (r.min_inclusive === false) out.minInclusive = false;
+    if (r.max_inclusive === false) out.maxInclusive = false;
+    return out;
+  });
+}
+
+/** Build the YAML value-constraint body, omitting empty values/ranges. */
+function serializeValueConstraintBody(
+  values: readonly string[],
+  ranges: readonly ValueRange[] | undefined,
+): OrmYamlValueConstraintBody {
+  const body: OrmYamlValueConstraintBody = {};
+  if (values.length > 0) body.values = [...values];
+  if (ranges && ranges.length > 0) body.ranges = serializeValueRanges(ranges);
+  return body;
+}
+
+/** Parse a YAML value-constraint body, defaulting a missing `values` to []. */
+function deserializeValueConstraintBody(
+  body: OrmYamlValueConstraintBody,
+): { values: string[]; ranges?: ValueRange[]; } {
+  const values = body.values ? [...body.values] : [];
+  if (body.ranges && body.ranges.length > 0) {
+    return { values, ranges: deserializeValueRanges(body.ranges) };
+  }
+  return { values };
+}
+
 interface OrmYamlObjectType {
   id: string;
   name: string;
@@ -51,7 +118,7 @@ interface OrmYamlObjectType {
   reference_mode?: string;
   definition?: string;
   source_context?: string;
-  value_constraint?: { values: string[]; };
+  value_constraint?: OrmYamlValueConstraintBody;
   data_type?: { name: string; length?: number; scale?: number; };
   aliases?: string[];
 }
@@ -75,7 +142,7 @@ type OrmYamlConstraint =
   | { type: "internal_uniqueness"; roles: string[]; is_preferred?: boolean; }
   | { type: "mandatory"; role: string; }
   | { type: "external_uniqueness"; roles: string[]; }
-  | { type: "value_constraint"; role?: string; values: string[]; }
+  | ({ type: "value_constraint"; role?: string; } & OrmYamlValueConstraintBody)
   | { type: "disjunctive_mandatory"; roles: string[]; }
   | { type: "exclusion"; roles: string[]; }
   | { type: "exclusive_or"; roles: string[]; }
@@ -306,7 +373,10 @@ export class OrmYamlSerializer {
       result.source_context = ot.sourceContext;
     }
     if (ot.valueConstraint) {
-      result.value_constraint = { values: [...ot.valueConstraint.values] };
+      result.value_constraint = serializeValueConstraintBody(
+        ot.valueConstraint.values,
+        ot.valueConstraint.ranges,
+      );
     }
     if (ot.dataType) {
       const dt: { name: string; length?: number; scale?: number; } = { name: ot.dataType.name };
@@ -367,12 +437,12 @@ export class OrmYamlSerializer {
         result = { type: "external_uniqueness", roles: [...c.roleIds] };
         break;
       case "value_constraint": {
-        const vc: OrmYamlConstraint = {
+        const vc: Extract<OrmYamlConstraint, { type: "value_constraint"; }> = {
           type: "value_constraint",
-          values: [...c.values],
+          ...serializeValueConstraintBody(c.values, c.ranges),
         };
         if (c.roleId) {
-          (vc as { type: "value_constraint"; role?: string; values: string[]; }).role = c.roleId;
+          vc.role = c.roleId;
         }
         result = vc;
         break;
@@ -513,7 +583,7 @@ export class OrmYamlSerializer {
         definition: otDoc.definition,
         sourceContext: otDoc.source_context,
         valueConstraint: otDoc.value_constraint
-          ? { values: otDoc.value_constraint.values }
+          ? deserializeValueConstraintBody(otDoc.value_constraint)
           : undefined,
         dataType: otDoc.data_type
           ? {
@@ -626,9 +696,13 @@ export class OrmYamlSerializer {
       case "external_uniqueness":
         result = { type: "external_uniqueness", roleIds: c.roles };
         break;
-      case "value_constraint":
-        result = { type: "value_constraint", roleId: c.role, values: c.values };
+      case "value_constraint": {
+        const body = deserializeValueConstraintBody(c);
+        result = body.ranges
+          ? { type: "value_constraint", roleId: c.role, values: body.values, ranges: body.ranges }
+          : { type: "value_constraint", roleId: c.role, values: body.values };
         break;
+      }
       case "disjunctive_mandatory":
         result = { type: "disjunctive_mandatory", roleIds: c.roles };
         break;

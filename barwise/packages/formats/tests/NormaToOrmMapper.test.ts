@@ -156,6 +156,29 @@ describe("NormaToOrmMapper", () => {
       expect(ot.valueConstraint!.values).toEqual(["A", "B", "C"]);
     });
 
+    it("maps value types with value ranges", () => {
+      const doc = makeDoc({
+        valueTypes: [
+          {
+            id: "_vt1",
+            name: "Age",
+            playedRoleRefs: [],
+            valueConstraint: {
+              values: [],
+              ranges: [{ min: "18" }, { min: "0", max: "120", maxInclusive: false }],
+            },
+          },
+        ],
+      });
+      const model = mapNormaToOrm(doc);
+      const ot = model.objectTypes[0]!;
+      expect(ot.valueConstraint).toBeDefined();
+      expect(ot.valueConstraint!.ranges).toEqual([
+        { min: "18" },
+        { min: "0", max: "120", maxInclusive: false },
+      ]);
+    });
+
     it("maps entity types with definitions", () => {
       const doc = makeDoc({
         entityTypes: [

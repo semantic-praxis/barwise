@@ -14,6 +14,7 @@
  *   - Valid populations produce no diagnostics
  */
 import { describe, expect, it } from "vitest";
+import type { ValueRange } from "../../src/model/ObjectType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
 
@@ -23,7 +24,7 @@ import { populationValidationRules } from "../../src/validation/rules/population
  */
 function makeOrderModel(options?: {
   uniqueness?: "role1" | "role2" | "spanning";
-  valueConstraint?: { roleId: string; values: string[]; };
+  valueConstraint?: { roleId: string; values: string[]; ranges?: ValueRange[]; };
   frequency?: { roleId: string; min: number; max: number | "unbounded"; };
 }): OrmModel {
   const model = new OrmModel({ name: "Test" });
@@ -56,6 +57,9 @@ function makeOrderModel(options?: {
       type: "value_constraint",
       roleId: options.valueConstraint.roleId,
       values: options.valueConstraint.values,
+      ...(options.valueConstraint.ranges
+        ? { ranges: options.valueConstraint.ranges }
+        : {}),
     });
   }
 
@@ -210,6 +214,38 @@ describe("populationValidationRules", () => {
       expect(diags[0]!.ruleId).toBe("population/value-constraint-violation");
       expect(diags[0]!.message).toContain("C999");
       expect(diags[0]!.message).toContain("C001");
+    });
+
+    it("accepts values within a range and rejects values outside it", () => {
+      const model = makeOrderModel({
+        valueConstraint: { roleId: "r1", values: [], ranges: [{ min: "1", max: "10" }] },
+      });
+      const ft = model.getFactTypeByName("Customer places Order")!;
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ id: "in", roleValues: { r1: "5", r2: "O1" } });
+      pop.addInstance({ id: "lo", roleValues: { r1: "0", r2: "O2" } });
+      pop.addInstance({ id: "hi", roleValues: { r1: "11", r2: "O3" } });
+
+      const diags = populationValidationRules(model);
+      expect(diags).toHaveLength(2);
+      expect(diags.map((d) => d.message).join(" ")).toContain('"0"');
+      expect(diags.map((d) => d.message).join(" ")).toContain('"11"');
+    });
+
+    it("respects exclusive range bounds", () => {
+      const model = makeOrderModel({
+        valueConstraint: {
+          roleId: "r1",
+          values: [],
+          ranges: [{ min: "0", max: "100", maxInclusive: false }],
+        },
+      });
+      const ft = model.getFactTypeByName("Customer places Order")!;
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ id: "edge", roleValues: { r1: "100", r2: "O1" } });
+
+      const diags = populationValidationRules(model);
+      expect(diags).toHaveLength(1); // 100 excluded by exclusive upper bound
     });
 
     it("passes when value is in allowed set", () => {

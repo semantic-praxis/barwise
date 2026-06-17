@@ -1,5 +1,6 @@
 import type { Constraint } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
+import type { ValueRange } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { Role } from "../model/Role.js";
 import {
@@ -11,6 +12,26 @@ import {
   type Verbalization,
   type VerbalizationSegment,
 } from "./Verbalization.js";
+
+/**
+ * Render a value range as a natural-language phrase, e.g. "between 1 and 10",
+ * "at least 18", or "less than 100".
+ */
+function describeValueRange(r: ValueRange): string {
+  const minIncl = r.minInclusive !== false;
+  const maxIncl = r.maxInclusive !== false;
+  const lower = minIncl ? `at least ${r.min}` : `greater than ${r.min}`;
+  const upper = maxIncl ? `at most ${r.max}` : `less than ${r.max}`;
+
+  if (r.min !== undefined && r.max !== undefined) {
+    return minIncl && maxIncl
+      ? `between ${r.min} and ${r.max}`
+      : `${lower} and ${upper}`;
+  }
+  if (r.min !== undefined) return lower;
+  if (r.max !== undefined) return upper;
+  return "any value";
+}
 
 /**
  * Verbalizes ORM constraints using FORML sentence patterns.
@@ -51,6 +72,7 @@ export class ConstraintVerbalizer {
         return this.verbalizeValueConstraint(
           constraint.roleId,
           constraint.values,
+          constraint.ranges,
           factType,
           model,
         );
@@ -326,11 +348,12 @@ export class ConstraintVerbalizer {
   }
 
   /**
-   * "The possible values of {TypeName} are: {'v1', 'v2', ...}."
+   * "The possible values of {TypeName} are: {'v1', 'v2', between 1 and 10}."
    */
   private verbalizeValueConstraint(
     roleId: string | undefined,
     values: readonly string[],
+    ranges: readonly ValueRange[] | undefined,
     factType: FactType,
     model: OrmModel,
   ): Verbalization {
@@ -347,7 +370,10 @@ export class ConstraintVerbalizer {
       targetId = factType.id;
     }
 
-    const valueList = values.map((v) => `'${v}'`).join(", ");
+    const valueList = [
+      ...values.map((v) => `'${v}'`),
+      ...(ranges ?? []).map((r) => describeValueRange(r)),
+    ].join(", ");
 
     const segments: VerbalizationSegment[] = [
       textSeg("The possible values of "),

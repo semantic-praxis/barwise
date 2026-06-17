@@ -21,6 +21,7 @@ import type {
   NormaRole,
   NormaSubtypeFact,
   NormaValueConstraintInline,
+  NormaValueRange,
   NormaValueType,
 } from "./NormaXmlTypes.js";
 
@@ -251,19 +252,57 @@ function parseValueRestriction(
   const vcs = asArray(vr["ValueConstraint"]);
   const vc = vcs.length > 0 ? vcs[0] : undefined;
   if (!vc) return undefined;
-  const ranges = child(vc, "ValueRanges") as Record<string, unknown> | undefined;
-  if (!ranges) return undefined;
+  const rangesEl = child(vc, "ValueRanges") as Record<string, unknown> | undefined;
+  if (!rangesEl) return undefined;
 
+  const { values, ranges } = parseValueRanges(rangesEl);
+  if (values.length === 0 && ranges.length === 0) return undefined;
+  return ranges.length > 0 ? { values, ranges } : { values };
+}
+
+/**
+ * Parse a NORMA `ValueRanges` element into enumerated values and ranges.
+ *
+ * A NORMA `ValueRange` with `MinValue === MaxValue` (both inclusive) is an
+ * enumerated value; anything else -- a genuine range or an open-ended bound
+ * -- becomes a range. NORMA marks an exclusive bound with
+ * `MinInclusion`/`MaxInclusion="Open"`; an absent or empty bound is
+ * open-ended.
+ */
+function parseValueRanges(
+  rangesEl: Record<string, unknown>,
+): { values: string[]; ranges: NormaValueRange[]; } {
   const values: string[] = [];
-  for (const range of asArray(ranges["ValueRange"])) {
-    const minVal = attr(range, "MinValue");
-    const maxVal = attr(range, "MaxValue");
-    // For enumerated values, MinValue === MaxValue.
-    if (minVal !== undefined && minVal === maxVal) {
-      values.push(minVal);
+  const ranges: NormaValueRange[] = [];
+
+  for (const range of asArray(rangesEl["ValueRange"])) {
+    const rawMin = attr(range, "MinValue");
+    const rawMax = attr(range, "MaxValue");
+    const min = rawMin !== undefined && rawMin !== "" ? rawMin : undefined;
+    const max = rawMax !== undefined && rawMax !== "" ? rawMax : undefined;
+    const minInclusive = attr(range, "MinInclusion") !== "Open";
+    const maxInclusive = attr(range, "MaxInclusion") !== "Open";
+
+    if (min !== undefined && min === max && minInclusive && maxInclusive) {
+      values.push(min); // A single enumerated value.
+      continue;
     }
+    if (min === undefined && max === undefined) continue; // Degenerate.
+
+    const r: {
+      min?: string;
+      max?: string;
+      minInclusive?: boolean;
+      maxInclusive?: boolean;
+    } = {};
+    if (min !== undefined) r.min = min;
+    if (max !== undefined) r.max = max;
+    if (!minInclusive) r.minInclusive = false;
+    if (!maxInclusive) r.maxInclusive = false;
+    ranges.push(r);
   }
-  return values.length > 0 ? { values } : undefined;
+
+  return { values, ranges };
 }
 
 // ---- Fact Type Parsing ----
@@ -494,23 +533,17 @@ function parseConstraints(
   // ValueConstraint
   for (const vc of asArray(constraints["ValueConstraint"])) {
     const roleSeq = firstRoleSequence(vc);
-    const ranges = child(vc, "ValueRanges") as Record<string, unknown> | undefined;
-    const values: string[] = [];
-    if (ranges) {
-      for (const range of asArray(ranges["ValueRange"])) {
-        const minVal = attr(range, "MinValue");
-        const maxVal = attr(range, "MaxValue");
-        if (minVal !== undefined && minVal === maxVal) {
-          values.push(minVal);
-        }
-      }
-    }
+    const rangesEl = child(vc, "ValueRanges") as Record<string, unknown> | undefined;
+    const { values, ranges } = rangesEl
+      ? parseValueRanges(rangesEl)
+      : { values: [], ranges: [] };
     result.push({
       type: "value_constraint",
       id: attr(vc, "id") ?? "",
       name: attr(vc, "Name") ?? "",
       roleRefs: roleSeq ? parseRoleSequenceRefs(roleSeq) : [],
       values,
+      ...(ranges.length > 0 ? { ranges } : {}),
     });
   }
 

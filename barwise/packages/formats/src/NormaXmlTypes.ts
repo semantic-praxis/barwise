@@ -58,9 +58,18 @@ export interface NormaValueType {
   readonly dataTypeScale?: number;
 }
 
+/** A value range parsed from a NORMA ValueRange element. */
+export interface NormaValueRange {
+  readonly min?: string;
+  readonly max?: string;
+  readonly minInclusive?: boolean;
+  readonly maxInclusive?: boolean;
+}
+
 /** Inline value constraint on a ValueType (ValueRestriction). */
 export interface NormaValueConstraintInline {
   readonly values: string[];
+  readonly ranges?: NormaValueRange[];
 }
 
 /** A NORMA ObjectifiedType element. */
@@ -175,6 +184,7 @@ export interface NormaValueConstraint {
   readonly name: string;
   readonly roleRefs: readonly string[];
   readonly values: string[];
+  readonly ranges?: NormaValueRange[];
 }
 
 export interface NormaSubsetConstraint {

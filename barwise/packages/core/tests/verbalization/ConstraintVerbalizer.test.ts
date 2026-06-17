@@ -202,6 +202,70 @@ describe("ConstraintVerbalizer", () => {
       );
     });
 
+    it("verbalizes value ranges and open-ended bounds", () => {
+      const model = new OrmModel({ name: "Test" });
+      const person = model.addObjectType({
+        name: "Person",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      const age = model.addObjectType({ name: "Age", kind: "value" });
+
+      const ft = model.addFactType({
+        name: "Person has Age",
+        roles: [
+          { name: "has", playerId: person.id, id: "r1" },
+          { name: "of", playerId: age.id, id: "r2" },
+        ],
+        readings: ["{0} has {1}", "{1} of {0}"],
+        constraints: [
+          {
+            type: "value_constraint",
+            roleId: "r2",
+            values: [],
+            ranges: [{ min: "18" }, { min: "0", max: "120", maxInclusive: false }],
+          },
+        ],
+      });
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe(
+        "The possible values of Age are: {at least 18, at least 0 and less than 120}.",
+      );
+    });
+
+    it("verbalizes enumerated values combined with a range", () => {
+      const model = new OrmModel({ name: "Test" });
+      const sale = model.addObjectType({
+        name: "Sale",
+        kind: "entity",
+        referenceMode: "sale_id",
+      });
+      const discount = model.addObjectType({ name: "Discount", kind: "value" });
+
+      const ft = model.addFactType({
+        name: "Sale has Discount",
+        roles: [
+          { name: "has", playerId: sale.id, id: "r1" },
+          { name: "of", playerId: discount.id, id: "r2" },
+        ],
+        readings: ["{0} has {1}", "{1} of {0}"],
+        constraints: [
+          {
+            type: "value_constraint",
+            roleId: "r2",
+            values: ["N/A"],
+            ranges: [{ min: "1", max: "10" }],
+          },
+        ],
+      });
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe(
+        "The possible values of Discount are: {'N/A', between 1 and 10}.",
+      );
+    });
+
     it("verbalizes a value constraint without role id", () => {
       const model = new OrmModel({ name: "Test" });
       const ot = model.addObjectType({

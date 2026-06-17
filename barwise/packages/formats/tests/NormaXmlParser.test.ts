@@ -183,6 +183,33 @@ describe("NormaXmlParser", () => {
       expect(doc.valueTypes[0]!.valueConstraint).toBeDefined();
       expect(doc.valueTypes[0]!.valueConstraint!.values).toEqual(["A", "B", "C"]);
     });
+
+    it("parses value ranges and open/exclusive bounds (not just enumerations)", () => {
+      const xml = wrap(`
+        <orm:Objects>
+          <orm:ValueType id="_vt1" Name="Age">
+            <orm:PlayedRoles />
+            <orm:ValueRestriction>
+              <orm:ValueConstraint>
+                <orm:ValueRanges>
+                  <orm:ValueRange MinValue="0" MaxValue="120" />
+                  <orm:ValueRange MinValue="200" />
+                  <orm:ValueRange MinValue="500" MaxValue="600" MinInclusion="Open" MaxInclusion="Open" />
+                </orm:ValueRanges>
+              </orm:ValueConstraint>
+            </orm:ValueRestriction>
+          </orm:ValueType>
+        </orm:Objects>
+      `);
+      const doc = parseNormaXml(xml);
+      const vc = doc.valueTypes[0]!.valueConstraint!;
+      expect(vc.values).toEqual([]); // none are single enumerated values
+      expect(vc.ranges).toEqual([
+        { min: "0", max: "120" },
+        { min: "200" },
+        { min: "500", max: "600", minInclusive: false, maxInclusive: false },
+      ]);
+    });
   });
 
   describe("objectified types", () => {
@@ -517,6 +544,29 @@ describe("NormaXmlParser", () => {
       if (c.type === "value_constraint") {
         expect(c.values).toEqual(["A", "B"]);
         expect(c.roleRefs).toEqual(["_r1"]);
+      }
+    });
+
+    it("keeps ranges alongside enumerations in a role-level value constraint", () => {
+      const xml = wrap(`
+        <orm:Constraints>
+          <orm:ValueConstraint id="_vc1" Name="VC1">
+            <orm:RoleSequence>
+              <orm:Role ref="_r1" />
+            </orm:RoleSequence>
+            <orm:ValueRanges>
+              <orm:ValueRange MinValue="A" MaxValue="A" />
+              <orm:ValueRange MinValue="1" MaxValue="10" />
+            </orm:ValueRanges>
+          </orm:ValueConstraint>
+        </orm:Constraints>
+      `);
+      const doc = parseNormaXml(xml);
+      const c = doc.constraints[0]!;
+      expect(c.type).toBe("value_constraint");
+      if (c.type === "value_constraint") {
+        expect(c.values).toEqual(["A"]);
+        expect(c.ranges).toEqual([{ min: "1", max: "10" }]);
       }
     });
 
