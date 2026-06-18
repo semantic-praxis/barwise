@@ -150,7 +150,12 @@ type OrmYamlConstraint =
   | { type: "equality"; roles_1: string[]; roles_2: string[]; }
   | { type: "ring"; role_1: string; role_2: string; ring_type: RingType; }
   | { type: "frequency"; role: string; min: number; max: number | "unbounded"; }
-  | { type: "value_comparison"; role_1: string; role_2: string; operator: ValueComparisonOperator; };
+  | {
+    type: "value_comparison";
+    role_1: string;
+    role_2: string;
+    operator: ValueComparisonOperator;
+  };
 
 interface OrmYamlSubtypeFact {
   id: string;
