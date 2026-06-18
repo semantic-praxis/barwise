@@ -13,6 +13,7 @@ import type { ObjectType } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { expandReading } from "../model/ReadingOrder.js";
 import type { Role } from "../model/Role.js";
+import { hopsFrom } from "../model/roleGraph.js";
 import { Verbalizer } from "../verbalization/Verbalizer.js";
 import type {
   ConstraintRef,
@@ -354,23 +355,21 @@ class QueryContext {
 
     while (queue.length > 0) {
       const currentId = queue.shift()!;
-      for (const ft of this.model.factTypesForObjectType(currentId)) {
-        for (const role of ft.roles) {
-          const neighborId = role.playerId;
-          if (visited.has(neighborId)) continue;
-          visited.add(neighborId);
-          predecessor.set(neighborId, { prevId: currentId, factType: ft });
-          if (neighborId === to.id) {
-            return {
-              kind: "path",
-              from: from.name,
-              to: to.name,
-              found: true,
-              steps: this.reconstructPath(predecessor, from.id, to.id),
-            };
-          }
-          queue.push(neighborId);
+      for (const hop of hopsFrom(this.model, currentId)) {
+        const neighborId = hop.exitRole.playerId;
+        if (visited.has(neighborId)) continue;
+        visited.add(neighborId);
+        predecessor.set(neighborId, { prevId: currentId, factType: hop.factType });
+        if (neighborId === to.id) {
+          return {
+            kind: "path",
+            from: from.name,
+            to: to.name,
+            found: true,
+            steps: this.reconstructPath(predecessor, from.id, to.id),
+          };
         }
+        queue.push(neighborId);
       }
     }
 
