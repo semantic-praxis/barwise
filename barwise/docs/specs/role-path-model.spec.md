@@ -229,6 +229,88 @@ Two existing gaps must close for this to be real, both already known:
   the `roleGraph` traversal extraction (query-side, pure) and this design.
   The two meet only at `roleGraph`'s signature -- agree that before code.
 
+## Workstreams (for the metamodel thread)
+
+Ordered, each its own PR keeping the full suite green, smallest blast
+radius first. WS1 is architecture-thread and lands first (it is the shared
+seam, off the conflict surface); WS2-7 are the metamodel thread's, on the
+Lane-B conflict surface, so they start once the Tier-1 hold lifts or by
+explicit coordination (refactor-metamodel-consolidation.spec.md). Do not
+start WS2 until the representation and cut line are signed off.
+
+### 1. Extract `model/roleGraph.ts` (architecture thread, pre-req)
+
+The shared traversal seam. Factor the role-adjacency that `query/
+evaluate.ts`'s BFS open-codes (lines ~355-374) into a pure, model-only
+primitive, and refactor `path()` to call it. No new construct, no
+behaviour change -- the query suite stays green. The agreed contract both
+threads build on:
+
+```
+// model/roleGraph.ts  (pure; depends only on the model)
+interface RoleHop { factType: FactType; entryRole: Role; exitRole: Role; }
+// every one-fact-type hop leaving an object type, deterministic order
+function hopsFrom(model: OrmModel, objectTypeId: string): RoleHop[];
+```
+
+Query discovery (BFS) expands `hopsFrom`; join-constraint evaluation
+(WS3) checks each declared `{ entry, exit }` step _is_ a real `RoleHop`
+and that steps are contiguous. One walk, two callers.
+
+### 2. Model + serialization (the foundation)
+
+Add `RolePath` (`model/RolePath.ts` or beside the join constraints) and
+the three variants to the `Constraint` union in `model/Constraint.ts`,
+with `isJoinSubset` / `isJoinEquality` / `isJoinExclusion` guards. Add
+serializer read/write in `OrmYamlSerializer.ts`; bump
+`CURRENT_ORM_VERSION` `1.0 -> 1.1` with a no-op `1.0 -> 1.1` migration in
+`schemaVersion.ts`, the schema `orm_version` `const` in lockstep, and the
+variants + `RolePath` `$defs` in `schemas/orm-model.schema.json`. A
+round-trip test per variant is mandatory. Nothing here evaluates a path --
+it only persists it.
+
+### 3. Validation (roleGraph consumer)
+
+A validation rule (in `validation/rules/`) that, given a join constraint:
+checks well-formedness (all operand paths share `root` type and endpoint
+type; each step is a real `RoleHop`; steps are contiguous), then evaluates
+satisfaction over the population (subset/equality/exclusion of the
+projected endpoints, correlated by `root`). Pure -- `check-core-purity`
+guards it. Cases: well-formed satisfied, well-formed violated, malformed
+(bad role ref / broken contiguity).
+
+### 4. Verbalization
+
+A `verbalizeJoinSubset/Equality/Exclusion` in the now-decomposed
+`verbalization/constraints/phase2.ts`: walk the path, compose each hop's
+fact-type reading into FORML ("... the same Country of which that Person
+is a citizen"). Module addition, not a god-switch edit. Verbalization
+golden per variant -- a path that cannot verbalize is not done.
+
+### 5. Diff + merge (RT-A prerequisite)
+
+Extend `diff/` constraint comparison to compare the join variants
+structurally (type + `root` + ordered `(entry, exit)` sequences; subset
+ordered, equality/exclusion as a set), and extend
+`ModelMerge.remapConstraintIds` (the TODO at ModelMerge.ts:267-283) to
+remap the role ids _inside_ every `RolePath`. Until this lands, RT-A does
+not actually guard joins -- so land it with, or before, WS6/WS7.
+
+### 6. NORMA importer
+
+Route a NORMA join role sequence to the matching join variant (and keep a
+no-join sequence -> flat constraint). This un-drops the `personCountryDemo`
+constraint that is silently discarded today. Importer tests over the
+fixture.
+
+### 7. NORMA exporter (RT-B follow-on)
+
+Emit the join variants to NORMA (the `norma-export.spec.md` WS3 slot), and
+add a join-path RT-A fixture (`personCountryDemo`) to
+`NormaExportFormat.test.ts`. With WS5 done, RT-A
+(`M == mapper(parser(serializer(writer(M)))))`) now covers joins
+end-to-end.
+
 ## API and migration impact
 
 - New public model types from `@barwise/core`: `RolePath` and the three
