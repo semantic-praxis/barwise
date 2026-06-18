@@ -46,7 +46,10 @@ function renderTable(table: Table): string {
   // Columns.
   for (const col of table.columns) {
     const nullable = col.nullable ? "" : " NOT NULL";
-    parts.push(`  ${quoteIdent(col.name)} ${col.dataType}${nullable}`);
+    const def = col.defaultValue !== undefined
+      ? ` DEFAULT ${sqlDefaultLiteral(col.defaultValue)}`
+      : "";
+    parts.push(`  ${quoteIdent(col.name)} ${col.dataType}${def}${nullable}`);
   }
 
   // Primary key.
@@ -72,6 +75,18 @@ function renderTable(table: Table): string {
   lines.push(");");
 
   return lines.join("\n");
+}
+
+/**
+ * Render a default value as a SQL literal: numeric and boolean values are
+ * emitted bare, everything else as a single-quoted string with embedded
+ * quotes doubled.
+ */
+function sqlDefaultLiteral(value: string): string {
+  if (/^-?\d+(\.\d+)?$/.test(value) || value === "TRUE" || value === "FALSE") {
+    return value;
+  }
+  return `'${value.replace(/'/g, "''")}'`;
 }
 
 function quoteIdent(name: string): string {

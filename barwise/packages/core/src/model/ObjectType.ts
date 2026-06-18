@@ -98,6 +98,11 @@ export interface ObjectTypeConfig {
    * "isolated object type" completeness warning.
    */
   readonly independent?: boolean;
+  /**
+   * Default value for a value type: the value assumed when none is supplied.
+   * Threaded into relational mapping as a SQL column DEFAULT.
+   */
+  readonly defaultValue?: string;
 }
 
 /**
@@ -116,6 +121,7 @@ export class ObjectType extends ModelElement {
   private _dataType: DataTypeDef | undefined;
   private _aliases: readonly string[] | undefined;
   private _independent: boolean;
+  private _defaultValue: string | undefined;
 
   constructor(config: ObjectTypeConfig) {
     super(config.name, config.id);
@@ -129,6 +135,7 @@ export class ObjectType extends ModelElement {
       ? Object.freeze([...config.aliases])
       : undefined;
     this._independent = config.independent ?? false;
+    this._defaultValue = config.defaultValue;
 
     if (this.kind === "entity" && !this._referenceMode) {
       throw new Error(
@@ -187,6 +194,10 @@ export class ObjectType extends ModelElement {
 
   get independent(): boolean {
     return this._independent;
+  }
+
+  get defaultValue(): string | undefined {
+    return this._defaultValue;
   }
 
   get isEntity(): boolean {

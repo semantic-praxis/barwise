@@ -122,6 +122,7 @@ interface OrmYamlObjectType {
   data_type?: { name: string; length?: number; scale?: number; };
   aliases?: string[];
   independent?: boolean;
+  default_value?: string;
 }
 
 interface OrmYamlFactType {
@@ -397,6 +398,9 @@ export class OrmYamlSerializer {
     if (ot.independent) {
       result.independent = true;
     }
+    if (ot.defaultValue !== undefined) {
+      result.default_value = ot.defaultValue;
+    }
 
     return result;
   }
@@ -612,6 +616,7 @@ export class OrmYamlSerializer {
           : undefined,
         aliases: otDoc.aliases,
         independent: otDoc.independent,
+        defaultValue: otDoc.default_value,
       });
     }
 

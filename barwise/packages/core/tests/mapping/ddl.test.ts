@@ -31,6 +31,30 @@ describe("DDL renderer", () => {
     expect(ddl).toContain("PRIMARY KEY (customer_id)");
   });
 
+  it("renders a column DEFAULT from a value type's default value", () => {
+    const model = new ModelBuilder("Test")
+      .withEntityType("Account", { referenceMode: "account_id" })
+      .withValueType("Status", { defaultValue: "active" })
+      .withValueType("Balance", { defaultValue: "0", dataType: { name: "integer" } })
+      .withBinaryFactType("Account has Status", {
+        role1: { player: "Account", name: "has" },
+        role2: { player: "Status", name: "is of" },
+        uniqueness: "role1",
+      })
+      .withBinaryFactType("Account has Balance", {
+        role1: { player: "Account", name: "has" },
+        role2: { player: "Balance", name: "is of" },
+        uniqueness: "role1",
+      })
+      .build();
+
+    const ddl = renderDdl(mapper.map(model));
+
+    // String default is quoted; numeric default is bare.
+    expect(ddl).toContain("DEFAULT 'active'");
+    expect(ddl).toContain("DEFAULT 0");
+  });
+
   it("renders foreign keys", () => {
     const model = new ModelBuilder("Test")
       .withEntityType("Customer", { referenceMode: "customer_id" })

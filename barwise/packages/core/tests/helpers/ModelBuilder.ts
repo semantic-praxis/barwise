@@ -18,6 +18,7 @@ interface ObjectTypeOptions {
   valueConstraint?: ValueConstraintDef;
   dataType?: DataTypeDef;
   aliases?: string[];
+  defaultValue?: string;
 }
 
 /**
@@ -224,6 +225,7 @@ export class ModelBuilder {
         valueConstraint: options.valueConstraint,
         dataType: options.dataType,
         aliases: options.aliases,
+        defaultValue: options.defaultValue,
       });
     }
 
