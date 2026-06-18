@@ -238,6 +238,22 @@ Lane-B conflict surface, so they start once the Tier-1 hold lifts or by
 explicit coordination (refactor-metamodel-consolidation.spec.md). Do not
 start WS2 until the representation and cut line are signed off.
 
+Three load-bearing points to get right first -- each easy to get subtly
+wrong, each detailed in its own section above:
+
+- _WS1 lands before WS2._ The `hopsFrom` contract is the one interface both
+  threads share; agree its signature, then query discovery and join-
+  constraint evaluation build on the same walk (see "Should declared
+  role-paths reuse the query path type?").
+- _WS5 is not optional and not last._ Diff does not deeply compare set-
+  comparison constraints today and `ModelMerge` only passes constraints
+  through, so RT-A looks green while silently not guarding joins until both
+  close. Land WS5 with or before WS6/WS7 (see "Identity and equality").
+- _Add variants, never mutate the flat constraints._ Zero migration, the
+  common case stays cheap, and the exhaustive-switch compile errors across
+  verbalization/validation/diff/NORMA enumerate WS3-WS7 for you -- the
+  nudge, not a regression (see "Should we extend ... or add variants?").
+
 ### 1. Extract `model/roleGraph.ts` (architecture thread, pre-req)
 
 The shared traversal seam. Factor the role-adjacency that `query/
