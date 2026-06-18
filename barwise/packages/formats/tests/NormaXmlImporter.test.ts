@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { importNormaXml, NormaImportError } from "../src/NormaXmlImporter.js";
+import { importNormaXml, NormaImportError } from "../src/norma/NormaXmlImporter.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const validator = new ValidationEngine();

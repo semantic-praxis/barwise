@@ -6,7 +6,7 @@
  * and proper ExportResult structure.
  */
 import { describe, expect, it } from "vitest";
-import { AvroExportFormat } from "../src/AvroExportFormat.js";
+import { AvroExportFormat } from "../src/avro/AvroExportFormat.js";
 import { ModelBuilder } from "./helpers/ModelBuilder.js";
 
 const avroFormat = new AvroExportFormat();

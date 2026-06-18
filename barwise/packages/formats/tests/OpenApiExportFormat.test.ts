@@ -7,7 +7,7 @@
 
 import { clearFormats, formatRegistry, registerFormat } from "@barwise/core";
 import { beforeEach, describe, expect, it } from "vitest";
-import { openApiExportFormat } from "../src/OpenApiExportFormat.js";
+import { openApiExportFormat } from "../src/openapi/OpenApiExportFormat.js";
 import { ModelBuilder } from "./helpers/ModelBuilder.js";
 
 describe("OpenApiExportFormat", () => {

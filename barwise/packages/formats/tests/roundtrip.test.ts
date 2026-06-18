@@ -9,8 +9,8 @@
 
 import { openApiToJson, RelationalMapper, renderDdl, renderOpenApi } from "@barwise/core/mapping";
 import { describe, expect, it } from "vitest";
-import { DdlImportFormat } from "../src/DdlImportFormat.js";
-import { OpenApiImportFormat } from "../src/OpenApiImportFormat.js";
+import { DdlImportFormat } from "../src/ddl/DdlImportFormat.js";
+import { OpenApiImportFormat } from "../src/openapi/OpenApiImportFormat.js";
 import { ModelBuilder } from "./helpers/ModelBuilder.js";
 
 describe("Round-trip tests", () => {

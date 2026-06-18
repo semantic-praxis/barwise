@@ -6,14 +6,14 @@
  * each mapping phase independently.
  */
 import { describe, expect, it } from "vitest";
-import { mapNormaToOrm, NormaMappingError } from "../src/NormaToOrmMapper.js";
+import { mapNormaToOrm, NormaMappingError } from "../src/norma/NormaToOrmMapper.js";
 import type {
   NormaConstraint,
   NormaDocument,
   NormaEntityType,
   NormaFactType,
   NormaValueType,
-} from "../src/NormaXmlTypes.js";
+} from "../src/norma/NormaXmlTypes.js";
 
 /** Create a minimal valid NormaDocument. */
 function makeDoc(overrides?: Partial<NormaDocument>): NormaDocument {

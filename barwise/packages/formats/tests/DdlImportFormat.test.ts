@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DdlImportFormat } from "../src/DdlImportFormat.js";
+import { DdlImportFormat } from "../src/ddl/DdlImportFormat.js";
 
 describe("DdlImportFormat", () => {
   const importer = new DdlImportFormat();
