@@ -112,9 +112,9 @@ describe("Standard format descriptors", () => {
       expect(normaFormat.description).toBeTruthy();
     });
 
-    it("has importer only (no exporter)", () => {
+    it("has both importer and exporter", () => {
       expect(normaFormat.importer).toBeDefined();
-      expect(normaFormat.exporter).toBeUndefined();
+      expect(normaFormat.exporter).toBeDefined();
     });
 
     it("importer has parse but not parseAsync", () => {
@@ -181,10 +181,10 @@ describe("registerStandardFormats", () => {
 
     // 4 formats (ddl, openapi, sql, norma) have importers.
     expect(importers).toHaveLength(4);
-    // 3 formats (ddl, openapi, avro) have exporters.
-    expect(exporters).toHaveLength(3);
+    // 4 formats (ddl, openapi, avro, norma) have exporters.
+    expect(exporters).toHaveLength(4);
     expect(importers.map((f) => f.name).sort()).toEqual(["ddl", "norma", "openapi", "sql"]);
-    expect(exporters.map((f) => f.name).sort()).toEqual(["avro", "ddl", "openapi"]);
+    expect(exporters.map((f) => f.name).sort()).toEqual(["avro", "ddl", "norma", "openapi"]);
   });
 
   it("is idempotent -- safe to call multiple times", () => {

@@ -12,6 +12,7 @@ import { type FormatDescriptor, formatRegistry, registerFormat } from "@barwise/
 import { AvroExportFormat } from "./avro/AvroExportFormat.js";
 import { DdlExportFormat } from "./ddl/DdlExportFormat.js";
 import { DdlImportFormat } from "./ddl/DdlImportFormat.js";
+import { NormaExportFormat } from "./norma/NormaExportFormat.js";
 import { NormaImportFormat } from "./norma/NormaImportFormat.js";
 import { OpenApiExportFormat } from "./openapi/OpenApiExportFormat.js";
 import { OpenApiImportFormat } from "./openapi/OpenApiImportFormat.js";
@@ -47,11 +48,12 @@ export const sqlFormat: FormatDescriptor = {
   importer: new SqlImportFormat(),
 };
 
-/** NORMA format: import only (NORMA .orm XML files). */
+/** NORMA format: bidirectional (import and export NORMA .orm XML files). */
 export const normaFormat: FormatDescriptor = {
   name: "norma",
   description: "NORMA .orm XML files",
   importer: new NormaImportFormat(),
+  exporter: new NormaExportFormat(),
 };
 
 /**
