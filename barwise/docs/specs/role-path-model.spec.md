@@ -375,10 +375,11 @@ threads), recorded here because it is in force from this construct on:
   bump (and a migration step) is required only when an existing file would
   read _differently_ or fail under the new metamodel: a renamed, removed,
   or retyped field, or changed semantics. Additive growth is not that.
-- _Cost still applies._ Every construct is model + serializer + JSON Schema
-  + validation + verbalization + round-trip test (ADR-0001's bounded-cost
-  filter); "a schemaVersion migration" in that filter means the seam must
-  _accommodate_ the construct, not that every construct bumps.
+- _Cost still applies._ Every construct is still model + serializer +
+  JSON Schema + validation + verbalization + round-trip test (ADR-0001's
+  bounded-cost filter); "a schemaVersion migration" in that filter means
+  the seam must _accommodate_ the construct, not that every construct
+  bumps.
 - _Forward-incompatibility is accepted._ The schema is strict
   (`additionalProperties: false`), so an old barwise rejects a file using a
   newer additive construct. That is tolerated: barwise is the sole reader
