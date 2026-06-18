@@ -479,7 +479,15 @@ function roleSequence(refs: readonly string[]): XmlNode {
  * how the parser recovers them.
  */
 function buildValueRanges(
-  vc: { values: readonly string[]; ranges?: readonly { min?: string; max?: string; minInclusive?: boolean; maxInclusive?: boolean; }[]; },
+  vc: {
+    values: readonly string[];
+    ranges?: readonly {
+      min?: string;
+      max?: string;
+      minInclusive?: boolean;
+      maxInclusive?: boolean;
+    }[];
+  },
 ): XmlNode {
   const ranges: XmlNode[] = [];
   for (const v of vc.values) {

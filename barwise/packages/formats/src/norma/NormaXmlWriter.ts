@@ -418,7 +418,10 @@ function writeSubtypeFacts(
   // Group subtype facts by supertype so exclusive/exhaustive partitions can
   // be re-expressed as exclusion / disjunctive-mandatory constraints over the
   // supertype meta-roles.
-  const bySupertype = new Map<string, { supertypeRoleIds: string[]; isExclusive: boolean; isExhaustive: boolean; }>();
+  const bySupertype = new Map<
+    string,
+    { supertypeRoleIds: string[]; isExclusive: boolean; isExhaustive: boolean; }
+  >();
 
   for (const sf of model.subtypeFacts) {
     const id = normaId(sf.id);
