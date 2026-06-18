@@ -39,8 +39,9 @@ decide what comes off the menu.
      This admits derivation rules as structure; it argues against
      constructs that are inherently about state change over time.
    - _Bounded cost._ Each field is model + serializer + JSON Schema +
-     validation + verbalization + round-trip test + a `schemaVersion`
-     migration. Batch related fields; resist one-offs.
+     validation + verbalization + round-trip test, under a shared minor
+     `orm_version` bump (one per release cycle, not one per field -- see
+     Schema versioning). Batch related fields; resist one-offs.
 
 3. **Tiering (below) sequences the menu.** Tier 1 ships soon; Tier 3 is a
    single deliberate architectural fork we may never fully take; Tier 4
@@ -67,6 +68,39 @@ decide what comes off the menu.
 | 2 -- worth it  | object cardinality (5t9.4), multi-role frequency (5t9.8), derived fact types (5t9.2)                                                      | Real value; 5t9.2 needs a rule-representation call (start informal/NL, defer formal).                                       |
 | 3 -- one fork  | role-path / join-rule model (5t9.10) -> unlocks join constraints (5t9.6), formal derivation paths, queries (5t9.11)                       | Highest leverage and highest risk: the one construct that breaks "inline and local". Spec-first; keep a constrained subset. |
 | 4 -- non-goals | dynamic rules (5t9.13), queries / subqueries (5t9.11)                                                                                     | Dynamic rules fight determinism; queries sit outside conceptual modeling. Decline explicitly.                               |
+
+## Schema versioning (resolved: additive constructs bump the minor `orm_version`)
+
+Adding an optional construct or field to `.orm.yaml` is a minor format
+change, so it bumps the minor `orm_version` (1.0 -> 1.1 -> ...), using the
+mechanism already specified in `docs/specs/schema-versioning.spec.md`: bump
+`CURRENT_ORM_VERSION` and the schema `const`, and register a forward
+migration (a no-op for a purely additive change). A breaking or structural
+change bumps the major version with a real migration.
+
+Why bump at all for an additive change: the serializer stamps every file
+with `CURRENT_ORM_VERSION` and the schema pins it as a `const`, so a tool
+reading a file whose version exceeds its own gets a clean "written by a
+newer barwise" error rather than a cryptic schema failure on an unknown
+construct. The version is the honest compatibility signal; a construct that
+did _not_ bump would let a file claim a version whose construct set it
+actually exceeds.
+
+The bump is **once per unreleased minor cycle, shared across every additive
+construct that lands in it** -- not per construct and not per PR. The first
+additive PR after a released version performs the bump; later additive PRs
+in the same cycle add their construct to the already-bumped schema without
+touching the version. This is the same batching the _bounded cost_ filter
+calls for.
+
+Scope note: value ranges (5t9.1) shipped under 1.0 and stays there -- "1.0"
+on main de-facto includes it -- so the discipline starts with the next
+construct (5t9.9 value-comparison), whose PR performs the one-time
+1.0 -> 1.1 bump. The whole Tier-1 batch then shares 1.1, and any other
+additive construct landing before 1.1 is released (e.g. the role-path join
+variants, barwise-0s8) shares the same 1.1 rather than bumping
+independently. Cross-thread implication: the role-path spec's separate
+1.0 -> 1.1 bump folds into this single shared bump.
 
 ## Consequences
 
