@@ -92,6 +92,7 @@ export function mapNormaToOrm(doc: NormaDocument): OrmModel {
       kind: "entity",
       referenceMode: et.referenceMode || `${snakeCase(et.name)}_id`,
       definition: et.definition,
+      independent: et.independent,
     });
     objectTypeIdMap.set(et.id, ot.id);
   }
@@ -104,6 +105,7 @@ export function mapNormaToOrm(doc: NormaDocument): OrmModel {
       definition: vt.definition,
       valueConstraint: toValueConstraintDef(vt.valueConstraint),
       dataType: resolveDataType(vt.dataTypeRef, vt.dataTypeLength, vt.dataTypeScale, dataTypeById),
+      independent: vt.independent,
     });
     objectTypeIdMap.set(vt.id, ot.id);
   }

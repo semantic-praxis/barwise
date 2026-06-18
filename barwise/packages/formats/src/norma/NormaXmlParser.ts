@@ -169,6 +169,7 @@ function parseEntityTypes(
       preferredIdentifier: prefId ? attr(prefId, "ref") : undefined,
       playedRoleRefs: parseRoleRefs(playedRoles),
       definition: defs,
+      independent: attr(et, "IsIndependent") === "true",
     };
   });
 }
@@ -199,6 +200,7 @@ function parseValueTypes(
       dataTypeRef: cdt ? attr(cdt, "ref") : undefined,
       dataTypeLength: dtLength !== undefined && !isNaN(dtLength) ? dtLength : undefined,
       dataTypeScale: dtScale !== undefined && !isNaN(dtScale) ? dtScale : undefined,
+      independent: attr(vt, "IsIndependent") === "true",
     };
   });
 }

@@ -78,6 +78,9 @@ function checkIsolatedObjectTypes(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   for (const ot of model.objectTypes) {
+    // Independent object types may exist standalone by design, so a lack
+    // of fact participation is intentional, not a completeness gap.
+    if (ot.independent) continue;
     const participations = model.factTypesForObjectType(ot.id);
     if (participations.length === 0) {
       diagnostics.push({
