@@ -41,6 +41,7 @@ export interface NormaEntityType {
   readonly preferredIdentifier?: string; // ref to UniquenessConstraint id
   readonly playedRoleRefs: readonly string[];
   readonly definition?: string;
+  readonly independent?: boolean;
 }
 
 /** A NORMA ValueType element. */
@@ -56,6 +57,7 @@ export interface NormaValueType {
   readonly dataTypeLength?: number;
   /** Scale parameter from ConceptualDataType (e.g. decimal scale). */
   readonly dataTypeScale?: number;
+  readonly independent?: boolean;
 }
 
 /** A value range parsed from a NORMA ValueRange element. */

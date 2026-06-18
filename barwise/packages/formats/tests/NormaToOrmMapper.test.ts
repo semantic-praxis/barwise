@@ -127,6 +127,23 @@ describe("NormaToOrmMapper", () => {
       expect(model.objectTypes[0]!.referenceMode).toBe("customer_id");
     });
 
+    it("maps the independent flag", () => {
+      const doc = makeDoc({
+        entityTypes: [
+          {
+            id: "_et1",
+            name: "Color",
+            referenceMode: "name",
+            playedRoleRefs: [],
+            independent: true,
+          },
+        ],
+      });
+      const model = mapNormaToOrm(doc);
+
+      expect(model.objectTypes[0]!.independent).toBe(true);
+    });
+
     it("maps value types", () => {
       const doc = makeDoc({
         valueTypes: [makeValue("_vt1", "CustomerName")],

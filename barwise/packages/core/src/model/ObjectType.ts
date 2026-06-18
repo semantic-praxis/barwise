@@ -91,6 +91,13 @@ export interface ObjectTypeConfig {
   readonly dataType?: DataTypeDef;
   /** Alternative names for this object type (synonyms from different stakeholders or contexts). */
   readonly aliases?: readonly string[];
+  /**
+   * Whether the object type is independent: its instances may exist without
+   * participating in any non-identifying fact (drawn with an open dot in
+   * ORM 2). Default false. Independence exempts the type from the
+   * "isolated object type" completeness warning.
+   */
+  readonly independent?: boolean;
 }
 
 /**
@@ -108,6 +115,7 @@ export class ObjectType extends ModelElement {
   private _valueConstraint: ValueConstraintDef | undefined;
   private _dataType: DataTypeDef | undefined;
   private _aliases: readonly string[] | undefined;
+  private _independent: boolean;
 
   constructor(config: ObjectTypeConfig) {
     super(config.name, config.id);
@@ -120,6 +128,7 @@ export class ObjectType extends ModelElement {
     this._aliases = config.aliases && config.aliases.length > 0
       ? Object.freeze([...config.aliases])
       : undefined;
+    this._independent = config.independent ?? false;
 
     if (this.kind === "entity" && !this._referenceMode) {
       throw new Error(
@@ -174,6 +183,10 @@ export class ObjectType extends ModelElement {
 
   get aliases(): readonly string[] | undefined {
     return this._aliases;
+  }
+
+  get independent(): boolean {
+    return this._independent;
   }
 
   get isEntity(): boolean {

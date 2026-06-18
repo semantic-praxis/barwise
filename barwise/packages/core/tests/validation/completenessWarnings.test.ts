@@ -175,6 +175,20 @@ describe("completenessWarnings", () => {
       expect(isolated[0]!.message).toContain("Orphan");
     });
 
+    it("does not report an independent object type that is standalone", () => {
+      const model = new OrmModel({ name: "Test" });
+      model.addObjectType({
+        name: "Color",
+        kind: "value",
+        independent: true,
+      });
+
+      const isolated = completenessWarnings(model).filter(
+        (d) => d.ruleId === "completeness/isolated-object-type",
+      );
+      expect(isolated).toHaveLength(0);
+    });
+
     it("does not report object types that participate in fact types", () => {
       const model = new ModelBuilder("Test")
         .withEntityType("A", {

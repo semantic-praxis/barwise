@@ -98,6 +98,9 @@ function buildEntityType(et: NormaEntityType): XmlNode {
   if (et.referenceMode !== undefined) {
     node[`${ATTR}_ReferenceMode`] = et.referenceMode;
   }
+  if (et.independent) {
+    node[`${ATTR}IsIndependent`] = "true";
+  }
   addPlayedRoles(node, et.playedRoleRefs);
   addDefinition(node, et.definition);
   if (et.preferredIdentifier) {
@@ -128,6 +131,9 @@ function buildValueType(vt: NormaValueType): XmlNode {
     [`${ATTR}id`]: vt.id,
     [`${ATTR}Name`]: vt.name,
   };
+  if (vt.independent) {
+    node[`${ATTR}IsIndependent`] = "true";
+  }
   addPlayedRoles(node, vt.playedRoleRefs);
   addDefinition(node, vt.definition);
   if (vt.dataTypeRef) {

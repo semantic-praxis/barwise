@@ -111,6 +111,10 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
           "description": "Alternative names for this object type (synonyms from different stakeholders or contexts)."
+        },
+        "independent": {
+          "type": "boolean",
+          "description": "Whether the object type is independent: its instances may exist without participating in any non-identifying fact."
         }
       },
       "if": {

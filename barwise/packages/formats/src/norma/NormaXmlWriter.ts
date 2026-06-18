@@ -105,6 +105,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
         preferredIdentifier: preferredIdByEntity.get(ot.id),
         playedRoleRefs: refs,
         definition: ot.definition,
+        independent: ot.independent,
       });
     }
   }
@@ -204,6 +205,7 @@ function writeValueType(ot: ObjectType, playedRoleRefs: string[]): NormaValueTyp
     dataTypeRef: dt ? dataTypeIdFor(dt.name) : undefined,
     dataTypeLength: dt?.length,
     dataTypeScale: dt?.scale,
+    independent: ot.independent,
   };
 }
 

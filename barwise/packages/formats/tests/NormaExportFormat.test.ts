@@ -123,6 +123,30 @@ describe("NormaExportFormat", () => {
     });
   });
 
+  describe("independent object types", () => {
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<orm:ORM2 xmlns:orm="http://schemas.neumont.edu/ORM/2006-04/ORMCore">
+  <orm:ORMModel id="_model1" Name="TestModel">
+    <orm:Objects>
+      <orm:EntityType id="_e1" Name="Color" _ReferenceMode="name" IsIndependent="true">
+        <orm:PlayedRoles />
+      </orm:EntityType>
+    </orm:Objects>
+  </orm:ORMModel>
+</orm:ORM2>`;
+
+    it("imports IsIndependent and round-trips it through export", () => {
+      const model = importNormaXml(xml);
+      expect(model.getObjectTypeByName("Color")!.independent).toBe(true);
+
+      const exported = exportToXml(model);
+      expect(exported).toContain('IsIndependent="true"');
+
+      const reimported = importNormaXml(exported);
+      expect(reimported.getObjectTypeByName("Color")!.independent).toBe(true);
+    });
+  });
+
   describe("semantic-only output", () => {
     it("emits no ORMDiagram elements for a model with no layout", () => {
       const model = importNormaXml(loadFixture("orderManagement.orm"));

@@ -121,6 +121,7 @@ interface OrmYamlObjectType {
   value_constraint?: OrmYamlValueConstraintBody;
   data_type?: { name: string; length?: number; scale?: number; };
   aliases?: string[];
+  independent?: boolean;
 }
 
 interface OrmYamlFactType {
@@ -393,6 +394,9 @@ export class OrmYamlSerializer {
     if (ot.aliases && ot.aliases.length > 0) {
       result.aliases = [...ot.aliases];
     }
+    if (ot.independent) {
+      result.independent = true;
+    }
 
     return result;
   }
@@ -607,6 +611,7 @@ export class OrmYamlSerializer {
           }
           : undefined,
         aliases: otDoc.aliases,
+        independent: otDoc.independent,
       });
     }
 

@@ -162,6 +162,27 @@ describe("OrmYamlSerializer", () => {
       });
     });
 
+    it("round-trips an independent object type and omits the flag when false", () => {
+      const model = new OrmModel({ name: "Test" });
+      model.addObjectType({ name: "Color", kind: "value", independent: true });
+      model.addObjectType({
+        name: "Customer",
+        kind: "entity",
+        referenceMode: "customer_id",
+      });
+
+      const yaml = serializer.serialize(model);
+      expect(yaml).toContain("independent: true");
+
+      // Only the independent type emits the flag (lossless, no noise).
+      expect((yaml.match(/independent:/g) ?? []).length).toBe(1);
+
+      const restored = serializer.deserialize(yaml);
+      expect(restored.getObjectTypeByName("Color")!.independent).toBe(true);
+      // A non-independent type defaults to false.
+      expect(restored.getObjectTypeByName("Customer")!.independent).toBe(false);
+    });
+
     it("serializes value types with data type", () => {
       const model = new OrmModel({ name: "Test" });
       model.addObjectType({
