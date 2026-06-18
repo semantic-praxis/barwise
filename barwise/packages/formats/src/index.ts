@@ -12,6 +12,7 @@ export {
 export { AvroExportFormat } from "./avro/AvroExportFormat.js";
 export { DdlExportFormat } from "./ddl/DdlExportFormat.js";
 export { DdlImportFormat } from "./ddl/DdlImportFormat.js";
+export { NormaExportFormat } from "./norma/NormaExportFormat.js";
 export { NormaImportFormat } from "./norma/NormaImportFormat.js";
 export { NormaImportError } from "./norma/NormaXmlImporter.js";
 export { OpenApiExportFormat } from "./openapi/OpenApiExportFormat.js";

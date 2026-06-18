@@ -1,8 +1,10 @@
 # NORMA XML Export and Round-Trip
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: WS1 implemented 2026-06-18 -- semantic exporter + RT-A round-trip
+landed in `packages/formats/src/norma/`. WS2 (diagram geometry, gated on
+barwise-e3g) and WS3 (RT-B fidelity as barwise-5t9 lands) remain open.
 Created: 2026-06-17
-Last-updated: 2026-06-17
+Last-updated: 2026-06-18
 Tracking: barwise-cb6 (norma CLI), barwise-e3g (diagram round-trip),
 barwise-5t9 (conceptual coverage gaps), docs/NORMA_VS_ORM_YAML.md
 
@@ -95,7 +97,7 @@ fast-xml-parser already provides `XMLBuilder`, so no new dependency.
 
 ```
 @barwise/formats
-  src/
+  src/norma/
     NormaXmlTypes.ts        shared intermediate (NormaDocument) -- exists
     NormaXmlParser.ts       XML        -> NormaDocument          (import, exists)
     NormaToOrmMapper.ts     NormaDocument -> OrmModel            (import, exists)

@@ -86,7 +86,8 @@ describe("NormaImportFormat", () => {
     it("normaFormat has correct shape", () => {
       expect(normaFormat.name).toBe("norma");
       expect(normaFormat.importer).toBeDefined();
-      expect(normaFormat.exporter).toBeUndefined();
+      // NORMA is now bidirectional: it carries an exporter too.
+      expect(normaFormat.exporter).toBeDefined();
     });
   });
 
@@ -103,11 +104,13 @@ describe("NormaImportFormat", () => {
       expect(importer?.name).toBe("norma");
     });
 
-    it("is not listed as an exporter", () => {
+    it("is listed as an exporter", () => {
       registerStandardFormats();
 
-      // norma is import-only; getExporter should not find it
-      expect(getExporter("norma")).toBeUndefined();
+      // norma is now bidirectional; getExporter should find it
+      const exporter = getExporter("norma");
+      expect(exporter).toBeDefined();
+      expect(exporter?.name).toBe("norma");
     });
   });
 });
