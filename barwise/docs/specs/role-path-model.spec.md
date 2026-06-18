@@ -1,7 +1,9 @@
 # Role-path / join-rule model
 
-Status: Draft for review (design only -- no implementation). Both threads
-must agree the representation and the subset cut line before code.
+Status: Design pending sign-off for the metamodel constructs (WS2-7). WS1
+-- the `model/roleGraph.ts` traversal seam -- has landed (2026-06-18,
+barwise-sf1); the metamodel thread builds WS2+ on it once both threads
+agree the representation and the subset cut line.
 Created: 2026-06-18
 Last-updated: 2026-06-18
 Tracking: barwise-0s8 (this design), barwise-5t9.10 (role-path substrate),
@@ -232,18 +234,20 @@ Two existing gaps must close for this to be real, both already known:
 ## Workstreams (for the metamodel thread)
 
 Ordered, each its own PR keeping the full suite green, smallest blast
-radius first. WS1 is architecture-thread and lands first (it is the shared
-seam, off the conflict surface); WS2-7 are the metamodel thread's, on the
-Lane-B conflict surface, so they start once the Tier-1 hold lifts or by
-explicit coordination (refactor-metamodel-consolidation.spec.md). Do not
-start WS2 until the representation and cut line are signed off.
+radius first. WS1 (architecture thread, the shared seam) has _landed_, so
+the `hopsFrom` contract below is live, not proposed. WS2-7 are the
+metamodel thread's, on the Lane-B conflict surface, so they start once the
+Tier-1 hold lifts or by explicit coordination
+(refactor-metamodel-consolidation.spec.md). Do not start WS2 until the
+representation and cut line are signed off.
 
 Three load-bearing points to get right first -- each easy to get subtly
 wrong, each detailed in its own section above:
 
-- _WS1 lands before WS2._ The `hopsFrom` contract is the one interface both
-  threads share; agree its signature, then query discovery and join-
-  constraint evaluation build on the same walk (see "Should declared
+- _WS1 has landed; build WS2 on the live `hopsFrom`._ The seam is shipped
+  in `model/roleGraph.ts` and query discovery already consumes it; WS3
+  evaluates a declared path by matching each step to a `RoleHop` (entry +
+  exit role) rather than re-walking the graph (see "Should declared
   role-paths reuse the query path type?").
 - _WS5 is not optional and not last._ Diff does not deeply compare set-
   comparison constraints today and `ModelMerge` only passes constraints
@@ -254,24 +258,30 @@ wrong, each detailed in its own section above:
   verbalization/validation/diff/NORMA enumerate WS3-WS7 for you -- the
   nudge, not a regression (see "Should we extend ... or add variants?").
 
-### 1. Extract `model/roleGraph.ts` (architecture thread, pre-req)
+### 1. Extract `model/roleGraph.ts` (architecture thread) -- LANDED
 
-The shared traversal seam. Factor the role-adjacency that `query/
-evaluate.ts`'s BFS open-codes (lines ~355-374) into a pure, model-only
-primitive, and refactor `path()` to call it. No new construct, no
-behaviour change -- the query suite stays green. The agreed contract both
-threads build on:
+Done (barwise-sf1). The role-adjacency that `query/evaluate.ts`'s path BFS
+open-coded is factored into a pure, model-only primitive in
+`packages/core/src/model/roleGraph.ts`, and `path()` now expands it.
+Behaviour-preserving -- the full core suite (1310) stays green; depcruise
+and purity clean. The _shipped_ contract both threads build on:
 
 ```
 // model/roleGraph.ts  (pure; depends only on the model)
 interface RoleHop { factType: FactType; entryRole: Role; exitRole: Role; }
-// every one-fact-type hop leaving an object type, deterministic order
+// every one-fact-type hop leaving an object type, deterministic order:
+//   fact types in factTypesForObjectType order, then for each role the
+//   object plays (entry) each other role of that fact type (exit). Ring
+//   hops (exit player == the object) are included.
 function hopsFrom(model: OrmModel, objectTypeId: string): RoleHop[];
 ```
 
-Query discovery (BFS) expands `hopsFrom`; join-constraint evaluation
-(WS3) checks each declared `{ entry, exit }` step _is_ a real `RoleHop`
-and that steps are contiguous. One walk, two callers.
+Query discovery (BFS) expands `hopsFrom`; WS3's join-constraint evaluation
+matches each declared `{ entry, exit }` step to a real `RoleHop` and checks
+contiguity (step k's exit player == step k+1's entry player). One walk, two
+callers. `hopsFrom` is internal to core (imported by `query/` and, at WS3,
+`validation/`) -- it is deliberately not on the public root barrel, so it
+stays off the metamodel conflict surface.
 
 ### 2. Model + serialization (the foundation)
 
