@@ -197,6 +197,10 @@ function constraintKey(
       }:${c.ringType}`;
     case "frequency":
       return `FREQ:${resolveRole(c.roleId, idxMap)}:${c.min}:${c.max}`;
+    case "value_comparison":
+      return `VCMP:${resolveRole(c.roleId1, idxMap)},${
+        resolveRole(c.roleId2, idxMap)
+      }:${c.operator}`;
   }
 }
 

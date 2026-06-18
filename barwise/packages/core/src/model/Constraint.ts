@@ -240,6 +240,35 @@ export interface FrequencyConstraint {
 }
 
 /**
+ * The comparison operator asserted between two role values.
+ */
+export type ValueComparisonOperator = "<" | "<=" | "=" | "<>" | ">=" | ">";
+
+/**
+ * Value-comparison constraint.
+ *
+ * Asserts an ordering between the values of two roles of the same fact
+ * type: for every instance, `value(roleId1) <operator> value(roleId2)`
+ * must hold. Distinct from a ring constraint, which relates two roles by
+ * instance identity rather than by value order. Comparisons across a join
+ * path (e.g. a Project's start vs end held in two fact types) are deferred
+ * to the role-path model (barwise-5t9.10).
+ *
+ * Example: "For each ReviewPeriod, the StartDate must be before the EndDate."
+ */
+export interface ValueComparisonConstraint {
+  readonly type: "value_comparison";
+  /** Unique identifier for this constraint (for traceability). */
+  readonly id?: string;
+  /** The left-hand role id. */
+  readonly roleId1: string;
+  /** The right-hand role id. */
+  readonly roleId2: string;
+  /** The relationship that must hold: value(roleId1) <operator> value(roleId2). */
+  readonly operator: ValueComparisonOperator;
+}
+
+/**
  * Union of all constraint types.
  */
 export type Constraint =
@@ -253,7 +282,8 @@ export type Constraint =
   | SubsetConstraint
   | EqualityConstraint
   | RingConstraint
-  | FrequencyConstraint;
+  | FrequencyConstraint
+  | ValueComparisonConstraint;
 
 // ---------------------------------------------------------------------------
 // Type guard helpers
@@ -309,4 +339,10 @@ export function isRing(c: Constraint): c is RingConstraint {
 
 export function isFrequency(c: Constraint): c is FrequencyConstraint {
   return c.type === "frequency";
+}
+
+export function isValueComparison(
+  c: Constraint,
+): c is ValueComparisonConstraint {
+  return c.type === "value_comparison";
 }

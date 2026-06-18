@@ -425,4 +425,35 @@ describe("ConstraintVerbalizer", () => {
       expect(vs[1]!.text).toContain("at least one");
     });
   });
+
+  describe("value comparison", () => {
+    it("verbalizes a value-comparison constraint with the operator phrase", () => {
+      const model = new OrmModel({ name: "Test" });
+      const trip = model.addObjectType({
+        name: "Trip",
+        kind: "entity",
+        referenceMode: "trip_id",
+      });
+      const start = model.addObjectType({ name: "StartDay", kind: "value" });
+      const end = model.addObjectType({ name: "EndDay", kind: "value" });
+
+      const ft = model.addFactType({
+        name: "Trip runs",
+        roles: [
+          { name: "for", playerId: trip.id, id: "r0" },
+          { name: "from", playerId: start.id, id: "r1" },
+          { name: "to", playerId: end.id, id: "r2" },
+        ],
+        readings: ["{0} runs from {1} to {2}"],
+        constraints: [
+          { type: "value_comparison", roleId1: "r1", roleId2: "r2", operator: "<=" },
+        ],
+      });
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe(
+        "StartDay must be less than or equal to EndDay.",
+      );
+    });
+  });
 });

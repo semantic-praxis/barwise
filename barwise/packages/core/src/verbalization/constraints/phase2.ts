@@ -309,6 +309,38 @@ export function verbalizeGenericFrequency(
   ]);
 }
 
+const VALUE_COMPARISON_PHRASES: Record<string, string> = {
+  "<": "less than",
+  "<=": "less than or equal to",
+  "=": "equal to",
+  "<>": "not equal to",
+  ">=": "greater than or equal to",
+  ">": "greater than",
+};
+
+export function verbalizeValueComparison(
+  roleId1: string,
+  roleId2: string,
+  operator: string,
+  factType: FactType,
+  model: OrmModel,
+): Verbalization {
+  const role1 = factType.getRoleById(roleId1);
+  const role2 = factType.getRoleById(roleId2);
+  const ot1 = role1 ? model.getObjectType(role1.playerId) : undefined;
+  const ot2 = role2 ? model.getObjectType(role2.playerId) : undefined;
+  const name1 = ot1?.name ?? role1?.name ?? roleId1;
+  const name2 = ot2?.name ?? role2?.name ?? roleId2;
+  const phrase = VALUE_COMPARISON_PHRASES[operator] ?? operator;
+
+  return buildVerbalization(factType.id, "constraint", [
+    refSeg(name1, role1?.playerId ?? roleId1),
+    textSeg(` must be ${phrase} `),
+    refSeg(name2, role2?.playerId ?? roleId2),
+    textSeg("."),
+  ]);
+}
+
 /**
  * Find a role by id model-wide: the owner fact type first, then any
  * other fact type. External uniqueness names roles across fact types,

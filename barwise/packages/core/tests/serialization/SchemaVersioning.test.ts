@@ -23,6 +23,14 @@ describe("OrmYamlSerializer version handling", () => {
     expect(model.name).toBe("T");
   });
 
+  it("migrates a 1.0 document forward to the current version", () => {
+    const model = serializer.deserialize(modelYaml("1.0"));
+    expect(model.name).toBe("T");
+    // The additive 1.0 -> 1.1 migration restamps the version; re-serializing
+    // a migrated model emits the current version, not the original 1.0.
+    expect(serializer.serialize(model)).toContain(`orm_version: "${CURRENT_ORM_VERSION}"`);
+  });
+
   it("rejects a newer version with an upgrade message", () => {
     expect(() => serializer.deserialize(modelYaml("2.0"))).toThrow(DeserializationError);
     expect(() => serializer.deserialize(modelYaml("2.0"))).toThrow(/newer barwise/);

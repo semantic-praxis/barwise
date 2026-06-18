@@ -856,3 +856,59 @@ function makeSelfRefModel(options?: {
 
   return model;
 }
+
+describe("value comparison violations", () => {
+  function makeComparisonModel(operator: "<" | "<=" | "=" | "<>" | ">=" | ">") {
+    const model = new OrmModel({ name: "Test" });
+    const trip = model.addObjectType({
+      name: "Trip",
+      kind: "entity",
+      referenceMode: "trip_id",
+    });
+    const day = model.addObjectType({ name: "Day", kind: "value" });
+    const ft = model.addFactType({
+      name: "Trip runs",
+      roles: [
+        { name: "for", playerId: trip.id, id: "r0" },
+        { name: "from", playerId: day.id, id: "r1" },
+        { name: "to", playerId: day.id, id: "r2" },
+      ],
+      readings: ["{0} runs from {1} to {2}"],
+      constraints: [
+        { type: "value_comparison", roleId1: "r1", roleId2: "r2", operator },
+      ],
+    });
+    return { model, ft };
+  }
+
+  it("passes when the numeric comparison holds and flags when it does not", () => {
+    const { model, ft } = makeComparisonModel("<=");
+    const pop = model.addPopulation({ factTypeId: ft.id });
+    pop.addInstance({ id: "ok", roleValues: { r0: "T1", r1: "1", r2: "5" } });
+    pop.addInstance({ id: "bad", roleValues: { r0: "T2", r1: "9", r2: "3" } });
+
+    const diags = populationValidationRules(model);
+    expect(diags).toHaveLength(1);
+    expect(diags[0]!.ruleId).toBe("population/value-comparison-violation");
+    expect(diags[0]!.message).toContain("bad");
+  });
+
+  it("compares lexically when values are not numbers", () => {
+    const { model, ft } = makeComparisonModel("<");
+    const pop = model.addPopulation({ factTypeId: ft.id });
+    pop.addInstance({ id: "ok", roleValues: { r0: "T1", r1: "apple", r2: "banana" } });
+    pop.addInstance({ id: "bad", roleValues: { r0: "T2", r1: "cherry", r2: "banana" } });
+
+    const diags = populationValidationRules(model);
+    expect(diags).toHaveLength(1);
+    expect(diags[0]!.message).toContain("bad");
+  });
+
+  it("ignores instances missing either compared role", () => {
+    const { model, ft } = makeComparisonModel(">=");
+    const pop = model.addPopulation({ factTypeId: ft.id });
+    pop.addInstance({ id: "partial", roleValues: { r0: "T1", r1: "5" } });
+
+    expect(populationValidationRules(model)).toHaveLength(0);
+  });
+});

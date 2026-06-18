@@ -26,7 +26,7 @@ describe("OrmYamlSerializer", () => {
       const model = new OrmModel({ name: "Empty Model" });
       const yaml = serializer.serialize(model);
 
-      expect(yaml).toContain('orm_version: "1.0"');
+      expect(yaml).toContain('orm_version: "1.1"');
       expect(yaml).toContain("name: Empty Model");
     });
 
@@ -126,6 +126,39 @@ describe("OrmYamlSerializer", () => {
         roleId: "r2",
         values: [],
         ranges: [{ min: "18", max: "65" }],
+      });
+    });
+
+    it("round-trips a value-comparison constraint", () => {
+      const model = new OrmModel({ name: "Test" });
+      const trip = model.addObjectType({
+        name: "Trip",
+        kind: "entity",
+        referenceMode: "trip_id",
+      });
+      const start = model.addObjectType({ name: "StartDay", kind: "value" });
+      const end = model.addObjectType({ name: "EndDay", kind: "value" });
+      model.addFactType({
+        name: "Trip runs",
+        roles: [
+          { name: "for", playerId: trip.id, id: "r0" },
+          { name: "from", playerId: start.id, id: "r1" },
+          { name: "to", playerId: end.id, id: "r2" },
+        ],
+        readings: ["{0} runs from {1} to {2}"],
+        constraints: [
+          { type: "value_comparison", roleId1: "r1", roleId2: "r2", operator: "<=" },
+        ],
+      });
+
+      const restored = serializer.deserialize(serializer.serialize(model));
+      const c = restored.getFactTypeByName("Trip runs")!.constraints
+        .find((x) => x.type === "value_comparison");
+      expect(c).toMatchObject({
+        type: "value_comparison",
+        roleId1: "r1",
+        roleId2: "r2",
+        operator: "<=",
       });
     });
 
@@ -799,7 +832,7 @@ model:
       const yaml = serializer.serialize(model);
 
       // The YAML should be readable and match the documented format.
-      expect(yaml).toContain('orm_version: "1.0"');
+      expect(yaml).toContain('orm_version: "1.1"');
       expect(yaml).toContain("name: Order Management");
       expect(yaml).toContain("domain_context: ecommerce");
       expect(yaml).toContain("id: ot-001");
