@@ -22,6 +22,7 @@ import {
   checkExternalUniquenessViolations,
   checkUniquenessViolations,
 } from "./population/uniqueness.js";
+import { checkValueComparisonViolations } from "./population/valueComparison.js";
 import {
   checkFrequencyViolations,
   checkValueConstraintViolations,
@@ -67,6 +68,7 @@ export function populationValidationRules(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkDanglingPopulationFactType(model));
   diagnostics.push(...checkUniquenessViolations(model));
   diagnostics.push(...checkValueConstraintViolations(model));
+  diagnostics.push(...checkValueComparisonViolations(model));
   diagnostics.push(...checkFrequencyViolations(model));
   diagnostics.push(...checkExclusionViolations(model));
   diagnostics.push(...checkExclusiveOrViolations(model));

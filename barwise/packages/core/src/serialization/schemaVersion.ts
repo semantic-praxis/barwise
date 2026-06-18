@@ -13,7 +13,7 @@
  * this onto every document it produces, and the JSON Schema pins its
  * `orm_version` `const` to the same value.
  */
-export const CURRENT_ORM_VERSION = "1.0";
+export const CURRENT_ORM_VERSION = "1.1";
 
 /**
  * Upgrades a parsed `.orm.yaml` document from one version to the next.
@@ -34,7 +34,17 @@ export interface OrmVersionMigration {
  * {@link CURRENT_ORM_VERSION} and the schema `const`, and add the
  * version-to-version migration here.
  */
-export const ORM_VERSION_MIGRATIONS: readonly OrmVersionMigration[] = [];
+export const ORM_VERSION_MIGRATIONS: readonly OrmVersionMigration[] = [
+  // 1.0 -> 1.1 added optional constructs (value ranges were de-facto part of
+  // 1.0; value-comparison constraints, barwise-5t9.9). The additions are
+  // optional, so an older document is already valid under 1.1 -- the
+  // migration only restamps the version.
+  {
+    from: "1.0",
+    to: "1.1",
+    migrate: (doc) => ({ ...doc, orm_version: "1.1" }),
+  },
+];
 
 /** The ordered migration steps needed to reach the current version. */
 export type MigrationPlan =

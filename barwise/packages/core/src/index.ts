@@ -18,11 +18,14 @@ export {
   isMandatoryRole,
   isRing,
   isSubset,
+  isValueComparison,
   isValueConstraint,
   type MandatoryRoleConstraint,
   type RingConstraint,
   type RingType,
   type SubsetConstraint,
+  type ValueComparisonConstraint,
+  type ValueComparisonOperator,
   type ValueConstraint,
 } from "./model/Constraint.js";
 export {

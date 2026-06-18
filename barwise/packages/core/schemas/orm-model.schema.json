@@ -9,8 +9,8 @@
   "properties": {
     "orm_version": {
       "type": "string",
-      "const": "1.0",
-      "description": "Schema version. Must be \"1.0\" for this schema revision."
+      "const": "1.1",
+      "description": "Schema version. Must be \"1.1\" for this schema revision."
     },
     "model": {
       "type": "object",
@@ -430,6 +430,32 @@
             }
           },
           "required": ["type", "role", "min", "max"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "value_comparison" },
+            "id": {
+              "type": "string",
+              "description": "Unique identifier for constraint traceability."
+            },
+            "role_1": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Left-hand role id."
+            },
+            "role_2": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Right-hand role id."
+            },
+            "operator": {
+              "type": "string",
+              "enum": ["<", "<=", "=", "<>", ">=", ">"],
+              "description": "value(role_1) <operator> value(role_2) must hold for every instance."
+            }
+          },
+          "required": ["type", "role_1", "role_2", "operator"],
           "additionalProperties": false
         }
       ]

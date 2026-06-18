@@ -15,6 +15,7 @@ import {
   verbalizeFrequency,
   verbalizeRing,
   verbalizeSubset,
+  verbalizeValueComparison,
 } from "./constraints/phase2.js";
 import type { Verbalization } from "./Verbalization.js";
 
@@ -113,6 +114,14 @@ export class ConstraintVerbalizer {
           constraint.roleId,
           constraint.min,
           constraint.max,
+          factType,
+          model,
+        );
+      case "value_comparison":
+        return verbalizeValueComparison(
+          constraint.roleId1,
+          constraint.roleId2,
+          constraint.operator,
           factType,
           model,
         );

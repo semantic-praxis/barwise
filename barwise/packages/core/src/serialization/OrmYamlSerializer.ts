@@ -1,5 +1,5 @@
 import { parse, stringify } from "yaml";
-import type { Constraint, RingType } from "../model/Constraint.js";
+import type { Constraint, RingType, ValueComparisonOperator } from "../model/Constraint.js";
 import type { Definition } from "../model/Definition.js";
 import type { DiagramLayout } from "../model/DiagramLayout.js";
 import type { FactType } from "../model/FactType.js";
@@ -149,7 +149,8 @@ type OrmYamlConstraint =
   | { type: "subset"; subset_roles: string[]; superset_roles: string[]; }
   | { type: "equality"; roles_1: string[]; roles_2: string[]; }
   | { type: "ring"; role_1: string; role_2: string; ring_type: RingType; }
-  | { type: "frequency"; role: string; min: number; max: number | "unbounded"; };
+  | { type: "frequency"; role: string; min: number; max: number | "unbounded"; }
+  | { type: "value_comparison"; role_1: string; role_2: string; operator: ValueComparisonOperator; };
 
 interface OrmYamlSubtypeFact {
   id: string;
@@ -472,6 +473,14 @@ export class OrmYamlSerializer {
       case "frequency":
         result = { type: "frequency", role: c.roleId, min: c.min, max: c.max };
         break;
+      case "value_comparison":
+        result = {
+          type: "value_comparison",
+          role_1: c.roleId1,
+          role_2: c.roleId2,
+          operator: c.operator,
+        };
+        break;
     }
     // Add constraint ID if present
     if (c.id) {
@@ -727,6 +736,14 @@ export class OrmYamlSerializer {
         break;
       case "frequency":
         result = { type: "frequency", roleId: c.role, min: c.min, max: c.max };
+        break;
+      case "value_comparison":
+        result = {
+          type: "value_comparison",
+          roleId1: c.role_1,
+          roleId2: c.role_2,
+          operator: c.operator,
+        };
         break;
     }
 

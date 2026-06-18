@@ -18,7 +18,7 @@ describe("SchemaValidator", () => {
   describe("valid documents", () => {
     it("accepts a minimal valid document", () => {
       const doc = {
-        orm_version: "1.0",
+        orm_version: "1.1",
         model: { name: "Test" },
       };
 
@@ -29,7 +29,7 @@ describe("SchemaValidator", () => {
 
     it("accepts a document with all fields populated", () => {
       const doc = {
-        orm_version: "1.0",
+        orm_version: "1.1",
         model: {
           name: "Order Management",
           domain_context: "ecommerce",
@@ -81,7 +81,7 @@ describe("SchemaValidator", () => {
 
     it("accepts external_uniqueness constraints", () => {
       const doc = {
-        orm_version: "1.0",
+        orm_version: "1.1",
         model: {
           name: "Test",
           fact_types: [
@@ -104,7 +104,7 @@ describe("SchemaValidator", () => {
 
     it("accepts value_constraint constraints with optional role", () => {
       const doc = {
-        orm_version: "1.0",
+        orm_version: "1.1",
         model: {
           name: "Test",
           fact_types: [
@@ -127,7 +127,7 @@ describe("SchemaValidator", () => {
 
     it("accepts value_constraint without role", () => {
       const doc = {
-        orm_version: "1.0",
+        orm_version: "1.1",
         model: {
           name: "Test",
           fact_types: [
@@ -158,20 +158,20 @@ describe("SchemaValidator", () => {
     });
 
     it("rejects a document missing model", () => {
-      const doc = { orm_version: "1.0" };
+      const doc = { orm_version: "1.1" };
       const result = validator.validateModel(doc);
       expect(result.valid).toBe(false);
     });
 
     it("rejects a document missing model name", () => {
-      const doc = { orm_version: "1.0", model: {} };
+      const doc = { orm_version: "1.1", model: {} };
       const result = validator.validateModel(doc);
       expect(result.valid).toBe(false);
     });
 
     it("rejects an entity type without reference_mode", () => {
       const doc = {
-        orm_version: "1.0",
+        orm_version: "1.1",
         model: {
           name: "Test",
           object_types: [
@@ -192,7 +192,7 @@ describe("SchemaValidator", () => {
 
     it("rejects additional properties at the top level", () => {
       const doc = {
-        orm_version: "1.0",
+        orm_version: "1.1",
         model: { name: "Test" },
         extra: "not allowed",
       };
@@ -202,7 +202,7 @@ describe("SchemaValidator", () => {
 
     it("rejects a fact type with no roles", () => {
       const doc = {
-        orm_version: "1.0",
+        orm_version: "1.1",
         model: {
           name: "Test",
           fact_types: [
@@ -217,7 +217,7 @@ describe("SchemaValidator", () => {
 
     it("rejects a fact type with no readings", () => {
       const doc = {
-        orm_version: "1.0",
+        orm_version: "1.1",
         model: {
           name: "Test",
           fact_types: [
