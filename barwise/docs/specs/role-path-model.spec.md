@@ -228,8 +228,14 @@ Two existing gaps must close for this to be real, both already known:
 - _Ownership per the consolidation spec._ `Constraint.ts`, the serializer,
   the JSON Schema, verbalization, validation, and the NORMA connector are
   the metamodel thread's lane (Lane B, held). The architecture thread owns
-  the `roleGraph` traversal extraction (query-side, pure) and this design.
-  The two meet only at `roleGraph`'s signature -- agree that before code.
+  the `roleGraph` traversal extraction (query-side, pure, landed) and this
+  design. The two meet only at `roleGraph`'s signature.
+- _WS5 (diff + merge) is the metamodel thread's_ (decided 2026-06-18).
+  `diff/` and `ModelMerge` are core internals off the conflict surface, but
+  WS5 needs the WS2 variant shapes and is coupled to WS6/WS7's NORMA RT-A,
+  so keeping the whole constraint pipeline in one thread avoids a
+  mid-feature handoff. The architecture thread's shared contribution is the
+  `roleGraph` seam (WS1), not the diff extension.
 
 ## Workstreams (for the metamodel thread)
 
@@ -288,12 +294,12 @@ stays off the metamodel conflict surface.
 Add `RolePath` (`model/RolePath.ts` or beside the join constraints) and
 the three variants to the `Constraint` union in `model/Constraint.ts`,
 with `isJoinSubset` / `isJoinEquality` / `isJoinExclusion` guards. Add
-serializer read/write in `OrmYamlSerializer.ts`; bump
-`CURRENT_ORM_VERSION` `1.0 -> 1.1` with a no-op `1.0 -> 1.1` migration in
-`schemaVersion.ts`, the schema `orm_version` `const` in lockstep, and the
-variants + `RolePath` `$defs` in `schemas/orm-model.schema.json`. A
-round-trip test per variant is mandatory. Nothing here evaluates a path --
-it only persists it.
+serializer read/write in `OrmYamlSerializer.ts`, and add the variants +
+`RolePath` `$defs` to `schemas/orm-model.schema.json` (the new `oneOf`
+branches). No `orm_version` bump -- the additions are additive and follow
+the project's version policy (see "Version policy" below), exactly as
+value ranges (5t9.1) landed at `1.0`. A round-trip test per variant is
+mandatory. Nothing here evaluates a path -- it only persists it.
 
 ### 3. Validation (roleGraph consumer)
 
@@ -313,7 +319,7 @@ fact-type reading into FORML ("... the same Country of which that Person
 is a citizen"). Module addition, not a god-switch edit. Verbalization
 golden per variant -- a path that cannot verbalize is not done.
 
-### 5. Diff + merge (RT-A prerequisite)
+### 5. Diff + merge (metamodel thread; RT-A prerequisite)
 
 Extend `diff/` constraint comparison to compare the join variants
 structurally (type + `root` + ordered `(entry, exit)` sequences; subset
@@ -342,18 +348,41 @@ end-to-end.
 - New public model types from `@barwise/core`: `RolePath` and the three
   join constraint interfaces + their type guards, added to the `Constraint`
   union. Additive -- no existing export changes signature.
-- `CURRENT_ORM_VERSION` `1.0 -> 1.1` (minor): a no-op `1.0 -> 1.1` migration
-  (the constructs are additive; old files simply lack them), the schema
-  `orm_version` `const` bumped in lockstep (a version-sync test asserts
-  this), and the new variants + `RolePath` added to
-  `schemas/orm-model.schema.json` (kept in sync with the serializer;
-  `schemas/**` is dprint-excluded).
+- No `orm_version` bump (see "Version policy"): the new variants + `RolePath`
+  are added to `schemas/orm-model.schema.json` as additive `oneOf` branches
+  / `$defs`, kept in sync with the serializer (`schemas/**` is
+  dprint-excluded). `CURRENT_ORM_VERSION` stays `1.0`; the migration list
+  stays empty.
 - The serializer gains read/write for the variants; a round-trip test per
   variant is mandatory (lossless rule).
 - Consumers that switch exhaustively over `Constraint` (verbalization,
   validation, diff, the NORMA mapper, the counterexample generator) get a
   compile error until they handle the new members -- the intended
   discriminated-union nudge, not a regression.
+
+## Version policy
+
+The standing rule for the whole metamodel queue (decided 2026-06-18, both
+threads), recorded here because it is in force from this construct on:
+
+- _Additive constructs do not bump `orm_version`._ A new optional field on
+  an existing element (value ranges, defaults, notes) or a new
+  discriminated-union member (the join constraint variants) is added to the
+  serializer and to `schemas/orm-model.schema.json` (a new optional
+  property or `oneOf` branch) without touching `CURRENT_ORM_VERSION`. This
+  is the practice value ranges (5t9.1) already set -- it landed at `1.0`.
+- _The `schemaVersion` migration seam is reserved for breaking changes._ A
+  bump (and a migration step) is required only when an existing file would
+  read _differently_ or fail under the new metamodel: a renamed, removed,
+  or retyped field, or changed semantics. Additive growth is not that.
+- _Cost still applies._ Every construct is model + serializer + JSON Schema
+  + validation + verbalization + round-trip test (ADR-0001's bounded-cost
+  filter); "a schemaVersion migration" in that filter means the seam must
+  _accommodate_ the construct, not that every construct bumps.
+- _Forward-incompatibility is accepted._ The schema is strict
+  (`additionalProperties: false`), so an old barwise rejects a file using a
+  newer additive construct. That is tolerated: barwise is the sole reader
+  and moves forward; we do not bump to advertise additive growth.
 
 ## Alternatives considered
 
