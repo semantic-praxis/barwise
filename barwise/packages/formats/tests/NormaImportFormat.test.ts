@@ -9,8 +9,8 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
-import { NormaImportFormat } from "../src/NormaImportFormat.js";
-import { NormaImportError } from "../src/NormaXmlImporter.js";
+import { NormaImportFormat } from "../src/norma/NormaImportFormat.js";
+import { NormaImportError } from "../src/norma/NormaXmlImporter.js";
 import { normaFormat, registerStandardFormats } from "../src/registration.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

@@ -9,13 +9,13 @@
  */
 
 import { type FormatDescriptor, formatRegistry, registerFormat } from "@barwise/core";
-import { AvroExportFormat } from "./AvroExportFormat.js";
-import { DdlExportFormat } from "./DdlExportFormat.js";
-import { DdlImportFormat } from "./DdlImportFormat.js";
-import { NormaImportFormat } from "./NormaImportFormat.js";
-import { OpenApiExportFormat } from "./OpenApiExportFormat.js";
-import { OpenApiImportFormat } from "./OpenApiImportFormat.js";
-import { SqlImportFormat } from "./SqlImportFormat.js";
+import { AvroExportFormat } from "./avro/AvroExportFormat.js";
+import { DdlExportFormat } from "./ddl/DdlExportFormat.js";
+import { DdlImportFormat } from "./ddl/DdlImportFormat.js";
+import { NormaImportFormat } from "./norma/NormaImportFormat.js";
+import { OpenApiExportFormat } from "./openapi/OpenApiExportFormat.js";
+import { OpenApiImportFormat } from "./openapi/OpenApiImportFormat.js";
+import { SqlImportFormat } from "./sql/SqlImportFormat.js";
 
 /** DDL format: bidirectional (import SQL CREATE TABLE, export DDL). */
 export const ddlFormat: FormatDescriptor = {
