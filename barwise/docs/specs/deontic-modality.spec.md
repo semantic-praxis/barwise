@@ -198,14 +198,16 @@ modified family.
   `extends` it. Resolved during review -- the base expresses a universal
   property without touching the union's discriminants or guards. Recorded
   here for the trail.
-- **Deontic violation severity: `warning` vs a dedicated channel.**
-  Recommend `warning` (reuses the existing severity ladder; tools already
-  render warnings distinctly). A dedicated `ruleId` suffix
-  (`...-deontic`) can ride along for filtering without a new channel.
-- **Modality on all constraints vs a subset.** Recommend the field on all
-  (uniform, future-proof); verbalization modal-switching is wired only
-  where a family has a natural phrasing, the rest carry the field and use
-  the obligatory-prefix fallback.
+- **Deontic violation severity (resolved: `warning`).** Reuses the
+  existing severity ladder; tools already render warnings distinctly. A
+  dedicated `ruleId` suffix (`...-deontic`) can ride along for filtering
+  without a new channel.
+- **Modality on all constraints vs a subset (resolved: all).** The field
+  is on the shared base, so any constraint can be deontic. Verbalization
+  modal-switching is wired only where a family has a natural phrasing; the
+  rest carry the field and use the obligatory-prefix fallback.
+
+All three open decisions are resolved; the spec is ready to implement.
 
 ## Risks and testing
 
