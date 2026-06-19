@@ -29,17 +29,21 @@ deontic as alethic is a _bug_ -- is the validation semantics: a deontic
 violation is a warning, not an error. That semantic, not the label, is
 the point of this change.
 
-## Should modality live on a shared base or per-interface? (resolved: per-interface)
+## Should modality live on a shared base or per-interface? (resolved: shared base)
 
-Per-interface. The `Constraint` union (model/Constraint.ts) is twelve
-separate interfaces, each already repeating `readonly id?: string`. Adding
-`readonly modality?: ConstraintModality` the same way is additive, touches
-no type guard, and keeps the flat discriminated union the metamodel and
-its exhaustive switches rely on. A shared `ConstraintBase` that all twelve
-`extends` would DRY `id` and `modality`, but it is a refactor of every
-interface for a secondary (DRY) benefit, against a primary one
-(orthogonality of the additive change). The repetition is the same kind
-the union already tolerates for `id`. (Surfaced as an open decision.)
+Shared base. `id` and `modality` are universal properties of every
+constraint, so a `ConstraintBase { id?; modality? }` that each of the
+twelve interfaces `extends` expresses that in the type system instead of
+repeating it as if it were a coincidence. The discriminated union is
+unaffected: each interface keeps its own `type` literal discriminant, so
+every type guard (`c.type === "..."`) and every exhaustive switch still
+narrows correctly; the base only contributes the two shared optional
+fields, which existing constraint literals already omit. The refactor is
+mechanical and safe -- replace each interface's `readonly id?: string`
+with `extends ConstraintBase` -- and it makes the next shared field (if one
+ever arrives) a one-line base edit rather than a twelve-fold one. DRY here
+does not compromise orthogonality: the union, its members' discriminants,
+and their guards are unchanged, so the model simply says what it means.
 
 ## Should a deontic violation be an error or a warning? (resolved: warning)
 
@@ -83,15 +87,15 @@ Out of scope:
 
 ## Inventory
 
-| Module                                           | Change                                                               |
-| ------------------------------------------------ | -------------------------------------------------------------------- |
-| `core/src/model/Constraint.ts`                   | `ConstraintModality` type; optional `modality` on each interface     |
-| `core/src/index.ts`                              | Export `ConstraintModality` (and any helper made public)             |
-| `core/src/serialization/OrmYamlSerializer.ts`    | Round-trip `modality` on each constraint (emit only deontic)         |
-| `core/schemas/orm-model.schema.json`             | `modality` enum on the constraint branches                           |
-| `core/src/verbalization/constraints/phase1,2.ts` | Deontic modal-verb softening + obligatory-prefix fallback            |
-| `core/src/validation/rules/population/*.ts`      | `severityForModality` helper; deontic violation -> `warning`         |
-| `core/src/diff/elementDiff.ts`                   | Fold `modality` into the constraint key (so a modality change diffs) |
+| Module                                           | Change                                                                             |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `core/src/model/Constraint.ts`                   | `ConstraintModality` type; `ConstraintBase` (id + modality) each interface extends |
+| `core/src/index.ts`                              | Export `ConstraintModality` (and any helper made public)                           |
+| `core/src/serialization/OrmYamlSerializer.ts`    | Round-trip `modality` on each constraint (emit only deontic)                       |
+| `core/schemas/orm-model.schema.json`             | `modality` enum on the constraint branches                                         |
+| `core/src/verbalization/constraints/phase1,2.ts` | Deontic modal-verb softening + obligatory-prefix fallback                          |
+| `core/src/validation/rules/population/*.ts`      | `severityForModality` helper; deontic violation -> `warning`                       |
+| `core/src/diff/elementDiff.ts`                   | Fold `modality` into the constraint key (so a modality change diffs)               |
 
 Not affected: the format registry, the relational mapper/DDL (modality
 has no relational projection), and `OrmModel`/`ObjectType` (constraint
@@ -102,11 +106,13 @@ property only).
 ```
 ConstraintModality = "alethic" | "deontic"          // model/Constraint.ts
 
-interface <Each>Constraint {
-  readonly type: "...";
-  readonly id?: string;
+interface ConstraintBase {                           // NEW shared base
+  readonly id?: string;                              // moved from each interface
   readonly modality?: ConstraintModality;            // NEW, default alethic
-  ...
+}
+interface <Each>Constraint extends ConstraintBase {
+  readonly type: "...";                              // discriminant unchanged
+  ...                                                // constraint-specific fields
 }
 
 .orm.yaml:  a constraint carries `modality: deontic` only when deontic;
@@ -124,11 +130,11 @@ verbalization: deontic -> soften modals (must/should) or prefix
 
 ## Alternatives considered
 
-- **Shared `ConstraintBase` interface** for `id` + `modality`. Rejected
-  for v1: refactors all twelve interfaces and risks the exhaustive
-  switches for a DRY (secondary) gain; per-interface is additive and
-  matches the existing `id?` repetition. A reasonable later cleanup, not
-  this change.
+- **Per-interface repetition of `modality?`** (no base). Rejected: it
+  treats a universal constraint property as a coincidence and repeats the
+  field twelve times, and it makes any future shared field another
+  twelve-fold edit. The shared base expresses the domain at no cost to
+  orthogonality, since the discriminants and guards are unchanged.
 - **Separate deontic constraint variants** (`deontic_mandatory`, ...).
   Rejected: modality is orthogonal to constraint type, so variants would
   double the union and every switch for no benefit.
@@ -187,10 +193,11 @@ modified family.
 
 ## Open decisions (for review)
 
-- **Per-interface `modality?` vs shared `ConstraintBase`.** Recommend
-  per-interface (additive, no guard/switch churn). The base is the
-  cleaner long-term shape but a twelve-interface refactor; defer it to a
-  dedicated cleanup if desired.
+- **Constraint shape: shared base vs per-interface (resolved: shared
+  base).** `ConstraintBase` carries `id` + `modality`; each interface
+  `extends` it. Resolved during review -- the base expresses a universal
+  property without touching the union's discriminants or guards. Recorded
+  here for the trail.
 - **Deontic violation severity: `warning` vs a dedicated channel.**
   Recommend `warning` (reuses the existing severity ladder; tools already
   render warnings distinctly). A dedicated `ruleId` suffix
