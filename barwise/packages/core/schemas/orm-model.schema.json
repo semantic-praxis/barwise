@@ -221,6 +221,11 @@
               "type": "string",
               "description": "Unique identifier for constraint traceability."
             },
+            "modality": {
+              "type": "string",
+              "enum": ["alethic", "deontic"],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
             "roles": {
               "type": "array",
               "items": { "type": "string", "minLength": 1 },
@@ -242,6 +247,11 @@
               "type": "string",
               "description": "Unique identifier for constraint traceability."
             },
+            "modality": {
+              "type": "string",
+              "enum": ["alethic", "deontic"],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
             "role": {
               "type": "string",
               "minLength": 1,
@@ -257,6 +267,11 @@
             "id": {
               "type": "string",
               "description": "Unique identifier for constraint traceability."
+            },
+            "modality": {
+              "type": "string",
+              "enum": ["alethic", "deontic"],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
             },
             "roles": {
               "type": "array",
@@ -274,6 +289,11 @@
             "id": {
               "type": "string",
               "description": "Unique identifier for constraint traceability."
+            },
+            "modality": {
+              "type": "string",
+              "enum": ["alethic", "deontic"],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
             },
             "role": {
               "type": "string",
@@ -304,6 +324,11 @@
               "type": "string",
               "description": "Unique identifier for constraint traceability."
             },
+            "modality": {
+              "type": "string",
+              "enum": ["alethic", "deontic"],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
             "roles": {
               "type": "array",
               "items": { "type": "string", "minLength": 1 },
@@ -320,6 +345,11 @@
             "id": {
               "type": "string",
               "description": "Unique identifier for constraint traceability."
+            },
+            "modality": {
+              "type": "string",
+              "enum": ["alethic", "deontic"],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
             },
             "roles": {
               "type": "array",
@@ -338,6 +368,11 @@
               "type": "string",
               "description": "Unique identifier for constraint traceability."
             },
+            "modality": {
+              "type": "string",
+              "enum": ["alethic", "deontic"],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
             "roles": {
               "type": "array",
               "items": { "type": "string", "minLength": 1 },
@@ -354,6 +389,11 @@
             "id": {
               "type": "string",
               "description": "Unique identifier for constraint traceability."
+            },
+            "modality": {
+              "type": "string",
+              "enum": ["alethic", "deontic"],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
             },
             "subset_roles": {
               "type": "array",
@@ -378,6 +418,11 @@
               "type": "string",
               "description": "Unique identifier for constraint traceability."
             },
+            "modality": {
+              "type": "string",
+              "enum": ["alethic", "deontic"],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
             "roles_1": {
               "type": "array",
               "items": { "type": "string", "minLength": 1 },
@@ -400,6 +445,11 @@
             "id": {
               "type": "string",
               "description": "Unique identifier for constraint traceability."
+            },
+            "modality": {
+              "type": "string",
+              "enum": ["alethic", "deontic"],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
             },
             "role_1": {
               "type": "string",
@@ -426,6 +476,11 @@
             "id": {
               "type": "string",
               "description": "Unique identifier for constraint traceability."
+            },
+            "modality": {
+              "type": "string",
+              "enum": ["alethic", "deontic"],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
             },
             "role": {
               "type": "string",
@@ -454,6 +509,11 @@
             "id": {
               "type": "string",
               "description": "Unique identifier for constraint traceability."
+            },
+            "modality": {
+              "type": "string",
+              "enum": ["alethic", "deontic"],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
             },
             "role_1": {
               "type": "string",

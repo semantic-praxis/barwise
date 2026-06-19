@@ -1,6 +1,7 @@
 import { isFrequency, isValueConstraint, type ValueRange } from "../../../model/Constraint.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
+import { severityForModality } from "./shared.js";
 
 /** Whether a string parses as a finite number. */
 function isFiniteNumber(s: string): boolean {
@@ -55,7 +56,7 @@ export function checkValueConstraintViolations(model: OrmModel): Diagnostic[] {
         if (!allowed) {
           const rangeNote = ranges.length > 0 ? " (or any permitted range)" : "";
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(vc),
             message: `Population "${pop.id}": instance "${inst.id}" has value `
               + `"${val}" for role "${vc.roleId}" which is not in the `
               + `allowed set [${vc.values.join(", ")}]${rangeNote}.`,
@@ -96,7 +97,7 @@ export function checkFrequencyViolations(model: OrmModel): Diagnostic[] {
       for (const [val, count] of counts) {
         if (count < fc.min) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(fc),
             message: `Population "${pop.id}": value "${val}" in role "${fc.roleId}" `
               + `appears ${count} time(s) but the minimum is ${fc.min}.`,
             elementId: pop.id,
@@ -105,7 +106,7 @@ export function checkFrequencyViolations(model: OrmModel): Diagnostic[] {
         }
         if (fc.max !== "unbounded" && count > fc.max) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(fc),
             message: `Population "${pop.id}": value "${val}" in role "${fc.roleId}" `
               + `appears ${count} time(s) but the maximum is ${fc.max}.`,
             elementId: pop.id,

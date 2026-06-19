@@ -1,6 +1,7 @@
 import { isValueComparison, type ValueComparisonOperator } from "../../../model/Constraint.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
+import { severityForModality } from "./shared.js";
 
 /** Whether a string parses as a finite number. */
 function isFiniteNumber(s: string): boolean {
@@ -53,7 +54,7 @@ export function checkValueComparisonViolations(model: OrmModel): Diagnostic[] {
         if (a === undefined || b === undefined) continue;
         if (!comparisonHolds(a, vc.operator, b)) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(vc),
             message: `Population "${pop.id}": instance "${inst.id}" violates the `
               + `value-comparison constraint -- "${a}" ${vc.operator} "${b}" is false.`,
             elementId: pop.id,

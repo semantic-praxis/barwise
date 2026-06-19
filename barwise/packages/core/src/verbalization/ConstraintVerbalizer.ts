@@ -17,7 +17,24 @@ import {
   verbalizeSubset,
   verbalizeValueComparison,
 } from "./constraints/phase2.js";
-import type { Verbalization } from "./Verbalization.js";
+import { buildVerbalization, kwSeg, type Verbalization } from "./Verbalization.js";
+
+/**
+ * Render a constraint's verbalization as a deontic obligation: prefix
+ * "It is obligatory that " and lower-case a leading keyword so the
+ * sentence reads as an obligation ("Each ..." -> "... that each ...").
+ */
+function toDeontic(v: Verbalization): Verbalization {
+  const segments = v.segments.map((s, i) =>
+    i === 0 && s.kind === "keyword" && s.text.length > 0
+      ? { ...s, text: s.text.charAt(0).toLowerCase() + s.text.slice(1) }
+      : s
+  );
+  return buildVerbalization(v.sourceElementId, v.category, [
+    kwSeg("It is obligatory that "),
+    ...segments,
+  ]);
+}
 
 /**
  * Verbalizes ORM constraints using FORML sentence patterns. The
@@ -38,6 +55,15 @@ export class ConstraintVerbalizer {
    * Verbalize a single constraint.
    */
   verbalize(
+    constraint: Constraint,
+    factType: FactType,
+    model: OrmModel,
+  ): Verbalization {
+    const v = this.verbalizeByType(constraint, factType, model);
+    return constraint.modality === "deontic" ? toDeontic(v) : v;
+  }
+
+  private verbalizeByType(
     constraint: Constraint,
     factType: FactType,
     model: OrmModel,

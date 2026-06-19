@@ -1,5 +1,10 @@
 import { parse, stringify } from "yaml";
-import type { Constraint, RingType, ValueComparisonOperator } from "../model/Constraint.js";
+import type {
+  Constraint,
+  ConstraintModality,
+  RingType,
+  ValueComparisonOperator,
+} from "../model/Constraint.js";
 import type { Definition } from "../model/Definition.js";
 import type { DiagramLayout } from "../model/DiagramLayout.js";
 import type { FactType } from "../model/FactType.js";
@@ -143,7 +148,7 @@ interface OrmYamlRole {
   role_name: string;
 }
 
-type OrmYamlConstraint =
+type OrmYamlConstraintBody =
   | { type: "internal_uniqueness"; roles: string[]; is_preferred?: boolean; }
   | { type: "mandatory"; role: string; }
   | { type: "external_uniqueness"; roles: string[]; }
@@ -161,6 +166,9 @@ type OrmYamlConstraint =
     role_2: string;
     operator: ValueComparisonOperator;
   };
+
+/** A serialized constraint carries the shared optional `modality`. */
+type OrmYamlConstraint = OrmYamlConstraintBody & { modality?: ConstraintModality; };
 
 interface OrmYamlSubtypeFact {
   id: string;
@@ -511,6 +519,10 @@ export class OrmYamlSerializer {
     if (c.id) {
       (result as { id?: string; }).id = c.id;
     }
+    // Modality round-trips only when deontic; alethic is the omitted default.
+    if (c.modality === "deontic") {
+      result.modality = "deontic";
+    }
     return result;
   }
 
@@ -780,6 +792,10 @@ export class OrmYamlSerializer {
     // Preserve ID if present in serialized form
     if (id) {
       result = { ...result, id };
+    }
+    // Preserve deontic modality (alethic is the omitted default).
+    if (c.modality === "deontic") {
+      result = { ...result, modality: "deontic" };
     }
 
     return result;

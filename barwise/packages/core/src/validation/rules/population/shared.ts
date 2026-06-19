@@ -1,5 +1,18 @@
+import type { ConstraintModality } from "../../../model/Constraint.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { FactInstance } from "../../../model/Population.js";
+import type { DiagnosticSeverity } from "../../Diagnostic.js";
+
+/**
+ * The severity of a constraint violation given its modality: an alethic
+ * constraint is a logical necessity, so a violation is an `error`; a
+ * deontic constraint is an obligation, so a violation is a `warning`.
+ */
+export function severityForModality(
+  c: { readonly modality?: ConstraintModality; },
+): DiagnosticSeverity {
+  return c.modality === "deontic" ? "warning" : "error";
+}
 
 /**
  * The universe of an object type: every distinct value that appears in any

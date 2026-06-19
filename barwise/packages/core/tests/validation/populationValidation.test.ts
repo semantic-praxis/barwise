@@ -912,3 +912,42 @@ describe("value comparison violations", () => {
     expect(populationValidationRules(model)).toHaveLength(0);
   });
 });
+
+describe("deontic modality", () => {
+  function violatingModel(modality: "alethic" | "deontic") {
+    const model = new OrmModel({ name: "Test" });
+    const trip = model.addObjectType({
+      name: "Trip",
+      kind: "entity",
+      referenceMode: "trip_id",
+    });
+    const day = model.addObjectType({ name: "Day", kind: "value" });
+    const ft = model.addFactType({
+      name: "Trip runs",
+      roles: [
+        { name: "for", playerId: trip.id, id: "r0" },
+        { name: "from", playerId: day.id, id: "r1" },
+        { name: "to", playerId: day.id, id: "r2" },
+      ],
+      readings: ["{0} runs from {1} to {2}"],
+      constraints: [
+        { type: "value_comparison", roleId1: "r1", roleId2: "r2", operator: "<=", modality },
+      ],
+    });
+    const pop = model.addPopulation({ factTypeId: ft.id });
+    pop.addInstance({ id: "bad", roleValues: { r0: "T1", r1: "9", r2: "3" } });
+    return model;
+  }
+
+  it("an alethic violation is an error", () => {
+    const diags = populationValidationRules(violatingModel("alethic"));
+    expect(diags).toHaveLength(1);
+    expect(diags[0]!.severity).toBe("error");
+  });
+
+  it("a deontic violation is a warning", () => {
+    const diags = populationValidationRules(violatingModel("deontic"));
+    expect(diags).toHaveLength(1);
+    expect(diags[0]!.severity).toBe("warning");
+  });
+});
