@@ -183,6 +183,17 @@ describe("OrmYamlSerializer", () => {
       expect(restored.getObjectTypeByName("Customer")!.independent).toBe(false);
     });
 
+    it("round-trips a value type default value", () => {
+      const model = new OrmModel({ name: "Test" });
+      model.addObjectType({ name: "Status", kind: "value", defaultValue: "active" });
+
+      const yaml = serializer.serialize(model);
+      expect(yaml).toContain("default_value: active");
+
+      const restored = serializer.deserialize(yaml);
+      expect(restored.getObjectTypeByName("Status")!.defaultValue).toBe("active");
+    });
+
     it("serializes value types with data type", () => {
       const model = new OrmModel({ name: "Test" });
       model.addObjectType({

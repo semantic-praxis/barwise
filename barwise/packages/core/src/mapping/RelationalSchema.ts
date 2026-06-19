@@ -11,6 +11,8 @@ export interface Column {
   readonly nullable: boolean;
   /** The role id this column was derived from (traceability). */
   readonly sourceRoleId?: string;
+  /** Default value (from the value type's default), rendered as SQL DEFAULT. */
+  readonly defaultValue?: string;
 }
 
 export interface PrimaryKey {

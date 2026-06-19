@@ -273,6 +273,7 @@ export class RelationalMapper {
       dataType: conceptualTypeToSql(valuePlayer.dataType),
       nullable: !isMandatory,
       sourceRoleId: entityRole.id,
+      defaultValue: valuePlayer.defaultValue,
     });
   }
 
