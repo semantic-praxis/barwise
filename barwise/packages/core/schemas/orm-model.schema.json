@@ -27,6 +27,10 @@
           "minLength": 1,
           "description": "The bounded context this model represents (e.g. \"ecommerce\")."
         },
+        "note": {
+          "type": "string",
+          "description": "Free-text model-level note, distinct from formal definitions."
+        },
         "object_types": {
           "type": "array",
           "items": { "$ref": "#/definitions/object_type" },
@@ -119,6 +123,10 @@
         "default_value": {
           "type": "string",
           "description": "Default value for a value type, threaded into relational mapping as a SQL column DEFAULT."
+        },
+        "note": {
+          "type": "string",
+          "description": "Free-text note, informal commentary distinct from the formal definition."
         }
       },
       "if": {
@@ -486,6 +494,10 @@
         "definition": {
           "type": "string",
           "description": "Natural-language definition."
+        },
+        "note": {
+          "type": "string",
+          "description": "Free-text note, informal commentary distinct from the formal definition."
         },
         "roles": {
           "type": "array",

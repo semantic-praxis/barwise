@@ -194,6 +194,33 @@ describe("OrmYamlSerializer", () => {
       expect(restored.getObjectTypeByName("Status")!.defaultValue).toBe("active");
     });
 
+    it("round-trips free-text notes on the model, object types, and fact types", () => {
+      const model = new OrmModel({ name: "Test", note: "TODO: review scope." });
+      const customer = model.addObjectType({
+        name: "Customer",
+        kind: "entity",
+        referenceMode: "customer_id",
+        note: "deprecated; use Party",
+      });
+      const name = model.addObjectType({ name: "Name", kind: "value" });
+      model.addFactType({
+        name: "Customer has Name",
+        roles: [
+          { name: "has", playerId: customer.id, id: "r1" },
+          { name: "of", playerId: name.id, id: "r2" },
+        ],
+        readings: ["{0} has {1}"],
+        note: "confirm cardinality with stakeholder",
+      });
+
+      const restored = serializer.deserialize(serializer.serialize(model));
+      expect(restored.note).toBe("TODO: review scope.");
+      expect(restored.getObjectTypeByName("Customer")!.note).toBe("deprecated; use Party");
+      expect(restored.getFactTypeByName("Customer has Name")!.note).toBe(
+        "confirm cardinality with stakeholder",
+      );
+    });
+
     it("serializes value types with data type", () => {
       const model = new OrmModel({ name: "Test" });
       model.addObjectType({

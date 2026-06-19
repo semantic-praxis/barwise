@@ -103,6 +103,11 @@ export interface ObjectTypeConfig {
    * Threaded into relational mapping as a SQL column DEFAULT.
    */
   readonly defaultValue?: string;
+  /**
+   * Free-text note: informal commentary distinct from the formal
+   * `definition` (e.g. a TODO, a caveat, a provenance remark).
+   */
+  readonly note?: string;
 }
 
 /**
@@ -122,6 +127,7 @@ export class ObjectType extends ModelElement {
   private _aliases: readonly string[] | undefined;
   private _independent: boolean;
   private _defaultValue: string | undefined;
+  private _note: string | undefined;
 
   constructor(config: ObjectTypeConfig) {
     super(config.name, config.id);
@@ -136,6 +142,7 @@ export class ObjectType extends ModelElement {
       : undefined;
     this._independent = config.independent ?? false;
     this._defaultValue = config.defaultValue;
+    this._note = config.note;
 
     if (this.kind === "entity" && !this._referenceMode) {
       throw new Error(
@@ -198,6 +205,14 @@ export class ObjectType extends ModelElement {
 
   get defaultValue(): string | undefined {
     return this._defaultValue;
+  }
+
+  get note(): string | undefined {
+    return this._note;
+  }
+
+  set note(value: string | undefined) {
+    this._note = value;
   }
 
   get isEntity(): boolean {
