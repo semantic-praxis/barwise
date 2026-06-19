@@ -41,6 +41,12 @@ export function diffObjectType(
     changes.push("value constraint changed");
   }
 
+  const aCard = a.cardinality ? `${a.cardinality.min}..${a.cardinality.max}` : "";
+  const bCard = b.cardinality ? `${b.cardinality.min}..${b.cardinality.max}` : "";
+  if (aCard !== bCard) {
+    changes.push("cardinality changed");
+  }
+
   // Aliases comparison (order-insensitive).
   const aAliases = (a.aliases ?? []).slice().sort().join(",");
   const bAliases = (b.aliases ?? []).slice().sort().join(",");
@@ -212,6 +218,8 @@ function constraintTypeKey(
       return `VCMP:${resolveRole(c.roleId1, idxMap)},${
         resolveRole(c.roleId2, idxMap)
       }:${c.operator}`;
+    case "cardinality":
+      return `CARD:${resolveRole(c.roleId, idxMap)}:${c.min}:${c.max}`;
   }
 }
 

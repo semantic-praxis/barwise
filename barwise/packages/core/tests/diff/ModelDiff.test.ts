@@ -1349,4 +1349,22 @@ describe("diffModels", () => {
       result.deltas.some((d) => d.kind === "modified" && d.elementType === "fact_type"),
     ).toBe(true);
   });
+
+  it("detects an object-type cardinality change", () => {
+    const make = (max: number | "unbounded") => {
+      const m = new OrmModel({ name: "Test" });
+      m.addObjectType({
+        name: "Department",
+        kind: "entity",
+        referenceMode: "dept_id",
+        cardinality: { min: 0, max },
+      });
+      return m;
+    };
+
+    const result = diffModels(make(50), make(100));
+    const delta = result.deltas.find((d) => d.kind === "modified" && d.name === "Department");
+    expect(delta).toBeDefined();
+    expect(delta!.changeDescriptions).toContain("cardinality changed");
+  });
 });

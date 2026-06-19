@@ -490,4 +490,26 @@ describe("ConstraintVerbalizer", () => {
       );
     });
   });
+
+  describe("cardinality", () => {
+    it("verbalizes a unary-role cardinality as an occurrence bound", () => {
+      const model = new OrmModel({ name: "Test" });
+      const promo = model.addObjectType({
+        name: "Promotion",
+        kind: "entity",
+        referenceMode: "promo_id",
+      });
+      const ft = model.addFactType({
+        name: "Promotion is active",
+        roles: [{ name: "is active", playerId: promo.id, id: "p1" }],
+        readings: ["{0} is active"],
+        constraints: [{ type: "cardinality", roleId: "p1", min: 0, max: 10 }],
+      });
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe(
+        "The 'is active' role is played by at most 10 Promotion instances.",
+      );
+    });
+  });
 });

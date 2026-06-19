@@ -1,6 +1,10 @@
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import {
+  checkObjectCardinalityViolations,
+  checkUnaryRoleCardinalityViolations,
+} from "./population/cardinality.js";
+import {
   checkDisjunctiveMandatoryViolations,
   checkMandatoryViolations,
 } from "./population/mandatory.js";
@@ -82,6 +86,8 @@ export function populationValidationRules(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkSpanningSubsetViolations(model));
   diagnostics.push(...checkSpanningEqualityViolations(model));
   diagnostics.push(...checkExternalUniquenessViolations(model));
+  diagnostics.push(...checkObjectCardinalityViolations(model));
+  diagnostics.push(...checkUnaryRoleCardinalityViolations(model));
 
   return diagnostics;
 }

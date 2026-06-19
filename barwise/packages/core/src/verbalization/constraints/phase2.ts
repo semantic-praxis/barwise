@@ -342,6 +342,74 @@ export function verbalizeValueComparison(
 }
 
 /**
+ * Render a min..max bound as an English quantifier: "at most 5", "at least
+ * 2", "exactly 3", or "at least 2 and at most 5". Shared by object-type and
+ * unary-role cardinality verbalization.
+ */
+export function cardinalityQuantifier(min: number, max: number | "unbounded"): string {
+  if (max === "unbounded") return `at least ${min}`;
+  if (min === max) return `exactly ${min}`;
+  if (min === 0) return `at most ${max}`;
+  return `at least ${min} and at most ${max}`;
+}
+
+/** The predicate text of a unary reading ("{0} is active" -> "is active"). */
+function unaryPredicate(factType: FactType): string {
+  const t = factType.readings[0]?.template ?? "";
+  const p = t.indexOf("{0}");
+  if (p >= 0) {
+    const after = t.slice(p + "{0}".length).trim();
+    if (after) return after;
+  }
+  return t.replace(/\{\d+\}/g, "").trim() || factType.name;
+}
+
+/**
+ * "The '{predicate}' role is played by {quantifier} {Type} instances." --
+ * a unary-role cardinality constraint bounds how many object instances play
+ * the unary role.
+ */
+export function verbalizeCardinality(
+  roleId: string,
+  min: number,
+  max: number | "unbounded",
+  factType: FactType,
+  model: OrmModel,
+): Verbalization {
+  const role = factType.getRoleById(roleId);
+  const ot = role ? model.getObjectType(role.playerId) : undefined;
+  const typeName = ot?.name ?? role?.name ?? roleId;
+  const predicate = unaryPredicate(factType);
+  const quantifier = cardinalityQuantifier(min, max);
+
+  return buildVerbalization(factType.id, "constraint", [
+    textSeg(`The '${predicate}' role is played by `),
+    kwSeg(`${quantifier} `),
+    refSeg(typeName, role?.playerId ?? roleId),
+    textSeg(" instances."),
+  ]);
+}
+
+/**
+ * "The number of {Type} instances is {quantifier}." -- an object-type
+ * cardinality bound on the whole population.
+ */
+export function verbalizeObjectCardinality(
+  objectTypeId: string,
+  objectTypeName: string,
+  min: number,
+  max: number | "unbounded",
+): Verbalization {
+  const quantifier = cardinalityQuantifier(min, max);
+  return buildVerbalization(objectTypeId, "constraint", [
+    textSeg("The number of "),
+    refSeg(objectTypeName, objectTypeId),
+    kwSeg(` instances is ${quantifier}`),
+    textSeg("."),
+  ]);
+}
+
+/**
  * Find a role by id model-wide: the owner fact type first, then any
  * other fact type. External uniqueness names roles across fact types,
  * so the owner-only `getRoleById` is not enough.

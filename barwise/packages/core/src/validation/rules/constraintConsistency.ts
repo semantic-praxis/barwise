@@ -216,6 +216,37 @@ export function constraintConsistencyRules(model: OrmModel): Diagnostic[] {
           }
           break;
         }
+
+        case "cardinality": {
+          if (!ft.hasRole(constraint.roleId)) {
+            diagnostics.push({
+              severity: "error",
+              message: `Cardinality constraint in fact type "${ft.name}" `
+                + `references role id "${constraint.roleId}" which does not belong to this fact type.`,
+              elementId: ft.id,
+              ruleId: "constraint/cardinality-invalid-role",
+            });
+          }
+          if (ft.arity !== 1) {
+            diagnostics.push({
+              severity: "error",
+              message: `Cardinality constraint in fact type "${ft.name}" `
+                + `applies to a unary role, but the fact type has arity ${ft.arity}.`,
+              elementId: ft.id,
+              ruleId: "constraint/cardinality-non-unary",
+            });
+          }
+          if (constraint.max !== "unbounded" && constraint.max < constraint.min) {
+            diagnostics.push({
+              severity: "error",
+              message: `Cardinality constraint in fact type "${ft.name}" `
+                + `has max (${constraint.max}) less than min (${constraint.min}).`,
+              elementId: ft.id,
+              ruleId: "constraint/cardinality-max-less-than-min",
+            });
+          }
+          break;
+        }
       }
     }
   }

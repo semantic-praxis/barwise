@@ -2,9 +2,9 @@
  * ORM constraint types (Phase 1 and Phase 2).
  */
 
-import type { ValueRange } from "./ObjectType.js";
+import type { CardinalityRange, ValueRange } from "./ObjectType.js";
 
-export type { ValueRange };
+export type { CardinalityRange, ValueRange };
 
 /**
  * The modality of a constraint: alethic (logical necessity, the default)
@@ -263,6 +263,22 @@ export interface ValueComparisonConstraint extends ConstraintBase {
 }
 
 /**
+ * Cardinality constraint on a unary role.
+ *
+ * Bounds how many object instances play a given unary role -- e.g. "at most
+ * 10 Promotions are active", where _Promotion is active_ is a unary fact
+ * type. Distinct from a frequency constraint (which bounds how many times a
+ * single object plays a role) and from object-type cardinality (the
+ * `cardinality` field on ObjectType, which bounds the whole population). The
+ * role must belong to a unary (arity-1) fact type.
+ */
+export interface CardinalityConstraint extends ConstraintBase, CardinalityRange {
+  readonly type: "cardinality";
+  /** The unary role whose occurrence count is bounded. */
+  readonly roleId: string;
+}
+
+/**
  * Union of all constraint types.
  */
 export type Constraint =
@@ -277,7 +293,8 @@ export type Constraint =
   | EqualityConstraint
   | RingConstraint
   | FrequencyConstraint
-  | ValueComparisonConstraint;
+  | ValueComparisonConstraint
+  | CardinalityConstraint;
 
 // ---------------------------------------------------------------------------
 // Type guard helpers
@@ -339,4 +356,8 @@ export function isValueComparison(
   c: Constraint,
 ): c is ValueComparisonConstraint {
   return c.type === "value_comparison";
+}
+
+export function isCardinality(c: Constraint): c is CardinalityConstraint {
+  return c.type === "cardinality";
 }

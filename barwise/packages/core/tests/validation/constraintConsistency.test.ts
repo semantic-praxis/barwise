@@ -196,4 +196,33 @@ describe("constraintConsistencyRules", () => {
       expect(warnings).toHaveLength(0);
     });
   });
+
+  describe("cardinality constraints", () => {
+    it("flags a cardinality constraint on a non-unary fact type", () => {
+      const model = buildModelWithConstraints([
+        { type: "cardinality", roleId: "r1", min: 0, max: 5 },
+      ]);
+
+      const diags = constraintConsistencyRules(model);
+      expect(diags.some((d) => d.ruleId === "constraint/cardinality-non-unary")).toBe(true);
+    });
+
+    it("accepts a cardinality constraint on a unary fact type", () => {
+      const model = new OrmModel({ name: "Test" });
+      const promo = model.addObjectType({
+        name: "Promotion",
+        kind: "entity",
+        referenceMode: "promo_id",
+      });
+      model.addFactType({
+        name: "Promotion is active",
+        roles: [{ name: "is active", playerId: promo.id, id: "p1" }],
+        readings: ["{0} is active"],
+        constraints: [{ type: "cardinality", roleId: "p1", min: 0, max: 10 }],
+      });
+
+      const diags = constraintConsistencyRules(model);
+      expect(diags.filter((d) => d.ruleId.startsWith("constraint/cardinality"))).toHaveLength(0);
+    });
+  });
 });

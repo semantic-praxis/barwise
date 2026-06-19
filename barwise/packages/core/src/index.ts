@@ -1,5 +1,6 @@
 // Model
 export {
+  type CardinalityConstraint,
   type Constraint,
   type ConstraintBase,
   type ConstraintModality,
@@ -10,6 +11,7 @@ export {
   type ExternalUniquenessConstraint,
   type FrequencyConstraint,
   type InternalUniquenessConstraint,
+  isCardinality,
   isDisjunctiveMandatory,
   isEquality,
   isExclusion,
@@ -46,6 +48,7 @@ export {
   type ObjectifiedFactTypeConfig,
 } from "./model/ObjectifiedFactType.js";
 export {
+  type CardinalityRange,
   type ConceptualDataTypeName,
   type DataTypeDef,
   ObjectType,

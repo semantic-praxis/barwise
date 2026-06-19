@@ -73,6 +73,20 @@ export interface DataTypeDef {
 }
 
 /**
+ * A bound on a count: an inclusive minimum and an inclusive maximum, where
+ * `max` may be `"unbounded"` for no upper limit. The same shape backs both
+ * object-type population cardinality (this module) and unary-role
+ * occurrence cardinality (`CardinalityConstraint` in Constraint.ts), so the
+ * count semantics live in one type. `min` defaults to 0 conceptually.
+ */
+export interface CardinalityRange {
+  /** Minimum number of instances (inclusive). */
+  readonly min: number;
+  /** Maximum number of instances (inclusive), or "unbounded" for no limit. */
+  readonly max: number | "unbounded";
+}
+
+/**
  * Configuration for creating a new ObjectType.
  */
 export interface ObjectTypeConfig {
@@ -108,6 +122,12 @@ export interface ObjectTypeConfig {
    * `definition` (e.g. a TODO, a caveat, a provenance remark).
    */
   readonly note?: string;
+  /**
+   * Cardinality bound on this object type's population: how many instances
+   * of the type may exist (e.g. "at most 50 Departments"). Distinct from a
+   * role frequency, which bounds how many times an object plays a role.
+   */
+  readonly cardinality?: CardinalityRange;
 }
 
 /**
@@ -128,6 +148,7 @@ export class ObjectType extends ModelElement {
   private _independent: boolean;
   private _defaultValue: string | undefined;
   private _note: string | undefined;
+  private _cardinality: CardinalityRange | undefined;
 
   constructor(config: ObjectTypeConfig) {
     super(config.name, config.id);
@@ -143,6 +164,7 @@ export class ObjectType extends ModelElement {
     this._independent = config.independent ?? false;
     this._defaultValue = config.defaultValue;
     this._note = config.note;
+    this._cardinality = config.cardinality;
 
     if (this.kind === "entity" && !this._referenceMode) {
       throw new Error(
@@ -164,6 +186,20 @@ export class ObjectType extends ModelElement {
       throw new Error(
         `Value constraint on "${this.name}" must have at least one value or range.`,
       );
+    }
+
+    if (this._cardinality) {
+      const { min, max } = this._cardinality;
+      if (min < 0) {
+        throw new Error(
+          `Cardinality on "${this.name}" must have a non-negative minimum.`,
+        );
+      }
+      if (max !== "unbounded" && max < min) {
+        throw new Error(
+          `Cardinality on "${this.name}" must have max >= min.`,
+        );
+      }
     }
   }
 
@@ -213,6 +249,10 @@ export class ObjectType extends ModelElement {
 
   set note(value: string | undefined) {
     this._note = value;
+  }
+
+  get cardinality(): CardinalityRange | undefined {
+    return this._cardinality;
   }
 
   get isEntity(): boolean {
