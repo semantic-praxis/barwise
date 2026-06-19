@@ -1,7 +1,7 @@
 import { isEquality, isExclusion, isExclusiveOr, isSubset } from "../../../model/Constraint.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
-import { makeCompositeKey } from "./shared.js";
+import { makeCompositeKey, severityForModality } from "./shared.js";
 
 /**
  * Exclusion constraints forbid an object from playing more than one of the
@@ -40,7 +40,7 @@ export function checkExclusionViolations(model: OrmModel): Diagnostic[] {
         for (const [val, roles] of valuesInRoles) {
           if (roles.length > 1) {
             diagnostics.push({
-              severity: "error",
+              severity: severityForModality(ec),
               message: `Population "${pop.id}": instance "${inst.id}" has value `
                 + `"${val}" in multiple excluded roles [${roles.join(", ")}].`,
               elementId: pop.id,
@@ -84,7 +84,7 @@ export function checkExclusiveOrViolations(model: OrmModel): Diagnostic[] {
 
         if (playedRoles.length === 0) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(xor),
             message: `Population "${pop.id}": instance "${inst.id}" does not play `
               + `any of the exclusive-or roles [${localRoleIds.join(", ")}].`,
             elementId: pop.id,
@@ -92,7 +92,7 @@ export function checkExclusiveOrViolations(model: OrmModel): Diagnostic[] {
           });
         } else if (playedRoles.length > 1) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(xor),
             message: `Population "${pop.id}": instance "${inst.id}" plays `
               + `${playedRoles.length} of the exclusive-or roles `
               + `[${playedRoles.join(", ")}] but must play exactly one.`,
@@ -137,7 +137,7 @@ export function checkSubsetViolations(model: OrmModel): Diagnostic[] {
         const subsetKey = makeCompositeKey(inst, sc.subsetRoleIds);
         if (!supersetTuples.has(subsetKey)) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(sc),
             message: `Population "${pop.id}": instance "${inst.id}" has subset `
               + `tuple [${subsetKey}] for roles [${sc.subsetRoleIds.join(", ")}] `
               + `with no matching superset tuple in roles `
@@ -185,7 +185,7 @@ export function checkEqualityViolations(model: OrmModel): Diagnostic[] {
         const key1 = makeCompositeKey(inst, eq.roleIds1);
         if (!tuples2.has(key1)) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(eq),
             message: `Population "${pop.id}": instance "${inst.id}" has tuple `
               + `[${key1}] in roles [${eq.roleIds1.join(", ")}] with no `
               + `matching tuple in roles [${eq.roleIds2.join(", ")}].`,
@@ -200,7 +200,7 @@ export function checkEqualityViolations(model: OrmModel): Diagnostic[] {
         const key2 = makeCompositeKey(inst, eq.roleIds2);
         if (!tuples1.has(key2)) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(eq),
             message: `Population "${pop.id}": instance "${inst.id}" has tuple `
               + `[${key2}] in roles [${eq.roleIds2.join(", ")}] with no `
               + `matching tuple in roles [${eq.roleIds1.join(", ")}].`,

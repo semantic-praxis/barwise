@@ -6,6 +6,24 @@ import type { ValueRange } from "./ObjectType.js";
 
 export type { ValueRange };
 
+/**
+ * The modality of a constraint: alethic (logical necessity, the default)
+ * or deontic (obligation -- it should hold; a violation is recorded, not
+ * impossible).
+ */
+export type ConstraintModality = "alethic" | "deontic";
+
+/**
+ * Fields shared by every constraint: a traceability id and an optional
+ * modality (default alethic). Each constraint interface extends this.
+ */
+export interface ConstraintBase {
+  /** Unique identifier for this constraint (for traceability). */
+  readonly id?: string;
+  /** Alethic (necessity, default) or deontic (obligation). */
+  readonly modality?: ConstraintModality;
+}
+
 // ---------------------------------------------------------------------------
 // Phase 1 constraints
 // ---------------------------------------------------------------------------
@@ -22,10 +40,8 @@ export type { ValueRange };
  * Multi-role example: "Each Employee, Date combination maps to at most one Shift"
  *   -> uniqueness spanning Employee and Date roles in a ternary fact type
  */
-export interface InternalUniquenessConstraint {
+export interface InternalUniquenessConstraint extends ConstraintBase {
   readonly type: "internal_uniqueness";
-  /** Unique identifier for this constraint (for traceability). */
-  readonly id?: string;
   /** Role ids within the same fact type. */
   readonly roleIds: readonly string[];
   /**
@@ -48,10 +64,8 @@ export interface InternalUniquenessConstraint {
  * Example: "Every Order is placed by some Customer"
  *   -> mandatory on the Order role of "Customer places Order"
  */
-export interface MandatoryRoleConstraint {
+export interface MandatoryRoleConstraint extends ConstraintBase {
   readonly type: "mandatory";
-  /** Unique identifier for this constraint (for traceability). */
-  readonly id?: string;
   /** The single role id that is mandatory. */
   readonly roleId: string;
 }
@@ -66,10 +80,8 @@ export interface MandatoryRoleConstraint {
  * Example: An Employee is uniquely identified by their combination
  * of FirstName and LastName (if those are separate fact types).
  */
-export interface ExternalUniquenessConstraint {
+export interface ExternalUniquenessConstraint extends ConstraintBase {
   readonly type: "external_uniqueness";
-  /** Unique identifier for this constraint (for traceability). */
-  readonly id?: string;
   /** Role ids spanning multiple fact types. */
   readonly roleIds: readonly string[];
 }
@@ -84,10 +96,8 @@ export interface ExternalUniquenessConstraint {
  *
  * Example: "Rating must be one of: A, B, C, D, F" or "Age must be >= 18".
  */
-export interface ValueConstraint {
+export interface ValueConstraint extends ConstraintBase {
   readonly type: "value_constraint";
-  /** Unique identifier for this constraint (for traceability). */
-  readonly id?: string;
   /** The role id this constraint applies to (if role-level). */
   readonly roleId?: string;
   /** Allowed enumerated values. */
@@ -108,10 +118,8 @@ export interface ValueConstraint {
  *
  * Example: "Each Person drives some Car or rides some Bus."
  */
-export interface DisjunctiveMandatoryConstraint {
+export interface DisjunctiveMandatoryConstraint extends ConstraintBase {
   readonly type: "disjunctive_mandatory";
-  /** Unique identifier for this constraint (for traceability). */
-  readonly id?: string;
   /** Two or more role ids (may span fact types). */
   readonly roleIds: readonly string[];
 }
@@ -124,10 +132,8 @@ export interface DisjunctiveMandatoryConstraint {
  *
  * Example: "No Person both drives some Car and rides some Bus."
  */
-export interface ExclusionConstraint {
+export interface ExclusionConstraint extends ConstraintBase {
   readonly type: "exclusion";
-  /** Unique identifier for this constraint (for traceability). */
-  readonly id?: string;
   /** Two or more role ids (may span fact types). */
   readonly roleIds: readonly string[];
 }
@@ -140,10 +146,8 @@ export interface ExclusionConstraint {
  *
  * Example: "Each Person either drives some Car or rides some Bus but not both."
  */
-export interface ExclusiveOrConstraint {
+export interface ExclusiveOrConstraint extends ConstraintBase {
   readonly type: "exclusive_or";
-  /** Unique identifier for this constraint (for traceability). */
-  readonly id?: string;
   /** Two or more role ids (may span fact types). */
   readonly roleIds: readonly string[];
 }
@@ -156,10 +160,8 @@ export interface ExclusiveOrConstraint {
  *
  * Example: "If a Customer rates some Product then that Customer purchases some Product."
  */
-export interface SubsetConstraint {
+export interface SubsetConstraint extends ConstraintBase {
   readonly type: "subset";
-  /** Unique identifier for this constraint (for traceability). */
-  readonly id?: string;
   /** Role ids forming the subset side. */
   readonly subsetRoleIds: readonly string[];
   /** Role ids forming the superset side. */
@@ -174,10 +176,8 @@ export interface SubsetConstraint {
  *
  * Example: "A Customer rates some Product if and only if that Customer purchases some Product."
  */
-export interface EqualityConstraint {
+export interface EqualityConstraint extends ConstraintBase {
   readonly type: "equality";
-  /** Unique identifier for this constraint (for traceability). */
-  readonly id?: string;
   /** First role sequence. */
   readonly roleIds1: readonly string[];
   /** Second role sequence. */
@@ -208,10 +208,8 @@ export type RingType =
  * Example (asymmetric): "If Person1 is a parent of Person2 then
  *   Person2 is not a parent of Person1."
  */
-export interface RingConstraint {
+export interface RingConstraint extends ConstraintBase {
   readonly type: "ring";
-  /** Unique identifier for this constraint (for traceability). */
-  readonly id?: string;
   /** First role id. */
   readonly roleId1: string;
   /** Second role id. */
@@ -227,10 +225,8 @@ export interface RingConstraint {
  *
  * Example: "Each Customer places at least 2 and at most 5 Orders."
  */
-export interface FrequencyConstraint {
+export interface FrequencyConstraint extends ConstraintBase {
   readonly type: "frequency";
-  /** Unique identifier for this constraint (for traceability). */
-  readonly id?: string;
   /** The role being frequency-constrained. */
   readonly roleId: string;
   /** Minimum number of times the object must play the role. */
@@ -256,10 +252,8 @@ export type ValueComparisonOperator = "<" | "<=" | "=" | "<>" | ">=" | ">";
  *
  * Example: "For each ReviewPeriod, the StartDate must be before the EndDate."
  */
-export interface ValueComparisonConstraint {
+export interface ValueComparisonConstraint extends ConstraintBase {
   readonly type: "value_comparison";
-  /** Unique identifier for this constraint (for traceability). */
-  readonly id?: string;
   /** The left-hand role id. */
   readonly roleId1: string;
   /** The right-hand role id. */

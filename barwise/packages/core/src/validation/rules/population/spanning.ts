@@ -4,6 +4,7 @@ import type { Diagnostic } from "../../Diagnostic.js";
 import {
   buildObjectUniverse,
   rolePlayerMap,
+  severityForModality,
   tuplesForRoleSeq,
   valuesPlayedInRole,
 } from "./shared.js";
@@ -29,7 +30,7 @@ export function checkSpanningExclusionViolations(model: OrmModel): Diagnostic[] 
         const count = valuesByRole.filter((set) => set.has(value)).length;
         if (count > 1) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(c),
             message: `Exclusion constraint on roles [${c.roleIds.join(", ")}] is `
               + `violated: "${value}" plays ${count} of the excluded roles.`,
             elementId: c.id ?? ft.id,
@@ -69,7 +70,7 @@ export function checkSpanningExclusiveOrViolations(model: OrmModel): Diagnostic[
         const count = valuesByRole.filter((set) => set.has(value)).length;
         if (count !== 1) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(c),
             message: `Exclusive-or constraint on roles [${c.roleIds.join(", ")}] `
               + `is violated: "${value}" plays ${count} of them (must be exactly one).`,
             elementId: c.id ?? ft.id,
@@ -100,7 +101,7 @@ export function checkSpanningSubsetViolations(model: OrmModel): Diagnostic[] {
       for (const tuple of subsetTuples) {
         if (!supersetTuples.has(tuple)) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(c),
             message: `Subset constraint is violated: tuple [${tuple}] in roles `
               + `[${c.subsetRoleIds.join(", ")}] has no match in roles `
               + `[${c.supersetRoleIds.join(", ")}].`,
@@ -132,7 +133,7 @@ export function checkSpanningEqualityViolations(model: OrmModel): Diagnostic[] {
       for (const tuple of tuples1) {
         if (!tuples2.has(tuple)) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(c),
             message: `Equality constraint is violated: tuple [${tuple}] in roles `
               + `[${c.roleIds1.join(", ")}] has no match in roles `
               + `[${c.roleIds2.join(", ")}].`,
@@ -144,7 +145,7 @@ export function checkSpanningEqualityViolations(model: OrmModel): Diagnostic[] {
       for (const tuple of tuples2) {
         if (!tuples1.has(tuple)) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(c),
             message: `Equality constraint is violated: tuple [${tuple}] in roles `
               + `[${c.roleIds2.join(", ")}] has no match in roles `
               + `[${c.roleIds1.join(", ")}].`,

@@ -153,6 +153,17 @@ function constraintKey(
   c: Constraint,
   idxMap: Map<string, number>,
 ): string {
+  const base = constraintTypeKey(c, idxMap);
+  // Modality is part of a constraint's identity: alethic vs deontic is a
+  // real change, so a deontic constraint keys distinctly from its alethic
+  // twin.
+  return c.modality === "deontic" ? `${base}|deontic` : base;
+}
+
+function constraintTypeKey(
+  c: Constraint,
+  idxMap: Map<string, number>,
+): string {
   switch (c.type) {
     case "internal_uniqueness": {
       const indices = c.roleIds.map((id) => resolveRole(id, idxMap)).sort();

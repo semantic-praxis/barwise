@@ -1,7 +1,7 @@
 import { isDisjunctiveMandatory, isMandatoryRole } from "../../../model/Constraint.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
-import { buildObjectUniverse, valuesPlayedInRole } from "./shared.js";
+import { buildObjectUniverse, severityForModality, valuesPlayedInRole } from "./shared.js";
 
 /**
  * Mandatory constraints require every instance of the role's player type
@@ -25,7 +25,7 @@ export function checkMandatoryViolations(model: OrmModel): Diagnostic[] {
       for (const value of required) {
         if (!played.has(value)) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(c),
             message: `Mandatory constraint on role "${c.roleId}" in fact type `
               + `"${ft.name}" is violated: "${value}" appears in the model but `
               + `does not play this mandatory role.`,
@@ -76,7 +76,7 @@ export function checkDisjunctiveMandatoryViolations(model: OrmModel): Diagnostic
       for (const value of required) {
         if (!playedSomewhere.has(value)) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(c),
             message: `Disjunctive mandatory constraint on roles `
               + `[${c.roleIds.join(", ")}] is violated: "${value}" plays none `
               + `of them.`,

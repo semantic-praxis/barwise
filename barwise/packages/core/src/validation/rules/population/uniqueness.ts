@@ -2,7 +2,7 @@ import { inferExternalUniquenessJoin } from "../../../externalUniqueness.js";
 import { isExternalUniqueness, isInternalUniqueness } from "../../../model/Constraint.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
-import { makeCompositeKey } from "./shared.js";
+import { makeCompositeKey, severityForModality } from "./shared.js";
 
 /**
  * Internal uniqueness constraints require that the combination of values
@@ -24,7 +24,7 @@ export function checkUniquenessViolations(model: OrmModel): Diagnostic[] {
         const firstId = seen.get(key);
         if (firstId) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(uc),
             message: `Population "${pop.id}": instance "${inst.id}" violates `
               + `internal uniqueness constraint on role(s) [${uc.roleIds.join(", ")}]. `
               + `Duplicate of instance "${firstId}".`,
@@ -96,7 +96,7 @@ export function checkExternalUniquenessViolations(model: OrmModel): Diagnostic[]
         const first = seen.get(tuple);
         if (first !== undefined && first !== common) {
           diagnostics.push({
-            severity: "error",
+            severity: severityForModality(c),
             message: `External uniqueness constraint is violated: "${common}" and `
               + `"${first}" share the same combination [${parts.join(", ")}].`,
             elementId: c.id ?? ft.id,

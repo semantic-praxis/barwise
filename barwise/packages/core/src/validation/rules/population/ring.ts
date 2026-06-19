@@ -1,6 +1,7 @@
 import { isRing } from "../../../model/Constraint.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
-import type { Diagnostic } from "../../Diagnostic.js";
+import type { Diagnostic, DiagnosticSeverity } from "../../Diagnostic.js";
+import { severityForModality } from "./shared.js";
 
 /**
  * Ring constraints apply to reflexive relationships (a fact type where both
@@ -70,7 +71,7 @@ export function checkRingViolations(model: OrmModel): Diagnostic[] {
             const b = inst.roleValues[rc.roleId2];
             if (a !== undefined && a === b) {
               diagnostics.push({
-                severity: "error",
+                severity: severityForModality(rc),
                 message: `Population "${pop.id}": instance "${inst.id}" violates `
                   + `irreflexive ring constraint -- "${a}" appears in both roles.`,
                 elementId: pop.id,
@@ -87,7 +88,7 @@ export function checkRingViolations(model: OrmModel): Diagnostic[] {
             if (a !== undefined && b !== undefined) {
               if (a === b) {
                 diagnostics.push({
-                  severity: "error",
+                  severity: severityForModality(rc),
                   message: `Population "${pop.id}": instance "${inst.id}" violates `
                     + `asymmetric ring constraint -- "${a}" appears in both `
                     + `roles (asymmetric implies irreflexive).`,
@@ -96,7 +97,7 @@ export function checkRingViolations(model: OrmModel): Diagnostic[] {
                 });
               } else if (pairSet.has(`${b}\0${a}`)) {
                 diagnostics.push({
-                  severity: "error",
+                  severity: severityForModality(rc),
                   message: `Population "${pop.id}": instance "${inst.id}" violates `
                     + `asymmetric ring constraint -- both (${a}, ${b}) and `
                     + `(${b}, ${a}) exist.`,
@@ -115,7 +116,7 @@ export function checkRingViolations(model: OrmModel): Diagnostic[] {
             if (a !== undefined && b !== undefined && a !== b) {
               if (pairSet.has(`${b}\0${a}`)) {
                 diagnostics.push({
-                  severity: "error",
+                  severity: severityForModality(rc),
                   message: `Population "${pop.id}": instance "${inst.id}" violates `
                     + `antisymmetric ring constraint -- both (${a}, ${b}) and `
                     + `(${b}, ${a}) exist but ${a} != ${b}.`,
@@ -133,7 +134,7 @@ export function checkRingViolations(model: OrmModel): Diagnostic[] {
             const b = inst.roleValues[rc.roleId2];
             if (a !== undefined && b !== undefined && !pairSet.has(`${b}\0${a}`)) {
               diagnostics.push({
-                severity: "error",
+                severity: severityForModality(rc),
                 message: `Population "${pop.id}": instance "${inst.id}" violates `
                   + `symmetric ring constraint -- (${a}, ${b}) exists but `
                   + `(${b}, ${a}) does not.`,
@@ -150,7 +151,7 @@ export function checkRingViolations(model: OrmModel): Diagnostic[] {
             for (const [b2, c] of pairs) {
               if (b === b2 && pairSet.has(`${a}\0${c}`)) {
                 diagnostics.push({
-                  severity: "error",
+                  severity: severityForModality(rc),
                   message: `Population "${pop.id}": intransitive ring constraint `
                     + `violated -- (${a}, ${b}) and (${b}, ${c}) exist, `
                     + `but (${a}, ${c}) also exists.`,
@@ -167,7 +168,7 @@ export function checkRingViolations(model: OrmModel): Diagnostic[] {
             for (const [b2, c] of pairs) {
               if (b === b2 && !pairSet.has(`${a}\0${c}`)) {
                 diagnostics.push({
-                  severity: "error",
+                  severity: severityForModality(rc),
                   message: `Population "${pop.id}": transitive ring constraint `
                     + `violated -- (${a}, ${b}) and (${b}, ${c}) exist, `
                     + `but (${a}, ${c}) does not.`,
@@ -180,7 +181,7 @@ export function checkRingViolations(model: OrmModel): Diagnostic[] {
           break;
 
         case "acyclic":
-          diagnostics.push(...checkAcyclic(pairs, pop.id));
+          diagnostics.push(...checkAcyclic(pairs, pop.id, severityForModality(rc)));
           break;
 
         case "purely_reflexive":
@@ -189,7 +190,7 @@ export function checkRingViolations(model: OrmModel): Diagnostic[] {
             const b = inst.roleValues[rc.roleId2];
             if (a !== undefined && b !== undefined && a !== b) {
               diagnostics.push({
-                severity: "error",
+                severity: severityForModality(rc),
                 message: `Population "${pop.id}": instance "${inst.id}" violates `
                   + `purely reflexive ring constraint -- (${a}, ${b}) exists `
                   + `but only self-loops (a, a) are allowed.`,
@@ -213,6 +214,7 @@ export function checkRingViolations(model: OrmModel): Diagnostic[] {
 function checkAcyclic(
   pairs: Array<[string, string]>,
   popId: string,
+  severity: DiagnosticSeverity,
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
@@ -240,7 +242,7 @@ function checkAcyclic(
         // Back edge: cycle detected.
         cycleFound = true;
         diagnostics.push({
-          severity: "error",
+          severity,
           message: `Population "${popId}": acyclic ring constraint violated -- `
             + `cycle detected involving "${node}" and "${neighbor}".`,
           elementId: popId,

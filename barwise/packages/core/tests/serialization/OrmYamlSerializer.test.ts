@@ -221,6 +221,38 @@ describe("OrmYamlSerializer", () => {
       );
     });
 
+    it("round-trips deontic modality and omits it when alethic", () => {
+      const model = new OrmModel({ name: "Test" });
+      const person = model.addObjectType({
+        name: "Person",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      const name = model.addObjectType({ name: "Name", kind: "value" });
+      model.addFactType({
+        name: "Person has Name",
+        roles: [
+          { name: "has", playerId: person.id, id: "r1" },
+          { name: "of", playerId: name.id, id: "r2" },
+        ],
+        readings: ["{0} has {1}"],
+        constraints: [
+          { type: "mandatory", roleId: "r1", modality: "deontic" },
+          { type: "internal_uniqueness", roleIds: ["r1"] }, // alethic default
+        ],
+      });
+
+      const yaml = serializer.serialize(model);
+      expect(yaml).toContain("modality: deontic");
+      // Only the deontic constraint emits the field; alethic omits it.
+      expect((yaml.match(/modality:/g) ?? []).length).toBe(1);
+
+      const restored = serializer.deserialize(yaml);
+      const constraints = restored.getFactTypeByName("Person has Name")!.constraints;
+      expect(constraints.find((c) => c.type === "mandatory")!.modality).toBe("deontic");
+      expect(constraints.find((c) => c.type === "internal_uniqueness")!.modality).toBeUndefined();
+    });
+
     it("serializes value types with data type", () => {
       const model = new OrmModel({ name: "Test" });
       model.addObjectType({

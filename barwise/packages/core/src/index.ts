@@ -1,6 +1,8 @@
 // Model
 export {
   type Constraint,
+  type ConstraintBase,
+  type ConstraintModality,
   type DisjunctiveMandatoryConstraint,
   type EqualityConstraint,
   type ExclusionConstraint,

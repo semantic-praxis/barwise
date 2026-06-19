@@ -456,4 +456,38 @@ describe("ConstraintVerbalizer", () => {
       );
     });
   });
+
+  describe("deontic modality", () => {
+    it("verbalizes a deontic constraint as an obligation", () => {
+      const model = new OrmModel({ name: "Test" });
+      const customer = model.addObjectType({
+        name: "Customer",
+        kind: "entity",
+        referenceMode: "customer_id",
+      });
+      const order = model.addObjectType({
+        name: "Order",
+        kind: "entity",
+        referenceMode: "order_number",
+      });
+      const ft = model.addFactType({
+        name: "Customer places Order",
+        roles: [
+          { name: "places", playerId: customer.id, id: "r1" },
+          { name: "is placed by", playerId: order.id, id: "r2" },
+        ],
+        readings: ["{0} places {1}", "{1} is placed by {0}"],
+        constraints: [
+          { type: "internal_uniqueness", roleIds: ["r2"], modality: "deontic" },
+        ],
+      });
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      // The alethic sentence "Each Order ... " becomes an obligation with a
+      // lower-cased leading keyword.
+      expect(v[0]!.text).toBe(
+        "It is obligatory that each Order is placed by at most one Customer.",
+      );
+    });
+  });
 });

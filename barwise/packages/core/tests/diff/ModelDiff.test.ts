@@ -12,6 +12,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
+import { OrmModel } from "../../src/model/OrmModel.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 function baseModel() {
@@ -1315,5 +1316,37 @@ describe("diffModels", () => {
     expect(removed[0]!.name).toBe("Customer");
     expect(added).toHaveLength(1);
     expect(added[0]!.name).toBe("Client");
+  });
+
+  it("detects a constraint modality change (alethic vs deontic)", () => {
+    function model(modality: "alethic" | "deontic") {
+      const m = new OrmModel({ name: "Test" });
+      const customer = m.addObjectType({
+        name: "Customer",
+        kind: "entity",
+        referenceMode: "customer_id",
+      });
+      const order = m.addObjectType({
+        name: "Order",
+        kind: "entity",
+        referenceMode: "order_number",
+      });
+      m.addFactType({
+        name: "Customer places Order",
+        roles: [
+          { name: "places", playerId: customer.id, id: "r1" },
+          { name: "is placed by", playerId: order.id, id: "r2" },
+        ],
+        readings: ["{0} places {1}"],
+        constraints: [{ type: "mandatory", roleId: "r2", modality }],
+      });
+      return m;
+    }
+
+    const result = diffModels(model("alethic"), model("deontic"));
+    expect(result.hasChanges).toBe(true);
+    expect(
+      result.deltas.some((d) => d.kind === "modified" && d.elementType === "fact_type"),
+    ).toBe(true);
   });
 });
