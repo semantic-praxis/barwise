@@ -14,6 +14,8 @@ export interface OrmModelConfig {
   readonly name: string;
   /** The bounded context this model represents. */
   readonly domainContext?: string;
+  /** Free-text note: informal model-level commentary. */
+  readonly note?: string;
 }
 
 /**
@@ -26,6 +28,7 @@ export interface OrmModelConfig {
 export class OrmModel {
   private _name: string;
   private _domainContext: string | undefined;
+  private _note: string | undefined;
 
   private readonly _objectTypes: Map<string, ObjectType> = new Map();
   private readonly _factTypes: Map<string, FactType> = new Map();
@@ -41,6 +44,7 @@ export class OrmModel {
     }
     this._name = config.name.trim();
     this._domainContext = config.domainContext;
+    this._note = config.note;
   }
 
   get name(): string {
@@ -56,6 +60,14 @@ export class OrmModel {
 
   get domainContext(): string | undefined {
     return this._domainContext;
+  }
+
+  get note(): string | undefined {
+    return this._note;
+  }
+
+  set note(value: string | undefined) {
+    this._note = value;
   }
 
   set domainContext(value: string | undefined) {

@@ -34,6 +34,7 @@ interface OrmYamlDocument {
   model: {
     name: string;
     domain_context?: string;
+    note?: string;
     object_types?: OrmYamlObjectType[];
     fact_types?: OrmYamlFactType[];
     subtype_facts?: OrmYamlSubtypeFact[];
@@ -123,12 +124,14 @@ interface OrmYamlObjectType {
   aliases?: string[];
   independent?: boolean;
   default_value?: string;
+  note?: string;
 }
 
 interface OrmYamlFactType {
   id: string;
   name: string;
   definition?: string;
+  note?: string;
   roles: OrmYamlRole[];
   readings: string[];
   constraints?: OrmYamlConstraint[];
@@ -323,6 +326,9 @@ export class OrmYamlSerializer {
     if (model.domainContext) {
       doc.model.domain_context = model.domainContext;
     }
+    if (model.note) {
+      doc.model.note = model.note;
+    }
 
     const objectTypes = model.objectTypes;
     if (objectTypes.length > 0) {
@@ -401,6 +407,9 @@ export class OrmYamlSerializer {
     if (ot.defaultValue !== undefined) {
       result.default_value = ot.defaultValue;
     }
+    if (ot.note) {
+      result.note = ot.note;
+    }
 
     return result;
   }
@@ -415,6 +424,9 @@ export class OrmYamlSerializer {
 
     if (ft.definition) {
       result.definition = ft.definition;
+    }
+    if (ft.note) {
+      result.note = ft.note;
     }
 
     if (ft.constraints.length > 0) {
@@ -593,6 +605,7 @@ export class OrmYamlSerializer {
     const model = new OrmModel({
       name: doc.model.name,
       domainContext: doc.model.domain_context,
+      note: doc.model.note,
     });
 
     // Add object types first (fact types reference them).
@@ -617,6 +630,7 @@ export class OrmYamlSerializer {
         aliases: otDoc.aliases,
         independent: otDoc.independent,
         defaultValue: otDoc.default_value,
+        note: otDoc.note,
       });
     }
 
@@ -629,6 +643,7 @@ export class OrmYamlSerializer {
           id: ftDoc.id,
           name: ftDoc.name,
           definition: ftDoc.definition,
+          note: ftDoc.note,
           roles: ftDoc.roles.map((r) => ({
             id: r.id,
             name: r.role_name,

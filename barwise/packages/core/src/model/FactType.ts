@@ -15,6 +15,8 @@ export interface FactTypeConfig {
   readonly constraints?: readonly Constraint[];
   /** Natural-language definition. */
   readonly definition?: string;
+  /** Free-text note: informal commentary distinct from `definition`. */
+  readonly note?: string;
 }
 
 /**
@@ -31,6 +33,7 @@ export class FactType extends ModelElement {
   private readonly _readings: ReadingOrder[];
   private readonly _constraints: Constraint[];
   private _definition: string | undefined;
+  private _note: string | undefined;
 
   constructor(config: FactTypeConfig) {
     super(config.name, config.id);
@@ -68,6 +71,7 @@ export class FactType extends ModelElement {
       c.id ? c : { ...c, id: randomUUID() }
     );
     this._definition = config.definition;
+    this._note = config.note;
   }
 
   /** The ordered roles in this fact type. */
@@ -96,6 +100,14 @@ export class FactType extends ModelElement {
 
   set definition(value: string | undefined) {
     this._definition = value;
+  }
+
+  get note(): string | undefined {
+    return this._note;
+  }
+
+  set note(value: string | undefined) {
+    this._note = value;
   }
 
   /** Find a role by its id. Returns undefined if not found. */
