@@ -41,7 +41,13 @@ export { type Definition } from "./model/Definition.js";
 export { type DiagramLayout } from "./model/DiagramLayout.js";
 export { DomainModel, type DomainModelConfig } from "./model/DomainModel.js";
 export { EntityMapping, type EntityMappingConfig } from "./model/EntityMapping.js";
-export { FactType, type FactTypeConfig } from "./model/FactType.js";
+export {
+  type DerivationKind,
+  type DerivationRule,
+  type DerivationStorage,
+  FactType,
+  type FactTypeConfig,
+} from "./model/FactType.js";
 export { ModelElement } from "./model/ModelElement.js";
 export {
   ObjectifiedFactType,

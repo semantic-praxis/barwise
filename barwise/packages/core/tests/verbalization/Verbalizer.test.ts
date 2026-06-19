@@ -238,4 +238,57 @@ describe("Verbalizer", () => {
       expect(texts).toContain("The number of Department instances is at most 50.");
     });
   });
+
+  describe("derivation", () => {
+    it("verbalizes a derived-and-stored fact type", () => {
+      const model = new OrmModel({ name: "Test" });
+      const order = model.addObjectType({
+        name: "Order",
+        kind: "entity",
+        referenceMode: "order_id",
+      });
+      const total = model.addObjectType({ name: "TotalPrice", kind: "value" });
+      model.addFactType({
+        name: "Order has TotalPrice",
+        roles: [
+          { name: "has", playerId: order.id, id: "r1" },
+          { name: "of", playerId: total.id, id: "r2" },
+        ],
+        readings: ["{0} has {1}"],
+        derivation: {
+          kind: "derived",
+          storage: "derived_and_stored",
+          expression: "Quantity * UnitPrice",
+        },
+      });
+
+      const texts = verbalizer.verbalizeModel(model).map((v) => v.text);
+      expect(texts).toContain(
+        "Fact type 'Order has TotalPrice' is derived and stored: Quantity * UnitPrice.",
+      );
+    });
+
+    it("appends a subtype defining rule to the subtype verbalization", () => {
+      const model = new OrmModel({ name: "Test" });
+      const person = model.addObjectType({
+        name: "Person",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      const adult = model.addObjectType({
+        name: "Adult",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      const sf = model.addSubtypeFact({
+        subtypeId: adult.id,
+        supertypeId: person.id,
+        definingRule: { kind: "derived", expression: "Person has Age >= 18" },
+      });
+
+      expect(verbalizer.verbalizeSubtypeFact(sf, model).text).toBe(
+        "Adult is a subtype of Person, defined as: Person has Age >= 18.",
+      );
+    });
+  });
 });

@@ -1,3 +1,4 @@
+import type { DerivationRule } from "./FactType.js";
 import { ModelElement } from "./ModelElement.js";
 
 /**
@@ -36,6 +37,12 @@ export interface SubtypeFactConfig {
    * constraint across the supertype meta-roles of the subtype partition.
    */
   readonly isExhaustive?: boolean;
+  /**
+   * Defining rule when this subtype's membership is determined by a
+   * derivation rule (Halpin's subtype-defining rules) rather than asserted.
+   * Absent for an asserted subtype.
+   */
+  readonly definingRule?: DerivationRule;
 }
 
 /**
@@ -59,6 +66,7 @@ export class SubtypeFact extends ModelElement {
   readonly providesIdentification: boolean;
   readonly isExclusive: boolean;
   readonly isExhaustive: boolean;
+  readonly definingRule: DerivationRule | undefined;
 
   constructor(config: SubtypeFactConfig) {
     // Name is derived from the relationship for display purposes.
@@ -72,6 +80,7 @@ export class SubtypeFact extends ModelElement {
     this.providesIdentification = config.providesIdentification ?? true;
     this.isExclusive = config.isExclusive ?? false;
     this.isExhaustive = config.isExhaustive ?? false;
+    this.definingRule = config.definingRule;
 
     if (config.subtypeId === config.supertypeId) {
       throw new Error(

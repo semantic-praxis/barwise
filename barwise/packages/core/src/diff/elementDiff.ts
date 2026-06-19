@@ -5,7 +5,7 @@
  */
 import type { Constraint } from "../model/Constraint.js";
 import type { Definition } from "../model/Definition.js";
-import type { FactType } from "../model/FactType.js";
+import type { DerivationRule, FactType } from "../model/FactType.js";
 import type { DataTypeDef, ObjectType } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { Role } from "../model/Role.js";
@@ -125,7 +125,17 @@ export function diffFactType(
     changes.push("definition changed");
   }
 
+  if (derivationKey(a.derivation) !== derivationKey(b.derivation)) {
+    changes.push("derivation changed");
+  }
+
   return changes;
+}
+
+/** A stable key for a derivation rule, or "" when absent (asserted). */
+function derivationKey(d: DerivationRule | undefined): string {
+  if (!d) return "";
+  return `${d.kind}|${d.storage ?? "derive_on_request"}|${d.expression}|${d.isFormal ? "f" : ""}`;
 }
 
 /**
