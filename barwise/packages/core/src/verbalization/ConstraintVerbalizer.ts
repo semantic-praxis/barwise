@@ -17,11 +17,7 @@ import {
   verbalizeSubset,
   verbalizeValueComparison,
 } from "./constraints/phase2.js";
-import {
-  buildVerbalization,
-  kwSeg,
-  type Verbalization,
-} from "./Verbalization.js";
+import { buildVerbalization, kwSeg, type Verbalization } from "./Verbalization.js";
 
 /**
  * Render a constraint's verbalization as a deontic obligation: prefix
