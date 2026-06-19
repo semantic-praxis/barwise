@@ -223,4 +223,19 @@ describe("Verbalizer", () => {
       expect(verbalizer.constraints).toBeDefined();
     });
   });
+
+  describe("object-type cardinality", () => {
+    it("verbalizes a population bound on an object type", () => {
+      const model = new OrmModel({ name: "Test" });
+      model.addObjectType({
+        name: "Department",
+        kind: "entity",
+        referenceMode: "dept_id",
+        cardinality: { min: 0, max: 50 },
+      });
+
+      const texts = verbalizer.verbalizeModel(model).map((v) => v.text);
+      expect(texts).toContain("The number of Department instances is at most 50.");
+    });
+  });
 });

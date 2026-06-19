@@ -8,6 +8,7 @@ import {
   verbalizeValueConstraint,
 } from "./constraints/phase1.js";
 import {
+  verbalizeCardinality,
   verbalizeDisjunctiveMandatory,
   verbalizeEquality,
   verbalizeExclusion,
@@ -148,6 +149,14 @@ export class ConstraintVerbalizer {
           constraint.roleId1,
           constraint.roleId2,
           constraint.operator,
+          factType,
+          model,
+        );
+      case "cardinality":
+        return verbalizeCardinality(
+          constraint.roleId,
+          constraint.min,
+          constraint.max,
           factType,
           model,
         );

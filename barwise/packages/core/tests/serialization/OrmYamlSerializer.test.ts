@@ -253,6 +253,51 @@ describe("OrmYamlSerializer", () => {
       expect(constraints.find((c) => c.type === "internal_uniqueness")!.modality).toBeUndefined();
     });
 
+    it("round-trips object-type and unary-role cardinality", () => {
+      const model = new OrmModel({ name: "Test" });
+      model.addObjectType({
+        name: "Department",
+        kind: "entity",
+        referenceMode: "dept_id",
+        cardinality: { min: 0, max: 50 },
+      });
+      const promo = model.addObjectType({
+        name: "Promotion",
+        kind: "entity",
+        referenceMode: "promo_id",
+        cardinality: { min: 2, max: "unbounded" },
+      });
+      model.addFactType({
+        name: "Promotion is active",
+        roles: [{ name: "is active", playerId: promo.id, id: "r1" }],
+        readings: ["{0} is active"],
+        constraints: [{ type: "cardinality", roleId: "r1", min: 0, max: 10 }],
+      });
+
+      const yaml = serializer.serialize(model);
+      expect(yaml).toContain("cardinality:");
+      expect(yaml).toContain("type: cardinality");
+
+      const restored = serializer.deserialize(yaml);
+      expect(restored.getObjectTypeByName("Department")!.cardinality).toEqual({
+        min: 0,
+        max: 50,
+      });
+      expect(restored.getObjectTypeByName("Promotion")!.cardinality).toEqual({
+        min: 2,
+        max: "unbounded",
+      });
+      const card = restored.getFactTypeByName("Promotion is active")!.constraints
+        .find((c) => c.type === "cardinality");
+      expect(card).toMatchObject({ type: "cardinality", roleId: "r1", min: 0, max: 10 });
+    });
+
+    it("omits cardinality when the object type has none", () => {
+      const model = new OrmModel({ name: "Test" });
+      model.addObjectType({ name: "Person", kind: "entity", referenceMode: "person_id" });
+      expect(serializer.serialize(model)).not.toContain("cardinality");
+    });
+
     it("serializes value types with data type", () => {
       const model = new OrmModel({ name: "Test" });
       model.addObjectType({

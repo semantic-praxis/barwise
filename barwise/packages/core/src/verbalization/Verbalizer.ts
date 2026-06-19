@@ -3,6 +3,7 @@ import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { expandReading } from "../model/ReadingOrder.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
+import { verbalizeObjectCardinality } from "./constraints/phase2.js";
 import { ConstraintVerbalizer } from "./ConstraintVerbalizer.js";
 import { FactTypeVerbalizer } from "./FactTypeVerbalizer.js";
 import { buildVerbalization, refSeg, textSeg, type Verbalization } from "./Verbalization.js";
@@ -32,6 +33,15 @@ export class Verbalizer {
       results.push(
         ...this.constraintVerbalizer.verbalizeAll(ft, model),
       );
+    }
+
+    // Object-type population cardinality.
+    for (const ot of model.objectTypes) {
+      if (ot.cardinality) {
+        results.push(
+          verbalizeObjectCardinality(ot.id, ot.name, ot.cardinality.min, ot.cardinality.max),
+        );
+      }
     }
 
     // Subtype fact verbalizations.

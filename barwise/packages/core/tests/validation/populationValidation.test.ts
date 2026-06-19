@@ -950,4 +950,105 @@ describe("deontic modality", () => {
     expect(diags).toHaveLength(1);
     expect(diags[0]!.severity).toBe("warning");
   });
+
+  describe("cardinality violations", () => {
+    function makeDeptModel(
+      cardinality?: { min: number; max: number | "unbounded"; },
+    ): OrmModel {
+      const model = new OrmModel({ name: "Test" });
+      const dept = model.addObjectType({
+        name: "Department",
+        kind: "entity",
+        referenceMode: "dept_id",
+        cardinality,
+      });
+      const code = model.addObjectType({ name: "Code", kind: "value" });
+      model.addFactType({
+        name: "Department has Code",
+        roles: [
+          { name: "has", playerId: dept.id, id: "d1" },
+          { name: "of", playerId: code.id, id: "c1" },
+        ],
+        readings: ["{0} has {1}"],
+      });
+      return model;
+    }
+
+    function makePromoModel(modality?: "deontic"): OrmModel {
+      const model = new OrmModel({ name: "Test" });
+      const promo = model.addObjectType({
+        name: "Promotion",
+        kind: "entity",
+        referenceMode: "promo_id",
+      });
+      model.addFactType({
+        name: "Promotion is active",
+        roles: [{ name: "is active", playerId: promo.id, id: "p1" }],
+        readings: ["{0} is active"],
+        constraints: [{ type: "cardinality", roleId: "p1", min: 0, max: 2, modality }],
+      });
+      return model;
+    }
+
+    it("flags an object type whose population exceeds its max cardinality", () => {
+      const model = makeDeptModel({ min: 0, max: 2 });
+      const ft = model.getFactTypeByName("Department has Code")!;
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ roleValues: { d1: "D1", c1: "X" } });
+      pop.addInstance({ roleValues: { d1: "D2", c1: "Y" } });
+      pop.addInstance({ roleValues: { d1: "D3", c1: "Z" } });
+
+      const diags = populationValidationRules(model).filter(
+        (d) => d.ruleId === "population/object-cardinality-violation",
+      );
+      expect(diags).toHaveLength(1);
+      expect(diags[0]!.severity).toBe("error");
+      expect(diags[0]!.message).toContain("at most 2");
+    });
+
+    it("accepts an object-type population within its cardinality bound", () => {
+      const model = makeDeptModel({ min: 2, max: 10 });
+      const ft = model.getFactTypeByName("Department has Code")!;
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ roleValues: { d1: "D1", c1: "X" } });
+      pop.addInstance({ roleValues: { d1: "D2", c1: "Y" } });
+
+      expect(populationValidationRules(model)).toHaveLength(0);
+    });
+
+    it("does not flag an object-type cardinality when no population exists", () => {
+      const model = makeDeptModel({ min: 2, max: 10 });
+      expect(populationValidationRules(model)).toHaveLength(0);
+    });
+
+    it("flags a unary role played by more instances than its max", () => {
+      const model = makePromoModel();
+      const ft = model.getFactTypeByName("Promotion is active")!;
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ roleValues: { p1: "P1" } });
+      pop.addInstance({ roleValues: { p1: "P2" } });
+      pop.addInstance({ roleValues: { p1: "P3" } });
+
+      const diags = populationValidationRules(model).filter(
+        (d) => d.ruleId === "population/unary-role-cardinality-violation",
+      );
+      expect(diags).toHaveLength(1);
+      expect(diags[0]!.severity).toBe("error");
+    });
+
+    it("downgrades a deontic unary-role cardinality violation to a warning", () => {
+      const model = makePromoModel("deontic");
+      const ft = model.getFactTypeByName("Promotion is active")!;
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ roleValues: { p1: "P1" } });
+      pop.addInstance({ roleValues: { p1: "P2" } });
+      pop.addInstance({ roleValues: { p1: "P3" } });
+
+      const diags = populationValidationRules(model).filter(
+        (d) => d.ruleId === "population/unary-role-cardinality-violation",
+      );
+      expect(diags).toHaveLength(1);
+      expect(diags[0]!.severity).toBe("warning");
+    });
+  });
 });

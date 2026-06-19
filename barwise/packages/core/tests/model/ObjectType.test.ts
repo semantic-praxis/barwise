@@ -200,4 +200,38 @@ describe("ObjectType", () => {
       expect(ot.sourceContext).toBe("billing");
     });
   });
+
+  describe("cardinality", () => {
+    it("stores a population cardinality bound", () => {
+      const ot = new ObjectType({
+        name: "Department",
+        kind: "entity",
+        referenceMode: "dept_id",
+        cardinality: { min: 0, max: 50 },
+      });
+      expect(ot.cardinality).toEqual({ min: 0, max: 50 });
+    });
+
+    it("rejects a negative minimum", () => {
+      expect(() =>
+        new ObjectType({
+          name: "Department",
+          kind: "entity",
+          referenceMode: "dept_id",
+          cardinality: { min: -1, max: 50 },
+        })
+      ).toThrow();
+    });
+
+    it("rejects a maximum below the minimum", () => {
+      expect(() =>
+        new ObjectType({
+          name: "Department",
+          kind: "entity",
+          referenceMode: "dept_id",
+          cardinality: { min: 10, max: 5 },
+        })
+      ).toThrow();
+    });
+  });
 });

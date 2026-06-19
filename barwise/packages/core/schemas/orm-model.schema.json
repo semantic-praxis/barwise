@@ -127,6 +127,10 @@
         "note": {
           "type": "string",
           "description": "Free-text note, informal commentary distinct from the formal definition."
+        },
+        "cardinality": {
+          "$ref": "#/definitions/cardinality_range_def",
+          "description": "Bound on this object type's population (number of instances)."
         }
       },
       "if": {
@@ -134,6 +138,25 @@
       },
       "then": {
         "required": ["reference_mode"]
+      }
+    },
+    "cardinality_range_def": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min", "max"],
+      "properties": {
+        "min": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum number of instances (inclusive)."
+        },
+        "max": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "string", "const": "unbounded" }
+          ],
+          "description": "Maximum number of instances, or \"unbounded\"."
+        }
       }
     },
     "value_range_def": {
@@ -532,6 +555,39 @@
             }
           },
           "required": ["type", "role_1", "role_2", "operator"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "cardinality" },
+            "id": {
+              "type": "string",
+              "description": "Unique identifier for constraint traceability."
+            },
+            "modality": {
+              "type": "string",
+              "enum": ["alethic", "deontic"],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "role": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The unary role whose occurrence count is bounded."
+            },
+            "min": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Minimum number of object instances playing the role."
+            },
+            "max": {
+              "oneOf": [
+                { "type": "integer", "minimum": 0 },
+                { "type": "string", "const": "unbounded" }
+              ],
+              "description": "Maximum number of instances, or \"unbounded\"."
+            }
+          },
+          "required": ["type", "role", "min", "max"],
           "additionalProperties": false
         }
       ]

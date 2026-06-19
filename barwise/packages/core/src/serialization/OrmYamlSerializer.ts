@@ -130,6 +130,7 @@ interface OrmYamlObjectType {
   independent?: boolean;
   default_value?: string;
   note?: string;
+  cardinality?: { min: number; max: number | "unbounded"; };
 }
 
 interface OrmYamlFactType {
@@ -165,7 +166,8 @@ type OrmYamlConstraintBody =
     role_1: string;
     role_2: string;
     operator: ValueComparisonOperator;
-  };
+  }
+  | { type: "cardinality"; role: string; min: number; max: number | "unbounded"; };
 
 /** A serialized constraint carries the shared optional `modality`. */
 type OrmYamlConstraint = OrmYamlConstraintBody & { modality?: ConstraintModality; };
@@ -418,6 +420,9 @@ export class OrmYamlSerializer {
     if (ot.note) {
       result.note = ot.note;
     }
+    if (ot.cardinality) {
+      result.cardinality = { min: ot.cardinality.min, max: ot.cardinality.max };
+    }
 
     return result;
   }
@@ -513,6 +518,9 @@ export class OrmYamlSerializer {
           role_2: c.roleId2,
           operator: c.operator,
         };
+        break;
+      case "cardinality":
+        result = { type: "cardinality", role: c.roleId, min: c.min, max: c.max };
         break;
     }
     // Add constraint ID if present
@@ -643,6 +651,7 @@ export class OrmYamlSerializer {
         independent: otDoc.independent,
         defaultValue: otDoc.default_value,
         note: otDoc.note,
+        cardinality: otDoc.cardinality,
       });
     }
 
@@ -786,6 +795,9 @@ export class OrmYamlSerializer {
           roleId2: c.role_2,
           operator: c.operator,
         };
+        break;
+      case "cardinality":
+        result = { type: "cardinality", roleId: c.role, min: c.min, max: c.max };
         break;
     }
 
