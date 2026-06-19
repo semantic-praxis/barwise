@@ -1,4 +1,5 @@
 import type { ExportAnnotation } from "../annotation/ExportAnnotationCollector.js";
+import type { DerivationRule, FactType } from "../model/FactType.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { expandReading } from "../model/ReadingOrder.js";
@@ -6,7 +7,20 @@ import type { SubtypeFact } from "../model/SubtypeFact.js";
 import { verbalizeObjectCardinality } from "./constraints/phase2.js";
 import { ConstraintVerbalizer } from "./ConstraintVerbalizer.js";
 import { FactTypeVerbalizer } from "./FactTypeVerbalizer.js";
-import { buildVerbalization, refSeg, textSeg, type Verbalization } from "./Verbalization.js";
+import {
+  buildVerbalization,
+  kwSeg,
+  refSeg,
+  textSeg,
+  type Verbalization,
+  type VerbalizationSegment,
+} from "./Verbalization.js";
+
+/** The taxonomy phrase for a derivation: "derived", "semiderived and stored", etc. */
+function derivationPhrase(d: DerivationRule): string {
+  const base = d.kind === "semiderived" ? "semiderived" : "derived";
+  return d.storage === "derived_and_stored" ? `${base} and stored` : base;
+}
 
 /**
  * Main entry point for verbalizing an ORM model.
@@ -33,6 +47,10 @@ export class Verbalizer {
       results.push(
         ...this.constraintVerbalizer.verbalizeAll(ft, model),
       );
+      // Derivation rule, when the fact type is derived.
+      if (ft.derivation) {
+        results.push(this.verbalizeDerivation(ft));
+      }
     }
 
     // Object-type population cardinality.
@@ -131,7 +149,23 @@ export class Verbalizer {
   }
 
   /**
-   * Verbalize a subtype fact: "{Subtype} is a subtype of {Supertype}."
+   * Verbalize a fact type's derivation rule: "Fact type '{name}' is
+   * {derived | semiderived}[ and stored]: {expression}."
+   */
+  private verbalizeDerivation(ft: FactType): Verbalization {
+    const d = ft.derivation!;
+    return buildVerbalization(ft.id, "fact_type", [
+      kwSeg("Fact type "),
+      textSeg(`'${ft.name}' is `),
+      kwSeg(derivationPhrase(d)),
+      textSeg(`: ${d.expression}.`),
+    ]);
+  }
+
+  /**
+   * Verbalize a subtype fact: "{Subtype} is a subtype of {Supertype}." When
+   * the subtype is defined by a rule, the rule is appended: "..., defined as:
+   * {expression}."
    */
   verbalizeSubtypeFact(
     sf: SubtypeFact,
@@ -142,12 +176,17 @@ export class Verbalizer {
     const subtypeName = subtype?.name ?? sf.subtypeId;
     const supertypeName = supertype?.name ?? sf.supertypeId;
 
-    return buildVerbalization(sf.id, "subtype", [
+    const segments: VerbalizationSegment[] = [
       refSeg(subtypeName, sf.subtypeId),
       textSeg(" is a subtype of "),
       refSeg(supertypeName, sf.supertypeId),
-      textSeg("."),
-    ]);
+    ];
+    if (sf.definingRule) {
+      segments.push(textSeg(`, defined as: ${sf.definingRule.expression}`));
+    }
+    segments.push(textSeg("."));
+
+    return buildVerbalization(sf.id, "subtype", segments);
   }
 
   /**

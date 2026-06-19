@@ -298,6 +298,75 @@ describe("OrmYamlSerializer", () => {
       expect(serializer.serialize(model)).not.toContain("cardinality");
     });
 
+    it("round-trips fact-type derivation and subtype defining rules", () => {
+      const model = new OrmModel({ name: "Test" });
+      const order = model.addObjectType({
+        name: "Order",
+        kind: "entity",
+        referenceMode: "order_id",
+      });
+      const total = model.addObjectType({ name: "TotalPrice", kind: "value" });
+      model.addFactType({
+        name: "Order has TotalPrice",
+        roles: [
+          { name: "has", playerId: order.id, id: "r1" },
+          { name: "of", playerId: total.id, id: "r2" },
+        ],
+        readings: ["{0} has {1}"],
+        derivation: {
+          kind: "derived",
+          storage: "derived_and_stored",
+          expression: "TotalPrice = sum(LineItem.amount)",
+        },
+      });
+      const person = model.addObjectType({
+        name: "Person",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      const adult = model.addObjectType({
+        name: "Adult",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      model.addSubtypeFact({
+        subtypeId: adult.id,
+        supertypeId: person.id,
+        definingRule: { kind: "derived", expression: "Person has Age >= 18" },
+      });
+
+      const yaml = serializer.serialize(model);
+      expect(yaml).toContain("derivation:");
+      expect(yaml).toContain("defining_rule:");
+      expect(yaml).toContain("storage: derived_and_stored");
+
+      const restored = serializer.deserialize(yaml);
+      expect(restored.getFactTypeByName("Order has TotalPrice")!.derivation).toEqual({
+        kind: "derived",
+        storage: "derived_and_stored",
+        expression: "TotalPrice = sum(LineItem.amount)",
+      });
+      expect(restored.subtypeFacts[0]!.definingRule).toEqual({
+        kind: "derived",
+        expression: "Person has Age >= 18",
+      });
+    });
+
+    it("omits derivation for an asserted fact type", () => {
+      const model = new OrmModel({ name: "Test" });
+      const a = model.addObjectType({ name: "A", kind: "entity", referenceMode: "a_id" });
+      const b = model.addObjectType({ name: "B", kind: "value" });
+      model.addFactType({
+        name: "A has B",
+        roles: [
+          { name: "has", playerId: a.id, id: "r1" },
+          { name: "of", playerId: b.id, id: "r2" },
+        ],
+        readings: ["{0} has {1}"],
+      });
+      expect(serializer.serialize(model)).not.toContain("derivation");
+    });
+
     it("serializes value types with data type", () => {
       const model = new OrmModel({ name: "Test" });
       model.addObjectType({

@@ -631,6 +631,35 @@
           "type": "array",
           "items": { "$ref": "#/definitions/constraint" },
           "description": "Constraints on this fact type."
+        },
+        "derivation": {
+          "$ref": "#/definitions/derivation_rule_def",
+          "description": "Derivation rule when this fact type is derived; absent for an asserted fact type."
+        }
+      }
+    },
+    "derivation_rule_def": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "expression"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["derived", "semiderived"],
+          "description": "Definitional axis: fully derived (*) or semiderived (+)."
+        },
+        "storage": {
+          "type": "string",
+          "enum": ["derive_on_request", "derived_and_stored"],
+          "description": "Storage axis: on-request (*, default) or stored (**)."
+        },
+        "expression": {
+          "type": "string",
+          "description": "The rule text (natural language or hand-written FORML). Stored verbatim, never executed."
+        },
+        "is_formal": {
+          "type": "boolean",
+          "description": "Reserved: true once the expression is a parsed formal rule. Absent or false in v1."
         }
       }
     },
@@ -668,6 +697,10 @@
           "type": "boolean",
           "default": false,
           "description": "Whether the subtypes of this supertype are exhaustive (cover all instances). When true, every supertype instance must be an instance of at least one subtype in the partition group."
+        },
+        "defining_rule": {
+          "$ref": "#/definitions/derivation_rule_def",
+          "description": "Defining rule when this subtype's membership is determined by a derivation rule; absent for an asserted subtype."
         }
       }
     },

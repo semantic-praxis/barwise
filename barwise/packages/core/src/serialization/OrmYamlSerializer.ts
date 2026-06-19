@@ -7,7 +7,12 @@ import type {
 } from "../model/Constraint.js";
 import type { Definition } from "../model/Definition.js";
 import type { DiagramLayout } from "../model/DiagramLayout.js";
-import type { FactType } from "../model/FactType.js";
+import type {
+  DerivationKind,
+  DerivationRule,
+  DerivationStorage,
+  FactType,
+} from "../model/FactType.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import type { ConceptualDataTypeName, ObjectType, ValueRange } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
@@ -117,6 +122,28 @@ function deserializeValueConstraintBody(
   return { values };
 }
 
+/** Serialize a derivation rule, omitting the default storage and absent flags. */
+function serializeDerivation(d: DerivationRule): OrmYamlDerivation {
+  const out: OrmYamlDerivation = { kind: d.kind, expression: d.expression };
+  if (d.storage && d.storage !== "derive_on_request") {
+    out.storage = d.storage;
+  }
+  if (d.isFormal) {
+    out.is_formal = true;
+  }
+  return out;
+}
+
+/** Parse a derivation rule, dropping the default storage and false flags. */
+function deserializeDerivation(d: OrmYamlDerivation): DerivationRule {
+  const rule: DerivationRule = { kind: d.kind, expression: d.expression };
+  return {
+    ...rule,
+    ...(d.storage ? { storage: d.storage } : {}),
+    ...(d.is_formal ? { isFormal: true } : {}),
+  };
+}
+
 interface OrmYamlObjectType {
   id: string;
   name: string;
@@ -133,6 +160,13 @@ interface OrmYamlObjectType {
   cardinality?: { min: number; max: number | "unbounded"; };
 }
 
+interface OrmYamlDerivation {
+  kind: DerivationKind;
+  storage?: DerivationStorage;
+  expression: string;
+  is_formal?: boolean;
+}
+
 interface OrmYamlFactType {
   id: string;
   name: string;
@@ -141,6 +175,7 @@ interface OrmYamlFactType {
   roles: OrmYamlRole[];
   readings: string[];
   constraints?: OrmYamlConstraint[];
+  derivation?: OrmYamlDerivation;
 }
 
 interface OrmYamlRole {
@@ -179,6 +214,7 @@ interface OrmYamlSubtypeFact {
   provides_identification?: boolean;
   is_exclusive?: boolean;
   is_exhaustive?: boolean;
+  defining_rule?: OrmYamlDerivation;
 }
 
 interface OrmYamlObjectifiedFactType {
@@ -445,6 +481,9 @@ export class OrmYamlSerializer {
     if (ft.constraints.length > 0) {
       result.constraints = ft.constraints.map((c) => this.serializeConstraint(c));
     }
+    if (ft.derivation) {
+      result.derivation = serializeDerivation(ft.derivation);
+    }
 
     return result;
   }
@@ -548,6 +587,9 @@ export class OrmYamlSerializer {
     }
     if (sf.isExhaustive) {
       result.is_exhaustive = true;
+    }
+    if (sf.definingRule) {
+      result.defining_rule = serializeDerivation(sf.definingRule);
     }
     return result;
   }
@@ -672,6 +714,7 @@ export class OrmYamlSerializer {
           })),
           readings: ftDoc.readings,
           constraints,
+          derivation: ftDoc.derivation ? deserializeDerivation(ftDoc.derivation) : undefined,
         },
         { skipPlayerValidation: options?.lenient },
       );
@@ -687,6 +730,9 @@ export class OrmYamlSerializer {
           providesIdentification: sfDoc.provides_identification ?? true,
           isExclusive: sfDoc.is_exclusive ?? false,
           isExhaustive: sfDoc.is_exhaustive ?? false,
+          definingRule: sfDoc.defining_rule
+            ? deserializeDerivation(sfDoc.defining_rule)
+            : undefined,
         },
         { skipPlayerValidation: options?.lenient },
       );

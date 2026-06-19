@@ -1367,4 +1367,30 @@ describe("diffModels", () => {
     expect(delta).toBeDefined();
     expect(delta!.changeDescriptions).toContain("cardinality changed");
   });
+
+  it("detects a fact-type derivation change", () => {
+    const make = (expression: string) => {
+      const m = new OrmModel({ name: "Test" });
+      const order = m.addObjectType({ name: "Order", kind: "entity", referenceMode: "order_id" });
+      const total = m.addObjectType({ name: "TotalPrice", kind: "value" });
+      m.addFactType({
+        id: "ft-1",
+        name: "Order has TotalPrice",
+        roles: [
+          { name: "has", playerId: order.id, id: "r1" },
+          { name: "of", playerId: total.id, id: "r2" },
+        ],
+        readings: ["{0} has {1}"],
+        derivation: { kind: "derived", expression },
+      });
+      return m;
+    };
+
+    const result = diffModels(make("Quantity * UnitPrice"), make("Quantity * NetPrice"));
+    const delta = result.deltas.find(
+      (d) => d.kind === "modified" && d.elementType === "fact_type",
+    );
+    expect(delta).toBeDefined();
+    expect(delta!.changeDescriptions).toContain("derivation changed");
+  });
 });

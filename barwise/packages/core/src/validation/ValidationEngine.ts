@@ -2,6 +2,7 @@ import type { OrmModel } from "../model/OrmModel.js";
 import type { Diagnostic, DiagnosticSeverity } from "./Diagnostic.js";
 import { completenessWarnings } from "./rules/completenessWarnings.js";
 import { constraintConsistencyRules } from "./rules/constraintConsistency.js";
+import { derivationRules } from "./rules/derivationRules.js";
 import { populationValidationRules } from "./rules/populationValidation.js";
 import { structuralRules } from "./rules/structural.js";
 import type { ValidationRule } from "./ValidationRule.js";
@@ -20,6 +21,7 @@ export class ValidationEngine {
     constraintConsistencyRules,
     completenessWarnings,
     populationValidationRules,
+    derivationRules,
   ];
 
   /**
