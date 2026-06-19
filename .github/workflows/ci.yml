@@ -28,10 +28,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      # A pull request that touches only Markdown still needs its prose
-      # formatting checked (dprint covers .md), but not build, test, or
-      # the linters. Detect that case and skip the heavy steps. Only
-      # applies to pull_request events; pushes to main always run the
+      # A pull request that touches only Markdown or beads tracker data
+      # (.beads/, e.g. issues.jsonl) still needs its prose formatting
+      # checked (dprint covers .md; it ignores .jsonl), but not build,
+      # test, or the linters -- neither Markdown nor tracker data can
+      # affect those outcomes. Detect that case and skip the heavy steps.
+      # Only applies to pull_request events; pushes to main always run the
       # full pipeline. The job itself always runs, so the required check
       # always reports a result.
       - name: Detect docs-only pull request
@@ -42,9 +44,9 @@ jobs:
           changed="$(git diff --name-only "$base" HEAD)"
           echo "Changed files:"
           echo "$changed"
-          if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qvE '\.md$'; then
+          if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qvE '\.md$|^\.beads/'; then
             echo "docs_only=true" >> "$GITHUB_OUTPUT"
-            echo "Docs-only change -- skipping build, test, and lint steps."
+            echo "Docs/tracker-only change -- skipping build, test, and lint steps."
           else
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
           fi
