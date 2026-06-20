@@ -508,7 +508,13 @@
             "role": {
               "type": "string",
               "minLength": 1,
-              "description": "The role being frequency-constrained."
+              "description": "The single role being frequency-constrained (legacy single-role form)."
+            },
+            "roles": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "minItems": 1,
+              "description": "The role sequence being frequency-constrained (a combination)."
             },
             "min": {
               "type": "integer",
@@ -523,7 +529,8 @@
               "description": "Maximum occurrences, or \"unbounded\"."
             }
           },
-          "required": ["type", "role", "min", "max"],
+          "required": ["type", "min", "max"],
+          "anyOf": [{ "required": ["role"] }, { "required": ["roles"] }],
           "additionalProperties": false
         },
         {

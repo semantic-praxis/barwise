@@ -175,8 +175,10 @@ export function modelToGraph(
     // Collect frequency constraints per role.
     const frequencyByRole = new Map<string, { min: number; max: number | "unbounded"; }>();
     for (const c of ft.constraints) {
-      if (c.type === "frequency") {
-        frequencyByRole.set(c.roleId, { min: c.min, max: c.max });
+      // Single-role frequency renders as a per-role badge; a multi-role
+      // (role-sequence) frequency has no single-role anchor and is skipped.
+      if (c.type === "frequency" && c.roleIds.length === 1) {
+        frequencyByRole.set(c.roleIds[0]!, { min: c.min, max: c.max });
       }
     }
 

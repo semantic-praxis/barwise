@@ -195,7 +195,7 @@ type OrmYamlConstraintBody =
   | { type: "subset"; subset_roles: string[]; superset_roles: string[]; }
   | { type: "equality"; roles_1: string[]; roles_2: string[]; }
   | { type: "ring"; role_1: string; role_2: string; ring_type: RingType; }
-  | { type: "frequency"; role: string; min: number; max: number | "unbounded"; }
+  | { type: "frequency"; role?: string; roles?: string[]; min: number; max: number | "unbounded"; }
   | {
     type: "value_comparison";
     role_1: string;
@@ -548,7 +548,9 @@ export class OrmYamlSerializer {
         result = { type: "ring", role_1: c.roleId1, role_2: c.roleId2, ring_type: c.ringType };
         break;
       case "frequency":
-        result = { type: "frequency", role: c.roleId, min: c.min, max: c.max };
+        result = c.roleIds.length === 1
+          ? { type: "frequency", role: c.roleIds[0]!, min: c.min, max: c.max }
+          : { type: "frequency", roles: [...c.roleIds], min: c.min, max: c.max };
         break;
       case "value_comparison":
         result = {
@@ -832,7 +834,12 @@ export class OrmYamlSerializer {
         result = { type: "ring", roleId1: c.role_1, roleId2: c.role_2, ringType: c.ring_type };
         break;
       case "frequency":
-        result = { type: "frequency", roleId: c.role, min: c.min, max: c.max };
+        result = {
+          type: "frequency",
+          roleIds: c.roles ?? (c.role !== undefined ? [c.role] : []),
+          min: c.min,
+          max: c.max,
+        };
         break;
       case "value_comparison":
         result = {

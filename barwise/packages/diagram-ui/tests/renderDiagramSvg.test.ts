@@ -159,7 +159,7 @@ describe("renderDiagramSvg", () => {
       })
       .build();
     const ft = model.getFactTypeByName("Person is parent of Person")!;
-    ft.addConstraint({ type: "frequency", roleId: ft.roles[0]!.id, min: 0, max: 2 });
+    ft.addConstraint({ type: "frequency", roleIds: [ft.roles[0]!.id], min: 0, max: 2 });
     ft.addConstraint({
       type: "ring",
       roleId1: ft.roles[0]!.id,

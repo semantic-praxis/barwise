@@ -487,7 +487,7 @@ describe("ModelToGraph", () => {
     const ft = model.getFactTypeByName("Person owns Car")!;
     ft.addConstraint({
       type: "frequency",
-      roleId: ft.roles[0]!.id,
+      roleIds: [ft.roles[0]!.id],
       min: 1,
       max: 3,
     });
@@ -517,7 +517,7 @@ describe("ModelToGraph", () => {
     const ft = model.getFactTypeByName("Person owns Car")!;
     ft.addConstraint({
       type: "frequency",
-      roleId: ft.roles[0]!.id,
+      roleIds: [ft.roles[0]!.id],
       min: 2,
       max: "unbounded",
     });

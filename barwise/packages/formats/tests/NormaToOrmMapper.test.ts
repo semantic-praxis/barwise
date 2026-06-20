@@ -444,6 +444,36 @@ describe("NormaToOrmMapper", () => {
       if (freq?.type === "frequency") {
         expect(freq.min).toBe(2);
         expect(freq.max).toBe(5);
+        expect(freq.roleIds).toEqual(["_ft1_r1"]);
+      }
+    });
+
+    it("maps a multi-role frequency constraint over the full role sequence", () => {
+      const fc: NormaConstraint = {
+        type: "frequency",
+        id: "_fc1",
+        name: "FC1",
+        min: 1,
+        max: 1,
+        roleRefs: ["_ft1_r1", "_ft1_r2"],
+      };
+      const doc = makeDoc({
+        entityTypes: [
+          makeEntity("_et1", "Customer", "Id"),
+          makeEntity("_et2", "Order", "Number"),
+        ],
+        factTypes: [
+          makeBinaryFactType("_ft1", "CustomerPlacesOrder", "_et1", "_et2", {
+            internalConstraintRefs: ["_fc1"],
+          }),
+        ],
+        constraints: [fc],
+      });
+      const model = mapNormaToOrm(doc);
+      const freq = model.factTypes[0]!.constraints.find((c) => c.type === "frequency");
+      expect(freq).toBeDefined();
+      if (freq?.type === "frequency") {
+        expect(freq.roleIds).toEqual(["_ft1_r1", "_ft1_r2"]);
       }
     });
 

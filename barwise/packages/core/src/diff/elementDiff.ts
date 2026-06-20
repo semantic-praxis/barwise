@@ -222,8 +222,10 @@ function constraintTypeKey(
       return `RING:${resolveRole(c.roleId1, idxMap)},${
         resolveRole(c.roleId2, idxMap)
       }:${c.ringType}`;
-    case "frequency":
-      return `FREQ:${resolveRole(c.roleId, idxMap)}:${c.min}:${c.max}`;
+    case "frequency": {
+      const indices = c.roleIds.map((id) => resolveRole(id, idxMap)).sort();
+      return `FREQ:${indices.join(",")}:${c.min}:${c.max}`;
+    }
     case "value_comparison":
       return `VCMP:${resolveRole(c.roleId1, idxMap)},${
         resolveRole(c.roleId2, idxMap)

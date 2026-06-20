@@ -1,7 +1,7 @@
 import { isFrequency, isValueConstraint, type ValueRange } from "../../../model/Constraint.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
-import { severityForModality } from "./shared.js";
+import { makeCompositeKey, severityForModality } from "./shared.js";
 
 /** Whether a string parses as a finite number. */
 function isFiniteNumber(s: string): boolean {
@@ -72,9 +72,11 @@ export function checkValueConstraintViolations(model: OrmModel): Diagnostic[] {
 }
 
 /**
- * Frequency constraints restrict how many times an object may play a role.
- * For each distinct value in the constrained role, count how many instances
- * have that value and check against the min/max bounds.
+ * Frequency constraints restrict how many times a value (single role) or
+ * value combination (a role sequence) occurs in the population. For each
+ * distinct value-tuple across the constrained roles, count the instances
+ * carrying it and check against the min/max bounds. A length-1 sequence is
+ * the single-role case, with its original message preserved.
  */
 export function checkFrequencyViolations(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -85,20 +87,26 @@ export function checkFrequencyViolations(model: OrmModel): Diagnostic[] {
 
     const frequencyConstraints = ft.constraints.filter(isFrequency);
     for (const fc of frequencyConstraints) {
-      // Count occurrences of each distinct value in the constrained role.
+      if (fc.roleIds.length === 0) continue;
+      // Count occurrences of each distinct value-tuple across the roles.
+      // Only complete tuples (every role valued) are a full combination.
       const counts = new Map<string, number>();
       for (const inst of pop.instances) {
-        const val = inst.roleValues[fc.roleId];
-        if (val !== undefined) {
-          counts.set(val, (counts.get(val) ?? 0) + 1);
-        }
+        if (!fc.roleIds.every((rid) => inst.roleValues[rid] !== undefined)) continue;
+        const key = makeCompositeKey(inst, fc.roleIds);
+        counts.set(key, (counts.get(key) ?? 0) + 1);
       }
 
-      for (const [val, count] of counts) {
+      const single = fc.roleIds.length === 1;
+      const roleLabel = fc.roleIds.join(", ");
+      for (const [key, count] of counts) {
+        const subject = single
+          ? `value "${key}" in role "${roleLabel}"`
+          : `combination "${key.split("\0").join(", ")}" in roles "${roleLabel}"`;
         if (count < fc.min) {
           diagnostics.push({
             severity: severityForModality(fc),
-            message: `Population "${pop.id}": value "${val}" in role "${fc.roleId}" `
+            message: `Population "${pop.id}": ${subject} `
               + `appears ${count} time(s) but the minimum is ${fc.min}.`,
             elementId: pop.id,
             ruleId: "population/frequency-violation",
@@ -107,7 +115,7 @@ export function checkFrequencyViolations(model: OrmModel): Diagnostic[] {
         if (fc.max !== "unbounded" && count > fc.max) {
           diagnostics.push({
             severity: severityForModality(fc),
-            message: `Population "${pop.id}": value "${val}" in role "${fc.roleId}" `
+            message: `Population "${pop.id}": ${subject} `
               + `appears ${count} time(s) but the maximum is ${fc.max}.`,
             elementId: pop.id,
             ruleId: "population/frequency-violation",

@@ -134,7 +134,7 @@ describe("Population validation integration", () => {
       constraints: [
         {
           type: "frequency",
-          roleId: "r1", // Each customer must place 2-5 orders
+          roleIds: ["r1"], // Each customer must place 2-5 orders
           min: 2,
           max: 5,
         },

@@ -221,15 +221,19 @@ export interface RingConstraint extends ConstraintBase {
 /**
  * Frequency constraint.
  *
- * Restricts how many times an object may play a given role.
+ * Restricts how many times a value (single role) or value combination (a
+ * role sequence) may occur in the population. A length-1 `roleIds` is the
+ * common single-role case ("each Customer places 2..5 Orders"); a longer
+ * sequence bounds a combination ("each (Room, TimeSlot) pair is booked
+ * 0..1 times").
  *
  * Example: "Each Customer places at least 2 and at most 5 Orders."
  */
 export interface FrequencyConstraint extends ConstraintBase {
   readonly type: "frequency";
-  /** The role being frequency-constrained. */
-  readonly roleId: string;
-  /** Minimum number of times the object must play the role. */
+  /** The role sequence being frequency-constrained (length 1 = single role). */
+  readonly roleIds: readonly string[];
+  /** Minimum number of times the value (combination) must occur. */
   readonly min: number;
   /** Maximum times, or "unbounded" for no upper limit. */
   readonly max: number | "unbounded";

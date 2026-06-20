@@ -187,14 +187,25 @@ export function constraintConsistencyRules(model: OrmModel): Diagnostic[] {
         }
 
         case "frequency": {
-          if (!ft.hasRole(constraint.roleId)) {
+          if (constraint.roleIds.length === 0) {
             diagnostics.push({
               severity: "error",
               message: `Frequency constraint in fact type "${ft.name}" `
-                + `references role id "${constraint.roleId}" which does not belong to this fact type.`,
+                + `must reference at least one role.`,
               elementId: ft.id,
-              ruleId: "constraint/frequency-invalid-role",
+              ruleId: "constraint/frequency-empty-roles",
             });
+          }
+          for (const roleId of constraint.roleIds) {
+            if (!ft.hasRole(roleId)) {
+              diagnostics.push({
+                severity: "error",
+                message: `Frequency constraint in fact type "${ft.name}" `
+                  + `references role id "${roleId}" which does not belong to this fact type.`,
+                elementId: ft.id,
+                ruleId: "constraint/frequency-invalid-role",
+              });
+            }
           }
           if (constraint.min < 1) {
             diagnostics.push({

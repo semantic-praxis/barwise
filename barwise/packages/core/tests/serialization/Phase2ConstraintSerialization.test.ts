@@ -80,16 +80,36 @@ describe("Phase 2 constraint serialization round-trip", () => {
   });
 
   it("round-trips frequency with numeric max", () => {
-    const c = roundTrip({ type: "frequency", roleId: "r1", min: 2, max: 5 });
+    const c = roundTrip({ type: "frequency", roleIds: ["r1"], min: 2, max: 5 });
     expect(c.type).toBe("frequency");
     expect((c as { min: number; }).min).toBe(2);
     expect((c as { max: number; }).max).toBe(5);
   });
 
   it("round-trips frequency with unbounded max", () => {
-    const c = roundTrip({ type: "frequency", roleId: "r1", min: 1, max: "unbounded" });
+    const c = roundTrip({ type: "frequency", roleIds: ["r1"], min: 1, max: "unbounded" });
     expect(c.type).toBe("frequency");
     expect((c as { min: number; }).min).toBe(1);
     expect((c as { max: string; }).max).toBe("unbounded");
+  });
+
+  it("emits the legacy `role:` key for a single-role frequency", () => {
+    const yaml = serializer.serialize(
+      buildModelWithConstraint({ type: "frequency", roleIds: ["r1"], min: 2, max: 5 }),
+    );
+    // Only a single-role frequency constraint emits the `role:` key.
+    expect(yaml).toContain("role: r1");
+  });
+
+  it("round-trips a multi-role frequency (no single-role `role:` key)", () => {
+    const yaml = serializer.serialize(
+      buildModelWithConstraint({ type: "frequency", roleIds: ["r1", "r2"], min: 1, max: 1 }),
+    );
+    // The multi-role form uses a `roles:` list, not the legacy `role:` key.
+    expect(yaml).not.toContain("role: r1");
+
+    const c = serializer.deserialize(yaml).factTypes[0]!.constraints[0]!;
+    expect(c.type).toBe("frequency");
+    expect((c as { roleIds: string[]; }).roleIds).toEqual(["r1", "r2"]);
   });
 });
