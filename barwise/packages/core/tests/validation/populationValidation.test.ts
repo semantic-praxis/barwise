@@ -66,7 +66,7 @@ function makeOrderModel(options?: {
   if (options?.frequency) {
     constraints.push({
       type: "frequency",
-      roleId: options.frequency.roleId,
+      roleIds: [options.frequency.roleId],
       min: options.frequency.min,
       max: options.frequency.max,
     });
@@ -306,6 +306,42 @@ describe("populationValidationRules", () => {
       expect(diags[0]!.ruleId).toBe("population/frequency-violation");
       expect(diags[0]!.message).toContain("3 time(s)");
       expect(diags[0]!.message).toContain("maximum is 2");
+    });
+
+    it("reports a multi-role frequency violation over a value combination", () => {
+      const model = new OrmModel({ name: "Test" });
+      const room = model.addObjectType({
+        name: "Room",
+        kind: "entity",
+        referenceMode: "room_id",
+      });
+      const slot = model.addObjectType({
+        name: "TimeSlot",
+        kind: "entity",
+        referenceMode: "slot_id",
+      });
+      const ft = model.addFactType({
+        name: "Room is booked for TimeSlot",
+        roles: [
+          { name: "is booked for", playerId: room.id, id: "r1" },
+          { name: "books", playerId: slot.id, id: "r2" },
+        ],
+        readings: ["{0} is booked for {1}"],
+        constraints: [{ type: "frequency", roleIds: ["r1", "r2"], min: 1, max: 1 }],
+      });
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      // Same (Room, TimeSlot) pair booked twice -> exceeds max 1.
+      pop.addInstance({ roleValues: { r1: "R1", r2: "T1" } });
+      pop.addInstance({ roleValues: { r1: "R1", r2: "T1" } });
+      // A distinct pair is fine.
+      pop.addInstance({ roleValues: { r1: "R1", r2: "T2" } });
+
+      const diags = populationValidationRules(model).filter(
+        (d) => d.ruleId === "population/frequency-violation",
+      );
+      expect(diags).toHaveLength(1);
+      expect(diags[0]!.message).toContain("combination");
+      expect(diags[0]!.message).toContain("maximum is 1");
     });
 
     it("passes when frequency is within bounds", () => {

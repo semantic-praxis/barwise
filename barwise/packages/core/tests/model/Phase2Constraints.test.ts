@@ -90,7 +90,7 @@ describe("Phase 2 Constraint types", () => {
   it("creates a frequency constraint", () => {
     const c: FrequencyConstraint = {
       type: "frequency",
-      roleId: "r1",
+      roleIds: ["r1"],
       min: 2,
       max: 5,
     };
@@ -102,7 +102,7 @@ describe("Phase 2 Constraint types", () => {
   it("supports unbounded frequency", () => {
     const c: FrequencyConstraint = {
       type: "frequency",
-      roleId: "r1",
+      roleIds: ["r1"],
       min: 1,
       max: "unbounded",
     };
@@ -144,7 +144,7 @@ describe("Phase 2 type guards", () => {
   });
 
   it("isFrequency identifies correctly", () => {
-    const c: Constraint = { type: "frequency", roleId: "r1", min: 1, max: 3 };
+    const c: Constraint = { type: "frequency", roleIds: ["r1"], min: 1, max: 3 };
     expect(isFrequency(c)).toBe(true);
   });
 });

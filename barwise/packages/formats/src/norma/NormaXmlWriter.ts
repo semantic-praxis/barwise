@@ -352,7 +352,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         name: "",
         min: c.min,
         max: c.max,
-        roleRefs: [normaId(c.roleId)],
+        roleRefs: c.roleIds.map(normaId),
       };
     case "value_constraint":
       return {

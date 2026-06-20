@@ -110,7 +110,7 @@ describe("counterexample generation", () => {
     const ft = model.getFactTypeByName("Customer places Order")!;
     ft.addConstraint({
       type: "frequency",
-      roleId: "Customer places Order::role1",
+      roleIds: ["Customer places Order::role1"],
       min: 1,
       max: 3,
     });
@@ -126,7 +126,7 @@ describe("counterexample generation", () => {
     const ft = model.getFactTypeByName("Customer places Order")!;
     ft.addConstraint({
       type: "frequency",
-      roleId: "Customer places Order::role1",
+      roleIds: ["Customer places Order::role1"],
       min: 2,
       max: "unbounded",
     });
@@ -142,7 +142,7 @@ describe("counterexample generation", () => {
     const ft = model.getFactTypeByName("Customer places Order")!;
     ft.addConstraint({
       type: "frequency",
-      roleId: "Customer places Order::role1",
+      roleIds: ["Customer places Order::role1"],
       min: 1,
       max: "unbounded",
     });
@@ -511,7 +511,7 @@ function buildConstraintRichModel(): OrmModel {
     { player: person.id, role: "has", id: "t1" },
     { player: ticket.id, role: "of", id: "t2" },
   );
-  hasTicket.addConstraint({ type: "frequency", roleId: "t1", min: 1, max: 3 });
+  hasTicket.addConstraint({ type: "frequency", roleIds: ["t1"], min: 1, max: 3 });
 
   // ring
   const reports = bf(

@@ -701,7 +701,7 @@ describe("diffModels", () => {
       readings: ["{0} mentors {1}"],
       constraints: [
         { type: "ring", roleId1: "aaa-r1", roleId2: "aaa-r2", ringType: "irreflexive" },
-        { type: "frequency", roleId: "aaa-r1", min: 1, max: 5 },
+        { type: "frequency", roleIds: ["aaa-r1"], min: 1, max: 5 },
       ],
     });
 
@@ -721,7 +721,7 @@ describe("diffModels", () => {
       readings: ["{0} mentors {1}"],
       constraints: [
         { type: "ring", roleId1: "bbb-r1", roleId2: "bbb-r2", ringType: "irreflexive" },
-        { type: "frequency", roleId: "bbb-r1", min: 1, max: 5 },
+        { type: "frequency", roleIds: ["bbb-r1"], min: 1, max: 5 },
       ],
     });
 

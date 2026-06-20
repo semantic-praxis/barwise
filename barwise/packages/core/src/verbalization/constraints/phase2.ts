@@ -238,12 +238,16 @@ export function verbalizeRing(
  * "Each {Subject} {pred} at least {min} and at most {max} {Object}."
  */
 export function verbalizeFrequency(
-  roleId: string,
+  roleIds: readonly string[],
   min: number,
   max: number | "unbounded",
   factType: FactType,
   model: OrmModel,
 ): Verbalization {
+  if (roleIds.length !== 1) {
+    return verbalizeMultiRoleFrequency(roleIds, min, max, factType, model);
+  }
+  const roleId = roleIds[0]!;
   if (factType.arity !== 2) {
     return verbalizeGenericFrequency(roleId, min, max, factType, model);
   }
@@ -305,6 +309,45 @@ export function verbalizeGenericFrequency(
     refSeg(name, role?.playerId ?? roleId),
     textSeg(` participates ${quantifier} in `),
     textSeg(factType.name),
+    textSeg("."),
+  ]);
+}
+
+/** "time" or "times" for a count. */
+function freqTimes(n: number): string {
+  return n === 1 ? "time" : "times";
+}
+
+/**
+ * "Each combination of {roles} occurs {quantifier}." -- a frequency
+ * constraint over a role sequence (a value combination).
+ */
+function verbalizeMultiRoleFrequency(
+  roleIds: readonly string[],
+  min: number,
+  max: number | "unbounded",
+  factType: FactType,
+  model: OrmModel,
+): Verbalization {
+  const names = roleIds.map((rid) => {
+    const role = factType.getRoleById(rid);
+    const ot = role ? model.getObjectType(role.playerId) : undefined;
+    return ot?.name ?? role?.name ?? rid;
+  });
+
+  let quantifier: string;
+  if (max === "unbounded") {
+    quantifier = `at least ${min} ${freqTimes(min)}`;
+  } else if (min === max) {
+    quantifier = `exactly ${min} ${freqTimes(min)}`;
+  } else {
+    quantifier = `at least ${min} and at most ${max} ${freqTimes(max)}`;
+  }
+
+  return buildVerbalization(factType.id, "constraint", [
+    kwSeg("Each combination of "),
+    textSeg(names.join(", ")),
+    kwSeg(` occurs ${quantifier}`),
     textSeg("."),
   ]);
 }

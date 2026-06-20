@@ -78,7 +78,7 @@ export function generateModel(seed: number): OrmModel {
       });
     }
     if (rng() < 0.2) {
-      ft.addConstraint({ type: "frequency", id: cid(), roleId: r1, min: 1, max: int(2, 4) });
+      ft.addConstraint({ type: "frequency", id: cid(), roleIds: [r1], min: 1, max: int(2, 4) });
     }
     if (rng() < 0.2 && p1.id === p2.id) {
       ft.addConstraint({

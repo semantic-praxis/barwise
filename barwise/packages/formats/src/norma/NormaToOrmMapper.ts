@@ -423,11 +423,13 @@ function mapFrequencyConstraint(
   nc: NormaFrequencyConstraint,
   factRoleIds: Set<string>,
 ): Constraint | undefined {
-  const roleId = nc.roleRefs.find((r) => factRoleIds.has(r));
-  if (!roleId) return undefined;
+  // Keep the whole role sequence (a multi-role frequency is a combination);
+  // restrict to roles that belong to this fact type.
+  const roleIds = nc.roleRefs.filter((r) => factRoleIds.has(r));
+  if (roleIds.length === 0) return undefined;
   return {
     type: "frequency",
-    roleId,
+    roleIds,
     min: nc.min,
     max: nc.max,
   };

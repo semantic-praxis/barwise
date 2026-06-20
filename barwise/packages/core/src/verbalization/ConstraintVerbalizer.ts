@@ -138,7 +138,7 @@ export class ConstraintVerbalizer {
         );
       case "frequency":
         return verbalizeFrequency(
-          constraint.roleId,
+          constraint.roleIds,
           constraint.min,
           constraint.max,
           factType,

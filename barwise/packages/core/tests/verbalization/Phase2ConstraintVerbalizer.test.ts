@@ -128,7 +128,7 @@ describe("Phase 2 constraint verbalization", () => {
 
   it("verbalizes frequency with range", () => {
     const { model, ft } = buildBinaryModel();
-    const c: Constraint = { type: "frequency", roleId: "r1", min: 2, max: 5 };
+    const c: Constraint = { type: "frequency", roleIds: ["r1"], min: 2, max: 5 };
     const v = verbalizer.verbalize(c, ft, model);
     expect(v.text).toContain("at least 2 and at most 5");
     expect(v.text).toContain("Customer");
@@ -136,7 +136,7 @@ describe("Phase 2 constraint verbalization", () => {
 
   it("verbalizes frequency unbounded", () => {
     const { model, ft } = buildBinaryModel();
-    const c: Constraint = { type: "frequency", roleId: "r1", min: 3, max: "unbounded" };
+    const c: Constraint = { type: "frequency", roleIds: ["r1"], min: 3, max: "unbounded" };
     const v = verbalizer.verbalize(c, ft, model);
     expect(v.text).toContain("at least 3");
     expect(v.text).not.toContain("at most");
@@ -144,7 +144,7 @@ describe("Phase 2 constraint verbalization", () => {
 
   it("verbalizes frequency with exact count", () => {
     const { model, ft } = buildBinaryModel();
-    const c: Constraint = { type: "frequency", roleId: "r1", min: 3, max: 3 };
+    const c: Constraint = { type: "frequency", roleIds: ["r1"], min: 3, max: 3 };
     const v = verbalizer.verbalize(c, ft, model);
     expect(v.text).toContain("exactly 3");
   });
@@ -168,10 +168,32 @@ describe("Phase 2 constraint verbalization", () => {
       readings: ["{0} works on {1} in {2}"],
     });
 
-    const c: Constraint = { type: "frequency", roleId: "r1", min: 2, max: 5 };
+    const c: Constraint = { type: "frequency", roleIds: ["r1"], min: 2, max: 5 };
     const v = verbalizer.verbalize(c, ft, model);
     expect(v.text).toContain("at least 2 and at most 5 times");
     expect(v.text).toContain("Employee");
+  });
+
+  it("verbalizes a multi-role (role-sequence) frequency as a combination", () => {
+    const model = new OrmModel({ name: "Test" });
+    const room = model.addObjectType({ name: "Room", kind: "entity", referenceMode: "room_id" });
+    const slot = model.addObjectType({
+      name: "TimeSlot",
+      kind: "entity",
+      referenceMode: "slot_id",
+    });
+    const ft = model.addFactType({
+      name: "Room is booked for TimeSlot",
+      roles: [
+        { id: "r1", name: "is booked for", playerId: room.id },
+        { id: "r2", name: "books", playerId: slot.id },
+      ],
+      readings: ["{0} is booked for {1}"],
+    });
+
+    const c: Constraint = { type: "frequency", roleIds: ["r1", "r2"], min: 1, max: 1 };
+    const v = verbalizer.verbalize(c, ft, model);
+    expect(v.text).toBe("Each combination of Room, TimeSlot occurs exactly 1 time.");
   });
 
   it("verbalizes frequency unbounded on a non-binary fact type", () => {
@@ -189,7 +211,7 @@ describe("Phase 2 constraint verbalization", () => {
       readings: ["{0} relates {1} with {2}"],
     });
 
-    const c: Constraint = { type: "frequency", roleId: "r1", min: 1, max: "unbounded" };
+    const c: Constraint = { type: "frequency", roleIds: ["r1"], min: 1, max: "unbounded" };
     const v = verbalizer.verbalize(c, ft, model);
     expect(v.text).toContain("at least 1 times");
   });
@@ -209,7 +231,7 @@ describe("Phase 2 constraint verbalization", () => {
       readings: ["{0} relates {1} with {2}"],
     });
 
-    const c: Constraint = { type: "frequency", roleId: "r1", min: 2, max: 2 };
+    const c: Constraint = { type: "frequency", roleIds: ["r1"], min: 2, max: 2 };
     const v = verbalizer.verbalize(c, ft, model);
     expect(v.text).toContain("exactly 2 times");
   });

@@ -398,7 +398,7 @@ export function parseDraftModel(
       } else {
         const freqConstraint: import("@barwise/core").Constraint = {
           type: "frequency",
-          roleId: roleIds[0]!,
+          roleIds: [roleIds[0]!],
           min: ic.min,
           max: ic.max,
         };
@@ -815,10 +815,12 @@ function isDuplicateConstraint(
     });
   }
   if (candidate.type === "frequency") {
+    const candRoles = [...candidate.roleIds].sort();
     return ft.constraints.some(
       (existing) =>
         existing.type === "frequency"
-        && existing.roleId === candidate.roleId,
+        && existing.roleIds.length === candRoles.length
+        && [...existing.roleIds].sort().every((id, i) => id === candRoles[i]),
     );
   }
   if (candidate.type === "ring") {

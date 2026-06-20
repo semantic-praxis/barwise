@@ -205,7 +205,7 @@ describe("Phase 2 constraint consistency rules", () => {
   it("frequency with valid role and min <= max passes", () => {
     const model = buildModelWithConstraint({
       type: "frequency",
-      roleId: "r1",
+      roleIds: ["r1"],
       min: 2,
       max: 5,
     });
@@ -216,7 +216,7 @@ describe("Phase 2 constraint consistency rules", () => {
   it("frequency with unbounded max passes", () => {
     const model = buildModelWithConstraint({
       type: "frequency",
-      roleId: "r1",
+      roleIds: ["r1"],
       min: 1,
       max: "unbounded",
     });
@@ -227,7 +227,7 @@ describe("Phase 2 constraint consistency rules", () => {
   it("frequency with invalid role fails", () => {
     const model = buildModelWithConstraint({
       type: "frequency",
-      roleId: "bogus",
+      roleIds: ["bogus"],
       min: 1,
       max: 3,
     });
@@ -238,7 +238,7 @@ describe("Phase 2 constraint consistency rules", () => {
   it("frequency with max < min fails", () => {
     const model = buildModelWithConstraint({
       type: "frequency",
-      roleId: "r1",
+      roleIds: ["r1"],
       min: 5,
       max: 2,
     });
@@ -273,7 +273,7 @@ describe("Phase 2 constraint consistency rules", () => {
   it("frequency with min < 1 fails", () => {
     const model = buildModelWithConstraint({
       type: "frequency",
-      roleId: "r1",
+      roleIds: ["r1"],
       min: 0,
       max: 3,
     });
@@ -285,7 +285,7 @@ describe("Phase 2 constraint consistency rules", () => {
   it("frequency with negative min fails", () => {
     const model = buildModelWithConstraint({
       type: "frequency",
-      roleId: "r1",
+      roleIds: ["r1"],
       min: -1,
       max: 5,
     });

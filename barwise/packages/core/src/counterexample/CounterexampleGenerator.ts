@@ -167,7 +167,12 @@ function forFrequency(
   ft: FactType,
   model: OrmModel,
 ): Counterexample | undefined {
-  const role = ft.roles.find((r) => r.id === fc.roleId);
+  // Counterexamples are generated for single-role frequency; a multi-role
+  // (role-sequence) frequency violation is over a value combination and is
+  // skipped here.
+  if (fc.roleIds.length !== 1) return undefined;
+  const roleId = fc.roleIds[0]!;
+  const role = ft.roles.find((r) => r.id === roleId);
   if (!role) return undefined;
 
   const name = playerName(role, model);
@@ -188,7 +193,7 @@ function forFrequency(
   for (let i = 0; i < count; i++) {
     const inst: RoleValues = {};
     for (const r of ft.roles) {
-      inst[r.id] = r.id === fc.roleId ? shared : mintValue(r, ft, model, i);
+      inst[r.id] = r.id === roleId ? shared : mintValue(r, ft, model, i);
     }
     instances.push(inst);
   }
