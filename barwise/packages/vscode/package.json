@@ -273,7 +273,7 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "File path to an .orm.yaml file. Omit to use the currently open .orm.yaml file."
+              "description": "File path to an .orm.yaml file. Omit to act on the open .orm.yaml editor (its current, unsaved contents are used)."
             }
           }
         }
@@ -294,7 +294,7 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "File path to an .orm.yaml file. Omit to use the currently open .orm.yaml file."
+              "description": "File path to an .orm.yaml file. Omit to act on the open .orm.yaml editor (its current, unsaved contents are used)."
             },
             "factType": {
               "type": "string",
@@ -320,7 +320,7 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "File path to an .orm.yaml file. Omit to use the currently open .orm.yaml file."
+              "description": "File path to an .orm.yaml file. Omit to act on the open .orm.yaml editor (its current, unsaved contents are used)."
             },
             "format": {
               "type": "string",
@@ -378,7 +378,7 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "File path to an .orm.yaml file. Omit to use the currently open .orm.yaml file."
+              "description": "File path to an .orm.yaml file. Omit to act on the open .orm.yaml editor (its current, unsaved contents are used)."
             }
           }
         }
@@ -456,7 +456,7 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "File path to an .orm.yaml file. Omit to use the currently open .orm.yaml file."
+              "description": "File path to an .orm.yaml file. Omit to act on the open .orm.yaml editor (its current, unsaved contents are used)."
             },
             "format": {
               "type": "string",
@@ -502,7 +502,7 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "File path to an .orm.yaml file. Omit to use the currently open .orm.yaml file."
+              "description": "File path to an .orm.yaml file. Omit to act on the open .orm.yaml editor (its current, unsaved contents are used)."
             },
             "focus": {
               "type": "string",
@@ -535,7 +535,7 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "File path to an .orm.yaml file. Omit to use the currently open .orm.yaml file."
+              "description": "File path to an .orm.yaml file. Omit to act on the open .orm.yaml editor (its current, unsaved contents are used)."
             },
             "query": {
               "type": "string",
@@ -600,7 +600,7 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "File path to an .orm.yaml file. Omit to use the currently open .orm.yaml file."
+              "description": "File path to an .orm.yaml file. Omit to act on the open .orm.yaml editor (its current, unsaved contents are used)."
             },
             "focus": {
               "type": "string",
@@ -625,7 +625,7 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "File path to an .orm.yaml file. Omit to use the currently open .orm.yaml file."
+              "description": "File path to an .orm.yaml file. Omit to act on the open .orm.yaml editor (its current, unsaved contents are used)."
             }
           }
         }
@@ -646,7 +646,7 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "File path to an .orm.yaml file. Omit to use the currently open .orm.yaml file."
+              "description": "File path to an .orm.yaml file. Omit to act on the open .orm.yaml editor (its current, unsaved contents are used)."
             },
             "elementId": {
               "type": "string",

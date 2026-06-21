@@ -5,9 +5,10 @@
  * `.orm.yaml` files attached as references).
  */
 
+import type { SourceInput } from "@barwise/mcp";
 import * as vscode from "vscode";
 import { DiagramPanel } from "../diagram/DiagramPanel.js";
-import { resolveOpenModel } from "./resolveModelSource.js";
+import { openModelSource, resolveOpenModel } from "./resolveModelSource.js";
 
 /**
  * Extract the paths of any `.orm.yaml` files attached to the chat as
@@ -58,4 +59,19 @@ export function getOpenModelPath(
     diagramModelPath: DiagramPanel.activeModelPath(),
     visibleOrmFiles,
   });
+}
+
+/**
+ * Resolve the open model as a tool `source`. Same priority as
+ * `getOpenModelPath`, but upgrades the result to `{ path, content }` when the
+ * model is open as a text editor, so tools act on the live buffer (unsaved
+ * edits included) instead of the stale copy on disk. A diagram-only model, or
+ * a reference that is not open as text, resolves to just `{ path }`.
+ */
+export function getOpenModelSource(
+  referenced?: readonly string[],
+): SourceInput | undefined {
+  const liveContent = (path: string): string | undefined =>
+    vscode.workspace.textDocuments.find((d) => d.uri.fsPath === path)?.getText();
+  return openModelSource(getOpenModelPath(referenced), liveContent);
 }
