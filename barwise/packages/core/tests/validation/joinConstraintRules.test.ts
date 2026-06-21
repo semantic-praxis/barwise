@@ -1,22 +1,23 @@
 /**
  * Structural well-formedness tests for join constraints.
  *
- * The rule checks the declaration only: every step is a real hop, steps are
- * contiguous, the path starts at the root, and all operand paths share a
- * root and an endpoint type. Population satisfaction is a separate rule.
+ * The rule checks the declaration only: every step is a real contiguous hop,
+ * each projection index is a valid path node, and all operands project
+ * tuples of the same arity and matching column object types. Population
+ * satisfaction is a separate rule.
  */
 import { describe, expect, it } from "vitest";
-import type { Constraint, RolePath } from "../../src/model/Constraint.js";
+import type { Constraint, JoinOperand } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { joinConstraintRules } from "../../src/validation/rules/joinConstraintRules.js";
 
-const bornIn: RolePath = {
-  root: "ot-person",
-  steps: [{ entry: "pb-person", exit: "pb-country" }],
+const bornIn: JoinOperand = {
+  path: { root: "ot-person", steps: [{ entry: "pb-person", exit: "pb-country" }] },
+  projection: [0, 1],
 };
-const citizenOf: RolePath = {
-  root: "ot-person",
-  steps: [{ entry: "pc-person", exit: "pc-country" }],
+const citizenOf: JoinOperand = {
+  path: { root: "ot-person", steps: [{ entry: "pc-person", exit: "pc-country" }] },
+  projection: [0, 1],
 };
 
 function buildModel(constraint: Constraint): OrmModel {
@@ -52,60 +53,67 @@ function buildModel(constraint: Constraint): OrmModel {
   return model;
 }
 
+const idsOf = (model: OrmModel) => joinConstraintRules(model).map((d) => d.ruleId);
+
 describe("joinConstraintRules", () => {
   it("accepts a well-formed join_equality", () => {
-    const diags = joinConstraintRules(buildModel({
-      type: "join_equality",
-      paths: [bornIn, citizenOf],
-    }));
-    expect(diags).toHaveLength(0);
+    const model = buildModel({ type: "join_equality", operands: [bornIn, citizenOf] });
+    expect(joinConstraintRules(model)).toHaveLength(0);
   });
 
   it("accepts a well-formed join_subset", () => {
-    const diags = joinConstraintRules(buildModel({
-      type: "join_subset",
-      subset: bornIn,
-      superset: citizenOf,
-    }));
-    expect(diags).toHaveLength(0);
+    const model = buildModel({ type: "join_subset", subset: bornIn, superset: citizenOf });
+    expect(joinConstraintRules(model)).toHaveLength(0);
   });
 
   it("flags an unknown root object type", () => {
-    const diags = joinConstraintRules(buildModel({
-      type: "join_equality",
-      paths: [{ root: "ot-missing", steps: bornIn.steps }, citizenOf],
-    }));
-    expect(diags.some((d) => d.ruleId === "constraint/join-unknown-root")).toBe(true);
+    const bad: JoinOperand = {
+      path: { root: "ot-missing", steps: bornIn.path.steps },
+      projection: [0, 1],
+    };
+    expect(idsOf(buildModel({ type: "join_equality", operands: [bad, citizenOf] })))
+      .toContain("constraint/join-unknown-root");
   });
 
   it("flags a step whose entry/exit are not roles of one fact type", () => {
-    const diags = joinConstraintRules(buildModel({
-      type: "join_equality",
-      paths: [
-        { root: "ot-person", steps: [{ entry: "pb-person", exit: "pc-country" }] },
-        citizenOf,
-      ],
-    }));
-    expect(diags.some((d) => d.ruleId === "constraint/join-bad-step")).toBe(true);
+    const bad: JoinOperand = {
+      path: { root: "ot-person", steps: [{ entry: "pb-person", exit: "pc-country" }] },
+      projection: [0, 1],
+    };
+    expect(idsOf(buildModel({ type: "join_equality", operands: [bad, citizenOf] })))
+      .toContain("constraint/join-bad-step");
   });
 
-  it("flags a discontiguous path (entry not played by the current node)", () => {
-    // Start the path at the Country end of bornIn while rooted at Person.
-    const diags = joinConstraintRules(buildModel({
-      type: "join_equality",
-      paths: [
-        { root: "ot-person", steps: [{ entry: "pb-country", exit: "pb-person" }] },
-        citizenOf,
-      ],
-    }));
-    expect(diags.some((d) => d.ruleId === "constraint/join-discontiguous")).toBe(true);
+  it("flags a discontiguous path", () => {
+    const bad: JoinOperand = {
+      path: { root: "ot-person", steps: [{ entry: "pb-country", exit: "pb-person" }] },
+      projection: [0, 1],
+    };
+    expect(idsOf(buildModel({ type: "join_equality", operands: [bad, citizenOf] })))
+      .toContain("constraint/join-discontiguous");
   });
 
-  it("flags fewer than two paths for join_equality", () => {
-    const diags = joinConstraintRules(buildModel({
-      type: "join_equality",
-      paths: [bornIn],
-    }));
-    expect(diags.some((d) => d.ruleId === "constraint/join-too-few-paths")).toBe(true);
+  it("flags a projection index outside the path", () => {
+    const bad: JoinOperand = { path: bornIn.path, projection: [0, 5] };
+    expect(idsOf(buildModel({ type: "join_equality", operands: [bad, citizenOf] })))
+      .toContain("constraint/join-bad-projection");
+  });
+
+  it("flags operands that project tuples of different arity", () => {
+    const oneCol: JoinOperand = { path: citizenOf.path, projection: [1] };
+    expect(idsOf(buildModel({ type: "join_equality", operands: [bornIn, oneCol] })))
+      .toContain("constraint/join-arity-mismatch");
+  });
+
+  it("flags operands that project mismatched column object types", () => {
+    // bornIn projects (Person, Country); this projects (Country, Person).
+    const swapped: JoinOperand = { path: citizenOf.path, projection: [1, 0] };
+    expect(idsOf(buildModel({ type: "join_equality", operands: [bornIn, swapped] })))
+      .toContain("constraint/join-column-type-mismatch");
+  });
+
+  it("flags fewer than two operands for join_equality", () => {
+    expect(idsOf(buildModel({ type: "join_equality", operands: [bornIn] })))
+      .toContain("constraint/join-too-few-operands");
   });
 });

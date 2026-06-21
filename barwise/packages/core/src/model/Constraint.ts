@@ -3,9 +3,9 @@
  */
 
 import type { CardinalityRange, ValueRange } from "./ObjectType.js";
-import type { RolePath, RolePathStep } from "./RolePath.js";
+import type { JoinOperand, RolePath, RolePathStep } from "./RolePath.js";
 
-export type { CardinalityRange, RolePath, RolePathStep, ValueRange };
+export type { CardinalityRange, JoinOperand, RolePath, RolePathStep, ValueRange };
 
 /**
  * The modality of a constraint: alethic (logical necessity, the default)
@@ -288,45 +288,46 @@ export interface CardinalityConstraint extends ConstraintBase, CardinalityRange 
 // ---------------------------------------------------------------------------
 
 /**
- * Join subset constraint: the projected endpoints of the `subset` role path
- * must be a subset of those of the `superset` path, correlated by their
- * shared root (join variable). The flat `SubsetConstraint` covers the
- * no-join case; this variant carries inline paths for cross-fact-type joins.
+ * Join subset constraint: the projected tuple set of the `subset` operand
+ * must be contained in that of the `superset` operand. Each operand is a role
+ * path with a projection (the compared tuple). The flat `SubsetConstraint`
+ * covers the no-join case; this variant carries inline path-projected
+ * operands for cross-fact-type joins.
  *
  * Example: "Each Person who was born in a Country is a citizen of some
  * Country" over the bornIn / citizenOf join paths.
  */
 export interface JoinSubsetConstraint extends ConstraintBase {
   readonly type: "join_subset";
-  /** The path whose endpoints must be contained in the superset path's. */
-  readonly subset: RolePath;
-  /** The path whose endpoints contain the subset path's. */
-  readonly superset: RolePath;
+  /** The operand whose projected tuples must be contained in the superset's. */
+  readonly subset: JoinOperand;
+  /** The operand whose projected tuples contain the subset's. */
+  readonly superset: JoinOperand;
 }
 
 /**
- * Join equality constraint: the projected endpoint sets of all operand paths
- * must be identical, correlated by their shared root. Two or more paths,
- * compared as an unordered set.
+ * Join equality constraint: the projected tuple sets of all operands must be
+ * identical. Two or more operands, compared as an unordered set.
  *
  * Example: "Each Person was born in the same Country of which that Person is
- * a citizen" over the bornIn / citizenOf join paths.
+ * a citizen" over the bornIn / citizenOf join paths, each projecting
+ * (Person, Country).
  */
 export interface JoinEqualityConstraint extends ConstraintBase {
   readonly type: "join_equality";
-  /** Two or more role paths whose endpoint sets must be equal. */
-  readonly paths: readonly RolePath[];
+  /** Two or more operands whose projected tuple sets must be equal. */
+  readonly operands: readonly JoinOperand[];
 }
 
 /**
- * Join exclusion constraint: no value may appear in the projected endpoints
- * of more than one operand path, correlated by their shared root. Two or
- * more paths, compared as an unordered set.
+ * Join exclusion constraint: no tuple may appear in the projected tuple set
+ * of more than one operand. Two or more operands, compared as an unordered
+ * set.
  */
 export interface JoinExclusionConstraint extends ConstraintBase {
   readonly type: "join_exclusion";
-  /** Two or more role paths whose endpoint sets must be pairwise disjoint. */
-  readonly paths: readonly RolePath[];
+  /** Two or more operands whose projected tuple sets must be pairwise disjoint. */
+  readonly operands: readonly JoinOperand[];
 }
 
 /**

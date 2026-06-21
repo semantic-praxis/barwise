@@ -29,6 +29,7 @@ export {
   isValueConstraint,
   type JoinEqualityConstraint,
   type JoinExclusionConstraint,
+  type JoinOperand,
   type JoinSubsetConstraint,
   type MandatoryRoleConstraint,
   type RingConstraint,

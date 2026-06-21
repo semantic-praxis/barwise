@@ -1426,9 +1426,15 @@ describe("diffModels", () => {
         readings: ["{0} is citizen of {1}"],
         constraints: [{
           type: "join_equality",
-          paths: [
-            { root: person.id, steps: [{ entry: "pb-person", exit: "pb-country" }] },
-            { root: person.id, steps: [{ entry: "pc-person", exit: citizenExit }] },
+          operands: [
+            {
+              path: { root: person.id, steps: [{ entry: "pb-person", exit: "pb-country" }] },
+              projection: [0, 1],
+            },
+            {
+              path: { root: person.id, steps: [{ entry: "pc-person", exit: citizenExit }] },
+              projection: [0, 1],
+            },
           ],
         }],
       });

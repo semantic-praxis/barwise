@@ -3,7 +3,7 @@
  * fact types (roles, readings, constraints), and definitions. Each
  * returns a list of human-readable change descriptions.
  */
-import type { Constraint, RolePath } from "../model/Constraint.js";
+import type { Constraint, JoinOperand } from "../model/Constraint.js";
 import type { Definition } from "../model/Definition.js";
 import type { DerivationRule, FactType } from "../model/FactType.js";
 import type { DataTypeDef, ObjectType } from "../model/ObjectType.js";
@@ -237,17 +237,18 @@ function constraintTypeKey(
     // owner fact type's positional index. Subset is ordered; equality and
     // exclusion are an unordered set of operand paths.
     case "join_subset":
-      return `JSUB:${rolePathKey(c.subset)}::${rolePathKey(c.superset)}`;
+      return `JSUB:${operandKey(c.subset)}::${operandKey(c.superset)}`;
     case "join_equality":
-      return `JEQ:${c.paths.map(rolePathKey).sort().join("::")}`;
+      return `JEQ:${c.operands.map(operandKey).sort().join("::")}`;
     case "join_exclusion":
-      return `JEXC:${c.paths.map(rolePathKey).sort().join("::")}`;
+      return `JEXC:${c.operands.map(operandKey).sort().join("::")}`;
   }
 }
 
-/** A stable structural key for a role path: root plus its entry/exit hops. */
-function rolePathKey(p: RolePath): string {
-  return `${p.root}|${p.steps.map((s) => `${s.entry}>${s.exit}`).join(",")}`;
+/** A stable structural key for a join operand: its path plus its projection. */
+function operandKey(o: JoinOperand): string {
+  const path = `${o.path.root}|${o.path.steps.map((s) => `${s.entry}>${s.exit}`).join(",")}`;
+  return `${path}#${o.projection.join(",")}`;
 }
 
 function diffConstraints(

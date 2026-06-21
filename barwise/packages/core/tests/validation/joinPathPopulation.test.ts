@@ -65,8 +65,14 @@ function buildModel(constraint: Constraint, rows: BornCitizen[]): OrmModel {
   return model;
 }
 
-const bornIn = { root: "ot-person", steps: [{ entry: "pb-person", exit: "pb-country" }] };
-const citizenOf = { root: "ot-person", steps: [{ entry: "pc-person", exit: "pc-country" }] };
+const bornIn = {
+  path: { root: "ot-person", steps: [{ entry: "pb-person", exit: "pb-country" }] },
+  projection: [0, 1],
+};
+const citizenOf = {
+  path: { root: "ot-person", steps: [{ entry: "pc-person", exit: "pc-country" }] },
+  projection: [0, 1],
+};
 
 function joinDiags(model: OrmModel) {
   return populationValidationRules(model).filter((d) => d.ruleId.startsWith("population/join-"));
@@ -75,7 +81,7 @@ function joinDiags(model: OrmModel) {
 describe("join constraint population satisfaction", () => {
   it("accepts a join_equality where each Person's countries coincide", () => {
     const model = buildModel(
-      { type: "join_equality", paths: [bornIn, citizenOf] },
+      { type: "join_equality", operands: [bornIn, citizenOf] },
       [{ person: "P1", born: "C1", citizen: "C1" }, { person: "P2", born: "C2", citizen: "C2" }],
     );
     expect(joinDiags(model)).toHaveLength(0);
@@ -83,7 +89,7 @@ describe("join constraint population satisfaction", () => {
 
   it("flags a join_equality where a Person's countries differ", () => {
     const model = buildModel(
-      { type: "join_equality", paths: [bornIn, citizenOf] },
+      { type: "join_equality", operands: [bornIn, citizenOf] },
       [{ person: "P1", born: "C1", citizen: "C1" }, { person: "P2", born: "C2", citizen: "C3" }],
     );
     const diags = joinDiags(model);
@@ -94,7 +100,7 @@ describe("join constraint population satisfaction", () => {
 
   it("flags a join_equality where one path reaches nothing (closed world)", () => {
     const model = buildModel(
-      { type: "join_equality", paths: [bornIn, citizenOf] },
+      { type: "join_equality", operands: [bornIn, citizenOf] },
       [{ person: "P1", born: "C1" }], // no citizenship fact for P1
     );
     expect(joinDiags(model)).toHaveLength(1);
@@ -120,7 +126,7 @@ describe("join constraint population satisfaction", () => {
 
   it("flags a join_exclusion where a Person shares a country across paths", () => {
     const model = buildModel(
-      { type: "join_exclusion", paths: [bornIn, citizenOf] },
+      { type: "join_exclusion", operands: [bornIn, citizenOf] },
       [{ person: "P1", born: "C1", citizen: "C1" }],
     );
     const diags = joinDiags(model);
@@ -130,14 +136,14 @@ describe("join constraint population satisfaction", () => {
 
   it("accepts a join_exclusion where the countries are disjoint", () => {
     const model = buildModel(
-      { type: "join_exclusion", paths: [bornIn, citizenOf] },
+      { type: "join_exclusion", operands: [bornIn, citizenOf] },
       [{ person: "P1", born: "C1", citizen: "C2" }],
     );
     expect(joinDiags(model)).toHaveLength(0);
   });
 
   it("emits nothing when there is no population (gated)", () => {
-    const model = buildModel({ type: "join_equality", paths: [bornIn, citizenOf] }, []);
+    const model = buildModel({ type: "join_equality", operands: [bornIn, citizenOf] }, []);
     expect(joinDiags(model)).toHaveLength(0);
   });
 });

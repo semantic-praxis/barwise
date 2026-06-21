@@ -5,7 +5,7 @@
 import type { FactType } from "../../model/FactType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import { expandReading } from "../../model/ReadingOrder.js";
-import type { RolePath } from "../../model/RolePath.js";
+import type { JoinOperand, RolePath } from "../../model/RolePath.js";
 import {
   buildVerbalization,
   kwSeg,
@@ -468,12 +468,13 @@ function factTypeOfRole(model: OrmModel, roleId: string): FactType | undefined {
   return undefined;
 }
 
-/** The object type id the path projects to (player of the last exit role). */
-function pathEndpointId(path: RolePath, model: OrmModel): string {
-  const last = path.steps[path.steps.length - 1];
-  if (!last) return path.root;
-  const ft = factTypeOfRole(model, last.exit);
-  return ft?.getRoleById(last.exit)?.playerId ?? path.root;
+/** The object type id at path node `index` (0 = root, k = after step k). */
+function pathNodeTypeId(path: RolePath, model: OrmModel, index: number): string {
+  if (index <= 0) return path.root;
+  const step = path.steps[index - 1];
+  if (!step) return path.root;
+  const ft = factTypeOfRole(model, step.exit);
+  return ft?.getRoleById(step.exit)?.playerId ?? path.root;
 }
 
 /** A readable chain of each hop's fact-type reading, e.g. "Person was born in Country". */
@@ -488,62 +489,68 @@ function pathChain(path: RolePath, model: OrmModel): string {
   return hops.join("; then ");
 }
 
+/** The projected column object-type names of an operand, e.g. "Person, Country". */
+function tupleDesc(operand: JoinOperand, model: OrmModel): string {
+  return operand.projection
+    .map((i) => objName(model, pathNodeTypeId(operand.path, model, i)))
+    .join(", ");
+}
+
 /**
- * "For each {Root}, every {Endpoint} via '{subset}' is also reached via
- * '{superset}'." -- a join subset constraint over two role paths.
+ * "For each {Root}, the [{tuple}] from '{subset}' is among those from
+ * '{superset}'." -- a join subset constraint over two projected operands.
  */
 export function verbalizeJoinSubset(
-  subset: RolePath,
-  superset: RolePath,
+  subset: JoinOperand,
+  superset: JoinOperand,
   factType: FactType,
   model: OrmModel,
 ): Verbalization {
-  const endpoint = objName(model, pathEndpointId(subset, model));
   return buildVerbalization(factType.id, "constraint", [
     kwSeg("For each "),
-    refSeg(objName(model, subset.root), subset.root),
+    refSeg(objName(model, subset.path.root), subset.path.root),
     textSeg(
-      `, every ${endpoint} via "${pathChain(subset, model)}" is also reached `
-        + `via "${pathChain(superset, model)}".`,
+      `, the [${tupleDesc(subset, model)}] from "${pathChain(subset.path, model)}" is among `
+        + `those from "${pathChain(superset.path, model)}".`,
     ),
   ]);
 }
 
 /**
- * "For each {Root}, '{A}' and '{B}' reach the same {Endpoint}." -- a join
- * equality constraint over two or more role paths.
+ * "For each {Root}, '{A}' and '{B}' project the same [{tuple}]." -- a join
+ * equality constraint over two or more projected operands.
  */
 export function verbalizeJoinEquality(
-  paths: readonly RolePath[],
+  operands: readonly JoinOperand[],
   factType: FactType,
   model: OrmModel,
 ): Verbalization {
-  const first = paths[0];
-  const endpoint = first ? objName(model, pathEndpointId(first, model)) : "value";
-  const chains = paths.map((p) => `"${pathChain(p, model)}"`).join(" and ");
+  const first = operands[0];
+  const chains = operands.map((o) => `"${pathChain(o.path, model)}"`).join(" and ");
+  const desc = first ? tupleDesc(first, model) : "tuple";
   return buildVerbalization(factType.id, "constraint", [
     kwSeg("For each "),
-    refSeg(first ? objName(model, first.root) : "object", first?.root ?? ""),
-    textSeg(`, ${chains} reach the same ${endpoint}.`),
+    refSeg(first ? objName(model, first.path.root) : "object", first?.path.root ?? ""),
+    textSeg(`, ${chains} project the same [${desc}].`),
   ]);
 }
 
 /**
- * "For each {Root}, '{A}' and '{B}' reach no common {Endpoint}." -- a join
- * exclusion constraint over two or more role paths.
+ * "For each {Root}, '{A}' and '{B}' share no [{tuple}]." -- a join exclusion
+ * constraint over two or more projected operands.
  */
 export function verbalizeJoinExclusion(
-  paths: readonly RolePath[],
+  operands: readonly JoinOperand[],
   factType: FactType,
   model: OrmModel,
 ): Verbalization {
-  const first = paths[0];
-  const endpoint = first ? objName(model, pathEndpointId(first, model)) : "value";
-  const chains = paths.map((p) => `"${pathChain(p, model)}"`).join(" and ");
+  const first = operands[0];
+  const chains = operands.map((o) => `"${pathChain(o.path, model)}"`).join(" and ");
+  const desc = first ? tupleDesc(first, model) : "tuple";
   return buildVerbalization(factType.id, "constraint", [
     kwSeg("For each "),
-    refSeg(first ? objName(model, first.root) : "object", first?.root ?? ""),
-    textSeg(`, ${chains} reach no common ${endpoint}.`),
+    refSeg(first ? objName(model, first.path.root) : "object", first?.path.root ?? ""),
+    textSeg(`, ${chains} share no [${desc}].`),
   ]);
 }
 

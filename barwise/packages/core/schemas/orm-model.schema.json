@@ -174,6 +174,23 @@
         }
       }
     },
+    "join_operand_def": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "projection"],
+      "description": "A join-constraint operand: a role path plus the projection selecting which path nodes form the compared tuple.",
+      "properties": {
+        "path": {
+          "$ref": "#/definitions/role_path_def",
+          "description": "The role path this operand projects from."
+        },
+        "projection": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 },
+          "description": "Path-node indices (0 = root, k = after step k) forming the compared tuple, in order."
+        }
+      }
+    },
     "cardinality_range_def": {
       "type": "object",
       "additionalProperties": false,
@@ -644,12 +661,12 @@
               "description": "Alethic (necessity, the default) or deontic (obligation)."
             },
             "subset": {
-              "$ref": "#/definitions/role_path_def",
-              "description": "The path whose endpoints must be contained in the superset path's."
+              "$ref": "#/definitions/join_operand_def",
+              "description": "The operand whose projected tuples must be contained in the superset's."
             },
             "superset": {
-              "$ref": "#/definitions/role_path_def",
-              "description": "The path whose endpoints contain the subset path's."
+              "$ref": "#/definitions/join_operand_def",
+              "description": "The operand whose projected tuples contain the subset's."
             }
           },
           "required": ["type", "subset", "superset"],
@@ -667,14 +684,14 @@
               "enum": ["alethic", "deontic"],
               "description": "Alethic (necessity, the default) or deontic (obligation)."
             },
-            "paths": {
+            "operands": {
               "type": "array",
-              "items": { "$ref": "#/definitions/role_path_def" },
+              "items": { "$ref": "#/definitions/join_operand_def" },
               "minItems": 2,
-              "description": "Two or more role paths whose endpoint sets must be equal."
+              "description": "Two or more operands whose projected tuple sets must be equal."
             }
           },
-          "required": ["type", "paths"],
+          "required": ["type", "operands"],
           "additionalProperties": false
         },
         {
@@ -689,14 +706,14 @@
               "enum": ["alethic", "deontic"],
               "description": "Alethic (necessity, the default) or deontic (obligation)."
             },
-            "paths": {
+            "operands": {
               "type": "array",
-              "items": { "$ref": "#/definitions/role_path_def" },
+              "items": { "$ref": "#/definitions/join_operand_def" },
               "minItems": 2,
-              "description": "Two or more role paths whose endpoint sets must be pairwise disjoint."
+              "description": "Two or more operands whose projected tuple sets must be pairwise disjoint."
             }
           },
-          "required": ["type", "paths"],
+          "required": ["type", "operands"],
           "additionalProperties": false
         }
       ]
