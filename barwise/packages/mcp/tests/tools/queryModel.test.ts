@@ -5,8 +5,13 @@
  * and surfaces parse errors.
  */
 
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { executeQueryModel } from "../../src/tools/queryModel.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const fixtures = resolve(__dirname, "../fixtures");
 
 const simpleModel = `
 orm_version: "1.0"
@@ -93,5 +98,29 @@ describe("query_model tool", () => {
   it("reports an error for an invalid model source", () => {
     const parsed = parse(executeQueryModel("not: valid: orm", "entities"));
     expect(parsed.error).toBeDefined();
+  });
+
+  describe("project source", () => {
+    const project = `${fixtures}/project/project.orm-project.yaml`;
+
+    it("queries every domain when no domain is given", () => {
+      const parsed = parse(executeQueryModel(project, "stats"));
+      const domains = parsed.domains as Array<{ domain: string; result: unknown; }>;
+      expect(domains).toHaveLength(2);
+      expect(domains.map((d) => d.domain)).toEqual(["crm", "billing"]);
+    });
+
+    it("queries only the chosen domain", () => {
+      const parsed = parse(executeQueryModel(project, "entities", "crm"));
+      expect(parsed.domain).toBe("crm");
+      expect((parsed.result as { kind: string; }).kind).toBe("entities");
+      expect(parsed.domains).toBeUndefined();
+    });
+
+    it("reports an error for an unknown domain", () => {
+      const parsed = parse(executeQueryModel(project, "entities", "ghost"));
+      expect(parsed.error).toBeDefined();
+      expect(parsed.error as string).toContain("crm, billing");
+    });
   });
 });

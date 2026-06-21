@@ -8,11 +8,12 @@
  *    source model and relevant ORM elements.
  */
 
+import type { OrmModel } from "@barwise/core";
 import { describeDomain } from "@barwise/core/describe";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { findOrmModel, resolveArtifact } from "../helpers/lineageIo.js";
-import { resolveSource } from "../helpers/resolve.js";
+import { resolveModels, resolveSource } from "../helpers/resolve.js";
 
 /** Maximum array sizes before describe_domain truncates and reports it. */
 const MAX_ENTITIES = 25;
@@ -101,11 +102,16 @@ export function registerDescribeDomainTool(server: McpServer): void {
         + "schemas, API code, or data models to ensure correctness. Optionally focus "
         + "on a specific entity, fact type, or constraint type. Can also accept a "
         + "generated artifact path (e.g., DDL file) and resolve back to the source "
-        + "model through lineage.",
+        + "model through lineage. Given a .orm-project.yaml manifest, describes "
+        + "every domain (or one chosen with `domain`).",
       inputSchema: {
         source: z
           .string()
-          .describe("File path to .orm.yaml or inline YAML content"),
+          .describe("File path to .orm.yaml, .orm-project.yaml, or inline YAML content"),
+        domain: z
+          .string()
+          .optional()
+          .describe("For a project source, describe only this one domain context"),
         focus: z
           .string()
           .optional()
@@ -129,8 +135,8 @@ export function registerDescribeDomainTool(server: McpServer): void {
           ),
       },
     },
-    async ({ source, focus, includePopulations, filePath }) => {
-      return executeDescribeDomain(source, focus, includePopulations, filePath);
+    async ({ source, domain, focus, includePopulations, filePath }) => {
+      return executeDescribeDomain(source, focus, includePopulations, filePath, domain);
     },
   );
 }
@@ -140,30 +146,27 @@ export function executeDescribeDomain(
   focus?: string,
   includePopulations?: boolean,
   filePath?: string,
+  domain?: string,
 ): { content: Array<{ type: "text"; text: string; }>; } {
-  // If filePath is provided, resolve through lineage manifest.
+  // If filePath is provided, resolve through lineage manifest (single model;
+  // a manifest pins one source model, so `domain` does not apply here).
   if (filePath) {
     return executeWithLineage(filePath, focus, includePopulations);
   }
 
-  const model = resolveSource(source);
-
   try {
-    const description = describeDomain(model, {
-      focus,
-      includePopulations,
+    const { resolved, problems } = resolveModels(source, domain);
+    const blocks = resolved.map(({ context, model }) => {
+      const block = describeOne(model, focus, includePopulations);
+      return context ? { domain: context, ...block } : block;
     });
 
-    // Return a structured JSON representation.
-    // The summary is a human-readable string, and the other fields provide
-    // structured (and length-capped) data for programmatic access.
-    const result = {
-      summary: description.summary,
-      ...shapeDescription(description),
-    };
+    // Single plain model: preserve the original { summary, ... } shape.
+    const payload = blocks.length === 1 ? blocks[0] : { domains: blocks };
+    const body = problems.length > 0 ? { ...payload, warnings: problems } : payload;
 
     return {
-      content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      content: [{ type: "text" as const, text: JSON.stringify(body, null, 2) }],
     };
   } catch (error) {
     return {
@@ -181,6 +184,19 @@ export function executeDescribeDomain(
       ],
     };
   }
+}
+
+/** Describe one model into the structured, length-capped shape. */
+function describeOne(
+  model: OrmModel,
+  focus?: string,
+  includePopulations?: boolean,
+): Record<string, unknown> {
+  const description = describeDomain(model, { focus, includePopulations });
+  return {
+    summary: description.summary,
+    ...shapeDescription(description),
+  };
 }
 
 /**

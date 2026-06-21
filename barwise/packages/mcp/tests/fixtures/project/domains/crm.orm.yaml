@@ -1,0 +1,35 @@
+orm_version: "1.0"
+
+model:
+  name: "CRM Domain"
+  domain_context: "crm"
+
+  object_types:
+    - id: "ot-customer"
+      name: "Customer"
+      kind: "entity"
+      reference_mode: "customer_id"
+      definition: "A person or organization tracked by the sales team."
+
+    - id: "ot-email"
+      name: "Email"
+      kind: "value"
+
+  fact_types:
+    - id: "ft-customer-has-email"
+      name: "Customer has Email"
+      roles:
+        - id: "r-cust-email"
+          player: "ot-customer"
+          role_name: "has"
+        - id: "r-email-of"
+          player: "ot-email"
+          role_name: "belongs to"
+      readings:
+        - "{0} has {1}"
+        - "{1} belongs to {0}"
+      constraints:
+        - type: "internal_uniqueness"
+          roles: ["r-cust-email"]
+        - type: "mandatory"
+          role: "r-cust-email"

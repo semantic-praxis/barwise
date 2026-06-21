@@ -9,9 +9,13 @@
 import { OrmYamlSerializer } from "@barwise/core";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { executeExportModel } from "../../src/tools/exportModel.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const fixtures = resolve(__dirname, "../fixtures");
 
 const _serializer = new OrmYamlSerializer();
 
@@ -201,5 +205,31 @@ model:
 
     // File path testing requires actual file system interaction,
     // which is covered by integration tests.
+  });
+
+  describe("project source", () => {
+    const project = `${fixtures}/project/project.orm-project.yaml`;
+
+    afterEach(() => {
+      rmSync(join(fixtures, "project", ".barwise"), { recursive: true, force: true });
+    });
+
+    it("exports the chosen domain", () => {
+      const result = executeExportModel(project, "ddl", undefined, undefined, "crm");
+      expect(readResult(result)).toContain("CREATE TABLE");
+    });
+
+    it("requires a domain to disambiguate a multi-domain project", () => {
+      const result = executeExportModel(project, "ddl");
+      const parsed = JSON.parse(result.content[0]!.text);
+      expect(parsed.error).toContain("domain");
+      expect(parsed.error).toContain("crm, billing");
+    });
+
+    it("reports an error for an unknown domain", () => {
+      const result = executeExportModel(project, "ddl", undefined, undefined, "ghost");
+      const parsed = JSON.parse(result.content[0]!.text);
+      expect(parsed.error).toContain("crm, billing");
+    });
   });
 });

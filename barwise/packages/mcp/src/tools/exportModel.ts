@@ -7,7 +7,7 @@ import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { resolveSource } from "../helpers/resolve.js";
+import { resolveModels } from "../helpers/resolve.js";
 import { boundedTextResult } from "../helpers/response.js";
 
 // Register the standard formats (DDL, OpenAPI, Avro, SQL, NORMA).
@@ -23,11 +23,17 @@ export function registerExportModelTool(server: McpServer): void {
       description: "Export an ORM 2 model to a specified format (ddl, openapi, etc.). "
         + "Supports validation, annotations, and format-specific options. Large "
         + "artifacts are written to a file and the tool returns the file path plus "
-        + "a preview; pass outputPath to choose the destination.",
+        + "a preview; pass outputPath to choose the destination. Given a "
+        + ".orm-project.yaml manifest, pass `domain` to choose which domain to "
+        + "export (a single call produces one artifact).",
       inputSchema: {
         source: z
           .string()
-          .describe("File path to .orm.yaml or inline YAML content"),
+          .describe("File path to .orm.yaml, .orm-project.yaml, or inline YAML content"),
+        domain: z
+          .string()
+          .optional()
+          .describe("For a project source, the one domain context to export"),
         format: z
           .string()
           .describe(
@@ -66,8 +72,8 @@ export function registerExportModelTool(server: McpServer): void {
           ),
       },
     },
-    async ({ source, format, options, outputPath }) => {
-      return executeExportModel(source, format, options, outputPath);
+    async ({ source, domain, format, options, outputPath }) => {
+      return executeExportModel(source, format, options, outputPath, domain);
     },
   );
 }
@@ -91,27 +97,31 @@ export function executeExportModel(
   format: string,
   options?: Record<string, unknown>,
   outputPath?: string,
+  domain?: string,
 ): { content: Array<{ type: "text"; text: string; }>; } {
-  const model = resolveSource(source);
-
   // Get the exporter from the unified registry.
   const exporter = getExporter(format);
   if (!exporter) {
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: JSON.stringify(
-            {
-              error:
-                `Unknown export format: "${format}". Use list_formats to see available formats.`,
-            },
-            null,
-            2,
-          ),
-        },
-      ],
-    };
+    return jsonError(
+      `Unknown export format: "${format}". Use list_formats to see available formats.`,
+    );
+  }
+
+  // Resolve the model to export. A single call yields one artifact, so a
+  // multi-domain project must name the `domain` to export.
+  let model;
+  try {
+    const { resolved } = resolveModels(source, domain);
+    if (resolved.length > 1) {
+      const available = resolved.map((r) => r.context).join(", ");
+      return jsonError(
+        `Exporting a project produces one artifact per call. Pass `
+          + `"domain" to choose which domain to export. Available: ${available}.`,
+      );
+    }
+    model = resolved[0]!.model;
+  } catch (error) {
+    return jsonError(error instanceof Error ? error.message : String(error));
   }
 
   try {
@@ -127,19 +137,13 @@ export function executeExportModel(
       extension: extensionForFormat(format),
     });
   } catch (error) {
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: JSON.stringify(
-            {
-              error: error instanceof Error ? error.message : String(error),
-            },
-            null,
-            2,
-          ),
-        },
-      ],
-    };
+    return jsonError(error instanceof Error ? error.message : String(error));
   }
+}
+
+/** A single-field error result, formatted as pretty JSON. */
+function jsonError(message: string): { content: Array<{ type: "text"; text: string; }>; } {
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify({ error: message }, null, 2) }],
+  };
 }

@@ -1,0 +1,36 @@
+orm_version: "1.0"
+
+model:
+  name: "Billing Domain"
+  domain_context: "billing"
+
+  object_types:
+    - id: "ot-account"
+      name: "Account"
+      kind: "entity"
+      reference_mode: "account_id"
+      definition: "An entity with an active or historical payment relationship."
+
+    - id: "ot-invoice"
+      name: "Invoice"
+      kind: "entity"
+      reference_mode: "invoice_number"
+
+  fact_types:
+    - id: "ft-account-receives-invoice"
+      name: "Account receives Invoice"
+      roles:
+        - id: "r-acct-receives"
+          player: "ot-account"
+          role_name: "receives"
+        - id: "r-invoice-sent-to"
+          player: "ot-invoice"
+          role_name: "is sent to"
+      readings:
+        - "{0} receives {1}"
+        - "{1} is sent to {0}"
+      constraints:
+        - type: "internal_uniqueness"
+          roles: ["r-invoice-sent-to"]
+        - type: "mandatory"
+          role: "r-invoice-sent-to"

@@ -4,8 +4,13 @@
  * Verifies that the tool returns structured domain descriptions.
  */
 
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { executeDescribeDomain } from "../../src/tools/describeDomain.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const fixtures = resolve(__dirname, "../fixtures");
 
 describe("describe_domain tool", () => {
   const simpleModel = `
@@ -229,6 +234,33 @@ model:
       expect(parsed.entities).toHaveLength(25);
       expect(parsed.truncation.entities).toEqual({ shown: 25, total: 40 });
       expect(parsed.note).toContain("query_model");
+    });
+  });
+
+  describe("project source", () => {
+    const project = `${fixtures}/project/project.orm-project.yaml`;
+
+    it("describes every domain when no domain is given", () => {
+      const result = executeDescribeDomain(project);
+      const parsed = JSON.parse(result.content[0]!.text);
+      const domains = parsed.domains as Array<{ domain: string; summary: string; }>;
+      expect(domains).toHaveLength(2);
+      expect(domains.map((d) => d.domain)).toEqual(["crm", "billing"]);
+      expect(domains[0]!.summary).toContain("CRM Domain");
+    });
+
+    it("describes only the chosen domain", () => {
+      const result = executeDescribeDomain(project, undefined, undefined, undefined, "billing");
+      const parsed = JSON.parse(result.content[0]!.text);
+      expect(parsed.domain).toBe("billing");
+      expect(parsed.summary).toContain("Billing Domain");
+      expect(parsed.domains).toBeUndefined();
+    });
+
+    it("reports an error for an unknown domain", () => {
+      const result = executeDescribeDomain(project, undefined, undefined, undefined, "ghost");
+      const parsed = JSON.parse(result.content[0]!.text);
+      expect(parsed.error).toContain("crm, billing");
     });
   });
 });

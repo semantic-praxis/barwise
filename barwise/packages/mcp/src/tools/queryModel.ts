@@ -18,7 +18,7 @@ import {
 } from "@barwise/core/query";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { resolveSource } from "../helpers/resolve.js";
+import { resolveModels } from "../helpers/resolve.js";
 
 const QUERY_DESCRIPTION = "Query DSL expression. Commands: "
   + "entities [entity|value], fact-types [arity], constraints [type], "
@@ -38,16 +38,22 @@ export function registerQueryModelTool(server: McpServer): void {
         + "Answers precise structural questions (what entities exist, what fact "
         + "types an entity participates in, what constraints apply, how two "
         + "entities connect, model statistics) without any LLM inference. Prefer "
-        + "this over re-deriving answers from a model summary.",
+        + "this over re-deriving answers from a model summary. Given a "
+        + ".orm-project.yaml manifest, queries every domain (or one chosen with "
+        + "`domain`).",
       inputSchema: {
         source: z
           .string()
-          .describe("File path to .orm.yaml or inline YAML content"),
+          .describe("File path to .orm.yaml, .orm-project.yaml, or inline YAML content"),
         query: z.string().describe(QUERY_DESCRIPTION),
+        domain: z
+          .string()
+          .optional()
+          .describe("For a project source, query only this one domain context"),
       },
     },
-    async ({ source, query }) => {
-      return executeQueryModel(source, query);
+    async ({ source, query, domain }) => {
+      return executeQueryModel(source, query, domain);
     },
   );
 }
@@ -55,6 +61,7 @@ export function registerQueryModelTool(server: McpServer): void {
 export function executeQueryModel(
   source: string,
   query: string,
+  domain?: string,
 ): { content: Array<{ type: "text"; text: string; }>; } {
   let parsed;
   try {
@@ -72,13 +79,16 @@ export function executeQueryModel(
   }
 
   try {
-    const model = resolveSource(source);
-    const result = queryModel(model, parsed);
-    return jsonContent({
-      query,
-      result,
-      text: formatQueryResult(result),
+    const { resolved, problems } = resolveModels(source, domain);
+    const blocks = resolved.map(({ context, model }) => {
+      const result = queryModel(model, parsed);
+      const block = { result, text: formatQueryResult(result) };
+      return context ? { domain: context, ...block } : block;
     });
+
+    // Single plain model: preserve the original { query, result, text } shape.
+    const payload = blocks.length === 1 ? { query, ...blocks[0] } : { query, domains: blocks };
+    return jsonContent(problems.length > 0 ? { ...payload, warnings: problems } : payload);
   } catch (error) {
     return jsonContent({
       error: error instanceof Error ? error.message : String(error),

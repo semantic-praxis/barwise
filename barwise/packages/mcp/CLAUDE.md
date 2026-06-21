@@ -19,7 +19,8 @@ src/
   index.ts              Main entry point (bin shebang)
   server.ts             McpServer setup and registration
   helpers/
-    resolve.ts          Source resolution (file path vs inline YAML)
+    resolve.ts          Source resolution (file path / inline YAML / project)
+    projectLoader.ts    Filesystem walk for a .orm-project.yaml manifest
   tools/
     index.ts            Tool registration barrel
     validate.ts         validate_model tool
@@ -52,9 +53,12 @@ npx tsc --noEmit            # type-check only
 ## Key Conventions
 
 - Uses stdio transport only (universally supported by all MCP clients).
-- Each tool accepts a `source` parameter that can be either a file
-  path to an `.orm.yaml` file or inline YAML content. The
-  `resolveSource` helper detects which case applies.
+- Each tool accepts a `source` parameter that can be a file path to an
+  `.orm.yaml` file, inline YAML content, or a `.orm-project.yaml`
+  manifest. The `resolveSource` helper handles single models; the read
+  tools use `resolveModels`, which adds the project branch and an
+  optional `domain` selector (no `domain` over a project yields a
+  combined per-domain view; a `domain` selects one).
 - Tool handlers return `{ content: [{ type: "text", text }] }` per
   MCP protocol.
 - Tests call tool handler functions directly with mock inputs (no
