@@ -4,6 +4,8 @@
  */
 import type { FactType } from "../../model/FactType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
+import { expandReading } from "../../model/ReadingOrder.js";
+import type { RolePath } from "../../model/RolePath.js";
 import {
   buildVerbalization,
   kwSeg,
@@ -449,6 +451,100 @@ export function verbalizeObjectCardinality(
     refSeg(objectTypeName, objectTypeId),
     kwSeg(` instances is ${quantifier}`),
     textSeg("."),
+  ]);
+}
+
+// ---------------------------------------------------------------------------
+// Join constraints (role-path operands)
+// ---------------------------------------------------------------------------
+
+const objName = (model: OrmModel, otId: string): string =>
+  model.getObjectType(otId)?.name ?? otId;
+
+/** The fact type owning a role id, scanning the whole model. */
+function factTypeOfRole(model: OrmModel, roleId: string): FactType | undefined {
+  for (const ft of model.factTypes) {
+    if (ft.getRoleById(roleId)) return ft;
+  }
+  return undefined;
+}
+
+/** The object type id the path projects to (player of the last exit role). */
+function pathEndpointId(path: RolePath, model: OrmModel): string {
+  const last = path.steps[path.steps.length - 1];
+  if (!last) return path.root;
+  const ft = factTypeOfRole(model, last.exit);
+  return ft?.getRoleById(last.exit)?.playerId ?? path.root;
+}
+
+/** A readable chain of each hop's fact-type reading, e.g. "Person was born in Country". */
+function pathChain(path: RolePath, model: OrmModel): string {
+  if (path.steps.length === 0) return objName(model, path.root);
+  const hops = path.steps.map((step) => {
+    const ft = factTypeOfRole(model, step.entry);
+    if (!ft) return "...";
+    const names = ft.roles.map((r) => objName(model, r.playerId));
+    return expandReading(ft.readings[0]?.template ?? ft.name, names);
+  });
+  return hops.join("; then ");
+}
+
+/**
+ * "For each {Root}, every {Endpoint} via '{subset}' is also reached via
+ * '{superset}'." -- a join subset constraint over two role paths.
+ */
+export function verbalizeJoinSubset(
+  subset: RolePath,
+  superset: RolePath,
+  factType: FactType,
+  model: OrmModel,
+): Verbalization {
+  const endpoint = objName(model, pathEndpointId(subset, model));
+  return buildVerbalization(factType.id, "constraint", [
+    kwSeg("For each "),
+    refSeg(objName(model, subset.root), subset.root),
+    textSeg(
+      `, every ${endpoint} via "${pathChain(subset, model)}" is also reached `
+        + `via "${pathChain(superset, model)}".`,
+    ),
+  ]);
+}
+
+/**
+ * "For each {Root}, '{A}' and '{B}' reach the same {Endpoint}." -- a join
+ * equality constraint over two or more role paths.
+ */
+export function verbalizeJoinEquality(
+  paths: readonly RolePath[],
+  factType: FactType,
+  model: OrmModel,
+): Verbalization {
+  const first = paths[0];
+  const endpoint = first ? objName(model, pathEndpointId(first, model)) : "value";
+  const chains = paths.map((p) => `"${pathChain(p, model)}"`).join(" and ");
+  return buildVerbalization(factType.id, "constraint", [
+    kwSeg("For each "),
+    refSeg(first ? objName(model, first.root) : "object", first?.root ?? ""),
+    textSeg(`, ${chains} reach the same ${endpoint}.`),
+  ]);
+}
+
+/**
+ * "For each {Root}, '{A}' and '{B}' reach no common {Endpoint}." -- a join
+ * exclusion constraint over two or more role paths.
+ */
+export function verbalizeJoinExclusion(
+  paths: readonly RolePath[],
+  factType: FactType,
+  model: OrmModel,
+): Verbalization {
+  const first = paths[0];
+  const endpoint = first ? objName(model, pathEndpointId(first, model)) : "value";
+  const chains = paths.map((p) => `"${pathChain(p, model)}"`).join(" and ");
+  return buildVerbalization(factType.id, "constraint", [
+    kwSeg("For each "),
+    refSeg(first ? objName(model, first.root) : "object", first?.root ?? ""),
+    textSeg(`, ${chains} reach no common ${endpoint}.`),
   ]);
 }
 

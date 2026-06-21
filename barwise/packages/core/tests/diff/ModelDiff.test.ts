@@ -1393,4 +1393,52 @@ describe("diffModels", () => {
     expect(delta).toBeDefined();
     expect(delta!.changeDescriptions).toContain("derivation changed");
   });
+
+  it("detects a changed join constraint path", () => {
+    const make = (citizenExit: string) => {
+      const m = new OrmModel({ name: "Test" });
+      const person = m.addObjectType({
+        id: "ot-person",
+        name: "Person",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      const country = m.addObjectType({
+        name: "Country",
+        kind: "entity",
+        referenceMode: "country_code",
+      });
+      m.addFactType({
+        name: "Person was born in Country",
+        roles: [
+          { name: "was born in", playerId: person.id, id: "pb-person" },
+          { name: "is birthplace of", playerId: country.id, id: "pb-country" },
+        ],
+        readings: ["{0} was born in {1}"],
+      });
+      m.addFactType({
+        id: "ft-citizen",
+        name: "Person is citizen of Country",
+        roles: [
+          { name: "is citizen of", playerId: person.id, id: "pc-person" },
+          { name: "has citizen", playerId: country.id, id: citizenExit },
+        ],
+        readings: ["{0} is citizen of {1}"],
+        constraints: [{
+          type: "join_equality",
+          paths: [
+            { root: person.id, steps: [{ entry: "pb-person", exit: "pb-country" }] },
+            { root: person.id, steps: [{ entry: "pc-person", exit: citizenExit }] },
+          ],
+        }],
+      });
+      return m;
+    };
+
+    const result = diffModels(make("pc-country"), make("pc-country-2"));
+    const delta = result.deltas.find(
+      (d) => d.kind === "modified" && d.elementType === "fact_type" && d.name?.includes("citizen"),
+    );
+    expect(delta).toBeDefined();
+  });
 });

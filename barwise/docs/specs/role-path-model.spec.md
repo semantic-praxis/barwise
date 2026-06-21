@@ -1,11 +1,13 @@
 # Role-path / join-rule model
 
-Status: Design pending sign-off for the metamodel constructs (WS2-7). WS1
--- the `model/roleGraph.ts` traversal seam -- has landed (2026-06-18,
-barwise-sf1); the metamodel thread builds WS2+ on it once both threads
-agree the representation and the subset cut line.
+Status: Approved 2026-06-20 (sign-off to proceed); WS1 (the
+`model/roleGraph.ts` traversal seam) landed 2026-06-18 (barwise-sf1).
+Metamodel-thread implementation underway, decomposed so each PR keeps the
+suite green: (PR 1) representation + serde + schema + verbalization + diff +
+structural well-formedness validation; (PR 2) population-satisfaction
+evaluation; (PR 3/4) NORMA import, then export + RT-A + merge id-remap.
 Created: 2026-06-18
-Last-updated: 2026-06-18
+Last-updated: 2026-06-20
 Tracking: barwise-0s8 (this design), barwise-5t9.10 (role-path substrate),
 barwise-5t9.6 (join set-comparison/ring),
 docs/adr/0001-metamodel-evolution-policy.md (tier 3),
