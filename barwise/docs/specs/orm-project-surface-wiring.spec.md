@@ -2,7 +2,7 @@
 
 Status: Draft for review (design only -- no implementation in this PR)
 Created: 2026-06-21
-Last-updated: 2026-06-21
+Last-updated: 2026-06-21 (WS4 schema-registration decision)
 Tracking: barwise-r4f, barwise-knq (multi-file workflow),
 barwise-e4k (splitting guide, blocked on this), deferred
 barwise-hwe / barwise-byy / barwise-sa4
@@ -84,7 +84,7 @@ In scope (fix now):
   fully deprecated).
 - VS Code: register `.orm-project.yaml` so the LSP gives diagnostics/hover
   on the manifest, and wire the existing `orm-project.schema.json` for
-  editor validation (`contributes.languages` + `jsonValidation`).
+  editor validation (`contributes.languages` + LSP manifest diagnostics).
 
 Out of scope (track as follow-ups):
 
@@ -107,8 +107,9 @@ Out of scope (track as follow-ups):
 | `cli/src/commands/export.ts`                            | Accept a project; `--domain` one, else per-domain files (like diagram)    |
 | `mcp/src/helpers/resolve.ts`                            | Add a project branch; expose a `domain` arg for the read tools            |
 | `mcp/src/tools/{validate,verbalize,exportModel,...}.ts` | Optional `domain` input; route project source through resolve             |
-| `vscode/src/server/OrmLanguageServer.ts`                | Handle `.orm-project.yaml` in the document selector / `isOrmYaml`         |
-| `vscode/package.json`                                   | Register `orm-project` language + jsonValidation for the manifest schema  |
+| `vscode/src/server/OrmLanguageServer.ts`                | Route `.orm-project.yaml` to manifest validation (`validateProject`)      |
+| `vscode/src/server/DiagnosticsProvider.ts`              | `validateProject` -- schema-validate the manifest via `ProjectSerializer` |
+| `vscode/package.json`                                   | Register the `orm-project` language (associate `.orm-project.yaml`)       |
 
 ## Workstreams (each its own PR, suite green)
 
@@ -126,8 +127,15 @@ commands reuse it.
    tools gain an optional `domain`. Tests: a tool over a project source with
    and without `domain`.
 4. VS Code LSP + schema registration. `.orm-project.yaml` in the document
-   selector; `contributes.languages` + `jsonValidation` for
-   `orm-project.schema.json`. Manual-verify diagnostics on a manifest.
+   selector; `contributes.languages` for the `orm-project` language. The LSP
+   validates a manifest against `orm-project.schema.json` via core's
+   `ProjectSerializer` and reports parse/schema errors -- mirroring how a
+   `.orm.yaml` model is LSP-validated rather than via a static schema entry.
+   (Resolved during WS4: `contributes.jsonValidation` was the original plan,
+   but VS Code applies it only to JSON, not YAML; routing manifest validation
+   through the LSP is both functional and consistent with the model path.
+   Full cross-file project diagnostics -- resolving and validating each
+   referenced domain with line mapping -- stay deferred to barwise-sa4.)
 
 ## API and migration impact
 

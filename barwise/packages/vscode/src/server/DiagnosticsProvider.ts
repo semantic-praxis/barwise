@@ -1,6 +1,7 @@
 import {
   type Diagnostic as OrmDiagnostic,
   OrmYamlSerializer,
+  ProjectSerializer,
   ValidationEngine,
 } from "@barwise/core";
 import type { TextDocument } from "vscode-languageserver-textdocument";
@@ -23,6 +24,7 @@ const ZERO_RANGE = {
 export class DiagnosticsProvider {
   private readonly connection: Connection;
   private readonly serializer = new OrmYamlSerializer();
+  private readonly projectSerializer = new ProjectSerializer();
   private readonly validationEngine = new ValidationEngine();
 
   constructor(connection: Connection) {
@@ -64,6 +66,33 @@ export class DiagnosticsProvider {
         range: ZERO_RANGE,
         message: (err as Error).message,
         source: "barwise (parse)",
+      });
+    }
+
+    this.connection.sendDiagnostics({
+      uri: document.uri,
+      diagnostics,
+    });
+  }
+
+  /**
+   * Validate a `.orm-project.yaml` manifest against the project schema and
+   * send diagnostics. This checks the manifest's own structure (its domain
+   * and mapping declarations) -- not the referenced domain models, which are
+   * separate `.orm.yaml` documents validated in their own right. A malformed
+   * manifest is reported as a single parse error at the top of the file.
+   */
+  validateProject(document: TextDocument): void {
+    const diagnostics: Diagnostic[] = [];
+
+    try {
+      this.projectSerializer.deserialize(document.getText());
+    } catch (err) {
+      diagnostics.push({
+        severity: DiagnosticSeverity.Error,
+        range: ZERO_RANGE,
+        message: (err as Error).message,
+        source: "barwise (project)",
       });
     }
 

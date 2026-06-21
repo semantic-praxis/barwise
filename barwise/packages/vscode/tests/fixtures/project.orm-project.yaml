@@ -1,0 +1,8 @@
+project:
+  name: "VS Code Test Project"
+
+  domains:
+    - path: "./domains/crm.orm.yaml"
+      context: "crm"
+    - path: "./domains/billing.orm.yaml"
+      context: "billing"
