@@ -73,7 +73,10 @@ describe("joinConstraintRules", () => {
   });
 
   it("flags an unknown root object type", () => {
-    const bad: JoinOperand = { path: { root: "ot-missing", steps: bornIn.path.steps }, projection: [0, 1] };
+    const bad: JoinOperand = {
+      path: { root: "ot-missing", steps: bornIn.path.steps },
+      projection: [0, 1],
+    };
     expect(idsOf(buildModel({ type: "join_equality", operands: [bad, citizenOf] })))
       .toContain("constraint/join-unknown-root");
   });
