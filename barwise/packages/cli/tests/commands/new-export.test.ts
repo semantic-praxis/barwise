@@ -213,3 +213,89 @@ describe("barwise export (new format registry)", () => {
     }
   });
 });
+
+describe("barwise export (project)", () => {
+  const project = `${fixtures}/project/project.orm-project.yaml`;
+
+  it("writes one file per domain into the --output directory", async () => {
+    const outputDir = `${testOutput}/project-export`;
+    if (existsSync(outputDir)) {
+      rmSync(outputDir, { recursive: true });
+    }
+
+    const result = await runCli([
+      "export",
+      project,
+      "--format",
+      "ddl",
+      "--output",
+      outputDir,
+    ]);
+    expect(result.exitCode).toBe(0);
+    expect(existsSync(join(outputDir, "crm.ddl"))).toBe(true);
+    expect(existsSync(join(outputDir, "billing.ddl"))).toBe(true);
+    expect(readFileSync(join(outputDir, "crm.ddl"), "utf-8")).toContain("CREATE TABLE");
+
+    rmSync(outputDir, { recursive: true });
+  });
+
+  it("exports a single domain to stdout with --domain", async () => {
+    const result = await runCli([
+      "export",
+      project,
+      "--format",
+      "ddl",
+      "--domain",
+      "crm",
+    ]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("CREATE TABLE");
+  });
+
+  it("exports a single domain to a file with --domain and --output", async () => {
+    const outputFile = `${testOutput}/crm-only.sql`;
+    if (existsSync(outputFile)) {
+      rmSync(outputFile);
+    }
+
+    const result = await runCli([
+      "export",
+      project,
+      "--format",
+      "ddl",
+      "--domain",
+      "crm",
+      "--output",
+      outputFile,
+    ]);
+    expect(result.exitCode).toBe(0);
+    expect(existsSync(outputFile)).toBe(true);
+    expect(readFileSync(outputFile, "utf-8")).toContain("CREATE TABLE");
+
+    rmSync(outputFile);
+  });
+
+  it("requires --output when exporting a whole project", async () => {
+    const result = await runCli([
+      "export",
+      project,
+      "--format",
+      "ddl",
+    ]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("requires --output");
+  });
+
+  it("reports an error for an unknown --domain", async () => {
+    const result = await runCli([
+      "export",
+      project,
+      "--format",
+      "ddl",
+      "--domain",
+      "ghost",
+    ]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("ghost");
+  });
+});
