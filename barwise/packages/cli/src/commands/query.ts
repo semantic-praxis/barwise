@@ -1,7 +1,8 @@
 /**
  * barwise query <source> <query...>
  *
- * Run a symbolic, deterministic query against an ORM model. The query
+ * Run a symbolic, deterministic query against an ORM model (or, given a
+ * `.orm-project.yaml`, each domain or one chosen with `--domain`). The query
  * is expressed in the query DSL (see @barwise/core query/parse). Returns
  * structured information about entities, fact types, constraints, and
  * their relationships.
@@ -15,7 +16,7 @@ import {
   QueryParseError,
 } from "@barwise/core/query";
 import type { Command } from "commander";
-import { loadModel } from "../helpers/io.js";
+import { resolveDomainModels } from "../helpers/domainModels.js";
 
 /**
  * Reassemble variadic CLI tokens into a single query string. Tokens that
@@ -32,12 +33,13 @@ export function registerQueryCommand(program: Command): void {
   program
     .command("query")
     .description("Run a deterministic symbolic query against an ORM model")
-    .argument("<source>", "Path to .orm.yaml file")
+    .argument("<source>", "Path to .orm.yaml or .orm-project.yaml file")
     .argument(
       "[query...]",
       `Query DSL expression. Commands: ${QUERY_COMMANDS.join(", ")}`,
     )
     .option("--json", "Output as JSON instead of human-readable text")
+    .option("--domain <context>", "For a project, query only this one domain")
     .addHelpText(
       "after",
       "\nExamples:\n"
@@ -47,7 +49,7 @@ export function registerQueryCommand(program: Command): void {
         + "  barwise query model.orm.yaml path Customer Product\n"
         + "  barwise query model.orm.yaml stats",
     )
-    .action((source: string, queryParts: string[], opts: { json?: boolean; }) => {
+    .action((source: string, queryParts: string[], opts: { json?: boolean; domain?: string; }) => {
       try {
         if (queryParts.length === 0) {
           process.stderr.write(
@@ -57,15 +59,25 @@ export function registerQueryCommand(program: Command): void {
           return;
         }
 
-        const model = loadModel(source);
+        const { resolved, problems } = resolveDomainModels(source, opts.domain);
+        for (const p of problems) process.stderr.write(`Warning: ${p}\n`);
+        const multi = resolved.length > 1;
         const query = parseQuery(joinQueryParts(queryParts));
-        const result = queryModel(model, query);
 
         if (opts.json) {
-          process.stdout.write(JSON.stringify(result, null, 2) + "\n");
-        } else {
-          process.stdout.write(formatQueryResult(result) + "\n");
+          const blocks = resolved.map(({ context, model }) => {
+            const result = queryModel(model, query);
+            return context ? { domain: context, result } : result;
+          });
+          process.stdout.write(JSON.stringify(multi ? blocks : blocks[0], null, 2) + "\n");
+          return;
         }
+
+        const parts = resolved.map(({ context, model }) => {
+          const body = formatQueryResult(queryModel(model, query));
+          return multi && context ? `== ${context} ==\n\n${body}` : body;
+        });
+        process.stdout.write(parts.join("\n\n") + "\n");
       } catch (err) {
         if (err instanceof QueryParseError) {
           process.stderr.write(`Query error: ${err.message}\n`);

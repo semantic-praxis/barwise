@@ -83,3 +83,34 @@ describe("barwise verbalize", () => {
     expect(result.exitCode).toBe(1);
   });
 });
+
+describe("barwise verbalize (project)", () => {
+  const project = `${fixtures}/project/project.orm-project.yaml`;
+
+  it("verbalizes every domain with == context == headers", async () => {
+    const result = await runCli(["verbalize", project]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("== crm ==");
+    expect(result.stdout).toContain("== billing ==");
+  });
+
+  it("verbalizes one domain with --domain (no headers)", async () => {
+    const result = await runCli(["verbalize", project, "--domain", "crm"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).not.toContain("== billing ==");
+    expect(result.stdout).not.toContain("== crm ==");
+  });
+
+  it("emits a JSON array over domains with --format json", async () => {
+    const result = await runCli(["verbalize", project, "--format", "json"]);
+    const parsed = JSON.parse(result.stdout);
+    expect(Array.isArray(parsed)).toBe(true);
+    expect(parsed.map((b) => b.domain).sort()).toEqual(["billing", "crm"]);
+  });
+
+  it("errors for an unknown --domain", async () => {
+    const result = await runCli(["verbalize", project, "--domain", "ghost"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("ghost");
+  });
+});

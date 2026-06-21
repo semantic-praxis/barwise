@@ -79,3 +79,33 @@ describe("barwise describe", () => {
     expect(result.stdout).toContain("Constraint Type:");
   });
 });
+
+describe("barwise describe (project)", () => {
+  const project = `${fixtures}/project/project.orm-project.yaml`;
+
+  it("describes every domain with == context == headers", async () => {
+    const result = await runCli(["describe", project]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("== crm ==");
+    expect(result.stdout).toContain("== billing ==");
+  });
+
+  it("describes one domain with --domain", async () => {
+    const result = await runCli(["describe", project, "--domain", "billing"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).not.toContain("== crm ==");
+  });
+
+  it("emits a JSON array over domains with --json", async () => {
+    const result = await runCli(["describe", project, "--json"]);
+    const parsed = JSON.parse(result.stdout);
+    expect(Array.isArray(parsed)).toBe(true);
+    expect(parsed.map((b) => b.domain).sort()).toEqual(["billing", "crm"]);
+  });
+
+  it("errors for an unknown --domain", async () => {
+    const result = await runCli(["describe", project, "--domain", "ghost"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("ghost");
+  });
+});
