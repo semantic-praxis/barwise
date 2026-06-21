@@ -4,6 +4,7 @@ import {
   checkObjectCardinalityViolations,
   checkUnaryRoleCardinalityViolations,
 } from "./population/cardinality.js";
+import { checkJoinPathViolations } from "./population/joinPath.js";
 import {
   checkDisjunctiveMandatoryViolations,
   checkMandatoryViolations,
@@ -88,6 +89,7 @@ export function populationValidationRules(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkExternalUniquenessViolations(model));
   diagnostics.push(...checkObjectCardinalityViolations(model));
   diagnostics.push(...checkUnaryRoleCardinalityViolations(model));
+  diagnostics.push(...checkJoinPathViolations(model));
 
   return diagnostics;
 }
