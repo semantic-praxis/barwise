@@ -53,8 +53,7 @@ function buildModel(constraint: Constraint): OrmModel {
   return model;
 }
 
-const idsOf = (model: OrmModel) =>
-  joinConstraintRules(model).map((d) => d.ruleId);
+const idsOf = (model: OrmModel) => joinConstraintRules(model).map((d) => d.ruleId);
 
 describe("joinConstraintRules", () => {
   it("accepts a well-formed join_equality", () => {
