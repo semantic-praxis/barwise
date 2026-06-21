@@ -28,6 +28,11 @@ Resolve an item by editing its status line (and the construct, if the book
 disagrees); the join-constraint deep-research pass (which corrected the
 single-endpoint model to projected tuples) is the template.
 
+This doc doubles as a study workbook: record your reading in the Reading log
+at the end, one answer per item, and add your own questions as they come.
+Working the items by hand against the text is the point -- it confirms
+barwise follows the book and deepens the ORM grounding at the same time.
+
 ## How to verify
 
 Prefer the book and Halpin's own papers over NORMA docs or the tool source:
@@ -205,10 +210,46 @@ linear paths only. Source: _Constraints on Conceptual Join Paths_; _Role
 Calculus for ORM_; b866. Status: largely verified; confirm projection
 default and verbalization.
 
-## Resolution log
+## Reading log and answers
 
-Append a dated line when an item is verified or a construct is changed in
-response, so the audit has a trail (mirrors the REPO_REVIEW dating
-convention without spawning a new file each time).
+The study workbook. As you read the 3rd ed. (2024), record an answer for each
+verification item below, and add your own questions freely -- the goal is to
+learn ORM deeply while confirming barwise follows the book. When an item is
+settled, flip its `Status:` line above and, if the book disagrees, open a
+construct change and note it in the dated trail.
+
+Entry template (copy one per item, or per question):
+
+```
+### <item id, e.g. T2.1> -- <short topic>
+Q: <the item's question, or your own>
+Book (3rd ed., chapter / section / page): <what the text actually says>
+Verdict: aligned | change needed -> <what to change>
+```
+
+### Example (partial -- CC5)
+
+Q: Is there a published JSON/YAML ORM schema our `.orm.yaml` should match?
+Book (3rd ed., ch. 16 "Data Interchange", 16.5 "XML, JSON, and ORM"): _to
+read_. Research so far (see docs/book-verification-cc5-serialization.md): no
+standard JSON/YAML ORM interchange exists -- all are XML -- and CQL/ActiveFacts
+is prior art for a legible text serialization that round-trips NORMA.
+Verdict: pending the book; provisionally aligned (we fill a real gap).
+
+### Your questions (add as you read)
+
+Space for questions the checklist did not anticipate -- notation details,
+FORML phrasings, mapping nuances -- using the same Q / Book / Verdict shape.
+These are as valuable as the seeded items; they are where the deeper learning
+shows up.
+
+## Dated trail
+
+A dated line whenever an item is verified or a construct changes, so the
+audit keeps a trail (mirrors the REPO_REVIEW dating convention without
+spawning a new file each time).
 
 - 2026-06-21 -- checklist created from the Tier 1-3 build sweep.
+- 2026-06-21 -- 3rd ed. (2024) set as the reference of record; CC5
+  serialization investigation parked (docs/book-verification-cc5-serialization.md).
+- 2026-06-21 -- reading-log / answers workbook added.
