@@ -77,3 +77,26 @@ describe("barwise query", () => {
     expect(result.stderr).toContain("File not found");
   });
 });
+
+describe("barwise query (project)", () => {
+  const project = `${fixtures}/project/project.orm-project.yaml`;
+
+  it("queries every domain with == context == headers", async () => {
+    const result = await runCli(["query", project, "entities"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("== crm ==");
+    expect(result.stdout).toContain("== billing ==");
+  });
+
+  it("queries one domain with --domain", async () => {
+    const result = await runCli(["query", project, "entities", "--domain", "crm"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).not.toContain("== billing ==");
+  });
+
+  it("errors for an unknown --domain", async () => {
+    const result = await runCli(["query", project, "entities", "--domain", "ghost"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("ghost");
+  });
+});
