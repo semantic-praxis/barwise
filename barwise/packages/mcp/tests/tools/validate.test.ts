@@ -75,4 +75,17 @@ describe("validate_model tool", () => {
       expect(() => executeValidate(project, "ghost")).toThrow(/crm, billing/);
     });
   });
+
+  describe("file-object source", () => {
+    it("accepts a { path } object", () => {
+      const result = executeValidate({ path: `${fixtures}/simple.orm.yaml` });
+      expect(JSON.parse(result.content[0]!.text).valid).toBe(true);
+    });
+
+    it("accepts a { content } object", () => {
+      const yaml = readFileSync(`${fixtures}/simple.orm.yaml`, "utf-8");
+      const result = executeValidate({ content: yaml });
+      expect(JSON.parse(result.content[0]!.text).valid).toBe(true);
+    });
+  });
 });

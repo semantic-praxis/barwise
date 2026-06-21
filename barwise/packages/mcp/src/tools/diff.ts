@@ -4,8 +4,8 @@
 
 import { diffModels } from "@barwise/core/diff";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
-import { resolveSource } from "../helpers/resolve.js";
+import { resolveSource, type SourceInput } from "../helpers/resolve.js";
+import { sourceInputSchema } from "../helpers/sourceSchema.js";
 
 export function registerDiffTool(server: McpServer): void {
   server.registerTool(
@@ -15,12 +15,8 @@ export function registerDiffTool(server: McpServer): void {
       description: "Compare two ORM 2 models and return the structural deltas. "
         + "Shows added, removed, and modified elements with breaking-level indicators.",
       inputSchema: {
-        base: z
-          .string()
-          .describe("File path or inline YAML for the base model"),
-        incoming: z
-          .string()
-          .describe("File path or inline YAML for the incoming model"),
+        base: sourceInputSchema("File path or inline YAML for the base model"),
+        incoming: sourceInputSchema("File path or inline YAML for the incoming model"),
       },
     },
     async ({ base, incoming }) => {
@@ -30,8 +26,8 @@ export function registerDiffTool(server: McpServer): void {
 }
 
 export function executeDiff(
-  base: string,
-  incoming: string,
+  base: SourceInput,
+  incoming: SourceInput,
 ): { content: Array<{ type: "text"; text: string; }>; } {
   const baseModel = resolveSource(base);
   const incomingModel = resolveSource(incoming);

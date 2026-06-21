@@ -60,4 +60,12 @@ describe("diff_models tool", () => {
     expect(result.content).toHaveLength(1);
     expect(result.content[0]!.type).toBe("text");
   });
+
+  it("accepts file-object base and incoming", () => {
+    const result = executeDiff(
+      { path: `${fixtures}/simple.orm.yaml` },
+      { path: `${fixtures}/simple-modified.orm.yaml` },
+    );
+    expect(JSON.parse(result.content[0]!.text).hasChanges).toBe(true);
+  });
 });

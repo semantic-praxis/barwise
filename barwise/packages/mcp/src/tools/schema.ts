@@ -5,7 +5,8 @@
 import { RelationalMapper, renderDdl } from "@barwise/core/mapping";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { resolveSource } from "../helpers/resolve.js";
+import { resolveSource, type SourceInput } from "../helpers/resolve.js";
+import { sourceInputSchema } from "../helpers/sourceSchema.js";
 
 export function registerSchemaTool(server: McpServer): void {
   server.registerTool(
@@ -17,9 +18,7 @@ export function registerSchemaTool(server: McpServer): void {
         + "Generate a relational schema (DDL or JSON) from an ORM 2 model. "
         + "Maps object types and fact types to tables, columns, and keys.",
       inputSchema: {
-        source: z
-          .string()
-          .describe("File path to .orm.yaml or inline YAML content"),
+        source: sourceInputSchema("File path to .orm.yaml or inline YAML content"),
         format: z
           .enum(["ddl", "json"])
           .default("ddl")
@@ -33,7 +32,7 @@ export function registerSchemaTool(server: McpServer): void {
 }
 
 export function executeSchema(
-  source: string,
+  source: SourceInput,
   format: "ddl" | "json" = "ddl",
 ): { content: Array<{ type: "text"; text: string; }>; } {
   const model = resolveSource(source);

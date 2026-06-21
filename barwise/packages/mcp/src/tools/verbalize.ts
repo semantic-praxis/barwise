@@ -7,8 +7,9 @@ import { type Counterexample, generateCounterexamples } from "@barwise/core/coun
 import { Verbalizer } from "@barwise/core/verbalization";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { resolveModels } from "../helpers/resolve.js";
+import { resolveModels, type SourceInput, sourcePath } from "../helpers/resolve.js";
 import { boundedTextResult } from "../helpers/response.js";
+import { sourceInputSchema } from "../helpers/sourceSchema.js";
 
 /** Readings shown inline by summary mode. */
 const SUMMARY_PREVIEW = 20;
@@ -25,9 +26,9 @@ export function registerVerbalizeTool(server: McpServer): void {
         + "Given a .orm-project.yaml manifest, verbalizes every domain (or one "
         + "chosen with `domain`).",
       inputSchema: {
-        source: z
-          .string()
-          .describe("File path to .orm.yaml, .orm-project.yaml, or inline YAML content"),
+        source: sourceInputSchema(
+          "File path to .orm.yaml, .orm-project.yaml, or inline YAML content",
+        ),
         domain: z
           .string()
           .optional()
@@ -60,18 +61,19 @@ export function registerVerbalizeTool(server: McpServer): void {
 }
 
 export function executeVerbalize(
-  source: string,
+  source: SourceInput,
   factType?: string,
   mode: "full" | "summary" = "full",
   counterexamples = false,
   domain?: string,
 ): { content: Array<{ type: "text"; text: string; }>; } {
   const { resolved, problems } = resolveModels(source, domain);
+  const spill = sourcePath(source);
 
   // Single plain model: preserve the original output exactly (summary and
   // not-found stay inline; full output spills when large).
   if (resolved.length === 1 && resolved[0]!.context === undefined && problems.length === 0) {
-    return verbalizeSingle(resolved[0]!.model, source, factType, mode, counterexamples);
+    return verbalizeSingle(resolved[0]!.model, spill, factType, mode, counterexamples);
   }
 
   const multi = resolved.length > 1;
@@ -82,13 +84,13 @@ export function executeVerbalize(
   const warn = problems.length > 0
     ? problems.map((p) => `Warning: ${p}`).join("\n") + "\n\n"
     : "";
-  return boundedTextResult(warn + parts.join("\n\n"), { kind: "verbalization", source });
+  return boundedTextResult(warn + parts.join("\n\n"), { kind: "verbalization", source: spill });
 }
 
 /** The original single-model behavior, kept byte-for-byte. */
 function verbalizeSingle(
   model: OrmModel,
-  source: string,
+  spill: string | undefined,
   factType: string | undefined,
   mode: "full" | "summary",
   counterexamples: boolean,
@@ -104,7 +106,7 @@ function verbalizeSingle(
   }
   return boundedTextResult(verbalizeText(model, factType, mode, counterexamples), {
     kind: "verbalization",
-    source,
+    source: spill,
   });
 }
 
