@@ -149,9 +149,10 @@ settles the representation and corrects the first cut of this spec:
   NORMA's general `RolePathOwner` machinery, shared across fact-type
   derivation, subtype derivation, and queries, and generalized beyond a join
   constraint's needs (projecting _calculated_ values, sub-paths, object
-  unifiers). barwise captures the _concept_ -- path + projected role sequence
-  + comparison kind -- without replicating that object graph; the purpose
-  tags are decoded on import to reconstruct the path, never stored.
+  unifiers). barwise captures the _concept_ -- a path, a projected role
+  sequence, and the comparison kind -- without replicating that object graph;
+  the purpose tags are decoded on import to reconstruct the path, never
+  stored.
 
 **Correction to the merged first cut (PR 1 #227, PR 2 #228).** Those PRs
 modeled a join operand as a single endpoint per root and compared
@@ -422,7 +423,7 @@ end-to-end.
 
 - New/revised public model types from `@barwise/core`: `RolePath`,
   `JoinOperand` (path + projection), and the three join constraint interfaces
-  + their type guards in the `Constraint` union. The merged first cut's
+  with their type guards in the `Constraint` union. The merged first cut's
   operand fields (`subset`/`superset`/`paths` as bare `RolePath`) become
   `JoinOperand` -- a breaking change to those just-added types, contained in
   the monorepo, with no `.orm.yaml` in the wild to migrate.
