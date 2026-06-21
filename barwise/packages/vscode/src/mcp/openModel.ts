@@ -71,11 +71,7 @@ export function getOpenModelPath(
 export function getOpenModelSource(
   referenced?: readonly string[],
 ): SourceInput | undefined {
-  return openModelSource(
-    getOpenModelPath(referenced),
-    (path) =>
-      vscode.workspace.textDocuments
-        .find((d) => d.uri.fsPath === path)
-        ?.getText(),
-  );
+  const liveContent = (path: string): string | undefined =>
+    vscode.workspace.textDocuments.find((d) => d.uri.fsPath === path)?.getText();
+  return openModelSource(getOpenModelPath(referenced), liveContent);
 }
