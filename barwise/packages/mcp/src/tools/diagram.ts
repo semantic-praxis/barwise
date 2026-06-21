@@ -5,9 +5,9 @@
 import { generateDiagram } from "@barwise/diagram";
 import { renderDiagramSvg } from "@barwise/diagram-ui/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
-import { resolveSource } from "../helpers/resolve.js";
+import { resolveSource, type SourceInput, sourcePath } from "../helpers/resolve.js";
 import { boundedTextResult } from "../helpers/response.js";
+import { sourceInputSchema } from "../helpers/sourceSchema.js";
 
 export function registerDiagramTool(server: McpServer): void {
   server.registerTool(
@@ -20,9 +20,7 @@ export function registerDiagramTool(server: McpServer): void {
         + "Large diagrams are written to a file and the tool returns the file path; "
         + "do not expect raw SVG markup to be returned inline.",
       inputSchema: {
-        source: z
-          .string()
-          .describe("File path to .orm.yaml or inline YAML content"),
+        source: sourceInputSchema("File path to .orm.yaml or inline YAML content"),
       },
     },
     async ({ source }) => {
@@ -32,14 +30,14 @@ export function registerDiagramTool(server: McpServer): void {
 }
 
 export async function executeDiagram(
-  source: string,
+  source: SourceInput,
 ): Promise<{ content: Array<{ type: "text"; text: string; }>; }> {
   const model = resolveSource(source);
   const result = await generateDiagram(model);
 
   return boundedTextResult(renderDiagramSvg(result.layout), {
     kind: "diagram",
-    source,
+    source: sourcePath(source),
     extension: "svg",
   });
 }

@@ -13,7 +13,8 @@ import { describeDomain } from "@barwise/core/describe";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { findOrmModel, resolveArtifact } from "../helpers/lineageIo.js";
-import { resolveModels, resolveSource } from "../helpers/resolve.js";
+import { resolveModels, resolveSource, type SourceInput } from "../helpers/resolve.js";
+import { sourceInputSchema } from "../helpers/sourceSchema.js";
 
 /** Maximum array sizes before describe_domain truncates and reports it. */
 const MAX_ENTITIES = 25;
@@ -105,9 +106,9 @@ export function registerDescribeDomainTool(server: McpServer): void {
         + "model through lineage. Given a .orm-project.yaml manifest, describes "
         + "every domain (or one chosen with `domain`).",
       inputSchema: {
-        source: z
-          .string()
-          .describe("File path to .orm.yaml, .orm-project.yaml, or inline YAML content"),
+        source: sourceInputSchema(
+          "File path to .orm.yaml, .orm-project.yaml, or inline YAML content",
+        ),
         domain: z
           .string()
           .optional()
@@ -142,7 +143,7 @@ export function registerDescribeDomainTool(server: McpServer): void {
 }
 
 export function executeDescribeDomain(
-  source: string,
+  source: SourceInput,
   focus?: string,
   includePopulations?: boolean,
   filePath?: string,

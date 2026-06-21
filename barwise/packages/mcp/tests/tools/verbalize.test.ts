@@ -84,6 +84,19 @@ describe("verbalize_model tool", () => {
     expect(existsSync(spill)).toBe(true);
   });
 
+  it("spills a { path } object beside the file, like the string form", () => {
+    process.env.BARWISE_MCP_INLINE_LIMIT = "50";
+    const dirOf = (r: { content: Array<{ text: string; }>; }) =>
+      dirname(r.content[0]!.text.match(/Full content written to: (.+)/)![1]!.trim());
+
+    const asString = dirOf(executeVerbalize(`${fixtures}/simple.orm.yaml`));
+    const asObject = dirOf(executeVerbalize({ path: `${fixtures}/simple.orm.yaml` }));
+
+    // The object form spills into the same cache dir next to the model file.
+    expect(asObject).toBe(asString);
+    expect(asObject).toContain(resolve(fixtures, ".barwise"));
+  });
+
   describe("project source", () => {
     const project = `${fixtures}/project/project.orm-project.yaml`;
 

@@ -7,7 +7,8 @@ import type { ProviderName } from "@barwise/llm";
 import { createLlmClient } from "@barwise/llm";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { resolveModels } from "../helpers/resolve.js";
+import { resolveModels, type SourceInput } from "../helpers/resolve.js";
+import { sourceInputSchema } from "../helpers/sourceSchema.js";
 
 export function registerReviewTool(server: McpServer): void {
   server.registerTool(
@@ -22,9 +23,9 @@ export function registerReviewTool(server: McpServer): void {
         + "a .orm-project.yaml manifest, reviews every domain (or one chosen "
         + "with `domain`).",
       inputSchema: {
-        source: z
-          .string()
-          .describe("File path to .orm.yaml, .orm-project.yaml, or inline YAML content"),
+        source: sourceInputSchema(
+          "File path to .orm.yaml, .orm-project.yaml, or inline YAML content",
+        ),
         domain: z
           .string()
           .optional()
@@ -56,7 +57,7 @@ export function registerReviewTool(server: McpServer): void {
 }
 
 export async function executeReview(
-  source: string,
+  source: SourceInput,
   focus?: string,
   provider?: ProviderName,
   model?: string,

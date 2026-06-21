@@ -18,7 +18,8 @@ import {
 } from "@barwise/core/query";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { resolveModels } from "../helpers/resolve.js";
+import { resolveModels, type SourceInput } from "../helpers/resolve.js";
+import { sourceInputSchema } from "../helpers/sourceSchema.js";
 
 const QUERY_DESCRIPTION = "Query DSL expression. Commands: "
   + "entities [entity|value], fact-types [arity], constraints [type], "
@@ -42,9 +43,9 @@ export function registerQueryModelTool(server: McpServer): void {
         + ".orm-project.yaml manifest, queries every domain (or one chosen with "
         + "`domain`).",
       inputSchema: {
-        source: z
-          .string()
-          .describe("File path to .orm.yaml, .orm-project.yaml, or inline YAML content"),
+        source: sourceInputSchema(
+          "File path to .orm.yaml, .orm-project.yaml, or inline YAML content",
+        ),
         query: z.string().describe(QUERY_DESCRIPTION),
         domain: z
           .string()
@@ -59,7 +60,7 @@ export function registerQueryModelTool(server: McpServer): void {
 }
 
 export function executeQueryModel(
-  source: string,
+  source: SourceInput,
   query: string,
   domain?: string,
 ): { content: Array<{ type: "text"; text: string; }>; } {

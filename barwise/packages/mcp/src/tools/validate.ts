@@ -5,7 +5,8 @@
 import { type Diagnostic, type OrmModel, ValidationEngine } from "@barwise/core";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { resolveModels } from "../helpers/resolve.js";
+import { resolveModels, type SourceInput } from "../helpers/resolve.js";
+import { sourceInputSchema } from "../helpers/sourceSchema.js";
 
 export function registerValidateTool(server: McpServer): void {
   server.registerTool(
@@ -17,9 +18,9 @@ export function registerValidateTool(server: McpServer): void {
         + ".orm-project.yaml manifest, validates every domain (or one chosen "
         + "with `domain`).",
       inputSchema: {
-        source: z
-          .string()
-          .describe("File path to .orm.yaml, .orm-project.yaml, or inline YAML content"),
+        source: sourceInputSchema(
+          "File path to .orm.yaml, .orm-project.yaml, or inline YAML content",
+        ),
         domain: z
           .string()
           .optional()
@@ -33,7 +34,7 @@ export function registerValidateTool(server: McpServer): void {
 }
 
 export function executeValidate(
-  source: string,
+  source: SourceInput,
   domain?: string,
 ): { content: Array<{ type: "text"; text: string; }>; } {
   const { resolved, problems } = resolveModels(source, domain);

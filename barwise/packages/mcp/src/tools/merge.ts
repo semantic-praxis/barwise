@@ -6,8 +6,8 @@ import { type Diagnostic, OrmYamlSerializer } from "@barwise/core";
 import { diffModels, mergeAndValidate } from "@barwise/core/diff";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { writeFileSync } from "node:fs";
-import { z } from "zod";
-import { isFilePath, resolveSource } from "../helpers/resolve.js";
+import { resolveSource, type SourceInput, sourcePath } from "../helpers/resolve.js";
+import { sourceInputSchema } from "../helpers/sourceSchema.js";
 
 const serializer = new OrmYamlSerializer();
 
@@ -20,12 +20,8 @@ export function registerMergeTool(server: McpServer): void {
         + "additions and modifications, rejects removals (non-interactive). "
         + "Returns the merged model as YAML with validation results.",
       inputSchema: {
-        base: z
-          .string()
-          .describe("File path or inline YAML for the base model"),
-        incoming: z
-          .string()
-          .describe("File path or inline YAML for the incoming model"),
+        base: sourceInputSchema("File path or inline YAML for the base model"),
+        incoming: sourceInputSchema("File path or inline YAML for the incoming model"),
       },
     },
     async ({ base, incoming }) => {
@@ -35,8 +31,8 @@ export function registerMergeTool(server: McpServer): void {
 }
 
 export function executeMerge(
-  base: string,
-  incoming: string,
+  base: SourceInput,
+  incoming: SourceInput,
 ): { content: Array<{ type: "text"; text: string; }>; } {
   const baseModel = resolveSource(base);
   // The incoming fragment may reference types from the base model
@@ -89,11 +85,12 @@ export function executeMerge(
     : serializer.serialize(baseModel);
 
   // Write back to the base file when the merge is valid and the base
-  // was specified as a file path.
+  // has a file path (a string path or a { path } object).
   let writtenTo: string | undefined;
-  if (mergeResult.isValid && isFilePath(base.trim())) {
-    writeFileSync(base.trim(), yaml, "utf-8");
-    writtenTo = base.trim();
+  const basePath = sourcePath(base);
+  if (mergeResult.isValid && basePath) {
+    writeFileSync(basePath, yaml, "utf-8");
+    writtenTo = basePath;
   }
 
   // mergeResult.diagnostics contains only structural errors (severity "error").

@@ -7,8 +7,9 @@ import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { resolveModels } from "../helpers/resolve.js";
+import { resolveModels, type SourceInput, sourcePath } from "../helpers/resolve.js";
 import { boundedTextResult } from "../helpers/response.js";
+import { sourceInputSchema } from "../helpers/sourceSchema.js";
 
 // Register the standard formats (DDL, OpenAPI, Avro, SQL, NORMA).
 registerStandardFormats();
@@ -27,9 +28,9 @@ export function registerExportModelTool(server: McpServer): void {
         + ".orm-project.yaml manifest, pass `domain` to choose which domain to "
         + "export (a single call produces one artifact).",
       inputSchema: {
-        source: z
-          .string()
-          .describe("File path to .orm.yaml, .orm-project.yaml, or inline YAML content"),
+        source: sourceInputSchema(
+          "File path to .orm.yaml, .orm-project.yaml, or inline YAML content",
+        ),
         domain: z
           .string()
           .optional()
@@ -93,7 +94,7 @@ function extensionForFormat(format: string): string {
 }
 
 export function executeExportModel(
-  source: string,
+  source: SourceInput,
   format: string,
   options?: Record<string, unknown>,
   outputPath?: string,
@@ -132,7 +133,7 @@ export function executeExportModel(
     // For multi-file formats, the text field contains a combined view.
     return boundedTextResult(result.text, {
       kind: `export-${format}`,
-      source,
+      source: sourcePath(source),
       outputPath,
       extension: extensionForFormat(format),
     });
