@@ -669,6 +669,16 @@
           ".orm.yaml"
         ],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "orm-project",
+        "aliases": [
+          "ORM Project"
+        ],
+        "extensions": [
+          ".orm-project.yaml"
+        ],
+        "configuration": "./language-configuration.json"
       }
     ]
   },

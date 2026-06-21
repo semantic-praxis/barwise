@@ -131,4 +131,42 @@ describe("DiagnosticsProvider", () => {
     expect(call.diagnostics[0].range.start.line).toBe(0);
     expect(call.diagnostics[0].range.start.character).toBe(0);
   });
+
+  describe("validateProject", () => {
+    const projectUri = "file:///test/project.orm-project.yaml";
+
+    function makeProjectDoc(content: string): TextDocument {
+      return TextDocument.create(projectUri, "orm-project", 1, content);
+    }
+
+    it("sends no diagnostics for a valid manifest", () => {
+      const doc = makeProjectDoc(loadFixture("project.orm-project.yaml"));
+      provider.validateProject(doc);
+
+      expect(connection.sendDiagnostics).toHaveBeenCalledOnce();
+      const call = connection.sendDiagnostics.mock.calls[0]![0]!;
+      expect(call.uri).toBe(projectUri);
+      expect(call.diagnostics).toHaveLength(0);
+    });
+
+    it("reports a schema error for a manifest missing its name", () => {
+      const doc = makeProjectDoc("project:\n  domains: []\n");
+      provider.validateProject(doc);
+
+      const call = connection.sendDiagnostics.mock.calls[0]![0]!;
+      expect(call.diagnostics).toHaveLength(1);
+      expect(call.diagnostics[0].severity).toBe(1); // Error
+      expect(call.diagnostics[0].source).toBe("barwise (project)");
+      expect(call.diagnostics[0].range.start.line).toBe(0);
+    });
+
+    it("reports a parse error for malformed manifest YAML", () => {
+      const doc = makeProjectDoc("{{{{not valid yaml at all");
+      provider.validateProject(doc);
+
+      const call = connection.sendDiagnostics.mock.calls[0]![0]!;
+      expect(call.diagnostics).toHaveLength(1);
+      expect(call.diagnostics[0].source).toBe("barwise (project)");
+    });
+  });
 });

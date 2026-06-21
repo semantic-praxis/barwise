@@ -40,6 +40,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const clientOptions: LanguageClientOptions = {
     documentSelector: [
       { scheme: "file", pattern: "**/*.orm.yaml" },
+      { scheme: "file", pattern: "**/*.orm-project.yaml" },
     ],
     initializationOptions: {
       showCounterexamplesOnHover: vscode.workspace

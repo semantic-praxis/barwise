@@ -43,18 +43,24 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
   };
 });
 
-// Validate on open and change.
+// Validate on open and change. A `.orm-project.yaml` manifest is validated
+// for its own structure (against the project schema); a `.orm.yaml` model is
+// validated by the full ORM validation engine.
 documents.onDidChangeContent((change) => {
-  if (isOrmYaml(change.document.uri)) {
-    diagnosticsProvider.validate(change.document);
-  }
+  validateDocument(change.document);
 });
 
 documents.onDidOpen((event) => {
-  if (isOrmYaml(event.document.uri)) {
-    diagnosticsProvider.validate(event.document);
-  }
+  validateDocument(event.document);
 });
+
+function validateDocument(document: TextDocument): void {
+  if (isOrmProject(document.uri)) {
+    diagnosticsProvider.validateProject(document);
+  } else if (isOrmYaml(document.uri)) {
+    diagnosticsProvider.validate(document);
+  }
+}
 
 // Completion.
 connection.onCompletion(
@@ -76,6 +82,10 @@ connection.onHover(
 
 function isOrmYaml(uri: string): boolean {
   return uri.endsWith(".orm.yaml");
+}
+
+function isOrmProject(uri: string): boolean {
+  return uri.endsWith(".orm-project.yaml");
 }
 
 documents.listen(connection);
