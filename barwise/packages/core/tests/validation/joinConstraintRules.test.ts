@@ -57,18 +57,13 @@ const idsOf = (model: OrmModel) => joinConstraintRules(model).map((d) => d.ruleI
 
 describe("joinConstraintRules", () => {
   it("accepts a well-formed join_equality", () => {
-    expect(joinConstraintRules(buildModel({
-      type: "join_equality",
-      operands: [bornIn, citizenOf],
-    }))).toHaveLength(0);
+    const model = buildModel({ type: "join_equality", operands: [bornIn, citizenOf] });
+    expect(joinConstraintRules(model)).toHaveLength(0);
   });
 
   it("accepts a well-formed join_subset", () => {
-    expect(joinConstraintRules(buildModel({
-      type: "join_subset",
-      subset: bornIn,
-      superset: citizenOf,
-    }))).toHaveLength(0);
+    const model = buildModel({ type: "join_subset", subset: bornIn, superset: citizenOf });
+    expect(joinConstraintRules(model)).toHaveLength(0);
   });
 
   it("flags an unknown root object type", () => {
