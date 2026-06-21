@@ -272,4 +272,72 @@ describe("Phase 2 constraint verbalization", () => {
       expect(v[0]!.text).toBeDefined();
     });
   });
+
+  describe("join constraints", () => {
+    function buildPersonCountry(): { model: OrmModel; ft: FactType; } {
+      const model = new OrmModel({ name: "Test" });
+      const person = model.addObjectType({
+        id: "ot-person",
+        name: "Person",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      const country = model.addObjectType({
+        name: "Country",
+        kind: "entity",
+        referenceMode: "country_code",
+      });
+      model.addFactType({
+        name: "Person was born in Country",
+        roles: [
+          { name: "was born in", playerId: person.id, id: "pb-person" },
+          { name: "is birthplace of", playerId: country.id, id: "pb-country" },
+        ],
+        readings: ["{0} was born in {1}"],
+      });
+      const ft = model.addFactType({
+        name: "Person is citizen of Country",
+        roles: [
+          { name: "is citizen of", playerId: person.id, id: "pc-person" },
+          { name: "has citizen", playerId: country.id, id: "pc-country" },
+        ],
+        readings: ["{0} is citizen of {1}"],
+      });
+      return { model, ft };
+    }
+
+    it("verbalizes join_equality as a same-endpoint statement", () => {
+      const { model, ft } = buildPersonCountry();
+      const c: Constraint = {
+        type: "join_equality",
+        paths: [
+          { root: "ot-person", steps: [{ entry: "pb-person", exit: "pb-country" }] },
+          { root: "ot-person", steps: [{ entry: "pc-person", exit: "pc-country" }] },
+        ],
+      };
+      const v = verbalizer.verbalize(c, ft, model);
+      expect(v.text).toBe(
+        'For each Person, "Person was born in Country" and '
+          + '"Person is citizen of Country" reach the same Country.',
+      );
+    });
+
+    it("verbalizes join_subset and join_exclusion recognizably", () => {
+      const { model, ft } = buildPersonCountry();
+      const paths = [
+        { root: "ot-person", steps: [{ entry: "pb-person", exit: "pb-country" }] },
+        { root: "ot-person", steps: [{ entry: "pc-person", exit: "pc-country" }] },
+      ];
+      const sub = verbalizer.verbalize(
+        { type: "join_subset", subset: paths[0]!, superset: paths[1]! },
+        ft,
+        model,
+      );
+      expect(sub.text).toContain("For each Person");
+      expect(sub.text).toContain("is also reached via");
+
+      const exc = verbalizer.verbalize({ type: "join_exclusion", paths }, ft, model);
+      expect(exc.text).toContain("reach no common Country");
+    });
+  });
 });

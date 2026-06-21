@@ -3,8 +3,9 @@
  */
 
 import type { CardinalityRange, ValueRange } from "./ObjectType.js";
+import type { RolePath, RolePathStep } from "./RolePath.js";
 
-export type { CardinalityRange, ValueRange };
+export type { CardinalityRange, RolePath, RolePathStep, ValueRange };
 
 /**
  * The modality of a constraint: alethic (logical necessity, the default)
@@ -282,6 +283,52 @@ export interface CardinalityConstraint extends ConstraintBase, CardinalityRange 
   readonly roleId: string;
 }
 
+// ---------------------------------------------------------------------------
+// Join constraints (role-path operands -- Tier 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Join subset constraint: the projected endpoints of the `subset` role path
+ * must be a subset of those of the `superset` path, correlated by their
+ * shared root (join variable). The flat `SubsetConstraint` covers the
+ * no-join case; this variant carries inline paths for cross-fact-type joins.
+ *
+ * Example: "Each Person who was born in a Country is a citizen of some
+ * Country" over the bornIn / citizenOf join paths.
+ */
+export interface JoinSubsetConstraint extends ConstraintBase {
+  readonly type: "join_subset";
+  /** The path whose endpoints must be contained in the superset path's. */
+  readonly subset: RolePath;
+  /** The path whose endpoints contain the subset path's. */
+  readonly superset: RolePath;
+}
+
+/**
+ * Join equality constraint: the projected endpoint sets of all operand paths
+ * must be identical, correlated by their shared root. Two or more paths,
+ * compared as an unordered set.
+ *
+ * Example: "Each Person was born in the same Country of which that Person is
+ * a citizen" over the bornIn / citizenOf join paths.
+ */
+export interface JoinEqualityConstraint extends ConstraintBase {
+  readonly type: "join_equality";
+  /** Two or more role paths whose endpoint sets must be equal. */
+  readonly paths: readonly RolePath[];
+}
+
+/**
+ * Join exclusion constraint: no value may appear in the projected endpoints
+ * of more than one operand path, correlated by their shared root. Two or
+ * more paths, compared as an unordered set.
+ */
+export interface JoinExclusionConstraint extends ConstraintBase {
+  readonly type: "join_exclusion";
+  /** Two or more role paths whose endpoint sets must be pairwise disjoint. */
+  readonly paths: readonly RolePath[];
+}
+
 /**
  * Union of all constraint types.
  */
@@ -298,7 +345,10 @@ export type Constraint =
   | RingConstraint
   | FrequencyConstraint
   | ValueComparisonConstraint
-  | CardinalityConstraint;
+  | CardinalityConstraint
+  | JoinSubsetConstraint
+  | JoinEqualityConstraint
+  | JoinExclusionConstraint;
 
 // ---------------------------------------------------------------------------
 // Type guard helpers
@@ -364,4 +414,16 @@ export function isValueComparison(
 
 export function isCardinality(c: Constraint): c is CardinalityConstraint {
   return c.type === "cardinality";
+}
+
+export function isJoinSubset(c: Constraint): c is JoinSubsetConstraint {
+  return c.type === "join_subset";
+}
+
+export function isJoinEquality(c: Constraint): c is JoinEqualityConstraint {
+  return c.type === "join_equality";
+}
+
+export function isJoinExclusion(c: Constraint): c is JoinExclusionConstraint {
+  return c.type === "join_exclusion";
 }

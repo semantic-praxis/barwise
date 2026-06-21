@@ -14,6 +14,9 @@ import {
   verbalizeExclusion,
   verbalizeExclusiveOr,
   verbalizeFrequency,
+  verbalizeJoinEquality,
+  verbalizeJoinExclusion,
+  verbalizeJoinSubset,
   verbalizeRing,
   verbalizeSubset,
   verbalizeValueComparison,
@@ -160,6 +163,12 @@ export class ConstraintVerbalizer {
           factType,
           model,
         );
+      case "join_subset":
+        return verbalizeJoinSubset(constraint.subset, constraint.superset, factType, model);
+      case "join_equality":
+        return verbalizeJoinEquality(constraint.paths, factType, model);
+      case "join_exclusion":
+        return verbalizeJoinExclusion(constraint.paths, factType, model);
     }
   }
 }

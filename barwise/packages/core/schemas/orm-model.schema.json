@@ -140,6 +140,40 @@
         "required": ["reference_mode"]
       }
     },
+    "role_path_def": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "steps"],
+      "description": "A declared role path: a root object type (the join variable) and ordered single-fact-type hops.",
+      "properties": {
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The root object type id -- the correlation / join variable's type."
+        },
+        "steps": {
+          "type": "array",
+          "description": "The ordered hops; empty means the path is just the root.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["entry", "exit"],
+            "properties": {
+              "entry": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Entry role id (played by the current path node)."
+              },
+              "exit": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exit role id (another role of the entry role's fact type)."
+              }
+            }
+          }
+        }
+      }
+    },
     "cardinality_range_def": {
       "type": "object",
       "additionalProperties": false,
@@ -595,6 +629,74 @@
             }
           },
           "required": ["type", "role", "min", "max"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "join_subset" },
+            "id": {
+              "type": "string",
+              "description": "Unique identifier for constraint traceability."
+            },
+            "modality": {
+              "type": "string",
+              "enum": ["alethic", "deontic"],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "subset": {
+              "$ref": "#/definitions/role_path_def",
+              "description": "The path whose endpoints must be contained in the superset path's."
+            },
+            "superset": {
+              "$ref": "#/definitions/role_path_def",
+              "description": "The path whose endpoints contain the subset path's."
+            }
+          },
+          "required": ["type", "subset", "superset"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "join_equality" },
+            "id": {
+              "type": "string",
+              "description": "Unique identifier for constraint traceability."
+            },
+            "modality": {
+              "type": "string",
+              "enum": ["alethic", "deontic"],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "paths": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/role_path_def" },
+              "minItems": 2,
+              "description": "Two or more role paths whose endpoint sets must be equal."
+            }
+          },
+          "required": ["type", "paths"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "join_exclusion" },
+            "id": {
+              "type": "string",
+              "description": "Unique identifier for constraint traceability."
+            },
+            "modality": {
+              "type": "string",
+              "enum": ["alethic", "deontic"],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "paths": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/role_path_def" },
+              "minItems": 2,
+              "description": "Two or more role paths whose endpoint sets must be pairwise disjoint."
+            }
+          },
+          "required": ["type", "paths"],
           "additionalProperties": false
         }
       ]
