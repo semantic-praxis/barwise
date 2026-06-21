@@ -2,6 +2,7 @@ import { parse, stringify } from "yaml";
 import type {
   Constraint,
   ConstraintModality,
+  JoinOperand,
   RingType,
   RolePath,
   ValueComparisonOperator,
@@ -128,6 +129,11 @@ interface OrmYamlRolePath {
   steps: { entry: string; exit: string; }[];
 }
 
+interface OrmYamlJoinOperand {
+  path: OrmYamlRolePath;
+  projection: number[];
+}
+
 /** Serialize a role path (root + ordered entry/exit hops). */
 function serializeRolePath(p: RolePath): OrmYamlRolePath {
   return {
@@ -142,6 +148,16 @@ function deserializeRolePath(p: OrmYamlRolePath): RolePath {
     root: p.root,
     steps: p.steps.map((s) => ({ entry: s.entry, exit: s.exit })),
   };
+}
+
+/** Serialize a join operand (path + projection node indices). */
+function serializeJoinOperand(o: JoinOperand): OrmYamlJoinOperand {
+  return { path: serializeRolePath(o.path), projection: [...o.projection] };
+}
+
+/** Parse a join operand back into the model shape. */
+function deserializeJoinOperand(o: OrmYamlJoinOperand): JoinOperand {
+  return { path: deserializeRolePath(o.path), projection: [...o.projection] };
 }
 
 /** Serialize a derivation rule, omitting the default storage and absent flags. */
@@ -225,9 +241,9 @@ type OrmYamlConstraintBody =
     operator: ValueComparisonOperator;
   }
   | { type: "cardinality"; role: string; min: number; max: number | "unbounded"; }
-  | { type: "join_subset"; subset: OrmYamlRolePath; superset: OrmYamlRolePath; }
-  | { type: "join_equality"; paths: OrmYamlRolePath[]; }
-  | { type: "join_exclusion"; paths: OrmYamlRolePath[]; };
+  | { type: "join_subset"; subset: OrmYamlJoinOperand; superset: OrmYamlJoinOperand; }
+  | { type: "join_equality"; operands: OrmYamlJoinOperand[]; }
+  | { type: "join_exclusion"; operands: OrmYamlJoinOperand[]; };
 
 /** A serialized constraint carries the shared optional `modality`. */
 type OrmYamlConstraint = OrmYamlConstraintBody & { modality?: ConstraintModality; };
@@ -591,15 +607,15 @@ export class OrmYamlSerializer {
       case "join_subset":
         result = {
           type: "join_subset",
-          subset: serializeRolePath(c.subset),
-          superset: serializeRolePath(c.superset),
+          subset: serializeJoinOperand(c.subset),
+          superset: serializeJoinOperand(c.superset),
         };
         break;
       case "join_equality":
-        result = { type: "join_equality", paths: c.paths.map(serializeRolePath) };
+        result = { type: "join_equality", operands: c.operands.map(serializeJoinOperand) };
         break;
       case "join_exclusion":
-        result = { type: "join_exclusion", paths: c.paths.map(serializeRolePath) };
+        result = { type: "join_exclusion", operands: c.operands.map(serializeJoinOperand) };
         break;
     }
     // Add constraint ID if present
@@ -893,15 +909,15 @@ export class OrmYamlSerializer {
       case "join_subset":
         result = {
           type: "join_subset",
-          subset: deserializeRolePath(c.subset),
-          superset: deserializeRolePath(c.superset),
+          subset: deserializeJoinOperand(c.subset),
+          superset: deserializeJoinOperand(c.superset),
         };
         break;
       case "join_equality":
-        result = { type: "join_equality", paths: c.paths.map(deserializeRolePath) };
+        result = { type: "join_equality", operands: c.operands.map(deserializeJoinOperand) };
         break;
       case "join_exclusion":
-        result = { type: "join_exclusion", paths: c.paths.map(deserializeRolePath) };
+        result = { type: "join_exclusion", operands: c.operands.map(deserializeJoinOperand) };
         break;
     }
 

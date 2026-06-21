@@ -3,7 +3,7 @@ import {
   isJoinEquality,
   isJoinExclusion,
   isJoinSubset,
-  type RolePath,
+  type JoinOperand,
 } from "../../model/Constraint.js";
 import type { FactType } from "../../model/FactType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
@@ -12,11 +12,12 @@ import type { Diagnostic } from "../Diagnostic.js";
 /**
  * Structural well-formedness for join constraints (role-path operands).
  *
- * Checks the declaration only -- the population-satisfaction evaluation of a
- * join path is a separate rule. Per the role-path spec's minimal grammar:
- * every step is a real hop (entry and exit are roles of one fact type, the
- * entry played by the current node), steps are contiguous, and all operand
- * paths of a constraint share the same root and endpoint object type.
+ * Checks the declaration only -- the population-satisfaction evaluation is a
+ * separate rule. Per the role-path spec's minimal grammar: every step is a
+ * real hop (entry and exit are roles of one fact type, the entry played by
+ * the current node), steps are contiguous, each projection index is a valid
+ * path node, and all operands of a constraint project tuples of the same
+ * arity and matching column object types (so the tuple sets are comparable).
  */
 export function joinConstraintRules(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -26,16 +27,16 @@ export function joinConstraintRules(model: OrmModel): Diagnostic[] {
       if (isJoinSubset(c)) {
         checkOperands([c.subset, c.superset], c, ft, model, diagnostics);
       } else if (isJoinEquality(c) || isJoinExclusion(c)) {
-        if (c.paths.length < 2) {
+        if (c.operands.length < 2) {
           diagnostics.push({
             severity: "error",
             message: `Join ${c.type === "join_equality" ? "equality" : "exclusion"} `
-              + `constraint in fact type "${ft.name}" must have at least two paths.`,
+              + `constraint in fact type "${ft.name}" must have at least two operands.`,
             elementId: c.id ?? ft.id,
-            ruleId: "constraint/join-too-few-paths",
+            ruleId: "constraint/join-too-few-operands",
           });
         }
-        checkOperands(c.paths, c, ft, model, diagnostics);
+        checkOperands(c.operands, c, ft, model, diagnostics);
       }
     }
   }
@@ -52,57 +53,100 @@ function factTypeOfRole(model: OrmModel, roleId: string): FactType | undefined {
 }
 
 /**
- * Validate each operand path is well-formed, then that all operands share a
- * root type and an endpoint type. Returns nothing -- diagnostics accumulate.
+ * Validate each operand, then that all operands project comparable tuples
+ * (same arity and matching column object types). Diagnostics accumulate.
  */
 function checkOperands(
-  paths: readonly RolePath[],
+  operands: readonly JoinOperand[],
   c: Constraint,
   ft: FactType,
   model: OrmModel,
   diagnostics: Diagnostic[],
 ): void {
-  const endpoints: (string | undefined)[] = [];
-  for (const path of paths) {
-    endpoints.push(checkPath(path, c, ft, model, diagnostics));
-  }
+  const columnTypes = operands.map((o) => checkOperand(o, c, ft, model, diagnostics));
+  const valid = columnTypes.filter((t): t is readonly string[] => t !== undefined);
+  if (valid.length !== operands.length) return; // a malformed operand was already flagged
 
-  const roots = new Set(paths.map((p) => p.root));
-  if (roots.size > 1) {
+  const arity = valid[0]!.length;
+  if (valid.some((t) => t.length !== arity)) {
     diagnostics.push({
       severity: "error",
-      message: `Join constraint in fact type "${ft.name}" has operand paths with `
-        + `different root object types; they must share one join variable.`,
+      message: `Join constraint in fact type "${ft.name}" has operands that project `
+        + `tuples of different arity; they must match.`,
       elementId: c.id ?? ft.id,
-      ruleId: "constraint/join-root-mismatch",
+      ruleId: "constraint/join-arity-mismatch",
     });
+    return;
   }
-
-  const definedEndpoints = endpoints.filter((e): e is string => e !== undefined);
-  if (definedEndpoints.length === paths.length && new Set(definedEndpoints).size > 1) {
-    diagnostics.push({
-      severity: "error",
-      message: `Join constraint in fact type "${ft.name}" has operand paths that `
-        + `project to different endpoint object types; they must match.`,
-      elementId: c.id ?? ft.id,
-      ruleId: "constraint/join-endpoint-mismatch",
-    });
+  for (let col = 0; col < arity; col++) {
+    const types = new Set(valid.map((t) => t[col]));
+    if (types.size > 1) {
+      diagnostics.push({
+        severity: "error",
+        message: `Join constraint in fact type "${ft.name}" projects column ${col + 1} `
+          + `from different object types across operands; they must match.`,
+        elementId: c.id ?? ft.id,
+        ruleId: "constraint/join-column-type-mismatch",
+      });
+    }
   }
 }
 
 /**
- * Validate a single path: the root exists, each step's entry and exit are
- * roles of one fact type, the entry is played by the current node, and steps
- * are contiguous. Returns the endpoint object type id, or undefined if the
- * path is malformed.
+ * Validate one operand: the path is well-formed (root exists, every step is a
+ * real contiguous hop) and every projection index is a valid path node.
+ * Returns the projected column object-type ids, or undefined if malformed.
  */
-function checkPath(
-  path: RolePath,
+function checkOperand(
+  operand: JoinOperand,
   c: Constraint,
   ft: FactType,
   model: OrmModel,
   diagnostics: Diagnostic[],
-): string | undefined {
+): readonly string[] | undefined {
+  const nodeTypes = pathNodeTypes(operand, c, ft, model, diagnostics);
+  if (!nodeTypes) return undefined;
+
+  const columns: string[] = [];
+  for (const idx of operand.projection) {
+    if (idx < 0 || idx >= nodeTypes.length) {
+      diagnostics.push({
+        severity: "error",
+        message: `Join constraint in fact type "${ft.name}" projects node ${idx}, `
+          + `which is outside the path (0..${nodeTypes.length - 1}).`,
+        elementId: c.id ?? ft.id,
+        ruleId: "constraint/join-bad-projection",
+      });
+      return undefined;
+    }
+    columns.push(nodeTypes[idx]!);
+  }
+  if (columns.length === 0) {
+    diagnostics.push({
+      severity: "error",
+      message: `Join constraint in fact type "${ft.name}" has an operand with an `
+        + `empty projection.`,
+      elementId: c.id ?? ft.id,
+      ruleId: "constraint/join-empty-projection",
+    });
+    return undefined;
+  }
+  return columns;
+}
+
+/**
+ * The object-type id at each path node (node 0 = root, node k = player after
+ * step k), validating the root exists and every step is a contiguous hop.
+ * Returns undefined if the path is malformed.
+ */
+function pathNodeTypes(
+  operand: JoinOperand,
+  c: Constraint,
+  ft: FactType,
+  model: OrmModel,
+  diagnostics: Diagnostic[],
+): string[] | undefined {
+  const { path } = operand;
   if (!model.getObjectType(path.root)) {
     diagnostics.push({
       severity: "error",
@@ -114,6 +158,7 @@ function checkPath(
     return undefined;
   }
 
+  const nodeTypes = [path.root];
   let currentTypeId = path.root;
   for (const step of path.steps) {
     const stepFt = factTypeOfRole(model, step.entry);
@@ -140,6 +185,7 @@ function checkPath(
       return undefined;
     }
     currentTypeId = exitRole.playerId;
+    nodeTypes.push(currentTypeId);
   }
-  return currentTypeId;
+  return nodeTypes;
 }

@@ -34,3 +34,18 @@ export interface RolePath {
   /** The ordered hops; empty means the path is just the root. */
   readonly steps: readonly RolePathStep[];
 }
+
+/**
+ * A join-constraint operand: a role path plus the projection that selects
+ * which path nodes' players form the compared tuple (Halpin's "role sequence
+ * projected from a join path"). Node `0` is the root; node `k` is the player
+ * reached after step `k`. The compared tuple is the players at the projected
+ * nodes, in order; the projection length is the operand's arity. The common
+ * (root, endpoint) case for an n-step path is `[0, n]`.
+ */
+export interface JoinOperand {
+  /** The role path this operand projects from. */
+  readonly path: RolePath;
+  /** Path-node indices (0 = root, k = after step k) forming the tuple. */
+  readonly projection: readonly number[];
+}

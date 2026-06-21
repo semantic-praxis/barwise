@@ -7,19 +7,19 @@
  * inline paths and deserialize back to an equal structure.
  */
 import { describe, expect, it } from "vitest";
-import type { Constraint, RolePath } from "../../src/model/Constraint.js";
+import type { Constraint, JoinOperand } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 
 const serializer = new OrmYamlSerializer();
 
-const bornIn: RolePath = {
-  root: "ot-person",
-  steps: [{ entry: "pb-person", exit: "pb-country" }],
+const bornIn: JoinOperand = {
+  path: { root: "ot-person", steps: [{ entry: "pb-person", exit: "pb-country" }] },
+  projection: [0, 1],
 };
-const citizenOf: RolePath = {
-  root: "ot-person",
-  steps: [{ entry: "pc-person", exit: "pc-country" }],
+const citizenOf: JoinOperand = {
+  path: { root: "ot-person", steps: [{ entry: "pc-person", exit: "pc-country" }] },
+  projection: [0, 1],
 };
 
 function buildModel(constraint: Constraint): OrmModel {
@@ -64,12 +64,12 @@ function roundTrip(constraint: Constraint): Constraint {
 
 describe("join constraint serialization round-trip", () => {
   it("round-trips join_equality (personCountryDemo)", () => {
-    const c = roundTrip({ type: "join_equality", paths: [bornIn, citizenOf] });
+    const c = roundTrip({ type: "join_equality", operands: [bornIn, citizenOf] });
     expect(c.type).toBe("join_equality");
     if (c.type === "join_equality") {
-      expect(c.paths).toHaveLength(2);
-      expect(c.paths[0]).toEqual(bornIn);
-      expect(c.paths[1]).toEqual(citizenOf);
+      expect(c.operands).toHaveLength(2);
+      expect(c.operands[0]).toEqual(bornIn);
+      expect(c.operands[1]).toEqual(citizenOf);
     }
   });
 
@@ -83,10 +83,10 @@ describe("join constraint serialization round-trip", () => {
   });
 
   it("round-trips join_exclusion", () => {
-    const c = roundTrip({ type: "join_exclusion", paths: [bornIn, citizenOf] });
+    const c = roundTrip({ type: "join_exclusion", operands: [bornIn, citizenOf] });
     expect(c.type).toBe("join_exclusion");
     if (c.type === "join_exclusion") {
-      expect(c.paths).toEqual([bornIn, citizenOf]);
+      expect(c.operands).toEqual([bornIn, citizenOf]);
     }
   });
 });

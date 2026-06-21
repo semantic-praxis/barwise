@@ -306,38 +306,42 @@ describe("Phase 2 constraint verbalization", () => {
       return { model, ft };
     }
 
-    it("verbalizes join_equality as a same-endpoint statement", () => {
+    const bornIn = {
+      path: { root: "ot-person", steps: [{ entry: "pb-person", exit: "pb-country" }] },
+      projection: [0, 1],
+    };
+    const citizenOf = {
+      path: { root: "ot-person", steps: [{ entry: "pc-person", exit: "pc-country" }] },
+      projection: [0, 1],
+    };
+
+    it("verbalizes join_equality as a same-tuple statement", () => {
       const { model, ft } = buildPersonCountry();
-      const c: Constraint = {
-        type: "join_equality",
-        paths: [
-          { root: "ot-person", steps: [{ entry: "pb-person", exit: "pb-country" }] },
-          { root: "ot-person", steps: [{ entry: "pc-person", exit: "pc-country" }] },
-        ],
-      };
+      const c: Constraint = { type: "join_equality", operands: [bornIn, citizenOf] };
       const v = verbalizer.verbalize(c, ft, model);
       expect(v.text).toBe(
         'For each Person, "Person was born in Country" and '
-          + '"Person is citizen of Country" reach the same Country.',
+          + '"Person is citizen of Country" project the same [Person, Country].',
       );
     });
 
     it("verbalizes join_subset and join_exclusion recognizably", () => {
       const { model, ft } = buildPersonCountry();
-      const paths = [
-        { root: "ot-person", steps: [{ entry: "pb-person", exit: "pb-country" }] },
-        { root: "ot-person", steps: [{ entry: "pc-person", exit: "pc-country" }] },
-      ];
       const sub = verbalizer.verbalize(
-        { type: "join_subset", subset: paths[0]!, superset: paths[1]! },
+        { type: "join_subset", subset: bornIn, superset: citizenOf },
         ft,
         model,
       );
       expect(sub.text).toContain("For each Person");
-      expect(sub.text).toContain("is also reached via");
+      expect(sub.text).toContain("[Person, Country]");
+      expect(sub.text).toContain("is among those from");
 
-      const exc = verbalizer.verbalize({ type: "join_exclusion", paths }, ft, model);
-      expect(exc.text).toContain("reach no common Country");
+      const exc = verbalizer.verbalize(
+        { type: "join_exclusion", operands: [bornIn, citizenOf] },
+        ft,
+        model,
+      );
+      expect(exc.text).toContain("share no [Person, Country]");
     });
   });
 });

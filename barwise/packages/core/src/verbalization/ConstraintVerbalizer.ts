@@ -166,9 +166,9 @@ export class ConstraintVerbalizer {
       case "join_subset":
         return verbalizeJoinSubset(constraint.subset, constraint.superset, factType, model);
       case "join_equality":
-        return verbalizeJoinEquality(constraint.paths, factType, model);
+        return verbalizeJoinEquality(constraint.operands, factType, model);
       case "join_exclusion":
-        return verbalizeJoinExclusion(constraint.paths, factType, model);
+        return verbalizeJoinExclusion(constraint.operands, factType, model);
     }
   }
 }
