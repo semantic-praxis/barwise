@@ -458,8 +458,7 @@ export function verbalizeObjectCardinality(
 // Join constraints (role-path operands)
 // ---------------------------------------------------------------------------
 
-const objName = (model: OrmModel, otId: string): string =>
-  model.getObjectType(otId)?.name ?? otId;
+const objName = (model: OrmModel, otId: string): string => model.getObjectType(otId)?.name ?? otId;
 
 /** The fact type owning a role id, scanning the whole model. */
 function factTypeOfRole(model: OrmModel, roleId: string): FactType | undefined {
