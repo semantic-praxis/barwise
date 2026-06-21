@@ -5,6 +5,8 @@
  * files the editor currently exposes and this picks which one to act on.
  */
 
+import type { SourceInput } from "@barwise/mcp";
+
 export interface OpenModelContext {
   /** Paths of `.orm.yaml` files attached to the chat as references. */
   readonly referencedOrmFiles?: readonly string[];
@@ -30,4 +32,21 @@ export function resolveOpenModel(ctx: OpenModelContext): string | undefined {
     ?? ctx.activeOrmFile
     ?? ctx.diagramModelPath
     ?? ctx.visibleOrmFiles?.[0];
+}
+
+/**
+ * Turn a resolved model path into the `source` a tool should act on. When
+ * the path is open as a text document, return `{ path, content }` so the
+ * tool sees the live editor buffer (unsaved edits included) rather than the
+ * stale copy on disk; otherwise return just `{ path }`. `liveContent` looks
+ * up the open document's text for a path, or returns undefined when it is
+ * not open as text (e.g. a diagram-only model or an unopened reference).
+ */
+export function openModelSource(
+  path: string | undefined,
+  liveContent: (path: string) => string | undefined,
+): SourceInput | undefined {
+  if (path === undefined) return undefined;
+  const content = liveContent(path);
+  return content !== undefined ? { path, content } : { path };
 }

@@ -4,7 +4,7 @@
  * the editor/diagram context the glue gathers.
  */
 import { describe, expect, it } from "vitest";
-import { resolveOpenModel } from "../../src/mcp/resolveModelSource.js";
+import { openModelSource, resolveOpenModel } from "../../src/mcp/resolveModelSource.js";
 
 describe("resolveOpenModel", () => {
   it("prefers a chat-referenced model above everything else", () => {
@@ -52,5 +52,25 @@ describe("resolveOpenModel", () => {
   it("returns undefined when no model is open", () => {
     expect(resolveOpenModel({})).toBeUndefined();
     expect(resolveOpenModel({ visibleOrmFiles: [] })).toBeUndefined();
+  });
+});
+
+describe("openModelSource", () => {
+  it("returns the live buffer as { path, content } when the model is open as text", () => {
+    const result = openModelSource(
+      "/a.orm.yaml",
+      (p) => (p === "/a.orm.yaml" ? "name: live edits" : undefined),
+    );
+    // The unsaved editor buffer is what the tool acts on, not the disk copy.
+    expect(result).toEqual({ path: "/a.orm.yaml", content: "name: live edits" });
+  });
+
+  it("returns just { path } when the model is not open as text (e.g. diagram-only)", () => {
+    const result = openModelSource("/d.orm.yaml", () => undefined);
+    expect(result).toEqual({ path: "/d.orm.yaml" });
+  });
+
+  it("returns undefined when there is no resolved path", () => {
+    expect(openModelSource(undefined, () => "ignored")).toBeUndefined();
   });
 });

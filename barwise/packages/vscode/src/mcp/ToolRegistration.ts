@@ -35,10 +35,11 @@ import {
   executeValidate,
   executeVerbalize,
   resolveSource,
+  type SourceInput,
 } from "@barwise/mcp";
 import * as vscode from "vscode";
 import { CopilotLlmClient } from "../llm/CopilotLlmClient.js";
-import { getOpenModelPath } from "./openModel.js";
+import { getOpenModelSource } from "./openModel.js";
 
 const serializer = new OrmYamlSerializer();
 
@@ -134,13 +135,16 @@ function toToolResult(
 }
 
 /**
- * Resolve a source parameter: use the provided value if non-empty,
- * otherwise fall back to the open model (editor or diagram). Throws if
- * neither is available.
+ * Resolve a source parameter: use the model-supplied value if non-empty,
+ * otherwise fall back to the open model. The fallback returns
+ * `{ path, content }` for an open editor (the live buffer, unsaved edits
+ * included) or `{ path }` for a diagram-only model, so a tool acts on what
+ * the user sees rather than on whatever the model retyped. Throws if neither
+ * is available.
  */
-function resolveSourceParam(source: string | undefined): string {
+function resolveSourceParam(source: string | undefined): SourceInput {
   if (source && source.trim().length > 0) return source;
-  const open = getOpenModelPath();
+  const open = getOpenModelSource();
   if (open) return open;
   throw new Error(
     "No source provided, and no .orm.yaml file is open or shown in a "
