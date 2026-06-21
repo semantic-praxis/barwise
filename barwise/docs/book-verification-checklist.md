@@ -9,13 +9,18 @@ docs/adr/0001-metamodel-evolution-policy.md, docs/NORMA_VS_ORM_YAML.md
 ## Why this exists
 
 ADR-0001 filter 4 says design the metamodel _against the book_ (Halpin &
-Morgan, _Information Modeling and Relational Databases_, 2nd ed., and
-Halpin's ORM 2 papers), not against NORMA's tooling. Across Tiers 1-3 we
-mostly held that line, but several constructs were grounded with NORMA
-artifacts in hand (the `ORM2Core.xsd`, the sample `.orm` corpus) and a few
-verbalizations are deterministic approximations rather than true FORML2.
-This is the standing list of claims to check against the canonical sources,
-so a NORMA habit does not quietly become a barwise decision.
+Morgan, _Information Modeling and Relational Databases_, 3rd ed., 2024 --
+ISBN 9780443237904 -- and Halpin's ORM 2 papers), not against NORMA's
+tooling. Across Tiers 1-3 we mostly held that line, but several constructs
+were grounded with NORMA artifacts in hand (the `ORM2Core.xsd`, the sample
+`.orm` corpus) and a few verbalizations are deterministic approximations
+rather than true FORML2. This is the standing list of claims to check
+against the canonical sources, so a NORMA habit does not quietly become a
+barwise decision.
+
+Verify against the 3rd ed. (2024), the current edition; earlier editions
+predate its updated ORM/FORML coverage and its new treatment of JSON/YAML
+and markup serialization (see CC5).
 
 Each item names the claim to verify, the canonical source to check it
 against, the NORMA-centrism risk, the current barwise choice, and a status.
@@ -27,8 +32,9 @@ single-endpoint model to projected tuples) is the template.
 
 Prefer the book and Halpin's own papers over NORMA docs or the tool source:
 
-- Halpin & Morgan, _Information Modeling and Relational Databases_, 2nd ed.
-  (the reference text; constraint chapters and the conceptual-join sections).
+- Halpin & Morgan, _Information Modeling and Relational Databases_, 3rd ed.
+  (2024; the reference text; constraint chapters and the conceptual-join
+  sections).
 - _ORM 2 Constraint Verbalization_, tech report ORM2-02
   (https://www.orm.net/pdf/ORM2_TechReport2.pdf) -- the FORML target forms.
 - _ORM 2 Graphical Notation_, tech report ORM2-01
@@ -81,6 +87,17 @@ are barwise tooling, not book constructs -- fine, but the one place a
 severity encodes a _conceptual_ claim is deontic = warning (CC/T1.6 below).
 Keep severity choices out of the "is this faithful to ORM" question except
 where a severity stands in for a modal/semantic distinction.
+
+### CC5. Read the 3rd ed.'s serialization coverage -- _priority: medium_
+
+The 3rd ed. (2024) newly covers JSON, YAML, and other markup serializations
+of ORM models. That is barwise's exact domain (the native `.orm.yaml`), so
+this is the rare case where a book edition could bear directly on a design
+choice rather than just a citation. Read that material and check whether the
+book sanctions a serialization framing barwise should align to -- the
+book-first answer to "is our format too NORMA-shaped?". Verify: the
+`.orm.yaml` schema shape and key vocabulary. Source: Halpin & Morgan, 3rd
+ed., the serialization / data-file-format material.
 
 ## Tier 1
 
