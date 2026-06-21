@@ -83,4 +83,29 @@ describe("verbalize_model tool", () => {
     const spill = text.match(/Full content written to: (.+)/)![1]!.trim();
     expect(existsSync(spill)).toBe(true);
   });
+
+  describe("project source", () => {
+    const project = `${fixtures}/project/project.orm-project.yaml`;
+
+    afterEach(() => {
+      rmSync(resolve(fixtures, "project", ".barwise"), { recursive: true, force: true });
+    });
+
+    it("verbalizes every domain under a header when no domain is given", () => {
+      const result = executeVerbalize(project);
+      const text = result.content[0]!.text;
+      expect(text).toContain("== crm ==");
+      expect(text).toContain("== billing ==");
+      expect(text).toContain("Customer");
+      expect(text).toContain("Account");
+    });
+
+    it("verbalizes only the chosen domain", () => {
+      const result = executeVerbalize(project, undefined, "full", false, "crm");
+      const text = result.content[0]!.text;
+      expect(text).toContain("Customer");
+      expect(text).not.toContain("Account");
+      expect(text).not.toContain("== crm ==");
+    });
+  });
 });

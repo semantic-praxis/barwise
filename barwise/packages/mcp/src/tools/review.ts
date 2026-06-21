@@ -7,7 +7,7 @@ import type { ProviderName } from "@barwise/llm";
 import { createLlmClient } from "@barwise/llm";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { resolveSource } from "../helpers/resolve.js";
+import { resolveModels } from "../helpers/resolve.js";
 
 export function registerReviewTool(server: McpServer): void {
   server.registerTool(
@@ -18,11 +18,17 @@ export function registerReviewTool(server: McpServer): void {
         + "Provides suggestions about naming, completeness, normalization, "
         + "constraints, and definitions. Distinct from validation (which checks "
         + "structural rules) -- review gives subjective modeling advice. "
-        + "Requires an LLM provider configured via environment variables.",
+        + "Requires an LLM provider configured via environment variables. Given "
+        + "a .orm-project.yaml manifest, reviews every domain (or one chosen "
+        + "with `domain`).",
       inputSchema: {
         source: z
           .string()
-          .describe("File path to .orm.yaml or inline YAML content"),
+          .describe("File path to .orm.yaml, .orm-project.yaml, or inline YAML content"),
+        domain: z
+          .string()
+          .optional()
+          .describe("For a project source, review only this one domain context"),
         focus: z
           .string()
           .optional()
@@ -37,12 +43,13 @@ export function registerReviewTool(server: McpServer): void {
           .describe("LLM model override (e.g. 'gpt-4o', 'claude-sonnet-4-5-20250929')"),
       },
     },
-    async ({ source, focus, provider, model }) => {
+    async ({ source, domain, focus, provider, model }) => {
       return executeReview(
         source,
         focus,
         provider as ProviderName | undefined,
         model,
+        domain,
       );
     },
   );
@@ -53,17 +60,29 @@ export async function executeReview(
   focus?: string,
   provider?: ProviderName,
   model?: string,
+  domain?: string,
 ): Promise<{ content: Array<{ type: "text"; text: string; }>; }> {
-  const ormModel = resolveSource(source);
+  const { resolved, problems } = resolveModels(source, domain);
 
-  const client = createLlmClient({
-    provider,
-    model,
-  });
+  const client = createLlmClient({ provider, model });
 
-  const result = await reviewModel(ormModel, client, { focus });
+  const multi = resolved.length > 1;
+  const sections: string[] = [];
+  for (const p of problems) sections.push(`Warning: ${p}`);
 
-  // Format the output
+  for (const { context, model: ormModel } of resolved) {
+    const result = await reviewModel(ormModel, client, { focus });
+    const body = formatReview(result);
+    sections.push(multi && context ? `== ${context} ==\n\n${body}` : body);
+  }
+
+  return {
+    content: [{ type: "text" as const, text: sections.join("\n\n") }],
+  };
+}
+
+/** Render one model's review result as Markdown. */
+function formatReview(result: Awaited<ReturnType<typeof reviewModel>>): string {
   const lines: string[] = [];
   lines.push("# Model Review");
   lines.push("");
@@ -96,7 +115,5 @@ export async function executeReview(
     }
   }
 
-  return {
-    content: [{ type: "text" as const, text: lines.join("\n") }],
-  };
+  return lines.join("\n");
 }

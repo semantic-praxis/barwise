@@ -48,4 +48,31 @@ describe("validate_model tool", () => {
     expect(result.content[0]!.type).toBe("text");
     expect(typeof result.content[0]!.text).toBe("string");
   });
+
+  describe("project source", () => {
+    const project = `${fixtures}/project/project.orm-project.yaml`;
+
+    it("validates every domain when no domain is given", () => {
+      const result = executeValidate(project);
+      const parsed = JSON.parse(result.content[0]!.text);
+      expect(parsed.domains).toHaveLength(2);
+      expect(parsed.domains.map((d: { domain: string; }) => d.domain)).toEqual([
+        "crm",
+        "billing",
+      ]);
+      expect(parsed.valid).toBe(true);
+    });
+
+    it("validates a single domain when domain is given", () => {
+      const result = executeValidate(project, "crm");
+      const parsed = JSON.parse(result.content[0]!.text);
+      expect(parsed.domain).toBe("crm");
+      expect(parsed.valid).toBe(true);
+      expect(parsed.domains).toBeUndefined();
+    });
+
+    it("throws for an unknown domain, listing the available ones", () => {
+      expect(() => executeValidate(project, "ghost")).toThrow(/crm, billing/);
+    });
+  });
 });

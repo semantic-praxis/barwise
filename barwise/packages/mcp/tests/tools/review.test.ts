@@ -165,4 +165,36 @@ describe("review_model tool", () => {
     expect(result.content[0]!.type).toBe("text");
     expect(typeof result.content[0]!.text).toBe("string");
   });
+
+  describe("project source", () => {
+    const project = `${fixtures}/project/project.orm-project.yaml`;
+
+    it("reviews every domain under a header when no domain is given", async () => {
+      const { reviewModel } = await import("@barwise/llm");
+      vi.mocked(reviewModel).mockResolvedValue({
+        suggestions: [],
+        summary: "Looks good.",
+      });
+
+      const result = await executeReview(project);
+
+      expect(reviewModel).toHaveBeenCalledTimes(2);
+      const text = result.content[0]!.text;
+      expect(text).toContain("== crm ==");
+      expect(text).toContain("== billing ==");
+    });
+
+    it("reviews only the chosen domain without a header", async () => {
+      const { reviewModel } = await import("@barwise/llm");
+      vi.mocked(reviewModel).mockResolvedValue({
+        suggestions: [],
+        summary: "Looks good.",
+      });
+
+      const result = await executeReview(project, undefined, undefined, undefined, "crm");
+
+      expect(reviewModel).toHaveBeenCalledTimes(1);
+      expect(result.content[0]!.text).not.toContain("== crm ==");
+    });
+  });
 });
