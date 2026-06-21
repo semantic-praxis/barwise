@@ -12,8 +12,7 @@
 import { z } from "zod";
 
 /** Appended to every `source` description so the object form is discoverable. */
-const OBJECT_FORM_NOTE =
-  " May also be an object: { path } reads from disk, { content } is inline "
+const OBJECT_FORM_NOTE = " May also be an object: { path } reads from disk, { content } is inline "
   + "YAML, { path, content } parses content located at path (e.g. an unsaved "
   + "editor buffer).";
 
