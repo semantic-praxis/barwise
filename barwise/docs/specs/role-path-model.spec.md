@@ -1,13 +1,17 @@
 # Role-path / join-rule model
 
-Status: Approved 2026-06-20 (sign-off to proceed); WS1 (the
-`model/roleGraph.ts` traversal seam) landed 2026-06-18 (barwise-sf1).
-Metamodel-thread implementation underway, decomposed so each PR keeps the
-suite green: (PR 1) representation + serde + schema + verbalization + diff +
-structural well-formedness validation; (PR 2) population-satisfaction
-evaluation; (PR 3/4) NORMA import, then export + RT-A + merge id-remap.
+Status: REVISED 2026-06-21 pending sign-off -- a cited research pass against
+the canonical sources (see "Canonical grounding") moved the operand from a
+single projected endpoint to a projected role _sequence_ (tuple), correcting
+the merged first cut (PR 1 #227, PR 2 #228). WS1 (the `model/roleGraph.ts`
+traversal seam) landed 2026-06-18 (barwise-sf1); the representation +
+evaluation landed under the old (endpoint) model and are revised by this
+spec. Implementation holds for sign-off on the revised cut line. Plan: (PR 3)
+projected-tuple model + serde + schema + validation/verbalization/evaluation;
+(PR 4) NORMA import; (PR 5) NORMA export + RT-A against the real Tests.Test1
+subset-join fixture + merge id-remap.
 Created: 2026-06-18
-Last-updated: 2026-06-20
+Last-updated: 2026-06-21
 Tracking: barwise-0s8 (this design), barwise-5t9.10 (role-path substrate),
 barwise-5t9.6 (join set-comparison/ring),
 docs/adr/0001-metamodel-evolution-policy.md (tier 3),
@@ -119,86 +123,154 @@ paths, sub-paths, and multiple join variables; negation, optional roles,
 outer joins; value-comparison along a path (5t9.9); `join_ring` (same shape,
 follow-on).
 
+## Canonical grounding (2026-06-21): projected tuples, not endpoints
+
+A cited research pass against the canonical sources (Halpin & Morgan,
+_Information Modeling and Relational Databases_ 2nd ed. Ch. 6/10; Halpin,
+_ORM 2 Graphical Notation_ TR ORM2-01; Bloesch & Halpin, _Constraints on
+Conceptual Join Paths_; Halpin, _Logical Data Modeling_ Pt 7-8, Business
+Rules Journal; Curland, Halpin & Stirewalt, _A Role Calculus for ORM_)
+settles the representation and corrects the first cut of this spec:
+
+- _Set-comparison constraints are defined over role sequences of one or more
+  roles._ A join operand is "a role sequence projected from a join path";
+  the comparison is between the projected _tuples_ (the canonical examples
+  are pairs: (student, course) from a ternary grade predicate; (advisor,
+  language) from a three-fact-type join). Single-column is the arity-1
+  special case, and the two-role case has its own name ("pair-subset
+  constraint"). So _multi-column projection is the canonical general form_,
+  not NORMA tooling -- adopt it.
+- _The compared columns are the first and last roles projected from the
+  path_, and projection is a distinct step from laying down the path. This
+  spec's `projection` field is exactly that step.
+- _NORMA's encoding is tool substrate, not the concept._ The
+  `RootObjectType` + purpose-tagged `PathedRole`s (`PostInnerJoin` /
+  `SameFactType`) + `JoinPathProjection`-with-pluggable-sources apparatus is
+  NORMA's general `RolePathOwner` machinery, shared across fact-type
+  derivation, subtype derivation, and queries, and generalized beyond a join
+  constraint's needs (projecting _calculated_ values, sub-paths, object
+  unifiers). barwise captures the _concept_ -- path + projected role sequence
+  + comparison kind -- without replicating that object graph; the purpose
+  tags are decoded on import to reconstruct the path, never stored.
+
+**Correction to the merged first cut (PR 1 #227, PR 2 #228).** Those PRs
+modeled a join operand as a single endpoint per root and compared
+endpoint sets correlated by a shared root. Per the sources, the operand is a
+_projected tuple_ and the comparison is between two independently projected
+tuple _sets_ -- the root is each path's internal correlation variable, not a
+correlation shared across operands. This revision replaces `subset` /
+`superset` / `paths: RolePath[]` with `JoinOperand` (path + projection) and
+re-specs validation/verbalization/evaluation to compare tuple sets. Join
+constraints are brand-new (no `.orm.yaml` in the wild uses them), so the
+revision carries no migration cost.
+
 ## The representation
 
-A `RolePath` is a plain serializable value: a root object type (the join
-variable) and an ordered list of hops, each traversing one fact type from
-an entry role to an exit role.
+A `RolePath` is a plain serializable value: a root object type and an
+ordered list of hops, each traversing one fact type from an entry role to an
+exit role. A join constraint _operand_ is a `RolePath` plus a `projection`
+-- the ordered path nodes whose players form the compared tuple (Halpin's
+"role sequence projected from a join path"). Node `0` is the root; node `k`
+is the player reached after step `k`.
 
 ```
 RolePath = {
-  root: ObjectTypeId          // the correlation / join variable's type
+  root: ObjectTypeId          // the path's correlation variable's type
   steps: { entry: RoleId; exit: RoleId }[]   // entry+exit are roles of one
                                              // fact type; fact type is
                                              // derivable from the role id
 }
-// endpoint type = player(last step.exit); empty steps => endpoint = root
+JoinOperand = {
+  path: RolePath
+  projection: number[]        // path-node indices (0 = root, k = after step k)
+                              // the compared tuple = players at these nodes
+}
+// arity = projection.length; the common (root, endpoint) case is [0, n]
 ```
 
-The new constraint variants (discriminated union members, with
-`isJoinSubset` / `isJoinEquality` / `isJoinExclusion` type guards):
+The constraint variants (discriminated union members, with `isJoinSubset` /
+`isJoinEquality` / `isJoinExclusion` type guards) compare the projected
+tuple _sets_:
 
 ```
-JoinSubsetConstraint    { type: "join_subset";    id?; subset: RolePath; superset: RolePath }
-JoinEqualityConstraint  { type: "join_equality";  id?; paths: RolePath[] }   // 2+, unordered
-JoinExclusionConstraint { type: "join_exclusion"; id?; paths: RolePath[] }   // 2+, unordered
+JoinSubsetConstraint    { type: "join_subset";    id?; subset: JoinOperand; superset: JoinOperand }
+JoinEqualityConstraint  { type: "join_equality";  id?; operands: JoinOperand[] }  // 2+, unordered
+JoinExclusionConstraint { type: "join_exclusion"; id?; operands: JoinOperand[] }  // 2+, unordered
 ```
 
-`personCountryDemo` ("Each Person was born in the same Country of which that
-Person is a citizen") serializes as:
+The real `Tests.Test1` subset-join projects a _pair_ -- `[0, 2]` (the root
+and the endpoint after two hops) -- and compares it to a flat two-role
+sequence. `personCountryDemo` ("Each Person was born in the same Country of
+which that Person is a citizen") is a join_equality whose two operands each
+project `[0, 1]` (Person, Country):
 
 ```yaml
 constraints:
   - type: join_equality
-    paths:
-      - root: ot-person
-        steps:
-          - { entry: r-person-bornIn,    exit: r-country-bornIn }
-      - root: ot-person
-        steps:
-          - { entry: r-person-citizenOf, exit: r-country-citizenOf }
+    operands:
+      - path:
+          root: ot-person
+          steps:
+            - { entry: r-person-bornIn,    exit: r-country-bornIn }
+        projection: [0, 1]      # (Person, born-in Country)
+      - path:
+          root: ot-person
+          steps:
+            - { entry: r-person-citizenOf, exit: r-country-citizenOf }
+        projection: [0, 1]      # (Person, citizen-of Country)
 ```
 
-Hops store role ids -- consistent with every existing constraint, stable
-for round-trip, and the same opacity the flat `subset`/`equality` already
-accept. Legibility is delivered where it already is for those constraints:
-by _verbalization_, which walks the path composing each hop's fact-type
-reading into "... the same Country of which that Person is a citizen." A
-path that cannot verbalize is not done (ADR-0001); the verbaliser is a new
-function in the now-decomposed `verbalization/constraints/phase2.ts`, a
-module addition, not a god-switch edit.
+Hops and projections store role ids / node indices -- stable for round-trip,
+the same opacity the flat `subset`/`equality` already accept. Legibility is
+delivered by _verbalization_, which walks each path composing its fact-type
+readings and names the projected columns ("... the same Country of which
+that Person is a citizen"). A path that cannot verbalize is not done
+(ADR-0001); the verbaliser is a module addition to
+`verbalization/constraints/phase2.ts`, not a god-switch edit.
+
+A flat operand (a role sequence within one fact type, no join) is exactly
+what barwise's existing `subset` / `equality` / `exclusion` constraints
+already carry; the join variants generalize them by allowing a
+path-projected operand. A constraint with _no_ join in either operand stays
+a flat constraint -- you reach for a join variant only when an operand needs
+a path to assemble its tuple.
 
 ## The subset cut line (barwise-5t9.6 minimal grammar)
 
 In -- the smallest grammar that covers the join set-comparison case and the
-`personCountryDemo` fixture:
+real `Tests.Test1` NORMA subset-join fixture:
 
 - _Linear_ paths only: a path is a sequence of single-fact-type hops, no
   branching or sub-paths.
-- A _single_ join variable: the shared `root` correlates the operand paths.
-  All operands of a constraint share the same root object type.
-- _Endpoint_ comparison: the constraint compares the projected endpoint
-  (player of the last hop) of each operand path; all operands must share the
-  same endpoint object type.
+- A _single_ join variable per path: each operand's `root` is the path's own
+  correlation variable. (Operands are _not_ required to share one root --
+  see "Canonical grounding".)
+- _Projected role-sequence (tuple) comparison_: each operand projects an
+  ordered tuple of path nodes (the `projection`); the constraint compares
+  the resulting tuple _sets_ (subset / equality / exclusion). The two
+  operands must have equal projection arity, type-compatible position by
+  position. Single-column (project just the endpoint) is the arity-1 case.
 - _Contiguity_: step `k`'s exit player equals step `k+1`'s entry player; n-
   ary fact types are fine because entry and exit roles are explicit.
 
-Out -- deferred so we do not build the full ORM 2 path engine prematurely:
-branching/tree paths and `RoleSubPathType`; multiple/independent join
-variables (`ObjectUnifierType` unifying non-root nodes); multi-column
-endpoint projection; negation, optional, outer joins. The
-`{ root, steps }` shape extends to these later (more steps, a richer hop, a
-list of join variables) without invalidating files written against the
-minimal grammar.
+Out -- deferred so we do not build NORMA's full role-path _substrate_
+(`RolePathOwner`) prematurely: branching/tree paths and sub-paths (Halpin's
+"primary path + subpaths", tail-split); multiple/independent join variables
+(object unifiers binding non-root nodes); projection of _calculated_ values
+(NORMA's derivation/query generalization); negation, optional, outer joins;
+value-comparison along a path (5t9.9); `join_ring` (same shape, follow-on).
+The `{ root, steps, projection }` shape extends to these later without
+invalidating files written against the minimal grammar.
 
 ## Identity and equality (diff / merge / RT-A)
 
-A join constraint is compared _structurally_, normalized: by `type`, `root`
-type, and the ordered `(entry, exit)` role-id sequence of each operand path
--- with operands ordered for `join_subset` (subset vs superset) and compared
-as an unordered set for `join_equality` / `join_exclusion`. Because hops are
-role ids and the NORMA exporter already preserves ids (deterministic
-passthrough), the path round-trips to an equal role-id sequence, so RT-A
+A join constraint is compared _structurally_, normalized: by `type` and, per
+operand, its `root` type, the ordered `(entry, exit)` role-id sequence of the
+path, and the `projection` node-index list -- with operands ordered for
+`join_subset` (subset vs superset) and compared as an unordered set for
+`join_equality` / `join_exclusion`. Because hops are role ids and projections
+are node indices, and the NORMA exporter preserves ids (deterministic
+passthrough), each operand round-trips to an equal structure, so RT-A
 (`model == mapper(parser(serializer(writer(model)))))`) holds.
 
 Two existing gaps must close for this to be real, both already known:
@@ -306,12 +378,13 @@ mandatory. Nothing here evaluates a path -- it only persists it.
 ### 3. Validation (roleGraph consumer)
 
 A validation rule (in `validation/rules/`) that, given a join constraint:
-checks well-formedness (all operand paths share `root` type and endpoint
-type; each step is a real `RoleHop`; steps are contiguous), then evaluates
-satisfaction over the population (subset/equality/exclusion of the
-projected endpoints, correlated by `root`). Pure -- `check-core-purity`
-guards it. Cases: well-formed satisfied, well-formed violated, malformed
-(bad role ref / broken contiguity).
+checks well-formedness (each step is a real `RoleHop`; steps are contiguous;
+each operand's `projection` indices are in range; the two operands have equal
+projection arity and type-compatible projected positions), then evaluates
+satisfaction over the population -- subset / equality / exclusion of the two
+projected tuple _sets_. Pure -- `check-core-purity` guards it. Cases:
+well-formed satisfied, well-formed violated, malformed (bad role ref / broken
+contiguity / projection arity or type mismatch).
 
 ### 4. Verbalization
 
@@ -347,9 +420,12 @@ end-to-end.
 
 ## API and migration impact
 
-- New public model types from `@barwise/core`: `RolePath` and the three
-  join constraint interfaces + their type guards, added to the `Constraint`
-  union. Additive -- no existing export changes signature.
+- New/revised public model types from `@barwise/core`: `RolePath`,
+  `JoinOperand` (path + projection), and the three join constraint interfaces
+  + their type guards in the `Constraint` union. The merged first cut's
+  operand fields (`subset`/`superset`/`paths` as bare `RolePath`) become
+  `JoinOperand` -- a breaking change to those just-added types, contained in
+  the monorepo, with no `.orm.yaml` in the wild to migrate.
 - No `orm_version` bump (see "Version policy"): the new variants + `RolePath`
   are added to `schemas/orm-model.schema.json` as additive `oneOf` branches
   / `$defs`, kept in sync with the serializer (`schemas/**` is
