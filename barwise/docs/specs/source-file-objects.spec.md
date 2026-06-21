@@ -1,4 +1,4 @@
-# MCP `source` accepts a file object, not just a string
+# `source` accepts a file object across interfaces, not just a string
 
 Status: Draft for review (design only -- no implementation in this PR)
 Created: 2026-06-21
@@ -8,22 +8,34 @@ rename) and barwise-r4f (project wiring)
 
 ## Principle
 
-This is an _explicit over implicit_ fix. Every MCP tool takes `source`
-as a bare string and guesses what it is: `isFilePath` treats a newline as
-"inline YAML," a `.yaml` suffix as "a path," an existing-on-disk string as
-"a path," and everything else as inline content. The guess is wrong at
-the edges -- a path that does not yet exist and lacks a `.yaml` suffix is
-parsed as YAML and fails with a deserialization error, not a "file not
-found"; a one-line inline model with no newline and no suffix is ambiguous.
-A caller that _knows_ whether it holds a path or content has no way to say
-so.
+This is an _explicit over implicit_ fix. The shared resolver behind every
+MCP tool (and, through them, the VS Code Language Model Tools) takes
+`source` as a bare string and guesses what it is: `isFilePath` treats a
+newline as "inline YAML," a `.yaml` suffix as "a path," an
+existing-on-disk string as "a path," and everything else as inline
+content. The guess is wrong at the edges -- a path that does not yet exist
+and lacks a `.yaml` suffix is parsed as YAML and fails with a
+deserialization error, not a "file not found"; a one-line inline model
+with no newline and no suffix is ambiguous. A caller that _knows_ whether
+it holds a path or content has no way to say so.
+
+The cost is sharpest in VS Code. There the tool `source` is filled by the
+language model, and Copilot routinely pastes the open file's YAML inline
+as that string -- so barwise validates the model's transcription of the
+file (stale, reflowed, or truncated), not the file. When `source` is left
+empty the extension falls back to the open file's _path_ and reads it from
+disk, so unsaved editor edits are invisible. Both failure modes are the
+same gap: the caller cannot say "here is the path, and here is the live
+content."
 
 Letting `source` also be a structured file object -- `{ path }`,
-`{ content }`, or `{ path, content }` -- lets the caller state intent
+`{ content }`, or `{ path, content }` -- lets each interface state intent
 instead of relying on a heuristic. The string form stays, so nothing
-breaks; the object form is the explicit path. This also serves
-composability: the one shared resolver (`resolveSource` / `resolveModels`)
-gains the object handling once and all eleven tools inherit it.
+breaks; the object form is the explicit path. This serves composability:
+the one shared resolver gains the object handling once, the eleven tools
+inherit it, and the VS Code wrapper becomes a deterministic consumer of
+the combined `{ path, content }` shape rather than a pass-through for
+whatever the model typed.
 
 ## Should we keep the string form? (resolved: yes)
 
@@ -47,27 +59,29 @@ In scope:
 - Threading the resolved originating path (when known) to
   `boundedTextResult` so spill/lineage files still land next to the
   source file, not the cwd, when a `{ path }` object is used.
+- VS Code resolving the open model to `{ path, content }` -- the document
+  path plus its live buffer -- so tools act on exactly what the user sees,
+  unsaved edits included, with no reliance on the model typing `source`.
+  Includes the `package.json` LM-tool schema update to advertise the
+  object form.
 
 Out of scope (track as follow-ups):
 
-- VS Code passing `{ path, content }` for an unsaved editor buffer (parse
-  the live content, locate spill/lineage by the document path). Real value
-  -- it is the motivating case for the combined object -- but it is VS Code
-  wiring plus `package.json` LM-tool schema edits; its own issue.
 - An in-memory project manifest (`{ content }` that is a manifest): a
   manifest references domain files by path, so assembling it from content
   alone is a separate, larger change. v1 requires a path for projects.
 
 ## Inventory
 
-| Module                           | Current state                         | Verdict                                       |
-| -------------------------------- | ------------------------------------- | --------------------------------------------- |
-| `mcp/src/helpers/resolve.ts`     | `source: string` + `isFilePath` guess | Accept `SourceInput`; normalize once          |
-| `mcp/src/helpers/response.ts`    | `spillDir(source?: string)`           | Take the resolved path string (unchanged sig) |
-| `mcp/src/tools/*.ts` (11 tools)  | `source: z.string()`                  | Use shared `sourceInputSchema`; pass through  |
-| `mcp/src/tools/index` exports    | `execute*(source: string, ...)`       | Widen to `SourceInput` (string still assigns) |
-| `vscode/.../ToolRegistration.ts` | passes `source?: string`              | No change (string is in the union)            |
-| `vscode/package.json` LM tools   | `"source": {"type": "string"}`        | No change now; object form is a follow-up     |
+| Module                           | Current state                         | Verdict                                          |
+| -------------------------------- | ------------------------------------- | ------------------------------------------------ |
+| `mcp/src/helpers/resolve.ts`     | `source: string` + `isFilePath` guess | Accept `SourceInput`; normalize once             |
+| `mcp/src/helpers/response.ts`    | `spillDir(source?: string)`           | Take the resolved path string (unchanged sig)    |
+| `mcp/src/tools/*.ts` (11 tools)  | `source: z.string()`                  | Use shared `sourceInputSchema`; pass through     |
+| `mcp/src/tools/index` exports    | `execute*(source: string, ...)`       | Widen to `SourceInput` (string still assigns)    |
+| `vscode/.../openModel.ts`        | resolves the open model to a path     | Also return the live buffer: `{ path, content }` |
+| `vscode/.../ToolRegistration.ts` | `resolveSourceParam` -> path string   | Return `SourceInput`; pass the object through    |
+| `vscode/package.json` LM tools   | `"source": {"type": "string"}`        | Advertise string-or-object for `source`          |
 
 The CLI is untouched: its `<source>` is a filesystem path argument, not a
 path-or-content string, so the file-object ambiguity does not arise there.
@@ -90,6 +104,11 @@ resolveModels(input,d): isProjectSource(path) -> loadProject(path) [content n/a 
 isProjectSource(input): normalized.path ends with ".orm-project.yaml"
 
 boundedTextResult(text, { source: normalized.path, ... })  // spill beside the file
+
+VS Code: resolveSourceParam(llmSource)
+  llm gave a path/content -> pass it through (object or string)
+  else open .orm.yaml editor -> { path: doc.fsPath, content: doc.getText() }
+  else open diagram only     -> { path: diagramModelPath }
 ```
 
 ## Workstreams (each independently shippable)
@@ -114,24 +133,39 @@ signature's `source` to `SourceInput`. Where a tool spills output
 each tool's test with one object-form case; the existing string cases are
 the back-compat guard.
 
+### 3. VS Code resolves the open model to `{ path, content }`
+
+Make `openModel.ts` return the active `.orm.yaml` editor's path _and_ its
+live text (a diagram-only context stays `{ path }`); change
+`resolveSourceParam` to yield a `SourceInput` and pass the object straight
+into the `execute*` calls. An explicit path/content the model supplied
+still wins. Advertise the object form in the `package.json` LM-tool
+`source` schemas. This is the workstream that closes the user-visible
+glitch: "validate the open file" parses the buffer on screen, not
+Copilot's retyping of it or a stale copy on disk. Builds on WS2 (the
+`execute*` signatures must accept `SourceInput` first).
+
 ## API and migration impact
 
 - `@barwise/mcp` exports a new `SourceInput` type; `execute*` signatures
   widen `source` from `string` to `SourceInput`. A `string` argument still
-  satisfies the union, so the VS Code Language Model Tools and every test
-  compile and run unchanged.
+  satisfies the union, so any caller that keeps passing strings compiles
+  and runs unchanged.
 - The MCP tool input schema for `source` becomes a `oneOf` (string or
   object). MCP clients that drive tools with an LLM see both forms; the
   `.describe` states when to use each. No client must change.
+- VS Code is the one interface whose _behavior_ changes: the open-file
+  case now parses the live buffer instead of the model's string or the
+  on-disk copy. This is the intended fix, guarded by a wrapper test.
 - No `core` change. No `.orm.yaml` / `.orm-project.yaml` format change.
 
 ## Open decisions (for review)
 
-- **Combined `{ path, content }` semantics.** Recommend: parse `content`,
-  use `path` only as the file's location (spill/lineage, project
-  detection). This is the unsaved-editor-buffer case. The alternative --
-  rejecting the combined form -- loses the one shape that motivates an
-  object over two scalars.
+- **Combined `{ path, content }` semantics.** Resolved by WS3 making VS
+  Code its first consumer: parse `content`, use `path` only as the file's
+  location (spill/lineage, project detection). The alternative -- rejecting
+  the combined form -- would leave the VS Code glitch unfixed, since the
+  open-buffer case needs exactly path-plus-content.
 - **Manifest as `{ content }`.** Recommend: v1 errors ("a project manifest
   requires a path"), since assembling a manifest from content alone means
   resolving its referenced files with no base directory. Tracked as a
@@ -153,3 +187,7 @@ the back-compat guard.
 - Spill-location regression: a `{ path }` object must spill beside the file
   exactly as the equivalent path string does -- assert the spill path in
   one tool test for both forms.
+- VS Code behavior change is the one intentional break in continuity: a
+  wrapper test asserts the open-editor case resolves to `{ path, content }`
+  with the live buffer text, and that an explicit model-supplied source
+  still takes precedence.
