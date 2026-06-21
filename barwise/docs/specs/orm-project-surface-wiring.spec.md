@@ -3,9 +3,9 @@
 Status: Draft for review (design only -- no implementation in this PR)
 Created: 2026-06-21
 Last-updated: 2026-06-21
-Tracking: barwise-r4f, barwise-knq (multi-file workflow), deferred:
- barwise-hwe / barwise-byy / barwise-sa4,
-barwise-e4k (splitting guide, blocked on this)
+Tracking: barwise-r4f, barwise-knq (multi-file workflow),
+barwise-e4k (splitting guide, blocked on this), deferred
+barwise-hwe / barwise-byy / barwise-sa4
 
 ## Principle / problem
 
