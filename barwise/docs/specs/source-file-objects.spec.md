@@ -1,9 +1,9 @@
 # `source` accepts a file object across interfaces, not just a string
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Implemented -- shipped in #238 (MCP, WS1+WS2) and #239 (VS Code, WS3)
 Created: 2026-06-21
-Last-updated: 2026-06-21
-Tracking: barwise-8sq (feature); relates to barwise-5d7 (workspace
+Last-updated: 2026-06-22
+Tracking: barwise-8sq (feature, closed); relates to barwise-5d7 (workspace
 rename) and barwise-r4f (project wiring)
 
 ## Principle
@@ -191,3 +191,30 @@ Copilot's retyping of it or a stale copy on disk. Builds on WS2 (the
   wrapper test asserts the open-editor case resolves to `{ path, content }`
   with the live buffer text, and that an explicit model-supplied source
   still takes precedence.
+
+## Implementation status (2026-06-22)
+
+Shipped and merged; barwise-8sq closed.
+
+- **WS1+WS2 (#238).** `SourceInput` + `normalizeSource` in
+  `mcp/src/helpers/resolve.ts`; a shared `sourceInputSchema` in
+  `mcp/src/helpers/sourceSchema.ts` across the model tools (`source`, plus
+  `base`/`incoming` on diff/merge); `sourcePath()` threaded into spill/dir
+  tools. A manifest given as inline content errors as designed. Resolver
+  unit tests cover every input shape.
+- **WS3 (#239).** `openModelSource` (pure) + `getOpenModelSource` (glue)
+  resolve the open model to `{ path, content }` (live buffer) or `{ path }`;
+  `resolveSourceParam` yields a `SourceInput`. The glitch is fixed.
+
+Deviations from the design above, by intent:
+
+- **`package.json` LM-tool schemas kept `source` as `string`** rather than
+  advertising a string-or-object `anyOf`. The extension now constructs
+  `{ path, content }` deterministically, so the model never needs to build
+  the object -- it passes a path or omits the argument. The descriptions
+  were sharpened to say omitting acts on the open editor's unsaved contents.
+- **`import_model` (DDL/directory) and `import_transcript` stay
+  string-only** -- they are not `.orm.yaml` model references, so the
+  file-object shape does not apply.
+- **Out of scope, still open:** an in-memory project manifest
+  (`{ content }` that is a manifest) remains a follow-up.
