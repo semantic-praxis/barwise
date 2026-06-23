@@ -17,6 +17,7 @@
     "depcruise": "depcruise packages --config .dependency-cruiser.cjs",
     "purity": "node scripts/check-core-purity.mjs",
     "filesize": "node scripts/check-file-size.mjs",
+    "check:beads": "bash scripts/check-beads.sh",
     "dup": "jscpd",
     "oxlint": "oxlint packages/*/src/",
     "publint": "publint packages/core && publint packages/diagram && publint packages/llm && publint packages/cli && publint packages/mcp",
