@@ -371,10 +371,10 @@ the three variants to the `Constraint` union in `model/Constraint.ts`,
 with `isJoinSubset` / `isJoinEquality` / `isJoinExclusion` guards. Add
 serializer read/write in `OrmYamlSerializer.ts`, and add the variants +
 `RolePath` `$defs` to `schemas/orm-model.schema.json` (the new `oneOf`
-branches). Per ADR-0001 these additive constructs share the Tier-1 minor
-`orm_version` bump (see "Version policy"): they ride 5t9.9's one-time
-`1.0 -> 1.1` rather than bumping on their own. A round-trip test per variant
-is mandatory. Nothing here evaluates a path -- it only persists it.
+branches). Per ADR-0001 these additive constructs live at the current
+`1.1` (see "Version policy") -- the Tier-1 bump already landed; they add no
+bump of their own. A round-trip test per variant is mandatory. Nothing here
+evaluates a path -- it only persists it.
 
 ### 3. Validation (roleGraph consumer)
 
@@ -441,27 +441,19 @@ end-to-end.
 
 ## Version policy
 
-Governed by ADR-0001's "Schema versioning" section (authoritative). The
-earlier "no-bump" rule once recorded here is **withdrawn**: ADR-0001
-resolved that _additive constructs do bump the minor `orm_version`_, once
-per unreleased minor cycle, shared across every additive construct that
-lands in it -- because the stamped version is the honest "written by a
-newer barwise" compatibility signal (see the ADR for the full reasoning).
+Governed by ADR-0001's "Schema versioning" section (authoritative): under
+it _additive constructs bump the shared minor `orm_version`_ once per
+unreleased minor cycle, because the stamped version is the honest "written
+by a newer barwise" compatibility signal. The earlier "no-bump" rule once
+recorded here is **withdrawn**.
 
-Consequence for this construct: the join variants + `RolePath` are additive
-and **share the Tier-1 `1.1` bump** -- they do not bump independently and do
-not stay at `1.0`. 5t9.9 (value-comparison) performs the one-time
-`1.0 -> 1.1`; every additive construct landing before `1.1` releases,
-including these, rides that single bump.
-
-Open reconciliation (metamodel thread, tracked on barwise-0s8): the first
-cut shipped under `1.0` (PRs 1-2, before any construct had bumped). That is
-consistent with the ADR's "the first additive PR after a release performs
-the bump" only if 5t9.9 lands the `1.0 -> 1.1` first; if a role-path PR is
-the first additive construct to land in this cycle, _it_ performs the bump
-instead. Either way the already-merged role-path constructs fold into `1.1`
--- whoever bumps first carries them. This is a sequencing detail for the
-metamodel thread to land, not a separate bump.
+That bump has already happened: `CURRENT_ORM_VERSION` is `1.1` on main,
+carrying the Tier-1 batch and the role-path first cut (the constructs landed
+at 1.1, with a forward migration registered). The join variants + `RolePath`
+are additive and **live at `1.1` with the rest -- they do not bump again**.
+The revised projected-tuple operand is a contained change to those
+just-added types (no released `.orm.yaml` in the wild), so it too stays
+within `1.1`.
 
 ## Alternatives considered
 
