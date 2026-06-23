@@ -4,6 +4,8 @@
 # Source it to get the `beads_check` function, or run it directly:
 #   . scripts/check-beads.sh && beads_check
 #   bash scripts/check-beads.sh [path-to-issues.jsonl]
+#   bash scripts/check-beads.sh --strict   # canonical-format mismatch -> ERROR
+#                                           # (BEADS_STRICT=1 also works; pre-commit uses it)
 #
 # Severity mirrors bd's own philosophy (cmd/bd/doctor/validation.go): integrity
 # problems are ERRORS (exit 1); enum / format / timestamp smells are WARNINGS
@@ -14,13 +16,22 @@
 # re-exports across branches. Requires python3.
 
 beads_check() {
-  local f="${1:-$(git rev-parse --show-toplevel 2>/dev/null)/.beads/issues.jsonl}"
+  local strict="${BEADS_STRICT:-0}" f=""
+  local a
+  for a in "$@"; do
+    case "$a" in
+      --strict) strict=1 ;;
+      *) f="$a" ;;
+    esac
+  done
+  f="${f:-$(git rev-parse --show-toplevel 2>/dev/null)/.beads/issues.jsonl}"
   [ -f "$f" ] || { echo "beads_check: no such file: $f" >&2; return 2; }
   command -v python3 >/dev/null 2>&1 || { echo "beads_check: python3 required" >&2; return 2; }
-  python3 - "$f" <<'PY'
-import json, re, sys
+  BEADS_STRICT="$strict" python3 - "$f" <<'PY'
+import json, os, re, sys
 
 PATH = sys.argv[1]
+STRICT = os.environ.get("BEADS_STRICT") == "1"  # canonical-format mismatch -> error
 REQUIRED = ["_type", "id", "title", "status", "priority", "issue_type", "owner",
             "created_at", "created_by", "updated_at",
             "dependency_count", "dependent_count", "comment_count"]
@@ -98,7 +109,7 @@ for n, raw in enumerate(open(PATH, encoding="utf-8"), 1):
         if isinstance(v, str) and not ISO_RE.match(v):
             W.append(f"L{n}: {k} {v!r} not ISO-8601")
     if line != go_compact(obj):
-        W.append(f"L{n}: not canonical compact form (id={obj.get('id')})")
+        (E if STRICT else W).append(f"L{n}: not canonical compact form (id={obj.get('id')})")
 
 for n, obj, _ in rows:
     src = obj.get("id")
