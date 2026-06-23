@@ -83,6 +83,15 @@ jobs:
       # Markdown, so docs-only PRs are still gated on prose formatting.
       - run: npm run fmt:check
 
+      # Validate the beads issue tracker on every PR (always runs, like
+      # fmt:check, and cheap). CI checks out the post-merge tree, so this is
+      # the bypass-proof half of the cross-branch guard (REPO_REVIEW F6) that
+      # `git commit --no-verify` cannot skip: integrity errors (invalid JSON,
+      # duplicate id, dangling dep, merge-conflict markers) and -- under
+      # --strict -- a non-canonical line fail the merge.
+      - name: Validate beads tracker
+        run: npm run check:beads -- --strict
+
       # Fast, source-only static gates next (none need the build), so a lint
       # or architecture violation fails in seconds rather than after the
       # build and test suite.
