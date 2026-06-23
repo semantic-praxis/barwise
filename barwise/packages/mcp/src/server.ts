@@ -41,7 +41,6 @@ export {
 } from "./prompts/guidance/guidance.js";
 
 // Re-export execute functions for direct invocation (no MCP transport).
-export { resolveSource, type SourceInput, sourcePath } from "./workspace/resolve.js";
 export { executeDescribeDomain } from "./tools/describeDomain.js";
 export { executeDiagram } from "./tools/diagram.js";
 export { executeDiff } from "./tools/diff.js";
@@ -56,3 +55,4 @@ export { executeReview } from "./tools/review.js";
 export { executeSchema } from "./tools/schema.js";
 export { executeValidate } from "./tools/validate.js";
 export { executeVerbalize } from "./tools/verbalize.js";
+export { resolveSource, type SourceInput, sourcePath } from "./workspace/resolve.js";
