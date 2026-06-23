@@ -11,7 +11,7 @@ projected-tuple model + serde + schema + validation/verbalization/evaluation;
 (PR 4) NORMA import; (PR 5) NORMA export + RT-A against the real Tests.Test1
 subset-join fixture + merge id-remap.
 Created: 2026-06-18
-Last-updated: 2026-06-21
+Last-updated: 2026-06-23
 Tracking: barwise-0s8 (this design), barwise-5t9.10 (role-path substrate),
 barwise-5t9.6 (join set-comparison/ring),
 docs/adr/0001-metamodel-evolution-policy.md (tier 3),
@@ -371,10 +371,10 @@ the three variants to the `Constraint` union in `model/Constraint.ts`,
 with `isJoinSubset` / `isJoinEquality` / `isJoinExclusion` guards. Add
 serializer read/write in `OrmYamlSerializer.ts`, and add the variants +
 `RolePath` `$defs` to `schemas/orm-model.schema.json` (the new `oneOf`
-branches). No `orm_version` bump -- the additions are additive and follow
-the project's version policy (see "Version policy" below), exactly as
-value ranges (5t9.1) landed at `1.0`. A round-trip test per variant is
-mandatory. Nothing here evaluates a path -- it only persists it.
+branches). Per ADR-0001 these additive constructs share the Tier-1 minor
+`orm_version` bump (see "Version policy"): they ride 5t9.9's one-time
+`1.0 -> 1.1` rather than bumping on their own. A round-trip test per variant
+is mandatory. Nothing here evaluates a path -- it only persists it.
 
 ### 3. Validation (roleGraph consumer)
 
@@ -427,11 +427,11 @@ end-to-end.
   operand fields (`subset`/`superset`/`paths` as bare `RolePath`) become
   `JoinOperand` -- a breaking change to those just-added types, contained in
   the monorepo, with no `.orm.yaml` in the wild to migrate.
-- No `orm_version` bump (see "Version policy"): the new variants + `RolePath`
-  are added to `schemas/orm-model.schema.json` as additive `oneOf` branches
-  / `$defs`, kept in sync with the serializer (`schemas/**` is
-  dprint-excluded). `CURRENT_ORM_VERSION` stays `1.0`; the migration list
-  stays empty.
+- `orm_version` per ADR-0001 (see "Version policy"): the variants +
+  `RolePath` are additive and share the Tier-1 `1.1` bump -- they do not
+  bump independently. They are added to `schemas/orm-model.schema.json` as
+  additive `oneOf` branches / `$defs`, kept in sync with the serializer
+  (`schemas/**` is dprint-excluded).
 - The serializer gains read/write for the variants; a round-trip test per
   variant is mandatory (lossless rule).
 - Consumers that switch exhaustively over `Constraint` (verbalization,
@@ -441,28 +441,27 @@ end-to-end.
 
 ## Version policy
 
-The standing rule for the whole metamodel queue (decided 2026-06-18, both
-threads), recorded here because it is in force from this construct on:
+Governed by ADR-0001's "Schema versioning" section (authoritative). The
+earlier "no-bump" rule once recorded here is **withdrawn**: ADR-0001
+resolved that _additive constructs do bump the minor `orm_version`_, once
+per unreleased minor cycle, shared across every additive construct that
+lands in it -- because the stamped version is the honest "written by a
+newer barwise" compatibility signal (see the ADR for the full reasoning).
 
-- _Additive constructs do not bump `orm_version`._ A new optional field on
-  an existing element (value ranges, defaults, notes) or a new
-  discriminated-union member (the join constraint variants) is added to the
-  serializer and to `schemas/orm-model.schema.json` (a new optional
-  property or `oneOf` branch) without touching `CURRENT_ORM_VERSION`. This
-  is the practice value ranges (5t9.1) already set -- it landed at `1.0`.
-- _The `schemaVersion` migration seam is reserved for breaking changes._ A
-  bump (and a migration step) is required only when an existing file would
-  read _differently_ or fail under the new metamodel: a renamed, removed,
-  or retyped field, or changed semantics. Additive growth is not that.
-- _Cost still applies._ Every construct is still model + serializer +
-  JSON Schema + validation + verbalization + round-trip test (ADR-0001's
-  bounded-cost filter); "a schemaVersion migration" in that filter means
-  the seam must _accommodate_ the construct, not that every construct
-  bumps.
-- _Forward-incompatibility is accepted._ The schema is strict
-  (`additionalProperties: false`), so an old barwise rejects a file using a
-  newer additive construct. That is tolerated: barwise is the sole reader
-  and moves forward; we do not bump to advertise additive growth.
+Consequence for this construct: the join variants + `RolePath` are additive
+and **share the Tier-1 `1.1` bump** -- they do not bump independently and do
+not stay at `1.0`. 5t9.9 (value-comparison) performs the one-time
+`1.0 -> 1.1`; every additive construct landing before `1.1` releases,
+including these, rides that single bump.
+
+Open reconciliation (metamodel thread, tracked on barwise-0s8): the first
+cut shipped under `1.0` (PRs 1-2, before any construct had bumped). That is
+consistent with the ADR's "the first additive PR after a release performs
+the bump" only if 5t9.9 lands the `1.0 -> 1.1` first; if a role-path PR is
+the first additive construct to land in this cycle, _it_ performs the bump
+instead. Either way the already-merged role-path constructs fold into `1.1`
+-- whoever bumps first carries them. This is a sequencing detail for the
+metamodel thread to land, not a separate bump.
 
 ## Alternatives considered
 
