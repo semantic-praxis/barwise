@@ -1,8 +1,8 @@
 import type { FactType, FactTypeConfig } from "../../model/FactType.js";
 import type { Role } from "../../model/Role.js";
 import {
-  type OrmYamlConstraint,
   deserializeConstraint,
+  type OrmYamlConstraint,
   serializeConstraint,
 } from "./constraint.js";
 import {
