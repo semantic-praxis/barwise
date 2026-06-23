@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { slugifyModel } from "../../src/commands/import.js";
-import { runCli } from "../helpers/run.js";
+import { runCli } from "../workspace/run.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const tmpDir = resolve(__dirname, "../tmp-import-test");

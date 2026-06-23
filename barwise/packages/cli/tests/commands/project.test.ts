@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCli } from "../helpers/run.js";
+import { runCli } from "../workspace/run.js";
 
 /** A small two-entity model with one cross-domain fact type. */
 const SHOP_MODEL = `orm_version: "1.0"

@@ -7,9 +7,9 @@ import { type Counterexample, generateCounterexamples } from "@barwise/core/coun
 import { Verbalizer } from "@barwise/core/verbalization";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { resolveModels, type SourceInput, sourcePath } from "../helpers/resolve.js";
-import { boundedTextResult } from "../helpers/response.js";
-import { sourceInputSchema } from "../helpers/sourceSchema.js";
+import { resolveModels, type SourceInput, sourcePath } from "../workspace/resolve.js";
+import { boundedTextResult } from "../workspace/response.js";
+import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
 /** Readings shown inline by summary mode. */
 const SUMMARY_PREVIEW = 20;

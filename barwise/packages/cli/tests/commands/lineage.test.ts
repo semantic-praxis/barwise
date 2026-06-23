@@ -8,9 +8,9 @@ import { dirname, resolve } from "node:path";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { loadModel } from "../../src/helpers/io.js";
-import { writeManifest } from "../../src/helpers/lineageIo.js";
-import { runCli } from "../helpers/run.js";
+import { loadModel } from "../../src/workspace/io.js";
+import { writeManifest } from "../../src/workspace/lineageIo.js";
+import { runCli } from "../workspace/run.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(__dirname, "../fixtures");

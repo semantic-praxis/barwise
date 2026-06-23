@@ -15,7 +15,7 @@ import {
 import type { Command } from "commander";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { readFile } from "../helpers/io.js";
+import { readFile } from "../workspace/io.js";
 
 /** Lowercase a name into a filesystem- and context-safe slug. */
 function slugify(name: string): string {

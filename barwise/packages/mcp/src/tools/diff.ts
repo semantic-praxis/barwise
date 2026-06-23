@@ -4,8 +4,8 @@
 
 import { diffModels } from "@barwise/core/diff";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { resolveSource, type SourceInput } from "../helpers/resolve.js";
-import { sourceInputSchema } from "../helpers/sourceSchema.js";
+import { resolveSource, type SourceInput } from "../workspace/resolve.js";
+import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
 export function registerDiffTool(server: McpServer): void {
   server.registerTool(

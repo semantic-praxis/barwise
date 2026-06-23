@@ -12,7 +12,7 @@ import {
   resolveModels,
   resolveSource,
   sourcePath,
-} from "../../src/helpers/resolve.js";
+} from "../../src/workspace/resolve.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(__dirname, "../fixtures");

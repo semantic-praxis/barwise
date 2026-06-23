@@ -6,8 +6,8 @@ import { type Diagnostic, OrmYamlSerializer } from "@barwise/core";
 import { diffModels, mergeAndValidate } from "@barwise/core/diff";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { writeFileSync } from "node:fs";
-import { resolveSource, type SourceInput, sourcePath } from "../helpers/resolve.js";
-import { sourceInputSchema } from "../helpers/sourceSchema.js";
+import { resolveSource, type SourceInput, sourcePath } from "../workspace/resolve.js";
+import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
 const serializer = new OrmYamlSerializer();
 

@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadProject } from "../../src/helpers/projectLoader.js";
+import { loadProject } from "../../src/workspace/projectLoader.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const manifestPath = resolve(

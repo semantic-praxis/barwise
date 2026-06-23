@@ -4,7 +4,7 @@ import type { ProviderName } from "@barwise/llm";
 import type { Command } from "commander";
 import { existsSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
-import { readFile } from "../../helpers/io.js";
+import { readFile } from "../../workspace/io.js";
 import { serializer, slugifyModel } from "./shared.js";
 
 export function addBatchSubcommand(importCmd: Command): void {

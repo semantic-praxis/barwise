@@ -24,7 +24,7 @@ src/
     diff.ts             barwise diff <file1> <file2>
     import.ts           barwise import (orchestrator over import/)
     import/             one module per import subcommand + shared helpers
-  helpers/
+  workspace/
     io.ts               File I/O helpers (loadModel, writeModel)
     format.ts           Output formatting helpers (JSON, text)
 tests/

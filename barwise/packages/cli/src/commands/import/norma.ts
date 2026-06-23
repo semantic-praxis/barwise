@@ -1,7 +1,7 @@
 import { getImporter, OrmYamlSerializer } from "@barwise/core";
 import type { Command } from "commander";
 import { basename, extname } from "node:path";
-import { readFile, writeOutput } from "../../helpers/io.js";
+import { readFile, writeOutput } from "../../workspace/io.js";
 
 export function addNormaSubcommand(importCmd: Command): void {
   // NORMA .orm XML import

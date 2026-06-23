@@ -2,7 +2,7 @@ import { getImporter, OrmYamlSerializer } from "@barwise/core";
 import type { Command } from "commander";
 import { statSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
-import { readFile, writeOutput } from "../../helpers/io.js";
+import { readFile, writeOutput } from "../../workspace/io.js";
 
 export function addSqlSubcommand(importCmd: Command): void {
   // SQL file/directory import

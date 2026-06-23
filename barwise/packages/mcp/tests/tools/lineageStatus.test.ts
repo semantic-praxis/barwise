@@ -10,7 +10,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeLineageStatus } from "../../src/tools/lineageStatus.js";
-import { writeManifest } from "../helpers/manifestFixture.js";
+import { writeManifest } from "../workspace/manifestFixture.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(__dirname, "../fixtures");

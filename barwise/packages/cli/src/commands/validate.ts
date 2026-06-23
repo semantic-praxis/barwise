@@ -7,9 +7,9 @@
 
 import { type Diagnostic, projectRules, ValidationEngine } from "@barwise/core";
 import type { Command } from "commander";
-import { formatDiagnostics, formatDiagnosticsJson } from "../helpers/format.js";
-import { isProjectFile, loadModel } from "../helpers/io.js";
-import { loadProject } from "../helpers/projectLoader.js";
+import { formatDiagnostics, formatDiagnosticsJson } from "../workspace/format.js";
+import { isProjectFile, loadModel } from "../workspace/io.js";
+import { loadProject } from "../workspace/projectLoader.js";
 
 interface ValidateOptions {
   format: string;

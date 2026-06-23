@@ -9,12 +9,12 @@ import type { OrmModel } from "@barwise/core";
 import { type Counterexample, generateCounterexamples } from "@barwise/core/counterexample";
 import { Verbalizer } from "@barwise/core/verbalization";
 import type { Command } from "commander";
-import { resolveDomainModels } from "../helpers/domainModels.js";
+import { resolveDomainModels } from "../workspace/domainModels.js";
 import {
   formatCounterexamples,
   formatVerbalizations,
   formatVerbalizationsJson,
-} from "../helpers/format.js";
+} from "../workspace/format.js";
 
 interface VerbalizeOptions {
   format: string;

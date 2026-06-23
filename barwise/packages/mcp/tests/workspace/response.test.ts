@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { boundedTextResult, INLINE_BYTE_LIMIT } from "../../src/helpers/response.js";
+import { boundedTextResult, INLINE_BYTE_LIMIT } from "../../src/workspace/response.js";
 
 let tmp: string;
 

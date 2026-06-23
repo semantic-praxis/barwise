@@ -5,9 +5,9 @@
 import { checkStaleness } from "@barwise/core/lineage";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { dirname, resolve } from "node:path";
-import { readManifest } from "../helpers/lineageIo.js";
-import { resolveSource, type SourceInput, sourcePath } from "../helpers/resolve.js";
-import { sourceInputSchema } from "../helpers/sourceSchema.js";
+import { readManifest } from "../workspace/lineageIo.js";
+import { resolveSource, type SourceInput, sourcePath } from "../workspace/resolve.js";
+import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
 export function registerLineageStatusTool(server: McpServer): void {
   server.registerTool(
