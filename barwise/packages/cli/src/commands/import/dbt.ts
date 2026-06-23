@@ -1,7 +1,7 @@
 import { getImporter, OrmYamlSerializer } from "@barwise/core";
 import type { Command } from "commander";
 import { basename, resolve } from "node:path";
-import { writeOutput } from "../../helpers/io.js";
+import { writeOutput } from "../../workspace/io.js";
 
 export function addDbtSubcommand(importCmd: Command): void {
   // Directory-based import (dbt project)

@@ -7,8 +7,8 @@
 import { analyzeImpact, checkStaleness } from "@barwise/core/lineage";
 import type { Command } from "commander";
 import { dirname, resolve } from "node:path";
-import { loadModel } from "../helpers/io.js";
-import { readManifest } from "../helpers/lineageIo.js";
+import { loadModel } from "../workspace/io.js";
+import { readManifest } from "../workspace/lineageIo.js";
 
 export function registerLineageCommand(program: Command): void {
   const lineage = program

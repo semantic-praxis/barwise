@@ -7,8 +7,8 @@
 
 import { RelationalMapper, renderDdl } from "@barwise/core/mapping";
 import type { Command } from "commander";
-import { loadModel } from "../helpers/io.js";
-import { writeOutput } from "../helpers/io.js";
+import { loadModel } from "../workspace/io.js";
+import { writeOutput } from "../workspace/io.js";
 
 export function registerSchemaCommand(program: Command): void {
   program

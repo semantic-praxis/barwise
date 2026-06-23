@@ -6,7 +6,7 @@
 
 import { diffModels, type ModelDelta, type SynonymCandidate } from "@barwise/core/diff";
 import type { Command } from "commander";
-import { loadModel } from "../helpers/io.js";
+import { loadModel } from "../workspace/io.js";
 
 export function registerDiffCommand(program: Command): void {
   program

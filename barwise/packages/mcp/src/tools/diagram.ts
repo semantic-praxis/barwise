@@ -5,9 +5,9 @@
 import { generateDiagram } from "@barwise/diagram";
 import { renderDiagramSvg } from "@barwise/diagram-ui/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { resolveSource, type SourceInput, sourcePath } from "../helpers/resolve.js";
-import { boundedTextResult } from "../helpers/response.js";
-import { sourceInputSchema } from "../helpers/sourceSchema.js";
+import { resolveSource, type SourceInput, sourcePath } from "../workspace/resolve.js";
+import { boundedTextResult } from "../workspace/response.js";
+import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
 export function registerDiagramTool(server: McpServer): void {
   server.registerTool(

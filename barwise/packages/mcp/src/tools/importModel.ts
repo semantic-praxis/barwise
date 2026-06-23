@@ -8,7 +8,7 @@ import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { readSource } from "../helpers/resolve.js";
+import { readSource } from "../workspace/resolve.js";
 
 const serializer = new OrmYamlSerializer();
 

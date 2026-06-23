@@ -9,7 +9,7 @@
 import type { OrmModel } from "@barwise/core";
 import { describeDomain } from "@barwise/core/describe";
 import type { Command } from "commander";
-import { resolveDomainModels } from "../helpers/domainModels.js";
+import { resolveDomainModels } from "../workspace/domainModels.js";
 
 interface DescribeOptions {
   focus?: string;

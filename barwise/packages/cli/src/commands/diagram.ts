@@ -10,8 +10,8 @@ import { renderDiagramSvg } from "@barwise/diagram-ui/server";
 import type { Command } from "commander";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { isProjectFile, loadModel, writeOutput } from "../helpers/io.js";
-import { loadProject } from "../helpers/projectLoader.js";
+import { isProjectFile, loadModel, writeOutput } from "../workspace/io.js";
+import { loadProject } from "../workspace/projectLoader.js";
 
 export function registerDiagramCommand(program: Command): void {
   program

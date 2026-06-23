@@ -18,7 +18,7 @@ VS Code.
 src/
   index.ts              Main entry point (bin shebang)
   server.ts             McpServer setup and registration
-  helpers/
+  workspace/
     resolve.ts          Source resolution (file path / inline YAML / project)
     projectLoader.ts    Filesystem walk for a .orm-project.yaml manifest
   tools/

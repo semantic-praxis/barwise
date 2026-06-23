@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { findOrmModel, readManifest, resolveArtifact } from "../../src/helpers/lineageIo.js";
+import { findOrmModel, readManifest, resolveArtifact } from "../../src/workspace/lineageIo.js";
 import { writeManifest } from "./manifestFixture.js";
 
 let tempDir: string;

@@ -7,8 +7,8 @@ import type { ProviderName } from "@barwise/llm";
 import { createLlmClient } from "@barwise/llm";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { resolveModels, type SourceInput } from "../helpers/resolve.js";
-import { sourceInputSchema } from "../helpers/sourceSchema.js";
+import { resolveModels, type SourceInput } from "../workspace/resolve.js";
+import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
 export function registerReviewTool(server: McpServer): void {
   server.registerTool(

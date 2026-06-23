@@ -5,7 +5,7 @@ import type { ProviderName } from "@barwise/llm";
 import type { Command } from "commander";
 import { existsSync, writeFileSync } from "node:fs";
 import { basename, extname } from "node:path";
-import { readFile, writeOutput } from "../../helpers/io.js";
+import { readFile, writeOutput } from "../../workspace/io.js";
 import { formatAlternativeFramings, serializer } from "./shared.js";
 
 export function addTranscriptSubcommand(importCmd: Command): void {

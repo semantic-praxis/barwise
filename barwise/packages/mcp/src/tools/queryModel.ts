@@ -18,8 +18,8 @@ import {
 } from "@barwise/core/query";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { resolveModels, type SourceInput } from "../helpers/resolve.js";
-import { sourceInputSchema } from "../helpers/sourceSchema.js";
+import { resolveModels, type SourceInput } from "../workspace/resolve.js";
+import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
 const QUERY_DESCRIPTION = "Query DSL expression. Commands: "
   + "entities [entity|value], fact-types [arity], constraints [type], "

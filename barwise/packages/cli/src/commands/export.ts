@@ -14,9 +14,9 @@ import { registerStandardFormats } from "@barwise/formats";
 import type { Command } from "commander";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { resolveDomainModels } from "../helpers/domainModels.js";
-import { isProjectFile, loadModel } from "../helpers/io.js";
-import { readManifest, writeManifest } from "../helpers/lineageIo.js";
+import { resolveDomainModels } from "../workspace/domainModels.js";
+import { isProjectFile, loadModel } from "../workspace/io.js";
+import { readManifest, writeManifest } from "../workspace/lineageIo.js";
 
 // Register the standard formats (DDL, OpenAPI, Avro, SQL, NORMA).
 registerStandardFormats();

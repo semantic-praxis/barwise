@@ -9,7 +9,7 @@ import { buildExistingModelContext, createLlmClient, processTranscript } from "@
 import type { CandidateFraming, ProviderName } from "@barwise/llm";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { readSource, resolveSource } from "../helpers/resolve.js";
+import { readSource, resolveSource } from "../workspace/resolve.js";
 
 const serializer = new OrmYamlSerializer();
 

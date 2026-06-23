@@ -7,9 +7,9 @@ import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { resolveModels, type SourceInput, sourcePath } from "../helpers/resolve.js";
-import { boundedTextResult } from "../helpers/response.js";
-import { sourceInputSchema } from "../helpers/sourceSchema.js";
+import { resolveModels, type SourceInput, sourcePath } from "../workspace/resolve.js";
+import { boundedTextResult } from "../workspace/response.js";
+import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
 // Register the standard formats (DDL, OpenAPI, Avro, SQL, NORMA).
 registerStandardFormats();

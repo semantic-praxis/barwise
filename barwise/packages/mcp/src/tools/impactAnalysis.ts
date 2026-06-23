@@ -6,9 +6,9 @@ import { analyzeImpact } from "@barwise/core/lineage";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { dirname, resolve } from "node:path";
 import { z } from "zod";
-import { readManifest } from "../helpers/lineageIo.js";
-import { type SourceInput, sourcePath } from "../helpers/resolve.js";
-import { sourceInputSchema } from "../helpers/sourceSchema.js";
+import { readManifest } from "../workspace/lineageIo.js";
+import { type SourceInput, sourcePath } from "../workspace/resolve.js";
+import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
 export function registerImpactAnalysisTool(server: McpServer): void {
   server.registerTool(

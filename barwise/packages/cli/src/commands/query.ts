@@ -16,7 +16,7 @@ import {
   QueryParseError,
 } from "@barwise/core/query";
 import type { Command } from "commander";
-import { resolveDomainModels } from "../helpers/domainModels.js";
+import { resolveDomainModels } from "../workspace/domainModels.js";
 
 /**
  * Reassemble variadic CLI tokens into a single query string. Tokens that
