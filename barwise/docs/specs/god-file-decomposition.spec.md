@@ -2,7 +2,7 @@
 
 Status: Draft for review (design only -- no implementation in this PR)
 Created: 2026-06-17
-Last-updated: 2026-06-17
+Last-updated: 2026-06-23
 Tracking: REPO_REVIEW-2026-06-16 finding F1 (S-ORTH-5); REPO_REVIEW
 2026-06 A1.
 
@@ -108,11 +108,29 @@ constraint, population), `describeDomain` orchestrates.
 Split the 21 per-constraint methods by constraint family (uniqueness,
 mandatory, set-comparison, ring, frequency), the class delegating.
 
-### 6. `DraftModelParser.ts` -> one module per pass (provisional)
+### 6. `DraftModelParser.ts` -> one module per response pass (grounded 2026-06-23)
 
-The four-pass algorithm decomposes into a module per pass plus the
-provenance helper, per the original review note. Largest file; do after
-the smaller ones validate the method on the llm package.
+`parseDraftModel` is one ~700-line function that builds an `OrmModel` from
+the LLM `ExtractionResponse` in sequential passes over each response section
+-- object types, fact types, inferred constraints (the ~375-line bulk),
+subtypes, populations, objectifications -- followed by a helpers block. The
+only threaded state is `(model, warnings)`; each pass mutates the model,
+accumulates warnings, and owns its provenance array.
+
+Decompose into a `parse/` subdir (the shape the `prompt/` split already set in
+this package), one module per pass -- `objectTypes`, `factTypes`,
+`constraints` (with the constraint-only `isDuplicateConstraint`/`arraysEqual`),
+`subtypes`, `populations`, `objectifications` -- plus `parse/helpers.ts`
+(`resolveRolesByPlayerName`, `camelCase`, `buildDefaultReading`,
+`resolveDataType`, the `VALID_*` sets). Each pass is a function
+`parseX(section, model, warnings): XProvenance[]` that returns its provenance;
+`DraftModelParser.ts` keeps `parseDraftModel` as the orchestrator -- set up
+`model`+`warnings`, call the passes in order (order matters: constraints
+resolve roles against fact types built earlier), assemble the
+`DraftModelResult`. No behavior change; guarded by the llm parser suites
+(`DraftModelParser`, `ExtractionConformance`, `ReasoningTrail`, `Alternatives`,
+`TranscriptProcessor`, `Pipeline.integration`). Off the metamodel conflict
+surface, so no cross-thread coordination.
 
 ### 7. `NormaToOrmMapper.ts` -> split mapping by concern (provisional)
 
