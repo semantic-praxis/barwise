@@ -2,7 +2,7 @@
 
 Status: Draft for review (design only -- no implementation in this PR)
 Created: 2026-06-17
-Last-updated: 2026-06-23
+Last-updated: 2026-06-24
 Tracking: REPO_REVIEW-2026-06-16 finding F1 (S-ORTH-5); REPO_REVIEW
 2026-06 A1.
 
@@ -138,10 +138,39 @@ surface, so no cross-thread coordination.
 types, constraints, data types) into helper modules the mapper composes.
 `DbtToOrmMapper.ts` (WS8) follows the same shape if it proves out here.
 
-### 8. `DbtToOrmMapper.ts` / `OrmDiagram.tsx` (provisional)
+### 8. `DbtToOrmMapper.ts` (grounded 2026-06-24) / `OrmDiagram.tsx` (provisional)
 
-Apply the WS7 pattern to the dbt mapper; extract subcomponents from the
-React diagram. Lowest priority; reassess after WS1-7.
+`DbtToOrmMapper` is a stateful `DbtMapper` class whose `map()` runs
+`indexSourceDataTypes -> analyzeModels -> phase1CreateEntityTypes ->
+phase2CreateValueTypes -> phase3CreateFactTypes`, sharing six `Map`s
+(pk / rel / entityId / valueTypeId / source-data-type indices) plus `doc`,
+`model`, and a `report` builder across the phases via `this`. Below the
+class sit free helpers (`buildConstraints`, `hasTest`,
+`findRelationshipTest`, `resolveDataType`, `toPascalCase`,
+`inferModelDescription`, `inferColumnDescription`).
+
+Split by concern into a `dbtMapping/` subdir, threading the shared state as
+an explicit mutable `DbtMapperContext` (the six maps + `doc` + `model` +
+`report`) rather than instance fields:
+
+```
+context.ts      DbtMapperContext + PkInfo / RelationshipInfo types
+sourceTypes.ts  indexSourceDataTypes + resolveSourceColumnType
+analyze.ts      analyzeModels (PK/FK/test detection)
+entityTypes.ts  phase 1     valueTypes.ts  phase 2     factTypes.ts  phase 3
+constraints.ts  buildConstraints, hasTest, findRelationshipTest
+naming.ts       resolveDataType, toPascalCase, infer* descriptions
+```
+
+Each phase is `phaseX(ctx): void` mutating the shared context; the helpers
+stay pure. `DbtToOrmMapper.ts` keeps `mapDbtToOrm` as the orchestrator
+(build the context, run the phases in order -- analysis populates the maps
+the create-phases read -- return `{ model, report }`) plus `DbtMappingError`
+and `DbtMapResult`. No behavior change; guarded by the dbt import suites
+(`DbtProjectImporter`, `DbtImportFormat`, `DbtSchemaParser`, `registration`).
+
+`OrmDiagram.tsx` stays provisional (extract React subcomponents); a separate
+follow-on, off the critical path.
 
 ## API and migration impact
 
