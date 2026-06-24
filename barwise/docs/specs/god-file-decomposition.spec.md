@@ -152,12 +152,16 @@ class sit free helpers (`buildConstraints`, `hasTest`,
 Split by concern into a `dbtMapping/` subdir, threading the shared state as
 an explicit mutable `DbtMapperContext` (the six maps + `doc` + `model` +
 `report`) rather than instance fields:
-  context.ts      DbtMapperContext + PkInfo / RelationshipInfo types
-  sourceTypes.ts  indexSourceDataTypes + resolveSourceColumnType
-  analyze.ts      analyzeModels (PK/FK/test detection)
-  entityTypes.ts  phase 1     valueTypes.ts  phase 2     factTypes.ts  phase 3
-  constraints.ts  buildConstraints, hasTest, findRelationshipTest
-  naming.ts       resolveDataType, toPascalCase, infer* descriptions
+
+```
+context.ts      DbtMapperContext + PkInfo / RelationshipInfo types
+sourceTypes.ts  indexSourceDataTypes + resolveSourceColumnType
+analyze.ts      analyzeModels (PK/FK/test detection)
+entityTypes.ts  phase 1     valueTypes.ts  phase 2     factTypes.ts  phase 3
+constraints.ts  buildConstraints, hasTest, findRelationshipTest
+naming.ts       resolveDataType, toPascalCase, infer* descriptions
+```
+
 Each phase is `phaseX(ctx): void` mutating the shared context; the helpers
 stay pure. `DbtToOrmMapper.ts` keeps `mapDbtToOrm` as the orchestrator
 (build the context, run the phases in order -- analysis populates the maps
