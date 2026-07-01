@@ -87,13 +87,13 @@ change to core.
 
 ## Inventory
 
-| Area             | Current state                                 | Verdict                              |
-| ---------------- | --------------------------------------------- | ------------------------------------ |
-| `packages/tutor` | does not exist                                | new package: format, judge, content  |
-| `packages/core`  | primitives exist and suffice (see Anchors)    | unchanged                            |
-| `packages/cli`   | 12 command modules, none tutorial             | adds `learn` command (workstream 3)  |
-| `packages/mcp`   | 14 tools, none tutorial or population-related | adds tutor tools (workstream 4)      |
-| `docs/specs`     | no tutorial or learning spec exists           | this spec plus the companion         |
+| Area             | Current state                                 | Verdict                             |
+| ---------------- | --------------------------------------------- | ----------------------------------- |
+| `packages/tutor` | does not exist                                | new package: format, judge, content |
+| `packages/core`  | primitives exist and suffice (see Anchors)    | unchanged                           |
+| `packages/cli`   | 12 command modules, none tutorial             | adds `learn` command (workstream 3) |
+| `packages/mcp`   | 14 tools, none tutorial or population-related | adds tutor tools (workstream 4)     |
+| `docs/specs`     | no tutorial or learning spec exists           | this spec plus the companion        |
 
 `packages/llm` looks adjacent but is untouched: this spec has no LLM
 surface by design.

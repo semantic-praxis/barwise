@@ -87,15 +87,15 @@ VS Code walkthrough.
 
 ## Inventory
 
-| Area                    | Current state                                | Verdict                                    |
-| ----------------------- | -------------------------------------------- | ------------------------------------------ |
-| `packages/tutor`        | judge and format from the beginner spec      | extends: case kind, accusation judge       |
-| `packages/tutor` (LLM)  | no LLM surface                               | adds pure prompt builders only             |
-| `packages/core`         | validation, counterexamples, verbalizer      | unchanged                                  |
-| `packages/mcp`          | no population or tutor tools                 | adds game-master tools (workstream 5)      |
-| `packages/llm`          | provider factory, transcript extraction      | unchanged; hosts wire its clients to tutor |
-| `packages/cli`          | `learn` command from the beginner spec       | extends: case sessions                     |
-| `docs/specs`            | no mystery/case spec                         | this spec                                  |
+| Area                   | Current state                           | Verdict                                    |
+| ---------------------- | --------------------------------------- | ------------------------------------------ |
+| `packages/tutor`       | judge and format from the beginner spec | extends: case kind, accusation judge       |
+| `packages/tutor` (LLM) | no LLM surface                          | adds pure prompt builders only             |
+| `packages/core`        | validation, counterexamples, verbalizer | unchanged                                  |
+| `packages/mcp`         | no population or tutor tools            | adds game-master tools (workstream 5)      |
+| `packages/llm`         | provider factory, transcript extraction | unchanged; hosts wire its clients to tutor |
+| `packages/cli`         | `learn` command from the beginner spec  | extends: case sessions                     |
+| `docs/specs`           | no mystery/case spec                    | this spec                                  |
 
 ## Target architecture
 
@@ -179,14 +179,14 @@ it never gates in CI.
 
 ## Season one (six episodes)
 
-| Episode | Case                     | Constraints taught                        |
-| ------- | ------------------------ | ----------------------------------------- |
-| 1       | The Locked Vault         | internal uniqueness; mandatory role       |
-| 2       | The Second Badge         | external uniqueness                       |
-| 3       | The Man Who Wasn't There | mandatory; disjunctive mandatory          |
-| 4       | The Uninvited Reader     | subset                                    |
-| 5       | The Provenance Loop      | ring (acyclicity)                         |
-| 6       | The Forger's Web         | exclusion; frequency; composition of 1-5  |
+| Episode | Case                     | Constraints taught                       |
+| ------- | ------------------------ | ---------------------------------------- |
+| 1       | The Locked Vault         | internal uniqueness; mandatory role      |
+| 2       | The Second Badge         | external uniqueness                      |
+| 3       | The Man Who Wasn't There | mandatory; disjunctive mandatory         |
+| 4       | The Uninvited Reader     | subset                                   |
+| 5       | The Provenance Loop      | ring (acyclicity)                        |
+| 6       | The Forger's Web         | exclusion; frequency; composition of 1-5 |
 
 Episode 6 is the capstone: planted inconsistencies from episodes 1-5
 resolve only under the composed schema. The setting carries over from
