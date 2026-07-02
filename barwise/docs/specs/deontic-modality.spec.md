@@ -1,8 +1,8 @@
 # Deontic modality for ORM 2 constraints
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Implemented -- deontic modality on constraints (5t9.3, c9bed84).
 Created: 2026-06-19
-Last-updated: 2026-06-19
+Last-updated: 2026-06-24
 Tracking: barwise-5t9.3, barwise-5t9 (epic),
 docs/adr/0001-metamodel-evolution-policy.md, docs/NORMA_VS_ORM_YAML.md
 

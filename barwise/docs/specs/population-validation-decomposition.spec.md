@@ -1,8 +1,8 @@
 # Decompose the population validation rules by constraint family
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Implemented -- decomposed by rule family (1,074 -> 85).
 Created: 2026-06-16
-Last-updated: 2026-06-16
+Last-updated: 2026-06-24
 Tracking: REPO_REVIEW-2026-06-16.md finding A1 (god files;
 populationValidation.ts -- the largest source file)
 
