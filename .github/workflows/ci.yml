@@ -65,7 +65,7 @@ jobs:
       # whose inputs match are served from cache. Keyed by commit so each run
       # writes a fresh entry; the prefix restores the most recent one.
       - name: Cache Turbo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: barwise/.turbo
           key: turbo-${{ runner.os }}-${{ github.sha }}
