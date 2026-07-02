@@ -1,8 +1,8 @@
 # Multi-role (role-sequence) frequency constraints
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Implemented -- multi-role frequency constraints (5t9.8, 8bf20d3).
 Created: 2026-06-19
-Last-updated: 2026-06-19
+Last-updated: 2026-06-24
 Tracking: barwise-5t9.8, barwise-5t9 (epic),
 docs/adr/0001-metamodel-evolution-policy.md, docs/NORMA_VS_ORM_YAML.md
 

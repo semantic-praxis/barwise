@@ -1,6 +1,9 @@
 # God-file decomposition
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: In progress -- WS1 (ToolRegistration), WS2 (ExtractionPrompt), WS5
+(ConstraintVerbalizer), WS6 (DraftModelParser), WS8a (DbtToOrmMapper) landed.
+Open: WS7 (NormaToOrmMapper), WS8b (OrmDiagram.tsx). WS3/WS4 (ModelDiff,
+describeDomain) fell under threshold -- moot.
 Created: 2026-06-17
 Last-updated: 2026-06-24
 Tracking: REPO_REVIEW-2026-06-16 finding F1 (S-ORTH-5); REPO_REVIEW
@@ -169,8 +172,16 @@ the create-phases read -- return `{ model, report }`) plus `DbtMappingError`
 and `DbtMapResult`. No behavior change; guarded by the dbt import suites
 (`DbtProjectImporter`, `DbtImportFormat`, `DbtSchemaParser`, `registration`).
 
-`OrmDiagram.tsx` stays provisional (extract React subcomponents); a separate
-follow-on, off the critical path.
+`OrmDiagram.tsx` (grounded 2026-07-02): the file is already a thin
+`OrmDiagram` container plus seven self-contained SVG sub-components
+(`ObjectTypeNode`, `FactTypeNode`, `RoleBox`, `RoleEdge`, `SubtypeEdge`,
+`ConstraintEdge`, `ConstraintNode`) -- pure functions taking props and
+returning JSX off an imported theme, no shared mutable state. Extract each
+into `parts/`, plus a tiny `parts/pathData.ts` shared by the three edge
+parts (keeps the container/edge import graph one-way). `OrmDiagram.tsx`
+keeps `OrmDiagramProps`, the container, and its `dimOpacity`/`edgeOpacity`
+helpers. No behavior change -- the rendered SVG is identical, guarded by the
+diagram-ui suite (`OrmDiagram`, `renderDiagramSvg`, `DiagramCanvas`).
 
 ## API and migration impact
 

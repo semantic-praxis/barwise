@@ -1,8 +1,8 @@
 # Decompose the import command into per-subcommand modules
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Implemented -- import.ts split into per-subcommand files (896 -> 43).
 Created: 2026-06-16
-Last-updated: 2026-06-16
+Last-updated: 2026-06-24
 Tracking: REPO_REVIEW-2026-06-16.md finding A1 (god files;
 cli/src/commands/import.ts)
 

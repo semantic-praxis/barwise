@@ -1,10 +1,9 @@
 # OrmYamlSerializer decomposition
 
-Status: Draft for review (design only -- no implementation). Touches a
-metamodel-thread conflict-surface file; sequencing needs sign-off (see
-"Sequencing and ownership").
+Status: Implemented (merged in #247) -- OrmYamlSerializer 935 -> 259, split
+into per-element-kind modules under serialization/yaml/. Nothing outstanding.
 Created: 2026-06-23
-Last-updated: 2026-06-23
+Last-updated: 2026-06-24
 Tracking: REPO_REVIEW-2026-06-23.md F3,
 docs/specs/god-file-decomposition.spec.md (supersedes its "keep -- cohesive
 pair" disposition for this file),
