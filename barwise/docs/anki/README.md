@@ -141,10 +141,18 @@ cards silently teach the old phrasing. Two mitigations:
 
 ## Further reading
 
-Each card's "Read more" pointer resolves to one of these. Book
-references cite chapter and section numbers verified against the 3rd
-edition's table of contents (e.g. uniqueness constraints are chapter 4,
-subtyping is section 6.5, the Rmap procedure is section 11.3).
+**If you are learning ORM seriously, buy Dr. Halpin's book.** _Information
+Modeling and Relational Databases_ (Halpin & Morgan) is the definitive
+text for the method, and this deck is a companion to it, not a
+substitute: the cards drill and index the concepts, but the book is
+where they are actually taught -- with the worked examples, diagrams, and
+reasoning a flashcard can only gesture at. It is available from Morgan
+Kaufmann / Elsevier (ISBN 9780443237904) and the usual booksellers.
+
+Each card's "Read more" pointer resolves to one of the sources below.
+Book references cite chapter and section numbers verified against the
+3rd edition's table of contents (e.g. uniqueness constraints are chapter
+4, subtyping is section 6.5, the Rmap procedure is section 11.3).
 
 - **Halpin & Morgan, _Information Modeling and Relational Databases_,
   3rd ed. (2024).** ISBN 9780443237904. The canonical ORM reference, and
