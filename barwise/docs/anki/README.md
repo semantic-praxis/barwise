@@ -48,6 +48,13 @@ only if you also justified it the way the back does. If a Tier 3 card
 turns out to be ambiguous or teaches a bad habit, cut it; the deck is
 meant to be pruned.
 
+Every card ends with a **"Read more"** pointer -- an italic line naming
+where the concept is covered in depth, so you can go from a card you
+just failed to the text that explains it. The pointers are topic-level
+(a chapter subject, not a page number), because the reference edition
+reorganized its sections; see [Further reading](#further-reading) for
+the full sources.
+
 ## Files
 
 Each file imports into its own subdeck under `ORM 2::`.
@@ -117,6 +124,10 @@ These rules keep the deck consistent and keep it honest to the tool.
 - **Cite the source of truth.** When a card encodes a rule from
   `ARCHITECTURE.md` or a verbalizer, keep the phrasing traceable to it
   so the deck can be re-verified when the metamodel moves.
+- **End each card with a "Read more" pointer.** Name the chapter topic
+  (not a section number) in the canonical sources below. Keep it
+  edition-honest: cite a subject a reader can find, not a page that may
+  have moved.
 
 ## Keeping the deck true to the code
 
@@ -129,3 +140,31 @@ cards silently teach the old phrasing. Two mitigations:
   `.orm.yaml` models through the existing verbalization engine, so the
   answers cannot drift from the tool by construction. See `docs/specs/`
   if that work gets specced.
+
+## Further reading
+
+Each card's "Read more" pointer resolves to one of these. References are
+given by chapter topic, not section number: the reference text's 3rd
+edition reorganized its material, so a subject you can look up in the
+table of contents is more durable than a number that may have moved.
+
+- **Halpin & Morgan, _Information Modeling and Relational Databases_,
+  3rd ed. (2024).** ISBN 9780443237904. The canonical ORM reference, and
+  the edition the barwise metamodel is designed against (see
+  `docs/adr/0001-metamodel-evolution-policy.md`).
+- **Halpin, _ORM 2 Constraint Verbalization_ (ORM2-02).** Tech report at
+  `https://www.orm.net/pdf/ORM2_TechReport2.pdf` -- the FORML target
+  forms the verbalizer follows; the primary source for the Tier 2 and
+  constraint cards.
+- **Halpin, _ORM 2 Graphical Notation_ (ORM2-01).** Tech report at
+  `https://www.orm.net/pdf/ORM2_TechReport1.pdf`.
+- **Halpin, _Logical Data Modeling_ series, Business Rules Journal** at
+  `https://www.brcommunity.com` -- constraint and verbalization
+  deep-dives.
+- **barwise `docs/ARCHITECTURE.md` and `docs/ORM_PROJECT_GUIDE.md`** for
+  the toolkit's own metamodel, multi-file projects, and relational
+  mapping (the sections named on the Projects and Relational Mapping
+  cards).
+- **Evans, _Domain-Driven Design_** for the context-mapping patterns
+  (shared kernel, published language, anticorruption layer) the Projects
+  cards reference.
