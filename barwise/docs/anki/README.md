@@ -50,10 +50,9 @@ meant to be pruned.
 
 Every card ends with a **"Read more"** pointer -- an italic line naming
 where the concept is covered in depth, so you can go from a card you
-just failed to the text that explains it. The pointers are topic-level
-(a chapter subject, not a page number), because the reference edition
-reorganized its sections; see [Further reading](#further-reading) for
-the full sources.
+just failed to the text that explains it. The pointers cite chapter and
+section numbers in the reference edition (verified against its table of
+contents); see [Further reading](#further-reading) for the full sources.
 
 ## Files
 
@@ -124,10 +123,9 @@ These rules keep the deck consistent and keep it honest to the tool.
 - **Cite the source of truth.** When a card encodes a rule from
   `ARCHITECTURE.md` or a verbalizer, keep the phrasing traceable to it
   so the deck can be re-verified when the metamodel moves.
-- **End each card with a "Read more" pointer.** Name the chapter topic
-  (not a section number) in the canonical sources below. Keep it
-  edition-honest: cite a subject a reader can find, not a page that may
-  have moved.
+- **End each card with a "Read more" pointer.** Cite the chapter or
+  section number in the canonical sources below, verified against the
+  reference edition's table of contents -- not a guessed number.
 
 ## Keeping the deck true to the code
 
@@ -143,15 +141,19 @@ cards silently teach the old phrasing. Two mitigations:
 
 ## Further reading
 
-Each card's "Read more" pointer resolves to one of these. References are
-given by chapter topic, not section number: the reference text's 3rd
-edition reorganized its material, so a subject you can look up in the
-table of contents is more durable than a number that may have moved.
+Each card's "Read more" pointer resolves to one of these. Book
+references cite chapter and section numbers verified against the 3rd
+edition's table of contents (e.g. uniqueness constraints are chapter 4,
+subtyping is section 6.5, the Rmap procedure is section 11.3).
 
 - **Halpin & Morgan, _Information Modeling and Relational Databases_,
   3rd ed. (2024).** ISBN 9780443237904. The canonical ORM reference, and
   the edition the barwise metamodel is designed against (see
-  `docs/adr/0001-metamodel-evolution-policy.md`).
+  `docs/adr/0001-metamodel-evolution-policy.md`). Key chapters: 3
+  (conceptual modeling and the CSDP), 4 (uniqueness), 5 (mandatory roles
+  and reference schemes), 6 (value, set-comparison, and subtype
+  constraints), 7 (ring, frequency, and final checks), 10.5
+  (objectification), and 11 (relational mapping).
 - **Halpin, _ORM 2 Constraint Verbalization_ (ORM2-02).** Tech report at
   `https://www.orm.net/pdf/ORM2_TechReport2.pdf` -- the FORML target
   forms the verbalizer follows; the primary source for the Tier 2 and
