@@ -153,7 +153,9 @@ subtyping is section 6.5, the Rmap procedure is section 11.3).
   (conceptual modeling and the CSDP), 4 (uniqueness), 5 (mandatory roles
   and reference schemes), 6 (value, set-comparison, and subtype
   constraints), 7 (ring, frequency, and final checks), 10.5
-  (objectification), and 11 (relational mapping).
+  (objectification), and 11 (relational mapping). The full contents,
+  with per-section page numbers and the card-to-section mapping, are in
+  `docs/halpin-morgan-3e-contents.md`.
 - **Halpin, _ORM 2 Constraint Verbalization_ (ORM2-02).** Tech report at
   `https://www.orm.net/pdf/ORM2_TechReport2.pdf` -- the FORML target
   forms the verbalizer follows; the primary source for the Tier 2 and
