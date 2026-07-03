@@ -178,10 +178,10 @@ interface GymExercise {
 }
 
 type GymCheck =
-  | { kind: "must_validate" }
-  | { kind: "requires_verbalization"; sentence: string; hint?: string }
-  | { kind: "forbids_population"; referenceConstraint: string; hint?: string }
-  | { kind: "requires_element"; query: ElementQuery; hint?: string };
+  | { kind: "must_validate"; }
+  | { kind: "requires_verbalization"; sentence: string; hint?: string; }
+  | { kind: "forbids_population"; referenceConstraint: string; hint?: string; }
+  | { kind: "requires_element"; query: ElementQuery; hint?: string; };
 
 interface GymReport {
   exerciseId: string;
