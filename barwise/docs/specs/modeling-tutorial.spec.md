@@ -143,8 +143,8 @@ interface TutorialStep {
   // forbids, generated at build time. For a non-constraint step
   // (e.g. stating elementary facts) the motivation is authored prose.
   motivation:
-    | { kind: "counterexample"; constraintId: string }
-    | { kind: "prose"; text: string };
+    | { kind: "counterexample"; constraintId: string; }
+    | { kind: "prose"; text: string; };
   concept: string; // the teaching text, shown after the motivation
   buildsOn: string[]; // ids of steps this one depends on (backward refs)
   unlocks: string[]; // ids of steps this one enables (forward refs)
