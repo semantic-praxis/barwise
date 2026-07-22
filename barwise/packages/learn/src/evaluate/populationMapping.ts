@@ -91,7 +91,7 @@ export function mapForbiddenPopulation(
   const roleMap = roleCorrespondence(refFt, refModel, candFt, candidate);
   if (!roleMap) return null;
 
-  const instances: { roleValues: Record<string, string> }[] = [];
+  const instances: { roleValues: Record<string, string>; }[] = [];
   for (const inst of forbidden.instances) {
     const roleValues: Record<string, string> = {};
     for (const [refRoleId, value] of Object.entries(inst.roleValues)) {

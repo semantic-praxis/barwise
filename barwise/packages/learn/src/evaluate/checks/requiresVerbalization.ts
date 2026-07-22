@@ -32,7 +32,8 @@ export function requiresVerbalization(
   return {
     kind: "requires_verbalization",
     passed: false,
-    message: `The model does not verbalize as "${sentence}". Check the fact type, its reading, and its constraints.`,
+    message:
+      `The model does not verbalize as "${sentence}". Check the fact type, its reading, and its constraints.`,
     hint,
   };
 }

@@ -1,6 +1,6 @@
 // Exercise format
-export { ExerciseParseError, parseExercise } from "./exercise/parseExercise.js";
 export { type LoadedExercise, loadExercise } from "./exercise/loadExercise.js";
+export { ExerciseParseError, parseExercise } from "./exercise/parseExercise.js";
 export type {
   ConstraintKind,
   Difficulty,

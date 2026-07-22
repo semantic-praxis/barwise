@@ -4,13 +4,7 @@
  * Pure -- no I/O -- so it is testable without the filesystem and reusable
  * by any loader.
  */
-import type {
-  ConstraintKind,
-  Difficulty,
-  ElementQuery,
-  GymCheck,
-  GymExercise,
-} from "./types.js";
+import type { ConstraintKind, Difficulty, ElementQuery, GymCheck, GymExercise } from "./types.js";
 
 const DIFFICULTIES: readonly Difficulty[] = ["intro", "core", "advanced"];
 const CONSTRAINT_KINDS: readonly ConstraintKind[] = [

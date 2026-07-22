@@ -28,8 +28,8 @@ export type ConstraintKind =
  * type exists, or that some fact type connects two named object types.
  */
 export type ElementQuery =
-  | { readonly entity: string }
-  | { readonly factTypeBetween: readonly [string, string] };
+  | { readonly entity: string; }
+  | { readonly factTypeBetween: readonly [string, string]; };
 
 /**
  * One rubric check. Each reuses a core primitive:
@@ -47,8 +47,8 @@ export type ElementQuery =
  *   scaffold the brief.
  */
 export type GymCheck =
-  | { readonly kind: "must_validate" }
-  | { readonly kind: "requires_verbalization"; readonly sentence: string; readonly hint?: string }
+  | { readonly kind: "must_validate"; }
+  | { readonly kind: "requires_verbalization"; readonly sentence: string; readonly hint?: string; }
   | {
     readonly kind: "forbids_population";
     /** Name of the fact type in the reference model that carries the constraint. */
@@ -57,7 +57,7 @@ export type GymCheck =
     readonly constraint: ConstraintKind;
     readonly hint?: string;
   }
-  | { readonly kind: "requires_element"; readonly element: ElementQuery; readonly hint?: string };
+  | { readonly kind: "requires_element"; readonly element: ElementQuery; readonly hint?: string; };
 
 /** An exercise as authored in a `.gym.yaml` file. */
 export interface GymExercise {
