@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://barwise.dev/schemas/gym-exercise.schema.json",
+  "title": "Barwise modeling-gym exercise",
+  "description": "A domain brief plus a rubric of declarative checks a candidate .orm.yaml model must satisfy.",
+  "type": "object",
+  "required": ["id", "title", "difficulty", "brief", "checks"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "difficulty": { "enum": ["intro", "core", "advanced"] },
+    "brief": { "type": "string", "minLength": 1, "description": "The domain prompt shown to the learner." },
+    "starter": { "type": "string", "description": "Path (relative to this file) to a partial starter .orm.yaml." },
+    "reference": { "type": "string", "description": "Path (relative to this file) to one valid answer; backs forbids_population checks." },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/check" }
+    }
+  },
+  "definitions": {
+    "constraintKind": {
+      "enum": ["internal_uniqueness", "mandatory", "value", "frequency", "ring"]
+    },
+    "elementQuery": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["entity"],
+          "additionalProperties": false,
+          "properties": { "entity": { "type": "string", "minLength": 1 } }
+        },
+        {
+          "type": "object",
+          "required": ["factTypeBetween"],
+          "additionalProperties": false,
+          "properties": {
+            "factTypeBetween": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
+        }
+      ]
+    },
+    "check": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "must_validate" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "sentence"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "requires_verbalization" },
+            "sentence": { "type": "string", "minLength": 1 },
+            "hint": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "element"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "requires_element" },
+            "element": { "$ref": "#/definitions/elementQuery" },
+            "hint": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "factType", "constraint"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "forbids_population" },
+            "factType": { "type": "string", "minLength": 1 },
+            "constraint": { "$ref": "#/definitions/constraintKind" },
+            "hint": { "type": "string" }
+          }
+        }
+      ]
+    }
+  }
+}
