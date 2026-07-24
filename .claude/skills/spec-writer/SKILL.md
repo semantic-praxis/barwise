@@ -28,6 +28,15 @@ reviewer's time as more valuable than your own. Three rules follow:
   Every section earns its place by changing what the reviewer decides or
   the implementer does.
 
+These rules are the reviewer-facing edge of the `articulation` skill,
+which governs whether the spec lands: the reviewer is the audience, and
+their action is to approve, object, or decide an open question. Invoke
+`articulation` as the clarity discipline for the whole spec. Start with
+its verbalization test -- state the spec's resolution in one plain
+sentence before structuring anything; if you cannot, the design is not
+yet ready to write down, and no formatting will rescue it. Let that
+sentence become the BLUF.
+
 ## Workflow
 
 1. **Ground it, then frame it.** Read `barwise/docs/ARCHITECTURE.md`,
@@ -57,8 +66,16 @@ reviewer's time as more valuable than your own. Three rules follow:
    the reviewer's call (package scope, where shared I/O lives,
    API shape). Recommend a default; do not silently decide. These are
    ADR-shaped -- state the options and the trade-off.
-6. **Edit.** Run the edit passes in `editing.md` (scanning `llm-tics.md`
-   during the voice pass) before the spec is shared.
+6. **Edit, then run an articulation pass.** Run the edit passes in
+   `editing.md` (scanning `llm-tics.md` during the voice pass), then
+   invoke the `articulation` skill in critique mode over the draft. Its
+   barrier taxonomy catches the spec-specific failures the voice pass
+   misses: a buried lede (a heading that does not state its resolution),
+   a fuzzy abstraction (a "robust" or "scalable" claim with no
+   operational meaning), a missing bridge (a design leap from premises
+   the reviewer does not have), or a wall of detail (an inventory or
+   architecture dump with no hierarchy). Fix what it finds before the
+   pre-push gate.
 7. **Clear the gate, then land.** Run the pre-push gate below, land the
    spec for review, then implement in separate PRs. Before implementing
    each workstream, ground it again and verify or correct the
