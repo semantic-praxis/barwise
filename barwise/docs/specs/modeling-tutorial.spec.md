@@ -2,7 +2,7 @@
 
 Status: Draft for review (design only -- no implementation in this PR)
 Created: 2026-07-03
-Last-updated: 2026-07-03
+Last-updated: 2026-07-22
 Tracking: Feature follow-up to the `docs/anki` learning deck (PR #253)
 and the modeling-gym spec (`docs/specs/modeling-gym.spec.md`, PR #254).
 No bd issue yet -- the bd binary is unavailable in this web session;
@@ -102,7 +102,7 @@ Out of scope, deferred and named:
 | `@barwise/core/counterexample` | `generateCounterexampleForConstraint` consumed as-is               | untouched |
 | `@barwise/core/verbalization`  | `Verbalizer` consumed as-is                                        | untouched |
 | `@barwise/diagram`             | Optional per-step SVG of the model-so-far                          | consumed  |
-| `@barwise/gym`                 | Its evaluator reused by the later interactive driver only          | untouched |
+| `@barwise/learn`               | Its evaluator reused by the later interactive driver only          | untouched |
 
 No core change: the build calls `generateCounterexampleForConstraint`,
 `Verbalizer`, `ValidationEngine`, and (optionally) the diagram renderer
@@ -126,7 +126,7 @@ purely as a consumer, through published exports.
   |      output:       docs/tutorial/*.md  (committed, regenerable)
   |
   |--- (later) interactive driver: CLI/MCP that walks the steps and
-  |            checks attempts via the @barwise/gym evaluator
+  |            checks attempts via the @barwise/learn evaluator
 ```
 
 The step contract:
@@ -175,7 +175,7 @@ lines for `buildsOn` / `unlocks`.
   itself unbuilt. The document carries the entire pedagogical payload;
   interactivity is an enhancement layered on later.
 - **A second new package `@barwise/tutorial`.** Weighed against reusing
-  `@barwise/gym` (see Open decision 1). The two share the
+  `@barwise/learn` (see Open decision 1). The two share the
   counterexample-as-motivation mechanism, the model-snapshot step shape,
   and -- for interactivity -- the evaluator. A separate package re-imports
   all three; hosting both learning artifacts in one package keeps the
@@ -213,7 +213,7 @@ link additionally depends on the gym's catalog.
 
 A CLI/MCP driver that walks the steps: show the generated motivation,
 present the model-so-far, invite the learner to make the step's change,
-and check the attempt with the `@barwise/gym` evaluator before advancing.
+and check the attempt with the `@barwise/learn` evaluator before advancing.
 The tutorial becomes a guided gym. Out of this spec's build scope; noted
 so the boundary is explicit. Depends on the gym (spec #254) being built.
 
@@ -223,21 +223,18 @@ Additive only. No existing signatures change. The tutorial build consumes
 `@barwise/core/counterexample`, `/verbalization`, and optionally
 `@barwise/diagram`, all as-is. A new `regen:tutorial`-style script and a
 drift test are added. The interactive driver (workstream 3) would later
-depend on `@barwise/gym`. No serialization, validation, or verbalization
+depend on `@barwise/learn`. No serialization, validation, or verbalization
 behavior changes, so downstream packages are unaffected.
 
 ## Open decisions
 
-1. **Where the tutorial build and schema live.** Reuse `@barwise/gym` as
-   the single learning package (recommended -- it already owns the
-   counterexample-as-motivation mechanism and the model-snapshot step
-   shape, and the interactive layer needs its evaluator) vs a new
-   `@barwise/tutorial` package vs a content-only `docs/tutorial/` with a
-   build script hosted in an existing package. Recommendation: host the
-   schema and renderer in the gym package; if that package's name is felt
-   to over-index on "gym", rename it to something covering both artifacts
-   (e.g. `@barwise/learn`) while it is still unbuilt. This couples to
-   Open decision 1 of the gym spec.
+1. **Where the tutorial build and schema live (resolved: `@barwise/learn`).**
+   The single learning package hosts both artifacts: the gym (its
+   evaluator already shipped there) and the tutorial's schema and
+   renderer. It already owns the counterexample-as-motivation mechanism
+   and the model-snapshot step shape, and the interactive layer needs its
+   evaluator. A separate `@barwise/tutorial` package was rejected to keep
+   the learning concern in one place.
 2. **The worked-tutorial domain.** Reuse an existing example domain
    (recommended -- e.g. a trimmed `order-management` from
    `examples/output/`, so the tutorial, the examples, and the gym share a
