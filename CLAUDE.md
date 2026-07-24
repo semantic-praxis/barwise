@@ -86,6 +86,9 @@ working in a package:
   |--- @barwise/formats         (core)  -- connector package: registers
   |                                        the standard DDL/OpenAPI/Avro/
   |                                        NORMA/SQL descriptors
+  |--- @barwise/learn           (core)  -- learning artifacts: the modeling
+  |                                        gym (exercise format + deterministic
+  |                                        evaluator); tutorial planned
   |--- @barwise/cli             (core, diagram, llm, code-analysis, dbt, formats)
   |--- @barwise/mcp             (core, diagram, llm, code-analysis, dbt, formats)
   |--- barwise-vscode           (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, mcp)

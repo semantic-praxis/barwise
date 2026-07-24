@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=../schemas/gym-exercise.schema.json
+id: "customer-order"
+title: "One customer per order"
+difficulty: "intro"
+brief: |
+  A customer places orders, and each order is placed by exactly one
+  customer. Model the object types Customer and Order, add a fact type
+  that relates them, and constrain it so that a single order can never be
+  recorded as placed by two different customers.
+reference: "customer-order.reference.orm.yaml"
+checks:
+  - kind: "requires_element"
+    element:
+      entity: "Order"
+  - kind: "requires_element"
+    element:
+      factTypeBetween: ["Customer", "Order"]
+  - kind: "must_validate"
+  - kind: "forbids_population"
+    factType: "Customer places Order"
+    constraint: "internal_uniqueness"
+    hint: "Put a single-role uniqueness constraint on the Order role -- each order is placed by at most one customer."

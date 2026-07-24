@@ -1,0 +1,37 @@
+{
+  "name": "@barwise/learn",
+  "version": "1.6.1",
+  "private": true,
+  "description": "Learning artifacts for ORM: the modeling gym (exercise format and deterministic evaluator) and, later, the guided tutorial",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "schemas",
+    "exercises"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest watch",
+    "lint": "eslint src/ tests/",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@barwise/core": "1.6.1",
+    "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "@vitest/coverage-v8": "^3.0.0",
+    "vitest": "^3.0.0"
+  }
+}
