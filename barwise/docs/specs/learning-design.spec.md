@@ -50,7 +50,12 @@ would know. That gap is what the standard closes.
 
 The six levels C1 transitions are named on, defined for barwise by what
 a learner at each level can observably do with ORM. The scale measures
-ORM proficiency specifically, not modeling experience in general.
+ORM proficiency specifically, not modeling experience in general. It is
+also a different axis from the deck's tier tags (`tier1-recall`,
+`tier3-judgment`, the planned discrimination tier): tiers classify the
+cognitive act a single card demands, the scale classifies the learner
+transition a module serves, and a module at any level can carry cards
+of several tiers.
 
 - **Naive** -- no exposure to fact-based modeling. Cannot yet tell a
   fact from an attribute. Gets the tutorial opening, the foundations
@@ -386,14 +391,19 @@ existing checks.
    cue, but cards then embed arbitrary learner content). Recommendation:
    check-and-hint only for the first iteration; add the fragment later
    if miss cards prove too abstract to trigger recall of the failure.
-5. **A local session history for resumability.** The gym CLI could
-   append a session log beside the miss cards -- exercise attempted,
-   checks failed, cards emitted, next step suggested -- so a learner can
-   see where they left off. It stays an output artifact owned by the
-   gym, like `misses.txt`; it becomes the rejected orchestrator only if
-   something starts reading it to control the other artifacts.
-   Recommendation: yes, as part of workstream 5's CLI write, with the
-   log format kept human-readable.
+5. **A local session history, and where learner state lives.** The gym
+   CLI could append a session log -- exercise attempted, checks failed,
+   cards emitted, next step suggested -- serving two purposes:
+   resumability (where did I leave off?) and longitudinal gap analysis
+   (the log plus the emitted cards are the record a learner, or the
+   coaching layer named in Non-goals, can mine for recurring gaps).
+   It stays an output artifact owned by the gym; it becomes the
+   rejected orchestrator only if something starts reading it to
+   control the other artifacts. Recommendation: yes, in workstream 5's
+   CLI write; keep it human-readable; home it at
+   `$XDG_STATE_HOME/barwise/` (fallback `~/.local/state/barwise/`),
+   and copy emitted miss-card files there too, so the complete record
+   lives in one place a future analysis session can read.
 
 ## Risks and testing
 

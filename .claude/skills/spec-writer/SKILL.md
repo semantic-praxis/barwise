@@ -153,6 +153,13 @@ reverse.
 - **Open decisions are genuinely open** -- each states the options and
   the trade-off and recommends a default, and nothing that is the
   reviewer's call has been silently decided in the body.
+- **Mechanism closure**: every field, file, command, or API a
+  requirement names must either exist (verified against the code) or
+  be delivered by a named workstream. The accuracy pass verifies
+  claims about what exists; this check covers the nouns the design
+  invents -- "the authored diagnosis" with no field to hold it reads
+  fine and builds nothing. Ask of each one: which field, in which
+  file, from which workstream?
 - **Header block is current** -- `Status`, `Created`, `Last-updated`
   (bumped if this push revises an existing spec), `Tracking`.
 - **REPO_REVIEW link**: reference the finding the spec resolves, and
