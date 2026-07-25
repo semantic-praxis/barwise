@@ -1,0 +1,220 @@
+id: "order-fulfillment"
+title: "Modeling Order Fulfillment: a CSDP walkthrough"
+
+# Learning-design C1: the transition this tutorial serves and the
+# observable performance that marks its far side.
+transition:
+  from: "naive"
+  to: "initiate"
+exitPerformance: >
+  Given a short description of a business domain with sample data, can
+  state its elementary facts as readings, model them as fact types with
+  reference schemes, add the uniqueness, mandatory, and value
+  constraints the samples justify, and defend each constraint against
+  the population it rules out.
+
+intro: >
+  This tutorial builds one small model -- order fulfillment: customers,
+  orders, products, statuses -- by walking the Conceptual Schema Design
+  Procedure (CSDP), the seven-step method ORM ships with. Every step
+  starts from a defect the model still has, and most defects are not
+  described but *generated*: barwise computes the exact population the
+  current model wrongly allows, and the step's concept is whatever rules
+  it out. By the end you will have watched a model earn each of its
+  constraints.
+
+steps:
+  - id: "facts"
+    csdpStep: 1
+    title: "From familiar examples to elementary facts"
+    model: "models/step-01.orm.yaml"
+    motivation:
+      kind: "prose"
+      text: >
+        Here is how the fulfillment team talks: "Ines placed order 501.
+        Order 501 includes the espresso machine and the grinder. It is
+        still open." Nothing here is a table or a column; it is
+        sentences about individual things. The first CSDP step is to
+        keep it that way: restate the examples as *elementary facts* --
+        sentences that cannot be split without losing information --
+        and name the kinds of things they mention. "Ines placed order
+        501" mentions a Customer and an Order; splitting it loses the
+        fact entirely, so it is elementary.
+    concept: >
+      An ORM model starts as a set of fact types -- sentence patterns
+      with holes -- not as tables. Each hole is a *role* played by an
+      *object type*, and each object type needs a *reference scheme*:
+      how a single instance is identified (a customer number, an order
+      number, a product code). Write the pattern both ways when it
+      reads naturally ("Customer places Order" / "Order is placed by
+      Customer"); these *readings* are the model's contract with the
+      domain expert, who can check a sentence but not a schema. Note
+      what is missing on purpose: no keys, no foreign keys, no nulls.
+      Those are relational concerns; here there are only facts.
+    buildsOn: []
+    unlocks: ["populate", "uc-one-customer"]
+    deck: "ORM 2::Fact Types"
+
+  - id: "populate"
+    csdpStep: 2
+    title: "Populate the fact types and look at what they allow"
+    model: "models/step-02.orm.yaml"
+    motivation:
+      kind: "prose"
+      text: >
+        A fact type without sample facts is a guess. The second CSDP
+        step is the *population check*: fill each fact type with real
+        examples and read every row aloud as a sentence. Do it here and
+        something is off: the sample data records both "C-1001 places
+        O-501" and "C-1002 places O-501" -- one order placed by two
+        different customers. Every row reads fine on its own. The
+        problem is not in any row; it is that nothing yet says which
+        *combinations* of rows are impossible.
+    concept: >
+      Populations are the model's test data, and reading them aloud is
+      the cheapest validation ORM has. A population that looks wrong
+      but is allowed is the signal that a *constraint* is missing --
+      constraints are exactly "which populations are impossible."
+      This step also covers the CSDP's early hygiene checks: are two
+      object types really the same kind of thing under different names
+      (Product vs. Item), and is any "fact" really derivable from
+      others? Settle those before constraining. From here on, every
+      step is provoked by a population the model still allows.
+    buildsOn: ["facts"]
+    unlocks: ["uc-one-customer"]
+    deck: "ORM 2::Verbalization"
+
+  - id: "uc-one-customer"
+    csdpStep: 4
+    title: "Each order has one placer: internal uniqueness"
+    model: "models/step-03.orm.yaml"
+    motivation:
+      kind: "counterexample"
+      constraintId: "c-uc-places-order"
+    concept: >
+      A *uniqueness constraint* over a role says: in the population,
+      each instance plays that role at most once. Spanning just the
+      Order role of "Customer places Order", it makes the offending
+      pair of rows from the last step impossible -- one order, one
+      placer -- while leaving a customer free to place many orders.
+      This is the constraint that fixes the fact type's *multiplicity*
+      (many-to-one), and it is the single most common constraint in
+      any model. Verbalized, it reads back as the business rule the
+      team would actually say: "each Order is placed by at most one
+      Customer."
+    buildsOn: ["populate"]
+    unlocks: ["uc-spanning", "mandatory-placer"]
+    deck: "ORM 2::Constraints I"
+    gym: "customer-order"
+
+  - id: "uc-spanning"
+    csdpStep: 4
+    title: "Many-to-many still needs uniqueness: the spanning constraint"
+    model: "models/step-04.orm.yaml"
+    motivation:
+      kind: "counterexample"
+      constraintId: "c-uc-includes"
+    concept: >
+      "Order includes Product" is genuinely many-to-many: an order
+      holds many products, a product appears in many orders. It is
+      tempting to conclude no uniqueness applies -- but then the same
+      row could be recorded twice, as the generated population shows.
+      The fix is a uniqueness constraint *spanning both roles*: each
+      (Order, Product) combination at most once. Every elementary fact
+      type carries some uniqueness constraint; what varies is how many
+      roles it spans. The same move gives "Order has OrderStatus" its
+      one-status-per-order rule.
+    buildsOn: ["uc-one-customer"]
+    unlocks: ["freq-line-limit"]
+    deck: "ORM 2::Constraints I"
+
+  - id: "mandatory-placer"
+    csdpStep: 5
+    title: "No order from nowhere: the mandatory role"
+    model: "models/step-05.orm.yaml"
+    motivation:
+      kind: "counterexample"
+      constraintId: "c-mand-places-order"
+    concept: >
+      Uniqueness says "at most"; *mandatory* says "at least". Without
+      it, an order can exist in the model -- appear in "Order includes
+      Product", carry a status -- while playing no role in "Customer
+      places Order" at all: an order nobody placed. Marking the Order
+      role mandatory closes that gap: every order that exists anywhere
+      must appear here. Together the pair reads "each Order is placed
+      by exactly one Customer" -- and note the asymmetry: Customer's
+      role stays optional, because a customer with no current orders
+      is fine. Deciding which roles are mandatory is a business
+      question, not a formality.
+    buildsOn: ["uc-one-customer"]
+    unlocks: ["value-status"]
+    deck: "ORM 2::Constraints I"
+
+  - id: "value-status"
+    csdpStep: 6
+    title: "Only these statuses: the value constraint"
+    model: "models/step-06.orm.yaml"
+    motivation:
+      kind: "counterexample"
+      constraintId: "c-val-status"
+    concept: >
+      OrderStatus is a *value type*: its instances are the values
+      themselves, so the type is constrained by listing them. A *value
+      constraint* on the status role pins the population to {open,
+      shipped, cancelled} -- anything else is not a status, it is a
+      typo. Value constraints are how a model refuses the "stringly
+      typed" failure mode: the legal vocabulary is part of the schema,
+      visible to the domain expert in the verbalization, not buried in
+      application code.
+    buildsOn: ["mandatory-placer"]
+    unlocks: ["subtype-priority"]
+    deck: "ORM 2::Constraints I"
+
+  - id: "subtype-priority"
+    csdpStep: 6
+    title: "Some orders are special: subtyping"
+    model: "models/step-07.orm.yaml"
+    motivation:
+      kind: "prose"
+      text: >
+        The team flags some orders for expedited handling, and only
+        those get assigned to a courier. Where does "is assigned to
+        Courier" attach? On Order, the model quietly claims any order
+        may have a courier -- false. A status value "priority" says
+        nothing about the courier rule. What the domain is telling us
+        is that a *kind of order* exists with facts of its own.
+    concept: >
+      A *subtype* is an object type whose instances are a subset of
+      another's: every PriorityOrder is an Order, identified the same
+      way, inheriting every Order fact type -- and roles that apply
+      only to the subtype attach to the subtype. "PriorityOrder is
+      assigned to Courier" now says exactly what the business said:
+      couriers are for priority orders, full stop. Subtype when a
+      subset of instances plays roles the rest cannot; use a value
+      (like OrderStatus) when it is just a changing label with no
+      facts of its own.
+    buildsOn: ["value-status"]
+    unlocks: ["freq-line-limit"]
+    deck: "ORM 2::Subtypes"
+
+  - id: "freq-line-limit"
+    csdpStep: 7
+    title: "At most five products: the frequency constraint"
+    model: "models/step-08.orm.yaml"
+    motivation:
+      kind: "counterexample"
+      constraintId: "c-freq-includes"
+    concept: >
+      The warehouse packs at most five distinct products per order;
+      bigger requests are split. Uniqueness cannot say this -- it only
+      forbids exact repeats. A *frequency constraint* bounds how many
+      times an instance may play a role: here, an order appears in
+      "Order includes Product" between one and five times. This is the
+      CSDP's final family -- the "other constraints" pass (frequency,
+      ring, and friends) that captures the numeric and structural
+      rules the earlier passes could not express. The model is now
+      complete enough to hand to the relational mapper -- and every
+      constraint in it was earned by a population it rules out.
+    buildsOn: ["uc-spanning", "subtype-priority"]
+    unlocks: []
+    deck: "ORM 2::Constraints II"

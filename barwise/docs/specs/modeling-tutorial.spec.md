@@ -1,8 +1,19 @@
 # Modeling tutorial: a motivated, CSDP-ordered path through ORM
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: WS1 + WS2 implemented 2026-07-25 -- the step format, pure
+parser, fs loader, and deterministic renderer live in
+`@barwise/learn/src/tutorial/`; the worked CSDP tutorial
+(order-fulfillment, 8 steps, 5 generated counterexample motivations)
+renders to the committed `docs/tutorial/order-fulfillment.md` via
+`npm run regen:tutorial`, guarded by a drift test plus renderer honesty
+checks (a step's named constraint must be new in that step; every
+snapshot must validate clean). Deck cross-links populated on every
+step; the gym link points at the seed `customer-order` exercise
+(more gym links as the catalog grows). C1 front matter (transition +
+exit performance) is required by the parser. WS3 (interactive driver)
+remains open, gated on the gym CLI surface.
 Created: 2026-07-03
-Last-updated: 2026-07-22
+Last-updated: 2026-07-25
 Tracking: Feature follow-up to the `docs/anki` learning deck (PR #253)
 and the modeling-gym spec (`docs/specs/modeling-gym.spec.md`, PR #254).
 No bd issue yet -- the bd binary is unavailable in this web session;

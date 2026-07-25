@@ -26,7 +26,8 @@
     "validate:examples": "bash scripts/validate-examples.sh",
     "regen:examples": "bash scripts/regen-example-output.sh",
     "arch:triage": "node scripts/arch-triage.mjs",
-    "prepare": "cd .. && husky barwise/.husky"
+    "prepare": "cd .. && husky barwise/.husky",
+    "regen:tutorial": "node scripts/regen-tutorial.mjs"
   },
   "devDependencies": {
     "@dprint/json": "0.19.4",

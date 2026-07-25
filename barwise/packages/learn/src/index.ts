@@ -12,3 +12,20 @@ export type {
 // Evaluator
 export { evaluateCandidate } from "./evaluate/evaluateCandidate.js";
 export type { CheckResult, GymReport } from "./evaluate/GymReport.js";
+
+// Tutorial (modeling-tutorial spec, workstream 1)
+export { loadTutorial } from "./tutorial/loadTutorial.js";
+export { parseTutorial, TutorialParseError } from "./tutorial/parseTutorial.js";
+export {
+  renderTutorial,
+  type RenderTutorialOptions,
+  TutorialRenderError,
+} from "./tutorial/renderTutorial.js";
+export type {
+  LoadedTutorial,
+  LoadedTutorialStep,
+  TutorialDef,
+  TutorialMotivation,
+  TutorialStepDef,
+  TutorialTransition,
+} from "./tutorial/types.js";
