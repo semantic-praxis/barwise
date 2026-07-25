@@ -3,6 +3,7 @@
  */
 
 import type { OrmModel } from "@barwise/core";
+import { collectOpenQuestionAnnotations } from "@barwise/core/annotation";
 import { type Counterexample, generateCounterexamples } from "@barwise/core/counterexample";
 import { Verbalizer } from "@barwise/core/verbalization";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -52,10 +53,17 @@ export function registerVerbalizeTool(server: McpServer): void {
               + "constraint forbids -- a probe to confirm the model rules "
               + "out what it should.",
           ),
+        annotate: z
+          .boolean()
+          .optional()
+          .describe(
+            "When false, omit the open-questions section derived from "
+              + "model annotations. Default true.",
+          ),
       },
     },
-    async ({ source, domain, factType, mode, counterexamples }) => {
-      return executeVerbalize(source, factType, mode, counterexamples, domain);
+    async ({ source, domain, factType, mode, counterexamples, annotate }) => {
+      return executeVerbalize(source, factType, mode, counterexamples, domain, annotate);
     },
   );
 }
@@ -66,6 +74,7 @@ export function executeVerbalize(
   mode: "full" | "summary" = "full",
   counterexamples = false,
   domain?: string,
+  annotate = true,
 ): { content: Array<{ type: "text"; text: string; }>; } {
   const { resolved, problems } = resolveModels(source, domain);
   const spill = sourcePath(source);
@@ -73,12 +82,12 @@ export function executeVerbalize(
   // Single plain model: preserve the original output exactly (summary and
   // not-found stay inline; full output spills when large).
   if (resolved.length === 1 && resolved[0]!.context === undefined && problems.length === 0) {
-    return verbalizeSingle(resolved[0]!.model, spill, factType, mode, counterexamples);
+    return verbalizeSingle(resolved[0]!.model, spill, factType, mode, counterexamples, annotate);
   }
 
   const multi = resolved.length > 1;
   const parts = resolved.map(({ context, model }) => {
-    const body = verbalizeText(model, factType, mode, counterexamples);
+    const body = verbalizeText(model, factType, mode, counterexamples, annotate);
     return multi && context ? `== ${context} ==\n\n${body}` : body;
   });
   const warn = problems.length > 0
@@ -94,6 +103,7 @@ function verbalizeSingle(
   factType: string | undefined,
   mode: "full" | "summary",
   counterexamples: boolean,
+  annotate: boolean,
 ): { content: Array<{ type: "text"; text: string; }>; } {
   if (factType && !model.getFactTypeByName(factType)) {
     return {
@@ -104,7 +114,7 @@ function verbalizeSingle(
     const verbalizations = new Verbalizer().verbalizeModel(model);
     return { content: [{ type: "text" as const, text: buildSummary(verbalizations) }] };
   }
-  return boundedTextResult(verbalizeText(model, factType, mode, counterexamples), {
+  return boundedTextResult(verbalizeText(model, factType, mode, counterexamples, annotate), {
     kind: "verbalization",
     source: spill,
   });
@@ -116,6 +126,7 @@ function verbalizeText(
   factType: string | undefined,
   mode: "full" | "summary",
   counterexamples: boolean,
+  annotate = true,
 ): string {
   const verbalizer = new Verbalizer();
 
@@ -132,7 +143,9 @@ function verbalizeText(
     return text;
   }
 
-  const verbalizations = verbalizer.verbalizeModel(model);
+  const verbalizations = mode === "full" && annotate
+    ? verbalizer.verbalizeModelWithAnnotations(model, collectOpenQuestionAnnotations(model))
+    : verbalizer.verbalizeModel(model);
   if (mode === "summary") return buildSummary(verbalizations);
 
   let text = verbalizations.map((v) => v.text).join("\n");

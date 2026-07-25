@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
 import type { Constraint } from "./Constraint.js";
+import { generateId } from "./id.js";
 import { ModelElement } from "./ModelElement.js";
 import { type ReadingOrder, validateReadingTemplate } from "./ReadingOrder.js";
 import { Role, type RoleConfig } from "./Role.js";
@@ -106,7 +106,7 @@ export class FactType extends ModelElement {
     this._readings = config.readings.map((template) => ({ template }));
     // Assign IDs to constraints that don't have them (for traceability).
     this._constraints = (config.constraints ?? []).map((c) =>
-      c.id ? c : { ...c, id: randomUUID() }
+      c.id ? c : { ...c, id: generateId() }
     );
     this._definition = config.definition;
     this._note = config.note;

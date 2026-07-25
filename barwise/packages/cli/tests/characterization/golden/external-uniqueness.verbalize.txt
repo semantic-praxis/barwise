@@ -5,3 +5,10 @@ Building houses Room
 Room has RoomNumber
 RoomNumber numbers Room
   Each Room has at most one RoomNumber.
+== Open questions ==
+[room] No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+[room.room_id] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+[room.building_code] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+[room.room_number] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+[building] No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+[building.building_code] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.

@@ -36,9 +36,20 @@ export class DiagramSession {
   private activeViewName: string | undefined;
   private readonly ghostObjectTypeIds = new Set<string>();
   private lastLayout: PositionedGraph | undefined;
+  /**
+   * Needs-attention annotations keyed by element id, supplied by the host
+   * (the session never derives them -- annotations enter the diagram
+   * package as input data, per the annotation-propagation spec).
+   */
+  private annotations: ReadonlyMap<string, readonly string[]> | undefined;
 
-  constructor(model: OrmModel, savedLayout?: DiagramLayout) {
+  constructor(
+    model: OrmModel,
+    savedLayout?: DiagramLayout,
+    annotations?: ReadonlyMap<string, readonly string[]>,
+  ) {
     this.model = model;
+    this.annotations = annotations;
     this.seedOverridesFromSavedLayout(model, savedLayout);
   }
 
@@ -56,8 +67,12 @@ export class DiagramSession {
    * Hot-swap the model (live reload). Stale filter ids are pruned and an
    * active view filter is expanded to touch the new model.
    */
-  setModel(model: OrmModel): void {
+  setModel(
+    model: OrmModel,
+    annotations?: ReadonlyMap<string, readonly string[]>,
+  ): void {
     this.model = model;
+    if (annotations !== undefined) this.annotations = annotations;
     this.cleanStaleFilterIds();
     this.expandFilterForNewModel();
   }
@@ -72,6 +87,7 @@ export class DiagramSession {
       focusEntityId: useFocusForFilter ? this.focusEntityId : undefined,
       hopCount: useFocusForFilter ? this.hopCount : undefined,
       includeFilter,
+      annotations: this.annotations,
     });
     this.lastLayout = result.layout;
     return this.buildPresentation(result.layout);

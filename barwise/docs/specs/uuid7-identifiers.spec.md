@@ -1,7 +1,12 @@
 # UUIDv7 identifiers: creation order visible in the id
 
-Status: Accepted (user-directed 2026-07-25) -- design ready for
-implementation
+Status: Implemented 2026-07-25 -- WS1: `core/src/model/id.ts`
+(`uuidv7FromParts` pure kernel, `generateId`/`setIdGenerator` seam,
+the three mint sites switched); WS2: `installUuidv7IdGenerator`
+installed at the CLI entry, MCP server entry, and VS Code activation,
+with the same-millisecond rand_a counter. Fixed-vector and
+mint-order tests in core, cli, and mcp; purity gate green. Accepted
+(user-directed 2026-07-25).
 Created: 2026-07-25
 Last-updated: 2026-07-25
 Tracking: project-owner directive (2026-07-25) alongside the role-path

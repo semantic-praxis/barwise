@@ -5,6 +5,7 @@
  * .orm-project.yaml manifest, generates one SVG per domain.
  */
 
+import { collectAnnotationMap } from "@barwise/core/annotation";
 import { generateDiagram } from "@barwise/diagram";
 import { renderDiagramSvg } from "@barwise/diagram-ui/server";
 import type { Command } from "commander";
@@ -23,8 +24,12 @@ export function registerDiagramCommand(program: Command): void {
       "--domain <context>",
       "For a project, diagram only this one domain (writes a single SVG)",
     )
+    .option(
+      "--no-annotate",
+      "Exclude needs-attention markers (dashed borders + TODO titles)",
+    )
     .action(
-      async (file: string, opts: { output?: string; domain?: string; }) => {
+      async (file: string, opts: { output?: string; domain?: string; annotate: boolean; }) => {
         // Print deprecation notice to stderr.
         process.stderr.write(
           "Note: 'barwise diagram' is deprecated. Use 'barwise export --format svg' instead (when available).\n\n",
@@ -33,13 +38,13 @@ export function registerDiagramCommand(program: Command): void {
         try {
           if (isProjectFile(file)) {
             if (opts.domain) {
-              await diagramDomain(file, opts.domain, opts.output);
+              await diagramDomain(file, opts.domain, opts.annotate, opts.output);
             } else {
-              await diagramProject(file, opts.output);
+              await diagramProject(file, opts.annotate, opts.output);
             }
           } else {
             const model = loadModel(file);
-            const result = await generateDiagram(model);
+            const result = await generateDiagram(model, diagramOptions(model, opts.annotate));
             writeOutput(renderDiagramSvg(result.layout), opts.output);
           }
         } catch (err) {
@@ -57,6 +62,7 @@ export function registerDiagramCommand(program: Command): void {
 async function diagramDomain(
   file: string,
   context: string,
+  annotate: boolean,
   output?: string,
 ): Promise<void> {
   const { project, problems } = loadProject(file);
@@ -81,7 +87,7 @@ async function diagramDomain(
     return;
   }
 
-  const result = await generateDiagram(domain.model);
+  const result = await generateDiagram(domain.model, diagramOptions(domain.model, annotate));
   writeOutput(renderDiagramSvg(result.layout), output);
 }
 
@@ -90,7 +96,11 @@ async function diagramDomain(
  * `<outputDir>/<context>.svg`. An output directory is required because
  * a project produces multiple SVGs.
  */
-async function diagramProject(file: string, outputDir?: string): Promise<void> {
+async function diagramProject(
+  file: string,
+  annotate: boolean,
+  outputDir?: string,
+): Promise<void> {
   if (!outputDir) {
     process.stderr.write(
       "Error: diagramming a project requires --output <dir>.\n",
@@ -108,7 +118,7 @@ async function diagramProject(file: string, outputDir?: string): Promise<void> {
   const written: string[] = [];
   for (const domain of project.domains) {
     if (!domain.model) continue;
-    const result = await generateDiagram(domain.model);
+    const result = await generateDiagram(domain.model, diagramOptions(domain.model, annotate));
     const outPath = join(outputDir, `${domain.context}.svg`);
     writeFileSync(outPath, renderDiagramSvg(result.layout), "utf-8");
     written.push(outPath);
@@ -124,4 +134,12 @@ async function diagramProject(file: string, outputDir?: string): Promise<void> {
   for (const path of written) {
     process.stderr.write(`  ${path}\n`);
   }
+}
+
+/**
+ * Diagram options for one model: needs-attention annotations unless the
+ * user opted out with --no-annotate.
+ */
+function diagramOptions(model: Parameters<typeof collectAnnotationMap>[0], annotate: boolean) {
+  return annotate ? { annotations: collectAnnotationMap(model) } : undefined;
 }

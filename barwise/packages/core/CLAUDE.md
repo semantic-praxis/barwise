@@ -50,8 +50,11 @@ Lint is run from the repo root: `npm run lint`.
 
 ## Key Conventions
 
-- Every model element has a UUID assigned at creation via
-  `node:crypto.randomUUID()`. Never add the `uuid` npm package.
+- Every model element gets a UUID default id at creation via
+  `generateId()` (`src/model/id.ts`): v4 `randomUUID()` unless a
+  surface entry point installed the UUIDv7 generator (see
+  `docs/specs/uuid7-identifiers.spec.md`). Never add the `uuid` npm
+  package; the v7 bit layout is core's pure `uuidv7FromParts`.
 - Constraint types use discriminated unions with type guard functions
   (`isInternalUniqueness`, `isMandatoryRole`, etc.) rather than class
   hierarchies.
