@@ -186,16 +186,17 @@ wrong model. This catalog seeds C2; authors extend it.
 | Assume binary arity; miss a genuine ternary        | Prose with an irreducible ternary (who scored what in which subject)                | The binary decomposition accepts a population the ternary forbids; `forbids_population` fails      |
 | Conflate entity types with value types             | Prose where a label looks self-identifying but carries its own facts                | The label accrues its own facts; `must_validate` fails on the entity type with no reference scheme |
 | Treat constraints as decoration added after        | Prose whose whole point is a rule (each order has one customer)                     | The unconstrained model forbids nothing; `forbids_population` fails wholesale                      |
-| Read subtypes as an ISA taxonomy, not role-derived | Prose with a subtype that plays no role its supertype cannot                        | The subtype earns nothing; `requires_element` on its distinguishing role fails                     |
+| Read subtypes as an ISA taxonomy, not role-derived | Prose with a subtype that plays no role its supertype cannot                        | The subtype earns nothing; `requires_element` (a fact type only the subtype plays) fails           |
 
 ## Scope
 
 In scope: the standard (C1-C6); the published proficiency scale with
 its start-early guidance for experienced modelers; the reductive-bias
 catalog; an authoring checklist extracted from the standard (where it
-lives is Open decision 1); the cross-artifact loop -- optional `reading`
-fields in the gym exercise schema and deck-format miss-card emission
-from gym failures; aligning the gym's difficulty axis to the scale; and
+lives is Open decision 1); the cross-artifact loop -- `reading` and
+`diagnosis` fields in the gym exercise schema and deck-format miss-card
+emission from gym failures; aligning the gym's difficulty axis to the
+scale; and
 the ordered workstreams that retrofit the deck, gym, and tutorial to
 conform.
 
@@ -279,10 +280,11 @@ session recipe; no code enforces it.
 
 This spec, plus the authoring checklist (the C1-C6 checks, the
 proficiency scale with its start-early guidance for experienced
-modelers, and the catalog, condensed) that every content PR references
-in its description; where the checklist lives is Open decision 1
-(recommended: `docs/learning-authoring.md`). Smallest blast radius:
-docs only, nothing depends on it yet.
+modelers, the session recipe from the target architecture, and the
+catalog, condensed) that every content PR references in its
+description; where the checklist lives is Open decision 1 (recommended:
+`docs/learning-authoring.md`). Smallest blast radius: docs only,
+nothing depends on it yet.
 
 ### 2. Gym: the reductive-bias exercise set
 
@@ -308,16 +310,24 @@ than blocking them; keep the generation-first hook.
 
 ### 5. Gym: reading references and miss-card emission
 
-Three changes to `@barwise/learn` and its planned CLI surface:
+Four changes to `@barwise/learn` and its planned CLI surface:
 
-- Optional `reading` fields in the exercise schema, at two grains:
+- `reading` fields in the exercise schema, at two grains:
   exercise-level (the pre-session skim) and per check (the section a
   failure sends you to). Schema-only; landing this alongside
   workstream 2 lets the bias exercises carry readings from birth.
+- A per-check `diagnosis` field: the text C2's diagnosis step reveals
+  and the miss card carries on its back. `hint` keeps its current job
+  (guidance toward the fix, shown on the card front); `diagnosis`
+  explains why the reading that produced the failure was wrong. Both
+  `reading` and `diagnosis` are optional in the schema so existing
+  exercises parse; the C6 check is what makes them required of
+  conforming modules.
 - Replace the exercise schema's `difficulty` enum (`intro`, `core`,
-  `advanced`) with the C1 `transition` declaration (`from`/`to` on the
-  proficiency scale). One field then serves both C1's front-matter
-  check and level-based selection ("I am an apprentice; show me
+  `advanced`) with the C1 front matter: a `transition` declaration
+  (`from`/`to` on the proficiency scale) and the exit-performance
+  sentence beside it. One declaration then serves both the C1 check
+  and level-based selection ("I am an apprentice; show me
   apprentice-onward exercises" means filtering on the transition's near
   side). Keeping a six-value difficulty beside a transition would say
   the same thing twice and let the two drift.
@@ -337,11 +347,12 @@ human-in-the-loop workstream, gated on access to those modelers.
 
 Docs and content only for workstreams 1-4. Workstream 3 adds a deck tag
 (`tier-discrimination`) -- a content convention, not an API. Workstream 5
-is code: optional `reading` fields in the gym exercise schema, a pure
-miss-card emission API in `@barwise/learn`, and a write option on the
-planned `barwise gym` command -- all additive -- plus one breaking schema
-change, `difficulty` replaced by `transition`, whose blast radius is
-the single seed exercise (a one-line migration). `@barwise/learn`
+is code: optional `reading` and `diagnosis` fields in the gym exercise
+schema, a pure miss-card emission API in `@barwise/learn`, and a write
+option on the planned `barwise gym` command -- all additive -- plus one
+breaking schema change, `difficulty` replaced by the C1 front matter
+(`transition` and the exit-performance sentence), whose blast radius is
+the single seed exercise (a two-line migration). `@barwise/learn`
 remains a leaf; core is untouched. A discrimination "same facts?" check
 as a new `@barwise/learn` check kind is possible but not required (see
 Open decisions); if added later it is additive and does not change
