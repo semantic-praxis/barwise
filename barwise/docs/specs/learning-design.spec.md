@@ -46,10 +46,10 @@ messy prose into a defensible model), sit here:
 None of the three states who it makes more expert, or how an observer
 would know. That gap is what the standard closes.
 
-## The standard: five design constraints (the target)
+## The standard: six design constraints (the target)
 
 Every learning artifact -- a deck subdeck, a gym exercise set, a tutorial
--- is authored and reviewed against these five constraints. Each is
+-- is authored and reviewed against these six constraints. Each is
 stated as a requirement, then as the check an author or reviewer applies.
 
 ### C1. Target a named proficiency transition, not a topic
@@ -115,6 +115,31 @@ meant to.
   the spaced-repetition scheduler) is not undercut by massing within a
   session.
 
+### C6. Close the loop: failures become scheduled practice
+
+When a learner's candidate fails a gym check, the toolkit shall emit a
+diagnosis card in the deck's tab-separated import format -- the failed
+check and its hint on the front, the authored diagnosis and a
+fine-grained reading reference on the back -- and when the same failure
+recurs, it shall emit the card again. Duplication is the recency
+mechanism: a re-imported card re-enters the new-card queue, so the
+misses subdeck tracks the learner's most recent failures by
+construction. The static deck tiers remain the always-available home
+for generic memorization; miss cards supplement them, per learner.
+
+Reading references enter the loop at two grains. An optional
+exercise-level reference supports a pre-session skim -- the exercise
+states plainly that skimming is welcome and deep reading is not
+expected before attempting. A check-level reference names the section
+or subsection to study after a failure, when the learner arrives with a
+specific question that section answers.
+
+- _Check:_ emission is deterministic -- same submission, same cards, no
+  timestamps or randomness in card content; the emitted file imports
+  under the deck's existing convention (`#separator:tab` headers, a
+  dedicated misses subdeck); every emitted card carries a check-level
+  reading reference; no exercise makes its reading a prerequisite.
+
 ## Reductive-bias case catalog
 
 The six known reductive readings in ORM, each with the engineered trap
@@ -132,10 +157,12 @@ wrong model. This catalog seeds C2; authors extend it.
 
 ## Scope
 
-In scope: the standard (C1-C5); the reductive-bias catalog; an authoring
+In scope: the standard (C1-C6); the reductive-bias catalog; an authoring
 checklist extracted from the standard (where it lives is Open decision
-1); and the ordered workstreams that retrofit the deck, gym, and
-tutorial to conform.
+1); the cross-artifact loop -- optional `reading` fields in the gym
+exercise schema and deck-format miss-card emission from gym failures;
+and the ordered workstreams that retrofit the deck, gym, and tutorial
+to conform.
 
 Out of scope, deferred and named:
 
@@ -155,6 +182,38 @@ Out of scope, deferred and named:
 | Gym (`@barwise/learn`)     | Format and checks already support C2, C3, C5; content misses C1-C4  | author to standard  |
 | Tutorial spec              | Meets C5 generation-first; misses C1 transition and C5 interleaving | amend spec          |
 | `@barwise/learn` evaluator | Provides the deterministic tells C2/C3 rely on                      | unchanged           |
+| Miss-card emission         | C6's mechanism; does not exist yet                                  | new, pure, in learn |
+
+## Target architecture: the cross-artifact loop
+
+Each artifact contributes the one thing the others lack: the tutorial
+sequences first exposure, the gym grades generation, the deck schedules
+retention, and the book supplies depth. The loop couples them through
+file formats and shared references only -- no artifact invokes another
+at runtime.
+
+```
+tutorial step (encode: generation-first exposure)
+      |
+      v
+gym exercise (generate -> fail a check -> diagnose)
+      |                              |
+      | emits miss cards             | reading references
+      | (deck tab-separated format,  |   before: exercise-level skim,
+      |  misses subdeck; duplicates  |     optional by design
+      |  intended -- recency)        |   after a failure: check-level
+      v                              v     section to study
+Anki deck (schedules retention)    Halpin & Morgan
+  static tiers: always available
+  misses subdeck: regenerated from
+    the learner's own failures
+```
+
+A session interleaves across the loop rather than blocking within one
+artifact: due cards from mixed subdecks, then a gym exercise on a
+construct the cards did not just rehearse, then the tutorial if one is
+in progress. The authoring checklist (workstream 1) carries this
+session recipe; no code enforces it.
 
 ## Alternatives considered
 
@@ -164,19 +223,26 @@ Out of scope, deferred and named:
   toward easy-to-author recall. Lost to the shared standard for the
   same reason one `@barwise/core` beats three engines.
 - **Enforce the standard in code from day one.** Add front-matter
-  schema and conformance checks to `@barwise/learn` so C1-C5 are
+  schema and conformance checks to `@barwise/learn` so C1-C6 are
   machine-rejected rather than reviewed. Lost for now: the constraints
   should be proven by authoring real content before they harden into
   code, and half of them (C1's exit performance, C4's messiness) are
   judgment calls a schema cannot settle. C2's executable tells capture
   the part that genuinely is machine-checkable; Open decision 2 keeps
   the door open for more.
+- **A runtime session orchestrator.** A `barwise learn session` engine
+  that launches cards, exercises, and tutorial steps in one interleaved
+  sitting. Lost: it couples three deliberately orthogonal artifacts to
+  achieve what a file-format contract and a one-paragraph session
+  recipe already provide, and each artifact stays independently usable
+  without it. The loop is coupled by declared references, not by a
+  runtime (explicit over implicit).
 
 ## Workstreams (each independently shippable)
 
 ### 1. Land the standard and the authoring checklist
 
-This spec, plus the authoring checklist (the C1-C5 checks and the
+This spec, plus the authoring checklist (the C1-C6 checks and the
 catalog, condensed) that every content PR references in its
 description; where the checklist lives is Open decision 1 (recommended:
 `docs/learning-authoring.md`). Smallest blast radius: docs only,
@@ -204,7 +270,21 @@ Amend the tutorial spec and its (future) content to declare the C1
 transition it serves and to interleave constructs across steps rather
 than blocking them; keep the generation-first hook.
 
-### 5. (later) Messy-case corpus from real modelers
+### 5. Gym: reading references and miss-card emission
+
+Two additive changes to `@barwise/learn` and its planned CLI surface:
+
+- Optional `reading` fields in the exercise schema, at two grains:
+  exercise-level (the pre-session skim) and per check (the section a
+  failure sends you to). Schema-only; landing this alongside
+  workstream 2 lets the bias exercises carry readings from birth.
+- Miss-card emission: a pure function beside the pure evaluator maps a
+  `GymReport`'s failed checks to deck-format card rows; the file write
+  rides the `barwise gym` CLI surface planned in the modeling-gym spec.
+  The package stays a leaf with its I/O at the edge, matching the
+  evaluator's own pure/loader split.
+
+### 6. (later) Messy-case corpus from real modelers
 
 Run cognitive task analysis on experienced modelers to extract the cases
 that were genuinely hard and why, and build the C4 corpus from them. A
@@ -212,11 +292,15 @@ human-in-the-loop workstream, gated on access to those modelers.
 
 ## API and migration impact
 
-Docs and content only; no code required for workstreams 1-4. Workstream 3
-adds a deck tag (`tier-discrimination`) -- a content convention, not an
-API. A discrimination "same facts?" check as a new `@barwise/learn` check
-kind is possible but not required (see Open decisions); if added later it
-is additive and does not change existing checks.
+Docs and content only for workstreams 1-4. Workstream 3 adds a deck tag
+(`tier-discrimination`) -- a content convention, not an API. Workstream 5
+is code, all of it additive: optional `reading` fields in the gym
+exercise schema, a pure miss-card emission API in `@barwise/learn`, and
+a write option on the planned `barwise gym` command. `@barwise/learn`
+remains a leaf; core is untouched. A discrimination "same facts?" check
+as a new `@barwise/learn` check kind is possible but not required (see
+Open decisions); if added later it is additive and does not change
+existing checks.
 
 ## Open decisions
 
@@ -236,17 +320,27 @@ is additive and does not change existing checks.
    auditing every module's placement on the six-rung scale. Recommendation:
    require the naming, not the placement -- the exit-performance sentence
    is the real test.
+4. **What the miss card's front carries.** The failed check and its hint
+   only (compact, deterministic, authored-quality prose), or additionally
+   a fragment of the learner's own submitted model (the most personal
+   cue, but cards then embed arbitrary learner content). Recommendation:
+   check-and-hint only for the first iteration; add the fragment later
+   if miss cards prove too abstract to trigger recall of the failure.
 
 ## Risks and testing
 
 - **Risk: the standard becomes front matter nobody reads.** Mitigation:
-  keep per-module conformance to the five C-checks; make the gym exercise
+  keep per-module conformance to the six C-checks; make the gym exercise
   its own conformance evidence -- an exercise that embodies C2 literally
   fails a barwise check on the wrong model, so conformance is executable,
   not asserted.
 - **Risk: an engineered trap teaches the trap.** Mitigation: C2 requires
   the diagnosis step after the reveal; the wrong model is never the last
   artifact the learner sees.
+- **Risk: the misses subdeck grows without bound.** It does, by design --
+  duplication is the recency mechanism. Mitigation: tell the learner the
+  misses subdeck is disposable (suspend or delete stale cards freely);
+  the static tiers are the durable deck.
 - **Testing:** the reductive-bias exercises are self-testing -- the wrong
   model fails a barwise check and the reference passes, which the gym's
   existing reference-passes-its-own-rubric test already asserts for each
