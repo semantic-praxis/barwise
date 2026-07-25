@@ -72,13 +72,18 @@ alongside this file.
 6. **Edit, then run an articulation pass.** Run the edit passes in
    `editing.md` (scanning `llm-tics.md` during the voice pass), then
    invoke the `articulation` skill in critique mode over the draft. Its
-   barrier taxonomy catches the spec-specific failures the voice pass
-   misses: a buried lede (a heading that does not state its resolution),
-   a fuzzy abstraction (a "robust" or "scalable" claim with no
-   operational meaning), a missing bridge (a design leap from premises
-   the reviewer does not have), or a wall of detail (an inventory or
-   architecture dump with no hierarchy). Fix what it finds before the
-   pre-push gate.
+   barrier taxonomy catches the failures the voice pass misses -- the
+   four most common in specs: a buried lede (a heading that does not
+   state its resolution), a fuzzy abstraction (a "robust" or "scalable"
+   claim with no operational meaning), a missing bridge (a design leap
+   from premises the reviewer does not have), or a wall of detail (an
+   inventory or architecture dump with no hierarchy). Then act on the
+   review's verdict: wording and boundary problems get fixed in place
+   (reword or restructure) before the pre-push gate; a
+   thinking-problems verdict means a decision is missing, so return to
+   grounding (step 1) or move the undecided item into Open decisions --
+   do not polish through it. The review runs in-conversation; commit
+   the fixes, never the review.
 7. **Clear the gate, then land.** Run the pre-push gate below, land the
    spec for review, then implement in separate PRs. Before implementing
    each workstream, ground it again and verify or correct the
