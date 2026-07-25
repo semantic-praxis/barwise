@@ -1,5 +1,12 @@
 # Repository analysis: clone, profile, and extract business rules
 
+Status: Partial -- phases 1-2 shipped (RepoManager clone/pull,
+RepoProfiler, six framework detectors, barwise analyze with
+--ref/--depth/--profile-only). Open: end-to-end orchestration, the
+analyze_repository MCP tool, and the VS Code entry point.
+Created: 2026-04-02
+Last-updated: 2026-07-25
+
 ## Problem
 
 Barwise can extract business rules from code via `barwise import

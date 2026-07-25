@@ -1,5 +1,12 @@
 # Propagate annotations to downstream artifacts
 
+Status: Partial -- exporter annotation collection, diagram
+rendering, and verbalizeModelWithAnnotations are built and tested,
+but the diagram and verbalization legs have no production caller
+passing annotations (docs/BACKLOG-2026-07-25.md item 3).
+Created: 2026-03-08
+Last-updated: 2026-07-25
+
 ## Problem
 
 Ambiguity annotations, low-confidence flags, and structural gap notes

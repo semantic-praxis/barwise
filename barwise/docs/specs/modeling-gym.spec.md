@@ -2,7 +2,7 @@
 
 Status: Draft for review (design only -- no implementation in this PR)
 Created: 2026-07-03
-Last-updated: 2026-07-22
+Last-updated: 2026-07-25
 Tracking: Feature follow-up to the `docs/anki` learning deck (merged in
 PR #253). No bd issue yet -- the bd binary is unavailable in this web
 session; file one before the first implementation PR.
@@ -333,3 +333,17 @@ downstream packages are unaffected except where they opt in.
   opinion. The tutor belongs in a later spec, layered on `mcp`.
 - **Not a replacement for the Anki deck.** Recall (deck) and judgment
   (gym) are complementary; neither subsumes the other.
+
+## Content candidates from the superseded tutorial arcs (2026-07-25)
+
+The gamified tutorial arcs (`archive/tutorial-beginner-arc.spec.md`,
+`archive/tutorial-mystery-arc.spec.md`, both 2026-07-01) predate this
+spec and are superseded: their deterministic-judge mechanism is this
+gym, and their narrative pedagogy is carried by
+`modeling-tutorial.spec.md`. One device survives as a content
+candidate: the mystery arc's **story elimination** -- constraint
+induction taught as detective cases, where each suspect carries a
+hidden population and the learner's schema must admit exactly the
+culprit's story (judged by `populationValidationRules`, exactly the
+gym's evaluator). If an induction-focused exercise pack is authored,
+start from that spec's case designs.

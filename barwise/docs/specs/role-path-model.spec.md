@@ -1,16 +1,17 @@
 # Role-path / join-rule model
 
-Status: SIGNED OFF 2026-07-25 (project owner) -- the revised projected-tuple
-representation and cut line are ratified. PR 3 (projected-tuple model +
-serde + schema + validation/verbalization/evaluation + diff) had already
-landed in 2acf7e7 on the revision date; the sign-off confirms it. Remaining:
-(PR 4) NORMA import (WS6, riding with the `NormaToOrmMapper` decomposition,
-god-file WS7); (PR 5) NORMA export + RT-A over a join-path fixture + merge
-id-remap (rest of WS5). WS1 (the `model/roleGraph.ts` traversal seam) landed
-2026-06-18 (barwise-sf1). History: REVISED 2026-06-21 -- a cited research
-pass against the canonical sources (see "Canonical grounding") moved the
-operand from a single projected endpoint to a projected role _sequence_
-(tuple), correcting the merged first cut (PR 1 #227, PR 2 #228).
+Status: COMPLETE 2026-07-25 -- all workstreams landed. Signed off by the
+project owner 2026-07-25 (revised projected-tuple representation and cut
+line). PR 3 (model + serde + schema + validation/verbalization/evaluation +
+diff) landed in 2acf7e7; PRs 4-5 (NORMA import and export of join
+constraints, RT-A over the personCountryDemo join fixture, merge id-remap)
+landed in #267, riding with the `NormaToOrmMapper` decomposition (god-file
+WS7). WS1 (the `model/roleGraph.ts` traversal seam) landed 2026-06-18
+(barwise-sf1). History: REVISED 2026-06-21 -- a cited research pass against
+the canonical sources (see "Canonical grounding") moved the operand from a
+single projected endpoint to a projected role _sequence_ (tuple),
+correcting the merged first cut (PR 1 #227, PR 2 #228). Kept live: the
+spec is referenced from core source (`model/RolePath.ts`).
 Created: 2026-06-18
 Last-updated: 2026-07-25
 Tracking: barwise-0s8 (this design), barwise-5t9.10 (role-path substrate),
