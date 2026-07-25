@@ -201,8 +201,9 @@ catalog; an authoring checklist extracted from the standard (where it
 lives is Open decision 1); the cross-artifact loop -- `reading` and
 `diagnosis` fields in the gym exercise schema and deck-format miss-card
 emission from gym failures; aligning the gym's difficulty axis to the
-scale; and
-the ordered workstreams that retrofit the deck, gym, and tutorial to
+scale; a companion conceptual model of the standard
+(`examples/models/learning-design.orm.yaml`, CI-validated); and the
+ordered workstreams that retrofit the deck, gym, and tutorial to
 conform.
 
 Out of scope, deferred and named:
@@ -255,6 +256,30 @@ artifact: due cards from mixed subdecks, then a gym exercise on a
 construct the cards did not just rehearse, then the tutorial if one is
 in progress. The authoring checklist (workstream 1) carries this
 session recipe; no code enforces it.
+
+## The standard, as a barwise model
+
+The standard's core domain is itself modeled in ORM and dogfooded:
+`examples/models/learning-design.orm.yaml` states the load-bearing
+rules as constraints, and the CI example-validation step
+(`npm run validate:examples`) checks the model on every push. The
+verbalizer reads the rules back as disputable fact sentences:
+
+- C1 is the mandatory, functional ternary "LearningModule advances
+  ProficiencyLevel to ProficiencyLevel", plus a mandatory
+  ExitPerformance.
+- The catalog's determinism promise is "each ReductiveBias is caught
+  by exactly one CheckKind."
+- C6's card anatomy is a GymCheck with mandatory Diagnosis and
+  ReadingReference roles. The missing-diagnosis-field inconsistency an
+  earlier draft of this spec carried is inexpressible in the model:
+  the mandatory role forces the question the prose let slip.
+- The deck's two axes are "DeckCard demands Tier" and "DeckCard is
+  leveled at ProficiencyLevel", both mandatory and functional.
+
+The model checks its own internal consistency, not the prose's
+agreement with it; keeping the two in step is a review duty. The model
+is the machine-checkable core, this spec the rationale around it.
 
 ## Alternatives considered
 
@@ -309,7 +334,11 @@ uses only merged infrastructure.
 Add a `tier-discrimination` tag and a set of "which preserves the same
 facts / what is the arity / which constraint" cards, plus one bias-trap
 card per catalog row that shows the wrong model and asks for the
-diagnosis. Retrofit the existing subdecks with C1 transition statements.
+diagnosis. Retrofit the existing subdecks with C1 transition statements,
+and tag every card on both axes -- its tier (the cognitive act) and its
+level (`level-novice`, `level-apprentice`, ...) -- so filtered study
+works across subdecks. The two axes are independent (see the
+proficiency scale); a card carries exactly one of each.
 
 ### 4. Tutorial: transition and interleaving
 
@@ -346,7 +375,19 @@ Four changes to `@barwise/learn` and its planned CLI surface:
   The package stays a leaf with its I/O at the edge, matching the
   evaluator's own pure/loader split.
 
-### 6. (later) Messy-case corpus from real modelers
+### 6. Learner-coaching skill over the state records
+
+A repo skill (a peer of `spec-writer` and `barwise-modeling`) a learner
+invokes to close the loop on their own record: it reads the session log
+and copied miss-card files in `$XDG_STATE_HOME/barwise/` (Open decision
+5) and answers "what do I keep getting wrong?" and "how do I get better
+at this?" -- mapping recurring failures to catalog biases and
+recommending the next exercises, readings, and transition to work at.
+This is the coaching layer Non-goals reserves: it consumes the
+deterministic records, and nothing in the loop depends on it. Depends
+on workstream 5, which creates the records it reads.
+
+### 7. (later) Messy-case corpus from real modelers
 
 Run cognitive task analysis on experienced modelers to extract the cases
 that were genuinely hard and why, and build the C4 corpus from them. A
@@ -361,8 +402,9 @@ schema, a pure miss-card emission API in `@barwise/learn`, and a write
 option on the planned `barwise gym` command -- all additive -- plus one
 breaking schema change, `difficulty` replaced by the C1 front matter
 (`transition` and the exit-performance sentence), whose blast radius is
-the single seed exercise (a two-line migration). `@barwise/learn`
-remains a leaf; core is untouched. A discrimination "same facts?" check
+the single seed exercise (a two-line migration). Workstream 6 is a repo
+skill -- markdown under `.claude/skills/`, no package code.
+`@barwise/learn` remains a leaf; core is untouched. A discrimination "same facts?" check
 as a new `@barwise/learn` check kind is possible but not required (see
 Open decisions); if added later it is additive and does not change
 existing checks.
@@ -431,4 +473,5 @@ existing checks.
   Design Procedure (CSDP).** The standard sits on top of the book's
   method; it governs how our materials teach, not what ORM is.
 - **Not an LLM tutor.** The standard is met with deterministic materials
-  first; a coaching layer, if it comes, consumes them.
+  first; the coaching layer (workstream 6) consumes those records, and
+  the standard does not depend on it.
