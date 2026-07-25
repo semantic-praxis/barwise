@@ -25,8 +25,7 @@ the deck, gym, and tutorial all consume, exactly as one `@barwise/core`
 powers the CLI, MCP, and VS Code. And it rides on infrastructure already
 merged -- the gym's deterministic checks (`must_validate`,
 `requires_verbalization`, `forbids_population`, `requires_element`) are
-the mechanism that makes several of these constraints machine-checkable,
-not aspirational.
+the mechanism that makes several of these constraints machine-checkable.
 
 ## Problem: "good" is implicit today, and it regresses to recall
 
@@ -94,9 +93,9 @@ play -- and shall not rely on definitions alone to build that perception.
 
 When a module reaches apprentice level or beyond, its cases shall be
 sourced from realistic messy inputs -- ambiguous requirements, stakeholder
-emails, contradictory spreadsheets -- rated on a messiness rubric
-(ambiguity, contradiction, irrelevant detail, missing information), not
-from textbook-clean prose.
+emails, contradictory spreadsheets -- not from textbook-clean prose. The
+messiness rubric is four dimensions -- ambiguity, contradiction,
+irrelevant detail, missing information -- each marked present or absent.
 
 - _Check:_ each apprentice-or-beyond case carries a messiness rating with
   at least one dimension present, and a note on what makes it hard.
@@ -113,7 +112,8 @@ meant to.
 - _Check:_ the module never shows the canonical model before the
   learner's attempt; a set of exercises interleaves constructs rather
   than grouping all of one kind; the deck's spacing (already provided by
-  the SRS scheduler) is not undercut by massing within a session.
+  the spaced-repetition scheduler) is not undercut by massing within a
+  session.
 
 ## Reductive-bias case catalog
 
@@ -126,15 +126,16 @@ wrong model. This catalog seeds C2; authors extend it.
 | "A fact type is a table, a role is a column"       | Prose whose facts are elementary but which a table-thinker lumps into one wide fact | The lumped fact type has no clean reading; `requires_verbalization` of the elementary facts fails      |
 | Attribute-first thinking (from ER / dimensional)   | Prose where the "attribute" later needs its own facts or a constraint               | The attribute never becomes a fact type; `requires_element` (a fact type between the two) fails        |
 | Assume binary arity; miss a genuine ternary        | Prose with an irreducible ternary (who scored what in which subject)                | The binary decomposition accepts a population the ternary forbids; `forbids_population` fails          |
-| Conflate entity types with value types             | Prose where a label looks self-identifying but carries its own facts                | Wrong reference scheme; `must_validate` flags the entity with no scheme, or the verbalization is wrong |
+| Conflate entity types with value types             | Prose where a label looks self-identifying but carries its own facts                | The label accrues its own facts; `must_validate` fails on the entity type with no reference scheme     |
 | Treat constraints as decoration added after        | Prose whose whole point is a rule (each order has one customer)                     | The unconstrained model forbids nothing; `forbids_population` fails wholesale                          |
 | Read subtypes as an ISA taxonomy, not role-derived | Prose with a subtype that plays no role its supertype cannot                        | The subtype earns nothing; `requires_element` on its distinguishing role fails                         |
 
 ## Scope
 
-In scope: the standard (C1-C5); the reductive-bias catalog; a one-page
-authoring checklist extracted from the standard; and the ordered
-workstreams that retrofit the deck, gym, and tutorial to conform.
+In scope: the standard (C1-C5); the reductive-bias catalog; an authoring
+checklist extracted from the standard (where it lives is Open decision
+1); and the ordered workstreams that retrofit the deck, gym, and
+tutorial to conform.
 
 Out of scope, deferred and named:
 
@@ -155,14 +156,31 @@ Out of scope, deferred and named:
 | Tutorial spec              | Meets C5 generation-first; misses C1 transition and C5 interleaving | amend spec          |
 | `@barwise/learn` evaluator | Provides the deterministic tells C2/C3 rely on                      | unchanged           |
 
+## Alternatives considered
+
+- **Per-artifact standards.** Let the deck, gym, and tutorial each keep
+  their own quality bar. This is the status quo, and it is the problem
+  statement: three artifacts re-deciding "good" independently drift
+  toward easy-to-author recall. Lost to the shared standard for the
+  same reason one `@barwise/core` beats three engines.
+- **Enforce the standard in code from day one.** Add front-matter
+  schema and conformance checks to `@barwise/learn` so C1-C5 are
+  machine-rejected rather than reviewed. Lost for now: the constraints
+  should be proven by authoring real content before they harden into
+  code, and half of them (C1's exit performance, C4's messiness) are
+  judgment calls a schema cannot settle. C2's executable tells capture
+  the part that genuinely is machine-checkable; Open decision 2 keeps
+  the door open for more.
+
 ## Workstreams (each independently shippable)
 
 ### 1. Land the standard and the authoring checklist
 
-This spec, plus a one-page `docs/learning-authoring.md` checklist (the
-C1-C5 checks and the catalog, condensed) that every content PR references
-in its description. Smallest blast radius: docs only, nothing depends on
-it yet.
+This spec, plus the authoring checklist (the C1-C5 checks and the
+catalog, condensed) that every content PR references in its
+description; where the checklist lives is Open decision 1 (recommended:
+`docs/learning-authoring.md`). Smallest blast radius: docs only,
+nothing depends on it yet.
 
 ### 2. Gym: the reductive-bias exercise set
 
@@ -237,8 +255,8 @@ is additive and does not change existing checks.
 
 ## Non-goals
 
-- **Not a replacement for Halpin's pedagogy or the CSDP.** The standard
-  sits on top of the book's method; it governs how our materials teach,
-  not what ORM is.
+- **Not a replacement for Halpin's pedagogy or the Conceptual Schema
+  Design Procedure (CSDP).** The standard sits on top of the book's
+  method; it governs how our materials teach, not what ORM is.
 - **Not an LLM tutor.** The standard is met with deterministic materials
   first; a coaching layer, if it comes, consumes them.
