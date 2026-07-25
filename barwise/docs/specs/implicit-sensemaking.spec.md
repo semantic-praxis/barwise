@@ -178,7 +178,7 @@ its own PR.
       (cross-fact-type constraints simply produce no probe).
       _(provisional: not yet grounded -- confirm the CLI/hover insertion
       points hold before building.)_
-- [ ] **WS4 -- Cross-fact-type counterexamples (#2b).** Extend the
+- [x] **WS4 -- Cross-fact-type counterexamples (#2b).** (Implemented; see archive/cross-fact-type-counterexamples.spec.md, verified 2026-07-25.) Extend the
       generator to mandatory, disjunctive mandatory, exclusion,
       exclusive-or, subset, equality, and external uniqueness. _(provisional:
       not yet grounded -- these need the cross-population representation

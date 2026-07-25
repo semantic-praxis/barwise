@@ -1,7 +1,19 @@
 # Cross-Fact-Type Counterexamples
 
-Status: draft
+Status: Implemented (verified against the source tree 2026-07-25) -- all
+three workstreams landed. WS4a: `objectUniverse`
+(validation/rules/population/shared.ts) powers mandatory, disjunctive
+mandatory (population/mandatory.ts), and the spanning
+exclusion/exclusive-or/subset/equality checks (population/spanning.ts).
+WS4b: `Counterexample.forbidden` is `readonly Population[]` and the
+generator dispatches cross-fact-type counterexamples for every family,
+guarded by the model-wide round-trip completeness suite. WS4c (external
+uniqueness) landed via the external-uniqueness spec (archived). The
+earlier backlog verdict listing WS4a/WS4b as open was stale -- it read
+this spec's own checkboxes rather than the code.
 Owner: design conversation (sensemaking initiative)
+Created: 2026-06-17
+Last-updated: 2026-07-25
 Tracking: implements WS4 of `implicit-sensemaking.spec.md`, which drafted
 it provisionally. File bd issues per workstream when this lands.
 
@@ -122,17 +134,17 @@ interface Counterexample {
 
 ## Workstreams
 
-- [ ] **WS4a -- Cross-fact-type population validation (`core`).** Add an
+- [x] **WS4a -- Cross-fact-type population validation (`core`).** Add an
       `objectUniverse` helper and validation for mandatory, disjunctive
       mandatory, and the spanning cases of exclusion, exclusive-or,
       subset, and equality. Independently valuable -- validation gets more
       complete. Unit tests over satisfying and violating populations.
-- [ ] **WS4b -- Multi-population counterexamples (`core`).** Change
+- [x] **WS4b -- Multi-population counterexamples (`core`).** Change
       `Counterexample.forbidden` to `readonly Population[]`, update WS2
       tests and the round-trip helper, and generate counterexamples for
       the WS4a constraints. _(provisional: not yet grounded -- confirm the
       minimal forbidden population set per constraint before building.)_
-- [ ] **WS4c -- External uniqueness.** Validation and counterexample for
+- [x] **WS4c -- External uniqueness.** Validation and counterexample for
       external uniqueness, which needs an instance-join across fact types.
       _(provisional: not yet grounded.)_
 
