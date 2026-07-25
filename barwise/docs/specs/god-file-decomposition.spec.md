@@ -1,11 +1,12 @@
 # God-file decomposition
 
 Status: In progress -- WS1 (ToolRegistration), WS2 (ExtractionPrompt), WS5
-(ConstraintVerbalizer), WS6 (DraftModelParser), WS8a (DbtToOrmMapper) landed.
-Open: WS7 (NormaToOrmMapper), WS8b (OrmDiagram.tsx). WS3/WS4 (ModelDiff,
-describeDomain) fell under threshold -- moot.
+(ConstraintVerbalizer), WS6 (DraftModelParser), WS8a (DbtToOrmMapper), and
+WS7 (NormaToOrmMapper, split into norma/mapping/ in #267) landed. Open:
+WS8b (OrmDiagram.tsx). WS3/WS4 (ModelDiff, describeDomain) fell under
+threshold -- moot.
 Created: 2026-06-17
-Last-updated: 2026-06-24
+Last-updated: 2026-07-25
 Tracking: REPO_REVIEW-2026-06-16 finding F1 (S-ORTH-5); REPO_REVIEW
 2026-06 A1.
 

@@ -1,10 +1,13 @@
 # NORMA XML Export and Round-Trip
 
 Status: WS1 implemented 2026-06-18 -- semantic exporter + RT-A round-trip
-landed in `packages/formats/src/norma/`. WS2 (diagram geometry, gated on
-barwise-e3g) and WS3 (RT-B fidelity as barwise-5t9 lands) remain open.
+landed in `packages/formats/src/norma/`. WS3 partially landed 2026-07-25:
+join constraints now export (JoinRule apparatus + RT-A over the
+personCountryDemo join fixture, #267); fidelity for the remaining 5t9
+constructs stays open as those gain NORMA encodings. WS2 (diagram
+geometry, gated on barwise-e3g) remains open.
 Created: 2026-06-17
-Last-updated: 2026-06-18
+Last-updated: 2026-07-25
 Tracking: barwise-cb6 (norma CLI), barwise-e3g (diagram round-trip),
 barwise-5t9 (conceptual coverage gaps), docs/NORMA_VS_ORM_YAML.md
 

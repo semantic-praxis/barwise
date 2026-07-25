@@ -1,8 +1,10 @@
 # Wiring `.orm-project.yaml` through the user-facing surfaces
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Implemented -- .orm-project.yaml wired through the CLI, MCP,
+and VS Code surfaces (LSP diagnostics, extension activation, project
+loaders). Kept live: referenced from cli source.
 Created: 2026-06-21
-Last-updated: 2026-06-21 (WS4 schema-registration decision)
+Last-updated: 2026-07-25
 Tracking: barwise-r4f, barwise-knq (multi-file workflow),
 barwise-e4k (splitting guide, blocked on this), deferred
 barwise-hwe / barwise-byy / barwise-sa4

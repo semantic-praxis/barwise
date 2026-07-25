@@ -1,5 +1,12 @@
 # Code analysis: business rule extraction from code
 
+Status: Partial -- TypeScript/Java/Kotlin importers registered on
+every surface (registerCodeFormats), LSP sessions and guiding-model
+context shipped. Open tail: the Calcite sidecar (the SQL leg runs on
+the heuristic cascade only).
+Created: 2026-03-26
+Last-updated: 2026-07-25
+
 ## Problem
 
 Barwise currently extracts ORM models from two kinds of sources:
