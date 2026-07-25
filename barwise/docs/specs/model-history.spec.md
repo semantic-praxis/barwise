@@ -1,7 +1,11 @@
 # Model history: semantic change-over-time from git
 
-Status: Accepted (user-directed 2026-07-25) -- design ready for
-implementation
+Status: WS1 implemented 2026-07-25 -- `barwise history`
+(packages/cli/src/commands/history.ts): git revision walk with
+--follow and --limit, per-pair semantic deltas via diffModels,
+unreadable-revision tolerance, and a working-tree entry; tested
+against a fixture repo including a rename. WS2 (MCP wrapper) remains
+open. Accepted (user-directed 2026-07-25).
 Created: 2026-07-25
 Last-updated: 2026-07-25
 Tracking: project-owner traceability decision 2026-07-25 (chosen

@@ -10,6 +10,7 @@ import { registerDescribeCommand } from "./commands/describe.js";
 import { registerDiagramCommand } from "./commands/diagram.js";
 import { registerDiffCommand } from "./commands/diff.js";
 import { registerExportCommand } from "./commands/export.js";
+import { registerHistoryCommand } from "./commands/history.js";
 import { registerImportCommand } from "./commands/import.js";
 import { registerLineageCommand } from "./commands/lineage.js";
 import { registerProjectCommand } from "./commands/project.js";
@@ -38,6 +39,7 @@ export function createProgram(version = "0.0.0-dev"): Command {
   registerExportCommand(program);
   registerDiagramCommand(program);
   registerDiffCommand(program);
+  registerHistoryCommand(program);
   registerImportCommand(program);
   registerLineageCommand(program);
 
