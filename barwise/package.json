@@ -29,6 +29,9 @@
     "prepare": "cd .. && husky barwise/.husky"
   },
   "devDependencies": {
+    "@dprint/json": "0.19.4",
+    "@dprint/markdown": "0.17.8",
+    "@dprint/typescript": "0.93.4",
     "@eslint/js": "^10.0.1",
     "dependency-cruiser": "^17.4.3",
     "dprint": "^0.52.0",

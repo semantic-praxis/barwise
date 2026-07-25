@@ -27,8 +27,8 @@
     "test-plan/**"
   ],
   "plugins": [
-    "https://plugins.dprint.dev/typescript-0.93.4.wasm",
-    "https://plugins.dprint.dev/json-0.19.4.wasm",
-    "https://plugins.dprint.dev/markdown-0.17.8.wasm"
+    "./node_modules/@dprint/typescript/plugin.wasm",
+    "./node_modules/@dprint/json/plugin.wasm",
+    "./node_modules/@dprint/markdown/plugin.wasm"
   ]
 }
