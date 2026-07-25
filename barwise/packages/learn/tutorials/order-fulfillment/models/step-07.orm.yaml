@@ -1,0 +1,165 @@
+orm_version: "1.1"
+
+model:
+  name: "Order Fulfillment"
+  domain_context: "order-fulfillment"
+
+  object_types:
+    - id: "ot-customer"
+      name: "Customer"
+      kind: "entity"
+      reference_mode: "customer_number"
+      definition: "A person or organization that places orders with us."
+
+    - id: "ot-order"
+      name: "Order"
+      kind: "entity"
+      reference_mode: "order_number"
+      definition: "A single request to buy, identified by an order number."
+
+    - id: "ot-product"
+      name: "Product"
+      kind: "entity"
+      reference_mode: "product_code"
+      definition: "An item we sell, identified by a product code."
+
+    - id: "ot-status"
+      name: "OrderStatus"
+      kind: "value"
+      data_type:
+        name: "text"
+
+    - id: "ot-priority-order"
+      name: "PriorityOrder"
+      kind: "entity"
+      reference_mode: "order_number"
+      definition: "An order flagged for expedited handling."
+
+    - id: "ot-courier"
+      name: "Courier"
+      kind: "entity"
+      reference_mode: "courier_id"
+      definition: "A delivery service that carries priority orders."
+
+  fact_types:
+    - id: "ft-places"
+      name: "Customer places Order"
+      roles:
+        - id: "r-places-customer"
+          player: "ot-customer"
+          role_name: "places"
+        - id: "r-places-order"
+          player: "ot-order"
+          role_name: "is placed by"
+      readings:
+        - "{0} places {1}"
+        - "{1} is placed by {0}"
+      constraints:
+        - id: "c-uc-places-order"
+          type: "internal_uniqueness"
+          roles: ["r-places-order"]
+        - id: "c-mand-places-order"
+          type: "mandatory"
+          role: "r-places-order"
+
+    - id: "ft-includes"
+      name: "Order includes Product"
+      roles:
+        - id: "r-includes-order"
+          player: "ot-order"
+          role_name: "includes"
+        - id: "r-includes-product"
+          player: "ot-product"
+          role_name: "is included in"
+      readings:
+        - "{0} includes {1}"
+        - "{1} is included in {0}"
+      constraints:
+        - id: "c-uc-includes"
+          type: "internal_uniqueness"
+          roles: ["r-includes-order", "r-includes-product"]
+
+    - id: "ft-status"
+      name: "Order has OrderStatus"
+      roles:
+        - id: "r-status-order"
+          player: "ot-order"
+          role_name: "has"
+        - id: "r-status-value"
+          player: "ot-status"
+          role_name: "is of"
+      readings:
+        - "{0} has {1}"
+      constraints:
+        - id: "c-uc-status-order"
+          type: "internal_uniqueness"
+          roles: ["r-status-order"]
+        - id: "c-val-status"
+          type: "value_constraint"
+          role: "r-status-value"
+          values: ["open", "shipped", "cancelled"]
+
+    - id: "ft-assigned"
+      name: "PriorityOrder is assigned to Courier"
+      roles:
+        - id: "r-assigned-porder"
+          player: "ot-priority-order"
+          role_name: "is assigned to"
+        - id: "r-assigned-courier"
+          player: "ot-courier"
+          role_name: "carries"
+      readings:
+        - "{0} is assigned to {1}"
+      constraints:
+        - id: "c-uc-assigned"
+          type: "internal_uniqueness"
+          roles: ["r-assigned-porder"]
+
+  subtype_facts:
+    - id: "sf-priority"
+      subtype: "ot-priority-order"
+      supertype: "ot-order"
+
+  populations:
+    - id: "pop-places"
+      fact_type: "ft-places"
+      description: "Who placed which order"
+      instances:
+        - id: "inst-p1"
+          role_values:
+            r-places-customer: "C-1001"
+            r-places-order: "O-501"
+        - id: "inst-p3"
+          role_values:
+            r-places-customer: "C-1002"
+            r-places-order: "O-502"
+
+    - id: "pop-includes"
+      fact_type: "ft-includes"
+      description: "What each order contains"
+      instances:
+        - id: "inst-i1"
+          role_values:
+            r-includes-order: "O-501"
+            r-includes-product: "P-9001"
+        - id: "inst-i2"
+          role_values:
+            r-includes-order: "O-501"
+            r-includes-product: "P-9002"
+        - id: "inst-i3"
+          role_values:
+            r-includes-order: "O-502"
+            r-includes-product: "P-9001"
+
+    - id: "pop-status"
+      fact_type: "ft-status"
+      description: "Where each order stands"
+      instances:
+        - id: "inst-s1"
+          role_values:
+            r-status-order: "O-501"
+            r-status-value: "open"
+        - id: "inst-s2"
+          role_values:
+            r-status-order: "O-502"
+            r-status-value: "shipped"

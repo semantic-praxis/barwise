@@ -15,7 +15,8 @@
   "files": [
     "dist",
     "schemas",
-    "exercises"
+    "exercises",
+    "tutorials"
   ],
   "scripts": {
     "build": "tsc",

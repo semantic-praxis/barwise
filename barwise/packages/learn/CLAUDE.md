@@ -1,10 +1,12 @@
 # @barwise/learn
 
-Learning artifacts for ORM, built on top of `@barwise/core`. The first
-capability is the **modeling gym**: an exercise format and a
+Learning artifacts for ORM, built on top of `@barwise/core`. Two
+capabilities live here: the **modeling gym** (an exercise format and a
 deterministic evaluator that grades a learner's candidate `.orm.yaml`
-against a rubric of semantic checks. The guided tutorial (a sibling
-learning artifact) is planned to live here too.
+against a rubric of semantic checks) and the **tutorial** (a step
+format, loader, and deterministic renderer that turns authored CSDP
+walkthroughs plus model snapshots into the committed Markdown under
+`docs/tutorial/`, with generated counterexample motivations).
 
 Specs: `docs/specs/modeling-gym.spec.md`, `docs/specs/modeling-tutorial.spec.md`.
 
@@ -24,10 +26,14 @@ src/
   evaluate/       The evaluator (evaluateCandidate) and its check runners
     checks/       mustValidate, requiresVerbalization, requiresElement, forbidsPopulation
     populationMapping.ts   Maps a reference forbidden population onto a candidate
+  tutorial/       Tutorial format: types, pure parser (parseTutorial), fs
+                  loader (loadTutorial), and the deterministic renderTutorial
   index.ts        Public API barrel (single "." export)
 
 schemas/          gym-exercise.schema.json (editor autocomplete for .gym.yaml)
 exercises/        Seed catalog: *.gym.yaml plus reference *.orm.yaml
+tutorials/        Tutorial sources: *.tutorial.yaml plus per-step model
+                  snapshots; rendered to docs/tutorial/ by regen:tutorial
 tests/            Vitest; tests/helpers/ModelBuilder.ts (copied from @barwise/core)
 ```
 
@@ -50,6 +56,13 @@ tests/            Vitest; tests/helpers/ModelBuilder.ts (copied from @barwise/co
   - Supported constraint kinds: `internal_uniqueness`, `mandatory`,
     `value`, `frequency`, `ring`. External uniqueness and set-comparison
     constraints are not yet supported by this check.
+- **The tutorial renderer is pure and honest.** `renderTutorial` is a
+  pure function (version stamped via an option, no clocks); a
+  "counterexample" step's hook is generated from its model snapshot, and
+  the render fails if the named constraint already exists in the prior
+  step's model or any snapshot has validation errors. A drift test
+  compares `docs/tutorial/*.md` against a fresh render; regenerate
+  intentionally with `npm run regen:tutorial` (repo root, after build).
 - **Reference models double as exercise answer keys.** A well-formed
   exercise's reference model should pass its own rubric (there is a test
   for the seed exercise asserting exactly this).

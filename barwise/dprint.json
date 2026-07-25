@@ -20,6 +20,7 @@
     "**/.turbo",
     "**/coverage",
     "**/*.orm.yaml",
+    "docs/tutorial/**",
     "**/*.map.yaml",
     "**/*.orm-project.yaml",
     "**/package-lock.json",
