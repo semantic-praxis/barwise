@@ -279,8 +279,8 @@ describe("NORMA XML Import integration", () => {
       expect(title.valueConstraint!.values).toHaveLength(6);
     });
 
-    it("imports all 8 fact types", () => {
-      expect(model.factTypes).toHaveLength(8);
+    it("imports all 10 fact types", () => {
+      expect(model.factTypes).toHaveLength(10);
     });
 
     it("imports fact types with correct readings", () => {
@@ -332,9 +332,9 @@ describe("NORMA XML Import integration", () => {
           (c) => c.type === "mandatory",
         ).length;
       }
-      // The file has 5 simple mandatory constraints and 8 implied ones.
-      // We should only see the 5 simple ones.
-      expect(mandatoryCount).toBe(5);
+      // The file has 6 simple mandatory constraints and 8 implied ones.
+      // We should only see the 6 simple ones.
+      expect(mandatoryCount).toBe(6);
     });
 
     it("produces a model that passes validation", () => {

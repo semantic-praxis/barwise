@@ -264,23 +264,56 @@ function resolvePlayerId(
 }
 
 /**
- * Remap role ids inside constraints from the source model's id space
- * to the merged model's id space. Since role ids inside a fact type
- * don't change (we preserve them), this is mostly a pass-through.
- * However, for cross-fact-type constraints (external uniqueness, etc.),
- * ids may need remapping.
+ * Remap ids inside constraints from the source model's id space to the
+ * merged model's id space. Role ids are preserved verbatim by the merge
+ * (every fact type keeps its source role ids), so role references pass
+ * through. The one id space the merge does rewrite is object types --
+ * matched-by-name elements keep the existing model's id -- so join
+ * constraints, whose operand paths carry a root object-type id, remap
+ * that root here.
  */
 function remapConstraintIds(
   constraints: readonly import("../model/Constraint.js").Constraint[],
   _source: import("../model/FactType.js").FactType,
-  _merged: OrmModel,
-  _idMap: Map<string, string>,
+  merged: OrmModel,
+  idMap: Map<string, string>,
 ): import("../model/Constraint.js").Constraint[] {
-  // For now, constraints within a single fact type use role ids
-  // that are preserved verbatim (we keep the source's role ids).
-  // Cross-fact-type constraints will need full id remapping when
-  // the merge engine supports them.
-  return [...constraints];
+  return constraints.map((c) => {
+    if (c.type === "join_subset") {
+      return {
+        ...c,
+        subset: remapJoinOperand(c.subset, merged, idMap),
+        superset: remapJoinOperand(c.superset, merged, idMap),
+      };
+    }
+    if (c.type === "join_equality" || c.type === "join_exclusion") {
+      return {
+        ...c,
+        operands: c.operands.map((o) => remapJoinOperand(o, merged, idMap)),
+      };
+    }
+    return c;
+  });
+}
+
+/**
+ * Remap a join operand's path root to its merged-model equivalent, using
+ * the same resolution order as role players: an id already present in
+ * the merged model wins, then the incoming-to-merged map.
+ */
+function remapJoinOperand(
+  operand: import("../model/Constraint.js").JoinOperand,
+  merged: OrmModel,
+  idMap: Map<string, string>,
+): import("../model/Constraint.js").JoinOperand {
+  const root = operand.path.root;
+  if (merged.getObjectType(root)) return operand;
+
+  const mapped = idMap.get(root);
+  if (mapped && merged.getObjectType(mapped)) {
+    return { ...operand, path: { ...operand.path, root: mapped } };
+  }
+  return operand;
 }
 
 /**

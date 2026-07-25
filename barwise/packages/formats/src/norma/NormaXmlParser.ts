@@ -13,8 +13,12 @@ import type {
   NormaDocument,
   NormaEntityType,
   NormaFactType,
+  NormaJoinPath,
+  NormaJoinProjection,
   NormaMultiplicity,
   NormaObjectifiedType,
+  NormaPathedRole,
+  NormaPathedRolePurpose,
   NormaReading,
   NormaReadingOrder,
   NormaRingType,
@@ -129,6 +133,9 @@ const arrayTags = new Set([
   "RingConstraint",
   "ValueRange",
   "RoleSequence",
+  "PathedRole",
+  "JoinPathProjection",
+  "ConstraintRoleProjection",
 ]);
 
 // ---- Helpers ----
@@ -551,33 +558,39 @@ function parseConstraints(
 
   // SubsetConstraint
   for (const sc of asArray(constraints["SubsetConstraint"])) {
-    const roleSequences = parseMultipleRoleSequences(sc);
+    const { sequences, joinPaths } = parseRoleSequencesWithJoins(sc);
     result.push({
       type: "subset",
       id: attr(sc, "id") ?? "",
       name: attr(sc, "Name") ?? "",
-      subsetRoleRefs: roleSequences[0] ?? [],
-      supersetRoleRefs: roleSequences[1] ?? [],
+      subsetRoleRefs: sequences[0] ?? [],
+      supersetRoleRefs: sequences[1] ?? [],
+      ...(joinPaths[0] ? { subsetJoinPath: joinPaths[0] } : {}),
+      ...(joinPaths[1] ? { supersetJoinPath: joinPaths[1] } : {}),
     });
   }
 
   // ExclusionConstraint
   for (const ec of asArray(constraints["ExclusionConstraint"])) {
+    const { sequences, joinPaths } = parseRoleSequencesWithJoins(ec);
     result.push({
       type: "exclusion",
       id: attr(ec, "id") ?? "",
       name: attr(ec, "Name") ?? "",
-      roleSequences: parseMultipleRoleSequences(ec),
+      roleSequences: sequences,
+      ...(joinPaths.some(Boolean) ? { joinPaths } : {}),
     });
   }
 
   // EqualityConstraint
   for (const eq of asArray(constraints["EqualityConstraint"])) {
+    const { sequences, joinPaths } = parseRoleSequencesWithJoins(eq);
     result.push({
       type: "equality",
       id: attr(eq, "id") ?? "",
       name: attr(eq, "Name") ?? "",
-      roleSequences: parseMultipleRoleSequences(eq),
+      roleSequences: sequences,
+      ...(joinPaths.some(Boolean) ? { joinPaths } : {}),
     });
   }
 
@@ -597,9 +610,9 @@ function parseConstraints(
   return result;
 }
 
-function parseMultipleRoleSequences(
+function parseRoleSequencesWithJoins(
   el: Record<string, unknown>,
-): string[][] {
+): { sequences: string[][]; joinPaths: (NormaJoinPath | undefined)[]; } {
   // NORMA wraps multi-role-sequence constraints in <RoleSequences>
   // (e.g. SubsetConstraint, ExclusionConstraint, EqualityConstraint).
   // Simpler constraints (Uniqueness, Mandatory) use <RoleSequence> directly.
@@ -607,10 +620,91 @@ function parseMultipleRoleSequences(
   const seqParent = wrapper ?? el;
 
   const sequences: string[][] = [];
+  const joinPaths: (NormaJoinPath | undefined)[] = [];
   for (const seq of asArray(seqParent["RoleSequence"])) {
     sequences.push(asArray(seq["Role"]).map((r) => attr(r, "ref") ?? ""));
+    joinPaths.push(parseJoinRule(seq));
   }
-  return sequences;
+  return { sequences, joinPaths };
+}
+
+// ---- Join Path Parsing ----
+
+/**
+ * Parse a role sequence's JoinRule into a NormaJoinPath, when present.
+ *
+ * The expected shape mirrors NORMA's RolePathOwner apparatus for a
+ * constraint role sequence: a JoinPath carrying a role path (root object
+ * type + purpose-tagged pathed roles) and a projection mapping each
+ * constraint role onto the pathed role it projects from. The parser is
+ * lenient about optional wrapper elements; anything it cannot recognize
+ * yields undefined and the constraint falls back to its flat mapping.
+ */
+function parseJoinRule(
+  seq: Record<string, unknown>,
+): NormaJoinPath | undefined {
+  const joinRule = child(seq, "JoinRule") as Record<string, unknown> | undefined;
+  if (!joinRule) return undefined;
+  const joinPath = (child(joinRule, "JoinPath") ?? joinRule) as Record<string, unknown>;
+
+  // The role path may sit under a PathComponents wrapper and be tagged
+  // RolePath or LeadRolePath.
+  const components = (child(joinPath, "PathComponents") ?? joinPath) as Record<string, unknown>;
+  const rolePath = (child(components, "RolePath") ?? child(components, "LeadRolePath")) as
+    | Record<string, unknown>
+    | undefined;
+  if (!rolePath) return undefined;
+
+  const rootEl = child(rolePath, "RootObjectType") as Record<string, unknown> | undefined;
+  if (!rootEl) return undefined;
+
+  const pathedWrapper = (child(rolePath, "PathedRoles") ?? rolePath) as Record<string, unknown>;
+  const pathedRoles: NormaPathedRole[] = asArray(pathedWrapper["PathedRole"]).map((pr) => ({
+    id: attr(pr, "id") ?? "",
+    roleRef: attr(pr, "ref") ?? "",
+    purpose: parsePathedRolePurpose(attr(pr, "Purpose")),
+  }));
+  if (pathedRoles.length === 0) return undefined;
+
+  return {
+    id: attr(joinPath, "id") ?? "",
+    rolePath: {
+      id: attr(rolePath, "id") ?? "",
+      rootObjectTypeRef: attr(rootEl, "ref") ?? "",
+      pathedRoles,
+    },
+    projections: parseJoinProjections(joinPath),
+  };
+}
+
+function parsePathedRolePurpose(raw: string | undefined): NormaPathedRolePurpose {
+  switch (raw) {
+    case "PostInnerJoin":
+      return "PostInnerJoin";
+    case "SameFactType":
+      return "SameFactType";
+    default:
+      return "None";
+  }
+}
+
+function parseJoinProjections(
+  joinPath: Record<string, unknown>,
+): NormaJoinProjection[] {
+  const wrapper = child(joinPath, "JoinPathProjections") as Record<string, unknown> | undefined;
+  if (!wrapper) return [];
+
+  const projections: NormaJoinProjection[] = [];
+  for (const proj of asArray(wrapper["JoinPathProjection"])) {
+    for (const crp of asArray(proj["ConstraintRoleProjection"])) {
+      const source = child(crp, "ProjectedFromPathedRole") as Record<string, unknown> | undefined;
+      projections.push({
+        constraintRoleRef: attr(crp, "ref") ?? "",
+        pathedRoleRef: source ? (attr(source, "ref") ?? "") : "",
+      });
+    }
+  }
+  return projections;
 }
 
 // ---- Data Type Parsing ----

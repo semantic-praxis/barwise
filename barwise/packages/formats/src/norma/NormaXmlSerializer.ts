@@ -19,6 +19,7 @@ import type {
   NormaDocument,
   NormaEntityType,
   NormaFactType,
+  NormaJoinPath,
   NormaObjectifiedType,
   NormaReadingOrder,
   NormaRingType,
@@ -391,7 +392,10 @@ function buildSubset(c: Extract<NormaConstraint, { type: "subset"; }>): XmlNode 
     [`${ATTR}id`]: c.id,
     [`${ATTR}Name`]: c.name,
     "orm:RoleSequences": {
-      "orm:RoleSequence": [roleSequence(c.subsetRoleRefs), roleSequence(c.supersetRoleRefs)],
+      "orm:RoleSequence": [
+        joinableRoleSequence(c.subsetRoleRefs, c.subsetJoinPath),
+        joinableRoleSequence(c.supersetRoleRefs, c.supersetJoinPath),
+      ],
     },
   };
 }
@@ -401,7 +405,9 @@ function buildExclusion(c: Extract<NormaConstraint, { type: "exclusion"; }>): Xm
     [`${ATTR}id`]: c.id,
     [`${ATTR}Name`]: c.name,
     "orm:RoleSequences": {
-      "orm:RoleSequence": c.roleSequences.map((seq) => roleSequence(seq)),
+      "orm:RoleSequence": c.roleSequences.map((seq, i) =>
+        joinableRoleSequence(seq, c.joinPaths?.[i])
+      ),
     },
   };
 }
@@ -411,9 +417,58 @@ function buildEquality(c: Extract<NormaConstraint, { type: "equality"; }>): XmlN
     [`${ATTR}id`]: c.id,
     [`${ATTR}Name`]: c.name,
     "orm:RoleSequences": {
-      "orm:RoleSequence": c.roleSequences.map((seq) => roleSequence(seq)),
+      "orm:RoleSequence": c.roleSequences.map((seq, i) =>
+        joinableRoleSequence(seq, c.joinPaths?.[i])
+      ),
     },
   };
+}
+
+/** A constraint role sequence, with its JoinRule when the sequence has one. */
+function joinableRoleSequence(
+  refs: readonly string[],
+  joinPath: NormaJoinPath | undefined,
+): XmlNode {
+  const node = roleSequence(refs);
+  if (joinPath) {
+    node["orm:JoinRule"] = buildJoinRule(joinPath);
+  }
+  return node;
+}
+
+function buildJoinRule(jp: NormaJoinPath): XmlNode {
+  const joinPath: XmlNode = {
+    [`${ATTR}id`]: jp.id,
+    "orm:PathComponents": {
+      "orm:RolePath": {
+        [`${ATTR}id`]: jp.rolePath.id,
+        "orm:RootObjectType": { [`${ATTR}ref`]: jp.rolePath.rootObjectTypeRef },
+        "orm:PathedRoles": {
+          "orm:PathedRole": jp.rolePath.pathedRoles.map((pr) => ({
+            [`${ATTR}id`]: pr.id,
+            [`${ATTR}ref`]: pr.roleRef,
+            // "None" is the default purpose; only the joins are tagged.
+            ...(pr.purpose === "None" ? {} : { [`${ATTR}Purpose`]: pr.purpose }),
+          })),
+        },
+      },
+    },
+  };
+
+  if (jp.projections.length > 0) {
+    joinPath["orm:JoinPathProjections"] = {
+      "orm:JoinPathProjection": {
+        [`${ATTR}id`]: `${jp.id}_proj`,
+        "orm:ConstraintRoleProjection": jp.projections.map((p, i) => ({
+          [`${ATTR}id`]: `${jp.id}_cr${i}`,
+          [`${ATTR}ref`]: p.constraintRoleRef,
+          "orm:ProjectedFromPathedRole": { [`${ATTR}ref`]: p.pathedRoleRef },
+        })),
+      },
+    };
+  }
+
+  return { "orm:JoinPath": joinPath };
 }
 
 function buildRing(c: Extract<NormaConstraint, { type: "ring"; }>): XmlNode {
