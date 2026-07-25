@@ -24,6 +24,25 @@ describe("barwise diagram", () => {
     expect(result.stdout).toContain("<svg");
   });
 
+  it("marks needs-attention elements from model annotations by default", async () => {
+    // simple.orm.yaml's Name value type has no data type, a TODO
+    // annotation on the Customer table's column; the owning node
+    // carries a TODO(barwise) title in the SVG.
+    const result = await runCli(["diagram", `${fixtures}/simple.orm.yaml`]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("TODO(barwise)");
+  });
+
+  it("omits annotation markers with --no-annotate", async () => {
+    const result = await runCli([
+      "diagram",
+      `${fixtures}/simple.orm.yaml`,
+      "--no-annotate",
+    ]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).not.toContain("TODO(barwise)");
+  });
+
   it("writes SVG to file with --output", async () => {
     mkdirSync(tmpDir, { recursive: true });
     const outFile = join(tmpDir, "diagram.svg");

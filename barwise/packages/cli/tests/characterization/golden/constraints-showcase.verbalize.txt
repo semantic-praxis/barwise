@@ -15,3 +15,17 @@ Person is child of Person
   Each combination of Person and Person is unique in Person is parent of Person.
   No Person is parent of that same Person.
   If Person1 is parent of Person2 then Person2 does not is parent of Person1.
+== Open questions ==
+[person] No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+[person.person_id] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+[person.vin] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+[person.bus_number] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+[car] No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+[car.vin] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+[bus] No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+[bus.bus_number] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+[ticket] No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+[ticket.ticket_id] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+[ticket.person_id] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+[person_is_parent_of_person.person_id] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+[person_is_parent_of_person.is_child_of_person_id] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.

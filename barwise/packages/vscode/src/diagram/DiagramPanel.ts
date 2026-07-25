@@ -1,4 +1,5 @@
 import { type DiagramLayout, type OrmModel, OrmYamlSerializer } from "@barwise/core";
+import { collectAnnotationMap } from "@barwise/core/annotation";
 import { type DiagramPresentation, DiagramSession } from "@barwise/diagram";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -43,7 +44,7 @@ export class DiagramPanel {
     this.panel = panel;
     this.extensionUri = extensionUri;
     this.filePath = fileName;
-    this.session = new DiagramSession(model, savedLayout);
+    this.session = new DiagramSession(model, savedLayout, collectAnnotationMap(model));
     this.setTitle(fileName);
     this.panel.webview.html = this.buildHtml();
 
@@ -82,7 +83,7 @@ export class DiagramPanel {
       const existing = DiagramPanel.currentPanel;
       existing.panel.reveal(column);
       existing.filePath = fileName;
-      existing.session = new DiagramSession(model, savedLayout);
+      existing.session = new DiagramSession(model, savedLayout, collectAnnotationMap(model));
       existing.lastPresentation = undefined;
       existing.setTitle(fileName);
       void existing.rerender(true);
@@ -238,7 +239,7 @@ export class DiagramPanel {
     } catch {
       return;
     }
-    this.session.setModel(newModel);
+    this.session.setModel(newModel, collectAnnotationMap(newModel));
     void this.rerender(false);
   }
 

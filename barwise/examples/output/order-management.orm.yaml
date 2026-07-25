@@ -2,22 +2,22 @@ orm_version: "1.1"
 model:
   name: Order Management
   object_types:
-    - id: 11832483-f577-4071-b8e4-e4f8f98163f9
+    - id: ab5fd82e-6c9f-4f21-874f-440a1c68e271
       name: Customer
       kind: entity
       reference_mode: customer_id
       definition: A person or organization that places orders in the CRM system.
-    - id: fd98e839-1da7-436d-aaea-e244d9c5f3c9
+    - id: 644b7940-3be0-4b68-afba-ba6c22d0a6d0
       name: Order
       kind: entity
       reference_mode: order_number
       definition: A confirmed request by a customer for one or more products.
-    - id: 85e8ade1-637e-4380-b298-9d62eaafb4da
+    - id: c6e67c9d-bab5-4520-97ce-ca5018cf0c61
       name: Product
       kind: entity
       reference_mode: sku
       definition: A product that can be ordered by customers.
-    - id: ff5510db-5ca4-41de-9452-878388663471
+    - id: 2547705c-99fd-474c-8f67-e20cc3d15970
       name: OrderStatus
       kind: value
       definition: The current status of an order in the fulfillment pipeline.
@@ -27,7 +27,7 @@ model:
           - confirmed
           - shipped
           - delivered
-    - id: d0249705-2934-4fc6-b97b-0922fbe056b6
+    - id: e9e31f18-5e71-499b-8c7e-4f4c46a41b1b
       name: Name
       kind: value
       definition: A customer's display name.
@@ -35,14 +35,14 @@ model:
         name: text
         length: 100
   fact_types:
-    - id: 5d897853-2cba-416f-acdc-f5d411858200
+    - id: d76c0c20-817b-41e4-b5af-3fb650b66255
       name: Customer places Order
       roles:
-        - id: 35e40022-b42d-4bc0-a389-3ae7dd1f617e
-          player: 11832483-f577-4071-b8e4-e4f8f98163f9
+        - id: 01c3f4a4-c9af-4bb6-a95f-cfb3262012c4
+          player: ab5fd82e-6c9f-4f21-874f-440a1c68e271
           role_name: places
-        - id: ff8ab4cf-41f7-4412-9db8-b1c80958a3af
-          player: fd98e839-1da7-436d-aaea-e244d9c5f3c9
+        - id: fcf4a744-dc77-4244-981c-cd3bc3effd76
+          player: 644b7940-3be0-4b68-afba-ba6c22d0a6d0
           role_name: is placed by
       readings:
         - "{0} places {1}"
@@ -50,29 +50,29 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - ff8ab4cf-41f7-4412-9db8-b1c80958a3af
+            - fcf4a744-dc77-4244-981c-cd3bc3effd76
         - type: mandatory
-          role: ff8ab4cf-41f7-4412-9db8-b1c80958a3af
-    - id: 587f2669-b228-4c22-a3bd-000cb3255e33
+          role: fcf4a744-dc77-4244-981c-cd3bc3effd76
+    - id: 924bcc6a-5e93-4a4e-b601-b03d9921b0aa
       name: Order contains Product
       roles:
-        - id: f2b3b799-d04e-419c-b1a9-68db87de2a88
-          player: fd98e839-1da7-436d-aaea-e244d9c5f3c9
+        - id: 5b38a1c9-8d91-42ad-af67-731bd37cc15e
+          player: 644b7940-3be0-4b68-afba-ba6c22d0a6d0
           role_name: contains
-        - id: e32110c2-72ef-40a7-82e5-44d61a2f5c57
-          player: 85e8ade1-637e-4380-b298-9d62eaafb4da
+        - id: ff669ef4-55cf-4e2a-abe7-4bda003ae16d
+          player: c6e67c9d-bab5-4520-97ce-ca5018cf0c61
           role_name: is contained in
       readings:
         - "{0} contains {1}"
         - "{1} is contained in {0}"
-    - id: 1677865e-4b7e-40ee-bb39-951f7244c49f
+    - id: 14795e5b-7482-4434-b5ea-d94458c3baef
       name: Order has OrderStatus
       roles:
-        - id: a48b04a2-05f5-4ac8-807b-410b425ca62d
-          player: fd98e839-1da7-436d-aaea-e244d9c5f3c9
+        - id: baeef61f-7ea9-440c-8331-9c2e5a8b6c29
+          player: 644b7940-3be0-4b68-afba-ba6c22d0a6d0
           role_name: has
-        - id: 45c3fe1f-d6f8-4a64-8e7f-21c637e9b30b
-          player: ff5510db-5ca4-41de-9452-878388663471
+        - id: 4de2bfe4-3e83-4ba0-8674-f4c1e20a7ab4
+          player: 2547705c-99fd-474c-8f67-e20cc3d15970
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -80,17 +80,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - a48b04a2-05f5-4ac8-807b-410b425ca62d
+            - baeef61f-7ea9-440c-8331-9c2e5a8b6c29
         - type: mandatory
-          role: a48b04a2-05f5-4ac8-807b-410b425ca62d
-    - id: bd8ccc23-1ec2-49d1-8222-8b8c363fae1e
+          role: baeef61f-7ea9-440c-8331-9c2e5a8b6c29
+    - id: b1e21c0f-ed72-405e-8bbf-070f6f90cc78
       name: Customer has Name
       roles:
-        - id: a45de9a4-f462-4589-ad0e-5fa4c7f4d483
-          player: 11832483-f577-4071-b8e4-e4f8f98163f9
+        - id: 06654a76-b915-49d5-a450-2c67130114a0
+          player: ab5fd82e-6c9f-4f21-874f-440a1c68e271
           role_name: has
-        - id: 7ca74bbd-1a8d-4a5f-a1ac-09c987aa6c68
-          player: d0249705-2934-4fc6-b97b-0922fbe056b6
+        - id: fba487c3-21fd-453c-972f-e1e8c655a9e6
+          player: e9e31f18-5e71-499b-8c7e-4f4c46a41b1b
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -98,7 +98,7 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - a45de9a4-f462-4589-ad0e-5fa4c7f4d483
+            - 06654a76-b915-49d5-a450-2c67130114a0
           is_preferred: true
         - type: mandatory
-          role: a45de9a4-f462-4589-ad0e-5fa4c7f4d483
+          role: 06654a76-b915-49d5-a450-2c67130114a0

@@ -1,9 +1,16 @@
 # Propagate annotations to downstream artifacts
 
-Status: Partial -- exporter annotation collection, diagram
-rendering, and verbalizeModelWithAnnotations are built and tested,
-but the diagram and verbalization legs have no production caller
-passing annotations (docs/BACKLOG-2026-07-25.md item 3).
+Status: Implemented -- all five legs wired. Exporters collect
+annotations internally; the diagram and verbalization legs are fed by
+production callers as of 2026-07-25: `collectAnnotationMap` /
+`collectOpenQuestionAnnotations` (core annotation subpath) wire the CLI
+diagram and verbalize commands (`--no-annotate` to opt out), the MCP
+generate_diagram and verbalize_model tools (`annotate` parameter), and
+the VS Code DiagramSession (annotations passed as input data, keeping
+the diagram package free of core's annotation module). Open questions
+are curated: todo severity only, column-level description nags dropped,
+deduplicated. Follow-up (minor): the collector's message wording is
+still dbt-flavored ("or edit the dbt YAML") on non-dbt surfaces.
 Created: 2026-03-08
 Last-updated: 2026-07-25
 

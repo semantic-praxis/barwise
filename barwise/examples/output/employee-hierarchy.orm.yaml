@@ -2,39 +2,39 @@ orm_version: "1.1"
 model:
   name: Employee Hierarchy
   object_types:
-    - id: 8d0d51fb-cdd2-4748-8a4e-d8c41bc3c3b8
+    - id: 29794ed2-50f9-4556-8232-a404aca72fec
       name: Person
       kind: entity
       reference_mode: person_id
       definition: Any individual tracked by the HR system.
-    - id: e9951d00-3c48-4a28-b3c5-6dd8cc86a224
+    - id: 60a2d2b5-f3cb-42a0-aee5-fc40697aa867
       name: Employee
       kind: entity
       reference_mode: employee_id
       definition: A person who works for the company.
-    - id: 1e59e835-69b5-42f6-842f-59f8368ded31
+    - id: bce5ed81-b9b3-4cec-9ca1-b556cb4f981b
       name: Manager
       kind: entity
       reference_mode: manager_id
       definition: An employee who manages other employees.
-    - id: 8db001ef-c8e7-4d52-a20d-f581a0ed8e96
+    - id: 1a70d51a-13f1-455b-90b4-9c3896ba9300
       name: Department
       kind: entity
       reference_mode: department_code
       definition: An organizational unit within the company.
-    - id: 30185cb4-1ff3-408c-bf33-7e720c39d940
+    - id: 34f9a420-17d4-44c3-8a1e-fae890efdb6e
       name: DepartmentName
       kind: value
       definition: The name of a department.
   fact_types:
-    - id: a2bd9b9c-6dd4-4b65-9907-ef9a1ee4967e
+    - id: 3203302c-1ab2-42f1-a63c-37522ccb5ca0
       name: Employee works in Department
       roles:
-        - id: 5101502f-3d7d-45e0-99fa-2ee2475f7f2e
-          player: e9951d00-3c48-4a28-b3c5-6dd8cc86a224
+        - id: 969d527f-861d-45aa-894d-135e5967ab16
+          player: 60a2d2b5-f3cb-42a0-aee5-fc40697aa867
           role_name: works in
-        - id: e74252c7-ac3d-4399-8c5c-5c90da13371f
-          player: 8db001ef-c8e7-4d52-a20d-f581a0ed8e96
+        - id: cd3d812f-6ded-4e22-b4f1-13487c18e7dd
+          player: 1a70d51a-13f1-455b-90b4-9c3896ba9300
           role_name: has
       readings:
         - "{0} works in {1}"
@@ -42,17 +42,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 5101502f-3d7d-45e0-99fa-2ee2475f7f2e
+            - 969d527f-861d-45aa-894d-135e5967ab16
         - type: mandatory
-          role: 5101502f-3d7d-45e0-99fa-2ee2475f7f2e
-    - id: 54e2fe90-25ab-46f1-adbe-023103867c67
+          role: 969d527f-861d-45aa-894d-135e5967ab16
+    - id: e2464003-5f5a-4490-b7ce-c536aa326cdb
       name: Manager manages Department
       roles:
-        - id: b161c394-1ba4-4bba-a88a-0f631722f180
-          player: 1e59e835-69b5-42f6-842f-59f8368ded31
+        - id: 205c5e98-4cd7-4bf3-bc2b-91bf8b4a5684
+          player: bce5ed81-b9b3-4cec-9ca1-b556cb4f981b
           role_name: manages
-        - id: ea0ecfc5-2e3f-4744-a818-9998eecc839c
-          player: 8db001ef-c8e7-4d52-a20d-f581a0ed8e96
+        - id: 9cc28b51-66b3-46e1-a453-fb94097ecde6
+          player: 1a70d51a-13f1-455b-90b4-9c3896ba9300
           role_name: is managed by
       readings:
         - "{0} manages {1}"
@@ -60,15 +60,15 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - ea0ecfc5-2e3f-4744-a818-9998eecc839c
-    - id: ee9a77d3-db78-4ff6-889d-7b532affdc15
+            - 9cc28b51-66b3-46e1-a453-fb94097ecde6
+    - id: aa45e145-c062-4768-96bb-3ec9a39bc7ac
       name: Department has DepartmentName
       roles:
-        - id: 7be19d26-bad6-45c9-ac9f-6941a08a103e
-          player: 8db001ef-c8e7-4d52-a20d-f581a0ed8e96
+        - id: 71ec80ff-39cb-4637-8136-15333fe4fb6a
+          player: 1a70d51a-13f1-455b-90b4-9c3896ba9300
           role_name: has
-        - id: f51d68b7-8471-45e6-b8c2-ab48a42fcb0a
-          player: 30185cb4-1ff3-408c-bf33-7e720c39d940
+        - id: 5c854036-e393-4208-90e2-c7f1ca1e400c
+          player: 34f9a420-17d4-44c3-8a1e-fae890efdb6e
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -76,12 +76,12 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 7be19d26-bad6-45c9-ac9f-6941a08a103e
+            - 71ec80ff-39cb-4637-8136-15333fe4fb6a
   subtype_facts:
-    - id: 0b1184e9-c64a-49cf-999a-ca133206a263
-      subtype: e9951d00-3c48-4a28-b3c5-6dd8cc86a224
-      supertype: 8d0d51fb-cdd2-4748-8a4e-d8c41bc3c3b8
+    - id: da2cd57d-b851-4016-a771-8bda6caec722
+      subtype: 60a2d2b5-f3cb-42a0-aee5-fc40697aa867
+      supertype: 29794ed2-50f9-4556-8232-a404aca72fec
       provides_identification: false
-    - id: 45acba07-91bd-40bc-9d67-8680bc50defb
-      subtype: 1e59e835-69b5-42f6-842f-59f8368ded31
-      supertype: e9951d00-3c48-4a28-b3c5-6dd8cc86a224
+    - id: adb0cd84-519c-418a-8716-fe54454d13e2
+      subtype: bce5ed81-b9b3-4cec-9ca1-b556cb4f981b
+      supertype: 60a2d2b5-f3cb-42a0-aee5-fc40697aa867

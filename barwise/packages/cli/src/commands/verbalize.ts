@@ -6,6 +6,7 @@
  */
 
 import type { OrmModel } from "@barwise/core";
+import { collectOpenQuestionAnnotations } from "@barwise/core/annotation";
 import { type Counterexample, generateCounterexamples } from "@barwise/core/counterexample";
 import { Verbalizer } from "@barwise/core/verbalization";
 import type { Command } from "commander";
@@ -21,6 +22,7 @@ interface VerbalizeOptions {
   factType?: string;
   counterexamples?: boolean;
   domain?: string;
+  annotate: boolean;
 }
 
 export function registerVerbalizeCommand(program: Command): void {
@@ -35,6 +37,10 @@ export function registerVerbalizeCommand(program: Command): void {
       "Also show the minimal population each constraint rules out",
     )
     .option("--domain <context>", "For a project, verbalize only this one domain")
+    .option(
+      "--no-annotate",
+      "Exclude the open-questions section derived from model annotations",
+    )
     .action(async (file: string, opts: VerbalizeOptions) => {
       try {
         const { resolved, problems } = resolveDomainModels(file, opts.domain);
@@ -85,7 +91,7 @@ function compute(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOptions
     verbalizations = ft ? verbalizer.verbalizeFactType(ft.id, model) : [];
     factTypeId = ft?.id;
   } else {
-    verbalizations = verbalizer.verbalizeModel(model);
+    verbalizations = verbalizeWhole(verbalizer, model, opts);
   }
 
   let counterexamples: readonly Counterexample[] = [];
@@ -95,6 +101,15 @@ function compute(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOptions
     );
   }
   return { verbalizations, counterexamples };
+}
+
+/**
+ * Whole-model verbalizations with the open-questions section appended
+ * from the model's export annotations (unless --no-annotate).
+ */
+function verbalizeWhole(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOptions) {
+  if (!opts.annotate) return verbalizer.verbalizeModel(model);
+  return verbalizer.verbalizeModelWithAnnotations(model, collectOpenQuestionAnnotations(model));
 }
 
 function textBody(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOptions): string {

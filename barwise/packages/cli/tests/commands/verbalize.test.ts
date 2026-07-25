@@ -43,6 +43,24 @@ describe("barwise verbalize", () => {
     expect(result.stdout).toContain("Customer");
   });
 
+  it("appends the open-questions section from model annotations", async () => {
+    // simple.orm.yaml's Name value type has no data type -- a TODO
+    // annotation -- so the default output carries the section.
+    const result = await runCli(["verbalize", `${fixtures}/simple.orm.yaml`]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("== Open questions ==");
+  });
+
+  it("omits the open-questions section with --no-annotate", async () => {
+    const result = await runCli([
+      "verbalize",
+      `${fixtures}/simple.orm.yaml`,
+      "--no-annotate",
+    ]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).not.toContain("== Open questions ==");
+  });
+
   it("appends counterexamples with --counterexamples", async () => {
     const result = await runCli([
       "verbalize",

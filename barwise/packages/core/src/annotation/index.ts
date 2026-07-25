@@ -1,6 +1,11 @@
 // Annotation helpers, ORM YAML annotator, export annotation collector.
 export { collectExportAnnotations, type ExportAnnotation } from "./ExportAnnotationCollector.js";
 export {
+  collectAnnotationMap,
+  collectModelAnnotations,
+  collectOpenQuestionAnnotations,
+} from "./exportAnnotationMap.js";
+export {
   type AnnotationSeverity,
   formatBarwiseComment,
   stripBarwiseComments,
