@@ -2,7 +2,7 @@
 
 Status: Draft for review (design only -- no implementation in this PR)
 Created: 2026-07-03
-Last-updated: 2026-07-03
+Last-updated: 2026-07-22
 Tracking: Feature follow-up to the `docs/anki` learning deck (merged in
 PR #253). No bd issue yet -- the bd binary is unavailable in this web
 session; file one before the first implementation PR.
@@ -36,7 +36,7 @@ their concerns out of core.
 
 ## Should we build the evaluator as a new package? (resolved: yes)
 
-Yes -- a new `@barwise/gym` package owns the evaluator and the exercise
+Yes -- a new `@barwise/learn` package owns the evaluator and the exercise
 catalog; core is untouched.
 
 The evaluator is pure and deterministic (candidate model + exercise
@@ -108,7 +108,7 @@ and cannot drift from the reference.
 
 ## Scope
 
-In scope: a new `@barwise/gym` package (exercise schema + loader, the
+In scope: a new `@barwise/learn` package (exercise schema + loader, the
 evaluator, a seed catalog); a JSON Schema for the `.gym.yaml` format; a
 CLI surface (`barwise gym list|show|check`); an MCP surface (`gym_list`,
 `gym_check`); and a seed catalog of four to six graded exercises spanning
@@ -130,12 +130,12 @@ Out of scope, deferred and named:
 
 | Area                               | Change                                                                  | Verdict   |
 | ---------------------------------- | ----------------------------------------------------------------------- | --------- |
-| `packages/gym/src/exercise/`       | Exercise schema types and `.gym.yaml` loader                            | new       |
-| `packages/gym/src/evaluate/`       | The evaluator and its four check runners (checks produce a `GymReport`) | new       |
-| `packages/gym/exercises/`          | Seed catalog content (`*.gym.yaml` plus reference `*.orm.yaml`)         | new       |
-| `packages/gym/schemas/`            | `gym-exercise.schema.json`                                              | new       |
+| `packages/learn/src/exercise/`     | Exercise schema types and `.gym.yaml` loader                            | new       |
+| `packages/learn/src/evaluate/`     | The evaluator and its four check runners (checks produce a `GymReport`) | new       |
+| `packages/learn/exercises/`        | Seed catalog content (`*.gym.yaml` plus reference `*.orm.yaml`)         | new       |
+| `packages/learn/schemas/`          | `gym-exercise.schema.json`                                              | new       |
 | `@barwise/core`                    | Consumed only through existing subpath exports                          | untouched |
-| `packages/cli/src/commands/gym.ts` | New `gym` command (list/show/check); add `@barwise/gym` dependency      | additive  |
+| `packages/cli/src/commands/gym.ts` | New `gym` command (list/show/check); add `@barwise/learn` dependency    | additive  |
 | `packages/mcp/src/tools/gym.ts`    | New `gym_list`/`gym_check` tools; bump `SERVER_VERSION`; add dependency | additive  |
 | `CLAUDE.md` dependency graph       | Add the `gym` node                                                      | doc       |
 
@@ -152,7 +152,7 @@ published subpath exports.
            counterexample (/counterexample), population validation rules,
            OrmYamlSerializer, query (/query)
   ^
-  |--- @barwise/gym                   (new; depends on core only)
+  |--- @barwise/learn                   (new; depends on core only)
   |      exercise/    ExerciseSchema, loadExercise(.gym.yaml)
   |      evaluate/    evaluateCandidate(model, exercise) -> GymReport
   |                   runners: mustValidate, requiresVerbalization,
@@ -203,7 +203,7 @@ exercise produce an identical report, byte for byte.
 
 ## Alternatives considered
 
-- **Evaluator in core (`@barwise/core/gym`).** Rejected on orthogonality.
+- **Evaluator in core (`@barwise/core/learn`).** Rejected on orthogonality.
   It is deterministic enough to live in core, but core's concern is the
   metamodel, not pedagogy; adding "exercise" and "score" to core's
   vocabulary couples it to a teaching concern it otherwise has no reason
@@ -226,7 +226,7 @@ exercise produce an identical report, byte for byte.
 
 ## Workstreams (each independently shippable)
 
-### 1. `@barwise/gym` foundation: schema, loader, evaluator
+### 1. `@barwise/learn` foundation: schema, loader, evaluator
 
 The package with the exercise schema, the `.gym.yaml` loader, the
 `evaluateCandidate` evaluator with all four check runners, and unit tests
@@ -251,7 +251,7 @@ call shape.
 A `gym` command with `list` (catalog), `show <id>` (brief plus starter),
 and `check <id> <candidate.orm.yaml>` (evaluate, print the report, exit 1
 if not passed). Mirrors the existing `project` subcommand pattern and the
-`--format text|json` convention. Adds the `@barwise/gym` dependency.
+`--format text|json` convention. Adds the `@barwise/learn` dependency.
 
 ### 3. MCP surface: `gym_list`, `gym_check`
 
@@ -277,7 +277,7 @@ follow-ups once workstreams 1 through 4 are proven.
 
 ## API and migration impact
 
-Additive only. No existing signature changes. New package `@barwise/gym`
+Additive only. No existing signature changes. New package `@barwise/learn`
 (depends on `core`); `cli` and `mcp` each gain a dependency on it and new
 command/tool surfaces. `SERVER_VERSION` bumps (workstream 3) with its sync
 test. The `CLAUDE.md` dependency graph gains the `gym` node. No
@@ -286,11 +286,13 @@ downstream packages are unaffected except where they opt in.
 
 ## Open decisions
 
-1. **Package name.** `@barwise/gym` (recommended -- short, memorable) vs
-   `@barwise/practice` or `@barwise/exercises` (more literal). Trivial,
-   but a package name is costly to change later.
+1. **Package name (resolved: `@barwise/learn`).** One learning package
+   hosts all learning artifacts -- the gym now, the tutorial later -- so
+   the name is deliberately broader than "gym". Workstream 1 shipped
+   under this name; the "gym" remains the capability name (the `barwise
+   gym` command, `.gym.yaml` files, `gym_*` tools).
 2. **Where the exercise catalog lives.** Inside the package
-   (`packages/gym/exercises/`, recommended -- the package owns its
+   (`packages/learn/exercises/`, recommended -- the package owns its
    content, mirroring how `formats` owns its descriptors) vs top-level
    `examples/gym/` (more discoverable, but splits the concern across two
    locations). Recommendation: in-package, with the CLI able to load an
