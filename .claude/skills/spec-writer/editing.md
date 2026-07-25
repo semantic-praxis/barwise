@@ -31,7 +31,10 @@ re-read.
    assertions -- and either ground them now or mark them provisional
    (see `sensemaking.md`). An ungrounded claim in settled prose is how a
    spec ships the wrong scope.
-7. **Pre-push gate.** Clear the gate in `SKILL.md` before pushing.
+7. **Articulation.** Invoke the `articulation` skill in critique mode
+   over the full draft and act on its verdict, per step 6 of the
+   workflow in `SKILL.md`.
+8. **Pre-push gate.** Clear the gate in `SKILL.md` before pushing.
 
 ## What never gets cut
 

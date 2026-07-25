@@ -28,7 +28,20 @@ reviewer's time as more valuable than your own. Three rules follow:
   Every section earns its place by changing what the reviewer decides or
   the implementer does.
 
+These rules are the reviewer-facing edge of the `articulation` skill,
+which governs whether the spec lands: the reviewer is the audience, and
+their action is to approve, object, or decide an open question. Invoke
+`articulation` as the clarity discipline for the whole spec. Start with
+its verbalization test -- state the spec's resolution in one plain
+sentence before structuring anything; if you cannot, the design is not
+yet ready to write down, and no formatting will rescue it. Let that
+sentence become the BLUF.
+
 ## Workflow
+
+The files the steps below reference -- `sensemaking.md`, `editing.md`,
+`llm-tics.md`, `template.spec.md` -- ship in this skill's directory,
+alongside this file.
 
 1. **Ground it, then frame it.** Read `barwise/docs/ARCHITECTURE.md`,
    the relevant package `CLAUDE.md`, and the source the spec covers (a
@@ -43,9 +56,8 @@ reviewer's time as more valuable than your own. Three rules follow:
    The strongest specs this project has produced reason _from_ these
    (e.g. "no interop format is mandatory to core, so core should ship
    none").
-3. **Draft from the template.** Copy `template.spec.md` (in this skill
-   dir) and fill it in. Drop sections that do not apply; do not invent
-   filler.
+3. **Draft from the template.** Copy `template.spec.md` and fill it
+   in. Drop sections that do not apply; do not invent filler.
 4. **Split into workstreams.** Decompose implementation into
    independently shippable steps, ordered smallest-blast-radius first,
    each keeping the full suite green as its own PR. Note coupling that
@@ -57,8 +69,21 @@ reviewer's time as more valuable than your own. Three rules follow:
    the reviewer's call (package scope, where shared I/O lives,
    API shape). Recommend a default; do not silently decide. These are
    ADR-shaped -- state the options and the trade-off.
-6. **Edit.** Run the edit passes in `editing.md` (scanning `llm-tics.md`
-   during the voice pass) before the spec is shared.
+6. **Edit, then run an articulation pass.** Run the edit passes in
+   `editing.md` (scanning `llm-tics.md` during the voice pass), then
+   invoke the `articulation` skill in critique mode over the draft. Its
+   barrier taxonomy catches the failures the voice pass misses -- the
+   four most common in specs: a buried lede (a heading that does not
+   state its resolution), a fuzzy abstraction (a "robust" or "scalable"
+   claim with no operational meaning), a missing bridge (a design leap
+   from premises the reviewer does not have), or a wall of detail (an
+   inventory or architecture dump with no hierarchy). Then act on the
+   review's verdict: wording and boundary problems get fixed in place
+   (reword or restructure) before the pre-push gate; a
+   thinking-problems verdict means a decision is missing, so return to
+   grounding (step 1) or move the undecided item into Open decisions --
+   do not polish through it. The review runs in-conversation; commit
+   the fixes, never the review.
 7. **Clear the gate, then land.** Run the pre-push gate below, land the
    spec for review, then implement in separate PRs. Before implementing
    each workstream, ground it again and verify or correct the
@@ -85,6 +110,15 @@ A header block -- `Status`, `Created` and `Last-updated` (ISO
 - **Open decisions** -- the reviewer's calls, with a recommendation.
 - **Risks and testing** / **Non-goals**.
 
+## Requirement phrasing
+
+State individual requirements in EARS form: "When `<trigger>`, the
+system shall `<response>`." Naming one trigger and one observable
+response is what makes the statement testable -- a reviewer can dispute
+it, and an implementer can turn it into a test case without
+interpreting. Use it for Scope bullets and workstream acceptance
+criteria; the surrounding argument stays in ordinary prose.
+
 ## Naming and dating
 
 The convention splits by document type, because specs are living and
@@ -103,21 +137,36 @@ reviews are point-in-time:
   is never edited in place; the next review is a new file. Use the full
   date, not just the month: more than one can land in a month.
 
-For requirement statements, EARS phrasing keeps them testable:
-"When `<trigger>`, the system shall `<response>`."
-
 ## Pre-push gate
 
-STOP: do not push until every item below passes. `dprint fmt:check`
-enforces the formatting in CI but cannot run locally here (the wasm
-plugin download is network-blocked), so check it by eye. Skipping this
-gate has cost a CI round-trip on nearly every PR that skipped it.
+STOP: do not push until every item below passes. Run the design gate
+first -- a design change invalidates formatting work, never the
+reverse.
 
-- **Principle check** (content, not formatting): does the chosen design
-  conflict with any stated pillar -- determinism in core, orthogonality,
-  composability, explicit over implicit? A real conflict is an Open
-  decision to surface, never a silent trade-off. This is the guard
-  against principle drift under implementation pressure.
+### Design gate (content)
+
+- **Principle check**: does the chosen design conflict with any stated
+  pillar -- determinism in core, orthogonality, composability, explicit
+  over implicit? A real conflict is an Open decision to surface, never
+  a silent trade-off. This is the guard against principle drift under
+  implementation pressure.
+- **Open decisions are genuinely open** -- each states the options and
+  the trade-off and recommends a default, and nothing that is the
+  reviewer's call has been silently decided in the body.
+- **Header block is current** -- `Status`, `Created`, `Last-updated`
+  (bumped if this push revises an existing spec), `Tracking`.
+- **REPO_REVIEW link**: reference the finding the spec resolves, and
+  update its checkbox/status line when the spec lands.
+
+### Formatting gate (dprint)
+
+`dprint fmt:check` enforces these in CI but cannot run locally here
+(the wasm plugin download is network-blocked), so check each by eye.
+Skipping this gate has cost a CI round-trip on nearly every PR that
+skipped it. The import rules apply because dprint formats fenced `ts`
+code blocks inside markdown -- a Target-architecture or API sketch is
+checked as real code.
+
 - **Emphasis uses underscores**, not asterisks: `_word_`, not `*word*`.
   (`**bold**` is fine.)
 - **Tables are column-aligned** -- every cell in a column padded to the
@@ -138,5 +187,3 @@ gate has cost a CI round-trip on nearly every PR that skipped it.
 - **No emoji** anywhere (project-wide rule).
 - Lines over 100 chars that dprint cannot break (long template literals)
   are fine; everything else stays under the width.
-- **REPO_REVIEW link**: reference the finding the spec resolves, and
-  update its checkbox/status line when the spec lands.
