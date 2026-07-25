@@ -195,6 +195,10 @@ export interface NormaSubsetConstraint {
   readonly name: string;
   readonly subsetRoleRefs: readonly string[];
   readonly supersetRoleRefs: readonly string[];
+  /** Join path attached to the subset role sequence, if any. */
+  readonly subsetJoinPath?: NormaJoinPath;
+  /** Join path attached to the superset role sequence, if any. */
+  readonly supersetJoinPath?: NormaJoinPath;
 }
 
 export interface NormaExclusionConstraint {
@@ -202,6 +206,8 @@ export interface NormaExclusionConstraint {
   readonly id: string;
   readonly name: string;
   readonly roleSequences: readonly (readonly string[])[];
+  /** Join path per role sequence (parallel to roleSequences), if any. */
+  readonly joinPaths?: readonly (NormaJoinPath | undefined)[];
 }
 
 export interface NormaEqualityConstraint {
@@ -209,6 +215,53 @@ export interface NormaEqualityConstraint {
   readonly id: string;
   readonly name: string;
   readonly roleSequences: readonly (readonly string[])[];
+  /** Join path per role sequence (parallel to roleSequences), if any. */
+  readonly joinPaths?: readonly (NormaJoinPath | undefined)[];
+}
+
+// ---- Join paths ----
+
+/**
+ * How a pathed role attaches to the join path being walked:
+ * "None" starts the path at the root object type, "PostInnerJoin" joins
+ * into a new fact type from the current path node, and "SameFactType"
+ * continues within the entry role's fact type (the hop's exit).
+ */
+export type NormaPathedRolePurpose = "None" | "PostInnerJoin" | "SameFactType";
+
+/** One purpose-tagged role along a NORMA join path. */
+export interface NormaPathedRole {
+  readonly id: string;
+  readonly roleRef: string;
+  readonly purpose: NormaPathedRolePurpose;
+}
+
+/** A linear role path: a root object type and its pathed roles, in order. */
+export interface NormaRolePathDef {
+  readonly id: string;
+  readonly rootObjectTypeRef: string;
+  readonly pathedRoles: readonly NormaPathedRole[];
+}
+
+/**
+ * Projection of one constraint role from a pathed role. Listed in the
+ * constraint role sequence's order; `pathedRoleRef` names the PathedRole
+ * element (by id) whose player the constraint column projects.
+ */
+export interface NormaJoinProjection {
+  readonly constraintRoleRef: string;
+  readonly pathedRoleRef: string;
+}
+
+/**
+ * A join path attached to one role sequence of a set-comparison
+ * constraint: the role path plus the projection that selects the
+ * compared columns.
+ */
+export interface NormaJoinPath {
+  readonly id: string;
+  readonly rolePath: NormaRolePathDef;
+  readonly projections: readonly NormaJoinProjection[];
 }
 
 export type NormaRingType =

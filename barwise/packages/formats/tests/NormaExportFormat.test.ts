@@ -121,6 +121,23 @@ describe("NormaExportFormat", () => {
         expectModelsEqual(original, reimported, fixture);
       }
     });
+
+    it("emits the join apparatus and re-imports the join equality (backstop)", () => {
+      // The conceptual diff already keys join constraints structurally,
+      // but assert the join survives explicitly, mirroring the
+      // subtype/objectification backstops above.
+      const original = importNormaXml(loadFixture("personCountryDemo.orm"));
+      const xml = exportToXml(original);
+      expect(xml).toContain("<orm:JoinRule>");
+      expect(xml).toContain('Purpose="SameFactType"');
+
+      const reimported = importNormaXml(xml);
+      const joins = reimported.factTypes.flatMap((ft) =>
+        ft.constraints.filter((c) => c.type === "join_equality")
+      );
+      expect(joins).toHaveLength(1);
+      expect(joins[0]!.operands).toHaveLength(2);
+    });
   });
 
   describe("independent object types", () => {

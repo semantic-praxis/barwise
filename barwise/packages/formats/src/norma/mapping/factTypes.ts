@@ -8,10 +8,12 @@ import type { Constraint, OrmModel, RoleConfig } from "@barwise/core";
 import type { NormaConstraint, NormaFactType } from "../NormaXmlTypes.js";
 import { type NormaMappingContext, NormaMappingError } from "./context.js";
 import { mapNormaConstraint } from "./factConstraints.js";
+import { createJoinDecoder, type NormaJoinDecoder } from "./joinPaths.js";
 
 /** Create fact types with roles, readings, and internal constraints (phase 2). */
 export function mapFactTypes(ctx: NormaMappingContext): void {
   const { doc, model, objectTypeIdMap, roleIdMap, factTypeIdMap, constraintById } = ctx;
+  const joinDecoder = createJoinDecoder(ctx);
 
   for (const nft of doc.factTypes) {
     const roles: RoleConfig[] = nft.roles.map((nr) => {
@@ -39,7 +41,7 @@ export function mapFactTypes(ctx: NormaMappingContext): void {
     }
 
     // Resolve constraints that belong to this fact type.
-    const constraints = resolveConstraintsForFactType(nft, constraintById);
+    const constraints = resolveConstraintsForFactType(nft, constraintById, joinDecoder);
 
     const ft = model.addFactType({
       name: nft.name || generateFactTypeName(nft, objectTypeIdMap, model),
@@ -110,6 +112,7 @@ function generateFactTypeName(
 function resolveConstraintsForFactType(
   nft: NormaFactType,
   constraintById: Map<string, NormaConstraint>,
+  joinDecoder: NormaJoinDecoder,
 ): Constraint[] {
   const constraints: Constraint[] = [];
   const internalRefs = new Set(nft.internalConstraintRefs);
@@ -118,7 +121,7 @@ function resolveConstraintsForFactType(
     const nc = constraintById.get(ref);
     if (!nc) continue;
 
-    const mapped = mapNormaConstraint(nc, nft);
+    const mapped = mapNormaConstraint(nc, nft, joinDecoder);
     if (mapped) {
       constraints.push(mapped);
     }

@@ -5,19 +5,21 @@
  * Used by phase 2 while resolving a fact type's InternalConstraints and by
  * the top-level constraint passes.
  */
-import type { Constraint } from "@barwise/core";
+import type { Constraint, JoinOperand } from "@barwise/core";
 import type {
   NormaConstraint,
   NormaEqualityConstraint,
   NormaExclusionConstraint,
   NormaFactType,
   NormaFrequencyConstraint,
+  NormaJoinPath,
   NormaMandatoryConstraint,
   NormaRingConstraint,
   NormaSubsetConstraint,
   NormaUniquenessConstraint,
   NormaValueConstraint,
 } from "../NormaXmlTypes.js";
+import type { NormaJoinDecoder } from "./joinPaths.js";
 
 /**
  * Map a single NORMA constraint to a Barwise Constraint.
@@ -27,6 +29,7 @@ import type {
 export function mapNormaConstraint(
   nc: NormaConstraint,
   nft: NormaFactType,
+  joinDecoder?: NormaJoinDecoder,
 ): Constraint | undefined {
   const factRoleIds = new Set(nft.roles.map((r) => r.id));
 
@@ -40,11 +43,11 @@ export function mapNormaConstraint(
     case "value_constraint":
       return mapValueConstraint(nc, factRoleIds);
     case "subset":
-      return mapSubsetConstraint(nc);
+      return mapSubsetConstraint(nc, joinDecoder);
     case "exclusion":
-      return mapExclusionConstraint(nc);
+      return mapExclusionConstraint(nc, joinDecoder);
     case "equality":
-      return mapEqualityConstraint(nc);
+      return mapEqualityConstraint(nc, joinDecoder);
     case "ring":
       return mapRingConstraint(nc, factRoleIds);
     default:
@@ -131,7 +134,18 @@ function mapValueConstraint(
 
 export function mapSubsetConstraint(
   nc: NormaSubsetConstraint,
+  joinDecoder?: NormaJoinDecoder,
 ): Constraint | undefined {
+  // A role sequence carrying a join path routes to the join variant; when
+  // any operand falls outside the minimal grammar, fall back to the flat
+  // mapping (which drops the path, today's behavior).
+  if (joinDecoder && (nc.subsetJoinPath || nc.supersetJoinPath)) {
+    const subset = joinDecoder.decodeOperand(nc.subsetRoleRefs, nc.subsetJoinPath);
+    const superset = joinDecoder.decodeOperand(nc.supersetRoleRefs, nc.supersetJoinPath);
+    if (subset && superset) {
+      return { type: "join_subset", subset, superset };
+    }
+  }
   return {
     type: "subset",
     subsetRoleIds: [...nc.subsetRoleRefs],
@@ -141,7 +155,17 @@ export function mapSubsetConstraint(
 
 export function mapExclusionConstraint(
   nc: NormaExclusionConstraint,
+  joinDecoder?: NormaJoinDecoder,
 ): Constraint | undefined {
+  const joinOperands = decodeSequenceOperands(
+    nc.roleSequences,
+    nc.joinPaths,
+    joinDecoder,
+  );
+  if (joinOperands) {
+    return { type: "join_exclusion", operands: joinOperands };
+  }
+
   // Flatten role sequences into a single array of role ids.
   const allRoleIds = nc.roleSequences.flat();
   if (allRoleIds.length === 0) return undefined;
@@ -158,13 +182,48 @@ export function mapExclusionConstraint(
 
 export function mapEqualityConstraint(
   nc: NormaEqualityConstraint,
+  joinDecoder?: NormaJoinDecoder,
 ): Constraint | undefined {
   if (nc.roleSequences.length < 2) return undefined;
+
+  const joinOperands = decodeSequenceOperands(
+    nc.roleSequences,
+    nc.joinPaths,
+    joinDecoder,
+  );
+  if (joinOperands) {
+    return { type: "join_equality", operands: joinOperands };
+  }
+
   return {
     type: "equality",
     roleIds1: [...nc.roleSequences[0]!],
     roleIds2: [...nc.roleSequences[1]!],
   };
+}
+
+/**
+ * Decode every role sequence of a multi-sequence constraint into a
+ * JoinOperand, when at least one sequence carries a join path. Returns
+ * undefined -- meaning "use the flat mapping" -- when no sequence has a
+ * path, there are fewer than two sequences, or any operand falls outside
+ * the minimal grammar.
+ */
+function decodeSequenceOperands(
+  roleSequences: readonly (readonly string[])[],
+  joinPaths: readonly (NormaJoinPath | undefined)[] | undefined,
+  joinDecoder: NormaJoinDecoder | undefined,
+): JoinOperand[] | undefined {
+  if (!joinDecoder || !joinPaths?.some(Boolean)) return undefined;
+  if (roleSequences.length < 2) return undefined;
+
+  const operands: JoinOperand[] = [];
+  for (let i = 0; i < roleSequences.length; i++) {
+    const operand = joinDecoder.decodeOperand(roleSequences[i]!, joinPaths[i]);
+    if (!operand) return undefined;
+    operands.push(operand);
+  }
+  return operands;
 }
 
 function mapRingConstraint(

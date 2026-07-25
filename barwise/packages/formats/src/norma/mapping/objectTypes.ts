@@ -2,7 +2,10 @@
  * Phase 1 of the NORMA mapping: object types.
  *
  * Creates entity types, value types (with data-type resolution), and the
- * entity halves of objectified types.
+ * entity halves of objectified types. Barwise object types preserve the
+ * NORMA element ids -- the same passthrough the roles already get -- so
+ * re-imports are id-stable and a join constraint's path root survives a
+ * NORMA round-trip.
  */
 import type { ConceptualDataTypeName, DataTypeDef, ValueConstraintDef } from "@barwise/core";
 import type { NormaDataType, NormaValueConstraintInline } from "../NormaXmlTypes.js";
@@ -27,6 +30,7 @@ export function mapObjectTypes(ctx: NormaMappingContext): void {
   for (const et of doc.entityTypes) {
     const ot = model.addObjectType({
       name: et.name,
+      id: et.id,
       kind: "entity",
       referenceMode: et.referenceMode || `${snakeCase(et.name)}_id`,
       definition: et.definition,
@@ -39,6 +43,7 @@ export function mapObjectTypes(ctx: NormaMappingContext): void {
   for (const vt of doc.valueTypes) {
     const ot = model.addObjectType({
       name: vt.name,
+      id: vt.id,
       kind: "value",
       definition: vt.definition,
       valueConstraint: toValueConstraintDef(vt.valueConstraint),
@@ -53,6 +58,7 @@ export function mapObjectTypes(ctx: NormaMappingContext): void {
   for (const ot of doc.objectifiedTypes) {
     const objectType = model.addObjectType({
       name: ot.name,
+      id: ot.id,
       kind: "entity",
       referenceMode: ot.referenceMode || `${snakeCase(ot.name)}_id`,
       definition: ot.definition,

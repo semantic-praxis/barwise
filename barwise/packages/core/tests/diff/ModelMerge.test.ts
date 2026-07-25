@@ -15,6 +15,7 @@
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { getStructuralErrors, mergeAndValidate, mergeModels } from "../../src/diff/ModelMerge.js";
+import { OrmModel } from "../../src/model/OrmModel.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 function baseModel() {
@@ -618,6 +619,102 @@ describe("mergeModels", () => {
     const code = merged.getObjectTypeByName("Code")!;
     expect(code.dataType).toBeDefined();
     expect(code.dataType!.length).toBe(10);
+  });
+
+  it("remaps a join constraint's path root to the merged object-type id", () => {
+    // The existing model already has Person and Country (their ids win in
+    // the merge); the incoming model brings the same object types under
+    // different ids plus two fact types and a join equality whose operand
+    // paths are rooted at the INCOMING Person id. Accepting the added
+    // fact types must rewrite each operand root to the merged Person id.
+    // Role ids are preserved by the merge, so the steps pass through.
+    const existing = new OrmModel({ name: "Test" });
+    const existingPerson = existing.addObjectType({
+      name: "Person",
+      kind: "entity",
+      referenceMode: "person_id",
+    });
+    existing.addObjectType({
+      name: "Country",
+      kind: "entity",
+      referenceMode: "country_name",
+    });
+
+    const incoming = new OrmModel({ name: "Test" });
+    const person = incoming.addObjectType({
+      name: "Person",
+      kind: "entity",
+      referenceMode: "person_id",
+    });
+    const country = incoming.addObjectType({
+      name: "Country",
+      kind: "entity",
+      referenceMode: "country_name",
+    });
+    incoming.addFactType({
+      name: "Person was born in Country",
+      roles: [
+        { name: "born", playerId: person.id, id: "r-born-person" },
+        { name: "birthplace of", playerId: country.id, id: "r-born-country" },
+      ],
+      readings: ["{0} was born in {1}"],
+      constraints: [
+        { type: "internal_uniqueness", roleIds: ["r-born-person"] },
+        {
+          type: "join_equality",
+          operands: [
+            {
+              path: {
+                root: person.id,
+                steps: [{ entry: "r-born-person", exit: "r-born-country" }],
+              },
+              projection: [0, 1],
+            },
+            {
+              path: {
+                root: person.id,
+                steps: [{ entry: "r-citizen-person", exit: "r-citizen-country" }],
+              },
+              projection: [0, 1],
+            },
+          ],
+        },
+      ],
+    });
+    incoming.addFactType({
+      name: "Person is a citizen of Country",
+      roles: [
+        { name: "citizen", playerId: person.id, id: "r-citizen-person" },
+        { name: "grants citizenship to", playerId: country.id, id: "r-citizen-country" },
+      ],
+      readings: ["{0} is a citizen of {1}"],
+      constraints: [
+        { type: "internal_uniqueness", roleIds: ["r-citizen-person", "r-citizen-country"] },
+      ],
+    });
+
+    const diff = diffModels(existing, incoming);
+    const accepted = new Set(
+      diff.deltas
+        .map((d, i) => [d, i] as const)
+        .filter(([d]) => d.kind === "added")
+        .map(([, i]) => i),
+    );
+    const merged = mergeModels(existing, incoming, diff.deltas, accepted);
+
+    const bornIn = merged.getFactTypeByName("Person was born in Country")!;
+    const join = bornIn.constraints.find((c) => c.type === "join_equality");
+    expect(join).toBeDefined();
+    if (join?.type !== "join_equality") throw new Error("unreachable");
+
+    for (const operand of join.operands) {
+      expect(operand.path.root).toBe(existingPerson.id);
+      expect(operand.path.root).not.toBe(person.id);
+    }
+    // Role ids inside the steps pass through unchanged.
+    expect(join.operands[0]!.path.steps).toEqual([
+      { entry: "r-born-person", exit: "r-born-country" },
+    ]);
   });
 });
 

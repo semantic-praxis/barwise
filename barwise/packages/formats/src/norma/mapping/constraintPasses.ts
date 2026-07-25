@@ -7,9 +7,15 @@
  * in any fact's InternalConstraints. Each pass finds the unprocessed
  * constraints of one family and attaches them to the owning fact type.
  */
-import type { OrmModel } from "@barwise/core";
+import type { Constraint, OrmModel } from "@barwise/core";
 import type { NormaDocument } from "../NormaXmlTypes.js";
 import { collectProcessedRefs, type NormaMappingContext } from "./context.js";
+import {
+  mapEqualityConstraint,
+  mapExclusionConstraint,
+  mapSubsetConstraint,
+} from "./factConstraints.js";
+import { createJoinDecoder } from "./joinPaths.js";
 
 /** Run every top-level constraint pass (phase 3). */
 export function runConstraintPasses(ctx: NormaMappingContext): void {
@@ -38,7 +44,7 @@ export function runConstraintPasses(ctx: NormaMappingContext): void {
 
   // Subset, exclusion, and equality constraints span fact types and are
   // typically not listed in InternalConstraints.
-  addMultiFactTypeConstraints(doc, model);
+  addMultiFactTypeConstraints(ctx);
 
   // Ring constraints not captured via internalConstraintRefs.
   addRingConstraints(doc, model);
@@ -210,13 +216,14 @@ function addDisjunctiveMandatoryConstraints(
  *
  * These constraints are typically defined at the top level and reference
  * roles across multiple fact types. They may or may not appear in any
- * fact type's InternalConstraints section.
+ * fact type's InternalConstraints section. A role sequence carrying a
+ * join path maps to the corresponding join variant; the flat mapping is
+ * the fallback.
  */
-function addMultiFactTypeConstraints(
-  doc: NormaDocument,
-  model: OrmModel,
-): void {
+function addMultiFactTypeConstraints(ctx: NormaMappingContext): void {
+  const { doc, model } = ctx;
   const processedRefs = collectProcessedRefs(doc);
+  const joinDecoder = createJoinDecoder(ctx);
 
   for (const nc of doc.constraints) {
     if (processedRefs.has(nc.id)) continue;
@@ -228,18 +235,19 @@ function addMultiFactTypeConstraints(
         const ft = model.factTypes.find((f) => allRoles.some((r) => f.hasRole(r)));
         if (!ft) continue;
 
-        const alreadyExists = ft.constraints.some(
-          (c) =>
-            c.type === "subset"
-            && c.subsetRoleIds.length === nc.subsetRoleRefs.length
-            && nc.subsetRoleRefs.every((id) => c.subsetRoleIds.includes(id)),
-        );
+        const mapped = mapSubsetConstraint(nc, joinDecoder);
+        if (!mapped) continue;
+
+        const alreadyExists = mapped.type === "join_subset"
+          ? ft.constraints.some((c) => c.type === "join_subset" && sameJoinShape(c, mapped))
+          : ft.constraints.some(
+            (c) =>
+              c.type === "subset"
+              && c.subsetRoleIds.length === nc.subsetRoleRefs.length
+              && nc.subsetRoleRefs.every((id) => c.subsetRoleIds.includes(id)),
+          );
         if (!alreadyExists) {
-          ft.addConstraint({
-            type: "subset",
-            subsetRoleIds: [...nc.subsetRoleRefs],
-            supersetRoleIds: [...nc.supersetRoleRefs],
-          });
+          ft.addConstraint(mapped);
         }
         break;
       }
@@ -250,17 +258,19 @@ function addMultiFactTypeConstraints(
         const ft = model.factTypes.find((f) => allRoles.some((r) => f.hasRole(r)));
         if (!ft) continue;
 
-        const alreadyExists = ft.constraints.some(
-          (c) =>
-            c.type === "exclusion"
-            && c.roleIds.length === allRoles.length
-            && allRoles.every((id) => c.roleIds.includes(id)),
-        );
+        const mapped = mapExclusionConstraint(nc, joinDecoder);
+        if (!mapped) continue;
+
+        const alreadyExists = mapped.type === "join_exclusion"
+          ? ft.constraints.some((c) => c.type === "join_exclusion" && sameJoinShape(c, mapped))
+          : ft.constraints.some(
+            (c) =>
+              c.type === "exclusion"
+              && c.roleIds.length === allRoles.length
+              && allRoles.every((id) => c.roleIds.includes(id)),
+          );
         if (!alreadyExists) {
-          ft.addConstraint({
-            type: "exclusion",
-            roleIds: [...allRoles],
-          });
+          ft.addConstraint(mapped);
         }
         break;
       }
@@ -271,18 +281,19 @@ function addMultiFactTypeConstraints(
         const ft = model.factTypes.find((f) => allRoles.some((r) => f.hasRole(r)));
         if (!ft) continue;
 
-        const alreadyExists = ft.constraints.some(
-          (c) =>
-            c.type === "equality"
-            && c.roleIds1.length === nc.roleSequences[0]!.length
-            && nc.roleSequences[0]!.every((id) => c.roleIds1.includes(id)),
-        );
+        const mapped = mapEqualityConstraint(nc, joinDecoder);
+        if (!mapped) continue;
+
+        const alreadyExists = mapped.type === "join_equality"
+          ? ft.constraints.some((c) => c.type === "join_equality" && sameJoinShape(c, mapped))
+          : ft.constraints.some(
+            (c) =>
+              c.type === "equality"
+              && c.roleIds1.length === nc.roleSequences[0]!.length
+              && nc.roleSequences[0]!.every((id) => c.roleIds1.includes(id)),
+          );
         if (!alreadyExists) {
-          ft.addConstraint({
-            type: "equality",
-            roleIds1: [...nc.roleSequences[0]!],
-            roleIds2: [...nc.roleSequences[1]!],
-          });
+          ft.addConstraint(mapped);
         }
         break;
       }
@@ -291,6 +302,24 @@ function addMultiFactTypeConstraints(
         break;
     }
   }
+}
+
+/**
+ * Structural equality for two join constraints of the same type, ignoring
+ * the constraint id: same operand paths (root + ordered steps) and
+ * projections, in order.
+ */
+function sameJoinShape(a: Constraint, b: Constraint): boolean {
+  const shape = (c: Constraint): string => {
+    if (c.type === "join_subset") {
+      return JSON.stringify([c.subset, c.superset]);
+    }
+    if (c.type === "join_equality" || c.type === "join_exclusion") {
+      return JSON.stringify(c.operands);
+    }
+    return "";
+  };
+  return shape(a) === shape(b);
 }
 
 /**

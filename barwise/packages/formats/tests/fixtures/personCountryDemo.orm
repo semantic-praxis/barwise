@@ -9,6 +9,8 @@
 					<orm:Role ref="_DF01EC20-FD1D-4DEF-BEDF-A1A65EF966D6" />
 					<orm:Role ref="_63C0EF52-DF3E-4984-A888-43512487555B" />
 					<orm:Role ref="_955014A5-DADF-4D4F-9E5B-6B82F6537E6C" />
+					<orm:Role ref="_FAB10000-0000-4000-8000-000000000002" />
+					<orm:Role ref="_FAC20000-0000-4000-8000-000000000002" />
 				</orm:PlayedRoles>
 				<orm:PreferredIdentifier ref="_ACBCF0FD-1072-4C0F-A1D3-12E53B16F4A9" />
 			</orm:EntityType>
@@ -47,6 +49,8 @@
 					<orm:Role ref="_FF8BF199-9A80-4EE8-B7E6-82C5879ECFC3" />
 					<orm:Role ref="_4B767624-751A-4F22-8F81-EB98DC72AE97" />
 					<orm:Role ref="_21E2D607-1A05-4562-9316-823C47A1207D" />
+					<orm:Role ref="_FAB10000-0000-4000-8000-000000000003" />
+					<orm:Role ref="_FAC20000-0000-4000-8000-000000000003" />
 				</orm:PlayedRoles>
 				<orm:PreferredIdentifier ref="_ABA06640-F54F-47F9-B0E2-6FDB32F54EEB" />
 			</orm:EntityType>
@@ -326,6 +330,59 @@
 					<orm:UniquenessConstraint ref="_10B5849B-5BAE-4A56-9754-7D2657E311CD" />
 				</orm:InternalConstraints>
 			</orm:Fact>
+			<orm:Fact id="_FAB10000-0000-4000-8000-000000000001" _Name="PersonWasBornInCountry">
+				<orm:FactRoles>
+					<orm:Role id="_FAB10000-0000-4000-8000-000000000002" _IsMandatory="true" _Multiplicity="ZeroToMany" Name="">
+						<orm:RolePlayer ref="_08FCB217-4D5A-4D6E-BB08-033359BFEF51" />
+					</orm:Role>
+					<orm:Role id="_FAB10000-0000-4000-8000-000000000003" _IsMandatory="false" _Multiplicity="ZeroToOne" Name="">
+						<orm:RolePlayer ref="_F074FCA1-6C15-4349-BC79-62CF67C98BC7" />
+					</orm:Role>
+				</orm:FactRoles>
+				<orm:ReadingOrders>
+					<orm:ReadingOrder id="_FAB10000-0000-4000-8000-000000000006">
+						<orm:Readings>
+							<orm:Reading id="_FAB10000-0000-4000-8000-000000000007">
+								<orm:Data>{0} was born in {1}</orm:Data>
+							</orm:Reading>
+						</orm:Readings>
+						<orm:RoleSequence>
+							<orm:Role ref="_FAB10000-0000-4000-8000-000000000002" />
+							<orm:Role ref="_FAB10000-0000-4000-8000-000000000003" />
+						</orm:RoleSequence>
+					</orm:ReadingOrder>
+				</orm:ReadingOrders>
+				<orm:InternalConstraints>
+					<orm:UniquenessConstraint ref="_FAB10000-0000-4000-8000-000000000004" />
+					<orm:MandatoryConstraint ref="_FAB10000-0000-4000-8000-000000000005" />
+				</orm:InternalConstraints>
+			</orm:Fact>
+			<orm:Fact id="_FAC20000-0000-4000-8000-000000000001" _Name="PersonIsCitizenOfCountry">
+				<orm:FactRoles>
+					<orm:Role id="_FAC20000-0000-4000-8000-000000000002" _IsMandatory="false" _Multiplicity="ZeroToMany" Name="">
+						<orm:RolePlayer ref="_08FCB217-4D5A-4D6E-BB08-033359BFEF51" />
+					</orm:Role>
+					<orm:Role id="_FAC20000-0000-4000-8000-000000000003" _IsMandatory="false" _Multiplicity="ZeroToMany" Name="">
+						<orm:RolePlayer ref="_F074FCA1-6C15-4349-BC79-62CF67C98BC7" />
+					</orm:Role>
+				</orm:FactRoles>
+				<orm:ReadingOrders>
+					<orm:ReadingOrder id="_FAC20000-0000-4000-8000-000000000006">
+						<orm:Readings>
+							<orm:Reading id="_FAC20000-0000-4000-8000-000000000007">
+								<orm:Data>{0} is a citizen of {1}</orm:Data>
+							</orm:Reading>
+						</orm:Readings>
+						<orm:RoleSequence>
+							<orm:Role ref="_FAC20000-0000-4000-8000-000000000002" />
+							<orm:Role ref="_FAC20000-0000-4000-8000-000000000003" />
+						</orm:RoleSequence>
+					</orm:ReadingOrder>
+				</orm:ReadingOrders>
+				<orm:InternalConstraints>
+					<orm:UniquenessConstraint ref="_FAC20000-0000-4000-8000-000000000004" />
+				</orm:InternalConstraints>
+			</orm:Fact>
 		</orm:Facts>
 		<orm:Constraints>
 			<orm:UniquenessConstraint id="_ACBCF0FD-1072-4C0F-A1D3-12E53B16F4A9" Name="InternalUniquenessConstraint1" IsInternal="true">
@@ -460,6 +517,80 @@
 				</orm:RoleSequence>
 				<orm:ImpliedByObjectType ref="_F7905F97-A891-420D-839D-BF1E09269C97" />
 			</orm:MandatoryConstraint>
+			<orm:UniquenessConstraint id="_FAB10000-0000-4000-8000-000000000004" Name="InternalUniquenessConstraint12" IsInternal="true">
+				<orm:RoleSequence>
+					<orm:Role id="_FAB10000-0000-4000-8000-000000000008" ref="_FAB10000-0000-4000-8000-000000000002" />
+				</orm:RoleSequence>
+			</orm:UniquenessConstraint>
+			<orm:MandatoryConstraint id="_FAB10000-0000-4000-8000-000000000005" Name="SimpleMandatoryConstraint6" IsSimple="true">
+				<orm:RoleSequence>
+					<orm:Role id="_FAB10000-0000-4000-8000-000000000009" ref="_FAB10000-0000-4000-8000-000000000002" />
+				</orm:RoleSequence>
+			</orm:MandatoryConstraint>
+			<orm:UniquenessConstraint id="_FAC20000-0000-4000-8000-000000000004" Name="InternalUniquenessConstraint13" IsInternal="true">
+				<orm:RoleSequence>
+					<orm:Role id="_FAC20000-0000-4000-8000-000000000008" ref="_FAC20000-0000-4000-8000-000000000002" />
+					<orm:Role id="_FAC20000-0000-4000-8000-000000000009" ref="_FAC20000-0000-4000-8000-000000000003" />
+				</orm:RoleSequence>
+			</orm:UniquenessConstraint>
+			<orm:EqualityConstraint id="_ECA10000-0000-4000-8000-000000000001" Name="JoinEqualityConstraint1">
+				<orm:RoleSequences>
+					<orm:RoleSequence id="_ECA10000-0000-4000-8000-000000000002">
+						<orm:Role id="_ECA10000-0000-4000-8000-000000000012" ref="_FAB10000-0000-4000-8000-000000000002" />
+						<orm:Role id="_ECA10000-0000-4000-8000-000000000013" ref="_FAB10000-0000-4000-8000-000000000003" />
+						<orm:JoinRule>
+							<orm:JoinPath id="_ECA10000-0000-4000-8000-000000000004">
+								<orm:PathComponents>
+									<orm:RolePath id="_ECA10000-0000-4000-8000-000000000005">
+										<orm:RootObjectType ref="_08FCB217-4D5A-4D6E-BB08-033359BFEF51" />
+										<orm:PathedRoles>
+											<orm:PathedRole id="_ECA10000-0000-4000-8000-000000000006" ref="_FAB10000-0000-4000-8000-000000000002" />
+											<orm:PathedRole id="_ECA10000-0000-4000-8000-000000000007" ref="_FAB10000-0000-4000-8000-000000000003" Purpose="SameFactType" />
+										</orm:PathedRoles>
+									</orm:RolePath>
+								</orm:PathComponents>
+								<orm:JoinPathProjections>
+									<orm:JoinPathProjection id="_ECA10000-0000-4000-8000-000000000008">
+										<orm:ConstraintRoleProjection id="_ECA10000-0000-4000-8000-000000000009" ref="_FAB10000-0000-4000-8000-000000000002">
+											<orm:ProjectedFromPathedRole ref="_ECA10000-0000-4000-8000-000000000006" />
+										</orm:ConstraintRoleProjection>
+										<orm:ConstraintRoleProjection id="_ECA10000-0000-4000-8000-00000000000A" ref="_FAB10000-0000-4000-8000-000000000003">
+											<orm:ProjectedFromPathedRole ref="_ECA10000-0000-4000-8000-000000000007" />
+										</orm:ConstraintRoleProjection>
+									</orm:JoinPathProjection>
+								</orm:JoinPathProjections>
+							</orm:JoinPath>
+						</orm:JoinRule>
+					</orm:RoleSequence>
+					<orm:RoleSequence id="_ECA10000-0000-4000-8000-000000000003">
+						<orm:Role id="_ECA10000-0000-4000-8000-000000000014" ref="_FAC20000-0000-4000-8000-000000000002" />
+						<orm:Role id="_ECA10000-0000-4000-8000-000000000015" ref="_FAC20000-0000-4000-8000-000000000003" />
+						<orm:JoinRule>
+							<orm:JoinPath id="_ECA10000-0000-4000-8000-00000000000B">
+								<orm:PathComponents>
+									<orm:RolePath id="_ECA10000-0000-4000-8000-00000000000C">
+										<orm:RootObjectType ref="_08FCB217-4D5A-4D6E-BB08-033359BFEF51" />
+										<orm:PathedRoles>
+											<orm:PathedRole id="_ECA10000-0000-4000-8000-00000000000D" ref="_FAC20000-0000-4000-8000-000000000002" />
+											<orm:PathedRole id="_ECA10000-0000-4000-8000-00000000000E" ref="_FAC20000-0000-4000-8000-000000000003" Purpose="SameFactType" />
+										</orm:PathedRoles>
+									</orm:RolePath>
+								</orm:PathComponents>
+								<orm:JoinPathProjections>
+									<orm:JoinPathProjection id="_ECA10000-0000-4000-8000-00000000000F">
+										<orm:ConstraintRoleProjection id="_ECA10000-0000-4000-8000-000000000010" ref="_FAC20000-0000-4000-8000-000000000002">
+											<orm:ProjectedFromPathedRole ref="_ECA10000-0000-4000-8000-00000000000D" />
+										</orm:ConstraintRoleProjection>
+										<orm:ConstraintRoleProjection id="_ECA10000-0000-4000-8000-000000000011" ref="_FAC20000-0000-4000-8000-000000000003">
+											<orm:ProjectedFromPathedRole ref="_ECA10000-0000-4000-8000-00000000000E" />
+										</orm:ConstraintRoleProjection>
+									</orm:JoinPathProjection>
+								</orm:JoinPathProjections>
+							</orm:JoinPath>
+						</orm:JoinRule>
+					</orm:RoleSequence>
+				</orm:RoleSequences>
+			</orm:EqualityConstraint>
 		</orm:Constraints>
 		<orm:DataTypes>
 			<orm:FixedLengthTextDataType id="_38E84285-1E24-4348-A250-C78F56D5BE2C" />

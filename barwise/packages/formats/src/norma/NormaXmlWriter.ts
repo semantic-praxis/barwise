@@ -23,6 +23,7 @@ import type {
   ConceptualDataTypeName,
   Constraint,
   FactType,
+  JoinOperand,
   ObjectType,
   OrmModel,
   Role,
@@ -34,7 +35,9 @@ import type {
   NormaDocument,
   NormaEntityType,
   NormaFactType,
+  NormaJoinPath,
   NormaObjectifiedType,
+  NormaPathedRole,
   NormaReadingOrder,
   NormaRingType,
   NormaRole,
@@ -403,9 +406,114 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         ringType: c.ringType as NormaRingType,
         roleRefs: [normaId(c.roleId1), normaId(c.roleId2)],
       };
+    case "join_subset": {
+      const subsetRefs = joinOperandRoleRefs(c.subset);
+      const supersetRefs = joinOperandRoleRefs(c.superset);
+      const subsetJoinPath = writeJoinPath(c.subset, `${id}_jp0`);
+      const supersetJoinPath = writeJoinPath(c.superset, `${id}_jp1`);
+      if (!subsetRefs || !supersetRefs || !subsetJoinPath || !supersetJoinPath) return undefined;
+      return {
+        type: "subset",
+        id,
+        name: "",
+        subsetRoleRefs: subsetRefs,
+        supersetRoleRefs: supersetRefs,
+        subsetJoinPath,
+        supersetJoinPath,
+      };
+    }
+    case "join_equality":
+    case "join_exclusion": {
+      const roleSequences: string[][] = [];
+      const joinPaths: NormaJoinPath[] = [];
+      for (let i = 0; i < c.operands.length; i++) {
+        const refs = joinOperandRoleRefs(c.operands[i]!);
+        const joinPath = writeJoinPath(c.operands[i]!, `${id}_jp${i}`);
+        if (!refs || !joinPath) return undefined;
+        roleSequences.push(refs);
+        joinPaths.push(joinPath);
+      }
+      return {
+        type: c.type === "join_equality" ? "equality" : "exclusion",
+        id,
+        name: "",
+        roleSequences,
+        joinPaths,
+      };
+    }
     default:
       return undefined;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Join paths
+// ---------------------------------------------------------------------------
+
+/**
+ * The concrete role each projected path node maps to in the constraint's
+ * role sequence: node 0 is the first hop's entry role (played by the
+ * root), node k is the exit role of step k. Returns undefined for an
+ * operand whose projection points outside its path.
+ */
+function joinOperandRoleRefs(o: JoinOperand): string[] | undefined {
+  const refs: string[] = [];
+  for (const node of o.projection) {
+    if (node === 0) {
+      const step = o.path.steps[0];
+      if (!step) return undefined;
+      refs.push(normaId(step.entry));
+    } else {
+      const step = o.path.steps[node - 1];
+      if (!step) return undefined;
+      refs.push(normaId(step.exit));
+    }
+  }
+  return refs.length > 0 ? refs : undefined;
+}
+
+/**
+ * Re-expand a JoinOperand into NORMA's purpose-tagged apparatus: entry
+ * roles carry no Purpose (first hop) or PostInnerJoin (later hops), exit
+ * roles carry SameFactType, and the projection maps each constraint role
+ * to the pathed role at its node. Ids derive deterministically from the
+ * constraint id so export stays a pure function of the model.
+ */
+function writeJoinPath(o: JoinOperand, id: string): NormaJoinPath | undefined {
+  if (o.path.steps.length === 0) return undefined;
+
+  const pathedRoles: NormaPathedRole[] = [];
+  o.path.steps.forEach((step, i) => {
+    pathedRoles.push({
+      id: `${id}_p${2 * i}`,
+      roleRef: normaId(step.entry),
+      purpose: i === 0 ? "None" : "PostInnerJoin",
+    });
+    pathedRoles.push({
+      id: `${id}_p${2 * i + 1}`,
+      roleRef: normaId(step.exit),
+      purpose: "SameFactType",
+    });
+  });
+
+  // Node 0 projects from the first entry; node k from the exit of step k.
+  const pathedIdForNode = (node: number): string =>
+    node === 0 ? `${id}_p0` : `${id}_p${2 * node - 1}`;
+  const roleRefs = joinOperandRoleRefs(o);
+  if (!roleRefs) return undefined;
+
+  return {
+    id,
+    rolePath: {
+      id: `${id}_rp`,
+      rootObjectTypeRef: normaId(o.path.root),
+      pathedRoles,
+    },
+    projections: o.projection.map((node, i) => ({
+      constraintRoleRef: roleRefs[i]!,
+      pathedRoleRef: pathedIdForNode(node),
+    })),
+  };
 }
 
 // ---------------------------------------------------------------------------
