@@ -5,7 +5,10 @@ implementation
 Created: 2026-07-25
 Last-updated: 2026-07-25
 Tracking: project-owner directive (2026-07-25) alongside the role-path
-sign-off; docs/BACKLOG-2026-07-25.md item 1 note
+sign-off; docs/BACKLOG-2026-07-25.md item 1 note. Confirmed 2026-07-25
+in the traceability decision, paired with
+`docs/specs/model-history.spec.md`: v7 ids order element creation,
+history explains change -- the two compose.
 
 ## Principle
 
