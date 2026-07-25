@@ -5,7 +5,7 @@ description: A meta-skill for making any artifact communicate clearly — prose,
 
 # Articulation
 
-Articulation is the act of moving an idea from one mind to another with minimal loss. Every artifact — a design doc, a function, a dbt model, a Slack message — is an attempt at this transfer. The artifact succeeds when the audience can do what they need to do after encountering it, and fails when a barrier stops them, even if every individual sentence or line is technically correct.
+Articulation is the act of moving an idea from one mind to another with minimal loss. Every artifact — a design doc, a function, a conceptual model, a commit message — is an attempt at this transfer. The artifact succeeds when the audience can do what they need to do after encountering it, and fails when a barrier stops them, even if every individual sentence or line is technically correct.
 
 This skill operates in three modes:
 
@@ -19,7 +19,7 @@ All modes rest on the same foundation. Read the principles first; the modes tell
 
 Before writing or reviewing anything, answer two questions:
 
-1. **Who is the audience?** Be specific. "Engineers" is fuzzy; "a mid-level engineer joining the team who has used Snowflake but never dbt" is usable. If the artifact serves multiple audiences, name the primary one — an artifact optimized for everyone is optimized for no one.
+1. **Who is the audience?** Be specific. "Engineers" is fuzzy; "a data engineer fluent in SQL and ER diagrams but new to fact-based modeling" is usable. If the artifact serves multiple audiences, name the primary one — an artifact optimized for everyone is optimized for no one.
 2. **What must they be able to do afterward?** Understanding is not the goal; action is. After reading a design doc, a reviewer must be able to approve or object. After reading a function signature, a caller must be able to call it correctly without reading the body. After reading a commit message, a future debugger must be able to decide whether this commit is relevant to their bug.
 
 Everything else in this skill is in service of that contract. A "clear" sentence that doesn't advance the audience toward their action is decoration.
@@ -28,7 +28,7 @@ Everything else in this skill is in service of that contract. A "clear" sentence
 
 The single most reliable articulation check: **state the idea as one plain sentence, out loud or in writing, before committing to the artifact form.**
 
-- For a document: "This doc argues that we should complete the Snowflake migration because splitting platforms doubles our governance cost." If you cannot produce this sentence, the document is not ready to be structured — the thinking is unfinished.
+- For a document: "This doc argues that Payment should be its own entity type, not an attribute of Order, because a payment accrues its own facts — method, refunds, timestamps." If you cannot produce this sentence, the document is not ready to be structured — the thinking is unfinished.
 - For a function or module: "This function returns the latest valid price for an asset, or raises if none exists." If the sentence requires "and" to be truthful ("...and also updates the cache and logs a metric"), the unit is doing too much, and no amount of naming will make it articulate.
 - For a data model or schema: verbalize the facts it records as natural-language sentences ("Each Auction is conducted at exactly one Site"). If a fact cannot be verbalized cleanly, the model is encoding something nobody can state — a defect that will surface later as confusion.
 
@@ -48,7 +48,7 @@ A barrier is anything that stops the audience or forces them to do the author's 
 
 5. **Wall of detail.** Everything the author knows, presented at uniform depth, with no signal about what matters. Detail is not generosity; undifferentiated detail transfers the work of prioritization to the reader. Fix: ruthless hierarchy — the main line of argument in the body, supporting detail pushed to appendices, footnotes, linked references, or deleted. (In code: a shallow module — an interface as complex as the implementation it wraps — is a wall of detail. A deep module hides detail behind a simple interface, which is articulation applied to design.)
 
-6. **Fuzzy abstraction.** A word that sounds like a claim but cannot be operationalized: "robust," "scalable," "improve alignment," "leverage synergies." Test: could two reasonable readers disagree about whether the claim is true? If yes, it is fuzz. Fix: replace with the concrete fact that motivated the word ("handles node failure without data loss" instead of "robust"). Fuzzy abstractions in an artifact are the strongest available signal of fuzzy thinking behind it.
+6. **Fuzzy abstraction.** A word that sounds like a claim but cannot be operationalized: "flexible," "clean," "properly normalized," "captures the domain." Test: could two reasonable readers disagree about whether the claim is true? If yes, it is fuzz. Fix: replace with the concrete fact that motivated the word ("a new payment method can be added without changing the Order schema" instead of "flexible"). Fuzzy abstractions in an artifact are the strongest available signal of fuzzy thinking behind it.
 
 ## Applying to code specifically
 
@@ -107,11 +107,11 @@ Keep the review honest about the wording/thinking distinction. Telling an author
 
 Requirements gathering is articulation in reverse: the idea lives in the stakeholder's head, often unformed, and the job is to help them get it out with minimal loss. The barriers stop being findings and become probes — each barrier type has a corresponding question that converts fuzz into fact.
 
-When given a vague request ("we need the dashboard to be faster," "make onboarding smoother," "add better error handling"):
+When given a vague request ("we need a Customer type," "make the returns model cleaner," "add better handling of optional data"):
 
 1. **Open with a critical incident.** Before any other probe, ask for a specific recent story: "Walk me through the last time this failed you — what were you trying to do, what happened, what did you do instead?" For greenfield requests with no failure history, use the forward variant: "Walk me through how you would use this next Tuesday, step by step." One concrete story usually recovers the real need faster than any general question, and its answer determines which probes below matter at all.
 
-2. **Reconstruct the audience contract.** Who experiences the problem, and what are they unable to do today? Many requests arrive as proposed solutions; the contract question recovers the underlying need. "We need a real-time dashboard" often decompresses to "the ops team makes staffing calls at 6 a.m. using data that is 24 hours old."
+2. **Reconstruct the audience contract.** Who experiences the problem, and what are they unable to do today? Many requests arrive as proposed solutions; the contract question recovers the underlying need. "We need a Customer type" often decompresses to "sales tracks leads and billing tracks payers, and forcing both to be one Customer makes every shared report ambiguous."
 
 3. **Probe by barrier type.** Match the fuzz to its probe:
    - *Buried lede* (long background, no ask) → ask for the lede: "If you had one sentence to tell me what you need, what is it?"
@@ -121,7 +121,7 @@ When given a vague request ("we need the dashboard to be faster," "make onboardi
    - *Wall of detail* (a request that lists twelve things) → ask for the hierarchy: "If we could ship only one of these this quarter, which one, and why that one?"
    - *Undefined term* (stakeholder jargon) → ask for the definition in examples: "Give me a concrete case of a 'qualified lead' and a case that looks similar but isn't one."
 
-4. **Verbalize back, in facts.** After probing, restate the requirement as plain, singular sentences the stakeholder can affirm or correct: "Each staffing decision must be based on transaction data no more than 15 minutes old." Concrete examples beat abstractions here — verbalizing specific instances ("this auction, this bidder, this timestamp") and generalizing from them surfaces hidden rules that direct questions about the general case miss. The stakeholder saying "no, that's not quite it" is a success: it means the loss in transfer was caught now instead of after delivery.
+4. **Verbalize back, in facts.** After probing, restate the requirement as plain, singular sentences the stakeholder can affirm or correct: "Each Order is placed by exactly one Customer." Concrete examples beat abstractions here — verbalizing specific instances ("this auction, this bidder, this timestamp") and generalizing from them surfaces hidden rules that direct questions about the general case miss. The stakeholder saying "no, that's not quite it" is a success: it means the loss in transfer was caught now instead of after delivery.
 
 5. **Name what is undecided.** Some fuzz is not miscommunication — it is a decision the stakeholder has not made. Do not paper over it with a plausible assumption. Surface it explicitly: "This depends on whether refunds count as revenue, and that is a business decision, not a technical one. Who decides?" A requirements document that honestly lists its open decisions articulates better than one that hides them under confident wording.
 
