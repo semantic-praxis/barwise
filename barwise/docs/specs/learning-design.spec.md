@@ -121,14 +121,14 @@ The six known reductive readings in ORM, each with the engineered trap
 that exposes it and the deterministic barwise check that catches the
 wrong model. This catalog seeds C2; authors extend it.
 
-| Reductive reading                                  | The trap that exposes it                                                            | Deterministic tell (barwise check)                                                                     |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| "A fact type is a table, a role is a column"       | Prose whose facts are elementary but which a table-thinker lumps into one wide fact | The lumped fact type has no clean reading; `requires_verbalization` of the elementary facts fails      |
-| Attribute-first thinking (from ER / dimensional)   | Prose where the "attribute" later needs its own facts or a constraint               | The attribute never becomes a fact type; `requires_element` (a fact type between the two) fails        |
-| Assume binary arity; miss a genuine ternary        | Prose with an irreducible ternary (who scored what in which subject)                | The binary decomposition accepts a population the ternary forbids; `forbids_population` fails          |
-| Conflate entity types with value types             | Prose where a label looks self-identifying but carries its own facts                | The label accrues its own facts; `must_validate` fails on the entity type with no reference scheme     |
-| Treat constraints as decoration added after        | Prose whose whole point is a rule (each order has one customer)                     | The unconstrained model forbids nothing; `forbids_population` fails wholesale                          |
-| Read subtypes as an ISA taxonomy, not role-derived | Prose with a subtype that plays no role its supertype cannot                        | The subtype earns nothing; `requires_element` on its distinguishing role fails                         |
+| Reductive reading                                  | The trap that exposes it                                                            | Deterministic tell (barwise check)                                                                 |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| "A fact type is a table, a role is a column"       | Prose whose facts are elementary but which a table-thinker lumps into one wide fact | The lumped fact type has no clean reading; `requires_verbalization` of the elementary facts fails  |
+| Attribute-first thinking (from ER / dimensional)   | Prose where the "attribute" later needs its own facts or a constraint               | The attribute never becomes a fact type; `requires_element` (a fact type between the two) fails    |
+| Assume binary arity; miss a genuine ternary        | Prose with an irreducible ternary (who scored what in which subject)                | The binary decomposition accepts a population the ternary forbids; `forbids_population` fails      |
+| Conflate entity types with value types             | Prose where a label looks self-identifying but carries its own facts                | The label accrues its own facts; `must_validate` fails on the entity type with no reference scheme |
+| Treat constraints as decoration added after        | Prose whose whole point is a rule (each order has one customer)                     | The unconstrained model forbids nothing; `forbids_population` fails wholesale                      |
+| Read subtypes as an ISA taxonomy, not role-derived | Prose with a subtype that plays no role its supertype cannot                        | The subtype earns nothing; `requires_element` on its distinguishing role fails                     |
 
 ## Scope
 
