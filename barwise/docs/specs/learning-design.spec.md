@@ -266,13 +266,17 @@ session recipe; no code enforces it.
   judgment calls a schema cannot settle. C2's executable tells capture
   the part that genuinely is machine-checkable; Open decision 2 keeps
   the door open for more.
-- **A runtime session orchestrator.** A `barwise learn session` engine
-  that launches cards, exercises, and tutorial steps in one interleaved
-  sitting. Lost: it couples three deliberately orthogonal artifacts to
-  achieve what a file-format contract and a one-paragraph session
-  recipe already provide, and each artifact stays independently usable
-  without it. The loop is coupled by declared references, not by a
-  runtime (explicit over implicit).
+- **A session orchestrator.** An interactive engine that drives a
+  whole sitting from one process -- serving due cards, launching the
+  gym exercise, stepping the tutorial, interleaved under its control --
+  and that must know about all three artifacts to do so. Lost: it
+  couples three deliberately orthogonal artifacts to achieve what a
+  file-format contract and a one-paragraph session recipe already
+  provide. In the chosen design every session is fire-and-forget: a
+  gym run grades the attempt, writes the miss cards, prints a
+  suggested next step, and exits. Nothing stays running, and no
+  artifact needs another installed to be useful (explicit over
+  implicit).
 
 ## Workstreams (each independently shippable)
 
@@ -382,6 +386,14 @@ existing checks.
    cue, but cards then embed arbitrary learner content). Recommendation:
    check-and-hint only for the first iteration; add the fragment later
    if miss cards prove too abstract to trigger recall of the failure.
+5. **A local session history for resumability.** The gym CLI could
+   append a session log beside the miss cards -- exercise attempted,
+   checks failed, cards emitted, next step suggested -- so a learner can
+   see where they left off. It stays an output artifact owned by the
+   gym, like `misses.txt`; it becomes the rejected orchestrator only if
+   something starts reading it to control the other artifacts.
+   Recommendation: yes, as part of workstream 5's CLI write, with the
+   log format kept human-readable.
 
 ## Risks and testing
 
