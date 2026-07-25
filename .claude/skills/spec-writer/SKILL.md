@@ -170,8 +170,10 @@ checked as real code.
 - **Emphasis uses underscores**, not asterisks: `_word_`, not `*word*`.
   (`**bold**` is fine.)
 - **Tables are column-aligned** -- every cell in a column padded to the
-  widest cell, separator dashes spanning the full width. Generate the
-  table with a script rather than by hand.
+  widest cell, separator dashes spanning the full width. Run
+  `node barwise/scripts/align-md-tables.mjs <file>` rather than padding
+  by hand; it reproduces dprint's table output byte for byte and is
+  idempotent.
 - **Task-list continuation lines indent 6 spaces** (aligned under the
   text after `- [ ] `), not 2. Regular `- ` bullet continuations indent
   2 spaces.
