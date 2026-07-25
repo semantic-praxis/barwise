@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 /**
  * A single fact instance (tuple) within a population.
  *
@@ -7,6 +5,7 @@ import { randomUUID } from "node:crypto";
  * concrete data for that role. For example, in "Customer places Order",
  * an instance might be { "role-customer": "C001", "role-order": "O123" }.
  */
+import { generateId } from "./id.js";
 export interface FactInstance {
   /** Unique identifier for this instance. */
   readonly id: string;
@@ -63,7 +62,7 @@ export class Population {
   private readonly _instances: FactInstance[] = [];
 
   constructor(config: PopulationConfig) {
-    this.id = config.id ?? randomUUID();
+    this.id = config.id ?? generateId();
     this.factTypeId = config.factTypeId;
     this.description = config.description;
 
@@ -116,7 +115,7 @@ export class Population {
 
 function createInstance(config: FactInstanceConfig): FactInstance {
   return {
-    id: config.id ?? randomUUID(),
+    id: config.id ?? generateId(),
     roleValues: { ...config.roleValues },
   };
 }

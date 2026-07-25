@@ -57,6 +57,7 @@ export {
   FactType,
   type FactTypeConfig,
 } from "./model/FactType.js";
+export { generateId, type IdGenerator, setIdGenerator, uuidv7FromParts } from "./model/id.js";
 export { ModelElement } from "./model/ModelElement.js";
 export {
   ObjectifiedFactType,

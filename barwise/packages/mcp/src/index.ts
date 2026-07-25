@@ -6,7 +6,9 @@
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createServer } from "./server.js";
+import { installUuidv7IdGenerator } from "./workspace/idGenerator.js";
 
+installUuidv7IdGenerator();
 const server = createServer();
 const transport = new StdioServerTransport();
 await server.connect(transport);

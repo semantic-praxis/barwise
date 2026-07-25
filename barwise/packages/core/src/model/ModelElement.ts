@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { generateId } from "./id.js";
 
 /**
  * Base class for all ORM model elements.
@@ -15,7 +15,7 @@ export class ModelElement {
     if (!name || name.trim().length === 0) {
       throw new Error("Model element name must be a non-empty string.");
     }
-    this.id = id ?? randomUUID();
+    this.id = id ?? generateId();
     this._name = name.trim();
   }
 

@@ -19,10 +19,13 @@ import { DiagramPanel } from "../diagram/DiagramPanel.js";
 import { registerMcpServerProvider } from "../mcp/McpServerProvider.js";
 import { registerLanguageModelTools } from "../mcp/ToolRegistration.js";
 import { ModelTreeProvider } from "../sidebar/ModelTreeProvider.js";
+import { installUuidv7IdGenerator } from "./idGenerator.js";
 
 let client: LanguageClient;
 
 export function activate(context: vscode.ExtensionContext): void {
+  installUuidv7IdGenerator();
+
   // Start language server.
   const serverModule = context.asAbsolutePath(
     path.join("dist", "server", "OrmLanguageServer.js"),

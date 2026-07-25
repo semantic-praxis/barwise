@@ -2,39 +2,39 @@ orm_version: "1.1"
 model:
   name: Employee Hierarchy
   object_types:
-    - id: 29794ed2-50f9-4556-8232-a404aca72fec
+    - id: c25bb81c-d97f-4b5e-b0c3-2545aade849d
       name: Person
       kind: entity
       reference_mode: person_id
       definition: Any individual tracked by the HR system.
-    - id: 60a2d2b5-f3cb-42a0-aee5-fc40697aa867
+    - id: 83ff3eeb-1da2-4186-a34a-402e726e6159
       name: Employee
       kind: entity
       reference_mode: employee_id
       definition: A person who works for the company.
-    - id: bce5ed81-b9b3-4cec-9ca1-b556cb4f981b
+    - id: f737d679-69cd-4c1a-ae0b-a22c61173345
       name: Manager
       kind: entity
       reference_mode: manager_id
       definition: An employee who manages other employees.
-    - id: 1a70d51a-13f1-455b-90b4-9c3896ba9300
+    - id: 0801444f-b49a-4086-a4e3-3a58ca29390e
       name: Department
       kind: entity
       reference_mode: department_code
       definition: An organizational unit within the company.
-    - id: 34f9a420-17d4-44c3-8a1e-fae890efdb6e
+    - id: c956318e-7d87-400f-ad78-80a8a5f5ecac
       name: DepartmentName
       kind: value
       definition: The name of a department.
   fact_types:
-    - id: 3203302c-1ab2-42f1-a63c-37522ccb5ca0
+    - id: 8b1f6eca-179d-428f-a012-c055a20534ff
       name: Employee works in Department
       roles:
-        - id: 969d527f-861d-45aa-894d-135e5967ab16
-          player: 60a2d2b5-f3cb-42a0-aee5-fc40697aa867
+        - id: b19fa2f4-4f2b-440c-a036-9917e8b4ea2d
+          player: 83ff3eeb-1da2-4186-a34a-402e726e6159
           role_name: works in
-        - id: cd3d812f-6ded-4e22-b4f1-13487c18e7dd
-          player: 1a70d51a-13f1-455b-90b4-9c3896ba9300
+        - id: 0bb5ebec-4e55-4e97-9492-bf383b52327c
+          player: 0801444f-b49a-4086-a4e3-3a58ca29390e
           role_name: has
       readings:
         - "{0} works in {1}"
@@ -42,17 +42,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 969d527f-861d-45aa-894d-135e5967ab16
+            - b19fa2f4-4f2b-440c-a036-9917e8b4ea2d
         - type: mandatory
-          role: 969d527f-861d-45aa-894d-135e5967ab16
-    - id: e2464003-5f5a-4490-b7ce-c536aa326cdb
+          role: b19fa2f4-4f2b-440c-a036-9917e8b4ea2d
+    - id: bec36a31-be6c-4e7c-b05d-76bf9a684aa0
       name: Manager manages Department
       roles:
-        - id: 205c5e98-4cd7-4bf3-bc2b-91bf8b4a5684
-          player: bce5ed81-b9b3-4cec-9ca1-b556cb4f981b
+        - id: ccd76361-8299-42cb-9985-e3e10cbc3bdc
+          player: f737d679-69cd-4c1a-ae0b-a22c61173345
           role_name: manages
-        - id: 9cc28b51-66b3-46e1-a453-fb94097ecde6
-          player: 1a70d51a-13f1-455b-90b4-9c3896ba9300
+        - id: 6c6a9256-90cd-4011-9326-28da4336c00f
+          player: 0801444f-b49a-4086-a4e3-3a58ca29390e
           role_name: is managed by
       readings:
         - "{0} manages {1}"
@@ -60,15 +60,15 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 9cc28b51-66b3-46e1-a453-fb94097ecde6
-    - id: aa45e145-c062-4768-96bb-3ec9a39bc7ac
+            - 6c6a9256-90cd-4011-9326-28da4336c00f
+    - id: aa35e4a5-0daa-4f2c-8bc7-b846d3e64e96
       name: Department has DepartmentName
       roles:
-        - id: 71ec80ff-39cb-4637-8136-15333fe4fb6a
-          player: 1a70d51a-13f1-455b-90b4-9c3896ba9300
+        - id: 9ce6f182-8aa3-4170-90c4-2f3fc5c81d30
+          player: 0801444f-b49a-4086-a4e3-3a58ca29390e
           role_name: has
-        - id: 5c854036-e393-4208-90e2-c7f1ca1e400c
-          player: 34f9a420-17d4-44c3-8a1e-fae890efdb6e
+        - id: 5f4c3d31-17b6-43c7-b6c5-fb8c2d837977
+          player: c956318e-7d87-400f-ad78-80a8a5f5ecac
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -76,12 +76,12 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 71ec80ff-39cb-4637-8136-15333fe4fb6a
+            - 9ce6f182-8aa3-4170-90c4-2f3fc5c81d30
   subtype_facts:
-    - id: da2cd57d-b851-4016-a771-8bda6caec722
-      subtype: 60a2d2b5-f3cb-42a0-aee5-fc40697aa867
-      supertype: 29794ed2-50f9-4556-8232-a404aca72fec
+    - id: ad90ed51-5d66-4618-8a04-45a9875c2e57
+      subtype: 83ff3eeb-1da2-4186-a34a-402e726e6159
+      supertype: c25bb81c-d97f-4b5e-b0c3-2545aade849d
       provides_identification: false
-    - id: adb0cd84-519c-418a-8716-fe54454d13e2
-      subtype: bce5ed81-b9b3-4cec-9ca1-b556cb4f981b
-      supertype: 60a2d2b5-f3cb-42a0-aee5-fc40697aa867
+    - id: c600073f-a579-4df6-8c6b-f5947dd6c37e
+      subtype: f737d679-69cd-4c1a-ae0b-a22c61173345
+      supertype: 83ff3eeb-1da2-4186-a34a-402e726e6159

@@ -2,52 +2,52 @@ orm_version: "1.1"
 model:
   name: University Enrollment
   object_types:
-    - id: e513f762-654b-4cce-bdbe-5cde798c62e3
+    - id: 9849141d-26c1-4b77-8d67-4d173b00ab4a
       name: Student
       kind: entity
       reference_mode: student_number
       definition: A person enrolled at the university, identified by a student number assigned at admission.
-    - id: ea4e06d9-bdb2-4c66-83de-483b58fa1ca2
+    - id: 534ada6b-3b24-408a-907e-6e214494bc59
       name: Course
       kind: entity
       reference_mode: course_code
       definition: A catalog entry representing an academic course, identified by a unique course code.
-    - id: ab98fcfa-72d3-46e7-ab6a-284db60ac9f5
+    - id: 041c6974-2131-4022-9847-c7cbba35fb15
       name: CourseOffering
       kind: entity
       reference_mode: offering_id
       definition: A specific instance of a course offered in a particular semester.
-    - id: 9db2c4d9-3f14-4632-82f9-1590fded04ba
+    - id: ad684844-f3f2-42f3-8396-030cef17648d
       name: Instructor
       kind: entity
       reference_mode: employee_id
       definition: A faculty member who teaches course offerings, identified by employee ID.
-    - id: f3fbfab3-8ce0-4591-89ad-a8226a8ae276
+    - id: 058c679d-40c8-405a-876b-82cd4cb25ee1
       name: Semester
       kind: entity
       reference_mode: term_code
       definition: An academic term during which course offerings take place, identified by a term code.
-    - id: ba6ee825-6c0d-4bd2-a9c9-92b7a5fa0f34
+    - id: 9738be5c-ff37-4007-bc07-fea0e9d96b4e
       name: Title
       kind: value
       definition: The free-text name of a course.
-    - id: eee63153-7133-44a7-bcfa-d6676809c765
+    - id: 6b50d051-5b2b-479b-b4b2-154d296e2236
       name: CreditValue
       kind: value
       definition: The number of credits a course is worth, expressed as a whole number.
-    - id: 66a814c1-91bc-4389-906e-45a251f9257b
+    - id: 6a3b6f77-6d84-4fe0-9bb9-032a27ab3979
       name: MaxCapacity
       kind: value
       definition: The maximum number of students that can enroll in a course offering.
-    - id: a8e92b99-898d-4103-9eff-f587e041d961
+    - id: 21989c2e-e18f-419a-a446-5f6562062f92
       name: StartDate
       kind: value
       definition: The date a semester begins.
-    - id: d6e26ad5-0814-4a9a-91ef-d710402b128d
+    - id: aeaca917-b71a-45da-ba7c-0287eadcc6b5
       name: EndDate
       kind: value
       definition: The date a semester ends.
-    - id: 6b5c8d8c-72b6-4517-9a2d-27f926b7e31c
+    - id: 068337c5-f71e-4404-84a4-859a093e2d57
       name: LetterGrade
       kind: value
       definition: A grade awarded to a student upon completion of a course offering.
@@ -59,26 +59,26 @@ model:
           - D
           - F
   fact_types:
-    - id: 023e54bd-8c33-4a48-8281-fa4651b8b756
+    - id: f092c02a-cf80-49db-87ae-5ba2fd0798e1
       name: Student enrolls in CourseOffering
       roles:
-        - id: a6da9de3-968f-4c1f-81b0-965d810d1bdd
-          player: e513f762-654b-4cce-bdbe-5cde798c62e3
+        - id: b27378ae-bf05-4a94-a4c2-e62630a46445
+          player: 9849141d-26c1-4b77-8d67-4d173b00ab4a
           role_name: enrolls in
-        - id: ba41e8fe-db05-4761-b71c-53f4896a4f28
-          player: ab98fcfa-72d3-46e7-ab6a-284db60ac9f5
+        - id: 377f01fd-4131-4937-ba9e-130f748b2b89
+          player: 041c6974-2131-4022-9847-c7cbba35fb15
           role_name: has enrolled
       readings:
         - "{0} enrolls in {1}"
         - "{1} has enrolled {0}"
-    - id: a84ebfc8-6350-4a28-9e0f-5f9a330d51c0
+    - id: 0cd92be6-e0fb-4556-88db-ab127bddea66
       name: CourseOffering is of Course
       roles:
-        - id: 65b9025d-4cd2-4f08-885e-a0699c047ddb
-          player: ab98fcfa-72d3-46e7-ab6a-284db60ac9f5
+        - id: efb274ae-f636-4e3e-852f-866f0769343a
+          player: 041c6974-2131-4022-9847-c7cbba35fb15
           role_name: is of
-        - id: 569f15d8-9465-4268-81f8-d4f7cbe26b14
-          player: ea4e06d9-bdb2-4c66-83de-483b58fa1ca2
+        - id: 10f34003-a669-4416-80f6-99054333c3bb
+          player: 534ada6b-3b24-408a-907e-6e214494bc59
           role_name: has offering
       readings:
         - "{0} is of {1}"
@@ -86,17 +86,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 65b9025d-4cd2-4f08-885e-a0699c047ddb
+            - efb274ae-f636-4e3e-852f-866f0769343a
         - type: mandatory
-          role: 65b9025d-4cd2-4f08-885e-a0699c047ddb
-    - id: ea9b7e35-2aad-43fd-b95b-086cc7deb44a
+          role: efb274ae-f636-4e3e-852f-866f0769343a
+    - id: 5df8a010-d0c9-4043-87e6-bc60b9b36a62
       name: CourseOffering is in Semester
       roles:
-        - id: 33adb7e5-7344-44f6-9cab-ae2254e716a2
-          player: ab98fcfa-72d3-46e7-ab6a-284db60ac9f5
+        - id: ac860c1d-80bd-4f1d-b4e4-838d2237714b
+          player: 041c6974-2131-4022-9847-c7cbba35fb15
           role_name: is in
-        - id: 93bd16e8-0a72-43bb-80bd-b6271ca36906
-          player: f3fbfab3-8ce0-4591-89ad-a8226a8ae276
+        - id: 96f8f3c5-335f-4e08-bb2c-d152c32f5d6f
+          player: 058c679d-40c8-405a-876b-82cd4cb25ee1
           role_name: includes
       readings:
         - "{0} is in {1}"
@@ -104,17 +104,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 33adb7e5-7344-44f6-9cab-ae2254e716a2
+            - ac860c1d-80bd-4f1d-b4e4-838d2237714b
         - type: mandatory
-          role: 33adb7e5-7344-44f6-9cab-ae2254e716a2
-    - id: 4977d088-ed39-4035-b022-c45bc055fde5
+          role: ac860c1d-80bd-4f1d-b4e4-838d2237714b
+    - id: a33a202b-0fee-411a-b8a1-6947f67f048f
       name: Instructor teaches CourseOffering
       roles:
-        - id: 7bcc5cba-b6fd-4907-95ca-684ad4c9f2c3
-          player: 9db2c4d9-3f14-4632-82f9-1590fded04ba
+        - id: 156c3ece-d725-48c4-8750-60de4b42b4f8
+          player: ad684844-f3f2-42f3-8396-030cef17648d
           role_name: teaches
-        - id: 8ee01a91-fabf-402f-9c4c-df1805c97dce
-          player: ab98fcfa-72d3-46e7-ab6a-284db60ac9f5
+        - id: f4bacc8f-21b1-4231-b20a-9ef3ecc4f983
+          player: 041c6974-2131-4022-9847-c7cbba35fb15
           role_name: is taught by
       readings:
         - "{0} teaches {1}"
@@ -122,17 +122,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 8ee01a91-fabf-402f-9c4c-df1805c97dce
+            - f4bacc8f-21b1-4231-b20a-9ef3ecc4f983
         - type: mandatory
-          role: 8ee01a91-fabf-402f-9c4c-df1805c97dce
-    - id: 8681269d-5b9a-4761-a9d6-0fcc7e9d3436
+          role: f4bacc8f-21b1-4231-b20a-9ef3ecc4f983
+    - id: 889166dd-6ed6-4cbb-8ef4-6951923d2198
       name: Course has Title
       roles:
-        - id: 14e3b923-9c98-411d-94c7-b4e9b4bb266e
-          player: ea4e06d9-bdb2-4c66-83de-483b58fa1ca2
+        - id: 28ced92a-d29d-461e-86e6-cea6af8bb109
+          player: 534ada6b-3b24-408a-907e-6e214494bc59
           role_name: has
-        - id: de89904b-b134-4423-b946-224a467e38b2
-          player: ba6ee825-6c0d-4bd2-a9c9-92b7a5fa0f34
+        - id: 15c49f15-21b3-4d45-9061-bf0de6367943
+          player: 9738be5c-ff37-4007-bc07-fea0e9d96b4e
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -140,15 +140,15 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 14e3b923-9c98-411d-94c7-b4e9b4bb266e
-    - id: 8acda33e-7049-45ab-a402-4380bb2614ed
+            - 28ced92a-d29d-461e-86e6-cea6af8bb109
+    - id: 0231fa36-457e-4216-86a7-d6b0660d89cd
       name: Course has CreditValue
       roles:
-        - id: 25faf39a-2a53-4ed4-b028-fb6cad391f22
-          player: ea4e06d9-bdb2-4c66-83de-483b58fa1ca2
+        - id: ae58d95d-9ded-4388-8cb1-807f92315209
+          player: 534ada6b-3b24-408a-907e-6e214494bc59
           role_name: has
-        - id: 9bbc13c0-d0e7-49ec-a325-d91f300b2fea
-          player: eee63153-7133-44a7-bcfa-d6676809c765
+        - id: 386d80f7-248e-49a7-bc32-5ba6f6401477
+          player: 6b50d051-5b2b-479b-b4b2-154d296e2236
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -156,15 +156,15 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 25faf39a-2a53-4ed4-b028-fb6cad391f22
-    - id: e58845b4-3fdc-440c-8bf2-56275e885058
+            - ae58d95d-9ded-4388-8cb1-807f92315209
+    - id: a1f5abc5-f78e-4d13-8bb3-ee4f39ff7c72
       name: CourseOffering has MaxCapacity
       roles:
-        - id: 77809f72-5d0b-4b0c-91b7-3563ad5f6bd4
-          player: ab98fcfa-72d3-46e7-ab6a-284db60ac9f5
+        - id: 54546e3a-e1aa-4842-b909-971808855af5
+          player: 041c6974-2131-4022-9847-c7cbba35fb15
           role_name: has
-        - id: 396ecae3-4f71-448b-8854-f1061129f152
-          player: 66a814c1-91bc-4389-906e-45a251f9257b
+        - id: c080a79a-d257-4f5d-ab2d-3abd70483d26
+          player: 6a3b6f77-6d84-4fe0-9bb9-032a27ab3979
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -172,15 +172,15 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 77809f72-5d0b-4b0c-91b7-3563ad5f6bd4
-    - id: e5403e63-9767-4bed-aaef-f3520c051846
+            - 54546e3a-e1aa-4842-b909-971808855af5
+    - id: 093dce77-b403-4097-9d70-7dbfb096d33c
       name: Semester has StartDate
       roles:
-        - id: 83c3faec-1e53-4287-af66-47a879be7a9a
-          player: f3fbfab3-8ce0-4591-89ad-a8226a8ae276
+        - id: af34b976-07e5-4722-8983-305e050e1965
+          player: 058c679d-40c8-405a-876b-82cd4cb25ee1
           role_name: has
-        - id: 0aa6f0db-80ad-4084-b5b2-8318384b4acf
-          player: a8e92b99-898d-4103-9eff-f587e041d961
+        - id: 2ccc38b1-67ca-42d9-a534-10698be1a2d9
+          player: 21989c2e-e18f-419a-a446-5f6562062f92
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -188,15 +188,15 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 83c3faec-1e53-4287-af66-47a879be7a9a
-    - id: e8129723-1770-403e-8955-6121951e4740
+            - af34b976-07e5-4722-8983-305e050e1965
+    - id: 1f2e22ff-0280-4237-9a9a-11330355ba9e
       name: Semester has EndDate
       roles:
-        - id: 46076992-bbbe-42c5-bd59-76826e658d39
-          player: f3fbfab3-8ce0-4591-89ad-a8226a8ae276
+        - id: ddde2ee8-53db-41c3-97ef-4879b88c3def
+          player: 058c679d-40c8-405a-876b-82cd4cb25ee1
           role_name: has
-        - id: 691fd6e1-6a91-4a9d-92cb-a634875f3143
-          player: d6e26ad5-0814-4a9a-91ef-d710402b128d
+        - id: cbdb9ff9-bb47-4f63-8777-a6686e442b12
+          player: aeaca917-b71a-45da-ba7c-0287eadcc6b5
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -204,18 +204,18 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 46076992-bbbe-42c5-bd59-76826e658d39
-    - id: 4e1a4992-2643-4853-9592-ddb5c02429bb
+            - ddde2ee8-53db-41c3-97ef-4879b88c3def
+    - id: 42e19434-af09-4463-a566-4d968d4334cc
       name: Student receives LetterGrade for CourseOffering
       roles:
-        - id: 370cf129-19b3-47df-9a4f-1482cb023f8c
-          player: e513f762-654b-4cce-bdbe-5cde798c62e3
+        - id: 68f86888-1fb6-4b5c-aa76-20df4b8ea66a
+          player: 9849141d-26c1-4b77-8d67-4d173b00ab4a
           role_name: receives
-        - id: 4ab22aed-17a7-4750-9087-173c4e2b7963
-          player: 6b5c8d8c-72b6-4517-9a2d-27f926b7e31c
+        - id: f7bb2626-7858-4e68-a557-7b9d2b96ab95
+          player: 068337c5-f71e-4404-84a4-859a093e2d57
           role_name: is received by
-        - id: 8ab70bca-41c9-4624-9691-f2f90e523137
-          player: ab98fcfa-72d3-46e7-ab6a-284db60ac9f5
+        - id: 03bf69ed-c1fe-4235-b1fa-9de5810c48aa
+          player: 041c6974-2131-4022-9847-c7cbba35fb15
           role_name: grades
       readings:
         - "{0} receives {1} for {2}"
