@@ -20,7 +20,9 @@ resolving observation, then the refinements that keep it honest.>
 
 ## Scope
 
-In scope: <the concrete changes this spec covers.>
+In scope: <the concrete changes this spec covers. State hard
+requirements in EARS form -- "When `<trigger>`, the system shall
+`<response>`.">
 
 Out of scope: <what is deliberately deferred, and to where -- a later
 workstream, a separate finding, a follow-up. Name it so the boundary is
@@ -44,6 +46,12 @@ the columns (generate with a script). Example columns:>
 what each exposes, and the boundary that is being restored. Concrete
 beats prose here.>
 ```
+
+## Alternatives considered
+
+- **<Rival design>.** <What it would look like and why it lost. Keep
+  the discarded frames here -- a reviewer weighing the choice, or a
+  later implementer who trips a tripwire, looks in this section first.>
 
 ## Workstreams (each independently shippable)
 
