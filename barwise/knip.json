@@ -3,7 +3,7 @@
   "ignoreExportsUsedInFile": true,
   "ignore": ["test-plan/**"],
   "ignoreBinaries": ["depcruise", "jscpd"],
-  "ignoreDependencies": ["dependency-cruiser", "jscpd"],
+  "ignoreDependencies": ["@dprint/json", "@dprint/markdown", "@dprint/typescript", "dependency-cruiser", "jscpd"],
   "workspaces": {
     "packages/core": {
       "ignore": ["scripts/**"]

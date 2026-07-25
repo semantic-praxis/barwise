@@ -153,6 +153,16 @@ reverse.
 - **Open decisions are genuinely open** -- each states the options and
   the trade-off and recommends a default, and nothing that is the
   reviewer's call has been silently decided in the body.
+- **Mechanism closure**: every field, file, command, or API a
+  requirement names must either exist (verified against the code) or
+  be delivered by a named workstream. This is the `sensemaking`
+  anchor discipline pointed at the nouns a design invents: an
+  invented mechanism cannot be verified by observation -- there is
+  nothing to test yet -- so it is settled by accounting instead, and
+  the accuracy pass (which tests claims about what exists) walks
+  right past it. "The authored diagnosis" with no field to hold it
+  reads fine and builds nothing. Ask of each one: which field, in
+  which file, from which workstream?
 - **Header block is current** -- `Status`, `Created`, `Last-updated`
   (bumped if this push revises an existing spec), `Tracking`.
 - **REPO_REVIEW link**: reference the finding the spec resolves, and
@@ -160,30 +170,18 @@ reverse.
 
 ### Formatting gate (dprint)
 
-`dprint fmt:check` enforces these in CI but cannot run locally here
-(the wasm plugin download is network-blocked), so check each by eye.
-Skipping this gate has cost a CI round-trip on nearly every PR that
-skipped it. The import rules apply because dprint formats fenced `ts`
-code blocks inside markdown -- a Target-architecture or API sketch is
-checked as real code.
+Run `npm run fmt` from `barwise/` and commit what it changes. dprint
+runs locally in every environment: its wasm plugins are vendored as
+npm devDependencies (`@dprint/*`) and referenced by `dprint.json` from
+`node_modules`, so no network beyond the npm registry is needed. It
+formats markdown, aligns tables, and formats fenced `ts` code blocks
+inside markdown (a Target-architecture sketch is checked as real
+code); `npm run fmt:check` is the CI-equivalent verification. The
+pre-commit hook runs `dprint fmt` on staged files, so a clean local
+commit is already gate-clean.
 
-- **Emphasis uses underscores**, not asterisks: `_word_`, not `*word*`.
-  (`**bold**` is fine.)
-- **Tables are column-aligned** -- every cell in a column padded to the
-  widest cell, separator dashes spanning the full width. Generate the
-  table with a script rather than by hand.
-- **Task-list continuation lines indent 6 spaces** (aligned under the
-  text after `- [ ] `), not 2. Regular `- ` bullet continuations indent
-  2 spaces.
-- **Imports/exports sort** by module specifier (external/bare before
-  relative), case-insensitively; named members sort within `{ }`.
-- **Import line breaks are decided by width, not by eye.** dprint keeps a
-  named import on one line when its single-line form fits the width and
-  breaks to one member per line otherwise. Measure -- do not guess: build
-  the one-line form and count it (`awk '{print length}'`), since dprint
-  cannot run here. The recurring trap: after removing a member from a
-  multiline import, re-measure -- the remainder often now fits and must
-  collapse to one line.
+Two things dprint does not police:
+
 - **No emoji** anywhere (project-wide rule).
-- Lines over 100 chars that dprint cannot break (long template literals)
-  are fine; everything else stays under the width.
+- **Tables wider than the line width** are legal but expensive to
+  read; consider restructuring before accepting one.
