@@ -46,6 +46,40 @@ messy prose into a defensible model), sit here:
 None of the three states who it makes more expert, or how an observer
 would know. That gap is what the standard closes.
 
+## The proficiency scale
+
+The six levels C1 transitions are named on, defined for barwise by what
+a learner at each level can observably do with ORM. The scale measures
+ORM proficiency specifically, not modeling experience in general.
+
+- **Naive** -- no exposure to fact-based modeling. Cannot yet tell a
+  fact from an attribute. Gets the tutorial opening, the foundations
+  recall cards, and textbook-clean intro exercises.
+- **Novice** -- knows what ORM is for. Can read a fact type and its
+  verbalization aloud and say what it asserts; cannot yet produce a
+  model unaided.
+- **Initiate** -- past introductory instruction. Models single
+  elementary fact types from clean prose, with reference schemes and
+  basic uniqueness constraints.
+- **Apprentice** -- turns a page of clean prose into a small model that
+  validates, with constraints defended. Messy inputs begin here: C4's
+  rubric applies from this level up.
+- **Journeyman** -- works unsupervised on realistic messy inputs;
+  resolves ambiguity and contradiction and defends grain and constraint
+  choices against plausible alternatives.
+- **Expert** -- handles the models others bring to them: subtle
+  subtyping, objectification, cross-context conflicts. Authors new
+  traps for the bias catalog from failures they have diagnosed.
+
+Learners who are experienced in other modeling traditions -- ER,
+relational, dimensional -- should start at the early levels anyway, and
+the framework says so wherever the scale is published. Prior modeling
+skill does not transfer as a head start here; it transfers as the
+reductive readings the catalog exists to break, and the early levels
+are where those frames are intercepted before they calcify. The
+naive-to-novice material costs an experienced modeler an hour and is
+the cheapest bias insurance the framework offers.
+
 ## The standard: six design constraints (the target)
 
 Every learning artifact -- a deck subdeck, a gym exercise set, a tutorial
@@ -55,10 +89,9 @@ stated as a requirement, then as the check an author or reviewer applies.
 ### C1. Target a named proficiency transition, not a topic
 
 When a module is authored, it shall declare (a) the transition it serves
-on the scale _naive, novice, initiate, apprentice, journeyman, expert_,
-and (b) the observable performance that marks the far side -- a can-do
-statement that includes defending the choice against a plausible
-alternative.
+on the proficiency scale above, and (b) the observable performance that
+marks the far side -- a can-do statement that includes defending the
+choice against a plausible alternative.
 
 - _Check:_ the module's front matter contains a transition and an
   exit-performance sentence of the form "given X, can produce Y and
@@ -157,12 +190,14 @@ wrong model. This catalog seeds C2; authors extend it.
 
 ## Scope
 
-In scope: the standard (C1-C6); the reductive-bias catalog; an authoring
-checklist extracted from the standard (where it lives is Open decision
-1); the cross-artifact loop -- optional `reading` fields in the gym
-exercise schema and deck-format miss-card emission from gym failures;
-and the ordered workstreams that retrofit the deck, gym, and tutorial
-to conform.
+In scope: the standard (C1-C6); the published proficiency scale with
+its start-early guidance for experienced modelers; the reductive-bias
+catalog; an authoring checklist extracted from the standard (where it
+lives is Open decision 1); the cross-artifact loop -- optional `reading`
+fields in the gym exercise schema and deck-format miss-card emission
+from gym failures; aligning the gym's difficulty axis to the scale; and
+the ordered workstreams that retrofit the deck, gym, and tutorial to
+conform.
 
 Out of scope, deferred and named:
 
@@ -242,11 +277,12 @@ session recipe; no code enforces it.
 
 ### 1. Land the standard and the authoring checklist
 
-This spec, plus the authoring checklist (the C1-C6 checks and the
-catalog, condensed) that every content PR references in its
-description; where the checklist lives is Open decision 1 (recommended:
-`docs/learning-authoring.md`). Smallest blast radius: docs only,
-nothing depends on it yet.
+This spec, plus the authoring checklist (the C1-C6 checks, the
+proficiency scale with its start-early guidance for experienced
+modelers, and the catalog, condensed) that every content PR references
+in its description; where the checklist lives is Open decision 1
+(recommended: `docs/learning-authoring.md`). Smallest blast radius:
+docs only, nothing depends on it yet.
 
 ### 2. Gym: the reductive-bias exercise set
 
@@ -272,12 +308,19 @@ than blocking them; keep the generation-first hook.
 
 ### 5. Gym: reading references and miss-card emission
 
-Two additive changes to `@barwise/learn` and its planned CLI surface:
+Three changes to `@barwise/learn` and its planned CLI surface:
 
 - Optional `reading` fields in the exercise schema, at two grains:
   exercise-level (the pre-session skim) and per check (the section a
   failure sends you to). Schema-only; landing this alongside
   workstream 2 lets the bias exercises carry readings from birth.
+- Replace the exercise schema's `difficulty` enum (`intro`, `core`,
+  `advanced`) with the C1 `transition` declaration (`from`/`to` on the
+  proficiency scale). One field then serves both C1's front-matter
+  check and level-based selection ("I am an apprentice; show me
+  apprentice-onward exercises" means filtering on the transition's near
+  side). Keeping a six-value difficulty beside a transition would say
+  the same thing twice and let the two drift.
 - Miss-card emission: a pure function beside the pure evaluator maps a
   `GymReport`'s failed checks to deck-format card rows; the file write
   rides the `barwise gym` CLI surface planned in the modeling-gym spec.
@@ -294,9 +337,11 @@ human-in-the-loop workstream, gated on access to those modelers.
 
 Docs and content only for workstreams 1-4. Workstream 3 adds a deck tag
 (`tier-discrimination`) -- a content convention, not an API. Workstream 5
-is code, all of it additive: optional `reading` fields in the gym
-exercise schema, a pure miss-card emission API in `@barwise/learn`, and
-a write option on the planned `barwise gym` command. `@barwise/learn`
+is code: optional `reading` fields in the gym exercise schema, a pure
+miss-card emission API in `@barwise/learn`, and a write option on the
+planned `barwise gym` command -- all additive -- plus one breaking schema
+change, `difficulty` replaced by `transition`, whose blast radius is
+the single seed exercise (a one-line migration). `@barwise/learn`
 remains a leaf; core is untouched. A discrimination "same facts?" check
 as a new `@barwise/learn` check kind is possible but not required (see
 Open decisions); if added later it is additive and does not change
