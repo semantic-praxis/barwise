@@ -32,6 +32,7 @@
     "@barwise/diagram": "1.6.1",
     "@barwise/diagram-ui": "1.6.1",
     "@barwise/formats": "1.6.1",
+    "@barwise/learn": "1.6.1",
     "@barwise/llm": "1.6.1",
     "commander": "^13.0.0"
   },

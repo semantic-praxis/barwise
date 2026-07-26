@@ -28,6 +28,7 @@ src/
     schema.ts           generate_schema tool
     diff.ts             diff_models tool
     diagram.ts          generate_diagram tool
+    gym.ts              gym_list / gym_check tools (modeling gym)
     import.ts           import_transcript tool
     merge.ts            merge_models tool
   resources/

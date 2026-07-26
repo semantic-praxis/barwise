@@ -7,6 +7,7 @@ import { registerDescribeDomainTool } from "./describeDomain.js";
 import { registerDiagramTool } from "./diagram.js";
 import { registerDiffTool } from "./diff.js";
 import { registerExportModelTool } from "./exportModel.js";
+import { registerGymTools } from "./gym.js";
 import { registerImpactAnalysisTool } from "./impactAnalysis.js";
 import { registerImportTool } from "./import.js";
 import { registerImportModelTool } from "./importModel.js";
@@ -33,4 +34,5 @@ export function registerTools(server: McpServer): void {
   registerLineageStatusTool(server);
   registerImpactAnalysisTool(server);
   registerReviewTool(server);
+  registerGymTools(server);
 }
