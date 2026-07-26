@@ -72,7 +72,10 @@ export function Inspector(props: InspectorProps): JSX.Element {
   if (summarySubtype) {
     return (
       <div className="inspector-body">
-        <Header kind="subtype" name={`${summarySubtype.subtypeName} is a ${summarySubtype.supertypeName}`} />
+        <Header
+          kind="subtype"
+          name={`${summarySubtype.subtypeName} is a ${summarySubtype.supertypeName}`}
+        />
         <Field label="Subtype">
           <button
             type="button"
@@ -117,11 +120,13 @@ export function Inspector(props: InspectorProps): JSX.Element {
   );
 }
 
-function ObjectTypeDetail(props: InspectorProps & {
-  node: PositionedObjectTypeNode | null;
-  detail: SummaryObjectType | null;
-  summary: ModelSummary | null;
-}): JSX.Element {
+function ObjectTypeDetail(
+  props: InspectorProps & {
+    node: PositionedObjectTypeNode | null;
+    detail: SummaryObjectType | null;
+    summary: ModelSummary | null;
+  },
+): JSX.Element {
   const { node, detail, summary, meta, isGhost, onSelectRelated } = props;
   const name = detail?.name ?? node?.name ?? "";
   const kind = detail?.kind ?? node?.objectTypeKind ?? "entity";
@@ -254,9 +259,7 @@ function FactTypeDetail(props: {
       {node?.isObjectified && (
         <Field label="Objectified as">{node.objectifiedEntityName ?? name}</Field>
       )}
-      {node?.ringConstraint && (
-        <Field label="Ring constraint">{node.ringConstraint.label}</Field>
-      )}
+      {node?.ringConstraint && <Field label="Ring constraint">{node.ringConstraint.label}</Field>}
       {detail && detail.readings.length > 0 && (
         <Field label="Readings">
           {detail.readings.map((r, i) => <div key={i} className="inspector-reading">{r}</div>)}
