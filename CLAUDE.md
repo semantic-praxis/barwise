@@ -228,7 +228,9 @@ A minor release is also the cadence point for the Phase A architecture
 review: run the deep assessment in
 `barwise/docs/specs/architecture-analysis.spec.md` (walk the scenario
 catalog in `docs/architecture-scenarios.md`, refresh the reflexion and
-hotspot snapshot via `npm run arch:triage`) and commit a new dated
+hotspot snapshot via `npm run arch:triage -- --base <last-release-tag>`,
+so the ranking covers only the changes since that release) and commit a
+new dated
 `docs/REPO_REVIEW-<YYYY-MM-DD>.md`. The continuous fitness functions
 (`npm run depcruise`, `npm run purity`) guard the structural pillars
 between releases; this review covers the judgment calls they cannot.
