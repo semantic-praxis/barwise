@@ -30,6 +30,7 @@ export interface CommandActions {
   readonly zoomIn: () => void;
   readonly zoomOut: () => void;
   readonly setTab: (tab: TabKey) => void;
+  readonly toggleDensity: () => void;
 }
 
 export interface CommandContext {
@@ -107,6 +108,13 @@ export function buildCommands(ctx: CommandContext): Command[] {
   for (const { tab, label } of TAB_COMMANDS) {
     cmds.push({ id: `tab-${tab}`, label: `Go to ${label}`, hint: "tab", run: () => a.setTab(tab) });
   }
+
+  cmds.push({
+    id: "toggle-density",
+    label: "Toggle compact density",
+    hint: "appearance",
+    run: a.toggleDensity,
+  });
 
   return cmds;
 }

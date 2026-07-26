@@ -7,6 +7,7 @@
  * `docs/specs/diagram-presentation-contract.spec.md`.
  */
 import type { PositionedGraph } from "../layout/LayoutTypes.js";
+import type { ModelSummary } from "./modelSummary.js";
 
 /** Active focus (hop-count) neighborhood state. */
 export interface DiagramFocus {
@@ -32,6 +33,11 @@ export interface DiagramPresentation {
   readonly availableViews: readonly string[];
   readonly hasUnsavedLayout: boolean;
   readonly modelName: string;
+  /**
+   * Serialized model structure for the front end's tree and inspector
+   * panes (modernization Phase 2) -- the front end never holds the model.
+   */
+  readonly modelSummary: ModelSummary;
 }
 
 /**

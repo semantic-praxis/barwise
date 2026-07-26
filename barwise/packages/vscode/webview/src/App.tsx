@@ -2,23 +2,27 @@
  * Root of the diagram webview application.
  *
  * Owns the diagram state pushed by the extension host, drives the typed
- * message protocol, and lays out the shell: top bar, context bar, center
- * pane, right inspector, bottom strip, and the command palette. Phase 1
- * ships the diagram pane, the inspector, and the focus / views / ghost
- * affordances; the left model tree and the alternate tabs land later.
+ * message protocol, and lays out the 3-pane shell: top bar, context
+ * bar, left model tree, center pane (diagram or tab panel), right
+ * inspector, bottom strip, and the command palette. Phases 2-4 of the
+ * modernization complete the shell: the self-contained tree, the
+ * summary-driven inspector, the tab panels wired to host-computed
+ * content, and the persisted density toggle.
  */
 import type { PositionedGraph } from "@barwise/diagram";
 import { DiagramCanvas, type DiagramCanvasHandle } from "@barwise/diagram-ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DiagramMeta } from "../../src/diagram/protocol";
+import type { TabPanels as TabPanelsData } from "../../src/diagram/tabPanels";
 import { buildCommands } from "./commands";
 import { BottomStrip } from "./components/BottomStrip";
 import { CommandPalette } from "./components/CommandPalette";
 import { ContextBar } from "./components/ContextBar";
 import { Inspector } from "./components/Inspector";
-import { TabPlaceholder } from "./components/TabPlaceholder";
+import { ModelTree } from "./components/ModelTree";
+import { TabPanelView } from "./components/TabPanels";
 import { type TabKey, TopBar } from "./components/TopBar";
-import { onMessage, postMessage } from "./vscodeApi";
+import { getPersistedState, onMessage, persistState, postMessage } from "./vscodeApi";
 
 /** Node id + its directly connected neighbours, for the highlight overlay. */
 function computeConnected(graph: PositionedGraph, id: string): Set<string> {
@@ -42,11 +46,15 @@ export function App(): JSX.Element {
   const [graph, setGraph] = useState<PositionedGraph | null>(null);
   const [ghostIds, setGhostIds] = useState<ReadonlySet<string>>(new Set());
   const [meta, setMeta] = useState<DiagramMeta | null>(null);
+  const [panels, setPanels] = useState<TabPanelsData | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [highlightIds, setHighlightIds] = useState<ReadonlySet<string> | null>(null);
   const [resetNonce, setResetNonce] = useState(0);
   const [tab, setTab] = useState<TabKey>("diagram");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [density, setDensity] = useState<"comfortable" | "compact">(
+    () => getPersistedState().density ?? "comfortable",
+  );
   const canvasRef = useRef<DiagramCanvasHandle>(null);
 
   useEffect(() => {
@@ -55,6 +63,7 @@ export function App(): JSX.Element {
         setGraph(msg.graph);
         setGhostIds(new Set(msg.ghostNodeIds));
         setMeta(msg.meta);
+        setPanels(msg.panels);
         if (msg.resetView) setResetNonce((n) => n + 1);
       } else if (msg.type === "highlight") {
         setGraph((g) => {
@@ -87,6 +96,16 @@ export function App(): JSX.Element {
     setSelectedId(id);
     postMessage({ type: "selectElement", elementId: id });
     setHighlightIds(id && graph ? computeConnected(graph, id) : null);
+  }, [graph]);
+
+  /** Selection from the tree or an inspector link; the id may be absent
+   * from the current (filtered) graph. */
+  const handleSelectById = useCallback((id: string): void => {
+    setSelectedId(id);
+    postMessage({ type: "selectElement", elementId: id });
+    setHighlightIds(
+      graph && graph.nodes.some((n) => n.id === id) ? computeConnected(graph, id) : null,
+    );
   }, [graph]);
 
   const handleNodeMoved = useCallback((nodeId: string, x: number, y: number): void => {
@@ -129,6 +148,14 @@ export function App(): JSX.Element {
     postMessage({ type: "loadView", viewName });
   }, []);
 
+  const toggleDensity = useCallback((): void => {
+    setDensity((d) => {
+      const next = d === "comfortable" ? "compact" : "comfortable";
+      persistState({ density: next });
+      return next;
+    });
+  }, []);
+
   const fit = useCallback((): void => canvasRef.current?.fit(), []);
   const zoomIn = useCallback((): void => canvasRef.current?.zoomIn(), []);
   const zoomOut = useCallback((): void => canvasRef.current?.zoomOut(), []);
@@ -138,6 +165,11 @@ export function App(): JSX.Element {
     [graph, selectedId],
   );
   const isSelectedGhost = selectedId != null && ghostIds.has(selectedId);
+
+  const visibleIds = useMemo(
+    () => new Set(graph?.nodes.map((n) => n.id) ?? []),
+    [graph],
+  );
 
   const commands = useMemo(
     () =>
@@ -158,6 +190,7 @@ export function App(): JSX.Element {
           zoomIn,
           zoomOut,
           setTab,
+          toggleDensity,
         },
       }),
     [
@@ -175,11 +208,12 @@ export function App(): JSX.Element {
       fit,
       zoomIn,
       zoomOut,
+      toggleDensity,
     ],
   );
 
   return (
-    <div className="app">
+    <div className={"app" + (density === "compact" ? " density-compact" : "")}>
       <TopBar
         modelName={meta?.modelName ?? "ORM Model"}
         activeTab={tab}
@@ -200,6 +234,14 @@ export function App(): JSX.Element {
         />
       )}
       <div className="main-row">
+        <div className="tree-pane">
+          <ModelTree
+            summary={meta?.modelSummary ?? null}
+            selectedId={selectedId}
+            visibleIds={visibleIds}
+            onSelect={handleSelectById}
+          />
+        </div>
         <div className="center">
           {tab === "diagram"
             ? (
@@ -220,17 +262,18 @@ export function App(): JSX.Element {
                 )
                 : <div className="empty-state">Loading model…</div>
             )
-            : <TabPlaceholder tab={tab} />}
+            : <TabPanelView tab={tab} panels={panels} />}
         </div>
         <div className="inspector">
           <Inspector
             node={selectedNode}
-            graph={graph}
+            selectedId={selectedId}
             meta={meta}
             isGhost={isSelectedGhost}
             onFocus={handleFocus}
             onShowNeighbors={handleShowNeighbors}
             onAddToView={handleAddToView}
+            onSelectRelated={handleSelectById}
           />
         </div>
       </div>
