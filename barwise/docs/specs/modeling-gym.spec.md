@@ -1,8 +1,16 @@
 # Modeling gym: deterministic practice-with-feedback for learning ORM
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Workstreams 1-3 implemented. WS1 (the `@barwise/learn` foundation)
+shipped in PR #258; WS2 (`barwise gym list|show|check`, with miss-card
+emission and the session log per learning-design C6) and WS3
+(`gym_list`/`gym_check` MCP tools) shipped 2026-07-26. The exercise schema
+now carries the learning-design C1 front matter (`transition` +
+`exitPerformance`, replacing `difficulty`) and per-check C6 guidance
+(`hint`/`diagnosis`/`reading`). Open: WS4 (the wider seed catalog --
+one seed exercise ships today; the reductive-bias set is learning-design
+WS2) and WS5 (VS Code integration).
 Created: 2026-07-03
-Last-updated: 2026-07-25
+Last-updated: 2026-07-26
 Tracking: Feature follow-up to the `docs/anki` learning deck (merged in
 PR #253). No bd issue yet -- the bd binary is unavailable in this web
 session; file one before the first implementation PR.
