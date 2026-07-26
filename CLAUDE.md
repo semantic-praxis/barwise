@@ -195,7 +195,9 @@ too (a one-pass rewrite of the `@barwise/*` entries in every
 lockfile -- otherwise `npm ci` fails trying to fetch the old version
 from the registry. Also bump the pinned `SERVER_VERSION` in
 `packages/mcp/src/server.ts` (a version-sync test asserts it matches
-package.json).
+package.json). Then `npm run regen:tutorial`: the committed
+tutorial Markdown stamps the tool version, and its drift test fails
+until regenerated.
 
 The `barwise-vscode` extension has its own version (visible in the VS
 Code marketplace) which may differ from the library packages. The
