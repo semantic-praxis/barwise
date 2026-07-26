@@ -15,7 +15,9 @@
  */
 import { XMLBuilder } from "fast-xml-parser";
 import type {
+  NormaCardinality,
   NormaConstraint,
+  NormaDiagram,
   NormaDocument,
   NormaEntityType,
   NormaFactType,
@@ -24,6 +26,7 @@ import type {
   NormaReadingOrder,
   NormaRingType,
   NormaRole,
+  NormaShape,
   NormaSubtypeFact,
   NormaValueConstraintInline,
   NormaValueType,
@@ -34,6 +37,7 @@ const ATTR = "@_";
 /** The ORMCore namespace URI used by NORMA .orm files. */
 const ORM_NS = "http://schemas.neumont.edu/ORM/2006-04/ORMCore";
 const ORM_ROOT_NS = "http://schemas.neumont.edu/ORM/2006-04/ORMRoot";
+const ORM_DIAGRAM_NS = "http://schemas.neumont.edu/ORM/2006-04/ORMDiagram";
 
 type XmlNode = Record<string, unknown>;
 
@@ -56,7 +60,13 @@ export function serializeNormaDocument(doc: NormaDocument): string {
     "ormRoot:ORM2": {
       [`${ATTR}xmlns:orm`]: ORM_NS,
       [`${ATTR}xmlns:ormRoot`]: ORM_ROOT_NS,
+      ...((doc.diagrams?.length ?? 0) > 0
+        ? { [`${ATTR}xmlns:ormDiagram`]: ORM_DIAGRAM_NS }
+        : {}),
       "orm:ORMModel": ormModel,
+      ...((doc.diagrams?.length ?? 0) > 0
+        ? { "ormDiagram:ORMDiagram": doc.diagrams!.map(buildDiagram) }
+        : {}),
     },
   };
 
@@ -102,6 +112,7 @@ function buildEntityType(et: NormaEntityType): XmlNode {
   if (et.independent) {
     node[`${ATTR}IsIndependent`] = "true";
   }
+  addCardinality(node, et.cardinality);
   addPlayedRoles(node, et.playedRoleRefs);
   addDefinition(node, et.definition);
   if (et.preferredIdentifier) {
@@ -119,6 +130,7 @@ function buildObjectifiedType(ot: NormaObjectifiedType): XmlNode {
     node[`${ATTR}_ReferenceMode`] = ot.referenceMode;
   }
   node["orm:NestedPredicate"] = { [`${ATTR}ref`]: ot.nestedFactTypeRef };
+  addCardinality(node, ot.cardinality);
   addPlayedRoles(node, ot.playedRoleRefs);
   addDefinition(node, ot.definition);
   if (ot.preferredIdentifier) {
@@ -135,6 +147,7 @@ function buildValueType(vt: NormaValueType): XmlNode {
   if (vt.independent) {
     node[`${ATTR}IsIndependent`] = "true";
   }
+  addCardinality(node, vt.cardinality);
   addPlayedRoles(node, vt.playedRoleRefs);
   addDefinition(node, vt.definition);
   if (vt.dataTypeRef) {
@@ -198,6 +211,20 @@ function buildFact(ft: NormaFactType, constraintTagById: Map<string, string>): X
       ft.internalConstraintRefs,
       constraintTagById,
     );
+  }
+  if (ft.derivationRule) {
+    const d = ft.derivationRule;
+    node["orm:DerivationRule"] = {
+      [`${ATTR}id`]: d.id,
+      ...(d.completeness ? { [`${ATTR}DerivationCompleteness`]: d.completeness } : {}),
+      ...(d.storage ? { [`${ATTR}DerivationStorage`]: d.storage } : {}),
+      "orm:InformalRule": {
+        "orm:DerivationNote": {
+          [`${ATTR}id`]: d.noteId,
+          "orm:Body": d.noteBody,
+        },
+      },
+    };
   }
   return node;
 }
@@ -351,6 +378,7 @@ function buildUniqueness(c: Extract<NormaConstraint, { type: "uniqueness"; }>): 
   const node: XmlNode = {
     [`${ATTR}id`]: c.id,
     [`${ATTR}Name`]: c.name,
+    ...(c.modality === "deontic" ? { [`${ATTR}Modality`]: "Deontic" } : {}),
     [`${ATTR}IsInternal`]: c.isInternal ? "true" : "false",
     [`${ATTR}IsPreferred`]: c.isPreferred ? "true" : "false",
     "orm:RoleSequence": roleSequence(c.roleRefs),
@@ -362,6 +390,7 @@ function buildMandatory(c: Extract<NormaConstraint, { type: "mandatory"; }>): Xm
   return {
     [`${ATTR}id`]: c.id,
     [`${ATTR}Name`]: c.name,
+    ...(c.modality === "deontic" ? { [`${ATTR}Modality`]: "Deontic" } : {}),
     [`${ATTR}IsSimple`]: c.isSimple ? "true" : "false",
     [`${ATTR}IsImplied`]: c.isImplied ? "true" : "false",
     "orm:RoleSequence": roleSequence(c.roleRefs),
@@ -372,6 +401,7 @@ function buildFrequency(c: Extract<NormaConstraint, { type: "frequency"; }>): Xm
   return {
     [`${ATTR}id`]: c.id,
     [`${ATTR}Name`]: c.name,
+    ...(c.modality === "deontic" ? { [`${ATTR}Modality`]: "Deontic" } : {}),
     [`${ATTR}MinFrequency`]: c.min,
     [`${ATTR}MaxFrequency`]: c.max === "unbounded" ? "" : c.max,
     "orm:RoleSequence": roleSequence(c.roleRefs),
@@ -382,6 +412,7 @@ function buildValueConstraint(c: Extract<NormaConstraint, { type: "value_constra
   return {
     [`${ATTR}id`]: c.id,
     [`${ATTR}Name`]: c.name,
+    ...(c.modality === "deontic" ? { [`${ATTR}Modality`]: "Deontic" } : {}),
     "orm:RoleSequence": roleSequence(c.roleRefs),
     "orm:ValueRanges": buildValueRanges({ values: c.values, ranges: c.ranges }),
   };
@@ -391,6 +422,7 @@ function buildSubset(c: Extract<NormaConstraint, { type: "subset"; }>): XmlNode 
   return {
     [`${ATTR}id`]: c.id,
     [`${ATTR}Name`]: c.name,
+    ...(c.modality === "deontic" ? { [`${ATTR}Modality`]: "Deontic" } : {}),
     "orm:RoleSequences": {
       "orm:RoleSequence": [
         joinableRoleSequence(c.subsetRoleRefs, c.subsetJoinPath),
@@ -404,6 +436,7 @@ function buildExclusion(c: Extract<NormaConstraint, { type: "exclusion"; }>): Xm
   return {
     [`${ATTR}id`]: c.id,
     [`${ATTR}Name`]: c.name,
+    ...(c.modality === "deontic" ? { [`${ATTR}Modality`]: "Deontic" } : {}),
     "orm:RoleSequences": {
       "orm:RoleSequence": c.roleSequences.map((seq, i) =>
         joinableRoleSequence(seq, c.joinPaths?.[i])
@@ -416,6 +449,7 @@ function buildEquality(c: Extract<NormaConstraint, { type: "equality"; }>): XmlN
   return {
     [`${ATTR}id`]: c.id,
     [`${ATTR}Name`]: c.name,
+    ...(c.modality === "deontic" ? { [`${ATTR}Modality`]: "Deontic" } : {}),
     "orm:RoleSequences": {
       "orm:RoleSequence": c.roleSequences.map((seq, i) =>
         joinableRoleSequence(seq, c.joinPaths?.[i])
@@ -475,6 +509,7 @@ function buildRing(c: Extract<NormaConstraint, { type: "ring"; }>): XmlNode {
   return {
     [`${ATTR}id`]: c.id,
     [`${ATTR}Name`]: c.name,
+    ...(c.modality === "deontic" ? { [`${ATTR}Modality`]: "Deontic" } : {}),
     [`${ATTR}Type`]: ringTypeToNorma(c.ringType),
     "orm:RoleSequence": roleSequence(c.roleRefs),
   };
@@ -483,6 +518,31 @@ function buildRing(c: Extract<NormaConstraint, { type: "ring"; }>): XmlNode {
 // ---------------------------------------------------------------------------
 // Data types
 // ---------------------------------------------------------------------------
+
+/** One ORMDiagram section: positioned object-type and fact-type shapes. */
+function buildDiagram(d: NormaDiagram): XmlNode {
+  const shapeNode = (sh: NormaShape): XmlNode => ({
+    [`${ATTR}id`]: sh.id,
+    [`${ATTR}IsExpanded`]: "true",
+    [`${ATTR}AbsoluteBounds`]: `${sh.x}, ${sh.y}, ${sh.width}, ${sh.height}`,
+    "ormDiagram:Subject": { [`${ATTR}ref`]: sh.subjectRef },
+  });
+  const objectShapes = d.shapes.filter((sh) => sh.kind === "object_type");
+  const factShapes = d.shapes.filter((sh) => sh.kind === "fact_type");
+  return {
+    [`${ATTR}id`]: d.id,
+    [`${ATTR}IsCompleteView`]: "false",
+    [`${ATTR}Name`]: d.name,
+    "ormDiagram:Shapes": {
+      ...(objectShapes.length > 0
+        ? { "ormDiagram:ObjectTypeShape": objectShapes.map(shapeNode) }
+        : {}),
+      ...(factShapes.length > 0
+        ? { "ormDiagram:FactTypeShape": factShapes.map(shapeNode) }
+        : {}),
+    },
+  };
+}
 
 function buildDataTypes(doc: NormaDocument): XmlNode | undefined {
   if (doc.dataTypes.length === 0) return undefined;
@@ -514,6 +574,25 @@ function kindToTag(kind: string): string {
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
+
+function addCardinality(
+  node: XmlNode,
+  cardinality: NormaCardinality | undefined,
+): void {
+  if (!cardinality) return;
+  node["orm:CardinalityRestriction"] = {
+    "orm:CardinalityConstraint": {
+      [`${ATTR}id`]: cardinality.id,
+      "orm:Ranges": {
+        "orm:CardinalityRange": cardinality.ranges.map((r, i) => ({
+          [`${ATTR}id`]: `${cardinality.id}_r${i}`,
+          [`${ATTR}From`]: r.from,
+          ...(r.to !== undefined ? { [`${ATTR}To`]: r.to } : {}),
+        })),
+      },
+    },
+  };
+}
 
 function addPlayedRoles(node: XmlNode, refs: readonly string[]): void {
   if (refs.length === 0) return;

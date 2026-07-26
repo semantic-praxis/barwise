@@ -32,7 +32,18 @@ export function mapNormaConstraint(
   joinDecoder?: NormaJoinDecoder,
 ): Constraint | undefined {
   const factRoleIds = new Set(nft.roles.map((r) => r.id));
+  const mapped = mapByType(nc, factRoleIds, joinDecoder);
+  if (!mapped) return undefined;
+  // Deontic modality survives the trip; alethic is the default and stays
+  // implicit on both sides.
+  return nc.modality === "deontic" ? { ...mapped, modality: "deontic" } : mapped;
+}
 
+function mapByType(
+  nc: NormaConstraint,
+  factRoleIds: Set<string>,
+  joinDecoder?: NormaJoinDecoder,
+): Constraint | undefined {
   switch (nc.type) {
     case "uniqueness":
       return mapUniquenessConstraint(nc, factRoleIds);

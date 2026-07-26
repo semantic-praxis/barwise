@@ -30,8 +30,11 @@ import type {
   ValueRange,
 } from "@barwise/core";
 import type {
+  NormaCardinality,
   NormaConstraint,
   NormaDataType,
+  NormaDerivationRule,
+  NormaDiagram,
   NormaDocument,
   NormaEntityType,
   NormaFactType,
@@ -41,6 +44,7 @@ import type {
   NormaReadingOrder,
   NormaRingType,
   NormaRole,
+  NormaShape,
   NormaSubtypeFact,
   NormaValueConstraintInline,
   NormaValueType,
@@ -99,6 +103,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
         preferredIdentifier: preferredIdByEntity.get(ot.id),
         playedRoleRefs: refs,
         definition: ot.definition,
+        cardinality: writeCardinality(ot),
       });
     } else {
       entityTypes.push({
@@ -109,6 +114,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
         playedRoleRefs: refs,
         definition: ot.definition,
         independent: ot.independent,
+        cardinality: writeCardinality(ot),
       });
     }
   }
@@ -141,6 +147,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
     subtypeFacts,
     constraints,
     dataTypes,
+    diagrams: writeDiagrams(model),
   };
 }
 
@@ -209,6 +216,7 @@ function writeValueType(ot: ObjectType, playedRoleRefs: string[]): NormaValueTyp
     dataTypeLength: dt?.length,
     dataTypeScale: dt?.scale,
     independent: ot.independent,
+    cardinality: writeCardinality(ot),
   };
 }
 
@@ -267,6 +275,7 @@ function writeFactType(
       readingOrders,
       internalConstraintRefs: internalRefs,
       definition: ft.definition,
+      derivationRule: writeDerivationRule(ft),
     },
     internalRefs,
   };
@@ -311,12 +320,14 @@ function isInternalConstraint(c: Constraint): boolean {
 
 function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | undefined {
   const id = c.id ? normaId(c.id) : fallbackId;
+  const modality = c.modality === "deontic" ? ({ modality: "deontic" } as const) : {};
   switch (c.type) {
     case "internal_uniqueness":
       return {
         type: "uniqueness",
         id,
         name: "",
+        ...modality,
         isInternal: true,
         isPreferred: c.isPreferred ?? false,
         roleRefs: c.roleIds.map(normaId),
@@ -326,6 +337,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         type: "uniqueness",
         id,
         name: "",
+        ...modality,
         isInternal: false,
         isPreferred: false,
         roleRefs: c.roleIds.map(normaId),
@@ -335,6 +347,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         type: "mandatory",
         id,
         name: "",
+        ...modality,
         isSimple: true,
         isImplied: false,
         roleRefs: [normaId(c.roleId)],
@@ -344,6 +357,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         type: "mandatory",
         id,
         name: "",
+        ...modality,
         isSimple: false,
         isImplied: false,
         roleRefs: c.roleIds.map(normaId),
@@ -353,6 +367,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         type: "frequency",
         id,
         name: "",
+        ...modality,
         min: c.min,
         max: c.max,
         roleRefs: c.roleIds.map(normaId),
@@ -362,6 +377,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         type: "value_constraint",
         id,
         name: "",
+        ...modality,
         roleRefs: c.roleId ? [normaId(c.roleId)] : [],
         values: [...c.values],
         ...(c.ranges && c.ranges.length > 0 ? { ranges: c.ranges.map((r) => ({ ...r })) } : {}),
@@ -371,6 +387,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         type: "subset",
         id,
         name: "",
+        ...modality,
         subsetRoleRefs: c.subsetRoleIds.map(normaId),
         supersetRoleRefs: c.supersetRoleIds.map(normaId),
       };
@@ -379,6 +396,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         type: "equality",
         id,
         name: "",
+        ...modality,
         roleSequences: [c.roleIds1.map(normaId), c.roleIds2.map(normaId)],
       };
     case "exclusion":
@@ -386,6 +404,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         type: "exclusion",
         id,
         name: "",
+        ...modality,
         roleSequences: c.roleIds.map((r) => [normaId(r)]),
       };
     case "exclusive_or":
@@ -396,6 +415,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         type: "exclusion",
         id,
         name: "",
+        ...modality,
         roleSequences: c.roleIds.map((r) => [normaId(r)]),
       };
     case "ring":
@@ -403,6 +423,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         type: "ring",
         id,
         name: "",
+        ...modality,
         ringType: c.ringType as NormaRingType,
         roleRefs: [normaId(c.roleId1), normaId(c.roleId2)],
       };
@@ -416,6 +437,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         type: "subset",
         id,
         name: "",
+        ...modality,
         subsetRoleRefs: subsetRefs,
         supersetRoleRefs: supersetRefs,
         subsetJoinPath,
@@ -437,6 +459,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         type: c.type === "join_equality" ? "equality" : "exclusion",
         id,
         name: "",
+        ...modality,
         roleSequences,
         joinPaths,
       };
@@ -608,6 +631,88 @@ const conceptualToNormaKind: Record<ConceptualDataTypeName, string> = {
 };
 
 /** Stable DataType element id for a conceptual type. */
+/** Object-type population cardinality -> NORMA CardinalityRestriction. */
+function writeCardinality(ot: ObjectType): NormaCardinality | undefined {
+  const c = ot.cardinality;
+  if (!c) return undefined;
+  return {
+    id: `${normaId(ot.id)}_card`,
+    ranges: [{ from: c.min, ...(c.max !== "unbounded" ? { to: c.max } : {}) }],
+  };
+}
+
+/**
+ * Fact-type derivation -> NORMA DerivationRule. Attribute defaults
+ * (FullyDerived, NotStored) are omitted, so a model that never stated
+ * the default round-trips cleanly.
+ */
+function writeDerivationRule(ft: FactType): NormaDerivationRule | undefined {
+  const d = ft.derivation;
+  if (!d) return undefined;
+  return {
+    id: `${normaId(ft.id)}_drule`,
+    ...(d.kind === "semiderived" ? { completeness: "PartiallyDerived" as const } : {}),
+    ...(d.storage === "derived_and_stored" ? { storage: "Stored" as const } : {}),
+    noteId: `${normaId(ft.id)}_dnote`,
+    noteBody: d.expression,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Diagram geometry (norma-export spec, workstream 2)
+// ---------------------------------------------------------------------------
+
+/** Barwise saved-layout coordinates are pixels; NORMA bounds are inches. */
+const PX_PER_INCH = 96;
+
+/** Estimated shape size in inches (positions round-trip; sizes are cosmetic). */
+function estimateShapeSize(
+  kind: "object_type" | "fact_type",
+  name: string,
+  arity: number,
+): { width: number; height: number; } {
+  if (kind === "fact_type") {
+    return { width: 0.192 * Math.max(1, arity), height: 0.244 };
+  }
+  return { width: Math.max(0.6, 0.15 + name.length * 0.055), height: 0.25 };
+}
+
+/**
+ * Emit one ORMDiagram per saved layout. A saved position is the element's
+ * center in pixels; NORMA AbsoluteBounds carries the top-left in inches,
+ * so the estimated size recenters the box. Elements without a stored
+ * position get no shape (NORMA renders them off-diagram, matching the
+ * saved view's element subset).
+ */
+function writeDiagrams(model: OrmModel): NormaDiagram[] {
+  return model.diagramLayouts.map((layout, di) => {
+    const shapes: NormaShape[] = [];
+    for (const [name, pos] of Object.entries(layout.positions)) {
+      const ot = model.getObjectTypeByName(name);
+      const ft = ot ? undefined : model.getFactTypeByName(name);
+      const element = ot ?? ft;
+      if (!element) continue;
+      const kind = ot ? "object_type" as const : "fact_type" as const;
+      const size = estimateShapeSize(kind, name, ft ? ft.roles.length : 0);
+      shapes.push({
+        id: `${normaId(element.id)}_shape${di}`,
+        kind,
+        subjectRef: normaId(element.id),
+        x: pos.x / PX_PER_INCH - size.width / 2,
+        y: pos.y / PX_PER_INCH - size.height / 2,
+        width: size.width,
+        height: size.height,
+      });
+    }
+    const slug = layout.name.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    return {
+      id: `_diagram_${slug || String(di)}`,
+      name: layout.name,
+      shapes,
+    };
+  });
+}
+
 function dataTypeIdFor(name: ConceptualDataTypeName): string {
   return `_dt_${conceptualToNormaKind[name]}`;
 }

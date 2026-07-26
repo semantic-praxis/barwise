@@ -1,12 +1,16 @@
 # God-file decomposition
 
-Status: In progress -- WS1 (ToolRegistration), WS2 (ExtractionPrompt), WS5
+Status: Complete -- WS1 (ToolRegistration), WS2 (ExtractionPrompt), WS5
 (ConstraintVerbalizer), WS6 (DraftModelParser), WS8a (DbtToOrmMapper), and
-WS7 (NormaToOrmMapper, split into norma/mapping/ in #267) landed. Open:
-WS8b (OrmDiagram.tsx). WS3/WS4 (ModelDiff, describeDomain) fell under
-threshold -- moot.
+WS7 (NormaToOrmMapper, split into norma/mapping/ in #267) landed. WS8b
+(OrmDiagram.tsx) landed with the renderer consolidation: verified against
+source 2026-07-26, `diagram-ui/src/OrmDiagram.tsx` is a 136-line dispatcher
+over seven `parts/` modules (ObjectTypeNode, FactTypeNode, RoleBox,
+ConstraintNode, RoleEdge, ConstraintEdge, SubtypeEdge), each covered by the
+diagram-ui component tests and the SVG golden corpus. WS3/WS4 (ModelDiff,
+describeDomain) fell under threshold -- moot.
 Created: 2026-06-17
-Last-updated: 2026-07-25
+Last-updated: 2026-07-26
 Tracking: REPO_REVIEW-2026-06-16 finding F1 (S-ORTH-5); REPO_REVIEW
 2026-06 A1.
 

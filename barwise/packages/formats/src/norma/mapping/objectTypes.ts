@@ -8,8 +8,19 @@
  * NORMA round-trip.
  */
 import type { ConceptualDataTypeName, DataTypeDef, ValueConstraintDef } from "@barwise/core";
-import type { NormaDataType, NormaValueConstraintInline } from "../NormaXmlTypes.js";
+import type {
+  NormaCardinality,
+  NormaDataType,
+  NormaValueConstraintInline,
+} from "../NormaXmlTypes.js";
 import type { NormaMappingContext } from "./context.js";
+
+/** First NORMA cardinality range -> the model's single population bound. */
+function toCardinality(c: NormaCardinality | undefined) {
+  const r = c?.ranges[0];
+  if (!r) return {};
+  return { cardinality: { min: r.from, max: r.to ?? ("unbounded" as const) } };
+}
 
 /** Map a NORMA inline value constraint to a core value-constraint definition. */
 export function toValueConstraintDef(
@@ -35,6 +46,7 @@ export function mapObjectTypes(ctx: NormaMappingContext): void {
       referenceMode: et.referenceMode || `${snakeCase(et.name)}_id`,
       definition: et.definition,
       independent: et.independent,
+      ...toCardinality(et.cardinality),
     });
     objectTypeIdMap.set(et.id, ot.id);
   }
@@ -49,6 +61,7 @@ export function mapObjectTypes(ctx: NormaMappingContext): void {
       valueConstraint: toValueConstraintDef(vt.valueConstraint),
       dataType: resolveDataType(vt.dataTypeRef, vt.dataTypeLength, vt.dataTypeScale, dataTypeById),
       independent: vt.independent,
+      ...toCardinality(vt.cardinality),
     });
     objectTypeIdMap.set(vt.id, ot.id);
   }
@@ -62,6 +75,7 @@ export function mapObjectTypes(ctx: NormaMappingContext): void {
       kind: "entity",
       referenceMode: ot.referenceMode || `${snakeCase(ot.name)}_id`,
       definition: ot.definition,
+      ...toCardinality(ot.cardinality),
     });
     objectTypeIdMap.set(ot.id, objectType.id);
   }

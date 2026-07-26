@@ -1,13 +1,26 @@
 # NORMA XML Export and Round-Trip
 
-Status: WS1 implemented 2026-06-18 -- semantic exporter + RT-A round-trip
-landed in `packages/formats/src/norma/`. WS3 partially landed 2026-07-25:
-join constraints now export (JoinRule apparatus + RT-A over the
-personCountryDemo join fixture, #267); fidelity for the remaining 5t9
-constructs stays open as those gain NORMA encodings. WS2 (diagram
-geometry, gated on barwise-e3g) remains open.
+Status: WS1 implemented 2026-06-18 (semantic exporter + RT-A). WS2
+implemented 2026-07-26: exported models carry one `ormDiagram:ORMDiagram`
+per saved layout (ObjectTypeShape/FactTypeShape with AbsoluteBounds in
+inch coordinates at 96 px/inch, encodings grounded against the NORMA
+project's own `ORM2Core.xsd` and a real NORMA-authored model), and import
+reads shape geometry back into `diagrams:` layouts -- positions
+round-trip exactly. One manual NORMA-load check of an exported diagram
+remains for the manual test plan. WS3 substantially landed: join
+constraints (#267), multi-role frequency (already carried), and now
+deontic modality (`Modality="Deontic"`), object-type cardinality
+(`CardinalityRestriction`, first range; NORMA multi-ranges collapse to
+the model's single bound), and fact-type derivation
+(`DerivationRule` completeness/storage attributes + informal
+`DerivationNote` body; attribute defaults omitted, so an explicit
+`derive_on_request` normalizes to the default on re-import). Still
+open: unary-role cardinality (core has `CardinalityConstraint`; the
+NORMA `UnaryRoleCardinalityRestriction` seat is grounded but unwired)
+and default values, which have no encoding in NORMA's schema at all --
+a permanent RT gap on NORMA's side, not barwise's.
 Created: 2026-06-17
-Last-updated: 2026-07-25
+Last-updated: 2026-07-26
 Tracking: barwise-cb6 (norma CLI), barwise-e3g (diagram round-trip),
 barwise-5t9 (conceptual coverage gaps), docs/NORMA_VS_ORM_YAML.md
 

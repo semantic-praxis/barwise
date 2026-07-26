@@ -21,6 +21,56 @@ export interface NormaDocument {
   readonly constraints: NormaConstraint[];
   /** Data type definitions from the DataTypes section (id -> tag-derived kind). */
   readonly dataTypes: NormaDataType[];
+  /** ORMDiagram sections (shape geometry), siblings of the ORMModel. */
+  readonly diagrams?: NormaDiagram[];
+}
+
+/** Constraint modality: NORMA emits Modality="Deontic"; alethic is the default. */
+export type NormaModality = "alethic" | "deontic";
+
+/** One From/To population bound; To omitted means unbounded. */
+export interface NormaCardinalityRange {
+  readonly from: number;
+  readonly to?: number;
+}
+
+/** A cardinality constraint (object-type population bound). */
+export interface NormaCardinality {
+  readonly id: string;
+  readonly ranges: readonly NormaCardinalityRange[];
+}
+
+/**
+ * A fact-type derivation rule. The rule body is carried as the informal
+ * DerivationNote text; completeness and storage mirror NORMA's
+ * DerivationCompleteness / DerivationStorage attributes.
+ */
+export interface NormaDerivationRule {
+  readonly id: string;
+  readonly completeness?: "FullyDerived" | "PartiallyDerived";
+  readonly storage?: "NotStored" | "Stored";
+  readonly noteId: string;
+  readonly noteBody: string;
+}
+
+/** One diagram shape: a positioned object-type or fact-type box. */
+export interface NormaShape {
+  readonly id: string;
+  readonly kind: "object_type" | "fact_type";
+  /** ref to the ObjectType / Fact element this shape displays. */
+  readonly subjectRef: string;
+  /** AbsoluteBounds, in NORMA's inch coordinates: x, y, width, height. */
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** One ormDiagram:ORMDiagram section. */
+export interface NormaDiagram {
+  readonly id: string;
+  readonly name: string;
+  readonly shapes: readonly NormaShape[];
 }
 
 /**
@@ -42,6 +92,7 @@ export interface NormaEntityType {
   readonly playedRoleRefs: readonly string[];
   readonly definition?: string;
   readonly independent?: boolean;
+  readonly cardinality?: NormaCardinality;
 }
 
 /** A NORMA ValueType element. */
@@ -58,6 +109,7 @@ export interface NormaValueType {
   /** Scale parameter from ConceptualDataType (e.g. decimal scale). */
   readonly dataTypeScale?: number;
   readonly independent?: boolean;
+  readonly cardinality?: NormaCardinality;
 }
 
 /** A value range parsed from a NORMA ValueRange element. */
@@ -83,6 +135,7 @@ export interface NormaObjectifiedType {
   readonly preferredIdentifier?: string;
   readonly playedRoleRefs: readonly string[];
   readonly definition?: string;
+  readonly cardinality?: NormaCardinality;
 }
 
 /** A NORMA Fact (regular fact type). */
@@ -93,6 +146,7 @@ export interface NormaFactType {
   readonly readingOrders: NormaReadingOrder[];
   readonly internalConstraintRefs: readonly string[];
   readonly definition?: string;
+  readonly derivationRule?: NormaDerivationRule;
 }
 
 /**
@@ -156,6 +210,7 @@ export interface NormaUniquenessConstraint {
   readonly type: "uniqueness";
   readonly id: string;
   readonly name: string;
+  readonly modality?: NormaModality;
   readonly isInternal: boolean;
   readonly isPreferred: boolean;
   readonly roleRefs: readonly string[];
@@ -165,6 +220,7 @@ export interface NormaMandatoryConstraint {
   readonly type: "mandatory";
   readonly id: string;
   readonly name: string;
+  readonly modality?: NormaModality;
   readonly isSimple: boolean;
   /** True if NORMA auto-generated this constraint (should not be imported). */
   readonly isImplied: boolean;
@@ -175,6 +231,7 @@ export interface NormaFrequencyConstraint {
   readonly type: "frequency";
   readonly id: string;
   readonly name: string;
+  readonly modality?: NormaModality;
   readonly min: number;
   readonly max: number | "unbounded";
   readonly roleRefs: readonly string[];
@@ -184,6 +241,7 @@ export interface NormaValueConstraint {
   readonly type: "value_constraint";
   readonly id: string;
   readonly name: string;
+  readonly modality?: NormaModality;
   readonly roleRefs: readonly string[];
   readonly values: string[];
   readonly ranges?: NormaValueRange[];
@@ -193,6 +251,7 @@ export interface NormaSubsetConstraint {
   readonly type: "subset";
   readonly id: string;
   readonly name: string;
+  readonly modality?: NormaModality;
   readonly subsetRoleRefs: readonly string[];
   readonly supersetRoleRefs: readonly string[];
   /** Join path attached to the subset role sequence, if any. */
@@ -205,6 +264,7 @@ export interface NormaExclusionConstraint {
   readonly type: "exclusion";
   readonly id: string;
   readonly name: string;
+  readonly modality?: NormaModality;
   readonly roleSequences: readonly (readonly string[])[];
   /** Join path per role sequence (parallel to roleSequences), if any. */
   readonly joinPaths?: readonly (NormaJoinPath | undefined)[];
@@ -214,6 +274,7 @@ export interface NormaEqualityConstraint {
   readonly type: "equality";
   readonly id: string;
   readonly name: string;
+  readonly modality?: NormaModality;
   readonly roleSequences: readonly (readonly string[])[];
   /** Join path per role sequence (parallel to roleSequences), if any. */
   readonly joinPaths?: readonly (NormaJoinPath | undefined)[];
@@ -278,6 +339,7 @@ export interface NormaRingConstraint {
   readonly type: "ring";
   readonly id: string;
   readonly name: string;
+  readonly modality?: NormaModality;
   readonly ringType: NormaRingType;
   readonly roleRefs: readonly string[];
 }
