@@ -15,17 +15,22 @@ Specs: `docs/specs/modeling-gym.spec.md`, `docs/specs/modeling-tutorial.spec.md`
 Depends only on `@barwise/core` (via its published root and subpath
 exports) and `yaml`. ZERO dependency on VS Code or any editor/platform
 API. `@barwise/diagram` may be added later for the tutorial's per-step
-SVGs. Nothing in the monorepo depends on this package; it is a leaf.
+SVGs. `@barwise/cli` (`barwise gym`) and `@barwise/mcp`
+(`gym_list`/`gym_check`) consume this package; it must never depend on
+either.
 
 ## Package Layout
 
 ```
 src/
-  exercise/       Exercise format: types, the pure parser (parseExercise),
-                  and the fs loader (loadExercise, resolves reference/starter models)
+  exercise/       Exercise format: types (C1 transition front matter, C6
+                  guidance fields), the pure parser (parseExercise), the fs
+                  loader (loadExercise), and catalog discovery (catalog.ts)
   evaluate/       The evaluator (evaluateCandidate) and its check runners
     checks/       mustValidate, requiresVerbalization, requiresElement, forbidsPopulation
     populationMapping.ts   Maps a reference forbidden population onto a candidate
+  deck/           Miss-card emission (learning-design C6): pure mapping of a
+                  GymReport's failures to Anki tab-separated import rows
   tutorial/       Tutorial format: types, pure parser (parseTutorial), fs
                   loader (loadTutorial), and the deterministic renderTutorial
   index.ts        Public API barrel (single "." export)
@@ -66,6 +71,15 @@ tests/            Vitest; tests/helpers/ModelBuilder.ts (copied from @barwise/co
 - **Reference models double as exercise answer keys.** A well-formed
   exercise's reference model should pass its own rubric (there is a test
   for the seed exercise asserting exactly this).
+- **Exercises declare a transition, not a difficulty.** The C1 front
+  matter (`transition: {from, to}` on the proficiency scale plus
+  `exitPerformance`) replaced the old three-value `difficulty` enum;
+  the parser rejects `difficulty` with a migration message. Checks may
+  carry `hint`, `diagnosis`, and `reading` (learning-design C6).
+- **Miss-card emission is pure.** `buildMissCards(exercise, report)` and
+  `renderMissCardFile` are deterministic (no clocks, no randomness);
+  the file write and the session log live in the `barwise gym` CLI, at
+  the edge, homed at `$XDG_STATE_HOME/barwise/`.
 
 ## Commands
 

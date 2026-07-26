@@ -9,11 +9,35 @@
  * candidate against a single "correct" model, because a domain has many
  * valid ORM models.
  *
- * Spec: `docs/specs/modeling-gym.spec.md`.
+ * Front matter follows learning-design C1: an exercise declares the
+ * proficiency transition it serves and its observable exit performance
+ * (replacing the earlier three-value difficulty enum, which said the
+ * same thing less precisely). Checks may carry the C6 fields: a
+ * `diagnosis` (why the reading that produced this failure was wrong)
+ * and a `reading` reference (the section to study after the failure);
+ * both feed miss-card emission.
+ *
+ * Specs: `docs/specs/modeling-gym.spec.md`,
+ * `docs/specs/learning-design.spec.md` (C1, C6).
  */
 
-/** How hard the exercise is meant to be. */
-export type Difficulty = "intro" | "core" | "advanced";
+/** The barwise ORM proficiency scale (learning-design), in order. */
+export const PROFICIENCY_LEVELS = [
+  "naive",
+  "novice",
+  "initiate",
+  "apprentice",
+  "journeyman",
+  "expert",
+] as const;
+
+export type ProficiencyLevel = (typeof PROFICIENCY_LEVELS)[number];
+
+/** The proficiency transition an exercise serves (learning-design C1). */
+export interface GymTransition {
+  readonly from: ProficiencyLevel;
+  readonly to: ProficiencyLevel;
+}
 
 /** The ORM constraint kinds a `forbids_population` check can name. */
 export type ConstraintKind =
@@ -32,6 +56,22 @@ export type ElementQuery =
   | { readonly factTypeBetween: readonly [string, string]; };
 
 /**
+ * Learner-facing guidance a check may carry (learning-design C6):
+ *
+ * - `hint` -- a nudge toward the fix, shown on failure (and on a miss
+ *   card's front).
+ * - `diagnosis` -- why the reading that produced the failure was wrong;
+ *   revealed after the failure and carried on a miss card's back.
+ * - `reading` -- the fine-grained section to study after this failure
+ *   (a miss card's back reference). Never a prerequisite.
+ */
+export interface CheckGuidance {
+  readonly hint?: string;
+  readonly diagnosis?: string;
+  readonly reading?: string;
+}
+
+/**
  * One rubric check. Each reuses a core primitive:
  *
  * - `must_validate` -- the candidate has no structural (error-severity)
@@ -47,25 +87,36 @@ export type ElementQuery =
  *   scaffold the brief.
  */
 export type GymCheck =
-  | { readonly kind: "must_validate"; }
-  | { readonly kind: "requires_verbalization"; readonly sentence: string; readonly hint?: string; }
-  | {
-    readonly kind: "forbids_population";
-    /** Name of the fact type in the reference model that carries the constraint. */
-    readonly factType: string;
-    /** The kind of constraint on that fact type whose forbidden population motivates the check. */
-    readonly constraint: ConstraintKind;
-    readonly hint?: string;
-  }
-  | { readonly kind: "requires_element"; readonly element: ElementQuery; readonly hint?: string; };
+  | ({ readonly kind: "must_validate"; } & CheckGuidance)
+  | ({ readonly kind: "requires_verbalization"; readonly sentence: string; } & CheckGuidance)
+  | (
+    & {
+      readonly kind: "forbids_population";
+      /** Name of the fact type in the reference model that carries the constraint. */
+      readonly factType: string;
+      /** The kind of constraint on that fact type whose forbidden population motivates the check. */
+      readonly constraint: ConstraintKind;
+    }
+    & CheckGuidance
+  )
+  | ({ readonly kind: "requires_element"; readonly element: ElementQuery; } & CheckGuidance);
 
 /** An exercise as authored in a `.gym.yaml` file. */
 export interface GymExercise {
   readonly id: string;
   readonly title: string;
-  readonly difficulty: Difficulty;
+  /** Learning-design C1: the transition this exercise serves. */
+  readonly transition: GymTransition;
+  /** Learning-design C1: what the learner can observably do afterwards. */
+  readonly exitPerformance: string;
   /** The domain prompt shown to the learner. */
   readonly brief: string;
+  /**
+   * Optional exercise-level reading for a pre-session skim. The gym
+   * states plainly that skimming is welcome and deep reading is not
+   * expected before attempting (learning-design C6).
+   */
+  readonly reading?: string;
   /** Optional path (relative to the exercise file) to a partial starter model. */
   readonly starter?: string;
   /** Path (relative to the exercise file) to one valid answer. Backs `forbids_population`. */

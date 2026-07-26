@@ -1,22 +1,51 @@
 # yaml-language-server: $schema=../schemas/gym-exercise.schema.json
 id: "customer-order"
 title: "One customer per order"
-difficulty: "intro"
+transition:
+  from: "novice"
+  to: "initiate"
+exitPerformance: >-
+  Model a binary fact type from clean prose, give both object types
+  reference schemes, and place the single-role uniqueness constraint
+  that makes the business rule hold.
 brief: |
   A customer places orders, and each order is placed by exactly one
   customer. Model the object types Customer and Order, add a fact type
   that relates them, and constrain it so that a single order can never be
   recorded as placed by two different customers.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 3 (elementary facts),
+  ch. 4 (uniqueness constraints). Deep reading is not expected before
+  attempting.
 reference: "customer-order.reference.orm.yaml"
 checks:
   - kind: "requires_element"
     element:
       entity: "Order"
+    diagnosis: >-
+      Attribute-first thinking keeps Order as a field on Customer; in ORM
+      every thing you state facts about is an object type of its own.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, sections 3.2-3.4 (elementary facts and object types)."
   - kind: "requires_element"
     element:
       factTypeBetween: ["Customer", "Order"]
+    diagnosis: >-
+      The relationship itself is a fact type -- "Customer places Order" --
+      not a foreign key or an attribute; without it the model states no
+      fact connecting the two.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4 (fact types and readings)."
   - kind: "must_validate"
+    diagnosis: >-
+      A structurally invalid model usually means a missing reference
+      scheme: every entity type needs a way to be identified before any
+      fact about it is well-formed.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.5 (reference schemes)."
   - kind: "forbids_population"
     factType: "Customer places Order"
     constraint: "internal_uniqueness"
     hint: "Put a single-role uniqueness constraint on the Order role -- each order is placed by at most one customer."
+    diagnosis: >-
+      Treating constraints as decoration leaves the fact type unconstrained,
+      so the model happily records the same order placed by two customers.
+      The uniqueness constraint is the business rule, not an afterthought.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 4, sections 4.1-4.3 (internal uniqueness constraints)."

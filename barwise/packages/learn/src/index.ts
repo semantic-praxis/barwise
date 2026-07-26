@@ -1,17 +1,29 @@
 // Exercise format
+export {
+  type CatalogEntry,
+  defaultCatalogDir,
+  findExercise,
+  listExercises,
+} from "./exercise/catalog.js";
 export { type LoadedExercise, loadExercise } from "./exercise/loadExercise.js";
 export { ExerciseParseError, parseExercise } from "./exercise/parseExercise.js";
-export type {
-  ConstraintKind,
-  Difficulty,
-  ElementQuery,
-  GymCheck,
-  GymExercise,
+export {
+  type CheckGuidance,
+  type ConstraintKind,
+  type ElementQuery,
+  type GymCheck,
+  type GymExercise,
+  type GymTransition,
+  PROFICIENCY_LEVELS,
+  type ProficiencyLevel,
 } from "./exercise/types.js";
 
 // Evaluator
 export { evaluateCandidate } from "./evaluate/evaluateCandidate.js";
 export type { CheckResult, GymReport } from "./evaluate/GymReport.js";
+
+// Miss-card emission (learning-design C6)
+export { buildMissCards, type MissCard, renderMissCardFile } from "./deck/missCards.js";
 
 // Tutorial (modeling-tutorial spec, workstream 1)
 export { loadTutorial } from "./tutorial/loadTutorial.js";

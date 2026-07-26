@@ -32,7 +32,8 @@ function exercise(checks: GymCheck[]): GymExercise {
   return {
     id: "customer-order",
     title: "Customer places Order",
-    difficulty: "intro",
+    transition: { from: "novice", to: "initiate" },
+    exitPerformance: "Model the fact type and constrain it unaided.",
     brief: "Model that a customer places orders, each order by one customer.",
     checks,
   };
