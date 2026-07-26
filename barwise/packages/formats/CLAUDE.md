@@ -18,7 +18,10 @@ does NOT depend on any editor or tool package.
 
 Allowed runtime dependencies: `@barwise/core`, `yaml`, `fast-xml-parser`.
 No others without discussion. The SQL importer uses `node:fs` for its
-directory-scan path (allowed outside core).
+directory-scan path and spawns an optional short-lived `python3`
+subprocess for the sqlglot structural tier (allowed outside core; the
+cascade degrades to core's pure regex tier when python3 or sqlglot is
+absent).
 
 ## Package Layout
 
@@ -32,6 +35,7 @@ src/
   OpenApiExportFormat.ts   ORM -> OpenAPI JSON (wraps renderOpenApi)
   AvroExportFormat.ts      ORM -> Avro schema (wraps renderAvro)
   SqlImportFormat.ts       Raw SQL files -> ORM (text + directory scan)
+  sql/SqlglotBridge.ts     Optional sqlglot sidecar: structural SQL tier
   NormaImportFormat.ts     NORMA .orm XML -> ORM
   NormaXmlImporter.ts      NORMA import facade
   NormaXmlParser.ts        NORMA XML parsing (fast-xml-parser)

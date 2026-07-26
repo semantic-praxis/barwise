@@ -2,11 +2,11 @@
  * SQL analysis types.
  *
  * Defines the dialect, pattern, and cascade result types used by
- * the SQL parsing cascade (Core Calcite -> Babel -> LLM fallback).
+ * the SQL parsing cascade (sqlglot sidecar -> regex -> LLM fallback).
  */
 
 /**
- * Supported SQL dialects for the Calcite cascade parser.
+ * Supported SQL dialects for the cascade parser.
  */
 export type SqlDialect =
   | "ansi"
@@ -20,12 +20,12 @@ export type SqlDialect =
 /**
  * Which cascade level produced a parse result.
  *
- * - "calcite-core": ANSI SQL, strict parsing via Calcite core.
- * - "calcite-babel": Multi-dialect parsing via Calcite Babel.
+ * - "sqlglot": Structural AST parsing via the optional sqlglot
+ *   sidecar (@barwise/formats owns the subprocess; core stays pure).
  * - "regex": Lightweight regex-based pattern extraction.
  * - "llm": Raw SQL sent to LLM for interpretation.
  */
-export type ParseLevel = "calcite-core" | "calcite-babel" | "regex" | "llm";
+export type ParseLevel = "sqlglot" | "regex" | "llm";
 
 /**
  * A SQL pattern extracted from analysis.

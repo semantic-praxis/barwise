@@ -2,10 +2,25 @@
 
 Status: Partial -- TypeScript/Java/Kotlin importers registered on
 every surface (registerCodeFormats), LSP sessions and guiding-model
-context shipped. Open tail: the Calcite sidecar (the SQL leg runs on
-the heuristic cascade only).
+context shipped. The Calcite sidecar was reconsidered and replaced
+(owner decision, 2026-07-26): the goal is high-fidelity structural SQL
+parsing across dialects, and a sqlglot sidecar (Python) achieves it
+with far less weight than a JVM -- sqlglot's dialect coverage is the
+widest available, the sidecar is a short-lived subprocess owned by
+@barwise/formats (core stays pure; the purity gate hardened after the
+original Calcite placement was written), and the cascade degrades to
+the regex tier when Python or sqlglot is absent, exactly the
+degradation the Calcite design promised. Alternatives weighed: pure-JS
+parsers (node-sql-parser, sql-parser-cst -- lighter but narrower
+dialects), libpg_query WASM (exact but Postgres-only), DuckDB
+json_serialize_sql (heavy, one dialect), extending the regex cascade
+(cannot parse nesting), LLM-only fallback (non-deterministic).
+Calcite re-earns a seat only if schema-aware validation or
+relational-algebra reasoning becomes a goal. Implemented 2026-07-26:
+the sqlglot tier (parseLevel "sqlglot") in @barwise/formats with
+regex fallback.
 Created: 2026-03-26
-Last-updated: 2026-07-25
+Last-updated: 2026-07-26
 
 ## Problem
 
