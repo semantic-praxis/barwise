@@ -274,6 +274,10 @@
             "source": {
               "type": "string",
               "description": "File path to an .orm.yaml file. Omit to act on the open .orm.yaml editor (its current, unsaved contents are used)."
+            },
+            "domain": {
+              "type": "string",
+              "description": "For a .orm-project.yaml source, act on only this one domain context"
             }
           }
         }
@@ -299,6 +303,26 @@
             "factType": {
               "type": "string",
               "description": "Specific fact type name to verbalize. Omit to verbalize all fact types."
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "full",
+                "summary"
+              ],
+              "description": "'full' (default) returns every reading; 'summary' returns per-category counts and a short preview"
+            },
+            "counterexamples": {
+              "type": "boolean",
+              "description": "When true, append the minimal sample population each constraint forbids"
+            },
+            "domain": {
+              "type": "string",
+              "description": "For a .orm-project.yaml source, act on only this one domain context"
+            },
+            "annotate": {
+              "type": "boolean",
+              "description": "When false, omit the open-questions section derived from model annotations (default true)"
             }
           }
         }
@@ -379,6 +403,10 @@
             "source": {
               "type": "string",
               "description": "File path to an .orm.yaml file. Omit to act on the open .orm.yaml editor (its current, unsaved contents are used)."
+            },
+            "annotate": {
+              "type": "boolean",
+              "description": "When false, omit needs-attention markers (dashed borders and TODO titles) derived from model annotations (default true)"
             }
           }
         }
@@ -479,6 +507,14 @@
             "strict": {
               "type": "boolean",
               "description": "Refuse to export if model has validation errors (default: false)"
+            },
+            "outputPath": {
+              "type": "string",
+              "description": "File path to write the exported text to (returned inline when omitted)"
+            },
+            "domain": {
+              "type": "string",
+              "description": "For a .orm-project.yaml source, act on only this one domain context"
             }
           },
           "required": [
@@ -515,6 +551,10 @@
             "filePath": {
               "type": "string",
               "description": "Path to a generated artifact (e.g., DDL file). When provided, resolves through lineage to find the source model."
+            },
+            "domain": {
+              "type": "string",
+              "description": "For a .orm-project.yaml source, act on only this one domain context"
             }
           }
         }
@@ -540,6 +580,10 @@
             "query": {
               "type": "string",
               "description": "Query DSL expression. Commands: entities [entity|value], fact-types [arity], constraints [type], entity <name>, fact-type <name>, fact-types-of <entity>, related-to <entity>, constraints-of <name>, subtypes-of <entity> [transitive], supertypes-of <entity> [transitive], mandatory-roles [entity], path <entityA> <entityB>, stats. Quote names with spaces, e.g. fact-type \"Customer places Order\"."
+            },
+            "domain": {
+              "type": "string",
+              "description": "For a .orm-project.yaml source, act on only this one domain context"
             }
           },
           "required": [
@@ -569,13 +613,23 @@
               "type": "string",
               "enum": [
                 "ddl",
-                "openapi"
+                "openapi",
+                "norma",
+                "dbt",
+                "sql",
+                "typescript",
+                "java",
+                "kotlin"
               ],
-              "description": "Format of the source: 'ddl' for SQL DDL, 'openapi' for OpenAPI 3.x specs"
+              "description": "The import format: ddl, openapi, norma, dbt, sql, typescript, java, or kotlin"
             },
             "modelName": {
               "type": "string",
               "description": "Name for the resulting ORM model. Defaults to format-specific name."
+            },
+            "dialect": {
+              "type": "string",
+              "description": "SQL dialect hint for the sql/ddl importers (e.g. postgres, snowflake)"
             }
           },
           "required": [

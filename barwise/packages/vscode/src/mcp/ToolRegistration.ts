@@ -49,11 +49,16 @@ const serializer = new OrmYamlSerializer();
 
 interface ValidateInput {
   source?: string;
+  domain?: string;
 }
 
 interface VerbalizeInput {
   source?: string;
   factType?: string;
+  mode?: "full" | "summary";
+  counterexamples?: boolean;
+  domain?: string;
+  annotate?: boolean;
 }
 
 interface SchemaInput {
@@ -68,6 +73,7 @@ interface DiffInput {
 
 interface DiagramInput {
   source?: string;
+  annotate?: boolean;
 }
 
 interface ImportTranscriptInput {
@@ -86,6 +92,8 @@ interface ExportModelInput {
   annotate?: boolean;
   includeExamples?: boolean;
   strict?: boolean;
+  outputPath?: string;
+  domain?: string;
 }
 
 interface DescribeDomainInput {
@@ -93,12 +101,14 @@ interface DescribeDomainInput {
   focus?: string;
   includePopulations?: boolean;
   filePath?: string;
+  domain?: string;
 }
 
 interface ImportModelInput {
   source: string;
-  format: "ddl" | "openapi";
+  format: "ddl" | "openapi" | "norma" | "dbt" | "sql" | "typescript" | "java" | "kotlin";
   modelName?: string;
+  dialect?: string;
 }
 
 interface ReviewModelInput {
@@ -118,6 +128,7 @@ interface ImpactAnalysisInput {
 interface QueryModelInput {
   source?: string;
   query: string;
+  domain?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +232,8 @@ function runExportModel(input: ExportModelInput): vscode.LanguageModelToolResult
     source,
     format,
     Object.keys(opts).length > 0 ? opts : undefined,
+    input.outputPath,
+    input.domain,
   );
   return toToolResult(result);
 }
@@ -310,13 +323,23 @@ export function registerLanguageModelTools(context: vscode.ExtensionContext): vo
   register<ValidateInput>(
     context,
     "barwise_validate_model",
-    (i) => toToolResult(executeValidate(resolveSourceParam(i.source))),
+    (i) => toToolResult(executeValidate(resolveSourceParam(i.source), i.domain)),
     "Validating Barwise model...",
   );
   register<VerbalizeInput>(
     context,
     "barwise_verbalize_model",
-    (i) => toToolResult(executeVerbalize(resolveSourceParam(i.source), i.factType)),
+    (i) =>
+      toToolResult(
+        executeVerbalize(
+          resolveSourceParam(i.source),
+          i.factType,
+          i.mode,
+          i.counterexamples,
+          i.domain,
+          i.annotate,
+        ),
+      ),
     "Verbalizing Barwise model...",
   );
   register<SchemaInput>(
@@ -334,7 +357,7 @@ export function registerLanguageModelTools(context: vscode.ExtensionContext): vo
   register<DiagramInput>(
     context,
     "barwise_generate_diagram",
-    async (i) => toToolResult(await executeDiagram(resolveSourceParam(i.source))),
+    async (i) => toToolResult(await executeDiagram(resolveSourceParam(i.source), i.annotate)),
     "Generating Barwise diagram...",
   );
   register<ImportTranscriptInput>(
@@ -365,6 +388,7 @@ export function registerLanguageModelTools(context: vscode.ExtensionContext): vo
           i.focus,
           i.includePopulations,
           i.filePath,
+          i.domain,
         ),
       ),
     "Describing domain model...",
@@ -372,13 +396,13 @@ export function registerLanguageModelTools(context: vscode.ExtensionContext): vo
   register<QueryModelInput>(
     context,
     "barwise_query_model",
-    (i) => toToolResult(executeQueryModel(resolveSourceParam(i.source), i.query)),
+    (i) => toToolResult(executeQueryModel(resolveSourceParam(i.source), i.query, i.domain)),
     (i) => `Querying Barwise model: ${i.query}`,
   );
   register<ImportModelInput>(
     context,
     "barwise_import_model",
-    async (i) => toToolResult(await executeImportModel(i.source, i.format, i.modelName)),
+    async (i) => toToolResult(await executeImportModel(i.source, i.format, i.modelName, i.dialect)),
     (i) => `Importing Barwise model from ${i.format.toUpperCase()}...`,
   );
   register<ReviewModelInput>(

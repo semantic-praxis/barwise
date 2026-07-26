@@ -188,7 +188,7 @@ its own PR.
       return two or three candidate models at genuine modeling forks,
       compared via the existing `diffModels`. _(provisional: not yet
       grounded.)_
-- [ ] **WS6 -- Anchors view and reasoning trail (#4).** A `core` anchors
+- [x] **WS6 -- Anchors view and reasoning trail (#4).** (Implemented; see archive/anchors-and-reasoning-trail.spec.md, verified 2026-07-25.) A `core` anchors
       query (identification schemes, preferred identifiers) and a
       reasoning-trail artifact served as an MCP resource. _(provisional:
       not yet grounded.)_
