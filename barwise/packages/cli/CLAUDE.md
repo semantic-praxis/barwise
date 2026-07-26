@@ -22,6 +22,8 @@ src/
     export.ts           barwise export <file> --format <name>
     diagram.ts          barwise diagram <file>
     diff.ts             barwise diff <file1> <file2>
+    gym.ts              barwise gym list|show|check (modeling gym; miss-card
+                        emission + session log at $XDG_STATE_HOME/barwise/)
     import.ts           barwise import (orchestrator over import/)
     import/             one module per import subcommand + shared helpers
   workspace/

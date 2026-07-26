@@ -12,7 +12,8 @@ describe("parseExercise", () => {
   const valid = {
     id: "x",
     title: "X",
-    difficulty: "intro",
+    transition: { from: "novice", to: "initiate" },
+    exitPerformance: "Model the thing unaided.",
     brief: "do the thing",
     checks: [
       { kind: "must_validate" },
@@ -33,8 +34,39 @@ describe("parseExercise", () => {
     expect(() => parseExercise("nope")).toThrow(ExerciseParseError);
   });
 
-  it("rejects a bad difficulty", () => {
-    expect(() => parseExercise({ ...valid, difficulty: "hard" })).toThrow(/difficulty/);
+  it("rejects the retired difficulty field with a migration message", () => {
+    expect(() => parseExercise({ ...valid, difficulty: "intro" })).toThrow(/transition/);
+  });
+
+  it("rejects a transition with an unknown level", () => {
+    expect(() => parseExercise({ ...valid, transition: { from: "novice", to: "wizard" } }))
+      .toThrow(/transition.to/);
+  });
+
+  it("rejects a transition that does not move forward on the scale", () => {
+    expect(() => parseExercise({ ...valid, transition: { from: "initiate", to: "novice" } }))
+      .toThrow(/forward/);
+    expect(() => parseExercise({ ...valid, transition: { from: "novice", to: "novice" } }))
+      .toThrow(/forward/);
+  });
+
+  it("parses the optional C6 guidance fields on a check", () => {
+    const ex = parseExercise({
+      ...valid,
+      reading: "Skim ch. 3.",
+      checks: [{
+        kind: "must_validate",
+        hint: "check reference schemes",
+        diagnosis: "a missing reference scheme",
+        reading: "ch. 3, section 3.5",
+      }],
+    });
+    expect(ex.reading).toBe("Skim ch. 3.");
+    expect(ex.checks[0]).toMatchObject({
+      hint: "check reference schemes",
+      diagnosis: "a missing reference scheme",
+      reading: "ch. 3, section 3.5",
+    });
   });
 
   it("rejects empty checks", () => {

@@ -4,13 +4,31 @@
   "title": "Barwise modeling-gym exercise",
   "description": "A domain brief plus a rubric of declarative checks a candidate .orm.yaml model must satisfy.",
   "type": "object",
-  "required": ["id", "title", "difficulty", "brief", "checks"],
+  "required": ["id", "title", "transition", "exitPerformance", "brief", "checks"],
   "additionalProperties": false,
   "properties": {
     "id": { "type": "string", "minLength": 1 },
     "title": { "type": "string", "minLength": 1 },
-    "difficulty": { "enum": ["intro", "core", "advanced"] },
+    "transition": {
+      "type": "object",
+      "description": "Learning-design C1: the proficiency transition this exercise serves; must move forward on the scale.",
+      "required": ["from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "from": { "$ref": "#/definitions/proficiencyLevel" },
+        "to": { "$ref": "#/definitions/proficiencyLevel" }
+      }
+    },
+    "exitPerformance": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Learning-design C1: what the learner can observably do after passing."
+    },
     "brief": { "type": "string", "minLength": 1, "description": "The domain prompt shown to the learner." },
+    "reading": {
+      "type": "string",
+      "description": "Optional pre-session skim reference (learning-design C6); skimming is welcome, deep reading is not expected before attempting."
+    },
     "starter": { "type": "string", "description": "Path (relative to this file) to a partial starter .orm.yaml." },
     "reference": { "type": "string", "description": "Path (relative to this file) to one valid answer; backs forbids_population checks." },
     "checks": {
@@ -20,6 +38,9 @@
     }
   },
   "definitions": {
+    "proficiencyLevel": {
+      "enum": ["naive", "novice", "initiate", "apprentice", "journeyman", "expert"]
+    },
     "constraintKind": {
       "enum": ["internal_uniqueness", "mandatory", "value", "frequency", "ring"]
     },
@@ -52,7 +73,12 @@
           "type": "object",
           "required": ["kind"],
           "additionalProperties": false,
-          "properties": { "kind": { "const": "must_validate" } }
+          "properties": {
+            "kind": { "const": "must_validate" },
+            "hint": { "type": "string" },
+            "diagnosis": { "type": "string" },
+            "reading": { "type": "string" }
+          }
         },
         {
           "type": "object",
@@ -61,7 +87,9 @@
           "properties": {
             "kind": { "const": "requires_verbalization" },
             "sentence": { "type": "string", "minLength": 1 },
-            "hint": { "type": "string" }
+            "hint": { "type": "string" },
+            "diagnosis": { "type": "string" },
+            "reading": { "type": "string" }
           }
         },
         {
@@ -71,7 +99,9 @@
           "properties": {
             "kind": { "const": "requires_element" },
             "element": { "$ref": "#/definitions/elementQuery" },
-            "hint": { "type": "string" }
+            "hint": { "type": "string" },
+            "diagnosis": { "type": "string" },
+            "reading": { "type": "string" }
           }
         },
         {
@@ -82,7 +112,9 @@
             "kind": { "const": "forbids_population" },
             "factType": { "type": "string", "minLength": 1 },
             "constraint": { "$ref": "#/definitions/constraintKind" },
-            "hint": { "type": "string" }
+            "hint": { "type": "string" },
+            "diagnosis": { "type": "string" },
+            "reading": { "type": "string" }
           }
         }
       ]

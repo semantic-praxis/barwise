@@ -45,6 +45,7 @@ export { executeDescribeDomain } from "./tools/describeDomain.js";
 export { executeDiagram } from "./tools/diagram.js";
 export { executeDiff } from "./tools/diff.js";
 export { executeExportModel } from "./tools/exportModel.js";
+export { executeGymCheck, executeGymList } from "./tools/gym.js";
 export { executeImpactAnalysis } from "./tools/impactAnalysis.js";
 export { executeImport } from "./tools/import.js";
 export { executeImportModel } from "./tools/importModel.js";

@@ -1,8 +1,13 @@
 # Learning-design constraints for barwise ORM materials
 
-Status: Draft for review (design only -- no content changes in this PR)
+Status: Standard adopted; workstreams landing. WS4 (tutorial transition +
+generation-first) shipped with the modeling tutorial; WS5 (gym C1 front
+matter, C6 reading/diagnosis fields, miss-card emission, the `barwise gym`
+CLI record at `$XDG_STATE_HOME/barwise/`) and WS6 (the `gym-coach` skill)
+shipped 2026-07-26. Open: WS2 (reductive-bias exercise set), WS3 (deck
+discrimination tier + bias-trap cards), WS7 (messy-case corpus).
 Created: 2026-07-25
-Last-updated: 2026-07-25
+Last-updated: 2026-07-26
 Tracking: Adopts the accelerated-proficiency framework supplied by the
 project owner (Hoffman et al., _Accelerated Expertise_, 2014; AFRL
 _Accelerated Proficiency and Facilitated Retention_, 2010) as a design
