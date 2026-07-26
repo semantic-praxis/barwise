@@ -8,8 +8,12 @@
  */
 import { XMLParser } from "fast-xml-parser";
 import type {
+  NormaCardinality,
+  NormaCardinalityRange,
   NormaConstraint,
   NormaDataType,
+  NormaDerivationRule,
+  NormaDiagram,
   NormaDocument,
   NormaEntityType,
   NormaFactType,
@@ -23,6 +27,7 @@ import type {
   NormaReadingOrder,
   NormaRingType,
   NormaRole,
+  NormaShape,
   NormaSubtypeFact,
   NormaValueConstraintInline,
   NormaValueRange,
@@ -106,13 +111,18 @@ export function parseNormaXml(xml: string): NormaDocument {
     subtypeFacts,
     constraints: parsedConstraints,
     dataTypes,
+    diagrams: parseDiagrams(root),
   };
 }
 
 // ---- Tags that should always be parsed as arrays ----
 
 const arrayTags = new Set([
+  "CardinalityRange",
   "EntityType",
+  "FactTypeShape",
+  "ObjectTypeShape",
+  "ORMDiagram",
   "ValueType",
   "ObjectifiedType",
   "Fact",
@@ -177,6 +187,7 @@ function parseEntityTypes(
       playedRoleRefs: parseRoleRefs(playedRoles),
       definition: defs,
       independent: attr(et, "IsIndependent") === "true",
+      cardinality: parseCardinalityRestriction(et),
     };
   });
 }
@@ -208,6 +219,7 @@ function parseValueTypes(
       dataTypeLength: dtLength !== undefined && !isNaN(dtLength) ? dtLength : undefined,
       dataTypeScale: dtScale !== undefined && !isNaN(dtScale) ? dtScale : undefined,
       independent: attr(vt, "IsIndependent") === "true",
+      cardinality: parseCardinalityRestriction(vt),
     };
   });
 }
@@ -230,6 +242,7 @@ function parseObjectifiedTypes(
       preferredIdentifier: prefId ? attr(prefId, "ref") : undefined,
       playedRoleRefs: parseRoleRefs(playedRoles),
       definition: defs,
+      cardinality: parseCardinalityRestriction(ot),
     };
   });
 }
@@ -336,6 +349,7 @@ function parseFactTypes(
       readingOrders: parseReadingOrders(readingOrders),
       internalConstraintRefs: parseInternalConstraintRefs(internalConstraints),
       definition: defs,
+      derivationRule: parseDerivationRule(ft),
     };
   });
 }
@@ -504,6 +518,7 @@ function parseConstraints(
       type: "uniqueness",
       id: attr(uc, "id") ?? "",
       name: attr(uc, "Name") ?? "",
+      ...(attr(uc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       isInternal: attr(uc, "IsInternal") === "true",
       isPreferred: attr(uc, "IsPreferred") === "true"
         || asArray(uc["PreferredIdentifierFor"]).length > 0,
@@ -518,6 +533,7 @@ function parseConstraints(
       type: "mandatory",
       id: attr(mc, "id") ?? "",
       name: attr(mc, "Name") ?? "",
+      ...(attr(mc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       isSimple: attr(mc, "IsSimple") === "true",
       isImplied: attr(mc, "IsImplied") === "true",
       roleRefs: roleSeq ? parseRoleSequenceRefs(roleSeq) : [],
@@ -533,6 +549,7 @@ function parseConstraints(
       type: "frequency",
       id: attr(fc, "id") ?? "",
       name: attr(fc, "Name") ?? "",
+      ...(attr(fc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       min: minStr ? parseInt(minStr, 10) : 1,
       max: maxStr ? parseInt(maxStr, 10) : "unbounded",
       roleRefs: roleSeq ? parseRoleSequenceRefs(roleSeq) : [],
@@ -550,6 +567,7 @@ function parseConstraints(
       type: "value_constraint",
       id: attr(vc, "id") ?? "",
       name: attr(vc, "Name") ?? "",
+      ...(attr(vc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       roleRefs: roleSeq ? parseRoleSequenceRefs(roleSeq) : [],
       values,
       ...(ranges.length > 0 ? { ranges } : {}),
@@ -563,6 +581,7 @@ function parseConstraints(
       type: "subset",
       id: attr(sc, "id") ?? "",
       name: attr(sc, "Name") ?? "",
+      ...(attr(sc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       subsetRoleRefs: sequences[0] ?? [],
       supersetRoleRefs: sequences[1] ?? [],
       ...(joinPaths[0] ? { subsetJoinPath: joinPaths[0] } : {}),
@@ -577,6 +596,7 @@ function parseConstraints(
       type: "exclusion",
       id: attr(ec, "id") ?? "",
       name: attr(ec, "Name") ?? "",
+      ...(attr(ec, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       roleSequences: sequences,
       ...(joinPaths.some(Boolean) ? { joinPaths } : {}),
     });
@@ -589,6 +609,7 @@ function parseConstraints(
       type: "equality",
       id: attr(eq, "id") ?? "",
       name: attr(eq, "Name") ?? "",
+      ...(attr(eq, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       roleSequences: sequences,
       ...(joinPaths.some(Boolean) ? { joinPaths } : {}),
     });
@@ -602,6 +623,7 @@ function parseConstraints(
       type: "ring",
       id: attr(rc, "id") ?? "",
       name: attr(rc, "Name") ?? "",
+      ...(attr(rc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       ringType: normalizeRingType(ringTypeStr),
       roleRefs: roleSeq ? parseRoleSequenceRefs(roleSeq) : [],
     });
@@ -753,6 +775,104 @@ function dataTypeTagToKind(tag: string): string {
     .toLowerCase()
     .replace(/^_/, "")
     .replace(/_+/g, "_");
+}
+
+/**
+ * CardinalityRestriction > CardinalityConstraint > Ranges > CardinalityRange
+ * (From required, To omitted for an unbounded range).
+ */
+function parseCardinalityRestriction(
+  el: Record<string, unknown>,
+): NormaCardinality | undefined {
+  const restriction = child(el, "CardinalityRestriction") as Record<string, unknown> | undefined;
+  if (!restriction) return undefined;
+  const cc = child(restriction, "CardinalityConstraint") as Record<string, unknown> | undefined;
+  if (!cc) return undefined;
+  const rangesEl = child(cc, "Ranges") as Record<string, unknown> | undefined;
+  const ranges: NormaCardinalityRange[] = asArray(rangesEl?.["CardinalityRange"]).map((r) => {
+    const fromStr = attr(r, "From");
+    const toStr = attr(r, "To");
+    return {
+      from: fromStr ? parseInt(fromStr, 10) : 0,
+      ...(toStr !== undefined ? { to: parseInt(toStr, 10) } : {}),
+    };
+  });
+  if (ranges.length === 0) return undefined;
+  return { id: attr(cc, "id") ?? "", ranges };
+}
+
+/**
+ * DerivationRule with DerivationCompleteness / DerivationStorage attributes
+ * and the informal rule body in InformalRule > DerivationNote > Body.
+ */
+function parseDerivationRule(
+  ft: Record<string, unknown>,
+): NormaDerivationRule | undefined {
+  const rule = child(ft, "DerivationRule") as Record<string, unknown> | undefined;
+  if (!rule) return undefined;
+  const informal = child(rule, "InformalRule") as Record<string, unknown> | undefined;
+  const note = informal
+    ? (child(informal, "DerivationNote") as Record<string, unknown> | undefined)
+    : undefined;
+  const body = note?.["Body"];
+  if (typeof body !== "string" || body.length === 0) return undefined;
+
+  const completeness = attr(rule, "DerivationCompleteness");
+  const storage = attr(rule, "DerivationStorage");
+  return {
+    id: attr(rule, "id") ?? "",
+    ...(completeness === "FullyDerived" || completeness === "PartiallyDerived"
+      ? { completeness }
+      : {}),
+    ...(storage === "NotStored" || storage === "Stored" ? { storage } : {}),
+    noteId: note ? (attr(note, "id") ?? "") : "",
+    noteBody: body,
+  };
+}
+
+/**
+ * ORMDiagram sections: siblings of ORMModel under the ORM2 root (the
+ * ormDiagram namespace prefix is removed by the parser). Only positioned
+ * object-type and fact-type shapes are read; NORMA recomputes connectors.
+ */
+function parseDiagrams(root: Record<string, unknown>): NormaDiagram[] {
+  return asArray(root["ORMDiagram"]).map((d) => {
+    const shapesEl = child(d, "Shapes") as Record<string, unknown> | undefined;
+    const shapes: NormaShape[] = [];
+    if (shapesEl) {
+      collectShapes(shapesEl, "ObjectTypeShape", "object_type", shapes);
+      collectShapes(shapesEl, "FactTypeShape", "fact_type", shapes);
+    }
+    return {
+      id: attr(d, "id") ?? "",
+      name: attr(d, "Name") ?? "",
+      shapes,
+    };
+  });
+}
+
+function collectShapes(
+  shapesEl: Record<string, unknown>,
+  tag: string,
+  kind: NormaShape["kind"],
+  out: NormaShape[],
+): void {
+  for (const shape of asArray(shapesEl[tag])) {
+    const subject = child(shape, "Subject") as Record<string, unknown> | undefined;
+    const boundsStr = attr(shape, "AbsoluteBounds");
+    if (!subject || !boundsStr) continue;
+    const parts = boundsStr.split(",").map((v) => parseFloat(v.trim()));
+    if (parts.length !== 4 || parts.some((v) => Number.isNaN(v))) continue;
+    out.push({
+      id: attr(shape, "id") ?? "",
+      kind,
+      subjectRef: attr(subject, "ref") ?? "",
+      x: parts[0]!,
+      y: parts[1]!,
+      width: parts[2]!,
+      height: parts[3]!,
+    });
+  }
 }
 
 function parseDataTypes(

@@ -49,6 +49,19 @@ export function mapFactTypes(ctx: NormaMappingContext): void {
       readings,
       constraints,
       definition: nft.definition,
+      ...(nft.derivationRule
+        ? {
+          derivation: {
+            kind: nft.derivationRule.completeness === "PartiallyDerived"
+              ? ("semiderived" as const)
+              : ("derived" as const),
+            ...(nft.derivationRule.storage === "Stored"
+              ? { storage: "derived_and_stored" as const }
+              : {}),
+            expression: nft.derivationRule.noteBody,
+          },
+        }
+        : {}),
     });
 
     factTypeIdMap.set(nft.id, ft.id);

@@ -13,6 +13,7 @@
 import { OrmModel } from "@barwise/core";
 import { runConstraintPasses } from "./mapping/constraintPasses.js";
 import { type NormaMappingContext, NormaMappingError } from "./mapping/context.js";
+import { mapDiagrams } from "./mapping/diagrams.js";
 import { mapFactTypes } from "./mapping/factTypes.js";
 import { mapObjectTypes } from "./mapping/objectTypes.js";
 import { mapObjectifiedTypes, mapSubtypeFacts } from "./mapping/subtypes.js";
@@ -60,6 +61,8 @@ export function mapNormaToOrm(doc: NormaDocument): OrmModel {
   runConstraintPasses(ctx);
   mapSubtypeFacts(ctx);
   mapObjectifiedTypes(ctx);
+
+  mapDiagrams(ctx);
 
   return model;
 }

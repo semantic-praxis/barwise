@@ -87,7 +87,11 @@ function addSimpleMandatoryConstraints(
           (c) => c.type === "mandatory" && c.roleId === roleRef,
         );
         if (!alreadyExists) {
-          ft.addConstraint({ type: "mandatory", roleId: roleRef });
+          ft.addConstraint({
+            type: "mandatory",
+            roleId: roleRef,
+            ...(nc.modality === "deontic" ? { modality: "deontic" as const } : {}),
+          });
         }
       }
     }
@@ -128,6 +132,7 @@ function addExternalUniquenessConstraints(
       ft.addConstraint({
         type: "external_uniqueness",
         roleIds: [...nc.roleRefs],
+        ...(nc.modality === "deontic" ? { modality: "deontic" as const } : {}),
       });
     }
   }
@@ -164,6 +169,7 @@ function addRoleLevelValueConstraints(
         ft.addConstraint({
           type: "value_constraint",
           roleId: roleRef,
+          ...(nc.modality === "deontic" ? { modality: "deontic" as const } : {}),
           values: [...nc.values],
           ...(nc.ranges && nc.ranges.length > 0 ? { ranges: [...nc.ranges] } : {}),
         });
@@ -206,6 +212,7 @@ function addDisjunctiveMandatoryConstraints(
       ft.addConstraint({
         type: "disjunctive_mandatory",
         roleIds: [...nc.roleRefs],
+        ...(nc.modality === "deontic" ? { modality: "deontic" as const } : {}),
       });
     }
   }
@@ -350,6 +357,7 @@ function addRingConstraints(
         type: "ring",
         roleId1: nc.roleRefs[0]!,
         roleId2: nc.roleRefs[1]!,
+        ...(nc.modality === "deontic" ? { modality: "deontic" as const } : {}),
         ringType: nc.ringType,
       });
     }
