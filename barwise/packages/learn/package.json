@@ -1,6 +1,6 @@
 {
   "name": "@barwise/learn",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "private": true,
   "description": "Learning artifacts for ORM: the modeling gym (exercise format and deterministic evaluator) and, later, the guided tutorial",
   "type": "module",
@@ -27,7 +27,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@barwise/core": "1.6.1",
+    "@barwise/core": "1.7.0",
     "yaml": "^2.8.2"
   },
   "devDependencies": {
