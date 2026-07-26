@@ -113,6 +113,10 @@
         "title": "New View...",
         "category": "Barwise",
         "icon": "$(add)"
+      },
+      {
+        "command": "barwise.analyzeRepository",
+        "title": "ORM: Analyze Repository"
       }
     ],
     "menus": {

@@ -3,6 +3,7 @@
  */
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerAnalyzeRepositoryTool } from "./analyze.js";
 import { registerDescribeDomainTool } from "./describeDomain.js";
 import { registerDiagramTool } from "./diagram.js";
 import { registerDiffTool } from "./diff.js";
@@ -35,4 +36,5 @@ export function registerTools(server: McpServer): void {
   registerImpactAnalysisTool(server);
   registerReviewTool(server);
   registerGymTools(server);
+  registerAnalyzeRepositoryTool(server);
 }
