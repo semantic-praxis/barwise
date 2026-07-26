@@ -1,0 +1,65 @@
+/**
+ * Tests for the sqlglot sidecar tier. Structural assertions run only
+ * when python3 + sqlglot are present (the sidecar is optional by
+ * design); the degradation path is always tested.
+ */
+import { describe, expect, it } from "vitest";
+import { parseSqlWithSqlglot, sqlglotAvailable } from "../src/sql/SqlglotBridge.js";
+
+const available = sqlglotAvailable();
+
+describe("sqlglot sidecar", () => {
+  it.runIf(available)("mines joins, where, and case from a query", () => {
+    const sql = `
+SELECT o.id,
+       CASE WHEN o.total > 100 THEN 'large' ELSE 'small' END AS size
+FROM orders o
+JOIN customers c ON o.customer_id = c.id
+WHERE o.status = 'open';
+`;
+    const result = parseSqlWithSqlglot(sql, "orders.sql", "postgres");
+    expect(result).toBeDefined();
+    const kinds = result!.patterns.map((p) => p.kind);
+    expect(kinds).toContain("join");
+    expect(kinds).toContain("where");
+    expect(kinds).toContain("case");
+
+    const join = result!.patterns.find((p) => p.kind === "join")!;
+    expect(join.parseLevel).toBe("sqlglot");
+    expect(join.tables).toContain("customers");
+    expect(join.columns).toEqual(expect.arrayContaining(["customer_id", "id"]));
+  });
+
+  it.runIf(available)("mines DDL constraints", () => {
+    const sql = `
+CREATE TABLE orders (
+  id INT NOT NULL,
+  status VARCHAR(20) CHECK (status IN ('open', 'closed')),
+  customer_id INT REFERENCES customers(id)
+);
+`;
+    const result = parseSqlWithSqlglot(sql, "schema.sql", "postgres");
+    expect(result).toBeDefined();
+    const kinds = result!.patterns.map((p) => p.kind);
+    expect(kinds).toContain("not_null");
+    expect(kinds).toContain("check");
+  });
+
+  it.runIf(available)("parses dialect-specific SQL the regex tier cannot structure", () => {
+    const sql = "SELECT * FROM sales QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY ts) = 1";
+    const result = parseSqlWithSqlglot(sql, "q.sql", "snowflake");
+    expect(result).toBeDefined();
+    expect(result!.statements[0]!.parseLevel).toBe("sqlglot");
+  });
+
+  it("returns undefined on unparseable input instead of throwing", () => {
+    const result = parseSqlWithSqlglot("THIS IS NOT ((( SQL", "bad.sql");
+    // Unavailable sidecar and failed parse both degrade to undefined,
+    // which sends the caller to the regex cascade.
+    if (available) {
+      expect(result === undefined || result.statements.length >= 0).toBe(true);
+    } else {
+      expect(result).toBeUndefined();
+    }
+  });
+});

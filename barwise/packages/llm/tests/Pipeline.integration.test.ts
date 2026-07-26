@@ -171,7 +171,11 @@ describe("Full pipeline integration", () => {
           model.objectTypes.length + model.factTypes.length,
         );
 
-        // Write output files for manual inspection.
+        // Refresh the committed examples/output artifacts only on
+        // request: every run mints fresh element ids, so an
+        // unconditional write dirtied the tracked files on every full
+        // test run. Regenerate intentionally with UPDATE_GOLDEN=1.
+        if (process.env["UPDATE_GOLDEN"] !== "1") return;
         mkdirSync(outputDir, { recursive: true });
         const slug = example.name.toLowerCase().replace(/\s+/g, "-");
 

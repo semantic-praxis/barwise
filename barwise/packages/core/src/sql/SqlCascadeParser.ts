@@ -2,15 +2,15 @@
  * SQL cascade parser.
  *
  * Orchestrates per-statement parsing through the cascade:
- * 1. Regex-based pattern extraction (always available)
- * 2. Calcite core parser (requires JVM sidecar)
- * 3. Calcite Babel parser (requires JVM sidecar, multi-dialect)
- * 4. LLM fallback (deferred to enrich() phase)
+ * 1. sqlglot structural parsing (optional sidecar, applied by
+ *    @barwise/formats before falling back here -- core stays pure)
+ * 2. Regex-based pattern extraction (always available)
+ * 3. LLM fallback (deferred to enrich() phase)
  *
- * The Calcite sidecar is optional. When unavailable, the parser
- * falls through to regex-based extraction which handles common
- * SQL patterns reliably. The LLM fallback is not invoked here --
- * it is handled by the enrich() method on the format importer.
+ * When the sqlglot sidecar is unavailable the cascade degrades to
+ * regex extraction, which handles common SQL patterns reliably. The
+ * LLM fallback is not invoked here -- it is handled by the enrich()
+ * method on the format importer.
  */
 
 import { extractSqlPatterns, splitSqlStatements } from "./SqlPatternExtractor.js";
@@ -24,9 +24,9 @@ import type {
 /**
  * Parse a SQL file through the cascade.
  *
- * Splits the file into statements and extracts patterns from each.
- * Currently uses regex-based extraction. The Calcite sidecar can be
- * integrated later for higher-fidelity structural parsing.
+ * Splits the file into statements and extracts patterns from each
+ * using regex-based extraction (the pure tier; the sqlglot tier is
+ * applied by @barwise/formats before this fallback).
  *
  * @param sql - The SQL file content
  * @param filePath - Source file path for provenance

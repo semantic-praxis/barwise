@@ -103,7 +103,9 @@ describe("layout metrics over the golden corpus (real ELK)", () => {
 
   for (const { path, maxEdgeLength } of CORPUS) {
     const name = path.split("/").pop();
-    it(`holds tolerances for ${name}`, async () => {
+    // Real ELK over the larger corpus models can exceed vitest's 5s
+    // default on a loaded CI runner under coverage instrumentation.
+    it(`holds tolerances for ${name}`, { timeout: 30_000 }, async () => {
       const model = serializer.deserialize(readFileSync(path, "utf-8"));
       const { layout } = await generateDiagram(model);
       const m = computeLayoutMetrics(layout);

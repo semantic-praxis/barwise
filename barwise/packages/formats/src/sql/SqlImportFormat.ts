@@ -19,6 +19,7 @@ import {
 import { parseSqlFile, type SqlDialect, type SqlPatternContext } from "@barwise/core/sql";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { parseSqlWithSqlglot } from "./SqlglotBridge.js";
 
 /**
  * Detect dialect from file-level hints in SQL content.
@@ -262,7 +263,8 @@ export class SqlImportFormat implements ImportFormat {
     const modelName = options?.modelName ?? "SQL Import";
     const dialect = (options?.dialect as SqlDialect) ?? detectDialectFromHints(input) ?? "ansi";
 
-    const fileResult = parseSqlFile(input, "input.sql", dialect);
+    const fileResult = parseSqlWithSqlglot(input, "input.sql", dialect)
+      ?? parseSqlFile(input, "input.sql", dialect);
 
     if (fileResult.patterns.length === 0) {
       warnings.push("No ORM-relevant patterns found in SQL input");
@@ -308,7 +310,8 @@ export class SqlImportFormat implements ImportFormat {
           detectedDialect = detectDialectFromHints(sql);
         }
 
-        const fileResult = parseSqlFile(sql, filePath, detectedDialect ?? "ansi");
+        const fileResult = parseSqlWithSqlglot(sql, filePath, detectedDialect ?? "ansi")
+          ?? parseSqlFile(sql, filePath, detectedDialect ?? "ansi");
         allPatterns.push(...fileResult.patterns);
       } catch (err) {
         warnings.push(
