@@ -143,11 +143,6 @@ export function sqlglotAvailable(): boolean {
   return availability;
 }
 
-/** Test hook: reset the cached availability probe. */
-export function resetSqlglotAvailability(): void {
-  availability = undefined;
-}
-
 interface SidecarStatement {
   sql: string;
   startLine: number;
