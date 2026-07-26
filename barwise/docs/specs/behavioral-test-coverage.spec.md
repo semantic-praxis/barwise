@@ -1,6 +1,13 @@
 # Behavioral test coverage as a refactor safety net
 
-Status: Draft for review (plan only -- no tests in this PR)
+Status: Implemented (verified against source 2026-07-26): workstream 1
+is the golden characterization suite at
+`packages/cli/tests/characterization/` (per-model verbalize / validate /
+ddl / openapi / avro goldens with the UPDATE_GOLDEN=1 regeneration
+hatch), and workstream 2 is the seeded property round-trip at
+`packages/core/tests/property/roundTrip.property.test.ts`. The
+`examples/output/` follow-up also closed: the artifacts are tracked and
+regenerate only under UPDATE_GOLDEN=1.
 Tracking: testing track; precedes the architecture refactor discussed in
 `docs/architecture-analysis.spec.md`
 

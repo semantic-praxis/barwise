@@ -84,6 +84,18 @@ anything that misbehaves, capture it with the bug template at the bottom.
 - [ ] Large model (split the auction monolith and open a domain) -- diagram and
       diagnostics remain responsive.
 
+## NORMA interchange (norma-export spec, one-time per release)
+
+Requires Visual Studio with the NORMA extension (Windows).
+
+- [ ] Export a model that has a saved layout:
+      `barwise export examples/models/diagram-layout.orm.yaml --format norma --output diagram-layout.orm`
+- [ ] Open the exported `.orm` in NORMA -- it loads without schema errors.
+- [ ] The diagram opens laid out (shapes positioned per the saved layout),
+      not as a blank surface with unplaced elements.
+- [ ] Spot-check one deontic constraint, one cardinality bound, and one
+      derivation note if the model carries them -- NORMA shows each.
+
 ## Bug capture template
 
 For each issue, record:

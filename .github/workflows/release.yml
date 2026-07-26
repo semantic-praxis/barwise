@@ -48,6 +48,15 @@ jobs:
 
       - run: npm run --workspace=@barwise/mcp bundle
 
+      # Release gate: the real-use harnesses drive the just-built
+      # bundles over real files, exit codes, and the stdio transport
+      # (manual-test-plan spec). A failing check blocks the artifacts.
+      - name: Test plan (CLI harness)
+        run: ./test-plan/cli-checks.sh
+
+      - name: Test plan (MCP harness)
+        run: node test-plan/mcp-checks.mjs
+
       - name: Package VSIX
         working-directory: barwise/packages/vscode
         run: npx @vscode/vsce package --no-dependencies

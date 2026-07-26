@@ -1,7 +1,11 @@
 # Manual test plan for the CLI, MCP, and VS Code surfaces
 
-Status: Draft for review (harness prototyped and green; this spec records
-the design)
+Status: Implemented and adopted as a release gate (2026-07-26): the
+CLI and MCP harnesses run in `release.yml` between bundling and
+artifact staging, so a failing real-use check blocks both versioned
+and edge artifacts. The VS Code checklist gained the one-time NORMA
+interchange walkthrough (exported diagram opens laid out) from the
+norma-export spec's manual step.
 Tracking: follow-up to the sensemaking program (PRs #160, #166, #167);
 supports real-use bug hunting before wider adoption
 
