@@ -1,7 +1,21 @@
 # Anchors View and Reasoning Trail
 
-Status: draft
+Status: Implemented (verified against the source tree 2026-07-25) --
+both workstreams landed. WS-A: the `anchors` query-DSL command
+(core/src/query/ types, parse, evaluate, format; tests in
+core/tests/query/anchors.test.ts), riding `query_model` and `barwise
+query` with no new surface -- in VS Code it is reachable through the
+`barwise_query_model` LM tool and the `@barwise /query` slash command,
+by design. WS-B: the reasoning trail persists as a `<model>.trail.json`
+sidecar written at import with --trail (the recommended persistence
+option), served by the `reasoning-trail://` MCP resource
+(mcp/src/resources/reasoningTrail.ts) with an anchors-only fallback
+computed from the model. The backlog's "VS Code anchors view" framing
+was a misreading of this spec's title: the resolved design deliberately
+adds no dedicated view.
 Owner: design conversation (sensemaking initiative)
+Created: 2026-06-17
+Last-updated: 2026-07-25
 Tracking: implements initiative #4 / WS6 of
 `implicit-sensemaking.spec.md`, which drafted it provisionally. File bd
 issues per workstream when this lands.
@@ -113,14 +127,14 @@ interface EntityAnchors {
 
 ## Workstreams
 
-- [ ] **WS-A -- Anchors query (core).** Add the `anchors` command to the
+- [x] **WS-A -- Anchors query (core).** Add the `anchors` command to the
       query DSL: types, parse, dispatch, a deterministic `anchors()`
       evaluator, and human-readable formatting. The evaluator walks each
       entity type's fact types for its preferred-identifier uniqueness and
       mandatory roles, reads its reference mode, and flags a missing
       identifier. Unit tests over a model with and without identifiers.
       Surfaced automatically through `query_model` and `barwise query`.
-- [ ] **WS-B -- Reasoning-trail artifact.** Assemble anchors + import-time
+- [x] **WS-B -- Reasoning-trail artifact.** Assemble anchors + import-time
       ambiguities, discarded framings, and low-confidence assumptions, and
       serve them as a `reasoning-trail://` MCP resource. _(provisional: not
       yet grounded -- depends on the persistence decision below.)_
