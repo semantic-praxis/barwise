@@ -659,3 +659,247 @@ button {
 .empty-state-sub {
   font-size: 12px;
 }
+
+/* -- Model tree (Phase 2) ---------------------------------------------- */
+
+.tree-pane {
+  width: 240px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  overflow: auto;
+}
+
+.tree {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0;
+}
+
+.tree-empty {
+  padding: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.tree-filter {
+  margin: 2px 8px 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.4)));
+  border-radius: 3px;
+  background: var(--vscode-input-background, transparent);
+  color: var(--vscode-input-foreground, inherit);
+  font-size: 12px;
+  outline: none;
+}
+
+.tree-filter:focus {
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.tree-section {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 4px;
+}
+
+.tree-section-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: none;
+  background: none;
+  color: var(--vscode-sideBarSectionHeader-foreground, var(--vscode-foreground));
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tree-chevron {
+  display: inline-block;
+  font-size: 9px;
+  transition: transform 0.1s ease;
+}
+
+.tree-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.tree-count {
+  margin-left: auto;
+  font-weight: 400;
+  color: var(--vscode-descriptionForeground);
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 20px;
+  border: none;
+  background: none;
+  color: var(--vscode-foreground);
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-item:hover {
+  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
+}
+
+.tree-item.selected {
+  background: var(--vscode-list-activeSelectionBackground, rgba(0, 127, 212, 0.35));
+  color: var(--vscode-list-activeSelectionForeground, inherit);
+}
+
+.tree-item.absent {
+  opacity: 0.55;
+}
+
+.tree-badge {
+  flex-shrink: 0;
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--vscode-badge-background, rgba(128, 128, 128, 0.3));
+  color: var(--vscode-badge-foreground, inherit);
+  font-size: 9.5px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.tree-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* -- Tab panels (Phase 3) ---------------------------------------------- */
+
+.panel-scroll {
+  height: 100%;
+  overflow: auto;
+  padding: 14px 18px;
+}
+
+.verbalization-list {
+  margin: 0;
+  padding-left: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.population-block {
+  margin-bottom: 20px;
+}
+
+.population-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.population-table {
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.population-table th,
+.population-table td {
+  border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  padding: 4px 10px;
+  text-align: left;
+}
+
+.population-table th {
+  background: var(--vscode-sideBar-background, rgba(128, 128, 128, 0.08));
+  font-weight: 600;
+}
+
+.code-view {
+  margin: 0;
+  font-family: var(--vscode-editor-font-family, "SF Mono", Consolas, monospace);
+  font-size: var(--vscode-editor-font-size, 12.5px);
+  line-height: 1.5;
+  white-space: pre;
+}
+
+/* -- Inspector additions (Phase 2) ------------------------------------- */
+
+.inspector-note {
+  margin: 0 12px 8px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.12));
+  color: var(--vscode-descriptionForeground);
+  font-size: 11.5px;
+}
+
+.inspector-link {
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--vscode-textLink-foreground, #3794ff);
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.inspector-link:hover {
+  text-decoration: underline;
+}
+
+.inspector-reading {
+  font-style: italic;
+}
+
+.inspector-constraint {
+  font-size: 12.5px;
+}
+
+/* -- Density (Phase 4) ------------------------------------------------- */
+
+.density-compact {
+  font-size: calc(var(--vscode-font-size, 13px) - 1px);
+}
+
+.density-compact .tree-pane {
+  width: 200px;
+}
+
+.density-compact .inspector {
+  width: 260px;
+}
+
+.density-compact .tree-item {
+  padding-top: 1px;
+  padding-bottom: 1px;
+  font-size: 11.5px;
+}
+
+.density-compact .topbar {
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
+.density-compact .panel-scroll {
+  padding: 8px 12px;
+}
+
+.density-compact .inspector-field {
+  margin-bottom: 6px;
+}
+
+.density-compact .bottomstrip {
+  padding-top: 2px;
+  padding-bottom: 2px;
+}

@@ -39,7 +39,15 @@ src/
   OrmDiagram.tsx       Pure PositionedGraph -> SVG (<g>) React component
   DiagramCanvas.tsx    Interactive pan / zoom / drag wrapper over OrmDiagram
   renderDiagramSvg.tsx Headless static SVG via react-dom/server
+  quantize.ts          Integer-pixel coordinate rounding for the static render
 ```
+
+The static render is guarded by golden files: `tests/golden/` renders a
+five-model corpus (the two `examples/models/` entries plus three
+feature-isolating fixtures) and byte-compares against checked-in SVGs.
+Quantization makes byte-equality platform-robust. Regenerate
+intentionally with `UPDATE_GOLDEN=1 npx vitest run tests/golden` and
+review the diff as a visual change (aesthetics spec, workstream 1).
 
 ## Commands
 

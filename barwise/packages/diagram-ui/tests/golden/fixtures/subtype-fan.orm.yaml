@@ -1,0 +1,59 @@
+orm_version: "1.1"
+model:
+  name: Subtype Fan
+  # Golden-corpus fixture: one supertype with three subtypes, isolating
+  # the radial subtype fan in PostAdjustments (ARC_RADIUS / ARC_ANGLE_RANGE).
+  object_types:
+    - id: ot-party
+      name: Party
+      kind: entity
+      reference_mode: party_id
+    - id: ot-person
+      name: Person
+      kind: entity
+      reference_mode: party_id
+    - id: ot-organization
+      name: Organization
+      kind: entity
+      reference_mode: party_id
+    - id: ot-trust
+      name: Trust
+      kind: entity
+      reference_mode: party_id
+    - id: ot-party-name
+      name: PartyName
+      kind: value
+      data_type:
+        name: text
+        length: 100
+  fact_types:
+    - id: ft-party-has-name
+      name: Party has PartyName
+      roles:
+        - id: r-party-has
+          player: ot-party
+          role_name: has
+        - id: r-name-of
+          player: ot-party-name
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-party-has
+        - type: mandatory
+          role: r-party-has
+  subtype_facts:
+    - id: sf-person
+      subtype: ot-person
+      supertype: ot-party
+      provides_identification: true
+    - id: sf-organization
+      subtype: ot-organization
+      supertype: ot-party
+      provides_identification: true
+    - id: sf-trust
+      subtype: ot-trust
+      supertype: ot-party
+      provides_identification: true

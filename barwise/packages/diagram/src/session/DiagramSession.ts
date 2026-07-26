@@ -16,6 +16,7 @@ import { generateDiagram } from "../DiagramGenerator.js";
 import { computeNeighborhood } from "../graph/NeighborhoodFilter.js";
 import type { PositionedFactTypeNode, PositionedGraph } from "../layout/LayoutTypes.js";
 import type { DiagramFocus, DiagramIntent, DiagramPresentation } from "./contract.js";
+import { buildModelSummary } from "./modelSummary.js";
 
 interface ViewFilter {
   readonly objectTypeIds: Set<string>;
@@ -480,6 +481,7 @@ export class DiagramSession {
       availableViews: this.model.diagramLayouts.map((d) => d.name),
       hasUnsavedLayout: this.hasUnsavedChanges,
       modelName: this.model.name,
+      modelSummary: buildModelSummary(this.model),
     };
   }
 

@@ -1,0 +1,143 @@
+orm_version: "1.1"
+model:
+  name: Cluster Split
+  # Golden-corpus fixture: two densely connected groups joined by a
+  # single bridge fact, isolating cluster detection and the two-level
+  # cluster layout in EntityPlacement (cluster edge lengths, NUDGE_DISTANCE).
+  object_types:
+    - id: ot-customer
+      name: Customer
+      kind: entity
+      reference_mode: customer_id
+    - id: ot-order
+      name: Order
+      kind: entity
+      reference_mode: order_number
+    - id: ot-order-line
+      name: OrderLine
+      kind: entity
+      reference_mode: line_number
+    - id: ot-product
+      name: Product
+      kind: entity
+      reference_mode: sku
+    - id: ot-employee
+      name: Employee
+      kind: entity
+      reference_mode: employee_id
+    - id: ot-department
+      name: Department
+      kind: entity
+      reference_mode: dept_code
+    - id: ot-team
+      name: Team
+      kind: entity
+      reference_mode: team_code
+  fact_types:
+    - id: ft-places
+      name: Customer places Order
+      roles:
+        - id: r-places
+          player: ot-customer
+          role_name: places
+        - id: r-placed-by
+          player: ot-order
+          role_name: is placed by
+      readings:
+        - "{0} places {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-placed-by
+        - type: mandatory
+          role: r-placed-by
+    - id: ft-contains
+      name: Order contains OrderLine
+      roles:
+        - id: r-contains
+          player: ot-order
+          role_name: contains
+        - id: r-contained-in
+          player: ot-order-line
+          role_name: is in
+      readings:
+        - "{0} contains {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-contained-in
+    - id: ft-line-product
+      name: OrderLine lists Product
+      roles:
+        - id: r-lists
+          player: ot-order-line
+          role_name: lists
+        - id: r-listed-on
+          player: ot-product
+          role_name: is listed on
+      readings:
+        - "{0} lists {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-lists
+    - id: ft-works-in
+      name: Employee works in Department
+      roles:
+        - id: r-works
+          player: ot-employee
+          role_name: works in
+        - id: r-employs
+          player: ot-department
+          role_name: employs
+      readings:
+        - "{0} works in {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-works
+    - id: ft-belongs-to
+      name: Employee belongs to Team
+      roles:
+        - id: r-belongs
+          player: ot-employee
+          role_name: belongs to
+        - id: r-has-member
+          player: ot-team
+          role_name: has member
+      readings:
+        - "{0} belongs to {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-belongs
+    - id: ft-team-dept
+      name: Team serves Department
+      roles:
+        - id: r-serves
+          player: ot-team
+          role_name: serves
+        - id: r-served-by
+          player: ot-department
+          role_name: is served by
+      readings:
+        - "{0} serves {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-serves
+    - id: ft-bridge
+      name: Customer is served by Employee
+      roles:
+        - id: r-served
+          player: ot-customer
+          role_name: is served by
+        - id: r-serves-customer
+          player: ot-employee
+          role_name: serves
+      readings:
+        - "{0} is served by {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-served

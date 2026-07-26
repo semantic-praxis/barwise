@@ -5,6 +5,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import type { DiagramMeta, OutboundMessage } from "./protocol.js";
+import { buildTabPanels, type TabPanels } from "./tabPanels.js";
 
 const saveSerializer = new OrmYamlSerializer();
 
@@ -27,6 +28,7 @@ export class DiagramPanel {
   private disposed = false;
   private webviewReady = false;
   private session: DiagramSession;
+  private panels: TabPanels;
   private filePath: string | undefined;
   private lastPresentation: DiagramPresentation | undefined;
   /** Guards against an older async render overwriting a newer one. */
@@ -45,6 +47,7 @@ export class DiagramPanel {
     this.extensionUri = extensionUri;
     this.filePath = fileName;
     this.session = new DiagramSession(model, savedLayout, collectAnnotationMap(model));
+    this.panels = buildTabPanels(model);
     this.setTitle(fileName);
     this.panel.webview.html = this.buildHtml();
 
@@ -84,6 +87,7 @@ export class DiagramPanel {
       existing.panel.reveal(column);
       existing.filePath = fileName;
       existing.session = new DiagramSession(model, savedLayout, collectAnnotationMap(model));
+      existing.panels = buildTabPanels(model);
       existing.lastPresentation = undefined;
       existing.setTitle(fileName);
       void existing.rerender(true);
@@ -240,6 +244,7 @@ export class DiagramPanel {
       return;
     }
     this.session.setModel(newModel, collectAnnotationMap(newModel));
+    this.panels = buildTabPanels(newModel);
     void this.rerender(false);
   }
 
@@ -269,6 +274,7 @@ export class DiagramPanel {
       graph: presentation.graph,
       ghostNodeIds: presentation.ghostNodeIds,
       meta: this.buildMeta(presentation),
+      panels: this.panels,
       resetView,
     });
   }
@@ -282,6 +288,7 @@ export class DiagramPanel {
       focus: presentation.focus,
       view: presentation.view,
       availableViews: presentation.availableViews,
+      modelSummary: presentation.modelSummary,
     };
   }
 

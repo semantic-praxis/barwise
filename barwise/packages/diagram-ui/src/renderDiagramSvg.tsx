@@ -10,6 +10,7 @@ import type { PositionedGraph } from "@barwise/diagram";
 import * as t from "@barwise/diagram/theme";
 import { renderToStaticMarkup } from "react-dom/server";
 import { OrmDiagram } from "./OrmDiagram.js";
+import { quantizeGraph } from "./quantize.js";
 
 export interface RenderDiagramSvgOptions {
   /** Node ids to render as dimmed ghost (preview) nodes. */
@@ -19,11 +20,17 @@ export interface RenderDiagramSvgOptions {
 const PADDING = 20;
 const NO_GHOSTS: ReadonlySet<string> = new Set();
 
-/** Render a positioned graph to a complete, standalone SVG string. */
+/**
+ * Render a positioned graph to a complete, standalone SVG string.
+ *
+ * Coordinates are quantized to integer pixels so the output is stable
+ * across platforms (the golden-file guard depends on this).
+ */
 export function renderDiagramSvg(
-  graph: PositionedGraph,
+  rawGraph: PositionedGraph,
   options?: RenderDiagramSvgOptions,
 ): string {
+  const graph = quantizeGraph(rawGraph);
   const width = graph.width + PADDING * 2;
   const height = graph.height + PADDING * 2;
   const viewBox = `${graph.originX - PADDING} ${graph.originY - PADDING} ${width} ${height}`;

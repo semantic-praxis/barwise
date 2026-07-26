@@ -1,6 +1,6 @@
 # Diagram UI Modernization
 
-Status: in progress
+Status: Implemented (Phases 0-4; see "Phase status" at the end)
 Owner: diagram / vscode
 Supersedes: the inline `DiagramPanel.ts` webview template.
 
@@ -223,7 +223,7 @@ inline styles are set via the DOM API and are not CSP-governed.
 - **Phase 3 -- tab panels** wired to `@barwise/core`.
 - **Phase 4 -- tweaks (themes, density) + command palette.**
 
-## Phase 0 / Phase 1 status
+## Phase status
 
 Phase 0 and the diagram-pane core landed in the first PR: webview build
 pipeline; typed protocol; React 3-pane shell (top bar, panes, bottom
@@ -233,16 +233,40 @@ orientation flip, save layout, selection + highlight, live reload on
 document change; `DiagramPanel` rewritten as a React-bundle host with
 CSP/nonce.
 
-This PR completes Phase 1's deferred affordances: focus/hop neighborhood
-(inspector control + context bar), named saved views (top-bar menu),
-ghost-neighbor preview (inspector actions + context bar), and a
-Cmd/Ctrl+K command palette. Host-side support for these already existed
-in `DiagramPanel`; the webview UI now drives it. See "Phase 1
-affordances" above.
+The second PR completed Phase 1's deferred affordances: focus/hop
+neighborhood (inspector control + context bar), named saved views
+(top-bar menu), ghost-neighbor preview (inspector actions + context
+bar), and a Cmd/Ctrl+K command palette. Host-side support for these
+already existed in `DiagramPanel`; the webview UI now drives it. See
+"Phase 1 affordances" above.
 
-Still deferred to later phases: the self-contained left model tree and
-deeper inspector content (Phase 2), the alternate tab panels (Phase 3),
-and theming / density tweaks (Phase 4).
+Phases 2-4 landed in the third PR:
+
+- **Phase 2.** The presentation contract now carries a serialized
+  `ModelSummary` (built by `@barwise/diagram`'s
+  `session/modelSummary.ts`, pure and unit-tested), and the webview
+  renders a self-contained left model tree over it (filter box,
+  collapsible sections, entity/value badges, dimming for elements
+  outside the current filtered view). The inspector deepened: readings,
+  constraint tags, data types, and clickable played-in fact types and
+  role players come from the summary, so elements selected from the
+  tree are described even when the filtered graph does not render them.
+- **Phase 3.** The Verbalization / Fact Population / YAML / SQL DDL
+  tabs are live, as thin views over host-computed content: the pure
+  `src/diagram/tabPanels.ts` builder (unit-tested without a VS Code
+  runtime) runs core's verbalizer, `OrmYamlSerializer`, the registered
+  DDL exporter, and the model's populations, and ships the result with
+  every `setGraph`.
+- **Phase 4.** A persisted comfortable/compact density toggle (webview
+  `setState`, reachable from the command palette). The shell already
+  follows the VS Code theme via CSS variables; the diagram canvas
+  deliberately keeps its light paper-like background in both themes,
+  matching the NORMA-style notation and the static SVG export.
+
+One renderer note: the consolidation spec later moved the diagram
+components (`OrmDiagram`, `DiagramCanvas`) into `@barwise/diagram-ui`;
+the app shell, panes, and this spec's chrome stay in
+`packages/vscode/webview/` as decided above.
 
 ## Testing
 

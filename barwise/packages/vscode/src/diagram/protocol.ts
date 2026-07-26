@@ -8,7 +8,13 @@
  * contract so there is one source of truth; `fileName` is a host concept
  * and lives only here.
  */
-import type { DiagramFocus, DiagramViewInfo, PositionedGraph } from "@barwise/diagram";
+import type {
+  DiagramFocus,
+  DiagramViewInfo,
+  ModelSummary,
+  PositionedGraph,
+} from "@barwise/diagram";
+import type { TabPanels } from "./tabPanels.js";
 
 /** Diagram-level metadata sent alongside every graph update. */
 export interface DiagramMeta {
@@ -19,6 +25,8 @@ export interface DiagramMeta {
   readonly view: DiagramViewInfo | null;
   /** Names of every saved layout in the model's `diagrams:` section. */
   readonly availableViews: readonly string[];
+  /** Serialized model structure for the tree and inspector (Phase 2). */
+  readonly modelSummary: ModelSummary;
 }
 
 /** Messages sent from the extension host to the webview. */
@@ -28,6 +36,8 @@ export type InboundMessage =
     readonly graph: PositionedGraph;
     readonly ghostNodeIds: readonly string[];
     readonly meta: DiagramMeta;
+    /** Content for the non-diagram tabs (Phase 3). */
+    readonly panels: TabPanels;
     /** When true, the webview re-fits the diagram to the viewport. */
     readonly resetView: boolean;
   }

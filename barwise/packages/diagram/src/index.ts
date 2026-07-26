@@ -35,6 +35,7 @@ export type {
   PositionedRoleBox,
   PositionedSubtypeEdge,
 } from "./layout/LayoutTypes.js";
+export { computeLayoutMetrics, type LayoutMetrics } from "./layout/metrics.js";
 
 // Theme constants (also exposed via the ./theme subpath for renderers).
 export * as theme from "./render/theme.js";
@@ -51,3 +52,12 @@ export type {
   DiagramViewInfo,
 } from "./session/contract.js";
 export { DiagramSession } from "./session/DiagramSession.js";
+export {
+  buildModelSummary,
+  type ModelSummary,
+  type SummaryConstraint,
+  type SummaryFactType,
+  type SummaryObjectType,
+  type SummaryRole,
+  type SummarySubtype,
+} from "./session/modelSummary.js";

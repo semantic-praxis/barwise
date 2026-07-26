@@ -25,6 +25,22 @@ export function postMessage(message: OutboundMessage): void {
   api?.postMessage(message);
 }
 
+/** UI preferences persisted across webview reloads (Phase 4). */
+export interface PersistedUiState {
+  readonly density?: "comfortable" | "compact";
+}
+
+/** Read the persisted UI state (empty outside VS Code). */
+export function getPersistedState(): PersistedUiState {
+  const state = api?.getState();
+  return typeof state === "object" && state !== null ? (state as PersistedUiState) : {};
+}
+
+/** Merge and persist UI state. */
+export function persistState(patch: PersistedUiState): void {
+  api?.setState({ ...getPersistedState(), ...patch });
+}
+
 /**
  * Subscribe to typed messages from the extension host. Returns an
  * unsubscribe function.

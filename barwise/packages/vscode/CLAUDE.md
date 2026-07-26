@@ -37,12 +37,20 @@ src/
   diagram/
     DiagramPanel.ts           Webview host; thin adapter over @barwise/diagram DiagramSession
     protocol.ts               Webview message types (envelopes over the diagram contract)
+    tabPanels.ts              Pure tab-panel content builder (verbalization, YAML, DDL,
+                              populations) shipped to the webview; no vscode import
   llm/
     CopilotLlmClient.ts      LlmClient implementation using GitHub Copilot chat API
   mcp/
     ToolRegistration.ts      Registers tools via vscode.lm.registerTool() (in-process, Copilot access)
     McpServerProvider.ts     Registers bundled MCP stdio server for external MCP clients
     stdio-entry.ts           Standalone entry point for the MCP server child process
+
+webview/
+  src/                       React app for the diagram webview (3-pane shell: model
+                             tree, diagram/tab center, inspector; command palette,
+                             density toggle). Bundled by esbuild to dist/webview.
+                             Diagram rendering itself comes from @barwise/diagram-ui.
 ```
 
 ## Build
