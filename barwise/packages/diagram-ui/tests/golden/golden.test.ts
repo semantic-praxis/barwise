@@ -48,7 +48,9 @@ async function renderCorpusModel(path: string): Promise<string> {
 
 describe("diagram SVG golden files", () => {
   for (const entry of CORPUS) {
-    it(`matches the golden for ${entry.name}`, async () => {
+    // Real ELK over the larger corpus models can exceed vitest's 5s
+    // default on a loaded CI runner under coverage instrumentation.
+    it(`matches the golden for ${entry.name}`, { timeout: 30_000 }, async () => {
       const svg = await renderCorpusModel(entry.path);
       const goldenPath = resolve(GOLDENS, `${entry.name}.svg`);
 
@@ -66,7 +68,7 @@ describe("diagram SVG golden files", () => {
     });
   }
 
-  it("renders are deterministic run-to-run", async () => {
+  it("renders are deterministic run-to-run", { timeout: 30_000 }, async () => {
     const first = await renderCorpusModel(CORPUS[2]!.path);
     const second = await renderCorpusModel(CORPUS[2]!.path);
     expect(second).toBe(first);
