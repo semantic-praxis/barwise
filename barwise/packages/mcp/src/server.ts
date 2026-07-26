@@ -41,6 +41,7 @@ export {
 } from "./prompts/guidance/guidance.js";
 
 // Re-export execute functions for direct invocation (no MCP transport).
+export { executeAnalyzeRepository } from "./tools/analyze.js";
 export { executeDescribeDomain } from "./tools/describeDomain.js";
 export { executeDiagram } from "./tools/diagram.js";
 export { executeDiff } from "./tools/diff.js";

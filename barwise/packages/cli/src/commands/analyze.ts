@@ -15,10 +15,45 @@ import {
   formatRepoRef,
   parseRepoRef,
   profileRepository,
+  registerCodeFormats,
   RepoManager,
 } from "@barwise/code-analysis";
 import type { RepoProfile } from "@barwise/code-analysis";
+import { getImporter, type OrmModel, OrmYamlSerializer } from "@barwise/core";
 import type { Command } from "commander";
+import { existsSync, statSync } from "node:fs";
+import { basename, resolve } from "node:path";
+import { writeOutput } from "../workspace/io.js";
+
+registerCodeFormats();
+
+/**
+ * Extract a model from the profiled repository: run the detected code
+ * importer over the detected domain scope. A single detected domain
+ * path narrows the scan to it; multiple paths (or none) fall back to
+ * the repo root, which the importers scan recursively.
+ */
+async function extractModel(
+  localPath: string,
+  profile: RepoProfile,
+  modelName: string,
+): Promise<OrmModel> {
+  if (!profile.importFormat) {
+    throw new Error(
+      "no deterministic import format detected for this repository "
+        + "(use `barwise import transcript` with an LLM provider instead)",
+    );
+  }
+  const format = getImporter(profile.importFormat);
+  if (!format?.parseAsync) {
+    throw new Error(`import format "${profile.importFormat}" is not registered`);
+  }
+  const scope = profile.domainPaths.length === 1
+    ? resolve(localPath, profile.domainPaths[0]!)
+    : localPath;
+  const result = await format.parseAsync(scope, { modelName });
+  return result.model;
+}
 
 export function registerAnalyzeCommand(program: Command): void {
   program
@@ -28,6 +63,8 @@ export function registerAnalyzeCommand(program: Command): void {
     .option("--profile-only", "Show repository profile without running full analysis")
     .option("--ref <ref>", "Branch, tag, or commit to analyze")
     .option("--depth <depth>", "Clone depth (0 for full clone)", "1")
+    .option("--domain <name>", "Model name for the extracted domain")
+    .option("--output <file>", "Write the extracted .orm.yaml here (default: stdout)")
     .option("--format <format>", "Output format (text or json)", "text")
     .action(
       async (
@@ -36,10 +73,18 @@ export function registerAnalyzeCommand(program: Command): void {
           profileOnly?: boolean;
           ref?: string;
           depth: string;
+          domain?: string;
+          output?: string;
           format: string;
         },
       ) => {
         try {
+          // A local directory analyzes in place -- no clone, no auth.
+          if (existsSync(repoArg) && statSync(repoArg).isDirectory()) {
+            await analyzePath(resolve(repoArg), repoArg, opts);
+            return;
+          }
+
           // Parse repo reference.
           const repo = parseRepoRef(repoArg);
           const manager = new RepoManager();
@@ -72,40 +117,46 @@ export function registerAnalyzeCommand(program: Command): void {
             );
           }
 
-          // Profile the repository.
-          process.stderr.write("Profiling repository...\n");
-          const profile = profileRepository(localPath);
-
-          if (opts.profileOnly) {
-            if (opts.format === "json") {
-              const json = formatProfileJson(profile, repoArg);
-              process.stdout.write(json + "\n");
-            } else {
-              const text = formatProfileText(profile, repoArg);
-              process.stdout.write(text + "\n");
-            }
-            return;
-          }
-
-          // Full analysis is Phase 2+. For now, show the profile
-          // and explain that full analysis is not yet implemented.
-          if (opts.format === "json") {
-            const json = formatProfileJson(profile, repoArg);
-            process.stdout.write(json + "\n");
-          } else {
-            const text = formatProfileText(profile, repoArg);
-            process.stdout.write(text + "\n");
-          }
-          process.stderr.write(
-            "\nFull analysis pipeline coming in a future release.\n"
-              + "Use --profile-only to suppress this message.\n",
-          );
+          await analyzePath(localPath, repoArg, opts);
         } catch (err) {
           process.stderr.write(`Error: ${(err as Error).message}\n`);
           process.exitCode = 1;
         }
       },
     );
+}
+
+/** Profile a local checkout and, unless --profile-only, extract a model. */
+async function analyzePath(
+  localPath: string,
+  repoArg: string,
+  opts: {
+    profileOnly?: boolean;
+    domain?: string;
+    output?: string;
+    format: string;
+  },
+): Promise<void> {
+  process.stderr.write("Profiling repository...\n");
+  const profile = profileRepository(localPath);
+
+  if (opts.profileOnly) {
+    const rendered = opts.format === "json"
+      ? formatProfileJson(profile, repoArg)
+      : formatProfileText(profile, repoArg);
+    process.stdout.write(rendered + "\n");
+    return;
+  }
+
+  process.stderr.write(formatProfileText(profile, repoArg) + "\n\n");
+  process.stderr.write("Extracting business rules...\n");
+  const modelName = opts.domain ?? basename(localPath);
+  const model = await extractModel(localPath, profile, modelName);
+  writeOutput(new OrmYamlSerializer().serialize(model), opts.output);
+  process.stderr.write(
+    `Extracted ${model.objectTypes.length} object types, `
+      + `${model.factTypes.length} fact types.\n`,
+  );
 }
 
 /** Format a repo profile as human-readable text. */

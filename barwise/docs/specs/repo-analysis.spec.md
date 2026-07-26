@@ -1,11 +1,20 @@
 # Repository analysis: clone, profile, and extract business rules
 
-Status: Partial -- phases 1-2 shipped (RepoManager clone/pull,
+Status: Phases 1-3 shipped. Phases 1-2: RepoManager clone/pull,
 RepoProfiler, six framework detectors, barwise analyze with
---ref/--depth/--profile-only). Open: end-to-end orchestration, the
-analyze_repository MCP tool, and the VS Code entry point.
+--ref/--depth/--profile-only. Phase 3 (2026-07-26): end-to-end
+orchestration -- barwise analyze now extracts after profiling (detected
+importer over the detected domain scope; --domain/--output; local
+directories analyze in place with no clone or auth), the
+analyze_repository MCP tool (clone gated behind requiresConfirmation /
+confirm=true; returns profile + extracted .orm.yaml), and the VS Code
+entry (barwise.analyzeRepository: input boxes, modal clone
+confirmation, progress, profile to the output channel, extracted model
+opened as an untitled document). Open: re-analysis diffing (--update,
+analysis metadata recording) and multi-domain-path merge (multiple
+detected paths currently widen the scan to the repo root).
 Created: 2026-04-02
-Last-updated: 2026-07-25
+Last-updated: 2026-07-26
 
 ## Problem
 

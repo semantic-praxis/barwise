@@ -9,6 +9,7 @@ import {
   TransportKind,
 } from "vscode-languageclient/node.js";
 import { registerChatParticipant } from "../chat/ChatParticipant.js";
+import { AnalyzeRepositoryCommand } from "../commands/AnalyzeRepositoryCommand.js";
 import { ExportCommand } from "../commands/ExportCommand.js";
 import { ImportCommand } from "../commands/ImportCommand.js";
 import { NewProjectCommand } from "../commands/NewProjectCommand.js";
@@ -82,6 +83,10 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(
       "barwise.import",
       () => new ImportCommand().execute(),
+    ),
+    vscode.commands.registerCommand(
+      "barwise.analyzeRepository",
+      () => new AnalyzeRepositoryCommand().execute(),
     ),
     vscode.commands.registerCommand(
       "barwise.export",
