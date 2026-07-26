@@ -1,6 +1,10 @@
 # Decompose the ELK layout engine into focused units
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Implemented (verified against source 2026-07-26: `ElkLayoutEngine.ts`
+is a 146-line orchestrator over the extracted `ElkInterop` /
+`ClusterDetection` / `EntityPlacement` / `FactTypePlacement` /
+`PostAdjustments` / `EdgeRouting` / `CollisionResolver` modules, with the
+raised coverage floors recorded in `vitest.config.ts`)
 Tracking: REPO_REVIEW-2026-06.md finding A1 (god files; ElkLayoutEngine first)
 
 ## Principle

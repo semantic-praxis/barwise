@@ -1,6 +1,9 @@
 # Diagram Renderer Consolidation: One Renderer, Not Two
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Implemented (verified against source 2026-07-26: `@barwise/diagram-ui`
+exists with `OrmDiagram` / `DiagramCanvas` / `renderDiagramSvg`; the CLI and
+MCP import `renderDiagramSvg` from `@barwise/diagram-ui/server`; `SvgRenderer`
+is retired -- `@barwise/diagram/src/render/` carries only `theme.ts`)
 Tracking: REPO_REVIEW-2026-06.md finding A6
 Related: `diagram-presentation-contract.spec.md` (independent -- session
 state, not the renderer; see "Relationship to other specs")
