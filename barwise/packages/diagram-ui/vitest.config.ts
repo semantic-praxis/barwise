@@ -11,6 +11,7 @@ export default defineConfig({
         "src/DiagramCanvas.tsx",
         "src/OrmDiagram.tsx",
         "src/renderDiagramSvg.tsx",
+        "src/quantize.ts",
         "src/parts/*.tsx",
         "src/parts/*.ts",
       ],

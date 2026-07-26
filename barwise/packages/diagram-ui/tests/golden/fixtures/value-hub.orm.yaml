@@ -1,0 +1,96 @@
+orm_version: "1.1"
+model:
+  name: Value Hub
+  # Golden-corpus fixture: one entity hub with four leaf value types,
+  # isolating the leaf-spoke distribution in PostAdjustments
+  # (SPOKE_DISTANCE).
+  object_types:
+    - id: ot-product
+      name: Product
+      kind: entity
+      reference_mode: sku
+    - id: ot-product-name
+      name: ProductName
+      kind: value
+      data_type:
+        name: text
+        length: 100
+    - id: ot-price
+      name: Price
+      kind: value
+      data_type:
+        name: decimal
+    - id: ot-color
+      name: Color
+      kind: value
+      data_type:
+        name: text
+        length: 30
+    - id: ot-weight
+      name: Weight
+      kind: value
+      data_type:
+        name: decimal
+  fact_types:
+    - id: ft-product-name
+      name: Product has ProductName
+      roles:
+        - id: r-pn-product
+          player: ot-product
+          role_name: has
+        - id: r-pn-name
+          player: ot-product-name
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-pn-product
+        - type: mandatory
+          role: r-pn-product
+    - id: ft-product-price
+      name: Product has Price
+      roles:
+        - id: r-pp-product
+          player: ot-product
+          role_name: has
+        - id: r-pp-price
+          player: ot-price
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-pp-product
+    - id: ft-product-color
+      name: Product has Color
+      roles:
+        - id: r-pc-product
+          player: ot-product
+          role_name: has
+        - id: r-pc-color
+          player: ot-color
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-pc-product
+    - id: ft-product-weight
+      name: Product has Weight
+      roles:
+        - id: r-pw-product
+          player: ot-product
+          role_name: has
+        - id: r-pw-weight
+          player: ot-weight
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-pw-product

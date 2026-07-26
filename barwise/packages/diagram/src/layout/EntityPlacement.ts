@@ -8,6 +8,16 @@ import type { FactTypeNode, OrmGraph } from "../graph/GraphTypes.js";
 import { FONT_SIZE_ALIAS, OT_ALIAS_LINE_HEIGHT, OT_HEIGHT, OT_MIN_WIDTH } from "../render/theme.js";
 import { detectClusters } from "./ClusterDetection.js";
 import { getElk } from "./ElkInterop.js";
+import {
+  FLAT_ENTITY_EDGE_LENGTH,
+  FLAT_ENTITY_NODE_SPACING,
+  INTER_CLUSTER_EDGE_LENGTH,
+  INTER_CLUSTER_NODE_SPACING,
+  INTRA_CLUSTER_EDGE_LENGTH,
+  INTRA_CLUSTER_NODE_SPACING,
+  NUDGE_DISTANCE,
+  STRESS_ITERATION_LIMIT,
+} from "./layoutParams.js";
 import type { Position, PositionedObjectTypeNode } from "./LayoutTypes.js";
 
 /** @internal Exported for testing. */
@@ -40,11 +50,11 @@ export function buildEntityElkGraph(graph: OrmGraph): ElkNode {
     id: "root",
     layoutOptions: {
       "org.eclipse.elk.algorithm": "stress",
-      "org.eclipse.elk.stress.desiredEdgeLength": "450",
-      "org.eclipse.elk.spacing.nodeNode": "300",
+      "org.eclipse.elk.stress.desiredEdgeLength": String(FLAT_ENTITY_EDGE_LENGTH),
+      "org.eclipse.elk.spacing.nodeNode": String(FLAT_ENTITY_NODE_SPACING),
       "org.eclipse.elk.padding": "[top=60,left=60,bottom=60,right=60]",
       "org.eclipse.elk.stress.epsilon": "0.001",
-      "org.eclipse.elk.stress.iterationLimit": "300",
+      "org.eclipse.elk.stress.iterationLimit": String(STRESS_ITERATION_LIMIT),
     },
     children,
     edges,
@@ -221,10 +231,10 @@ export async function layoutEntitiesWithClusters(
     id: "root",
     layoutOptions: {
       "org.eclipse.elk.algorithm": "stress",
-      "org.eclipse.elk.stress.desiredEdgeLength": "600",
-      "org.eclipse.elk.spacing.nodeNode": "250",
+      "org.eclipse.elk.stress.desiredEdgeLength": String(INTER_CLUSTER_EDGE_LENGTH),
+      "org.eclipse.elk.spacing.nodeNode": String(INTER_CLUSTER_NODE_SPACING),
       "org.eclipse.elk.padding": "[top=60,left=60,bottom=60,right=60]",
-      "org.eclipse.elk.stress.iterationLimit": "300",
+      "org.eclipse.elk.stress.iterationLimit": String(STRESS_ITERATION_LIMIT),
     },
     children: clusterLayouts.map((cl) => ({
       id: `cluster-${cl.clusterId}`,
@@ -295,11 +305,11 @@ function buildClusterElkSubGraph(
     id: "cluster",
     layoutOptions: {
       "org.eclipse.elk.algorithm": "stress",
-      "org.eclipse.elk.stress.desiredEdgeLength": "350",
-      "org.eclipse.elk.spacing.nodeNode": "200",
+      "org.eclipse.elk.stress.desiredEdgeLength": String(INTRA_CLUSTER_EDGE_LENGTH),
+      "org.eclipse.elk.spacing.nodeNode": String(INTRA_CLUSTER_NODE_SPACING),
       "org.eclipse.elk.padding": "[top=30,left=30,bottom=30,right=30]",
       "org.eclipse.elk.stress.epsilon": "0.001",
-      "org.eclipse.elk.stress.iterationLimit": "300",
+      "org.eclipse.elk.stress.iterationLimit": String(STRESS_ITERATION_LIMIT),
     },
     children,
     edges,
@@ -371,7 +381,6 @@ function adjustBoundaryEntities(
   }
 
   const nudged = new Set<string>();
-  const NUDGE_DISTANCE = 40;
 
   for (const [key] of edgeWeights) {
     const parts = key.split("--");

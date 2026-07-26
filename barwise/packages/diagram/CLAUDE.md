@@ -29,6 +29,8 @@ src/
     FactTypePlacement.ts  Pass 2: fact-type and constraint-node placement
     EdgeRouting.ts        Edge routing, border-intersection geometry, viewBox bounds
     CollisionResolver.ts  Coordinate normalization + overlap resolution (pure)
+    layoutParams.ts       Named placement parameters (the aesthetic levers)
+    metrics.ts            Pure layout-quality metrics over PositionedGraph
   render/
     theme.ts            Color/dimension constants (also via the ./theme subpath)
   session/

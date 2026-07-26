@@ -1,6 +1,13 @@
 # Diagram layout aesthetics: measurable and safe to tune
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Workstreams 1-3 implemented (2026-07-26): integer-pixel quantization
+in `renderDiagramSvg` (`quantize.ts`), the five-model SVG golden corpus in
+`diagram-ui/tests/golden/` (`UPDATE_GOLDEN=1` regenerates), the pure layout
+metrics (`layout/metrics.ts`) with tolerance assertions over real ELK, and
+the named placement parameters (`layout/layoutParams.ts` -- goldens stayed
+byte-identical, proving the relocation moved no behavior). Workstream 4 (the
+initial tuning pass) is open: it needs a human review of the golden diffs as
+intentional visual change.
 Tracking: REPO_REVIEW-2026-06.md finding T5 (SVG / diagram visual
 regression); follows the A1 ElkLayoutEngine decomposition
 (`diagram-layout-decomposition.spec.md`)

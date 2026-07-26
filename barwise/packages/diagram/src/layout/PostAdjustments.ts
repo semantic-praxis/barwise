@@ -4,6 +4,11 @@
  * entity. Pure functions over the entity positions ELK produced.
  */
 import type { FactTypeNode, OrmGraph } from "../graph/GraphTypes.js";
+import {
+  LEAF_SPOKE_DISTANCE,
+  SUBTYPE_ARC_ANGLE_RANGE,
+  SUBTYPE_ARC_RADIUS,
+} from "./layoutParams.js";
 import type { PositionedObjectTypeNode } from "./LayoutTypes.js";
 
 /**
@@ -78,9 +83,6 @@ export function placeSubtypesRadially(
     arr.push(se.subtypeNodeId);
   }
 
-  const ARC_RADIUS = 180;
-  const ARC_ANGLE_RANGE = Math.PI * 0.75; // 135 degrees
-
   for (const [supertypeId, subtypeIds] of fanMap) {
     const superPos = entityPositions.get(supertypeId);
     if (!superPos) continue;
@@ -114,21 +116,21 @@ export function placeSubtypesRadially(
 
       entityPositions.set(subtypeIds[0]!, {
         ...subPos,
-        x: superCx + outDx * ARC_RADIUS - subPos.width / 2,
-        y: superCy + outDy * ARC_RADIUS - subPos.height / 2,
+        x: superCx + outDx * SUBTYPE_ARC_RADIUS - subPos.width / 2,
+        y: superCy + outDy * SUBTYPE_ARC_RADIUS - subPos.height / 2,
       });
     } else {
       // Multiple subtypes: fan in an arc centered on the outward vector.
-      const startAngle = outwardAngle - ARC_ANGLE_RANGE / 2;
-      const angleStep = ARC_ANGLE_RANGE / (n - 1);
+      const startAngle = outwardAngle - SUBTYPE_ARC_ANGLE_RANGE / 2;
+      const angleStep = SUBTYPE_ARC_ANGLE_RANGE / (n - 1);
 
       for (let i = 0; i < n; i++) {
         const subPos = entityPositions.get(subtypeIds[i]!);
         if (!subPos) continue;
 
         const angle = startAngle + i * angleStep;
-        const cx = superCx + ARC_RADIUS * Math.cos(angle);
-        const cy = superCy + ARC_RADIUS * Math.sin(angle);
+        const cx = superCx + SUBTYPE_ARC_RADIUS * Math.cos(angle);
+        const cy = superCy + SUBTYPE_ARC_RADIUS * Math.sin(angle);
 
         entityPositions.set(subtypeIds[i]!, {
           ...subPos,
@@ -188,7 +190,6 @@ export function alignLeafValueTypes(
   }
 
   // For each hub entity, distribute its leaf value types around it.
-  const SPOKE_DISTANCE = 200;
 
   for (const [hubId, leaves] of hubLeaves) {
     const hubPos = entityPositions.get(hubId);
@@ -245,8 +246,8 @@ export function alignLeafValueTypes(
         if (!leafPos) continue;
 
         const angle = startAngle + i * angleStep;
-        const targetCx = hubCx + SPOKE_DISTANCE * Math.cos(angle);
-        const targetCy = hubCy + SPOKE_DISTANCE * Math.sin(angle);
+        const targetCx = hubCx + LEAF_SPOKE_DISTANCE * Math.cos(angle);
+        const targetCy = hubCy + LEAF_SPOKE_DISTANCE * Math.sin(angle);
 
         entityPositions.set(leaf.leafId, {
           ...leafPos,
