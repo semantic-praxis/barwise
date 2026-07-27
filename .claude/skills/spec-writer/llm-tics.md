@@ -56,3 +56,43 @@ Each entry names the pattern and says when to flag it.
     considerations: first... second... third..." where prose would
     communicate the same information more naturally. Flag when the list
     adds no scannability that prose lacks.
+
+11. **Benefit-tail participles.** A factual statement with an unearned
+    benefit clause welded on: "..., enabling faster iteration,"
+    "..., ensuring consistency," "..., making the code more
+    maintainable." The claim rides in on grammar instead of argument.
+    Flag when the trailing clause asserts a benefit the surrounding
+    text does not demonstrate; promote it to a claim with evidence or
+    cut it.
+
+12. **Synonym doublets.** Two near-synonyms joined by "and" for
+    rhythm: "clear and concise," "robust and reliable," "simple and
+    straightforward." One word carries the meaning; the second is
+    padding. Flag unless the pair draws a real distinction the
+    sentence needs ("build and test" is two things; "clean and
+    elegant" is one).
+
+13. **Vague quantifiers.** "Several modules," "various callers," "a
+    number of tests," "numerous places." In a spec every one of these
+    is checkable -- grep and count. Flag each; replace with the number
+    or the list. The accuracy pass catches some of these later, but by
+    then a vague count reads as settled prose -- catch it at the word
+    level too.
+
+14. **Importance inflation.** "Critical," "key," "essential,"
+    "crucial" attached to routine nouns -- "the key insight," "a
+    critical component." When everything is key, nothing is. Flag any
+    section using more than one; keep the single instance naming a
+    genuinely load-bearing element, or better, show the stakes instead
+    of asserting them.
+
+15. **Redundant wrap-up.** A closing sentence that restates what the
+    section just said: "In summary," "Ultimately, this design,"
+    "Taken together." BLUF already put the conclusion first; a
+    restated conclusion at the bottom is padding. Flag any final
+    restatement that adds no new constraint or number.
+
+16. **Copula avoidance.** "Serves as," "acts as," "functions as,"
+    "stands as," "represents" where "is" is meant. Inflates a
+    definition into a performance. Flag when substituting "is" loses
+    nothing.

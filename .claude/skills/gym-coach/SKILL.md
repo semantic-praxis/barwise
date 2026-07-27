@@ -1,6 +1,6 @@
 ---
 name: gym-coach
-description: Use when a learner asks "what do I keep getting wrong?", "how do I get better at ORM modeling?", or wants a study plan from their modeling-gym history - reads the deterministic session records the barwise gym CLI writes ($XDG_STATE_HOME/barwise/) and coaches from them, mapping recurring failures to the reductive-bias catalog and recommending next exercises, readings, and the proficiency transition to work at.
+description: Coach a learner from their modeling-gym history. Use when someone asks what they keep getting wrong or how to get better at ORM modeling - reads the gym's session records ($XDG_STATE_HOME/barwise/), maps recurring failures to the reductive-bias catalog, and recommends next exercises and readings.
 ---
 
 # Coaching a Learner from Their Gym Record
