@@ -103,7 +103,9 @@ export function registerDescribeDomainTool(server: McpServer): void {
         + "schemas, API code, or data models to ensure correctness. Optionally focus "
         + "on a specific entity, fact type, or constraint type. Can also accept a "
         + "generated artifact path (e.g., DDL file) and resolve back to the source "
-        + "model through lineage. Given a .orm-project.yaml manifest, describes "
+        + "model through lineage. Result arrays are length-capped; if the result "
+        + "reports truncation, follow up with query_model for the full enumeration. "
+        + "Given a .orm-project.yaml manifest, describes "
         + "every domain (or one chosen with `domain`).",
       inputSchema: {
         source: sourceInputSchema(

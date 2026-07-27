@@ -18,7 +18,9 @@ export function registerMergeTool(server: McpServer): void {
       title: "Merge ORM Models",
       description: "Merge an incoming ORM model into a base model. Accepts all "
         + "additions and modifications, rejects removals (non-interactive). "
-        + "Returns the merged model as YAML with validation results.",
+        + "Returns the full merged model as inline YAML plus validation "
+        + "results -- large for big models, so write it to a file rather "
+        + "than re-quoting it.",
       inputSchema: {
         base: sourceInputSchema("File path or inline YAML for the base model"),
         incoming: sourceInputSchema("File path or inline YAML for the incoming model"),

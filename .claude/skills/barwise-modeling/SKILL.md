@@ -20,28 +20,13 @@ Code extension.
 5. **Review** - `review_model` for semantic-quality suggestions.
 6. **Export** - `export_model` (ddl, openapi, ...) once the model is sound.
 
-## Context hygiene (important)
+## Context hygiene
 
-The barwise tools can return very large output. To keep this conversation's
-context window clean:
-
-- For a **specific structural question** (what entities exist, which roles
-  are mandatory, how two entities connect, model statistics), use
-  `query_model` - it gives a precise deterministic answer. Do not re-derive
-  answers from a large `describe_domain` dump or guess from prior context.
-- For an **overview**, use `describe_domain`. Its arrays are length-capped;
-  if it reports truncation, follow up with `query_model`.
-- `verbalize_model` defaults to full output - call it with `mode='summary'`
-  first, or pass `factType=<name>` to focus on one fact type.
-- `export_model` and `generate_diagram` write large artifacts to a file and
-  return the **file path**. Reference the path; never paste raw DDL,
-  OpenAPI, or SVG into a reply. Pass `outputPath` to choose where
-  `export_model` writes.
-- When a tool says output was written to a file, open that file with `Read`
-  only if you genuinely need the full content - the inline preview usually
-  suffices.
-- Do not read the `orm-model://` resource for a non-trivial model; it
-  returns the entire model JSON, unbounded.
+Each tool's description states its own output-size behavior (summary
+modes, length caps, file spills) - trust those. The one cross-tool rule:
+when a tool writes an artifact to a file, reference the path in replies
+rather than pasting the contents, and read the file back only when the
+inline preview genuinely does not suffice.
 
 ## Delegate heavy operations
 

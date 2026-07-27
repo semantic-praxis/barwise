@@ -21,11 +21,11 @@ export function registerVerbalizeTool(server: McpServer): void {
     {
       title: "Verbalize ORM Model",
       description: "Generate FORML natural-language readings for fact types "
-        + "and constraints in an ORM 2 model. Defaults to full output (large "
-        + "results spill to a file). Pass mode='summary' for category counts "
-        + "plus a short preview, or factType to focus on a single fact type. "
-        + "Given a .orm-project.yaml manifest, verbalizes every domain (or one "
-        + "chosen with `domain`).",
+        + "and constraints in an ORM 2 model. Call with mode='summary' first "
+        + "(category counts plus a short preview), or factType to focus on "
+        + "one fact type; the default full output is large and spills to a "
+        + "file. Given a .orm-project.yaml manifest, verbalizes every domain "
+        + "(or one chosen with `domain`).",
       inputSchema: {
         source: sourceInputSchema(
           "File path to .orm.yaml, .orm-project.yaml, or inline YAML content",
