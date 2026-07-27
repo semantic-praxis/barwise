@@ -43,9 +43,37 @@ which generalizes better than a bare imperative:
 - `CLAUDE.md`'s session-completion push requirement guards against a real
   remote-session failure mode (work stranded in an ephemeral container).
 
-Rules that pass the test go: trigger-phrase enumeration in descriptions,
-all-caps emphasis, and hygiene rules that restate what a tool description
-already says.
+Rules that pass the test go: exhaustive trigger-phrase enumeration in
+descriptions, all-caps emphasis, and hygiene rules that restate what a tool
+description already says.
+
+## Should we maintain model-class-specific skill versions? (resolved: no -- write once, degrade gracefully)
+
+These skills are not used only by Claude 5-generation models: sessions,
+subagents, and workflow stages may run Opus/Sonnet 4.x or Haiku 4.5, for
+which the guardrail-era guidance still helps. Forked per-class variants are
+the wrong remedy: the skill format has no model-conditional loading (the same
+`SKILL.md` loads whichever model is running), so variants would need manual
+selection, and two copies of every opinion recreates exactly the drift this
+spec exists to remove.
+
+Instead, write each skill once, to a form that serves both classes:
+
+- **Rule with reason.** A stated rule plus its rationale is near-optimal for
+  both: a 5-generation model reads the reason and generalizes; a 4.x model
+  follows the rule. This is what the guardrail resolution above already
+  prescribes -- the cut is shouting and repetition, not the rules themselves.
+- **Progressive disclosure costs older models nothing.** Frontmatter-only
+  loading and body-on-trigger are harness mechanics, independent of the
+  model. Reference-file pointers ("read `editing.md` during the edit pass")
+  are followed less reliably by 4.x models, so keep pointers few and place
+  them at the point of need rather than in a preamble.
+- **Descriptions are the one real tension.** 4.x models genuinely
+  under-trigger, so stripping all triggering cues optimizes for one class at
+  the other's expense. The resolution: compress, don't strip -- state what
+  the skill provides, when to use it, and two or three representative
+  contexts, dropping only the long verbatim phrase lists. Workstream 2 is
+  scoped to this standard.
 
 ## Scope
 
@@ -58,7 +86,8 @@ In scope:
   template, or another skill, the skill shall replace the mirror with a
   pointer to the owner.
 - When a skill frontmatter description is rewritten, it shall state what the
-  skill provides and when to use it, without enumerated trigger phrases.
+  skill provides, when to use it, and at most a few representative contexts,
+  without exhaustive trigger-phrase lists.
 - `CLAUDE.md` slimming: procedure moves to a skill; derivable history is cut;
   gotchas stay.
 - One provisional saved workflow for the Phase A architecture review.
@@ -137,13 +166,15 @@ only), so this is a description-only change plus a rebuild. Then the skill's
 to the two subagents, and trust the tool descriptions for per-tool size
 behavior. The workflow section and canonical-reference pointer stay.
 
-### 2. Simplify skill frontmatter descriptions
+### 2. Compress skill frontmatter descriptions
 
-Rewrite all four descriptions to state what the skill provides and when to use
-it in one or two sentences. Drop trigger-phrase enumeration ("Trigger on
-'articulation review', 'is this clear', 'tighten this up', ...") -- Claude 5
-models trigger on meaning, and phrase lists now cost tokens in every session's
-skill listing without improving recall.
+Rewrite all four descriptions to state what the skill provides, when to use
+it, and two or three representative contexts. Drop the exhaustive phrase lists
+("Trigger on 'articulation review', 'is this clear', 'tighten this up', ...")
+-- Claude 5 models trigger on meaning, and long lists cost tokens in every
+session's skill listing. Keep a few representative contexts because 4.x-class
+models still under-trigger (see the model-class resolution above); compress,
+don't strip.
 
 ### 3. Dedupe spec-writer, add unknowns discovery
 
