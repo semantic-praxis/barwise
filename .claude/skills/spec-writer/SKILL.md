@@ -50,65 +50,57 @@ alongside this file.
    `sensemaking.md`: anchor the design in verified facts, hold two or
    three alternatives, and test each against what the code should and
    should not show before committing.
-2. **Argue from principles.** Frame the problem and the resolution in
+2. **Interview away the ambiguities.** Before designing, interview the
+   requester one question at a time about anything ambiguous,
+   prioritizing questions whose answer would change the architecture,
+   and stop when answers stop changing the design. What stays genuinely
+   undecided afterward is the seed of Open decisions -- carry it there
+   rather than resolving it silently.
+3. **Argue from principles.** Frame the problem and the resolution in
    terms of the stated principles: determinism in core, orthogonality
    and composability (primary), explicit over implicit, DRY (secondary).
    The strongest specs this project has produced reason _from_ these
    (e.g. "no interop format is mandatory to core, so core should ship
    none").
-3. **Draft from the template.** Copy `template.spec.md` and fill it
+4. **Draft from the template.** Copy `template.spec.md` and fill it
    in. Drop sections that do not apply; do not invent filler.
-4. **Split into workstreams.** Decompose implementation into
+5. **Split into workstreams.** Decompose implementation into
    independently shippable steps, ordered smallest-blast-radius first,
    each keeping the full suite green as its own PR. Note coupling that
    forces steps together (e.g. a function only one caller uses vs. one
    five modules share). A later workstream is usually drafted before it
    is grounded; mark its conclusions provisional until then (see
    `sensemaking.md`), so an anticipated claim does not read as settled.
-5. **Surface open decisions.** End with the choices that are genuinely
+6. **Surface open decisions.** End with the choices that are genuinely
    the reviewer's call (package scope, where shared I/O lives,
    API shape). Recommend a default; do not silently decide. These are
    ADR-shaped -- state the options and the trade-off.
-6. **Edit, then run an articulation pass.** Run the edit passes in
+7. **Edit, then run an articulation pass.** Run the edit passes in
    `editing.md` (scanning `llm-tics.md` during the voice pass), then
-   invoke the `articulation` skill in critique mode over the draft. Its
-   barrier taxonomy catches the failures the voice pass misses -- the
-   four most common in specs: a buried lede (a heading that does not
-   state its resolution), a fuzzy abstraction (a "robust" or "scalable"
-   claim with no operational meaning), a missing bridge (a design leap
-   from premises the reviewer does not have), or a wall of detail (an
-   inventory or architecture dump with no hierarchy). Then act on the
-   review's verdict: wording and boundary problems get fixed in place
-   (reword or restructure) before the pre-push gate; a
-   thinking-problems verdict means a decision is missing, so return to
-   grounding (step 1) or move the undecided item into Open decisions --
-   do not polish through it. The review runs in-conversation; commit
-   the fixes, never the review.
-7. **Clear the gate, then land.** Run the pre-push gate below, land the
+   invoke the `articulation` skill in critique mode over the draft --
+   its barrier taxonomy catches what the voice pass misses; in specs
+   the usual offenders are a buried lede, a fuzzy abstraction, a
+   missing bridge, and a wall of detail. Then act on the review's
+   verdict: wording and boundary problems get fixed in place before
+   the pre-push gate; a thinking-problems verdict means a decision is
+   missing, so return to grounding (step 1) or move the undecided item
+   into Open decisions -- do not polish through it. The review runs
+   in-conversation; commit the fixes, never the review.
+8. **Clear the gate, then land.** Run the pre-push gate below, land the
    spec for review, then implement in separate PRs. Before implementing
    each workstream, ground it again and verify or correct the
    conclusions drafted ahead of time; revise the spec if the scope
-   differs from the brief.
+   differs from the brief. During implementation, keep a short
+   implementation-notes record of deviations from the spec (an edge
+   case that forced a different tack, a mechanism that turned out not
+   to exist); fold them into the spec's next revision so the next
+   workstream starts from reality, not the brief.
 
 ## House structure
 
-A header block -- `Status`, `Created` and `Last-updated` (ISO
-`YYYY-MM-DD`), and `Tracking` -- then the sections that apply:
-
-- **Principle / Problem** -- what is wrong and which pillar it touches.
-- **Should we X?** (when the choice is non-obvious) -- reason it through
-  under a heading that states the resolution.
-- **Scope** -- in scope / out of scope, explicitly.
-- **Inventory** -- a table classifying what changes and the verdict.
-- **Target architecture** -- a fenced code block of the end state.
-- **Alternatives considered** -- the rival designs the sensemaking pass
-  weighed and rejected, each with the reason it lost. Keeps the
-  discarded frames in the artifact, where a reviewer (or a later
-  implementer who trips a tripwire) looks first.
-- **Workstreams** -- the ordered, independently shippable steps.
-- **API and migration impact** -- what moves, what breaks, blast radius.
-- **Open decisions** -- the reviewer's calls, with a recommendation.
-- **Risks and testing** / **Non-goals**.
+`template.spec.md` in this skill's directory is the contract: the
+header block, the section set, and what belongs in each, annotated in
+place. Read it there rather than from a summary here.
 
 ## Requirement phrasing
 
@@ -139,8 +131,8 @@ reviews are point-in-time:
 
 ## Pre-push gate
 
-STOP: do not push until every item below passes. Run the design gate
-first -- a design change invalidates formatting work, never the
+Every item below must pass before pushing. Run the design gate first,
+because a design change invalidates formatting work, never the
 reverse.
 
 ### Design gate (content)
