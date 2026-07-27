@@ -1,6 +1,6 @@
 ---
 name: spec-writer
-description: Use when writing a design spec for a barwise change before implementing it - turning a REPO_REVIEW finding, feature, or refactor into a reviewable docs/specs/*.spec.md. The project convention is spec-before-code; this provides the house spec format, the design-principle framing, the workstream-splitting discipline, and the pre-flight checklist that keeps specs passing dprint fmt:check on the first push.
+description: Use when writing a design spec for a barwise change before implementing it - the project convention is spec-before-code. Turns a REPO_REVIEW finding, feature, or refactor into a reviewable docs/specs/*.spec.md using the house format, design-principle framing, and pre-push checklist.
 ---
 
 # Writing a Barwise Spec

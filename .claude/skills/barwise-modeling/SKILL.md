@@ -1,6 +1,6 @@
 ---
 name: barwise-modeling
-description: Use when working with ORM 2 / Object-Role Modeling, .orm.yaml files, or the barwise toolkit (the barwise CLI, the barwise-mcp server, or the VS Code extension) - building, validating, verbalizing, diagramming, diffing, or exporting conceptual data models. Provides the modeling workflow and the rules for using barwise's tools without flooding the context window.
+description: Use when working with ORM 2 / Object-Role Modeling, .orm.yaml files, or the barwise toolkit (CLI, MCP server, VS Code extension) - building, validating, verbalizing, diagramming, diffing, or exporting conceptual models. Provides the modeling workflow and tool-usage rules.
 ---
 
 # Barwise ORM Modeling

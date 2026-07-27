@@ -1,6 +1,6 @@
 ---
 name: articulation
-description: A meta-skill for making any artifact communicate clearly — prose, code, diagrams, data models, commit messages, or documentation — and for driving clarity out of vague requests. Use this whenever creating a written or code artifact for an audience; whenever asked to review, critique, or improve the clarity of an existing artifact; and whenever gathering, refining, or pinning down requirements from a stakeholder request that is vague, ambiguous, or underspecified. Trigger on phrases like "articulation review," "is this clear," "tighten this up," "why is this confusing," "review this for clarity," "help me figure out what they actually want," "turn this ask into requirements," "verbalize this model," "check these fact sentences," or when a user shares a fuzzy stakeholder request. Also apply it silently as a quality lens during creation of documents, designs, and code. This skill is a peer to any formatting or conventions skill — conventions govern structure and style; articulation governs whether the artifact actually lands with its audience.
+description: Make any artifact communicate clearly - prose, code, diagrams, data models, commit messages - and drive clarity out of vague requests. Use when creating an artifact for an audience, when asked to review or improve something's clarity (an "articulation review"), or when turning a vague stakeholder ask into precise requirements. Also applies silently as a quality lens while writing documents, designs, and code.
 ---
 
 # Articulation
