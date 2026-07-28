@@ -294,4 +294,74 @@ describe("DbtImportFormat", () => {
       expect(result.warnings.length).toBeGreaterThan(0);
     });
   });
+
+  describe("SQL mining (sql-dialect-capability WS1)", () => {
+    it("merges rules mined from model SQL into the YAML-derived model", async () => {
+      writeYaml(testDir, "models/marts/customers.yml", CUSTOMERS_YAML);
+      // customer_name has no YAML tests; the SQL guard and CASE below
+      // are the only signals for it and customer_type-style enums.
+      writeYaml(
+        testDir,
+        "models/marts/customers.sql",
+        `SELECT
+  customer_id,
+  customer_name,
+  CASE WHEN customer_type = 'new' THEN 1 WHEN customer_type = 'returning' THEN 0 END AS is_new
+FROM raw_customers
+WHERE customer_name IS NOT NULL
+`,
+      );
+
+      const result = await format.parseAsync!(testDir);
+
+      // WHERE guard -> mandatory on Customers has CustomerName.
+      const nameFt = result.model.getFactTypeByName("Customers has CustomerName");
+      expect(nameFt).toBeDefined();
+      expect(nameFt!.constraints.some((c) => c.type === "mandatory")).toBe(true);
+
+      // The YAML accepted_values already covers customer_type; the CASE
+      // enumeration must not duplicate it.
+      const typeFt = result.model.getFactTypeByName("Customers has CustomerType");
+      const valueConstraints = typeFt!.constraints.filter(
+        (c) => c.type === "value_constraint",
+      );
+      expect(valueConstraints).toHaveLength(1);
+
+      // The merge is surfaced in the warnings stream.
+      expect(result.warnings.some((w) => w.includes("SQL analysis:"))).toBe(true);
+      expect(
+        result.warnings.some((w) => w.includes("mandatory constraint")),
+      ).toBe(true);
+    });
+
+    it("reports undeclared JOIN relationships from model SQL as gaps", async () => {
+      writeYaml(testDir, "models/customers.yml", CUSTOMERS_YAML);
+      const ordersNoRel = `
+models:
+  - name: orders
+    columns:
+      - name: order_id
+        data_tests: [not_null, unique]
+`;
+      writeYaml(testDir, "models/orders.yml", ordersNoRel);
+      writeYaml(
+        testDir,
+        "models/orders.sql",
+        `SELECT o.order_id
+FROM raw_orders o
+JOIN customers c ON o.customer_id = c.customer_id
+`,
+      );
+
+      const result = await format.parseAsync!(testDir);
+
+      expect(
+        result.warnings.some(
+          (w) => w.includes("[gap]") && w.includes("relationships test"),
+        ),
+      ).toBe(true);
+      // Report-only: no fact type is invented for the join.
+      expect(result.model.getFactTypeByName("Orders has Customers")).toBeUndefined();
+    });
+  });
 });

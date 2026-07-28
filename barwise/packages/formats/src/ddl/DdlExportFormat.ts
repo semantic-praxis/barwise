@@ -4,7 +4,13 @@
  * Wraps the existing renderDdl() function as an ExportFormat, adding:
  * - Validation with strict mode support
  * - Annotation support (TODO/NOTE SQL comments from ExportAnnotationCollector)
- * - ExportResult structure with annotations array
+ * - Dialect-targeted constraint routing (sql-dialect-capability spec,
+ *   WS2): a per-dialect capability profile routes each constraint to a
+ *   native clause, an informational clause (e.g. `NOT ENFORCED`), or
+ *   the ConstraintSpec spillway plus a SQL comment -- degradation is
+ *   visible output, never silent dropping. Core's renderer stays
+ *   dialect-free; the judgment lives here.
+ * - ExportResult structure with annotations and constraintSpecs arrays
  */
 
 import {
@@ -16,6 +22,13 @@ import {
 } from "@barwise/core";
 import { collectExportAnnotations, type ExportAnnotation } from "@barwise/core/annotation";
 import { RelationalMapper, renderDdl, renderPopulationAsSql } from "@barwise/core/mapping";
+import {
+  type ConstraintRouting,
+  routeConstraints,
+  type RoutedClause,
+  type SpilledConstraint,
+} from "./constraintRouting.js";
+import { type DialectCapabilityProfile, resolveDialectProfile } from "./dialectCapabilities.js";
 
 /**
  * DDL (SQL CREATE TABLE) export format.
@@ -30,6 +43,8 @@ export class DdlExportFormat implements ExportFormatAdapter {
     const annotate = options?.annotate ?? true;
     const strict = options?.strict ?? false;
     const includeExamples = options?.includeExamples ?? true;
+    const dialect = (options?.["dialect"] as string | undefined) ?? "ansi";
+    const profile = resolveDialectProfile(dialect);
 
     // Run validation.
     const engine = new ValidationEngine();
@@ -53,8 +68,12 @@ export class DdlExportFormat implements ExportFormatAdapter {
       ? collectExportAnnotations(model, schema)
       : [];
 
-    // Render DDL.
+    // Render DDL (dialect-free), then route constraints through the
+    // dialect capability profile: extra UNIQUE/CHECK clauses,
+    // informational markers, and spillway comments.
     let ddlText = renderDdl(schema);
+    const routing = routeConstraints(model, schema, profile, dialect);
+    ddlText = applyConstraintRouting(ddlText, routing, profile, dialect);
 
     // If annotate is true, add source/definition comments and
     // TODO/NOTE annotations as SQL comments.
@@ -81,18 +100,17 @@ export class DdlExportFormat implements ExportFormatAdapter {
     return {
       text,
       annotations: annotations.length > 0 ? annotations : undefined,
+      constraintSpecs: routing.spilled.length > 0
+        ? routing.spilled.map((s) => s.spec)
+        : undefined,
     };
   }
 
   /**
-   * Add constraint annotations as SQL comments.
-   *
-   * This is a placeholder implementation for Stage A. Stage B will expand
-   * this to include detailed constraint specifications (verbalization,
-   * pseudocode, examples) for constraints that DDL cannot express natively.
-   *
-   * For now, we add simple comments for each table indicating which ORM
-   * element it came from.
+   * Add table source/definition annotations as SQL comments for each
+   * table indicating which ORM element it came from. (Constraint
+   * specifications for inexpressible constraints are handled by the
+   * constraint routing pass.)
    */
   private addConstraintAnnotations(
     ddl: string,
@@ -102,37 +120,158 @@ export class DdlExportFormat implements ExportFormatAdapter {
     const lines = ddl.split("\n");
     const result: string[] = [];
 
-    for (const table of schema.tables) {
-      // Find the CREATE TABLE line for this table.
-      const createTablePattern = new RegExp(
-        `^CREATE TABLE ("|)${table.name}("|) \\(`,
-      );
+    for (const line of lines) {
+      const match = /^CREATE TABLE "?(.+?)"? \($/.exec(line);
+      const table = match
+        ? schema.tables.find((t) => t.name === match[1])
+        : undefined;
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i]!;
+      if (table) {
+        // Find the source element (entity or fact type) that produced this table.
+        const sourceElement = model.objectTypes.find((ot) => ot.id === table.sourceElementId)
+          ?? model.factTypes.find((ft) => ft.id === table.sourceElementId);
 
-        if (createTablePattern.test(line)) {
-          // Find the source element (entity or fact type) that produced this table.
-          const sourceElement = model.objectTypes.find((ot) => ot.id === table.sourceElementId)
-            ?? model.factTypes.find((ft) => ft.id === table.sourceElementId);
+        if (sourceElement) {
+          result.push(`-- Table: ${table.name}`);
+          result.push(`-- Source: ${sourceElement.name} (${sourceElement.id})`);
 
-          if (sourceElement) {
-            result.push(`-- Table: ${table.name}`);
-            result.push(`-- Source: ${sourceElement.name} (${sourceElement.id})`);
-
-            // If the source has a definition, include it.
-            if ("definition" in sourceElement && sourceElement.definition) {
-              result.push(`-- Definition: ${sourceElement.definition}`);
-            }
+          // If the source has a definition, include it.
+          if ("definition" in sourceElement && sourceElement.definition) {
+            result.push(`-- Definition: ${sourceElement.definition}`);
           }
         }
-
-        result.push(line);
       }
+
+      result.push(line);
     }
 
     return result.join("\n");
   }
+}
+
+// ---------------------------------------------------------------------------
+// Dialect constraint routing (text pass)
+// ---------------------------------------------------------------------------
+
+/**
+ * Apply a constraint routing to rendered DDL:
+ *
+ * - inject routed UNIQUE/CHECK clauses into their CREATE TABLE bodies
+ * - mark PRIMARY KEY / FOREIGN KEY clauses the dialect treats as
+ *   informational (suffix such as ` NOT ENFORCED`, or a trailing
+ *   comment when the dialect has no marker syntax)
+ * - emit a comment above each table for every constraint that spilled
+ *   to the ConstraintSpec channel, so the degradation is visible in
+ *   the artifact itself
+ */
+function applyConstraintRouting(
+  ddl: string,
+  routing: ConstraintRouting,
+  profile: DialectCapabilityProfile,
+  dialectName: string,
+): string {
+  if (
+    routing.clauses.length === 0
+    && routing.spilled.length === 0
+    && profile.primaryKey !== "informational"
+    && profile.foreignKey !== "informational"
+  ) {
+    return ddl;
+  }
+
+  const informationalComment = `informational: not enforced by ${dialectName}`;
+
+  const clausesByTable = new Map<string, RoutedClause[]>();
+  for (const clause of routing.clauses) {
+    const list = clausesByTable.get(clause.tableName) ?? [];
+    list.push(clause);
+    clausesByTable.set(clause.tableName, list);
+  }
+
+  const spillsByTable = new Map<string, SpilledConstraint[]>();
+  const unplacedSpills: SpilledConstraint[] = [];
+  for (const spill of routing.spilled) {
+    if (spill.tableName) {
+      const list = spillsByTable.get(spill.tableName) ?? [];
+      list.push(spill);
+      spillsByTable.set(spill.tableName, list);
+    } else {
+      unplacedSpills.push(spill);
+    }
+  }
+
+  const lines = ddl.split("\n");
+  const out: string[] = [];
+  let currentTable: string | undefined;
+
+  for (const line of lines) {
+    const create = /^CREATE TABLE "?(.+?)"? \($/.exec(line);
+    if (create) {
+      currentTable = create[1]!;
+      for (const spill of spillsByTable.get(currentTable) ?? []) {
+        out.push(`-- Constraint (${spill.reason}): ${spill.spec.verbalization}`);
+      }
+      out.push(line);
+      continue;
+    }
+
+    if (currentTable) {
+      if (profile.primaryKey === "informational" && /^\s{2}PRIMARY KEY \(/.test(line)) {
+        out.push(markInformational(line, profile.informationalSuffix, informationalComment));
+        continue;
+      }
+      if (profile.foreignKey === "informational" && /^\s{2}FOREIGN KEY \(/.test(line)) {
+        out.push(markInformational(line, profile.informationalSuffix, informationalComment));
+        continue;
+      }
+      if (line === ");") {
+        const additions = clausesByTable.get(currentTable) ?? [];
+        if (additions.length > 0 && out.length > 0) {
+          out[out.length - 1] = appendComma(out[out.length - 1]!);
+          additions.forEach((clause, i) => {
+            let text = `  ${clause.sql}`;
+            if (clause.channel === "informational") text += profile.informationalSuffix;
+            if (i < additions.length - 1) text += ",";
+            if (clause.channel === "informational" && profile.informationalSuffix === "") {
+              text += ` -- ${informationalComment}`;
+            }
+            out.push(text);
+          });
+        }
+        out.push(line);
+        currentTable = undefined;
+        continue;
+      }
+    }
+
+    out.push(line);
+  }
+
+  for (const spill of unplacedSpills) {
+    out.push(`-- Constraint (${spill.reason}): ${spill.spec.verbalization}`);
+  }
+
+  return out.join("\n");
+}
+
+/**
+ * Mark an existing PK/FK clause line as informational: append the
+ * dialect's suffix before any trailing comma, or a trailing comment
+ * when the dialect has no marker syntax.
+ */
+function markInformational(line: string, suffix: string, comment: string): string {
+  const trimmed = line.trimEnd();
+  const hasComma = trimmed.endsWith(",");
+  const base = hasComma ? trimmed.slice(0, -1) : trimmed;
+  const marked = `${base}${suffix}${hasComma ? "," : ""}`;
+  return suffix === "" ? `${marked} -- ${comment}` : marked;
+}
+
+/** Append a comma to a clause line, keeping any trailing comment last. */
+function appendComma(line: string): string {
+  const commentIdx = line.indexOf(" --");
+  if (commentIdx === -1) return `${line},`;
+  return `${line.slice(0, commentIdx)},${line.slice(commentIdx)}`;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,16 +1,18 @@
 /**
- * The sqlglot sidecar: high-fidelity structural SQL parsing
- * (code-analysis spec; replaces the earlier Calcite sidecar design).
+ * The dbt connector's sqlglot sidecar: high-fidelity structural SQL
+ * parsing for mined dbt model SQL (sql-dialect-capability spec, WS1).
  *
  * Runs a short-lived `python3` subprocess with an embedded program
  * that parses SQL through sqlglot's multi-dialect AST and emits the
  * same pattern shapes the regex tier produces, tagged
  * `parseLevel: "sqlglot"`. The sidecar is optional: availability is
  * probed once per process, and callers fall back to the pure regex
- * cascade in core when Python or sqlglot is absent -- the degradation
- * the original sidecar design promised. The subprocess lives here in
- * @barwise/formats (which owns its I/O, like the dbt connector);
- * core stays pure.
+ * cascade in core when Python or sqlglot is absent.
+ *
+ * This file deliberately parallels `@barwise/formats`' bridge instead
+ * of sharing it: each connector package owns its subprocess I/O, and
+ * a shared bridge would couple the two packages (DRY is secondary to
+ * orthogonality here -- see the monorepo CLAUDE.md).
  */
 import type { CascadeFileResult, SqlDialect, SqlPatternContext } from "@barwise/core/sql";
 import { execFileSync } from "node:child_process";

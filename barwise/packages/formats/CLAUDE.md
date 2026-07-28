@@ -27,20 +27,27 @@ absent).
 
 ```
 src/
-  index.ts                Public API
-  registration.ts         The 5 descriptors + registerStandardFormats()
-  DdlImportFormat.ts       SQL DDL -> ORM
-  DdlExportFormat.ts       ORM -> SQL DDL (wraps renderDdl)
-  OpenApiImportFormat.ts   OpenAPI 3.x -> ORM
-  OpenApiExportFormat.ts   ORM -> OpenAPI JSON (wraps renderOpenApi)
-  AvroExportFormat.ts      ORM -> Avro schema (wraps renderAvro)
-  SqlImportFormat.ts       Raw SQL files -> ORM (text + directory scan)
-  sql/SqlglotBridge.ts     Optional sqlglot sidecar: structural SQL tier
-  NormaImportFormat.ts     NORMA .orm XML -> ORM
-  NormaXmlImporter.ts      NORMA import facade
-  NormaXmlParser.ts        NORMA XML parsing (fast-xml-parser)
-  NormaToOrmMapper.ts      NORMA document -> ORM model
-  NormaXmlTypes.ts         NORMA XML types
+  index.ts                       Public API
+  registration.ts                The 5 descriptors + registerStandardFormats()
+  ddl/DdlImportFormat.ts         SQL DDL -> ORM
+  ddl/DdlExportFormat.ts         ORM -> SQL DDL (wraps renderDdl; applies the
+                                 dialect constraint routing as a text pass)
+  ddl/dialectCapabilities.ts     Per-dialect constraint capability profiles
+                                 (native / informational / absent)
+  ddl/constraintRouting.ts       Routes model constraints to UNIQUE/CHECK
+                                 clauses or the ConstraintSpec spillway
+  openapi/OpenApiImportFormat.ts OpenAPI 3.x -> ORM
+  openapi/OpenApiExportFormat.ts ORM -> OpenAPI JSON (wraps renderOpenApi)
+  avro/AvroExportFormat.ts       ORM -> Avro schema (wraps renderAvro)
+  sql/SqlImportFormat.ts         Raw SQL files -> ORM (text + directory scan)
+  sql/SqlglotBridge.ts           Optional sqlglot sidecar: structural SQL tier
+                                 + sourceText normalization
+  norma/NormaImportFormat.ts     NORMA .orm XML -> ORM
+  norma/NormaExportFormat.ts     ORM -> NORMA .orm XML
+  norma/NormaXmlImporter.ts      NORMA import facade
+  norma/NormaXmlParser.ts        NORMA XML parsing (fast-xml-parser)
+  norma/NormaToOrmMapper.ts      NORMA document -> ORM model
+  norma/NormaXmlTypes.ts         NORMA XML types
 tests/
   helpers/ModelBuilder.ts  Fluent model builder (test-only)
   fixtures/*.orm           NORMA XML fixtures

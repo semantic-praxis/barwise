@@ -14,13 +14,16 @@
  * and extracts JOIN, WHERE, CASE, and constraint patterns.
  */
 
-import type { ImportFormat, ImportOptions, ImportResult } from "@barwise/core";
+import type { ImportFormat, ImportOptions, ImportResult, OrmModel } from "@barwise/core";
 import { parseSqlFile, type SqlDialect } from "@barwise/core/sql";
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { type DbtDialectOptions, detectDbtDialect } from "./DbtDialectDetector.js";
+import { ReportBuilder } from "./DbtImportReport.js";
+import { mergeSqlPatterns, type MinedSqlFile } from "./dbtMapping/sqlPatterns.js";
 import { importDbtProject } from "./DbtProjectImporter.js";
 import { compileDbtSql } from "./DbtSqlCompiler.js";
+import { normalizeCascadeResult, parseSqlWithSqlglot } from "./sql/SqlglotBridge.js";
 
 /**
  * Recursively find all .yml and .yaml files under a directory.
@@ -149,7 +152,9 @@ export class DbtImportFormat implements ImportFormat {
       (result.model as { name: string; }).name = options.modelName;
     }
 
-    // SQL analysis: compile and parse SQL files for additional patterns.
+    // SQL analysis: compile SQL models, mine patterns through the
+    // cascade (sqlglot sidecar when available, regex otherwise), and
+    // merge them into the same stream the YAML tests produced.
     // Dialect-detection inputs come from the caller (the tool layer reads
     // the environment), never from process.env in core.
     const dialectOptions: DbtDialectOptions = {
@@ -157,18 +162,13 @@ export class DbtImportFormat implements ImportFormat {
       targetType: options?.["dbtTargetType"] as string | undefined,
       homeDir: options?.["dbtProfilesHome"] as string | undefined,
     };
-    const sqlPatternCount = this.analyzeSqlFiles(projectDir, warnings, dialectOptions);
+    const sqlReport = new ReportBuilder();
+    this.analyzeSqlFiles(result.model, projectDir, warnings, dialectOptions, sqlReport);
 
     // Convert report entries to warnings for the ImportResult interface.
-    const reportWarnings = result.report.entries
+    const reportWarnings = [...result.report.entries, ...sqlReport.build().entries]
       .filter((e) => e.severity === "warning" || e.severity === "gap")
       .map((e) => `[${e.severity}] ${e.modelName}: ${e.message}`);
-
-    if (sqlPatternCount > 0) {
-      warnings.push(
-        `SQL analysis: found ${sqlPatternCount} pattern(s) from compiled SQL models`,
-      );
-    }
 
     return {
       model: result.model,
@@ -178,38 +178,59 @@ export class DbtImportFormat implements ImportFormat {
   }
 
   /**
-   * Analyze SQL files in the dbt project.
+   * Analyze SQL files in the dbt project and merge the mined patterns
+   * into the model.
    *
-   * Compiles Jinja-templated SQL via dbt compile output or stub rendering,
-   * then extracts patterns through the SQL cascade parser.
-   *
-   * @returns Number of patterns found
+   * Compiles Jinja-templated SQL via dbt compile output or stub
+   * rendering, extracts patterns through the cascade (the sqlglot
+   * sidecar when python3 + sqlglot are present, core's pure regex tier
+   * otherwise), and merges them into the model alongside the
+   * YAML-derived constraints.
    */
   private analyzeSqlFiles(
+    model: OrmModel,
     projectDir: string,
     warnings: string[],
     dialectOptions: DbtDialectOptions,
-  ): number {
+    report: ReportBuilder,
+  ): void {
     try {
       const dialect = detectDbtDialect(projectDir, dialectOptions);
       const compiledFiles = compileDbtSql(projectDir);
 
       if (compiledFiles.length === 0) {
-        return 0;
+        return;
       }
 
+      const mined: MinedSqlFile[] = [];
       let totalPatterns = 0;
+      let sqlglotFiles = 0;
       for (const file of compiledFiles) {
-        const result = parseSqlFile(file.sql, file.sourcePath, dialect);
+        const result = parseSqlWithSqlglot(file.sql, file.sourcePath, dialect)
+          ?? normalizeCascadeResult(parseSqlFile(file.sql, file.sourcePath, dialect));
+        if (result.statements.some((s) => s.parseLevel === "sqlglot")) {
+          sqlglotFiles += 1;
+        }
         totalPatterns += result.patterns.length;
+        mined.push({
+          modelName: basename(file.sourcePath, ".sql"),
+          sourcePath: file.sourcePath,
+          patterns: result.patterns,
+        });
       }
 
-      return totalPatterns;
+      const stats = mergeSqlPatterns(model, mined, report);
+      if (totalPatterns > 0) {
+        warnings.push(
+          `SQL analysis: ${totalPatterns} pattern(s) from ${compiledFiles.length} SQL `
+            + `model(s) (${sqlglotFiles} via sqlglot); ${stats.constraintsAdded} `
+            + `constraint(s) merged into the model`,
+        );
+      }
     } catch (err) {
       warnings.push(
         `SQL analysis skipped: ${err instanceof Error ? err.message : String(err)}`,
       );
-      return 0;
     }
   }
 }

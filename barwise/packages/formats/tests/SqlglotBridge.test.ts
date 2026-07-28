@@ -3,8 +3,14 @@
  * when python3 + sqlglot are present (the sidecar is optional by
  * design); the degradation path is always tested.
  */
+import { parseSqlFile } from "@barwise/core/sql";
 import { describe, expect, it } from "vitest";
-import { parseSqlWithSqlglot, sqlglotAvailable } from "../src/sql/SqlglotBridge.js";
+import {
+  normalizeCascadeResult,
+  normalizeSqlTexts,
+  parseSqlWithSqlglot,
+  sqlglotAvailable,
+} from "../src/sql/SqlglotBridge.js";
 
 const available = sqlglotAvailable();
 
@@ -60,6 +66,39 @@ CREATE TABLE orders (
       expect(result === undefined || result.statements.length >= 0).toBe(true);
     } else {
       expect(result).toBeUndefined();
+    }
+  });
+});
+
+describe("sourceText normalization (WS3)", () => {
+  it.runIf(available)("renders equivalent snippets identically regardless of whitespace", () => {
+    const [a] = normalizeSqlTexts(["SELECT   x FROM t WHERE x  IN ('a',   'b')"])!;
+    const [b] = normalizeSqlTexts(["SELECT x\nFROM t\nWHERE x IN ('a', 'b')"])!;
+    expect(a).toBe(b);
+  });
+
+  it.runIf(available)("leaves unparseable clause fragments unchanged", () => {
+    const fragment = "FOREIGN KEY (a) REFERENCES b (c)";
+    expect(normalizeSqlTexts([fragment])![0]).toBe(fragment);
+  });
+
+  it("degrades to raw text without python", () => {
+    if (!available) {
+      expect(normalizeSqlTexts(["SELECT 1"])).toBeUndefined();
+    }
+    expect(normalizeSqlTexts([])).toEqual([]);
+  });
+
+  it("normalizeCascadeResult keeps pattern structure intact", () => {
+    const raw = parseSqlFile("SELECT * FROM t WHERE status   IN ('a',  'b')", "t.sql");
+    const normalized = normalizeCascadeResult(raw);
+    expect(normalized.patterns.length).toBe(raw.patterns.length);
+    expect(normalized.statements.length).toBe(raw.statements.length);
+    if (available) {
+      const where = normalized.patterns.find((p) => p.kind === "where");
+      expect(where?.sourceText).toBe("status IN ('a', 'b')");
+    } else {
+      expect(normalized).toBe(raw);
     }
   });
 });

@@ -30,6 +30,7 @@ interface ExportOptions {
   strict: boolean;
   examples: boolean;
   domain?: string;
+  dialect?: string;
 }
 
 export function registerExportCommand(program: Command): void {
@@ -43,6 +44,12 @@ export function registerExportCommand(program: Command): void {
     .option("--strict", "Fail on validation errors")
     .option("--no-examples", "Exclude population examples")
     .option("--domain <context>", "For a project, export only this one domain")
+    .option(
+      "--dialect <name>",
+      "Target SQL dialect for DDL export (ansi, postgres, mysql, snowflake, "
+        + "bigquery, redshift, databricks); routes each constraint to a native "
+        + "clause, an informational clause, or a constraint-spec comment",
+    )
     .action(async (source: string, opts: ExportOptions) => {
       try {
         const exporter = getExporter(opts.format);
@@ -86,7 +93,12 @@ export function registerExportCommand(program: Command): void {
 }
 
 function exportOpts(opts: ExportOptions) {
-  return { annotate: opts.annotate, strict: opts.strict, includeExamples: opts.examples };
+  return {
+    annotate: opts.annotate,
+    strict: opts.strict,
+    includeExamples: opts.examples,
+    ...(opts.dialect ? { dialect: opts.dialect } : {}),
+  };
 }
 
 /** Write a single export result to a file or directory (no lineage manifest). */
