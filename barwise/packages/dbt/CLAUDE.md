@@ -16,7 +16,10 @@ editor or tool package.
 
 Allowed runtime dependencies: `@barwise/core`, `yaml`. No others without
 discussion. The package uses `node:fs` for project discovery and
-`node:child_process` (via `DbtSqlCompiler`) for `dbt compile`.
+`node:child_process` for `dbt compile` (via `DbtSqlCompiler`) and for
+the optional sqlglot sidecar (via `sql/SqlglotBridge`; SQL mining
+degrades to core's pure regex tier when python3 or sqlglot is absent --
+the same optional-python posture as `@barwise/formats`).
 
 ## Package Layout
 
@@ -34,6 +37,11 @@ src/
   DbtDialectDetector.ts  Resolve SQL dialect from profiles.yml/options
   DbtSqlCompiler.ts      Compile SQL models (dbt compile / stub Jinja)
   DbtExportFormat.ts     ExportFormatAdapter: ORM model -> dbt schema YAML
+  sql/SqlglotBridge.ts   Optional sqlglot sidecar for SQL mining (parallel
+                         to formats' bridge by design; connectors own
+                         their subprocess I/O)
+  dbtMapping/sqlPatterns.ts  Merge mined SQL patterns (WHERE guards, CASE
+                         branches, DDL constraints, joins) into the model
 tests/
   helpers/ModelBuilder.ts  Fluent model builder (test-only)
   *.test.ts                Mirrors src/

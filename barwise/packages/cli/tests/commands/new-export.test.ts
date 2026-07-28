@@ -63,6 +63,32 @@ describe("barwise export (new format registry)", () => {
     rmSync(outputFile);
   });
 
+  it("targets a SQL dialect with --dialect", async () => {
+    const result = await runCli([
+      "export",
+      `${fixtures}/simple.orm.yaml`,
+      "--format",
+      "ddl",
+      "--dialect",
+      "snowflake",
+    ]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toMatch(/PRIMARY KEY \([^)]*\) NOT ENFORCED/);
+  });
+
+  it("reports error for an unknown --dialect", async () => {
+    const result = await runCli([
+      "export",
+      `${fixtures}/simple.orm.yaml`,
+      "--format",
+      "ddl",
+      "--dialect",
+      "oracle",
+    ]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("Unknown SQL dialect");
+  });
+
   it("reports error for unknown format", async () => {
     const result = await runCli([
       "export",

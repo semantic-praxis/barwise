@@ -17,6 +17,11 @@ export type {
   ReportSeverity,
 } from "./DbtImportReport.js";
 export { ReportBuilder } from "./DbtImportReport.js";
+export {
+  mergeSqlPatterns,
+  type MinedSqlFile,
+  type SqlMergeStats,
+} from "./dbtMapping/sqlPatterns.js";
 export { DbtImportError, type DbtImportResult, importDbtProject } from "./DbtProjectImporter.js";
 export { DbtParseError, parseDbtSchema } from "./DbtSchemaParser.js";
 export type {

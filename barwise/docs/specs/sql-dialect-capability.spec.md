@@ -1,12 +1,17 @@
 # SQL dialect capability: dbt SQL mining, targeted DDL export, normalization
 
-Status: Ratified by the owner 2026-07-26 (follow-ups to the sqlglot
-sidecar, #277); not yet implemented. Re-ground against source before
-building -- the sidecar (`formats/src/sql/SqlglotBridge.ts`) and the
-`ConstraintSpec` export channel (`core/src/export/types.ts`) are the
-two seams everything below plugs into.
+Status: Implemented 2026-07-28 (all three workstreams). WS1: the dbt
+importer gained its own sqlglot sidecar (`dbt/src/sql/SqlglotBridge.ts`)
+and merges mined patterns into the model via
+`dbt/src/dbtMapping/sqlPatterns.ts`. WS2: the capability profile is a
+declarative table (`formats/src/ddl/dialectCapabilities.ts`, the
+recommended open decision) routing constraints only -- type rendering
+untouched, and no `transpile()` call in the export path so the artifact
+does not depend on whether python is installed. WS3:
+`normalizeSqlTexts` in both sidecar bridges canonicalizes regex-tier
+`sourceText` when python is present.
 Created: 2026-07-27
-Last-updated: 2026-07-27
+Last-updated: 2026-07-28
 Tracking: code-analysis spec (sqlglot decision recorded in its status);
 REPO_REVIEW-2026-07-26 standing follow-ups
 

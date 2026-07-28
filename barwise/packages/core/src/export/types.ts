@@ -80,7 +80,7 @@ export interface ExportOptions {
   /**
    * Format-specific options.
    * Examples:
-   * - ddl: { dialect: "generic" | "postgres" | "snowflake" }
+   * - ddl: { dialect: "ansi" | "postgres" | "mysql" | "snowflake" | "bigquery" | "redshift" | "databricks" }
    * - openapi: { title, apiVersion, basePath }
    * - avro: { namespace }
    * - dbt: { sourceName, generateRelationshipTests }
