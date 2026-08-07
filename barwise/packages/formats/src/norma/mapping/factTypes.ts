@@ -42,6 +42,7 @@ export function mapFactTypes(ctx: NormaMappingContext): void {
 
     // Resolve constraints that belong to this fact type.
     const constraints = resolveConstraintsForFactType(nft, constraintById, joinDecoder);
+    constraints.push(...roleCardinalityConstraints(nft));
 
     const ft = model.addFactType({
       name: nft.name || generateFactTypeName(nft, objectTypeIdMap, model),
@@ -112,6 +113,29 @@ function generateFactTypeName(
     return "Unknown";
   });
   return playerNames.join(" has ");
+}
+
+/**
+ * Unary-role cardinality restrictions carried inline on the Role elements
+ * (not in InternalConstraints) -> CardinalityConstraint. First NORMA range
+ * -> the model's single bound, mirroring the object-type mapping.
+ */
+function roleCardinalityConstraints(nft: NormaFactType): Constraint[] {
+  const constraints: Constraint[] = [];
+  for (const nr of nft.roles) {
+    const card = nr.cardinality;
+    const r = card?.ranges[0];
+    if (!card || !r) continue;
+    constraints.push({
+      type: "cardinality",
+      ...(card.id ? { id: card.id } : {}),
+      roleId: nr.id,
+      min: r.from,
+      max: r.to ?? "unbounded",
+      ...(card.modality ? { modality: card.modality } : {}),
+    });
+  }
+  return constraints;
 }
 
 /**

@@ -14,13 +14,19 @@ deontic modality (`Modality="Deontic"`), object-type cardinality
 the model's single bound), and fact-type derivation
 (`DerivationRule` completeness/storage attributes + informal
 `DerivationNote` body; attribute defaults omitted, so an explicit
-`derive_on_request` normalizes to the default on re-import). Still
-open: unary-role cardinality (core has `CardinalityConstraint`; the
-NORMA `UnaryRoleCardinalityRestriction` seat is grounded but unwired)
-and default values, which have no encoding in NORMA's schema at all --
-a permanent RT gap on NORMA's side, not barwise's.
+`derive_on_request` normalizes to the default on re-import).
+WS3 completed 2026-08-07 with unary-role cardinality: a `cardinality`
+constraint round-trips as the Role element's `CardinalityRestriction >
+UnaryRoleCardinalityConstraint` (nesting re-confirmed against
+`ORM2Core.xsd`: `RoleBaseType` carries the restriction; the inner
+element is `UnaryRoleCardinalityConstraint`), including deontic
+modality on both cardinality homes. Default values remain
+unencodable -- no seat in NORMA's schema at all, a permanent RT gap on
+NORMA's side, not barwise's. All engineering workstreams are complete;
+the one remaining item is the manual NORMA-load check of an exported
+diagram (manual test plan, needs a NORMA install).
 Created: 2026-06-17
-Last-updated: 2026-07-26
+Last-updated: 2026-08-07
 Tracking: barwise-cb6 (norma CLI), barwise-e3g (diagram round-trip),
 barwise-5t9 (conceptual coverage gaps), docs/NORMA_VS_ORM_YAML.md
 

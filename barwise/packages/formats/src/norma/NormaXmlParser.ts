@@ -360,12 +360,14 @@ function parseRoles(
   if (!factRoles) return [];
   return asArray(factRoles["Role"]).map((r) => {
     const playerEl = child(r, "RolePlayer") as Record<string, unknown> | undefined;
+    const cardinality = parseCardinalityRestriction(r, "UnaryRoleCardinalityConstraint");
     return {
       id: attr(r, "id") ?? "",
       name: attr(r, "Name") ?? "",
       playerRef: playerEl ? (attr(playerEl, "ref") ?? "") : "",
       isMandatory: attr(r, "_IsMandatory") === "true",
       multiplicity: parseMultiplicity(attr(r, "_Multiplicity")),
+      ...(cardinality ? { cardinality } : {}),
     };
   });
 }
@@ -778,15 +780,18 @@ function dataTypeTagToKind(tag: string): string {
 }
 
 /**
- * CardinalityRestriction > CardinalityConstraint > Ranges > CardinalityRange
- * (From required, To omitted for an unbounded range).
+ * CardinalityRestriction > {constraintTag} > Ranges > CardinalityRange
+ * (From required, To omitted for an unbounded range). The inner tag is
+ * CardinalityConstraint on object types and UnaryRoleCardinalityConstraint
+ * on roles; the nesting is otherwise identical.
  */
 function parseCardinalityRestriction(
   el: Record<string, unknown>,
+  constraintTag = "CardinalityConstraint",
 ): NormaCardinality | undefined {
   const restriction = child(el, "CardinalityRestriction") as Record<string, unknown> | undefined;
   if (!restriction) return undefined;
-  const cc = child(restriction, "CardinalityConstraint") as Record<string, unknown> | undefined;
+  const cc = child(restriction, constraintTag) as Record<string, unknown> | undefined;
   if (!cc) return undefined;
   const rangesEl = child(cc, "Ranges") as Record<string, unknown> | undefined;
   const ranges: NormaCardinalityRange[] = asArray(rangesEl?.["CardinalityRange"]).map((r) => {
@@ -798,7 +803,11 @@ function parseCardinalityRestriction(
     };
   });
   if (ranges.length === 0) return undefined;
-  return { id: attr(cc, "id") ?? "", ranges };
+  return {
+    id: attr(cc, "id") ?? "",
+    ranges,
+    ...(attr(cc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
+  };
 }
 
 /**

@@ -20,6 +20,7 @@
  * These mappings are derived from publicly documented format information.
  */
 import type {
+  CardinalityConstraint,
   ConceptualDataTypeName,
   Constraint,
   FactType,
@@ -285,12 +286,24 @@ function writeRole(ft: FactType, role: Role): NormaRole {
   const isMandatory = ft.constraints.some(
     (c) => c.type === "mandatory" && c.roleId === role.id,
   );
+  const card = ft.constraints.find(
+    (c): c is CardinalityConstraint => c.type === "cardinality" && c.roleId === role.id,
+  );
   return {
     id: normaId(role.id),
     name: role.name,
     playerRef: normaId(role.playerId),
     isMandatory,
     multiplicity: "Unspecified",
+    ...(card
+      ? {
+        cardinality: {
+          id: card.id ? normaId(card.id) : `${normaId(role.id)}_card`,
+          ranges: [{ from: card.min, ...(card.max !== "unbounded" ? { to: card.max } : {}) }],
+          ...(card.modality === "deontic" ? { modality: "deontic" as const } : {}),
+        },
+      }
+      : {}),
   };
 }
 
@@ -444,6 +457,10 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         supersetJoinPath,
       };
     }
+    case "cardinality":
+      // Carried on the role itself (UnaryRoleCardinalityConstraint inside
+      // the Role's CardinalityRestriction), never as a top-level constraint.
+      return undefined;
     case "join_equality":
     case "join_exclusion": {
       const roleSequences: string[][] = [];
