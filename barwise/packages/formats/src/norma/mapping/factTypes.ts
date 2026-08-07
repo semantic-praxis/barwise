@@ -159,9 +159,21 @@ function resolveConstraintsForFactType(
     if (!nc) continue;
 
     const mapped = mapNormaConstraint(nc, nft, joinDecoder);
-    if (mapped) {
-      constraints.push(mapped);
+    if (!mapped) continue;
+    // Both halves of an exclusive-or pair map to the same exclusive_or;
+    // if a file lists both in InternalConstraints, keep one.
+    if (
+      mapped.type === "exclusive_or"
+      && constraints.some(
+        (c) =>
+          c.type === "exclusive_or"
+          && c.roleIds.length === mapped.roleIds.length
+          && mapped.roleIds.every((id) => c.roleIds.includes(id)),
+      )
+    ) {
+      continue;
     }
+    constraints.push(mapped);
   }
 
   return constraints;
