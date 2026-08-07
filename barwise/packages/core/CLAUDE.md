@@ -36,7 +36,7 @@ the root barrel: `@barwise/core/mapping`, `/diff`, `/verbalization`,
 `/query`. Each has a `src/<name>/index.ts` barrel listed in
 `package.json` `exports`. Import a capability from its subpath; import
 the metamodel, serializers, validation, and the format registry from the
-root. (Spec: `docs/specs/core-subpath-exports.spec.md`.)
+root. (Spec: `docs/specs/archive/core-subpath-exports.spec.md`.)
 
 ## Commands
 
@@ -53,7 +53,7 @@ Lint is run from the repo root: `npm run lint`.
 - Every model element gets a UUID default id at creation via
   `generateId()` (`src/model/id.ts`): v4 `randomUUID()` unless a
   surface entry point installed the UUIDv7 generator (see
-  `docs/specs/uuid7-identifiers.spec.md`). Never add the `uuid` npm
+  `docs/specs/archive/uuid7-identifiers.spec.md`). Never add the `uuid` npm
   package; the v7 bit layout is core's pure `uuidv7FromParts`.
 - Constraint types use discriminated unions with type guard functions
   (`isInternalUniqueness`, `isMandatoryRole`, etc.) rather than class

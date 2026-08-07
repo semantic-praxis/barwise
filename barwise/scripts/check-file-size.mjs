@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// File-size smell report -- WS6 of docs/specs/architecture-analysis.spec.md.
+// File-size smell report -- WS6 of docs/specs/archive/architecture-analysis.spec.md.
 //
 // Warn-only (never gates). Large files are a smell, not a rule -- a
 // cohesive generated file can be legitimately long, so this reports

@@ -19,7 +19,7 @@ const saveSerializer = new OrmYamlSerializer();
  * concerns: hosting the webview, watching the document, translating
  * webview messages into `DiagramSession` intents and posting the resulting
  * presentation back, and the file I/O for save-layout / save-view. See
- * `docs/specs/diagram-presentation-contract.spec.md`.
+ * `docs/specs/archive/diagram-presentation-contract.spec.md`.
  */
 export class DiagramPanel {
   private static currentPanel: DiagramPanel | undefined;

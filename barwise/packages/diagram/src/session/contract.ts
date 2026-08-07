@@ -4,7 +4,7 @@
  * Plain, serializable data a `DiagramSession` produces and a front end
  * renders. No class instances, no functions -- these cross `postMessage`,
  * a JSON file, or a function return identically. See
- * `docs/specs/diagram-presentation-contract.spec.md`.
+ * `docs/specs/archive/diagram-presentation-contract.spec.md`.
  */
 import type { PositionedGraph } from "../layout/LayoutTypes.js";
 import type { ModelSummary } from "./modelSummary.js";

@@ -46,12 +46,32 @@ function buildModel(): OrmModel {
     id: "ft-preferred",
     roles: [{ id: "r-preferred", name: "is preferred", playerId: customer.id }],
     readings: ["{0} is preferred"],
-    constraints: [{ type: "internal_uniqueness", roleIds: ["r-preferred"] }],
+    constraints: [
+      { type: "internal_uniqueness", roleIds: ["r-preferred"] },
+      { type: "cardinality", id: "c-pref-card", roleId: "r-preferred", min: 0, max: 10 },
+    ],
     derivation: {
       kind: "semiderived",
       storage: "derived_and_stored",
       expression: "Customer placed more than 10 Orders last year",
     },
+  });
+  model.addFactType({
+    name: "Customer is active",
+    id: "ft-active",
+    roles: [{ id: "r-active", name: "is active", playerId: customer.id }],
+    readings: ["{0} is active"],
+    constraints: [
+      { type: "internal_uniqueness", roleIds: ["r-active"] },
+      {
+        type: "cardinality",
+        id: "c-active-card",
+        roleId: "r-active",
+        min: 2,
+        max: "unbounded",
+        modality: "deontic",
+      },
+    ],
   });
   model.addDiagramLayout({
     name: "Main",
@@ -98,6 +118,33 @@ describe("NORMA construct round-trip (WS3)", () => {
     expect(back.getObjectTypeByName("Order")!.cardinality).toEqual({
       min: 0,
       max: "unbounded",
+    });
+  });
+
+  it("emits unary-role cardinality on the Role element, not top-level", () => {
+    expect(xml).toContain("orm:UnaryRoleCardinalityConstraint");
+    // The restriction nests inside the fact's Role, so the constraint id
+    // must not appear in the fact's InternalConstraints refs.
+    expect(xml).not.toMatch(/InternalConstraints[^>]*>[^]*?ref="c-pref-card"/);
+  });
+
+  it("round-trips unary-role cardinality, bounded and deontic-unbounded", () => {
+    const pref = back.getFactTypeByName("Customer is preferred")!;
+    const prefCard = pref.constraints.find((c) => c.type === "cardinality")!;
+    expect(prefCard).toMatchObject({
+      roleId: pref.roles[0]!.id,
+      min: 0,
+      max: 10,
+    });
+    expect(prefCard.modality).toBeUndefined();
+
+    const active = back.getFactTypeByName("Customer is active")!;
+    const activeCard = active.constraints.find((c) => c.type === "cardinality")!;
+    expect(activeCard).toMatchObject({
+      roleId: active.roles[0]!.id,
+      min: 2,
+      max: "unbounded",
+      modality: "deontic",
     });
   });
 

@@ -89,6 +89,9 @@ jobs:
       # contributor's `git pull` fail with "would clobber existing tag".
       # The downloadable bundles stay current; the release body records
       # the real build commit even though the tag itself does not move.
+      # --draft=false: a release left in draft (e.g. by a manual edit in
+      # the UI) is invisible and undownloadable, so every refresh
+      # republishes it.
       - name: Refresh edge pre-release
         if: github.event_name == 'push'
         env:
@@ -96,7 +99,7 @@ jobs:
         run: |
           notes="Automatically built from commit ${{ github.sha }}. Unstable preview of the latest main -- not a tagged release. For a stable build, use the latest versioned release."
           if gh release view edge --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            gh release edit edge --prerelease --notes "$notes" \
+            gh release edit edge --draft=false --prerelease --notes "$notes" \
               --repo "${{ github.repository }}"
           else
             gh release create edge --prerelease --target "${{ github.sha }}" \

@@ -34,10 +34,16 @@ export interface NormaCardinalityRange {
   readonly to?: number;
 }
 
-/** A cardinality constraint (object-type population bound). */
+/**
+ * A cardinality constraint: an object-type population bound
+ * (CardinalityConstraint) or a unary-role bound
+ * (UnaryRoleCardinalityConstraint). Same range shape either way; the
+ * owning element decides which NORMA tag it serializes under.
+ */
 export interface NormaCardinality {
   readonly id: string;
   readonly ranges: readonly NormaCardinalityRange[];
+  readonly modality?: "deontic";
 }
 
 /**
@@ -168,6 +174,8 @@ export interface NormaRole {
   readonly playerRef: string; // ref to ObjectType id
   readonly isMandatory: boolean;
   readonly multiplicity: NormaMultiplicity;
+  /** Unary-role cardinality (CardinalityRestriction on the Role element). */
+  readonly cardinality?: NormaCardinality;
 }
 
 /** A reading order within a NORMA fact type. */

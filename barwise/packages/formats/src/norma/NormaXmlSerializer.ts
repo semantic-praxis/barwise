@@ -252,12 +252,14 @@ function constraintRefTag(c: NormaConstraint): string {
 }
 
 function buildFactRole(role: NormaRole): XmlNode {
-  return {
+  const node: XmlNode = {
     [`${ATTR}id`]: role.id,
     [`${ATTR}Name`]: role.name,
     [`${ATTR}_IsMandatory`]: role.isMandatory ? "true" : "false",
     "orm:RolePlayer": { [`${ATTR}ref`]: role.playerRef },
   };
+  addCardinality(node, role.cardinality, "orm:UnaryRoleCardinalityConstraint");
+  return node;
 }
 
 function buildReadingOrder(ro: NormaReadingOrder): XmlNode {
@@ -578,11 +580,13 @@ function kindToTag(kind: string): string {
 function addCardinality(
   node: XmlNode,
   cardinality: NormaCardinality | undefined,
+  constraintTag = "orm:CardinalityConstraint",
 ): void {
   if (!cardinality) return;
   node["orm:CardinalityRestriction"] = {
-    "orm:CardinalityConstraint": {
+    [constraintTag]: {
       [`${ATTR}id`]: cardinality.id,
+      ...(cardinality.modality === "deontic" ? { [`${ATTR}Modality`]: "Deontic" } : {}),
       "orm:Ranges": {
         "orm:CardinalityRange": cardinality.ranges.map((r, i) => ({
           [`${ATTR}id`]: `${cardinality.id}_r${i}`,

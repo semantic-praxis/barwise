@@ -5,7 +5,7 @@
  *
  * This is the one shared project branch the read/analyze commands reuse, so
  * each does not re-implement project detection (the pattern `diagram` first
- * open-coded). See docs/specs/orm-project-surface-wiring.spec.md.
+ * open-coded). See docs/specs/archive/orm-project-surface-wiring.spec.md.
  */
 
 import type { OrmModel } from "@barwise/core";

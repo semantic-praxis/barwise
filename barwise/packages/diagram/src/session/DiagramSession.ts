@@ -6,7 +6,7 @@
  * ghost neighbors -- and produces a serializable `DiagramPresentation`.
  * It has zero VS Code, browser, or filesystem dependencies, so any front
  * end (the VS Code webview today, a server tomorrow, a unit test) can
- * drive it. See `docs/specs/diagram-presentation-contract.spec.md`.
+ * drive it. See `docs/specs/archive/diagram-presentation-contract.spec.md`.
  *
  * Persistence (reading/writing the `.orm.yaml`) and the async stale-render
  * guard stay in the host adapter; this class only assembles the data.

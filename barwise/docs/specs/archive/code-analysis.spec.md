@@ -1,6 +1,6 @@
 # Code analysis: business rule extraction from code
 
-Status: Partial -- TypeScript/Java/Kotlin importers registered on
+Status: Complete -- TypeScript/Java/Kotlin importers registered on
 every surface (registerCodeFormats), LSP sessions and guiding-model
 context shipped. The Calcite sidecar was reconsidered and replaced
 (owner decision, 2026-07-26): the goal is high-fidelity structural SQL

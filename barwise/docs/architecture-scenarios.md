@@ -1,7 +1,7 @@
 # Architecture scenarios: the principle-to-scenario catalog
 
 Status: living document. This is WS1 of the architecture-analysis
-program (`docs/specs/architecture-analysis.spec.md`). It is the input to
+program (`docs/specs/archive/architecture-analysis.spec.md`). It is the input to
 every Phase A deep assessment and the source list for the Phase B
 fitness functions.
 

@@ -72,7 +72,7 @@ current download always exists between tagged releases.
 ## Minor releases: run the Phase A architecture review
 
 A minor release is the cadence point for the deep assessment in
-`barwise/docs/specs/architecture-analysis.spec.md`: walk the scenario
+`barwise/docs/specs/archive/architecture-analysis.spec.md`: walk the scenario
 catalog in `docs/architecture-scenarios.md`, refresh the reflexion and
 hotspot snapshot via `npm run arch:triage -- --base <last-release-tag>`
 (so the ranking covers only the changes since that release), and
