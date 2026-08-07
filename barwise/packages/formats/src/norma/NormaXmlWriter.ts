@@ -422,8 +422,9 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
       };
     case "exclusive_or":
       // NORMA models exclusive-or as a paired exclusion + disjunctive
-      // mandatory. The importer collapses an exclusion back to "exclusion";
-      // here we emit the exclusion half so the disjunction is preserved.
+      // mandatory. Only the exclusion half is emitted here, so the
+      // constraint degrades to "at most one" on round-trip -- the known
+      // open defect in the constraint round-trip (NORMA_VS_ORM_YAML.md).
       return {
         type: "exclusion",
         id,
