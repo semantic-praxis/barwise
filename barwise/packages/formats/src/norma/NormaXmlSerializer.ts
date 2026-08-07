@@ -162,6 +162,10 @@ function buildValueType(vt: NormaValueType): XmlNode {
   if (vt.valueConstraint) {
     node["orm:ValueRestriction"] = buildInlineValueRestriction(vt.id, vt.valueConstraint);
   }
+  // XSD order: ConceptualDataType, ValueRestriction, then DefaultValue.
+  if (vt.defaultValue !== undefined) {
+    node["orm:DefaultValue"] = vt.defaultValue;
+  }
   return node;
 }
 
@@ -248,6 +252,8 @@ function constraintRefTag(c: NormaConstraint): string {
       return "orm:EqualityConstraint";
     case "ring":
       return "orm:RingConstraint";
+    case "value_comparison":
+      return "orm:ValueComparisonConstraint";
   }
 }
 
@@ -335,6 +341,7 @@ function buildConstraints(doc: NormaDocument): XmlNode {
   const exclusion: XmlNode[] = [];
   const equality: XmlNode[] = [];
   const ring: XmlNode[] = [];
+  const valueComparison: XmlNode[] = [];
 
   for (const c of doc.constraints) {
     switch (c.type) {
@@ -362,6 +369,9 @@ function buildConstraints(doc: NormaDocument): XmlNode {
       case "ring":
         ring.push(buildRing(c));
         break;
+      case "value_comparison":
+        valueComparison.push(buildValueComparison(c));
+        break;
     }
   }
 
@@ -373,7 +383,22 @@ function buildConstraints(doc: NormaDocument): XmlNode {
   if (exclusion.length > 0) out["orm:ExclusionConstraint"] = exclusion;
   if (equality.length > 0) out["orm:EqualityConstraint"] = equality;
   if (ring.length > 0) out["orm:RingConstraint"] = ring;
+  if (valueComparison.length > 0) {
+    out["orm:ValueComparisonConstraint"] = valueComparison;
+  }
   return out;
+}
+
+function buildValueComparison(
+  c: Extract<NormaConstraint, { type: "value_comparison"; }>,
+): XmlNode {
+  return {
+    [`${ATTR}id`]: c.id,
+    [`${ATTR}Name`]: c.name,
+    ...(c.modality === "deontic" ? { [`${ATTR}Modality`]: "Deontic" } : {}),
+    [`${ATTR}Operator`]: c.operator,
+    "orm:RoleSequence": roleSequence(c.roleRefs),
+  };
 }
 
 function buildUniqueness(c: Extract<NormaConstraint, { type: "uniqueness"; }>): XmlNode {
@@ -396,6 +421,11 @@ function buildMandatory(c: Extract<NormaConstraint, { type: "mandatory"; }>): Xm
     [`${ATTR}IsSimple`]: c.isSimple ? "true" : "false",
     [`${ATTR}IsImplied`]: c.isImplied ? "true" : "false",
     "orm:RoleSequence": roleSequence(c.roleRefs),
+    ...(c.exclusiveOrExclusionRef !== undefined
+      ? {
+        "orm:ExclusiveOrExclusionConstraint": { [`${ATTR}ref`]: c.exclusiveOrExclusionRef },
+      }
+      : {}),
   };
 }
 
@@ -444,6 +474,11 @@ function buildExclusion(c: Extract<NormaConstraint, { type: "exclusion"; }>): Xm
         joinableRoleSequence(seq, c.joinPaths?.[i])
       ),
     },
+    ...(c.exclusiveOrMandatoryRef !== undefined
+      ? {
+        "orm:ExclusiveOrMandatoryConstraint": { [`${ATTR}ref`]: c.exclusiveOrMandatoryRef },
+      }
+      : {}),
   };
 }
 

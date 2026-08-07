@@ -110,6 +110,8 @@ export interface NormaValueType {
   readonly valueConstraint?: NormaValueConstraintInline;
   /** Reference to a NormaDataType id from the DataTypes section. */
   readonly dataTypeRef?: string;
+  /** DefaultValue element: the declared default for this value type. */
+  readonly defaultValue?: string;
   /** Length parameter from ConceptualDataType (e.g. VARCHAR length). */
   readonly dataTypeLength?: number;
   /** Scale parameter from ConceptualDataType (e.g. decimal scale). */
@@ -212,7 +214,29 @@ export type NormaConstraint =
   | NormaSubsetConstraint
   | NormaExclusionConstraint
   | NormaEqualityConstraint
-  | NormaRingConstraint;
+  | NormaRingConstraint
+  | NormaValueComparisonConstraint;
+
+/** NORMA's ValueComparisonOperatorValues enumeration (Undefined excluded on write). */
+export type NormaValueComparisonOperator =
+  | "Undefined"
+  | "Equal"
+  | "NotEqual"
+  | "LessThan"
+  | "LessThanOrEqual"
+  | "GreaterThan"
+  | "GreaterThanOrEqual";
+
+/** A value-comparison constraint over a two-role sequence. */
+export interface NormaValueComparisonConstraint {
+  readonly type: "value_comparison";
+  readonly id: string;
+  readonly name: string;
+  readonly modality?: NormaModality;
+  readonly operator: NormaValueComparisonOperator;
+  /** The compared roles in RoleSequence order (left, right). */
+  readonly roleRefs: readonly string[];
+}
 
 export interface NormaUniquenessConstraint {
   readonly type: "uniqueness";
@@ -233,6 +257,11 @@ export interface NormaMandatoryConstraint {
   /** True if NORMA auto-generated this constraint (should not be imported). */
   readonly isImplied: boolean;
   readonly roleRefs: readonly string[];
+  /**
+   * ExclusiveOrExclusionConstraint coupler: the exclusion this mandatory
+   * pairs with to form an exclusive-or pattern.
+   */
+  readonly exclusiveOrExclusionRef?: string;
 }
 
 export interface NormaFrequencyConstraint {
@@ -276,6 +305,11 @@ export interface NormaExclusionConstraint {
   readonly roleSequences: readonly (readonly string[])[];
   /** Join path per role sequence (parallel to roleSequences), if any. */
   readonly joinPaths?: readonly (NormaJoinPath | undefined)[];
+  /**
+   * ExclusiveOrMandatoryConstraint coupler: the mandatory this exclusion
+   * pairs with to form an exclusive-or pattern.
+   */
+  readonly exclusiveOrMandatoryRef?: string;
 }
 
 export interface NormaEqualityConstraint {

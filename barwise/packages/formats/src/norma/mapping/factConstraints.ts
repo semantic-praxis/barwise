@@ -5,7 +5,7 @@
  * Used by phase 2 while resolving a fact type's InternalConstraints and by
  * the top-level constraint passes.
  */
-import type { Constraint, JoinOperand } from "@barwise/core";
+import type { Constraint, JoinOperand, ValueComparisonOperator } from "@barwise/core";
 import type {
   NormaConstraint,
   NormaEqualityConstraint,
@@ -17,6 +17,8 @@ import type {
   NormaRingConstraint,
   NormaSubsetConstraint,
   NormaUniquenessConstraint,
+  NormaValueComparisonConstraint,
+  NormaValueComparisonOperator,
   NormaValueConstraint,
 } from "../NormaXmlTypes.js";
 import type { NormaJoinDecoder } from "./joinPaths.js";
@@ -61,6 +63,8 @@ function mapByType(
       return mapEqualityConstraint(nc, joinDecoder);
     case "ring":
       return mapRingConstraint(nc, factRoleIds);
+    case "value_comparison":
+      return mapValueComparisonConstraint(nc, factRoleIds);
     default:
       return undefined;
   }
@@ -104,6 +108,14 @@ function mapMandatoryConstraint(
     const roleId = nc.roleRefs.find((r) => factRoleIds.has(r));
     if (!roleId) return undefined;
     return { type: "mandatory", roleId };
+  } else if (nc.exclusiveOrExclusionRef !== undefined) {
+    // Coupled to an exclusion: NORMA's exclusive-or encoding. The pair
+    // maps to one exclusive_or; the paired exclusion maps to the same
+    // constraint and duplicates are dropped by the callers.
+    return {
+      type: "exclusive_or",
+      roleIds: nc.roleRefs,
+    };
   } else {
     // Disjunctive mandatory -> maps to disjunctive_mandatory.
     return {
@@ -181,13 +193,53 @@ export function mapExclusionConstraint(
   const allRoleIds = nc.roleSequences.flat();
   if (allRoleIds.length === 0) return undefined;
 
-  // Check if NORMA paired this with a mandatory constraint (exclusive-or).
-  // In NORMA, exclusive-or is an exclusion constraint + a mandatory constraint
-  // on the same roles. The mapper currently maps them separately and lets
-  // validation detect the pattern if needed.
+  // Coupled to a disjunctive mandatory: NORMA's exclusive-or encoding.
+  if (nc.exclusiveOrMandatoryRef !== undefined) {
+    return {
+      type: "exclusive_or",
+      roleIds: allRoleIds,
+    };
+  }
+
   return {
     type: "exclusion",
     roleIds: allRoleIds,
+  };
+}
+
+/** NORMA's ValueComparisonOperatorValues -> barwise comparison operators. */
+const normaOperatorToBarwise: Partial<
+  Record<NormaValueComparisonOperator, ValueComparisonOperator>
+> = {
+  LessThan: "<",
+  LessThanOrEqual: "<=",
+  Equal: "=",
+  NotEqual: "<>",
+  GreaterThanOrEqual: ">=",
+  GreaterThan: ">",
+};
+
+/**
+ * Map a NORMA value-comparison constraint. Only the same-fact-type,
+ * no-join case is representable; an `Undefined` operator is NORMA's
+ * own validation-error state and is skipped like other unmappable
+ * constructs.
+ */
+export function mapValueComparisonConstraint(
+  nc: NormaValueComparisonConstraint,
+  factRoleIds: Set<string>,
+): Constraint | undefined {
+  const operator = normaOperatorToBarwise[nc.operator];
+  if (!operator) return undefined;
+  if (nc.roleRefs.length !== 2) return undefined;
+  const [roleId1, roleId2] = nc.roleRefs;
+  if (!factRoleIds.has(roleId1!) || !factRoleIds.has(roleId2!)) return undefined;
+  return {
+    type: "value_comparison",
+    roleId1: roleId1!,
+    roleId2: roleId2!,
+    operator,
+    ...(nc.modality === "deontic" ? { modality: "deontic" as const } : {}),
   };
 }
 

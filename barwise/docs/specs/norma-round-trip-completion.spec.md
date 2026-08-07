@@ -1,6 +1,10 @@
 # NORMA round-trip completion: exclusive-or, value comparison, defaults, populations
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: WS1-WS3 implemented 2026-08-07 (exclusive-or coupled-pair
+round-trip with one-sided-coupler tolerance; value-comparison wiring
+with the full operator map; value-type default values). Open: WS4
+(sample populations), provisional pending a NORMA-authored populated
+fixture.
 Created: 2026-08-07
 Last-updated: 2026-08-07
 Tracking: NORMA_VS_ORM_YAML.md feature audit (exclusive-or defect,
@@ -57,11 +61,17 @@ In scope (all in `@barwise/formats`, `src/norma/`):
   role-id -> value maps.
 
 Out of scope: modeler queries and dynamic rules (metamodel gaps, not
-wiring; a future metamodel spec), NORMA `Note` elements (no barwise
-seat; `definition` already round-trips), multi-range cardinality (the
+wiring; a future metamodel spec), multi-range cardinality (the
 single-bound collapse stands), role-level `DefaultValue` (barwise
 models defaults on the object type, not the role; revisit only if the
 metamodel grows role defaults).
+
+Candidate follow-up (owner-flagged, undecided): NORMA `Note` elements
+(model-level and element-level). barwise has no notes seat today --
+`definition` already round-trips, so the open design question is where
+imported notes would live (definition text, the annotation system, or
+a new metamodel seat). File as its own small spec if pursued; not part
+of this spec's workstreams.
 
 ## Inventory
 

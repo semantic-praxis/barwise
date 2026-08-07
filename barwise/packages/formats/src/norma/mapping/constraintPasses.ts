@@ -14,6 +14,7 @@ import {
   mapEqualityConstraint,
   mapExclusionConstraint,
   mapSubsetConstraint,
+  mapValueComparisonConstraint,
 } from "./factConstraints.js";
 import { createJoinDecoder } from "./joinPaths.js";
 
@@ -191,6 +192,7 @@ function addDisjunctiveMandatoryConstraints(
   model: OrmModel,
 ): void {
   const processedRefs = collectProcessedRefs(doc);
+  const xorPairs = collectExclusiveOrPairs(doc);
 
   for (const nc of doc.constraints) {
     if (nc.type !== "mandatory" || nc.isSimple || nc.isImplied) continue;
@@ -200,6 +202,26 @@ function addDisjunctiveMandatoryConstraints(
     // Check that at least one role belongs to a known fact type.
     const ft = model.factTypes.find((f) => nc.roleRefs.some((roleRef) => f.hasRole(roleRef)));
     if (!ft) continue;
+
+    // A mandatory coupled to an exclusion is NORMA's exclusive-or
+    // encoding: the pair maps to one exclusive_or constraint, and the
+    // paired exclusion is skipped in addMultiFactTypeConstraints.
+    if (xorPairs.mandatoryIds.has(nc.id)) {
+      const alreadyExists = ft.constraints.some(
+        (c) =>
+          c.type === "exclusive_or"
+          && c.roleIds.length === nc.roleRefs.length
+          && nc.roleRefs.every((id) => c.roleIds.includes(id)),
+      );
+      if (!alreadyExists) {
+        ft.addConstraint({
+          type: "exclusive_or",
+          roleIds: [...nc.roleRefs],
+          ...(nc.modality === "deontic" ? { modality: "deontic" as const } : {}),
+        });
+      }
+      continue;
+    }
 
     // Check if already exists on this fact type.
     const alreadyExists = ft.constraints.some(
@@ -219,6 +241,29 @@ function addDisjunctiveMandatoryConstraints(
 }
 
 /**
+ * Collect both halves of every exclusive-or pattern, keyed from either
+ * coupler direction (NORMA writes both; a hand-authored file may carry
+ * only one).
+ */
+function collectExclusiveOrPairs(doc: NormaDocument): {
+  mandatoryIds: Set<string>;
+  exclusionIds: Set<string>;
+} {
+  const mandatoryIds = new Set<string>();
+  const exclusionIds = new Set<string>();
+  for (const nc of doc.constraints) {
+    if (nc.type === "mandatory" && nc.exclusiveOrExclusionRef !== undefined) {
+      mandatoryIds.add(nc.id);
+      exclusionIds.add(nc.exclusiveOrExclusionRef);
+    } else if (nc.type === "exclusion" && nc.exclusiveOrMandatoryRef !== undefined) {
+      exclusionIds.add(nc.id);
+      mandatoryIds.add(nc.exclusiveOrMandatoryRef);
+    }
+  }
+  return { mandatoryIds, exclusionIds };
+}
+
+/**
  * Add subset, exclusion, and equality constraints that span multiple fact types.
  *
  * These constraints are typically defined at the top level and reference
@@ -230,10 +275,14 @@ function addDisjunctiveMandatoryConstraints(
 function addMultiFactTypeConstraints(ctx: NormaMappingContext): void {
   const { doc, model } = ctx;
   const processedRefs = collectProcessedRefs(doc);
+  const xorPairs = collectExclusiveOrPairs(doc);
   const joinDecoder = createJoinDecoder(ctx);
 
   for (const nc of doc.constraints) {
     if (processedRefs.has(nc.id)) continue;
+    // The exclusion half of an exclusive-or pattern is consumed by
+    // addDisjunctiveMandatoryConstraints along with its paired mandatory.
+    if (nc.type === "exclusion" && xorPairs.exclusionIds.has(nc.id)) continue;
 
     switch (nc.type) {
       case "subset": {
@@ -253,6 +302,27 @@ function addMultiFactTypeConstraints(ctx: NormaMappingContext): void {
               && c.subsetRoleIds.length === nc.subsetRoleRefs.length
               && nc.subsetRoleRefs.every((id) => c.subsetRoleIds.includes(id)),
           );
+        if (!alreadyExists) {
+          ft.addConstraint(mapped);
+        }
+        break;
+      }
+
+      case "value_comparison": {
+        if (nc.roleRefs.length !== 2) continue;
+        const ft = model.factTypes.find((f) => nc.roleRefs.every((r) => f.hasRole(r)));
+        if (!ft) continue;
+
+        const mapped = mapValueComparisonConstraint(nc, new Set(nc.roleRefs));
+        if (!mapped || mapped.type !== "value_comparison") continue;
+
+        const alreadyExists = ft.constraints.some(
+          (c) =>
+            c.type === "value_comparison"
+            && c.roleId1 === mapped.roleId1
+            && c.roleId2 === mapped.roleId2
+            && c.operator === mapped.operator,
+        );
         if (!alreadyExists) {
           ft.addConstraint(mapped);
         }

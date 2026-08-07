@@ -126,14 +126,15 @@ equality, all seven ring types, frequency including multi-role, value
 constraints including ranges and open bounds), join-path set
 constraints, deontic modality, derivation rules, object-type and
 unary-role cardinality, independent object types, conceptual data
-types, and diagram positions. One constraint type degrades:
-exclusive-or (see the audit).
+types, exclusive-or (as NORMA's coupled exclusion + disjunctive
+mandatory pair), value-comparison constraints, value-type default
+values, and diagram positions.
 
 Where NORMA is more faithful to the _full_ standard, the difference is
 either a derived artifact barwise recomputes (OIAL, the relational
 bridge) or one of a handful of constructs barwise does not yet model or
 wire -- dynamic rules, modeler queries, element notes, sample-population
-instances, value-comparison wiring. Each is examined in
+instances. Each is examined in
 [the feature audit](#feature-audit-where-the-formats-differ).
 
 ### NORMA's schema vs NORMA's tooling
@@ -204,7 +205,7 @@ the NORMA round-trip (import and export are symmetric unless noted).
 | Preferred identifier                  | Yes              | Yes         | Yes                 |
 | Mandatory / disjunctive mandatory     | Yes              | Yes         | Yes                 |
 | Exclusion                             | Yes              | Yes         | Yes                 |
-| Exclusive-or                          | Yes (as pair)    | Yes         | Degrades            |
+| Exclusive-or                          | Yes (as pair)    | Yes         | Yes                 |
 | Subset / equality                     | Yes              | Yes         | Yes                 |
 | Ring (7 types)                        | Yes              | Yes         | Yes                 |
 | Frequency (single and multi-role)     | Yes              | Yes         | Yes                 |
@@ -217,9 +218,9 @@ the NORMA round-trip (import and export are symmetric unless noted).
 | Unary-role cardinality                | Yes (multirange) | Yes         | Yes (first range)   |
 | Independent object types              | Yes              | Yes         | Yes                 |
 | Join-path set constraints             | Yes              | Yes         | Yes                 |
+| Value-comparison constraints          | Yes              | Yes         | Yes                 |
+| Default values                        | Yes (VT + role)  | Yes         | Yes (value types)   |
 | Diagram geometry                      | Yes (styled)     | Positions   | Positions exact     |
-| Value-comparison constraints          | Yes              | Yes         | No (unwired)        |
-| Default values                        | No schema seat   | Yes         | No (NORMA-side gap) |
 | Sample populations                    | Yes              | Yes         | No (unwired)        |
 | Model / element notes                 | Yes              | Annotations | Definitions only    |
 | Modeler queries / subqueries          | Yes              | No          | No                  |
@@ -261,47 +262,18 @@ import and barwise populations are absent from exports. This is the
 highest-value unwired feature, precisely because both sides already
 model it.
 
-### Exclusive-or
-
-_Expected value:_ "exactly one of these holds" ("each Person is
-employed or retired, but not both") is a stronger claim than exclusion
-alone; collapsing it to "at most one" silently legalizes the
-neither-case.
-
-NORMA has no single xor element -- it encodes the constraint as a
-coupled pair, an exclusion plus a disjunctive mandatory. barwise's
-writer currently emits only the exclusion half of an `exclusive_or`,
-and the importer does not re-couple an exclusion/disjunctive-mandatory
-pair back into one constraint. The result (verified empirically): a
-barwise `exclusive_or` round-trips as a plain `exclusion` -- the
-mandatory half is lost. The fix is known shape on both sides (emit the
-pair on export; detect the coupled pair on import) and is the one
-open defect in the constraint round-trip.
-
-### Value-comparison constraints
-
-_Expected value:_ comparisons across roles ("end date must be on or
-after start date") are among the most common real-world business rules;
-without them the rule lives in prose or in application code, invisible
-to validation.
-
-Both metamodels model them -- barwise added
-`ValueComparisonConstraint` in the constraint union -- but the NORMA
-parser and writer have no wiring for NORMA's `ValueComparisonConstraint`
-element, so they drop in both directions. A wiring-only gap, like unary
-cardinality was before it landed.
-
 ### Default values
 
 _Expected value:_ a declared default ("Status defaults to 'active'")
 carries straight into relational mapping as a column default, keeping
 schema generation faithful to stakeholder intent.
 
-The direction of this gap is the reverse of the others: barwise models
-default values on object types, but NORMA's `ORM2Core.xsd` has no seat
-for them at all. A barwise default is silently absent from a NORMA
-export and cannot arrive via import. Permanent unless NORMA's schema
-grows the construct; nothing to do on barwise's side.
+Value-type defaults round-trip: barwise's `defaultValue` maps to the
+`DefaultValue` element on the NORMA ValueType. Two edges stay
+one-sided. NORMA's second seat is the Role (a per-role default), which
+barwise does not model; and a barwise default on an _entity_ type has
+no NORMA object-type seat. Both are documented normalizations, not
+silent losses.
 
 ### Model and element notes
 
@@ -381,10 +353,10 @@ NORMA user needs the model -- the conceptual core survives the loop.
 Two round-trips, per the norma-export spec:
 
 - **RT-A, `model -> NORMA -> model`.** Lossless for everything
-  `.orm.yaml` can represent except default values (no NORMA seat),
-  barwise annotations, and the exclusive-or degradation above. Pinned
-  by the `@barwise/formats` round-trip tests over the fixture corpus
-  and the WS3 construct suite.
+  `.orm.yaml` can represent except entity-type default values (NORMA's
+  default seats are the value type and the role) and barwise
+  annotations. Pinned by the `@barwise/formats` round-trip tests over
+  the fixture corpus and the construct suites.
 - **RT-B, `NORMA -> model -> NORMA`.** Semantically lossless for the
   conceptual core -- verified by importing each NORMA fixture,
   exporting, re-importing, and diffing (`barwise diff` reports no

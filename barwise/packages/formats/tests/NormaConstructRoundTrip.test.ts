@@ -183,6 +183,166 @@ describe("NORMA construct round-trip (WS3)", () => {
   });
 });
 
+describe("exclusive-or round-trip (norma-round-trip-completion WS1)", () => {
+  function xorModel(): OrmModel {
+    const model = new OrmModel({ name: "Xor" });
+    const person = model.addObjectType({
+      name: "Person",
+      id: "ot-person",
+      kind: "entity",
+      referenceMode: "person_id",
+    });
+    model.addFactType({
+      name: "Person is employed",
+      id: "ft-employed",
+      roles: [{ id: "r-employed", name: "is employed", playerId: person.id }],
+      readings: ["{0} is employed"],
+      constraints: [{ type: "internal_uniqueness", roleIds: ["r-employed"] }],
+    });
+    model.addFactType({
+      name: "Person is retired",
+      id: "ft-retired",
+      roles: [{ id: "r-retired", name: "is retired", playerId: person.id }],
+      readings: ["{0} is retired"],
+      constraints: [
+        { type: "internal_uniqueness", roleIds: ["r-retired"] },
+        { type: "exclusive_or", id: "c-xor", roleIds: ["r-employed", "r-retired"] },
+      ],
+    });
+    return model;
+  }
+
+  it("exports the coupled pair and re-imports a single exclusive_or", () => {
+    const { xml, back } = roundTrip(xorModel());
+    expect(xml).toContain("orm:ExclusiveOrMandatoryConstraint");
+    expect(xml).toContain("orm:ExclusiveOrExclusionConstraint");
+    expect(xml).toMatch(/MandatoryConstraint[^>]*IsSimple="false"/);
+
+    const all = back.factTypes.flatMap((f) => f.constraints);
+    const xors = all.filter((c) => c.type === "exclusive_or");
+    expect(xors).toHaveLength(1);
+    const expectedRoleIds = [
+      back.getFactTypeByName("Person is employed")!.roles[0]!.id,
+      back.getFactTypeByName("Person is retired")!.roles[0]!.id,
+    ].sort();
+    expect([...xors[0]!.roleIds].sort()).toEqual(expectedRoleIds);
+    expect(all.some((c) => c.type === "exclusion")).toBe(false);
+    expect(all.some((c) => c.type === "disjunctive_mandatory")).toBe(false);
+  });
+
+  it("collapses a pair carrying only the mandatory-side coupler", () => {
+    // NORMA writes both coupler refs; a file carrying only one must
+    // still collapse. Strip the exclusion-side coupler and re-import.
+    const xml = serializeNormaDocument(writeOrmToNorma(xorModel()));
+    const oneSided = xml.replace(/<orm:ExclusiveOrMandatoryConstraint[^/]*\/>/, "");
+    expect(oneSided).not.toContain("ExclusiveOrMandatoryConstraint");
+    expect(oneSided).toContain("ExclusiveOrExclusionConstraint");
+
+    const back = mapNormaToOrm(parseNormaXml(oneSided));
+    const all = back.factTypes.flatMap((f) => f.constraints);
+    expect(all.filter((c) => c.type === "exclusive_or")).toHaveLength(1);
+    expect(all.some((c) => c.type === "exclusion")).toBe(false);
+    expect(all.some((c) => c.type === "disjunctive_mandatory")).toBe(false);
+  });
+});
+
+describe("value-comparison round-trip (norma-round-trip-completion WS2)", () => {
+  function comparisonModel(): OrmModel {
+    const model = new OrmModel({ name: "Comparison" });
+    const period = model.addObjectType({
+      name: "ReviewPeriod",
+      id: "ot-period",
+      kind: "entity",
+      referenceMode: "period_id",
+    });
+    const date = model.addObjectType({
+      name: "EventDate",
+      id: "ot-date",
+      kind: "value",
+      dataType: { name: "date" },
+    });
+    model.addFactType({
+      name: "ReviewPeriod runs from and to",
+      id: "ft-runs",
+      roles: [
+        { id: "r-period", name: "spans", playerId: period.id },
+        { id: "r-start", name: "starts on", playerId: date.id },
+        { id: "r-end", name: "ends on", playerId: date.id },
+      ],
+      readings: ["{0} runs from {1} to {2}"],
+      constraints: [
+        { type: "internal_uniqueness", roleIds: ["r-period"] },
+        {
+          type: "value_comparison",
+          id: "c-cmp",
+          roleId1: "r-start",
+          roleId2: "r-end",
+          operator: "<=",
+          modality: "deontic",
+        },
+      ],
+    });
+    return model;
+  }
+
+  it("round-trips the constraint with its operator and modality", () => {
+    const { xml, back } = roundTrip(comparisonModel());
+    expect(xml).toContain("orm:ValueComparisonConstraint");
+    expect(xml).toContain('Operator="LessThanOrEqual"');
+
+    const ft = back.getFactTypeByName("ReviewPeriod runs from and to")!;
+    const cmp = ft.constraints.find((c) => c.type === "value_comparison")!;
+    expect(cmp).toMatchObject({
+      roleId1: ft.roles[1]!.id,
+      roleId2: ft.roles[2]!.id,
+      operator: "<=",
+      modality: "deontic",
+    });
+  });
+});
+
+describe("default-value round-trip (norma-round-trip-completion WS3)", () => {
+  it("round-trips a value-type default, preserving numeric text", () => {
+    const model = new OrmModel({ name: "Defaults" });
+    const status = model.addObjectType({
+      name: "StatusCode",
+      id: "ot-status",
+      kind: "value",
+      dataType: { name: "text" },
+      defaultValue: "active",
+    });
+    model.addObjectType({
+      name: "RetryCount",
+      id: "ot-retry",
+      kind: "value",
+      dataType: { name: "integer" },
+      defaultValue: "3",
+    });
+    const order = model.addObjectType({
+      name: "Order",
+      id: "ot-order",
+      kind: "entity",
+      referenceMode: "order_id",
+    });
+    model.addFactType({
+      name: "Order has StatusCode",
+      id: "ft-status",
+      roles: [
+        { id: "r-order", name: "has", playerId: order.id },
+        { id: "r-status", name: "is of", playerId: status.id },
+      ],
+      readings: ["{0} has {1}"],
+      constraints: [{ type: "internal_uniqueness", roleIds: ["r-order"] }],
+    });
+
+    const { xml, back } = roundTrip(model);
+    expect(xml).toContain("orm:DefaultValue");
+    expect(back.getObjectTypeByName("StatusCode")!.defaultValue).toBe("active");
+    expect(back.getObjectTypeByName("RetryCount")!.defaultValue).toBe("3");
+    expect(back.getObjectTypeByName("Order")!.defaultValue).toBeUndefined();
+  });
+});
+
 describe("NORMA diagram geometry round-trip (WS2)", () => {
   const { back } = roundTrip(buildModel());
 

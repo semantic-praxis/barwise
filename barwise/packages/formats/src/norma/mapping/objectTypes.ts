@@ -59,6 +59,7 @@ export function mapObjectTypes(ctx: NormaMappingContext): void {
       kind: "value",
       definition: vt.definition,
       valueConstraint: toValueConstraintDef(vt.valueConstraint),
+      defaultValue: vt.defaultValue,
       dataType: resolveDataType(vt.dataTypeRef, vt.dataTypeLength, vt.dataTypeScale, dataTypeById),
       independent: vt.independent,
       ...toCardinality(vt.cardinality),

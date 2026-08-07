@@ -29,6 +29,7 @@ import type {
   NormaRole,
   NormaShape,
   NormaSubtypeFact,
+  NormaValueComparisonOperator,
   NormaValueConstraintInline,
   NormaValueRange,
   NormaValueType,
@@ -141,6 +142,7 @@ const arrayTags = new Set([
   "ExclusionConstraint",
   "EqualityConstraint",
   "RingConstraint",
+  "ValueComparisonConstraint",
   "ValueRange",
   "RoleSequence",
   "PathedRole",
@@ -201,6 +203,13 @@ function parseValueTypes(
     const defs = parseDefinitionText(vt);
     const valueRestriction = child(vt, "ValueRestriction") as Record<string, unknown> | undefined;
     const cdt = child(vt, "ConceptualDataType") as Record<string, unknown> | undefined;
+    // DefaultValue is a text element; fast-xml-parser may coerce numeric
+    // text, so normalize back to the string form.
+    const rawDefault = (vt as Record<string, unknown>)["DefaultValue"];
+    const defaultValue =
+      rawDefault !== undefined && rawDefault !== null && typeof rawDefault !== "object"
+        ? String(rawDefault)
+        : undefined;
 
     const lengthStr = cdt ? attr(cdt, "Length") : undefined;
     const scaleStr = cdt ? attr(cdt, "Scale") : undefined;
@@ -216,6 +225,7 @@ function parseValueTypes(
         ? parseValueRestriction(valueRestriction)
         : undefined,
       dataTypeRef: cdt ? attr(cdt, "ref") : undefined,
+      ...(defaultValue !== undefined ? { defaultValue } : {}),
       dataTypeLength: dtLength !== undefined && !isNaN(dtLength) ? dtLength : undefined,
       dataTypeScale: dtScale !== undefined && !isNaN(dtScale) ? dtScale : undefined,
       independent: attr(vt, "IsIndependent") === "true",
@@ -370,6 +380,22 @@ function parseRoles(
       ...(cardinality ? { cardinality } : {}),
     };
   });
+}
+
+function parseValueComparisonOperator(
+  raw: string | undefined,
+): NormaValueComparisonOperator {
+  switch (raw) {
+    case "Equal":
+    case "NotEqual":
+    case "LessThan":
+    case "LessThanOrEqual":
+    case "GreaterThan":
+    case "GreaterThanOrEqual":
+      return raw;
+    default:
+      return "Undefined";
+  }
 }
 
 function parseMultiplicity(raw: string | undefined): NormaMultiplicity {
@@ -531,6 +557,9 @@ function parseConstraints(
   // MandatoryConstraint
   for (const mc of asArray(constraints["MandatoryConstraint"])) {
     const roleSeq = firstRoleSequence(mc);
+    const xorExclusion = child(mc, "ExclusiveOrExclusionConstraint") as
+      | Record<string, unknown>
+      | undefined;
     result.push({
       type: "mandatory",
       id: attr(mc, "id") ?? "",
@@ -539,6 +568,9 @@ function parseConstraints(
       isSimple: attr(mc, "IsSimple") === "true",
       isImplied: attr(mc, "IsImplied") === "true",
       roleRefs: roleSeq ? parseRoleSequenceRefs(roleSeq) : [],
+      ...(xorExclusion && attr(xorExclusion, "ref")
+        ? { exclusiveOrExclusionRef: attr(xorExclusion, "ref") }
+        : {}),
     });
   }
 
@@ -594,6 +626,9 @@ function parseConstraints(
   // ExclusionConstraint
   for (const ec of asArray(constraints["ExclusionConstraint"])) {
     const { sequences, joinPaths } = parseRoleSequencesWithJoins(ec);
+    const xorMandatory = child(ec, "ExclusiveOrMandatoryConstraint") as
+      | Record<string, unknown>
+      | undefined;
     result.push({
       type: "exclusion",
       id: attr(ec, "id") ?? "",
@@ -601,6 +636,22 @@ function parseConstraints(
       ...(attr(ec, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       roleSequences: sequences,
       ...(joinPaths.some(Boolean) ? { joinPaths } : {}),
+      ...(xorMandatory && attr(xorMandatory, "ref")
+        ? { exclusiveOrMandatoryRef: attr(xorMandatory, "ref") }
+        : {}),
+    });
+  }
+
+  // ValueComparisonConstraint
+  for (const vcc of asArray(constraints["ValueComparisonConstraint"])) {
+    const roleSeq = firstRoleSequence(vcc);
+    result.push({
+      type: "value_comparison",
+      id: attr(vcc, "id") ?? "",
+      name: attr(vcc, "Name") ?? "",
+      ...(attr(vcc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
+      operator: parseValueComparisonOperator(attr(vcc, "Operator")),
+      roleRefs: roleSeq ? parseRoleSequenceRefs(roleSeq) : [],
     });
   }
 

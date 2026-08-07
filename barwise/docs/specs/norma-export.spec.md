@@ -20,11 +20,13 @@ constraint round-trips as the Role element's `CardinalityRestriction >
 UnaryRoleCardinalityConstraint` (nesting re-confirmed against
 `ORM2Core.xsd`: `RoleBaseType` carries the restriction; the inner
 element is `UnaryRoleCardinalityConstraint`), including deontic
-modality on both cardinality homes. Default values remain
-unencodable -- no seat in NORMA's schema at all, a permanent RT gap on
-NORMA's side, not barwise's. All engineering workstreams are complete;
-the one remaining item is the manual NORMA-load check of an exported
-diagram (manual test plan, needs a NORMA install).
+modality on both cardinality homes. All engineering workstreams are
+complete; the one remaining item is the manual NORMA-load check of an
+exported diagram (manual test plan, needs a NORMA install).
+Correction (2026-08-07): this spec previously claimed default values
+have no seat in NORMA's schema; the XSD carries `DefaultValue` on both
+the ValueType and Role elements, and value-type defaults are wired by
+`norma-round-trip-completion.spec.md` WS3.
 Created: 2026-06-17
 Last-updated: 2026-08-07
 Tracking: barwise-cb6 (norma CLI), barwise-e3g (diagram round-trip),

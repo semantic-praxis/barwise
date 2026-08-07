@@ -28,6 +28,7 @@ import type {
   ObjectType,
   OrmModel,
   Role,
+  ValueComparisonOperator,
   ValueRange,
 } from "@barwise/core";
 import type {
@@ -47,6 +48,7 @@ import type {
   NormaRole,
   NormaShape,
   NormaSubtypeFact,
+  NormaValueComparisonOperator,
   NormaValueConstraintInline,
   NormaValueType,
 } from "./NormaXmlTypes.js";
@@ -214,6 +216,7 @@ function writeValueType(ot: ObjectType, playedRoleRefs: string[]): NormaValueTyp
     definition: ot.definition,
     valueConstraint,
     dataTypeRef: dt ? dataTypeIdFor(dt.name) : undefined,
+    ...(ot.defaultValue !== undefined ? { defaultValue: ot.defaultValue } : {}),
     dataTypeLength: dt?.length,
     dataTypeScale: dt?.scale,
     independent: ot.independent,
@@ -255,6 +258,36 @@ function writeFactType(
     // from the fact type id and the constraint's position so every emitted
     // constraint has a unique id token.
     const fallbackId = `${normaId(ft.id)}_c${i}`;
+    if (c.type === "exclusive_or") {
+      // NORMA has no single xor element: the native encoding is an
+      // exclusion + disjunctive mandatory pair joined by mutual coupler
+      // refs. Both halves are multi-fact, so neither is internal.
+      const exclusionId = c.id ? normaId(c.id) : fallbackId;
+      const mandatoryId = `${exclusionId}_xormand`;
+      if (seen.has(exclusionId)) return;
+      seen.add(exclusionId);
+      seen.add(mandatoryId);
+      const modality = c.modality === "deontic" ? ({ modality: "deontic" } as const) : {};
+      constraints.push({
+        type: "exclusion",
+        id: exclusionId,
+        name: "",
+        ...modality,
+        roleSequences: c.roleIds.map((r) => [normaId(r)]),
+        exclusiveOrMandatoryRef: mandatoryId,
+      });
+      constraints.push({
+        type: "mandatory",
+        id: mandatoryId,
+        name: "",
+        ...modality,
+        isSimple: false,
+        isImplied: false,
+        roleRefs: c.roleIds.map(normaId),
+        exclusiveOrExclusionRef: exclusionId,
+      });
+      return;
+    }
     const written = writeConstraint(c, fallbackId);
     if (!written) return;
     if (!seen.has(written.id)) {
@@ -421,17 +454,9 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         roleSequences: c.roleIds.map((r) => [normaId(r)]),
       };
     case "exclusive_or":
-      // NORMA models exclusive-or as a paired exclusion + disjunctive
-      // mandatory. Only the exclusion half is emitted here, so the
-      // constraint degrades to "at most one" on round-trip -- the known
-      // open defect in the constraint round-trip (NORMA_VS_ORM_YAML.md).
-      return {
-        type: "exclusion",
-        id,
-        name: "",
-        ...modality,
-        roleSequences: c.roleIds.map((r) => [normaId(r)]),
-      };
+      // Emitted by writeFactType as NORMA's coupled exclusion +
+      // disjunctive-mandatory pair; never reaches this switch.
+      return undefined;
     case "ring":
       return {
         type: "ring",
@@ -462,6 +487,15 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
       // Carried on the role itself (UnaryRoleCardinalityConstraint inside
       // the Role's CardinalityRestriction), never as a top-level constraint.
       return undefined;
+    case "value_comparison":
+      return {
+        type: "value_comparison",
+        id,
+        name: "",
+        ...modality,
+        operator: valueComparisonOperatorToNorma[c.operator],
+        roleRefs: [normaId(c.roleId1), normaId(c.roleId2)],
+      };
     case "join_equality":
     case "join_exclusion": {
       const roleSequences: string[][] = [];
@@ -486,6 +520,19 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
       return undefined;
   }
 }
+
+/** barwise comparison operators -> NORMA's ValueComparisonOperatorValues. */
+const valueComparisonOperatorToNorma: Record<
+  ValueComparisonOperator,
+  NormaValueComparisonOperator
+> = {
+  "<": "LessThan",
+  "<=": "LessThanOrEqual",
+  "=": "Equal",
+  "<>": "NotEqual",
+  ">=": "GreaterThanOrEqual",
+  ">": "GreaterThan",
+};
 
 // ---------------------------------------------------------------------------
 // Join paths
