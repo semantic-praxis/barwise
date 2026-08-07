@@ -133,8 +133,8 @@ values, and diagram positions.
 Where NORMA is more faithful to the _full_ standard, the difference is
 either a derived artifact barwise recomputes (OIAL, the relational
 bridge) or one of a handful of constructs barwise does not yet model or
-wire -- dynamic rules, modeler queries, element notes, sample-population
-instances. Each is examined in
+wire -- dynamic rules, modeler queries, element notes, unary-role
+population instances. Each is examined in
 [the feature audit](#feature-audit-where-the-formats-differ).
 
 ### NORMA's schema vs NORMA's tooling
@@ -220,8 +220,8 @@ the NORMA round-trip (import and export are symmetric unless noted).
 | Join-path set constraints             | Yes              | Yes         | Yes                 |
 | Value-comparison constraints          | Yes              | Yes         | Yes                 |
 | Default values                        | Yes (VT + role)  | Yes         | Yes (value types)   |
+| Sample populations                    | Yes              | Yes         | Yes (binary+)       |
 | Diagram geometry                      | Yes (styled)     | Positions   | Positions exact     |
-| Sample populations                    | Yes              | Yes         | No (unwired)        |
 | Model / element notes                 | Yes              | Annotations | Definitions only    |
 | Modeler queries / subqueries          | Yes              | No          | No                  |
 | Dynamic (state-transition) rules      | Yes              | No          | No                  |
@@ -254,26 +254,18 @@ reality -- Halpin's method validates a constraint by trying concrete
 examples against it, and a stored population turns that from a
 whiteboard exercise into an executable test.
 
-Both metamodels carry them: NORMA persists instance collections, and
-barwise's populations are first-class, driving deterministic population
-validation and counterexample generation. The NORMA importer and
-exporter simply do not wire them yet, so NORMA sample data drops on
-import and barwise populations are absent from exports. This is the
-highest-value unwired feature, precisely because both sides already
-model it.
-
-### Default values
-
-_Expected value:_ a declared default ("Status defaults to 'active'")
-carries straight into relational mapping as a column default, keeping
-schema generation faithful to stakeholder intent.
-
-Value-type defaults round-trip: barwise's `defaultValue` maps to the
-`DefaultValue` element on the NORMA ValueType. Two edges stay
-one-sided. NORMA's second seat is the Role (a per-role default), which
-barwise does not model; and a barwise default on an _entity_ type has
-no NORMA object-type seat. Both are documented normalizations, not
-silent losses.
+These now round-trip. barwise's flat role-value populations become
+NORMA's instance graph on export (ValueTypeInstance elements per
+distinct value, EntityTypeInstance elements identified through the
+reference scheme, role-instance declarations, FactTypeInstance tuples)
+and flatten back on import -- the encoding was verified against a
+NORMA-authored populated model before wiring. One structural
+consequence: an entity instance can only carry its value through an
+identifying fact, so exporting a populated native model synthesizes
+the reference-scheme expansion NORMA itself persists (the injected
+value type and identifying fact appear explicitly on re-import; stable
+from the second cycle). Unary-role populations use a different NORMA
+apparatus and stay deferred.
 
 ### Model and element notes
 

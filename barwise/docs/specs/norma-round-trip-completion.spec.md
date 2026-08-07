@@ -1,10 +1,20 @@
 # NORMA round-trip completion: exclusive-or, value comparison, defaults, populations
 
-Status: WS1-WS3 implemented 2026-08-07 (exclusive-or coupled-pair
-round-trip with one-sided-coupler tolerance; value-comparison wiring
-with the full operator map; value-type default values). Open: WS4
-(sample populations), provisional pending a NORMA-authored populated
-fixture.
+Status: Complete -- all four workstreams implemented 2026-08-07.
+WS1-WS3: exclusive-or coupled-pair round-trip with one-sided-coupler
+tolerance; value-comparison wiring with the full operator map;
+value-type default values. WS4: sample populations, with the instance
+graph verified against a NORMA-authored populated model (the NORMA
+project's SamplePopulationTests) before implementation. Implementation
+note (deviation from the draft): entity instances need an identifying
+seat to carry their value, so the writer now synthesizes the
+reference-scheme expansion (injected value type, identifying fact,
+uniqueness pair + mandatory, PreferredIdentifier link) for populated
+entities that lack an explicit one -- mirroring what NORMA itself
+persists alongside _ReferenceMode. First export of a populated native
+model therefore adds the expansion; the cycle is stable from then on
+(covered by a test). Unary-role populations resolved as option (b):
+deferred and documented.
 Created: 2026-08-07
 Last-updated: 2026-08-07
 Tracking: NORMA_VS_ORM_YAML.md feature audit (exclusive-or defect,
@@ -171,7 +181,7 @@ seat is the Role) and stay barwise-side, documented. Corrects the
 false "no schema seat" claim in norma-export.spec.md and
 NORMA_VS_ORM_YAML.md.
 
-### 4. Sample populations (largest; provisional pending a NORMA-authored populated fixture)
+### 4. Sample populations (implemented; grounding verified)
 
 Export: for each population, synthesize the instance graph --
 `ValueTypeInstance` elements (distinct values per value type),
@@ -193,13 +203,11 @@ only higher-fidelity NORMA files.
 
 ## Open decisions (for review)
 
-- **Unary-role population encoding (WS4).** NORMA populates unary
-  roles via `EntityTypeUnaryRoleInstance` on the entity instance,
-  not via fact instances. Options: (a) wire it symmetrically with
-  binary+ populations; (b) defer unary populations to a follow-up and
-  document. Recommend (a) if the fixture confirms the encoding
-  cheaply, else (b) -- the spec treats (b) as acceptable because unary
-  populations are rare in practice.
+- **Unary-role population encoding (WS4).** Resolved as (b), 2026-08-07:
+  NORMA populates unary roles via `EntityTypeUnaryRoleInstance` on the
+  entity instance, a different apparatus from fact instances; deferred
+  and documented (unary populations are rare in practice). Revisit if
+  a real model needs them.
 - **Where an imported value-comparison attaches when its two roles
   span fact types via a join path (`SetConstraintWithJoinType`).**
   barwise's constraint is same-fact-type only (cross-fact comparison

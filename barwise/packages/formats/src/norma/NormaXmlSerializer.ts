@@ -20,16 +20,20 @@ import type {
   NormaDiagram,
   NormaDocument,
   NormaEntityType,
+  NormaEntityTypeInstance,
   NormaFactType,
+  NormaFactTypeInstance,
   NormaJoinPath,
   NormaObjectifiedType,
   NormaReadingOrder,
   NormaRingType,
   NormaRole,
+  NormaRoleInstanceDecl,
   NormaShape,
   NormaSubtypeFact,
   NormaValueConstraintInline,
   NormaValueType,
+  NormaValueTypeInstance,
 } from "./NormaXmlTypes.js";
 
 const ATTR = "@_";
@@ -118,6 +122,7 @@ function buildEntityType(et: NormaEntityType): XmlNode {
   if (et.preferredIdentifier) {
     node["orm:PreferredIdentifier"] = { [`${ATTR}ref`]: et.preferredIdentifier };
   }
+  addEntityInstances(node, et.instances);
   return node;
 }
 
@@ -162,10 +167,11 @@ function buildValueType(vt: NormaValueType): XmlNode {
   if (vt.valueConstraint) {
     node["orm:ValueRestriction"] = buildInlineValueRestriction(vt.id, vt.valueConstraint);
   }
-  // XSD order: ConceptualDataType, ValueRestriction, then DefaultValue.
+  // XSD order: ConceptualDataType, ValueRestriction, DefaultValue, Instances.
   if (vt.defaultValue !== undefined) {
     node["orm:DefaultValue"] = vt.defaultValue;
   }
+  addValueInstances(node, vt.instances);
   return node;
 }
 
@@ -230,6 +236,7 @@ function buildFact(ft: NormaFactType, constraintTagById: Map<string, string>): X
       },
     };
   }
+  addFactInstances(node, ft.instances);
   return node;
 }
 
@@ -265,6 +272,7 @@ function buildFactRole(role: NormaRole): XmlNode {
     "orm:RolePlayer": { [`${ATTR}ref`]: role.playerRef },
   };
   addCardinality(node, role.cardinality, "orm:UnaryRoleCardinalityConstraint");
+  addRoleInstanceDecls(node, role.roleInstances);
   return node;
 }
 
@@ -631,6 +639,83 @@ function addCardinality(
       },
     },
   };
+}
+
+/** Instances > ValueTypeInstance (id + Value text). */
+function addValueInstances(
+  node: XmlNode,
+  instances: readonly NormaValueTypeInstance[] | undefined,
+): void {
+  if (!instances || instances.length === 0) return;
+  node["orm:Instances"] = {
+    "orm:ValueTypeInstance": instances.map((i) => ({
+      [`${ATTR}id`]: i.id,
+      "orm:Value": i.value,
+    })),
+  };
+}
+
+/** Instances > EntityTypeInstance (id + identifying role-instance refs). */
+function addEntityInstances(
+  node: XmlNode,
+  instances: readonly NormaEntityTypeInstance[] | undefined,
+): void {
+  if (!instances || instances.length === 0) return;
+  node["orm:Instances"] = {
+    "orm:EntityTypeInstance": instances.map((i) => ({
+      [`${ATTR}id`]: i.id,
+      "orm:RoleInstances": {
+        "orm:EntityTypeRoleInstance": i.roleInstanceRefs.map((ref) => ({
+          [`${ATTR}ref`]: ref,
+        })),
+      },
+    })),
+  };
+}
+
+/** Instances > FactTypeInstance (id + role-instance refs). */
+function addFactInstances(
+  node: XmlNode,
+  instances: readonly NormaFactTypeInstance[] | undefined,
+): void {
+  if (!instances || instances.length === 0) return;
+  node["orm:Instances"] = {
+    "orm:FactTypeInstance": instances.map((i) => ({
+      [`${ATTR}id`]: i.id,
+      "orm:RoleInstances": {
+        "orm:FactTypeRoleInstance": i.roleInstanceRefs.map((ref) => ({
+          [`${ATTR}ref`]: ref,
+        })),
+      },
+    })),
+  };
+}
+
+/**
+ * Role-instance declarations on a Role: id + ref pairs, tagged by the
+ * consuming instance kind.
+ */
+function addRoleInstanceDecls(
+  node: XmlNode,
+  decls: readonly NormaRoleInstanceDecl[] | undefined,
+): void {
+  if (!decls || decls.length === 0) return;
+  const container: XmlNode = {};
+  const entity = decls.filter((d) => d.consumer === "entity");
+  const fact = decls.filter((d) => d.consumer === "fact");
+  if (entity.length > 0) {
+    container["orm:EntityTypeRoleInstance"] = entity.map((d) => ({
+      [`${ATTR}id`]: d.id,
+      [`${ATTR}ref`]: d.objectInstanceRef,
+    }));
+  }
+  if (fact.length > 0) {
+    container["orm:FactTypeRoleInstance"] = fact.map((d) => ({
+      [`${ATTR}id`]: d.id,
+      [`${ATTR}ref`]: d.objectInstanceRef,
+    }));
+  }
+  node["orm:RoleInstances"] = container;
 }
 
 function addPlayedRoles(node: XmlNode, refs: readonly string[]): void {

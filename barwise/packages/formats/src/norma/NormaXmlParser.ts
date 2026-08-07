@@ -16,7 +16,9 @@ import type {
   NormaDiagram,
   NormaDocument,
   NormaEntityType,
+  NormaEntityTypeInstance,
   NormaFactType,
+  NormaFactTypeInstance,
   NormaJoinPath,
   NormaJoinProjection,
   NormaMultiplicity,
@@ -27,12 +29,14 @@ import type {
   NormaReadingOrder,
   NormaRingType,
   NormaRole,
+  NormaRoleInstanceDecl,
   NormaShape,
   NormaSubtypeFact,
   NormaValueComparisonOperator,
   NormaValueConstraintInline,
   NormaValueRange,
   NormaValueType,
+  NormaValueTypeInstance,
 } from "./NormaXmlTypes.js";
 
 /**
@@ -144,6 +148,12 @@ const arrayTags = new Set([
   "RingConstraint",
   "ValueComparisonConstraint",
   "ValueRange",
+  "EntityTypeInstance",
+  "ValueTypeInstance",
+  "FactTypeInstance",
+  "EntityTypeRoleInstance",
+  "ValueTypeRoleInstance",
+  "FactTypeRoleInstance",
   "RoleSequence",
   "PathedRole",
   "JoinPathProjection",
@@ -190,6 +200,7 @@ function parseEntityTypes(
       definition: defs,
       independent: attr(et, "IsIndependent") === "true",
       cardinality: parseCardinalityRestriction(et),
+      ...withInstances(parseEntityInstances(et)),
     };
   });
 }
@@ -230,6 +241,7 @@ function parseValueTypes(
       dataTypeScale: dtScale !== undefined && !isNaN(dtScale) ? dtScale : undefined,
       independent: attr(vt, "IsIndependent") === "true",
       cardinality: parseCardinalityRestriction(vt),
+      ...withInstances(parseValueInstances(vt)),
     };
   });
 }
@@ -360,6 +372,7 @@ function parseFactTypes(
       internalConstraintRefs: parseInternalConstraintRefs(internalConstraints),
       definition: defs,
       derivationRule: parseDerivationRule(ft),
+      ...withInstances(parseFactInstances(ft)),
     };
   });
 }
@@ -371,6 +384,7 @@ function parseRoles(
   return asArray(factRoles["Role"]).map((r) => {
     const playerEl = child(r, "RolePlayer") as Record<string, unknown> | undefined;
     const cardinality = parseCardinalityRestriction(r, "UnaryRoleCardinalityConstraint");
+    const roleInstances = parseRoleInstanceDecls(r);
     return {
       id: attr(r, "id") ?? "",
       name: attr(r, "Name") ?? "",
@@ -378,8 +392,103 @@ function parseRoles(
       isMandatory: attr(r, "_IsMandatory") === "true",
       multiplicity: parseMultiplicity(attr(r, "_Multiplicity")),
       ...(cardinality ? { cardinality } : {}),
+      ...(roleInstances.length > 0 ? { roleInstances } : {}),
     };
   });
+}
+
+/** Spread helper: include an instances field only when non-empty. */
+function withInstances<T>(instances: readonly T[]): { instances?: readonly T[]; } {
+  return instances.length > 0 ? { instances } : {};
+}
+
+/**
+ * Role-instance declarations on a Role element: RoleInstances >
+ * (EntityTypeRoleInstance | ValueTypeRoleInstance | FactTypeRoleInstance),
+ * each with an id and a ref to an object-type instance. The tag records
+ * the consuming instance kind.
+ */
+function parseRoleInstanceDecls(
+  role: Record<string, unknown>,
+): NormaRoleInstanceDecl[] {
+  const container = child(role, "RoleInstances") as Record<string, unknown> | undefined;
+  if (!container) return [];
+  const decls: NormaRoleInstanceDecl[] = [];
+  const tags: readonly [string, "entity" | "fact"][] = [
+    ["EntityTypeRoleInstance", "entity"],
+    ["ValueTypeRoleInstance", "fact"],
+    ["FactTypeRoleInstance", "fact"],
+  ];
+  for (const [tag, consumer] of tags) {
+    for (const el of asArray(container[tag])) {
+      const id = attr(el, "id");
+      const ref = attr(el, "ref");
+      if (!id || !ref) continue;
+      decls.push({ id, objectInstanceRef: ref, consumer });
+    }
+  }
+  return decls;
+}
+
+/** Instances > ValueTypeInstance > Value (text; numeric text normalized to string). */
+function parseValueInstances(
+  vt: Record<string, unknown>,
+): NormaValueTypeInstance[] {
+  const container = child(vt, "Instances") as Record<string, unknown> | undefined;
+  if (!container) return [];
+  const instances: NormaValueTypeInstance[] = [];
+  for (const el of asArray(container["ValueTypeInstance"])) {
+    const id = attr(el, "id");
+    const raw = el["Value"];
+    if (!id || raw === undefined || raw === null || typeof raw === "object") continue;
+    instances.push({ id, value: String(raw) });
+  }
+  return instances;
+}
+
+/** Instances > EntityTypeInstance > RoleInstances (refs to role-instance decls). */
+function parseEntityInstances(
+  et: Record<string, unknown>,
+): NormaEntityTypeInstance[] {
+  const container = child(et, "Instances") as Record<string, unknown> | undefined;
+  if (!container) return [];
+  const instances: NormaEntityTypeInstance[] = [];
+  for (const el of asArray(container["EntityTypeInstance"])) {
+    const id = attr(el, "id");
+    if (!id) continue;
+    instances.push({ id, roleInstanceRefs: parseInstanceRoleRefs(el) });
+  }
+  return instances;
+}
+
+/** Instances > FactTypeInstance > RoleInstances (refs to role-instance decls). */
+function parseFactInstances(
+  f: Record<string, unknown>,
+): NormaFactTypeInstance[] {
+  const container = child(f, "Instances") as Record<string, unknown> | undefined;
+  if (!container) return [];
+  const instances: NormaFactTypeInstance[] = [];
+  for (const el of asArray(container["FactTypeInstance"])) {
+    const id = attr(el, "id");
+    if (!id) continue;
+    instances.push({ id, roleInstanceRefs: parseInstanceRoleRefs(el) });
+  }
+  return instances;
+}
+
+/** The ref list inside an instance's RoleInstances container (any tag kind). */
+function parseInstanceRoleRefs(instance: Record<string, unknown>): string[] {
+  const container = child(instance, "RoleInstances") as Record<string, unknown> | undefined;
+  if (!container) return [];
+  const refs: string[] = [];
+  for (const tag of ["EntityTypeRoleInstance", "ValueTypeRoleInstance", "FactTypeRoleInstance"]) {
+    for (const el of asArray(container[tag])) {
+      const ref = attr(el, "ref");
+      // Declarations carry id + ref; consumer references carry ref only.
+      if (ref && !attr(el, "id")) refs.push(ref);
+    }
+  }
+  return refs;
 }
 
 function parseValueComparisonOperator(

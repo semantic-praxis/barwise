@@ -16,6 +16,7 @@ import { type NormaMappingContext, NormaMappingError } from "./mapping/context.j
 import { mapDiagrams } from "./mapping/diagrams.js";
 import { mapFactTypes } from "./mapping/factTypes.js";
 import { mapObjectTypes } from "./mapping/objectTypes.js";
+import { mapPopulations } from "./mapping/populations.js";
 import { mapObjectifiedTypes, mapSubtypeFacts } from "./mapping/subtypes.js";
 import type { NormaConstraint, NormaDataType, NormaDocument } from "./NormaXmlTypes.js";
 
@@ -61,6 +62,7 @@ export function mapNormaToOrm(doc: NormaDocument): OrmModel {
   runConstraintPasses(ctx);
   mapSubtypeFacts(ctx);
   mapObjectifiedTypes(ctx);
+  mapPopulations(ctx);
 
   mapDiagrams(ctx);
 
