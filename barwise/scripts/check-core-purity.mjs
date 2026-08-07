@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Core-determinism gate -- WS5 of docs/specs/architecture-analysis.spec.md.
+// Core-determinism gate -- WS5 of docs/specs/archive/architecture-analysis.spec.md.
 //
 // Enforces "determinism in core": packages/core/src must be free of I/O,
 // clocks, randomness, and the LLM SDKs (scenarios S-DET-1..3). This is a

@@ -1,8 +1,12 @@
 # Restructure skills, CLAUDE.md, and tool descriptions for Claude 5 context engineering
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Workstreams 1-4 implemented (PR #281, 2026-07-27): complete MCP
+descriptions + slimmed barwise-modeling, compressed skill frontmatter,
+deduped spec-writer with unknowns discovery, slimmed CLAUDE.md with the
+release skill extracted. Open: WS5 (arch-review saved workflow),
+provisional -- not yet grounded in a demonstrated need.
 Created: 2026-07-27
-Last-updated: 2026-07-27
+Last-updated: 2026-08-07
 Tracking: Claude 5 guidance articles -- "The new rules of context engineering
 for Claude 5 generation models", "A field guide to Claude Fable 5: Finding
 your unknowns", "A harness for every task: dynamic workflows in Claude Code"

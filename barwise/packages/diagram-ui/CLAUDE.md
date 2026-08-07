@@ -2,7 +2,7 @@
 
 The React renderer for ORM diagrams -- the one renderer the
 diagram-renderer-consolidation spec calls for
-(`docs/specs/diagram-renderer-consolidation.spec.md`). It turns a
+(`docs/specs/archive/diagram-renderer-consolidation.spec.md`). It turns a
 `PositionedGraph` from `@barwise/diagram` into SVG from a single
 component: `OrmDiagram` is the pure, presentational component (the ORM 2
 notation); `DiagramCanvas` wraps it with the interactive pan / zoom /

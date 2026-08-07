@@ -3,7 +3,7 @@
  * queries). A declared, serialized path: a root object type -- the join
  * variable that correlates operand paths -- and an ordered list of single-
  * fact-type hops, each entering at one role and exiting at another role of
- * the same fact type. See docs/specs/role-path-model.spec.md.
+ * the same fact type. See docs/specs/archive/role-path-model.spec.md.
  *
  * Unlike the query `path` (discovered at read time, name-keyed,
  * fact-type-granular), a `RolePath` is declared, role-id-keyed, and stored,

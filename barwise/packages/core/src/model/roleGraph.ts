@@ -4,7 +4,7 @@
  * The single, pure adjacency walk over an ORM model's fact-type graph,
  * shared by the symbolic query path search (read-time discovery in
  * `query/evaluate.ts`) and the forthcoming role-path constraint operands
- * (declared and serialized -- see docs/specs/role-path-model.spec.md). One
+ * (declared and serialized -- see docs/specs/archive/role-path-model.spec.md). One
  * walk, two callers: query BFS expands `hopsFrom` to find a path between two
  * entities; a declared role path is validated by checking each of its steps
  * is a real `RoleHop` and that consecutive steps are contiguous.

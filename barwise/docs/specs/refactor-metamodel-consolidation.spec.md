@@ -6,8 +6,8 @@ Last-updated: 2026-06-18
 Tracking: barwise-jtl (consolidation epic),
 REPO_REVIEW-2026-06-16.md (F1 god files, F2 core barrel, F4 minors),
 docs/adr/0001-metamodel-evolution-policy.md, barwise-5t9 (+ children),
-docs/specs/god-file-decomposition.spec.md,
-docs/specs/diagram-presentation-contract.spec.md,
+docs/specs/archive/god-file-decomposition.spec.md,
+docs/specs/archive/diagram-presentation-contract.spec.md,
 docs/specs/norma-export.spec.md
 
 ## Principle
