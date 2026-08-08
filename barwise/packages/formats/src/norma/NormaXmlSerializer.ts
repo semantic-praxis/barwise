@@ -50,10 +50,14 @@ export function serializeNormaDocument(doc: NormaDocument): string {
   const ormModel: XmlNode = {
     [`${ATTR}id`]: doc.modelId,
     [`${ATTR}Name`]: doc.modelName,
+  };
+  // XSD order: the model's Notes precede Objects.
+  addNote(ormModel, doc.modelId, doc.modelNote);
+  Object.assign(ormModel, {
     "orm:Objects": buildObjects(doc),
     "orm:Facts": buildFacts(doc),
     "orm:Constraints": buildConstraints(doc),
-  };
+  });
 
   const dataTypes = buildDataTypes(doc);
   if (dataTypes) {
@@ -119,6 +123,7 @@ function buildEntityType(et: NormaEntityType): XmlNode {
   addCardinality(node, et.cardinality);
   addPlayedRoles(node, et.playedRoleRefs);
   addDefinition(node, et.definition);
+  addNote(node, et.id, et.note);
   if (et.preferredIdentifier) {
     node["orm:PreferredIdentifier"] = { [`${ATTR}ref`]: et.preferredIdentifier };
   }
@@ -138,6 +143,7 @@ function buildObjectifiedType(ot: NormaObjectifiedType): XmlNode {
   addCardinality(node, ot.cardinality);
   addPlayedRoles(node, ot.playedRoleRefs);
   addDefinition(node, ot.definition);
+  addNote(node, ot.id, ot.note);
   if (ot.preferredIdentifier) {
     node["orm:PreferredIdentifier"] = { [`${ATTR}ref`]: ot.preferredIdentifier };
   }
@@ -155,6 +161,7 @@ function buildValueType(vt: NormaValueType): XmlNode {
   addCardinality(node, vt.cardinality);
   addPlayedRoles(node, vt.playedRoleRefs);
   addDefinition(node, vt.definition);
+  addNote(node, vt.id, vt.note);
   if (vt.dataTypeRef) {
     const cdt: XmlNode = {
       [`${ATTR}id`]: `${vt.id}_cdt`,
@@ -216,6 +223,7 @@ function buildFact(ft: NormaFactType, constraintTagById: Map<string, string>): X
     "orm:ReadingOrders": { "orm:ReadingOrder": ft.readingOrders.map(buildReadingOrder) },
   };
   addDefinition(node, ft.definition);
+  addNote(node, ft.id, ft.note);
   if (ft.internalConstraintRefs.length > 0) {
     node["orm:InternalConstraints"] = buildInternalConstraintRefs(
       ft.internalConstraintRefs,
@@ -730,6 +738,14 @@ function addPlayedRoles(node: XmlNode, refs: readonly string[]): void {
   if (refs.length === 0) return;
   node["orm:PlayedRoles"] = {
     "orm:Role": refs.map((ref) => ({ [`${ATTR}ref`]: ref })),
+  };
+}
+
+/** Notes > Note > Text (XSD position: directly after Definitions). */
+function addNote(node: XmlNode, ownerId: string, note: string | undefined): void {
+  if (!note) return;
+  node["orm:Notes"] = {
+    "orm:Note": { [`${ATTR}id`]: `${ownerId}_note`, "orm:Text": note },
   };
 }
 

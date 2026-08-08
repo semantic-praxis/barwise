@@ -79,12 +79,10 @@ single-bound collapse stands), role-level `DefaultValue` (barwise
 models defaults on the object type, not the role; revisit only if the
 metamodel grows role defaults).
 
-Candidate follow-up (owner-flagged, undecided): NORMA `Note` elements
-(model-level and element-level). barwise has no notes seat today --
-`definition` already round-trips, so the open design question is where
-imported notes would live (definition text, the annotation system, or
-a new metamodel seat). File as its own small spec if pursued; not part
-of this spec's workstreams.
+Candidate follow-up, since pursued: NORMA `Note` elements landed via
+`norma-notes.spec.md` (2026-08-08). The "no notes seat" premise was
+stale -- barwise carries `note` on ObjectType, FactType, and OrmModel,
+so the mapping was pure wiring.
 
 ## Inventory
 

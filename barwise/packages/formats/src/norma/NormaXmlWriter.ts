@@ -113,6 +113,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
         preferredIdentifier: preferredIdByEntity.get(ot.id),
         playedRoleRefs: refs,
         definition: ot.definition,
+        note: ot.note,
         cardinality: writeCardinality(ot),
       });
     } else {
@@ -126,6 +127,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
           ?? popGraph.syntheticPreferredIdByEntity.get(normaId(ot.id)),
         playedRoleRefs: [...refs, ...extraRefs],
         definition: ot.definition,
+        note: ot.note,
         independent: ot.independent,
         cardinality: writeCardinality(ot),
         ...(instances ? { instances } : {}),
@@ -187,6 +189,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
     factTypes,
     subtypeFacts,
     constraints,
+    ...(model.note !== undefined ? { modelNote: model.note } : {}),
     dataTypes,
     diagrams: writeDiagrams(model),
   };
@@ -252,6 +255,7 @@ function writeValueType(ot: ObjectType, playedRoleRefs: string[]): NormaValueTyp
     name: ot.name,
     playedRoleRefs,
     definition: ot.definition,
+    note: ot.note,
     valueConstraint,
     dataTypeRef: dt ? dataTypeIdFor(dt.name) : undefined,
     ...(ot.defaultValue !== undefined ? { defaultValue: ot.defaultValue } : {}),
@@ -349,6 +353,7 @@ function writeFactType(
       readingOrders,
       internalConstraintRefs: internalRefs,
       definition: ft.definition,
+      note: ft.note,
       derivationRule: writeDerivationRule(ft),
       ...(factInstances ? { instances: factInstances } : {}),
     },

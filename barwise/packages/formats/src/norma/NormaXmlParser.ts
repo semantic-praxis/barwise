@@ -115,6 +115,7 @@ export function parseNormaXml(xml: string): NormaDocument {
     factTypes,
     subtypeFacts,
     constraints: parsedConstraints,
+    modelNote: parseModelNote(ormModel),
     dataTypes,
     diagrams: parseDiagrams(root),
   };
@@ -148,6 +149,7 @@ const arrayTags = new Set([
   "RingConstraint",
   "ValueComparisonConstraint",
   "ValueRange",
+  "ModelNote",
   "EntityTypeInstance",
   "ValueTypeInstance",
   "FactTypeInstance",
@@ -199,6 +201,7 @@ function parseEntityTypes(
       preferredIdentifier: prefId ? attr(prefId, "ref") : undefined,
       playedRoleRefs: parseRoleRefs(playedRoles),
       definition: defs,
+      note: parseNotesText(et),
       independent: attr(et, "IsIndependent") === "true",
       cardinality: parseCardinalityRestriction(et),
       ...withInstances(parseEntityInstances(et)),
@@ -233,6 +236,7 @@ function parseValueTypes(
       name: attr(vt, "Name") ?? "",
       playedRoleRefs: parseRoleRefs(playedRoles),
       definition: defs,
+      note: parseNotesText(vt),
       valueConstraint: valueRestriction
         ? parseValueRestriction(valueRestriction)
         : undefined,
@@ -262,6 +266,7 @@ function parseObjectifiedTypes(
       name: attr(ot, "Name") ?? "",
       nestedFactTypeRef: nested ? (attr(nested, "ref") ?? "") : "",
       referenceMode: attr(ot, "_ReferenceMode"),
+      note: parseNotesText(ot),
       preferredIdentifier: prefId ? attr(prefId, "ref") : undefined,
       playedRoleRefs: parseRoleRefs(playedRoles),
       definition: defs,
@@ -288,6 +293,38 @@ function parseDefinitionText(
   if (!defn) return undefined;
   const text = child(defn, "DefinitionText");
   return text != null ? String(text) : undefined;
+}
+
+/** Notes > Note > Text on any element (mirrors parseDefinitionText). */
+function parseNotesText(
+  el: Record<string, unknown>,
+): string | undefined {
+  const notes = child(el, "Notes") as Record<string, unknown> | undefined;
+  if (!notes) return undefined;
+  const note = child(notes, "Note") as Record<string, unknown> | undefined;
+  if (!note) return undefined;
+  const text = child(note, "Text");
+  return text != null && typeof text !== "object" ? String(text) : undefined;
+}
+
+/**
+ * The model-level note: the ORMModel's own Notes text plus any floating
+ * ModelNote texts, blank-line separated so no note text drops.
+ */
+function parseModelNote(
+  ormModel: Record<string, unknown>,
+): string | undefined {
+  const parts: string[] = [];
+  const own = parseNotesText(ormModel);
+  if (own) parts.push(own);
+  const modelNotes = child(ormModel, "ModelNotes") as Record<string, unknown> | undefined;
+  if (modelNotes) {
+    for (const mn of asArray(modelNotes["ModelNote"])) {
+      const text = child(mn, "Text");
+      if (text != null && typeof text !== "object") parts.push(String(text));
+    }
+  }
+  return parts.length > 0 ? parts.join("\n\n") : undefined;
 }
 
 function parseValueRestriction(
@@ -372,6 +409,7 @@ function parseFactTypes(
       readingOrders: parseReadingOrders(readingOrders),
       internalConstraintRefs: parseInternalConstraintRefs(internalConstraints),
       definition: defs,
+      note: parseNotesText(ft),
       derivationRule: parseDerivationRule(ft),
       ...withInstances(parseFactInstances(ft)),
     };
