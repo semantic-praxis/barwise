@@ -1,0 +1,22 @@
+id: order-management
+transcript: order-management.transcript.md
+reference: order-management.reference.orm.yaml
+checks:
+  - kind: must_validate
+  - kind: requires_element
+    element:
+      entity: Order
+  - kind: requires_element
+    element:
+      factTypeBetween: [Customer, Order]
+  - kind: requires_element
+    element:
+      factTypeBetween: [Order, Product]
+  - kind: forbids_population
+    factType: Customer places Order
+    constraint: internal_uniqueness
+    hint: Each order is placed by at most one customer.
+  - kind: forbids_population
+    factType: Customer places Order
+    constraint: mandatory
+    hint: Every order must be placed by some customer.

@@ -15,6 +15,7 @@ import { registerHistoryCommand } from "./commands/history.js";
 import { registerImportCommand } from "./commands/import.js";
 import { registerLineageCommand } from "./commands/lineage.js";
 import { registerProjectCommand } from "./commands/project.js";
+import { registerPromptCommand } from "./commands/prompt.js";
 import { registerQueryCommand } from "./commands/query.js";
 import { registerSchemaCommand } from "./commands/schema.js";
 import { registerValidateCommand } from "./commands/validate.js";
@@ -44,6 +45,7 @@ export function createProgram(version = "0.0.0-dev"): Command {
   registerHistoryCommand(program);
   registerImportCommand(program);
   registerLineageCommand(program);
+  registerPromptCommand(program);
 
   return program;
 }

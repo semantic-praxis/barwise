@@ -10,6 +10,7 @@
     },
     "packages/diagram": {},
     "packages/llm": {},
+    "packages/promptlab": {},
     "packages/cli": {
       "entry": ["src/bundle-entry.ts"]
     },

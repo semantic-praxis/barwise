@@ -1,0 +1,521 @@
+{
+  "object_types": [
+    {
+      "name": "Patient",
+      "kind": "entity",
+      "definition": "A person who receives medical care at the clinic, identified by a medical record number.",
+      "reference_mode": "medical_record_number",
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "A patient books an appointment with a doctor. We identify patients by their medical record number, which is assigned at registration."
+        }
+      ]
+    },
+    {
+      "name": "Doctor",
+      "kind": "entity",
+      "definition": "A medical practitioner at the clinic, identified by a state-issued provider ID.",
+      "reference_mode": "provider_id",
+      "source_references": [
+        {
+          "lines": [5, 5],
+          "excerpt": "Each doctor has a provider ID issued by the state medical board."
+        }
+      ]
+    },
+    {
+      "name": "Appointment",
+      "kind": "entity",
+      "definition": "A scheduled visit between a patient and a doctor, identified by a confirmation number.",
+      "reference_mode": "confirmation_number",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Each appointment gets a unique confirmation number when it's created."
+        }
+      ]
+    },
+    {
+      "name": "ExamRoom",
+      "kind": "entity",
+      "definition": "A physical examination room at the clinic, identified by a room number.",
+      "reference_mode": "room_number",
+      "source_references": [
+        {
+          "lines": [19, 19],
+          "excerpt": "Each exam room has a room number."
+        }
+      ]
+    },
+    {
+      "name": "Specialty",
+      "kind": "value",
+      "definition": "The medical specialty of a doctor.",
+      "value_constraint": {
+        "values": ["cardiology", "dermatology", "family medicine", "orthopedics", "pediatrics"]
+      },
+      "source_references": [
+        {
+          "lines": [5, 5],
+          "excerpt": "things like cardiology, dermatology, family medicine, orthopedics, or pediatrics"
+        }
+      ]
+    },
+    {
+      "name": "AppointmentDate",
+      "kind": "value",
+      "definition": "The calendar date of an appointment.",
+      "source_references": [
+        {
+          "lines": [9, 9],
+          "excerpt": "The date, a time slot, and a reason for the visit."
+        }
+      ]
+    },
+    {
+      "name": "TimeSlot",
+      "kind": "value",
+      "definition": "A half-hour time slot during clinic hours.",
+      "value_constraint": {
+        "values": [
+          "8:00",
+          "8:30",
+          "9:00",
+          "9:30",
+          "10:00",
+          "10:30",
+          "11:00",
+          "11:30",
+          "13:00",
+          "13:30",
+          "14:00",
+          "14:30",
+          "15:00",
+          "15:30",
+          "16:00",
+          "16:30"
+        ]
+      },
+      "source_references": [
+        {
+          "lines": [9, 9],
+          "excerpt": "The time slot is one of: 8:00, 8:30, 9:00, 9:30, 10:00, 10:30, 11:00, 11:30, 13:00, 13:30, 14:00, 14:30, 15:00, 15:30, 16:00, or 16:30."
+        }
+      ]
+    },
+    {
+      "name": "VisitReason",
+      "kind": "value",
+      "definition": "Free-text reason for the appointment as described by the patient.",
+      "source_references": [
+        {
+          "lines": [9, 9],
+          "excerpt": "The reason is free text -- whatever the patient describes when they call."
+        }
+      ]
+    },
+    {
+      "name": "AppointmentStatus",
+      "kind": "value",
+      "definition": "The current status of an appointment in its lifecycle.",
+      "value_constraint": {
+        "values": ["scheduled", "checked-in", "in-progress", "completed", "cancelled", "no-show"]
+      },
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "scheduled, checked-in, in-progress, completed, cancelled, or no-show"
+        }
+      ]
+    },
+    {
+      "name": "FollowUpNote",
+      "kind": "value",
+      "definition": "Free-text follow-up note attached to a completed appointment.",
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "A completed appointment may also have a follow-up note, which is free text."
+        }
+      ]
+    }
+  ],
+  "fact_types": [
+    {
+      "name": "Patient books Appointment",
+      "roles": [
+        { "player": "Patient", "role_name": "books" },
+        { "player": "Appointment", "role_name": "is booked by" }
+      ],
+      "readings": [
+        "{0} books {1}",
+        "{1} is booked by {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "A patient books an appointment with a doctor."
+        }
+      ]
+    },
+    {
+      "name": "Appointment is with Doctor",
+      "roles": [
+        { "player": "Appointment", "role_name": "is with" },
+        { "player": "Doctor", "role_name": "sees" }
+      ],
+      "readings": [
+        "{0} is with {1}",
+        "{1} sees {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "A patient books an appointment with a doctor."
+        }
+      ]
+    },
+    {
+      "name": "Doctor has Specialty",
+      "roles": [
+        { "player": "Doctor", "role_name": "has" },
+        { "player": "Specialty", "role_name": "is of" }
+      ],
+      "readings": [
+        "{0} has {1}",
+        "{1} is of {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [5, 5],
+          "excerpt": "Every doctor has a specialty"
+        }
+      ]
+    },
+    {
+      "name": "Appointment is on AppointmentDate",
+      "roles": [
+        { "player": "Appointment", "role_name": "is on" },
+        { "player": "AppointmentDate", "role_name": "is of" }
+      ],
+      "readings": [
+        "{0} is on {1}",
+        "{1} is of {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [9, 9],
+          "excerpt": "Every appointment must have a date and a time slot."
+        }
+      ]
+    },
+    {
+      "name": "Appointment is at TimeSlot",
+      "roles": [
+        { "player": "Appointment", "role_name": "is at" },
+        { "player": "TimeSlot", "role_name": "is of" }
+      ],
+      "readings": [
+        "{0} is at {1}",
+        "{1} is of {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [9, 9],
+          "excerpt": "Every appointment must have a date and a time slot."
+        }
+      ]
+    },
+    {
+      "name": "Appointment has VisitReason",
+      "roles": [
+        { "player": "Appointment", "role_name": "has" },
+        { "player": "VisitReason", "role_name": "is of" }
+      ],
+      "readings": [
+        "{0} has {1}",
+        "{1} is of {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [9, 9],
+          "excerpt": "a reason for the visit. The reason is free text"
+        }
+      ]
+    },
+    {
+      "name": "Appointment has AppointmentStatus",
+      "roles": [
+        { "player": "Appointment", "role_name": "has" },
+        { "player": "AppointmentStatus", "role_name": "is of" }
+      ],
+      "readings": [
+        "{0} has {1}",
+        "{1} is of {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "An appointment has a status"
+        }
+      ]
+    },
+    {
+      "name": "Appointment has FollowUpNote",
+      "roles": [
+        { "player": "Appointment", "role_name": "has" },
+        { "player": "FollowUpNote", "role_name": "is of" }
+      ],
+      "readings": [
+        "{0} has {1}",
+        "{1} is of {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "A completed appointment may also have a follow-up note"
+        }
+      ]
+    },
+    {
+      "name": "Patient has primary Doctor",
+      "roles": [
+        { "player": "Patient", "role_name": "has primary" },
+        { "player": "Doctor", "role_name": "is primary doctor of" }
+      ],
+      "readings": [
+        "{0} has primary {1}",
+        "{1} is primary doctor of {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [21, 21],
+          "excerpt": "we do track a \"primary doctor\" for each patient. Every patient must have a primary doctor on file."
+        }
+      ]
+    }
+  ],
+  "subtypes": [],
+  "inferred_constraints": [
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Patient books Appointment",
+      "roles": ["is booked by"],
+      "description": "Each Appointment is booked by at most one Patient.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "A patient books an appointment"
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Patient books Appointment",
+      "roles": ["is booked by"],
+      "description": "Every Appointment is booked by some Patient.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "A patient books an appointment"
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Appointment is with Doctor",
+      "roles": ["is with"],
+      "description": "Each Appointment is with at most one Doctor.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "A patient books an appointment with a doctor."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Appointment is with Doctor",
+      "roles": ["is with"],
+      "description": "Every Appointment is with some Doctor.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "A patient books an appointment with a doctor."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Doctor has Specialty",
+      "roles": ["has"],
+      "description": "Each Doctor has exactly one Specialty.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [5, 5],
+          "excerpt": "A doctor has exactly one specialty."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Doctor has Specialty",
+      "roles": ["has"],
+      "description": "Every Doctor has some Specialty.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [5, 5],
+          "excerpt": "Every doctor has a specialty"
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Appointment is on AppointmentDate",
+      "roles": ["is on"],
+      "description": "Each Appointment is on at most one AppointmentDate.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [9, 9],
+          "excerpt": "Every appointment must have a date"
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Appointment is on AppointmentDate",
+      "roles": ["is on"],
+      "description": "Every Appointment is on some AppointmentDate.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [9, 9],
+          "excerpt": "Every appointment must have a date"
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Appointment is at TimeSlot",
+      "roles": ["is at"],
+      "description": "Each Appointment is at at most one TimeSlot.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [9, 9],
+          "excerpt": "Every appointment must have a date and a time slot."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Appointment is at TimeSlot",
+      "roles": ["is at"],
+      "description": "Every Appointment is at some TimeSlot.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [9, 9],
+          "excerpt": "Every appointment must have a date and a time slot."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Appointment has AppointmentStatus",
+      "roles": ["has"],
+      "description": "Each Appointment has at most one AppointmentStatus.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "An appointment has a status"
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Appointment has AppointmentStatus",
+      "roles": ["has"],
+      "description": "Every Appointment has some AppointmentStatus.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "Every appointment starts as scheduled."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Appointment has FollowUpNote",
+      "roles": ["has"],
+      "description": "Each Appointment has at most one FollowUpNote.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "A completed appointment may also have a follow-up note"
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Patient has primary Doctor",
+      "roles": ["has primary"],
+      "description": "Each Patient has at most one primary Doctor.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [21, 21],
+          "excerpt": "we do track a \"primary doctor\" for each patient"
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Patient has primary Doctor",
+      "roles": ["has primary"],
+      "description": "Every Patient has some primary Doctor.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [21, 21],
+          "excerpt": "Every patient must have a primary doctor on file."
+        }
+      ]
+    }
+  ],
+  "ambiguities": [
+    {
+      "description": "The transcript describes a composite uniqueness constraint: a doctor can only see one patient per time slot on a given day, and a patient can only have one appointment per time slot on a given day. These external uniqueness constraints span multiple fact types and cannot be represented as simple internal uniqueness constraints.",
+      "source_references": [
+        {
+          "lines": [11, 11],
+          "excerpt": "a patient can only have one appointment per time slot on a given day -- no double-booking from the patient side."
+        },
+        {
+          "lines": [13, 13],
+          "excerpt": "A doctor can only see one patient per time slot on a given day."
+        }
+      ]
+    },
+    {
+      "description": "Room assignment is described as 'a doctor is assigned to a room for the day' which implies a ternary fact type involving Doctor, ExamRoom, and a date, with shared rooms across doctors on different days. This is not modeled as a simple binary.",
+      "source_references": [
+        {
+          "lines": [19, 19],
+          "excerpt": "A doctor is assigned to a room for the day, but rooms can be shared across doctors on different days."
+        }
+      ]
+    }
+  ]
+}

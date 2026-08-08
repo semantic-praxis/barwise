@@ -7,7 +7,8 @@ packages (`@barwise/core`, `@barwise/diagram`, `@barwise/llm`) into a
 ## Dependency Rule
 
 This package depends on `@barwise/core`, `@barwise/diagram`,
-`@barwise/llm`, and `commander`. It has ZERO dependencies on VS Code.
+`@barwise/llm`, `@barwise/promptlab`, and `commander`. It has ZERO
+dependencies on VS Code.
 
 ## Package Layout
 
@@ -26,6 +27,8 @@ src/
                         emission + session log at $XDG_STATE_HOME/barwise/)
     import.ts           barwise import (orchestrator over import/)
     import/             one module per import subcommand + shared helpers
+    prompt.ts           barwise prompt eval|score|schema|history (prompt
+                        evaluation over @barwise/promptlab)
   workspace/
     io.ts               File I/O helpers (loadModel, writeModel)
     format.ts           Output formatting helpers (JSON, text)

@@ -1,7 +1,8 @@
 # Prompt optimization harness: DSPy-optimized, per-provider prompt artifacts for the LLM surfaces
 
-Status: Accepted (merged in PR #289). Workstream 1 (artifact seam)
-implemented; see Implementation notes. Workstreams 2-6 open.
+Status: Accepted (merged in PR #289). Workstreams 1 (artifact seam)
+and 2 (promptlab: eval suite, scorer, runner, CLI) implemented; see
+Implementation notes. Workstreams 3-6 open.
 Created: 2026-08-08
 Last-updated: 2026-08-08
 Tracking: `docs/ARCHITECTURE.md` open question #4 ("LLM prompt as a
@@ -550,6 +551,32 @@ otherwise as specified, and the golden byte-identity guard holds.
   renders nothing, which is what keeps the default byte-stable. The
   golden files live in `packages/llm/tests/fixtures/prompts/` and were
   generated from the build preceding the refactor.
+
+### Workstream 2 (2026-08-08)
+
+As specified, with three grounded refinements:
+
+- **The seed references are generated, not hand-authored.** Each
+  `*.reference.orm.yaml` was produced by running the corresponding
+  recorded extraction payload (from `packages/llm/tests/fixtures/`)
+  through `parseExtractionFromJson` and serializing, so the references
+  cannot drift from what the pipeline builds. The recorded payloads
+  double as the suite's answer keys: each passes its full rubric, with
+  exact scores pinned in `tests/scoreExtraction.test.ts` (0.98 / 0.96 /
+  0.96 / 0.94 -- below 1.0 only by the conformance penalty, which is
+  the scorer working as designed).
+- **Rubrics reuse the gym wholesale.** An eval case's `checks` are
+  literal `GymCheck` values; the scorer adapts the case to the
+  exercise shape and calls `evaluateCandidate`, so the four check
+  runners are shared, not copied. One authoring limit surfaced: the
+  counterexample generator could not derive a forbidden population for
+  the mandatory constraint on employee-hierarchy's subtype-heavy
+  works-in fact type, so that rubric uses the department-name
+  uniqueness instead.
+- **`prompt score` throws on an unparseable payload** (exit 1); the
+  suite runner and the DSPy metric treat that as a zero-scored run.
+  Suite manifests declare weights and the case list explicitly -- no
+  directory discovery.
 
 ## Non-goals
 

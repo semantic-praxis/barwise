@@ -25,7 +25,8 @@ const INTENDED = {
   "dbt": ["core"],
   "formats": ["core"],
   "learn": ["core"],
-  "cli": ["core", "diagram", "llm", "code-analysis", "dbt", "formats", "learn"],
+  "promptlab": ["core", "llm", "learn"],
+  "cli": ["core", "diagram", "llm", "code-analysis", "dbt", "formats", "learn", "promptlab"],
   "mcp": ["core", "diagram", "llm", "code-analysis", "dbt", "formats", "learn"],
   "vscode": [
     "core",

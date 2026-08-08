@@ -1,0 +1,9 @@
+version: 1.0.0
+weights:
+  conformanceCorrection: 0.02
+  validationError: 0.1
+cases:
+  - order-management.eval.yaml
+  - university-enrollment.eval.yaml
+  - clinic-appointments.eval.yaml
+  - employee-hierarchy.eval.yaml

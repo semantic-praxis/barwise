@@ -1,0 +1,22 @@
+id: university-enrollment
+transcript: university-enrollment.transcript.md
+reference: university-enrollment.reference.orm.yaml
+checks:
+  - kind: must_validate
+  - kind: requires_element
+    element:
+      entity: CourseOffering
+  - kind: requires_element
+    element:
+      factTypeBetween: [Student, CourseOffering]
+  - kind: requires_element
+    element:
+      factTypeBetween: [CourseOffering, Semester]
+  - kind: forbids_population
+    factType: CourseOffering is of Course
+    constraint: internal_uniqueness
+    hint: Each offering is of exactly one course.
+  - kind: forbids_population
+    factType: Instructor teaches CourseOffering
+    constraint: internal_uniqueness
+    hint: Each offering is taught by exactly one instructor.
