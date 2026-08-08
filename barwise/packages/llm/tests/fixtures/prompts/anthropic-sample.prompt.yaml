@@ -1,0 +1,19 @@
+surface: extraction
+version: 2.1.0
+match:
+  provider: anthropic
+  modelPrefix: claude-
+instructions: |-
+  Sample optimized instructions for the extraction surface.
+demos:
+  - transcriptExcerpt: |-
+      Customer Alice placed Order 123.
+    extraction: |-
+      {"object_types": [{"name": "Customer", "kind": "entity"}]}
+provenance:
+  optimizer: dspy/MIPROv2
+  proposerModel: claude-opus-5
+  scoredAgainst: claude-sonnet-5
+  suiteVersion: 1.0.0
+  score: 0.91
+  date: "2026-08-08"

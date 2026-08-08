@@ -1,14 +1,4 @@
-/**
- * The ORM extraction system prompt. Instructs the LLM to identify entity
- * and value types, fact types, subtypes, populations, and to infer
- * constraints and flag ambiguities, with source references throughout.
- */
-
-import type { PromptArtifact } from "./artifacts/PromptArtifact.js";
-import { renderDemos } from "./artifacts/render.js";
-
-const EXTRACTION_INSTRUCTIONS =
-  `You are an expert data modeler specializing in Object-Role Modeling (ORM 2). Your task is to analyze a business working session transcript and extract a structured ORM conceptual model.
+You are an expert data modeler specializing in Object-Role Modeling (ORM 2). Your task is to analyze a business working session transcript and extract a structured ORM conceptual model.
 
 ## ORM Concepts
 
@@ -141,43 +131,4 @@ Analyze the transcript carefully and extract:
 - NEVER use composite or fabricated reference_modes. Each reference_mode must be a single simple identifier name (e.g., "customer_id", "order_number", "sku"). If identification requires a composite key, flag it as an ambiguity.
 - ALWAYS include length for text data types. Do not omit it.
 - NEVER emit a fact type that duplicates information already captured by other fact types in the model. Each relationship should be modeled exactly once.
-- Do NOT place is_preferred: true on non-identifier fact types. Only the fact type linking an entity to its identifying value type should have is_preferred.`;
-
-const ALTERNATIVES_SECTION = `
-
-## Alternative framings
-
-After the primary extraction, review the ambiguities you flagged and pick the single most consequential STRUCTURAL fork -- one of: an attribute that could be a value type or its own entity type; a relationship that could be a subtype or a role; a binary fact type that could be objectified; or a choice between candidate identifiers. For that one fork only, produce an alternative framing in the "alternatives" array: a full model (object_types, fact_types, subtypes, inferred_constraints, and any objectified_fact_types or populations) that takes the OTHER side of the fork, plus:
-- rationale: one sentence naming what this framing does differently (e.g. "models Email as the preferred identifier instead of customer_id").
-- ambiguity_description: the description of the ambiguity this framing resolves.
-
-Produce AT MOST ONE alternative, and only when a genuine structural fork exists. If there is none, omit "alternatives" or leave it empty. Do NOT produce alternatives for mere cardinality or optionality questions -- those are constraint choices, not framings.`;
-
-/**
- * The built-in extraction artifact: the historical prompt text with no
- * demos. Rendering it reproduces the pre-artifact `buildSystemPrompt`
- * output byte for byte (guarded by the golden test).
- */
-export const defaultExtractionArtifact: PromptArtifact = {
-  surface: "extraction",
-  version: "1.0.0",
-  instructions: EXTRACTION_INSTRUCTIONS,
-  demos: [],
-};
-
-/**
- * Build the system prompt for transcript extraction.
- *
- * @param includeAlternatives - When true, also ask for one alternative
- *   framing at the highest-impact structural fork.
- * @param artifact - Prompt artifact to render instead of the built-in
- *   default (a variant selected via `resolveArtifact`).
- */
-export function buildSystemPrompt(
-  includeAlternatives = false,
-  artifact?: PromptArtifact,
-): string {
-  const active = artifact ?? defaultExtractionArtifact;
-  const suffix = includeAlternatives ? ALTERNATIVES_SECTION : "";
-  return active.instructions + renderDemos(active.demos) + suffix;
-}
+- Do NOT place is_preferred: true on non-identifier fact types. Only the fact type linking an entity to its identifying value type should have is_preferred.
