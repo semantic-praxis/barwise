@@ -118,12 +118,26 @@ are candidates for the default artifact too -- deferred until a keyed
 
 ## Candidate results (same channel)
 
-| Case                  | Sonnet 5 default | Sonnet 5 sonnet5-1 |
-| --------------------- | ---------------- | ------------------ |
-| order-management      | 1.000            | (pending)          |
-| university-enrollment | 1.000            | (pending)          |
-| clinic-appointments   | 1.000            | (pending)          |
-| employee-hierarchy    | 0.700            | (pending)          |
+| Case                  | Sonnet 5 default  | Sonnet 5 sonnet5-1 |
+| --------------------- | ----------------- | ------------------ |
+| order-management      | 1.000             | 1.000              |
+| university-enrollment | 1.000             | 1.000              |
+| clinic-appointments   | 1.000             | 1.000              |
+| employee-hierarchy    | 0.700             | 1.000              |
+| **mean / worst**      | **0.925 / 0.700** | **1.000 / 1.000**  |
+
+Versus the Fable 5 default-artifact baseline (0.665 / 0.447), the
+candidate improves the suite mean by +0.335 and the worst case by
++0.553 on this channel.
+
+One behavioral observation: under the variant's rules all four runs
+emitted zero populations. That is the correct reading of this suite --
+every example in these transcripts is a one-role value list ("like
+Payroll or Field Operations", "like CS101"), which the rules route to
+value_constraint, and all four answer keys also carry zero populations.
+But the suite currently has no case that rewards a genuinely complete
+example fact, so nothing guards against the rules suppressing
+populations that should be captured. See follow-ups.
 
 ## Follow-ups
 
@@ -135,5 +149,8 @@ are candidates for the default artifact too -- deferred until a keyed
   arity difference (binary vs ternary) makes a witness unmappable and
   fails the check with a misleading message. Consider a subset-aware
   fallback or a clearer "arity mismatch" message in `@barwise/learn`.
+- Add an eval case whose transcript states a complete example fact
+  ("Customer Alice placed Order 123") with an answer key that captures
+  it, so the population rules are tested in both directions.
 - The bd binary is unavailable in this session; file bd issues for the
   items above when back on a keyed machine.
