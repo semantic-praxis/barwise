@@ -24,8 +24,8 @@ quality evidence is a pair of hand-scored A/B scorecards
 the `tests/live/` directory that `packages/llm/CLAUDE.md` and
 `ARCHITECTURE.md` section 7.5 both prescribe for prompt-engineering
 runs does not exist. Meanwhile the provider factory supports three
-providers plus Copilot, teams run different models, and models change
-under the prompt without any signal that quality moved.
+providers plus Copilot, different surfaces run different models, and
+models change under the prompt without any signal that quality moved.
 
 The fix is the DSPy discipline: separate the prompt (a declared,
 versioned artifact) from the metric (a programmatic scorer), and let
@@ -155,21 +155,29 @@ In scope:
 
 Out of scope, deferred and named:
 
-- The guidance prompts (`packages/mcp/src/prompts/guidance/`), the MCP
-  prompts, the chat-participant prompt, and the `.claude/` agent and
-  skill texts. They steer external agents whose behavior barwise
-  cannot invoke and score headlessly; no deterministic metric exists
-  for them today. Revisit if a scoreable harness for agent
-  transcripts appears.
+- The process skills and steering texts with no deterministic metric:
+  the guidance prompts (`packages/mcp/src/prompts/guidance/`), the MCP
+  prompts, the chat-participant prompt, and the `.claude/` skills
+  (`spec-writer`, `articulation`, `release`, `gym-coach`,
+  `barwise-modeling`). Their output is prose or process; scoring them
+  needs a judge, which reintroduces the drift this harness exists to
+  kill. They stay hand-authored.
+- Optimizing the two `.claude/` subagents
+  (`barwise-transcript-extractor`, `barwise-model-reviewer`). Their
+  deliverable is an `.orm.yaml` the scorer can grade, so they get
+  measure-first regression evals (workstream 6) -- but they stay out
+  of the DSPy loop: each evaluation is a full agent session (an order
+  of magnitude more cost and variance than one completion), and their
+  instruction text is single-sourced for human maintainability.
 - The review surface (`reviewModel.ts`). Its output is a finding list,
   so its metric needs seeded-defect fixtures (planted defects, score =
   recall), which is real authoring work. Workstream 5, provisional.
 - `CodeExtractionPrompt` in `@barwise/code-analysis`: dead code today
   (built, exported at `src/index.ts:31`, never sent to a model). It
   joins the harness when it gains a call site.
-- Auto-applying optimized artifacts without review, and any scheduled
-  CI operation. Both are open decisions below; neither blocks the
-  harness landing as a manual tool.
+- A scheduled CI workflow. Re-evaluation is a local act triggered by
+  a model release (see Decisions); the checked-in score history is
+  the durable record.
 - Multi-turn few-shot demos. `CompletionRequest` is a single
   systemPrompt + userMessage (`LlmClient.ts:8-14`); exported demos
   render inline into the system prompt. Extending `LlmClient` to
@@ -178,21 +186,21 @@ Out of scope, deferred and named:
 
 ## Inventory
 
-| Area                                        | Change                                                                         | Verdict   |
-| ------------------------------------------- | ------------------------------------------------------------------------------ | --------- |
-| `packages/llm/src/prompt/systemPrompt.ts`   | Becomes the default extraction artifact; `buildSystemPrompt` reads an artifact | refactor  |
-| `packages/llm/src/prompt/artifacts/`        | Artifact types, loader, resolver (surface x provider -> artifact)              | new       |
-| `packages/llm/prompts/`                     | Checked-in artifact variants (`*.prompt.yaml`) with provenance metadata        | new       |
-| `packages/promptlab/`                       | Eval-case loader, scorer, suite runner, history writer                         | new       |
-| `packages/promptlab/evals/`                 | Seed suite (`*.eval.yaml` + reference `*.orm.yaml` + transcripts)              | new       |
-| `optimizer/`                                | DSPy project: extraction program, shell-out metric, exporter (Python, uv)      | new       |
-| `packages/cli/src/commands/prompt.ts`       | `barwise prompt eval                                                           | score     |
-| `packages/llm/src/TranscriptProcessor.ts`   | Accepts an optional artifact (default preserves current behavior)              | additive  |
-| `@barwise/learn`                            | Consumed as-is: `evaluateCandidate`, check types, `GymReport`                  | untouched |
-| `@barwise/core`                             | Consumed as-is through existing subpath exports                                | untouched |
-| `packages/cli/src/commands/import/batch.ts` | Stays; its concern is bulk import, and eval supersedes it for scoring          | untouched |
-| `packages/mcp`, `packages/vscode`           | Pick up artifact resolution for free via `processTranscript`                   | untouched |
-| `CLAUDE.md` dependency graph                | Add the `promptlab` node; note the offline `optimizer/` lane                   | doc       |
+| Area                                        | Change                                                                          | Verdict   |
+| ------------------------------------------- | ------------------------------------------------------------------------------- | --------- |
+| `packages/llm/src/prompt/systemPrompt.ts`   | Becomes the default extraction artifact; `buildSystemPrompt` reads an artifact  | refactor  |
+| `packages/llm/src/prompt/artifacts/`        | Artifact types, loader, resolver (surface x provider -> artifact)               | new       |
+| `packages/llm/prompts/`                     | Checked-in artifact variants (`*.prompt.yaml`) with provenance metadata         | new       |
+| `packages/promptlab/`                       | Eval-case loader, scorer, suite runner, history writer                          | new       |
+| `packages/promptlab/evals/`                 | Seed suite (`*.eval.yaml` + reference `*.orm.yaml` + transcripts)               | new       |
+| `optimizer/`                                | DSPy project: extraction program, shell-out metric, exporter (Python, uv)       | new       |
+| `packages/cli/src/commands/prompt.ts`       | New `barwise prompt` command (eval, score, schema, history); adds promptlab dep | additive  |
+| `packages/llm/src/TranscriptProcessor.ts`   | Accepts an optional artifact (default preserves current behavior)               | additive  |
+| `@barwise/learn`                            | Consumed as-is: `evaluateCandidate`, check types, `GymReport`                   | untouched |
+| `@barwise/core`                             | Consumed as-is through existing subpath exports                                 | untouched |
+| `packages/cli/src/commands/import/batch.ts` | Stays; its concern is bulk import, and eval supersedes it for scoring           | untouched |
+| `packages/mcp`, `packages/vscode`           | Pick up artifact resolution for free via `processTranscript`                    | untouched |
+| `CLAUDE.md` dependency graph                | Add the `promptlab` node; note the offline `optimizer/` lane                    | doc       |
 
 The review prompt (`reviewModel.ts`) looks affected but is not until
 workstream 5: the artifact seam is designed for both surfaces, but
@@ -235,7 +243,7 @@ optimizer/                             (uv-managed; dspy dependency)
                 + delta report
 
   data flow:  evals/*.eval.yaml --> compile.py --> candidate .prompt.yaml
-              candidate --> barwise prompt eval (acceptance gate) --> PR
+              candidate --> barwise prompt eval (acceptance gate) --> commit
 ```
 
 The artifact and its resolution are explicit: a `.prompt.yaml` names
@@ -375,7 +383,7 @@ need excerpt-truncation rules in the exporter).
 
 ### 4. Per-provider variants in the wild (provisional: not yet grounded)
 
-Run the optimizer against the provider/model pairs teams actually use
+Run the optimizer against the provider/model pairs in active use
 (at minimum one Anthropic and one OpenAI-compatible target), gate each
 candidate through `barwise prompt eval`, and commit the accepted
 variants with provenance metadata. This workstream is content plus
@@ -390,6 +398,23 @@ planted defects per review category, metric = recall of planted
 defects. Wires the artifact seam (already designed for both surfaces)
 into `buildReviewSystemPrompt` and adds a review program to
 `optimizer/`. Deferred until the extraction harness proves the shape.
+
+### 6. Agent-output evals for the `.claude/` subagents (provisional: not yet grounded)
+
+Measure-first, optimize-never: a runner that headlessly drives
+`barwise-transcript-extractor` (Claude Agent SDK or `claude -p`
+against the barwise MCP server) over the suite transcripts, scores
+each resulting model through the same `barwise prompt score` path,
+and appends to the same history file. This gives the agentic surface
+the regression signal across Claude releases that workstream 2 gives
+the API surfaces, and it answers a question the extraction evals
+cannot: whether the multi-turn validate-and-revise path beats
+single-shot `processTranscript` on the same cases. No DSPy
+involvement; the agent and skill texts stay hand-authored, and a
+skill only becomes an optimization candidate if this history shows it
+bleeding score across model releases. Grounding notes before
+building: confirm a headless runner can drive the MCP tools
+noninteractively, and bound per-run session cost.
 
 ## API and migration impact
 
@@ -410,45 +435,45 @@ into `buildReviewSystemPrompt` and adds a review program to
 - `CLAUDE.md` dependency graph and the package list gain `promptlab`;
   the optimizer lane is documented as offline tooling.
 
-## Open decisions (for review)
+## Decisions (resolved 2026-08-08: single-maintainer mode)
 
-- **Package name.** `@barwise/promptlab` (recommended) vs.
-  `@barwise/prompt-gym` vs. folding into `@barwise/llm`.
-  "Gym" is taken by a learner-facing capability and overloading it
-  muddies the two audiences; folding into `llm` loses the
-  orthogonality argued above. Minor, but it lands in the public
-  dependency graph, so it is the reviewer's call.
-- **Where the Python project lives.** Top-level `optimizer/`
-  (recommended: it is a lane, not a package, and top level keeps it
-  visibly outside the workspace) vs. `tools/optimizer/` vs. a
-  separate repository. A separate repo maximizes isolation but splits
-  the eval suite from the code that consumes its output; keeping it
-  in-tree keeps artifact, suite, and optimizer versioned together.
-- **First optimizer to wire.** MIPROv2 (recommended: instruction +
-  demo search, well-documented, bounded) vs. GEPA (stronger recent
-  results, heavier budget) vs. BootstrapFewShot only (cheapest, demos
-  without instruction search). The exporter is optimizer-agnostic;
-  this only decides what `compile.py` runs first.
-- **Rollout policy for optimized artifacts.** Recommended: candidates
-  land only via a reviewed PR carrying the delta report -- the
-  "LLM-assisted, human-governed" principle applied to prompts.
-  Alternative: an auto-apply mode for teams that trust the suite.
-  Recommendation is PR-only until the suite has enough cases that a
-  score improvement is hard to game.
-- **Where "periodically" runs.** The trigger for re-evaluation is a
-  model release, not a calendar date, and the run needs API keys and
-  spends real tokens. Recommended: manual `barwise prompt eval` plus
-  the checked-in history file first; an opt-in scheduled CI workflow
-  (monthly, posting a report or draft PR on score regression) as a
-  follow-up once the org decides where eval keys live. Scheduling
-  before the key question is answered would build a workflow nobody
-  can run.
-- **Score weights.** The penalty sizes (per conformance correction,
-  per residual validation error) shape what the optimizer chases.
-  Recommended defaults: 0.02 per correction, 0.10 per validation
-  error, floor at 0; declared in the suite file, not hardcoded, so
-  reweighting is a data change. Reviewer may prefer rubric-only
-  scoring for v1.
+The project has one user, who is also the maintainer and reviewer.
+The decisions below are resolved for that operating mode; the ones
+marked with an asterisk trade away protections that only matter with
+multiple users, and should be reopened if the project gains any.
+
+- **Package name (resolved: `@barwise/promptlab`).** "Gym" is taken
+  by a learner-facing capability, and folding into `llm` loses the
+  orthogonality argued above.
+- **Where the Python project lives (resolved: in-tree, top-level
+  `optimizer/`).** It is a lane, not a package; top level keeps it
+  visibly outside the workspace. In-tree keeps artifact schema, eval
+  suite, scorer semantics, and optimizer versioned together -- any
+  git SHA is self-consistent, and no cross-repo compatibility matrix
+  exists to maintain. Extract to its own repository only if a second
+  project ever consumes it; the coupling is one CLI call and two file
+  formats, so extraction stays cheap.
+- **First optimizer to wire (resolved: MIPROv2).** Instruction + demo
+  search, well-documented, bounded budget. GEPA and BootstrapFewShot
+  remain one-line swaps in `compile.py`; the exporter is
+  optimizer-agnostic.
+- **Rollout policy (resolved: gate-then-commit, no PR ceremony).***
+  A candidate that passes the `barwise prompt eval` acceptance gate
+  is committed directly with its delta report; the maintainer
+  reviewing their own PR adds process without protection. The gate
+  and the committed history are the governance. With multiple users,
+  return to reviewed-PR-only.
+- **Where "periodically" runs (resolved: locally, on model
+  releases).*** The trigger is a model release, not a calendar date.
+  The maintainer runs `barwise prompt eval` with local keys and
+  commits the history row; no CI workflow, no CI key management. A
+  scheduled agent session re-running the eval and reporting drift is
+  a compatible later convenience, since the keys and the machine are
+  the maintainer's own.
+- **Score weights (resolved: 0.02 per conformance correction, 0.10
+  per residual validation error, floor 0).** Declared in the suite
+  file, not hardcoded, so reweighting is a data change recorded in
+  history.
 
 ## Risks and testing
 
@@ -501,11 +526,11 @@ into `buildReviewSystemPrompt` and adds a review program to
   composes `processTranscript`, `evaluateCandidate`,
   `enforceConformance`, and validation as a consumer.
 - **Not an agent-prompt optimizer.** The guidance texts, MCP prompts,
-  chat participant, and `.claude/` skills stay hand-authored; they
-  have no headless metric.
+  chat participant, and `.claude/` skills stay hand-authored. The
+  subagents get measured (workstream 6), never machine-rewritten.
 - **Not a model picker.** The harness scores (prompt, model) pairs; it
   does not recommend models or manage the scattered model-ID defaults
   (`anthropic.ts:39`, `vscode/package.json`, tool descriptions). That
   cleanup is real but separate; file it as its own finding.
-- **Not continuous deployment of prompts.** Artifacts change by
-  reviewed commit, whatever the periodic-operation decision.
+- **Not continuous deployment of prompts.** Artifacts change only by
+  a commit that passed the eval gate; nothing rewrites a live prompt.
