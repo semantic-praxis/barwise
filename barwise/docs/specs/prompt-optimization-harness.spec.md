@@ -578,6 +578,29 @@ As specified, with three grounded refinements:
   Suite manifests declare weights and the case list explicitly -- no
   directory discovery.
 
+### Workstream 4, first slice (2026-08-08)
+
+First variant landed: `packages/llm/prompts/extraction.sonnet5.prompt.yaml`
+(`sonnet5-1`, match: anthropic + `claude-sonnet-5`), produced by manual
+failure analysis rather than DSPy (workstream 3 remains open). Full delta
+report: `docs/prompt-eval-sonnet5-2026-08-08.md`. Grounding notes:
+
+- **The session had no API keys**, so completions came from Claude Code
+  subagents pinned to the target models over the byte-exact rendered
+  prompts, scored through the normal `scoreExtraction` path. That
+  channel is fine for within-session comparison but is not the
+  production tool-use path, so no rows were appended to
+  `evals/history.jsonl`; the acceptance gate stays a keyed
+  `barwise prompt eval` run (commands in the delta report).
+- **The eval-vs-prompt consistency risk is real and bit immediately**:
+  the order-management answer key predated the prompt's ternary
+  order-line rule, so the rubric punished prompt-compliant extractions
+  (witness mapping fails across a binary/ternary arity difference).
+  Fixed by updating the promptlab answer key to the ternary and
+  regenerating the reference; pinned scores were unchanged. When
+  authoring or editing prompts, re-check that each case's answer key is
+  something the current prompt would actually produce.
+
 ## Non-goals
 
 - **No new modeling capability and no core change.** The harness

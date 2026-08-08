@@ -73,6 +73,18 @@
           "excerpt": "every customer has a name. It's just a text field."
         }
       ]
+    },
+    {
+      "name": "Quantity",
+      "kind": "value",
+      "definition": "The number of units of a product specified on an order line.",
+      "data_type": { "name": "integer" },
+      "source_references": [
+        {
+          "lines": [9, 9],
+          "excerpt": "Each line in the order specifies a product and a quantity."
+        }
+      ]
     }
   ],
   "fact_types": [
@@ -94,19 +106,19 @@
       ]
     },
     {
-      "name": "Order contains Product",
+      "name": "Order contains Product with Quantity",
       "roles": [
         { "player": "Order", "role_name": "contains" },
-        { "player": "Product", "role_name": "is contained in" }
+        { "player": "Product", "role_name": "is contained in" },
+        { "player": "Quantity", "role_name": "is the quantity for" }
       ],
       "readings": [
-        "{0} contains {1}",
-        "{1} is contained in {0}"
+        "{0} contains {1} with quantity {2}"
       ],
       "source_references": [
         {
           "lines": [9, 9],
-          "excerpt": "An order contains one or more products."
+          "excerpt": "Each line in the order specifies a product and a quantity."
         }
       ]
     },
@@ -147,6 +159,19 @@
   ],
   "subtypes": [],
   "inferred_constraints": [
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Order contains Product with Quantity",
+      "roles": ["Order", "Product"],
+      "description": "Each Order-Product combination appears on at most one order line, so it determines at most one Quantity.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [9, 9],
+          "excerpt": "Each line in the order specifies a product and a quantity."
+        }
+      ]
+    },
     {
       "type": "internal_uniqueness",
       "fact_type": "Customer places Order",
