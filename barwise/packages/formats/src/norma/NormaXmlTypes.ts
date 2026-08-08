@@ -19,6 +19,8 @@ export interface NormaDocument {
   readonly factTypes: NormaFactType[];
   readonly subtypeFacts: NormaSubtypeFact[];
   readonly constraints: NormaConstraint[];
+  /** Model-level note (Notes on ORMModel, plus folded ModelNote texts). */
+  readonly modelNote?: string;
   /** Data type definitions from the DataTypes section (id -> tag-derived kind). */
   readonly dataTypes: NormaDataType[];
   /** ORMDiagram sections (shape geometry), siblings of the ORMModel. */
@@ -97,6 +99,8 @@ export interface NormaEntityType {
   readonly preferredIdentifier?: string; // ref to UniquenessConstraint id
   readonly playedRoleRefs: readonly string[];
   readonly definition?: string;
+  /** Notes > Note > Text: informal commentary distinct from Definitions. */
+  readonly note?: string;
   readonly independent?: boolean;
   readonly cardinality?: NormaCardinality;
   /** Sample population instances (Instances > EntityTypeInstance). */
@@ -109,6 +113,8 @@ export interface NormaValueType {
   readonly name: string;
   readonly playedRoleRefs: readonly string[];
   readonly definition?: string;
+  /** Notes > Note > Text: informal commentary distinct from Definitions. */
+  readonly note?: string;
   readonly valueConstraint?: NormaValueConstraintInline;
   /** Reference to a NormaDataType id from the DataTypes section. */
   readonly dataTypeRef?: string;
@@ -147,6 +153,8 @@ export interface NormaObjectifiedType {
   readonly preferredIdentifier?: string;
   readonly playedRoleRefs: readonly string[];
   readonly definition?: string;
+  /** Notes > Note > Text: informal commentary distinct from Definitions. */
+  readonly note?: string;
   readonly cardinality?: NormaCardinality;
 }
 
@@ -158,6 +166,8 @@ export interface NormaFactType {
   readonly readingOrders: NormaReadingOrder[];
   readonly internalConstraintRefs: readonly string[];
   readonly definition?: string;
+  /** Notes > Note > Text: informal commentary distinct from Definitions. */
+  readonly note?: string;
   readonly derivationRule?: NormaDerivationRule;
   /** Sample population instances (Instances > FactTypeInstance). */
   readonly instances?: readonly NormaFactTypeInstance[];

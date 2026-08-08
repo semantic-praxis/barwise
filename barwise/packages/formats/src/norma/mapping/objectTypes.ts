@@ -45,6 +45,7 @@ export function mapObjectTypes(ctx: NormaMappingContext): void {
       kind: "entity",
       referenceMode: et.referenceMode || `${snakeCase(et.name)}_id`,
       definition: et.definition,
+      note: et.note,
       independent: et.independent,
       ...toCardinality(et.cardinality),
     });
@@ -58,6 +59,7 @@ export function mapObjectTypes(ctx: NormaMappingContext): void {
       id: vt.id,
       kind: "value",
       definition: vt.definition,
+      note: vt.note,
       valueConstraint: toValueConstraintDef(vt.valueConstraint),
       defaultValue: vt.defaultValue,
       dataType: resolveDataType(vt.dataTypeRef, vt.dataTypeLength, vt.dataTypeScale, dataTypeById),
@@ -76,6 +78,7 @@ export function mapObjectTypes(ctx: NormaMappingContext): void {
       kind: "entity",
       referenceMode: ot.referenceMode || `${snakeCase(ot.name)}_id`,
       definition: ot.definition,
+      note: ot.note,
       ...toCardinality(ot.cardinality),
     });
     objectTypeIdMap.set(ot.id, objectType.id);

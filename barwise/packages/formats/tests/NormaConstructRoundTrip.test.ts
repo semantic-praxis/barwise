@@ -593,6 +593,75 @@ describe("sample-population round-trip (norma-round-trip-completion WS4)", () =>
   });
 });
 
+describe("note round-trip (norma-notes)", () => {
+  it("round-trips object-type, fact-type, and model notes", () => {
+    const model = new OrmModel({
+      name: "Noted",
+      note: "Model-level context from the domain workshop.",
+    });
+    const person = model.addObjectType({
+      name: "Person",
+      id: "ot-person",
+      kind: "entity",
+      referenceMode: "person_id",
+      definition: "A human party.",
+      note: "Modeled as person, not party -- no organizations in scope.",
+    });
+    const nickname = model.addObjectType({
+      name: "Nickname",
+      id: "ot-nick",
+      kind: "value",
+      dataType: { name: "text" },
+      note: "Free-form; no uniqueness intended.",
+    });
+    model.addFactType({
+      name: "Person goes by Nickname",
+      id: "ft-nick",
+      roles: [
+        { id: "r-person", name: "goes by", playerId: person.id },
+        { id: "r-nick", name: "names", playerId: nickname.id },
+      ],
+      readings: ["{0} goes by {1}"],
+      constraints: [{ type: "internal_uniqueness", roleIds: ["r-person"] }],
+      note: "Kept despite low value -- stakeholders insisted.",
+    });
+
+    const { xml, back } = roundTrip(model);
+    expect(xml).toContain("orm:Notes");
+    expect(xml).toContain("orm:Text");
+    expect(back.note).toBe("Model-level context from the domain workshop.");
+    expect(back.getObjectTypeByName("Person")!.note).toBe(
+      "Modeled as person, not party -- no organizations in scope.",
+    );
+    // Definitions and notes stay distinct.
+    expect(back.getObjectTypeByName("Person")!.definition).toBe("A human party.");
+    expect(back.getObjectTypeByName("Nickname")!.note).toBe(
+      "Free-form; no uniqueness intended.",
+    );
+    expect(back.getFactTypeByName("Person goes by Nickname")!.note).toBe(
+      "Kept despite low value -- stakeholders insisted.",
+    );
+  });
+
+  it("folds floating ModelNote texts into the model note on import", () => {
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<ormRoot:ORM2 xmlns:orm="http://schemas.neumont.edu/ORM/2006-04/ORMCore" xmlns:ormRoot="http://schemas.neumont.edu/ORM/2006-04/ORMRoot">
+  <orm:ORMModel id="_m1" Name="Annotated">
+    <orm:Notes><orm:Note id="_n0"><orm:Text>Own note.</orm:Text></orm:Note></orm:Notes>
+    <orm:Objects>
+      <orm:EntityType id="_et_a" Name="A" _ReferenceMode="id" />
+    </orm:Objects>
+    <orm:ModelNotes>
+      <orm:ModelNote id="_mn1"><orm:Text>Floating note one.</orm:Text></orm:ModelNote>
+      <orm:ModelNote id="_mn2"><orm:Text>Floating note two.</orm:Text></orm:ModelNote>
+    </orm:ModelNotes>
+  </orm:ORMModel>
+</ormRoot:ORM2>`;
+    const model = mapNormaToOrm(parseNormaXml(xml));
+    expect(model.note).toBe("Own note.\n\nFloating note one.\n\nFloating note two.");
+  });
+});
+
 describe("NORMA diagram geometry round-trip (WS2)", () => {
   const { back } = roundTrip(buildModel());
 

@@ -35,7 +35,10 @@ export { NormaMappingError };
  * 5. Objectified fact types -- depend on both object types and fact types
  */
 export function mapNormaToOrm(doc: NormaDocument): OrmModel {
-  const model = new OrmModel({ name: doc.modelName });
+  const model = new OrmModel({
+    name: doc.modelName,
+    ...(doc.modelNote !== undefined ? { note: doc.modelNote } : {}),
+  });
 
   const dataTypeById = new Map<string, NormaDataType>();
   for (const dt of doc.dataTypes) {

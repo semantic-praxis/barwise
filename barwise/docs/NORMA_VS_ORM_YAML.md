@@ -133,8 +133,7 @@ values, and diagram positions.
 Where NORMA is more faithful to the _full_ standard, the difference is
 either a derived artifact barwise recomputes (OIAL, the relational
 bridge) or one of a handful of constructs barwise does not yet model or
-wire -- dynamic rules, modeler queries, element notes. Each is
-examined in
+wire -- dynamic rules and modeler queries. Each is examined in
 [the feature audit](#feature-audit-where-the-formats-differ).
 
 ### NORMA's schema vs NORMA's tooling
@@ -222,7 +221,7 @@ the NORMA round-trip (import and export are symmetric unless noted).
 | Default values                        | Yes (VT + role)  | Yes         | Yes (value types)   |
 | Sample populations                    | Yes              | Yes         | Yes                 |
 | Diagram geometry                      | Yes (styled)     | Positions   | Positions exact     |
-| Model / element notes                 | Yes              | Annotations | Definitions only    |
+| Model / element notes                 | Yes              | Yes         | Yes                 |
 | Modeler queries / subqueries          | Yes              | No          | No                  |
 | Dynamic (state-transition) rules      | Yes              | No          | No                  |
 
@@ -275,12 +274,14 @@ _Expected value:_ rationale ("we model this as a party, not a person,
 because...") is the knowledge that evaporates first; notes anchor it to
 the element it explains.
 
-The formats split this concept. Informal `definition` text on object
-and fact types round-trips both ways (NORMA `Definitions`). But NORMA's
-separate `Note` elements drop on import, and barwise's TODO/NOTE
-annotation system -- designed for authoring workflow, propagated into
-exports as comments -- has no NORMA seat. Definitions are the durable
-common ground.
+These round-trip: barwise's `note` on object types, fact types, and
+the model maps to NORMA's `Notes > Note > Text` on the corresponding
+elements, alongside the `definition` <-> `Definitions` mapping that was
+already in place. Two normalizations: NORMA's floating `ModelNotes`
+fold into the model note on import (blank-line separated; their
+element anchors have no barwise seat and drop), and barwise's TODO/NOTE
+export annotations remain a separate authoring mechanism with no NORMA
+counterpart.
 
 ### Modeler queries and subqueries
 

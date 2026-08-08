@@ -50,6 +50,7 @@ export function mapFactTypes(ctx: NormaMappingContext): void {
       readings,
       constraints,
       definition: nft.definition,
+      note: nft.note,
       ...(nft.derivationRule
         ? {
           derivation: {
