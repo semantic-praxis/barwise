@@ -20,6 +20,7 @@ import {
 } from "./ExtractionPrompt.js";
 import type { CandidateFraming, DraftModelResult, ExtractionResponse } from "./ExtractionTypes.js";
 import type { LlmClient } from "./LlmClient.js";
+import type { PromptArtifact } from "./prompt/artifacts/PromptArtifact.js";
 
 export interface ProcessorOptions {
   /** Name for the resulting model. Defaults to "Extracted Model". */
@@ -36,6 +37,13 @@ export interface ProcessorOptions {
    * Opt-in; default false (no change to output or cost).
    */
   readonly alternatives?: boolean;
+  /**
+   * Prompt artifact to render instead of the built-in default -- a
+   * variant selected via `resolveArtifact`. Must be an "extraction"
+   * artifact. Omitted, the output is byte-identical to the
+   * pre-artifact pipeline.
+   */
+  readonly artifact?: PromptArtifact;
 }
 
 /**
@@ -55,8 +63,14 @@ export async function processTranscript(
     throw new Error("Transcript is empty.");
   }
 
+  if (options?.artifact !== undefined && options.artifact.surface !== "extraction") {
+    throw new Error(
+      `Prompt artifact surface "${options.artifact.surface}" cannot drive transcript extraction.`,
+    );
+  }
+
   const includeAlternatives = options?.alternatives ?? false;
-  const systemPrompt = buildSystemPrompt(includeAlternatives);
+  const systemPrompt = buildSystemPrompt(includeAlternatives, options?.artifact);
   const userMessage = buildUserMessage(transcript, options?.existingModelContext);
   const responseSchema = buildResponseSchema(includeAlternatives);
 

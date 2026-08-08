@@ -1,6 +1,7 @@
 # Prompt optimization harness: DSPy-optimized, per-provider prompt artifacts for the LLM surfaces
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Accepted (merged in PR #289). Workstream 1 (artifact seam)
+implemented; see Implementation notes. Workstreams 2-6 open.
 Created: 2026-08-08
 Last-updated: 2026-08-08
 Tracking: `docs/ARCHITECTURE.md` open question #4 ("LLM prompt as a
@@ -519,6 +520,36 @@ multiple users, and should be reopened if the project gains any.
   is validated by the same artifact loader tests. Live runs stay
   manual, per the existing `tests/live/` policy -- which this harness
   finally implements.
+
+## Implementation notes
+
+### Workstream 1 (2026-08-08)
+
+Grounding forced three deviations from the brief; the mechanism is
+otherwise as specified, and the golden byte-identity guard holds.
+
+- **The default artifact lives in code, not in
+  `prompts/extraction.default.prompt.yaml`.** `@barwise/llm` publishes
+  only `dist/` and is bundled into the VS Code extension by esbuild, so
+  the default prompt cannot depend on loading a YAML file at runtime.
+  `defaultExtractionArtifact` is exported from
+  `src/prompt/systemPrompt.ts` with the historical text; `.prompt.yaml`
+  files are the format for _variants_, loaded explicitly via
+  `loadArtifact`/`loadArtifactsFromDir`. The `packages/llm/prompts/`
+  directory appears when workstream 4 lands the first variant.
+- **`match.provider` is a string, not `ProviderName`.** The VS Code
+  Copilot client lives outside the factory union; typing the match to
+  `ProviderName` would make a Copilot variant undeclarable.
+- **Resolution is pure.** `resolveArtifact(artifacts, query)` takes an
+  explicit artifact list (no ambient directory scanning inside
+  resolution); the most specific applicable variant wins (a modelPrefix
+  match outweighs a provider match) and an equal-specificity tie throws
+  an authoring error rather than picking silently.
+- Demos render inline as a `## Worked Examples` section appended to the
+  instructions (before the alternatives section); an empty demo list
+  renders nothing, which is what keeps the default byte-stable. The
+  golden files live in `packages/llm/tests/fixtures/prompts/` and were
+  generated from the build preceding the refactor.
 
 ## Non-goals
 

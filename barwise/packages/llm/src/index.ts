@@ -30,6 +30,19 @@ export {
   parseExtractionResponse,
 } from "./ExtractionPrompt.js";
 
+// Prompt artifacts
+export { loadArtifact, loadArtifactsFromDir } from "./prompt/artifacts/loadArtifact.js";
+export type {
+  PromptArtifact,
+  PromptArtifactMatch,
+  PromptDemo,
+  PromptProvenance,
+  PromptSurface,
+} from "./prompt/artifacts/PromptArtifact.js";
+export { resolveArtifact } from "./prompt/artifacts/resolveArtifact.js";
+export type { ArtifactQuery } from "./prompt/artifacts/resolveArtifact.js";
+export { defaultExtractionArtifact } from "./prompt/systemPrompt.js";
+
 // Conformance validation
 export { enforceConformance } from "./ExtractionConformance.js";
 export type { ConformanceCorrection, ConformanceResult } from "./ExtractionConformance.js";
