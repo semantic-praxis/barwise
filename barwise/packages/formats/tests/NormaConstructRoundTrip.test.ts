@@ -427,6 +427,61 @@ describe("sample-population round-trip (norma-round-trip-completion WS4)", () =>
     );
   });
 
+  it("round-trips a unary population via the entity instances", () => {
+    const model = populatedModel();
+    const unary = model.addFactType({
+      name: "Customer is preferred",
+      id: "ft-preferred",
+      roles: [{
+        id: "r-preferred",
+        name: "is preferred",
+        playerId: model.getObjectType("ot-customer")!.id,
+      }],
+      readings: ["{0} is preferred"],
+      constraints: [{ type: "internal_uniqueness", roleIds: ["r-preferred"] }],
+    });
+    model.addPopulation({
+      factTypeId: unary.id,
+      instances: [
+        { roleValues: { "r-preferred": "C001" } },
+        { roleValues: { "r-preferred": "C003" } },
+      ],
+    });
+
+    const { xml, back } = roundTrip(model);
+    expect(xml).toContain("orm:EntityTypeUnaryRoleInstance");
+    expect(flatten(back, "Customer is preferred").map((r) => r["is preferred"]).sort())
+      .toEqual(["C001", "C003"]);
+    // The binary population is untouched by the unary rows.
+    expect(flatten(back, "Customer gave Rating")).toHaveLength(2);
+  });
+
+  it("skips a value-typed unary player (no NORMA seat), without damage", () => {
+    const model = new OrmModel({ name: "ValueUnary" });
+    const rating = model.addObjectType({
+      name: "Rating",
+      id: "ot-rating",
+      kind: "value",
+      dataType: { name: "integer" },
+    });
+    const unary = model.addFactType({
+      name: "Rating is extreme",
+      id: "ft-extreme",
+      roles: [{ id: "r-extreme", name: "is extreme", playerId: rating.id }],
+      readings: ["{0} is extreme"],
+      constraints: [{ type: "internal_uniqueness", roleIds: ["r-extreme"] }],
+    });
+    model.addPopulation({
+      factTypeId: unary.id,
+      instances: [{ roleValues: { "r-extreme": "10" } }],
+    });
+
+    const { xml, back } = roundTrip(model);
+    expect(xml).not.toContain("orm:EntityTypeUnaryRoleInstance");
+    expect(back.populations).toHaveLength(0);
+    expect(back.getFactTypeByName("Rating is extreme")).toBeDefined();
+  });
+
   it("flattens a NORMA-authored instance graph on import", () => {
     // Hand-authored, mirroring the structure NORMA itself writes (verified
     // against the NORMA project's SamplePopulationTests): entity instances

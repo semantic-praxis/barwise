@@ -133,8 +133,8 @@ values, and diagram positions.
 Where NORMA is more faithful to the _full_ standard, the difference is
 either a derived artifact barwise recomputes (OIAL, the relational
 bridge) or one of a handful of constructs barwise does not yet model or
-wire -- dynamic rules, modeler queries, element notes, unary-role
-population instances. Each is examined in
+wire -- dynamic rules, modeler queries, element notes. Each is
+examined in
 [the feature audit](#feature-audit-where-the-formats-differ).
 
 ### NORMA's schema vs NORMA's tooling
@@ -220,7 +220,7 @@ the NORMA round-trip (import and export are symmetric unless noted).
 | Join-path set constraints             | Yes              | Yes         | Yes                 |
 | Value-comparison constraints          | Yes              | Yes         | Yes                 |
 | Default values                        | Yes (VT + role)  | Yes         | Yes (value types)   |
-| Sample populations                    | Yes              | Yes         | Yes (binary+)       |
+| Sample populations                    | Yes              | Yes         | Yes                 |
 | Diagram geometry                      | Yes (styled)     | Positions   | Positions exact     |
 | Model / element notes                 | Yes              | Annotations | Definitions only    |
 | Modeler queries / subqueries          | Yes              | No          | No                  |
@@ -264,8 +264,10 @@ consequence: an entity instance can only carry its value through an
 identifying fact, so exporting a populated native model synthesizes
 the reference-scheme expansion NORMA itself persists (the injected
 value type and identifying fact appear explicitly on re-import; stable
-from the second cycle). Unary-role populations use a different NORMA
-apparatus and stay deferred.
+from the second cycle). Unary populations ride NORMA's entity-instance
+seat (EntityTypeUnaryRoleInstance) and round-trip for entity-played
+unary roles; a value-typed unary player has no seat in NORMA's schema
+and is skipped on export.
 
 ### Model and element notes
 

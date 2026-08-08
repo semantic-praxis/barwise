@@ -152,6 +152,7 @@ const arrayTags = new Set([
   "ValueTypeInstance",
   "FactTypeInstance",
   "EntityTypeRoleInstance",
+  "EntityTypeUnaryRoleInstance",
   "ValueTypeRoleInstance",
   "FactTypeRoleInstance",
   "RoleSequence",
@@ -456,9 +457,26 @@ function parseEntityInstances(
   for (const el of asArray(container["EntityTypeInstance"])) {
     const id = attr(el, "id");
     if (!id) continue;
-    instances.push({ id, roleInstanceRefs: parseInstanceRoleRefs(el) });
+    const unaryRoleRefs = parseUnaryRoleRefs(el);
+    instances.push({
+      id,
+      roleInstanceRefs: parseInstanceRoleRefs(el),
+      ...(unaryRoleRefs.length > 0 ? { unaryRoleRefs } : {}),
+    });
   }
   return instances;
+}
+
+/** EntityTypeUnaryRoleInstance refs: unary roles this instance populates. */
+function parseUnaryRoleRefs(instance: Record<string, unknown>): string[] {
+  const container = child(instance, "RoleInstances") as Record<string, unknown> | undefined;
+  if (!container) return [];
+  const refs: string[] = [];
+  for (const el of asArray(container["EntityTypeUnaryRoleInstance"])) {
+    const ref = attr(el, "ref");
+    if (ref) refs.push(ref);
+  }
+  return refs;
 }
 
 /** Instances > FactTypeInstance > RoleInstances (refs to role-instance decls). */

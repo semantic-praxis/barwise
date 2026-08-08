@@ -213,11 +213,14 @@ export interface NormaValueTypeInstance {
 
 /**
  * An EntityTypeInstance, identified by refs to role-instance declarations
- * on its identifying fact's roles.
+ * on its identifying fact's roles. Unary roles the instance populates are
+ * carried directly as role refs (EntityTypeUnaryRoleInstance) -- NORMA's
+ * unary-population seat lives on the entity instance, not the fact.
  */
 export interface NormaEntityTypeInstance {
   readonly id: string;
   readonly roleInstanceRefs: readonly string[];
+  readonly unaryRoleRefs?: readonly string[];
 }
 
 /** A FactTypeInstance: one sample tuple, as refs to role-instance declarations. */

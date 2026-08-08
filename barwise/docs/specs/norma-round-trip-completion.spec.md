@@ -13,8 +13,11 @@ uniqueness pair + mandatory, PreferredIdentifier link) for populated
 entities that lack an explicit one -- mirroring what NORMA itself
 persists alongside _ReferenceMode. First export of a populated native
 model therefore adds the expansion; the cycle is stable from then on
-(covered by a test). Unary-role populations resolved as option (b):
-deferred and documented.
+(covered by a test). Unary-role populations, first resolved as
+deferral, were implemented the same day at the owner's direction:
+entity-played unary roles round-trip via NORMA's
+EntityTypeUnaryRoleInstance seat on the entity instance; a value-typed
+unary player has no seat in NORMA's schema and is skipped, documented.
 Created: 2026-08-07
 Last-updated: 2026-08-07
 Tracking: NORMA_VS_ORM_YAML.md feature audit (exclusive-or defect,
@@ -203,11 +206,13 @@ only higher-fidelity NORMA files.
 
 ## Open decisions (for review)
 
-- **Unary-role population encoding (WS4).** Resolved as (b), 2026-08-07:
-  NORMA populates unary roles via `EntityTypeUnaryRoleInstance` on the
-  entity instance, a different apparatus from fact instances; deferred
-  and documented (unary populations are rare in practice). Revisit if
-  a real model needs them.
+- **Unary-role population encoding (WS4).** Resolved 2026-08-07 --
+  first deferred, then implemented at the owner's direction: NORMA
+  populates unary roles via `EntityTypeUnaryRoleInstance` (a role ref)
+  on the entity instance, and that seat is now wired both ways.
+  Value-typed unary players have no seat in NORMA's schema (only
+  `EntityTypeRoleInstancesType` carries the unary element) and are
+  skipped on export, documented in the audit.
 - **Where an imported value-comparison attaches when its two roles
   span fact types via a join path (`SetConstraintWithJoinType`).**
   barwise's constraint is same-fact-type only (cross-fact comparison

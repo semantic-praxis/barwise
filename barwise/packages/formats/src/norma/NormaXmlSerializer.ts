@@ -668,6 +668,14 @@ function addEntityInstances(
         "orm:EntityTypeRoleInstance": i.roleInstanceRefs.map((ref) => ({
           [`${ATTR}ref`]: ref,
         })),
+        // XSD order: identifying role instances, then populated unary roles.
+        ...((i.unaryRoleRefs?.length ?? 0) > 0
+          ? {
+            "orm:EntityTypeUnaryRoleInstance": i.unaryRoleRefs!.map((ref) => ({
+              [`${ATTR}ref`]: ref,
+            })),
+          }
+          : {}),
       },
     })),
   };

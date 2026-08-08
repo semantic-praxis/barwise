@@ -55,13 +55,36 @@ export function mapPopulations(ctx: NormaMappingContext): void {
     }
   }
 
+  // Unary populations ride on the entity instances: each
+  // EntityTypeUnaryRoleInstance ref marks a unary role the instance
+  // populates, and the row's value is the instance's identifying value.
+  const factByRoleId = new Map<string, string>();
+  for (const nft of doc.factTypes) {
+    for (const role of nft.roles) factByRoleId.set(role.id, nft.id);
+  }
+  const unaryRowsByFact = new Map<string, FactInstanceConfig[]>();
+  for (const et of doc.entityTypes) {
+    for (const inst of et.instances ?? []) {
+      const value = valueByInstanceId.get(inst.id);
+      if (value === undefined) continue;
+      for (const roleRef of inst.unaryRoleRefs ?? []) {
+        const factId = factByRoleId.get(roleRef);
+        if (!factId) continue;
+        const rows = unaryRowsByFact.get(factId) ?? [];
+        rows.push({ roleValues: { [roleIdMap.get(roleRef) ?? roleRef]: value } });
+        unaryRowsByFact.set(factId, rows);
+      }
+    }
+  }
+
   for (const nft of doc.factTypes) {
     const normaInstances = nft.instances ?? [];
-    if (normaInstances.length === 0) continue;
+    const unaryRows = unaryRowsByFact.get(nft.id) ?? [];
+    if (normaInstances.length === 0 && unaryRows.length === 0) continue;
     const factTypeId = factTypeIdMap.get(nft.id);
     if (!factTypeId) continue;
 
-    const instances: FactInstanceConfig[] = [];
+    const instances: FactInstanceConfig[] = [...unaryRows];
     for (const fi of normaInstances) {
       const roleValues: Record<string, string> = {};
       for (const ref of fi.roleInstanceRefs) {
