@@ -1,0 +1,470 @@
+{
+  "object_types": [
+    {
+      "name": "Student",
+      "kind": "entity",
+      "definition": "A person enrolled at the university, identified by a student number assigned at admission.",
+      "reference_mode": "student_number",
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "Students enroll in courses. Each student is identified by a student number that we assign when they're admitted."
+        }
+      ]
+    },
+    {
+      "name": "Course",
+      "kind": "entity",
+      "definition": "A catalog entry representing an academic course, identified by a unique course code.",
+      "reference_mode": "course_code",
+      "source_references": [
+        {
+          "lines": [9, 9],
+          "excerpt": "Each course has a course code, like CS101 or HIST230. The code is unique across the catalog."
+        }
+      ]
+    },
+    {
+      "name": "CourseOffering",
+      "kind": "entity",
+      "definition": "A specific instance of a course offered in a particular semester.",
+      "reference_mode": "offering_id",
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "A course offering is a specific instance of that course in a particular semester."
+        }
+      ]
+    },
+    {
+      "name": "Instructor",
+      "kind": "entity",
+      "definition": "A faculty member who teaches course offerings, identified by employee ID.",
+      "reference_mode": "employee_id",
+      "source_references": [
+        {
+          "lines": [13, 13],
+          "excerpt": "An instructor is identified by their employee ID."
+        }
+      ]
+    },
+    {
+      "name": "Semester",
+      "kind": "entity",
+      "definition": "An academic term during which course offerings take place, identified by a term code.",
+      "reference_mode": "term_code",
+      "source_references": [
+        {
+          "lines": [17, 17],
+          "excerpt": "By term code. It's a short string like \"F25\" or \"SP26.\""
+        }
+      ]
+    },
+    {
+      "name": "Title",
+      "kind": "value",
+      "definition": "The free-text name of a course.",
+      "source_references": [
+        {
+          "lines": [11, 11],
+          "excerpt": "A title and a credit value. The title is free text."
+        }
+      ]
+    },
+    {
+      "name": "CreditValue",
+      "kind": "value",
+      "definition": "The number of credits a course is worth, expressed as a whole number.",
+      "source_references": [
+        {
+          "lines": [11, 11],
+          "excerpt": "Credits are always a whole number -- usually 3 or 4, but labs can be 1 or 2."
+        }
+      ]
+    },
+    {
+      "name": "MaxCapacity",
+      "kind": "value",
+      "definition": "The maximum number of students that can enroll in a course offering.",
+      "source_references": [
+        {
+          "lines": [19, 19],
+          "excerpt": "Each course offering has a maximum capacity."
+        }
+      ]
+    },
+    {
+      "name": "StartDate",
+      "kind": "value",
+      "definition": "The date a semester begins.",
+      "source_references": [
+        {
+          "lines": [17, 17],
+          "excerpt": "Each term has a start date and an end date."
+        }
+      ]
+    },
+    {
+      "name": "EndDate",
+      "kind": "value",
+      "definition": "The date a semester ends.",
+      "source_references": [
+        {
+          "lines": [17, 17],
+          "excerpt": "Each term has a start date and an end date."
+        }
+      ]
+    },
+    {
+      "name": "LetterGrade",
+      "kind": "value",
+      "definition": "A grade awarded to a student upon completion of a course offering.",
+      "value_constraint": {
+        "values": ["A", "B", "C", "D", "F"]
+      },
+      "source_references": [
+        {
+          "lines": [21, 21],
+          "excerpt": "The possible values are A, B, C, D, and F."
+        }
+      ]
+    }
+  ],
+  "fact_types": [
+    {
+      "name": "Student enrolls in CourseOffering",
+      "roles": [
+        { "player": "Student", "role_name": "enrolls in" },
+        { "player": "CourseOffering", "role_name": "has enrolled" }
+      ],
+      "readings": [
+        "{0} enrolls in {1}",
+        "{1} has enrolled {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "Students enroll in courses."
+        },
+        {
+          "lines": [15, 15],
+          "excerpt": "Students enroll in offerings, not courses directly."
+        }
+      ]
+    },
+    {
+      "name": "CourseOffering is of Course",
+      "roles": [
+        { "player": "CourseOffering", "role_name": "is of" },
+        { "player": "Course", "role_name": "has offering" }
+      ],
+      "readings": [
+        "{0} is of {1}",
+        "{1} has offering {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "A course offering is a specific instance of that course in a particular semester."
+        }
+      ]
+    },
+    {
+      "name": "CourseOffering is in Semester",
+      "roles": [
+        { "player": "CourseOffering", "role_name": "is in" },
+        { "player": "Semester", "role_name": "includes" }
+      ],
+      "readings": [
+        "{0} is in {1}",
+        "{1} includes {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "A course offering is a specific instance of that course in a particular semester."
+        }
+      ]
+    },
+    {
+      "name": "Instructor teaches CourseOffering",
+      "roles": [
+        { "player": "Instructor", "role_name": "teaches" },
+        { "player": "CourseOffering", "role_name": "is taught by" }
+      ],
+      "readings": [
+        "{0} teaches {1}",
+        "{1} is taught by {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [13, 13],
+          "excerpt": "Each course offering is taught by an instructor."
+        }
+      ]
+    },
+    {
+      "name": "Course has Title",
+      "roles": [
+        { "player": "Course", "role_name": "has" },
+        { "player": "Title", "role_name": "is of" }
+      ],
+      "readings": [
+        "{0} has {1}",
+        "{1} is of {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [11, 11],
+          "excerpt": "A title and a credit value."
+        }
+      ]
+    },
+    {
+      "name": "Course has CreditValue",
+      "roles": [
+        { "player": "Course", "role_name": "has" },
+        { "player": "CreditValue", "role_name": "is of" }
+      ],
+      "readings": [
+        "{0} has {1}",
+        "{1} is of {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [11, 11],
+          "excerpt": "Credits are always a whole number -- usually 3 or 4, but labs can be 1 or 2."
+        }
+      ]
+    },
+    {
+      "name": "CourseOffering has MaxCapacity",
+      "roles": [
+        { "player": "CourseOffering", "role_name": "has" },
+        { "player": "MaxCapacity", "role_name": "is of" }
+      ],
+      "readings": [
+        "{0} has {1}",
+        "{1} is of {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [19, 19],
+          "excerpt": "Each course offering has a maximum capacity."
+        }
+      ]
+    },
+    {
+      "name": "Semester has StartDate",
+      "roles": [
+        { "player": "Semester", "role_name": "has" },
+        { "player": "StartDate", "role_name": "is of" }
+      ],
+      "readings": [
+        "{0} has {1}",
+        "{1} is of {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [17, 17],
+          "excerpt": "Each term has a start date and an end date."
+        }
+      ]
+    },
+    {
+      "name": "Semester has EndDate",
+      "roles": [
+        { "player": "Semester", "role_name": "has" },
+        { "player": "EndDate", "role_name": "is of" }
+      ],
+      "readings": [
+        "{0} has {1}",
+        "{1} is of {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [17, 17],
+          "excerpt": "Each term has a start date and an end date."
+        }
+      ]
+    },
+    {
+      "name": "Student receives LetterGrade for CourseOffering",
+      "roles": [
+        { "player": "Student", "role_name": "receives" },
+        { "player": "LetterGrade", "role_name": "is received by" },
+        { "player": "CourseOffering", "role_name": "grades" }
+      ],
+      "readings": [
+        "{0} receives {1} for {2}"
+      ],
+      "source_references": [
+        {
+          "lines": [21, 21],
+          "excerpt": "When a student completes an offering, they receive a letter grade."
+        }
+      ]
+    }
+  ],
+  "subtypes": [],
+  "inferred_constraints": [
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "CourseOffering is of Course",
+      "roles": ["is of"],
+      "description": "Each CourseOffering is of at most one Course.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "A course offering is a specific instance of that course"
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "CourseOffering is of Course",
+      "roles": ["is of"],
+      "description": "Every CourseOffering is of some Course.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "A course offering is a specific instance of that course"
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "CourseOffering is in Semester",
+      "roles": ["is in"],
+      "description": "Each CourseOffering is in at most one Semester.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "A course offering is a specific instance of that course in a particular semester"
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "CourseOffering is in Semester",
+      "roles": ["is in"],
+      "description": "Every CourseOffering is in some Semester.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "in a particular semester"
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Instructor teaches CourseOffering",
+      "roles": ["is taught by"],
+      "description": "Each CourseOffering is taught by at most one Instructor.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [13, 13],
+          "excerpt": "Each course offering is taught by an instructor."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Instructor teaches CourseOffering",
+      "roles": ["is taught by"],
+      "description": "Every CourseOffering is taught by some Instructor.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [13, 13],
+          "excerpt": "Every course must have an assigned instructor before enrollment opens"
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Course has Title",
+      "roles": ["has"],
+      "description": "Each Course has at most one Title.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [11, 11],
+          "excerpt": "A title and a credit value."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Course has CreditValue",
+      "roles": ["has"],
+      "description": "Each Course has at most one CreditValue.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [11, 11],
+          "excerpt": "Credits are always a whole number"
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "CourseOffering has MaxCapacity",
+      "roles": ["has"],
+      "description": "Each CourseOffering has at most one MaxCapacity.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [19, 19],
+          "excerpt": "Each course offering has a maximum capacity."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Semester has StartDate",
+      "roles": ["has"],
+      "description": "Each Semester has at most one StartDate.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [17, 17],
+          "excerpt": "Each term has a start date and an end date."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Semester has EndDate",
+      "roles": ["has"],
+      "description": "Each Semester has at most one EndDate.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [17, 17],
+          "excerpt": "Each term has a start date and an end date."
+        }
+      ]
+    }
+  ],
+  "ambiguities": [
+    {
+      "description": "The transcript initially says 'students enroll in courses' but later clarifies they actually enroll in course offerings. The model reflects the corrected understanding.",
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "Students enroll in courses."
+        },
+        {
+          "lines": [15, 15],
+          "excerpt": "Students enroll in offerings, not courses directly."
+        }
+      ]
+    }
+  ]
+}

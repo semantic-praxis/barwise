@@ -62,7 +62,8 @@ working in a package:
 - `barwise/packages/code-analysis/CLAUDE.md` -- code connector package; registers TypeScript/Java/Kotlin importers into the `FormatDescriptor` registry
 - `barwise/packages/dbt/CLAUDE.md` -- dbt connector package; registers the dbt importer/exporter into the `FormatDescriptor` registry (owns its fs + subprocess I/O)
 - `barwise/packages/formats/CLAUDE.md` -- standard interop connector package; registers the DDL/OpenAPI/Avro/NORMA/SQL descriptors into the `FormatDescriptor` registry
-- `barwise/packages/cli/CLAUDE.md` -- CLI tool (validate, verbalize, schema, export, diagram, diff, import, gym)
+- `barwise/packages/promptlab/CLAUDE.md` -- deterministic prompt evaluation: eval suite, scorer, runner, score history for the LLM surfaces
+- `barwise/packages/cli/CLAUDE.md` -- CLI tool (validate, verbalize, schema, export, diagram, diff, import, gym, prompt)
 - `barwise/packages/mcp/CLAUDE.md` -- MCP server (tools, resources, prompts)
 - `barwise/packages/vscode/CLAUDE.md` -- VS Code extension integration
 - `AGENTS.md` -- General guidance on development practices.
@@ -90,7 +91,11 @@ working in a package:
   |                                        gym (exercise format, deterministic
   |                                        evaluator, miss-card emission) and
   |                                        the tutorial renderer
-  |--- @barwise/cli             (core, diagram, llm, code-analysis, dbt, formats, learn)
+  |--- @barwise/promptlab       (core, llm, learn)  -- deterministic prompt
+  |                                        evaluation: eval suite, scorer,
+  |                                        runner, score history (the DSPy
+  |                                        optimizer lane's metric)
+  |--- @barwise/cli             (core, diagram, llm, code-analysis, dbt, formats, learn, promptlab)
   |--- @barwise/mcp             (core, diagram, llm, code-analysis, dbt, formats, learn)
   |--- barwise-vscode           (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, mcp)
 ```

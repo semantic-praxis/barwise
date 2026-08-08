@@ -1,0 +1,22 @@
+id: clinic-appointments
+transcript: clinic-appointments.transcript.md
+reference: clinic-appointments.reference.orm.yaml
+checks:
+  - kind: must_validate
+  - kind: requires_element
+    element:
+      entity: Appointment
+  - kind: requires_element
+    element:
+      factTypeBetween: [Patient, Appointment]
+  - kind: requires_element
+    element:
+      factTypeBetween: [Appointment, Doctor]
+  - kind: forbids_population
+    factType: Patient books Appointment
+    constraint: internal_uniqueness
+    hint: Each appointment is booked by at most one patient.
+  - kind: forbids_population
+    factType: Appointment has AppointmentStatus
+    constraint: mandatory
+    hint: Every appointment must have a status.

@@ -1,0 +1,196 @@
+{
+  "object_types": [
+    {
+      "name": "Person",
+      "kind": "entity",
+      "definition": "Any individual tracked by the HR system.",
+      "reference_mode": "person_id",
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "We track people in the HR system by their person ID."
+        }
+      ]
+    },
+    {
+      "name": "Employee",
+      "kind": "entity",
+      "definition": "A person who works for the company.",
+      "reference_mode": "employee_id",
+      "source_references": [
+        {
+          "lines": [5, 5],
+          "excerpt": "An employee is a person who works for us. Each employee gets an employee ID."
+        }
+      ]
+    },
+    {
+      "name": "Manager",
+      "kind": "entity",
+      "definition": "An employee who manages other employees.",
+      "reference_mode": "manager_id",
+      "source_references": [
+        {
+          "lines": [9, 9],
+          "excerpt": "A manager is an employee who manages other employees."
+        }
+      ]
+    },
+    {
+      "name": "Department",
+      "kind": "entity",
+      "definition": "An organizational unit within the company.",
+      "reference_mode": "department_code",
+      "source_references": [
+        {
+          "lines": [13, 13],
+          "excerpt": "Each department has a unique department code."
+        }
+      ]
+    },
+    {
+      "name": "DepartmentName",
+      "kind": "value",
+      "definition": "The name of a department.",
+      "source_references": [
+        {
+          "lines": [13, 13],
+          "excerpt": "Each department has a name."
+        }
+      ]
+    }
+  ],
+  "fact_types": [
+    {
+      "name": "Employee works in Department",
+      "roles": [
+        { "player": "Employee", "role_name": "works in" },
+        { "player": "Department", "role_name": "has" }
+      ],
+      "readings": [
+        "{0} works in {1}",
+        "{1} has {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Every employee works in a department."
+        }
+      ]
+    },
+    {
+      "name": "Manager manages Department",
+      "roles": [
+        { "player": "Manager", "role_name": "manages" },
+        { "player": "Department", "role_name": "is managed by" }
+      ],
+      "readings": [
+        "{0} manages {1}",
+        "{1} is managed by {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [11, 11],
+          "excerpt": "Each department is managed by exactly one manager."
+        }
+      ]
+    },
+    {
+      "name": "Department has DepartmentName",
+      "roles": [
+        { "player": "Department", "role_name": "has" },
+        { "player": "DepartmentName", "role_name": "is of" }
+      ],
+      "readings": [
+        "{0} has {1}",
+        "{1} is of {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [13, 13],
+          "excerpt": "Each department has a name."
+        }
+      ]
+    }
+  ],
+  "subtypes": [
+    {
+      "subtype": "Employee",
+      "supertype": "Person",
+      "provides_identification": false,
+      "description": "An Employee is a Person who works for the company. Employees have their own employee_id distinct from person_id.",
+      "source_references": [
+        {
+          "lines": [5, 5],
+          "excerpt": "An employee is a person who works for us. Each employee gets an employee ID."
+        }
+      ]
+    },
+    {
+      "subtype": "Manager",
+      "supertype": "Employee",
+      "description": "A Manager is an Employee who manages other employees.",
+      "source_references": [
+        {
+          "lines": [9, 9],
+          "excerpt": "A manager is an employee who manages other employees."
+        }
+      ]
+    }
+  ],
+  "inferred_constraints": [
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Employee works in Department",
+      "roles": ["works in"],
+      "description": "Each Employee works in at most one Department.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Every employee works in a department."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Employee works in Department",
+      "roles": ["works in"],
+      "description": "Every Employee works in some Department.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Every employee works in a department."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Manager manages Department",
+      "roles": ["is managed by"],
+      "description": "Each Department is managed by at most one Manager.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [11, 11],
+          "excerpt": "Each department is managed by exactly one manager."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Department has DepartmentName",
+      "roles": ["has"],
+      "description": "Each Department has at most one DepartmentName.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [13, 13],
+          "excerpt": "Each department has a name."
+        }
+      ]
+    }
+  ],
+  "ambiguities": []
+}

@@ -1,0 +1,19 @@
+id: employee-hierarchy
+transcript: employee-hierarchy.transcript.md
+reference: employee-hierarchy.reference.orm.yaml
+checks:
+  - kind: must_validate
+  - kind: requires_element
+    element:
+      entity: Department
+  - kind: requires_element
+    element:
+      factTypeBetween: [Employee, Department]
+  - kind: forbids_population
+    factType: Employee works in Department
+    constraint: internal_uniqueness
+    hint: Each employee works in at most one department.
+  - kind: forbids_population
+    factType: Department has DepartmentName
+    constraint: internal_uniqueness
+    hint: No two departments share a name.
