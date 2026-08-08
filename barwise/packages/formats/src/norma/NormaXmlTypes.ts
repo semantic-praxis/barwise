@@ -99,6 +99,8 @@ export interface NormaEntityType {
   readonly definition?: string;
   readonly independent?: boolean;
   readonly cardinality?: NormaCardinality;
+  /** Sample population instances (Instances > EntityTypeInstance). */
+  readonly instances?: readonly NormaEntityTypeInstance[];
 }
 
 /** A NORMA ValueType element. */
@@ -118,6 +120,8 @@ export interface NormaValueType {
   readonly dataTypeScale?: number;
   readonly independent?: boolean;
   readonly cardinality?: NormaCardinality;
+  /** Sample population instances (Instances > ValueTypeInstance). */
+  readonly instances?: readonly NormaValueTypeInstance[];
 }
 
 /** A value range parsed from a NORMA ValueRange element. */
@@ -155,6 +159,8 @@ export interface NormaFactType {
   readonly internalConstraintRefs: readonly string[];
   readonly definition?: string;
   readonly derivationRule?: NormaDerivationRule;
+  /** Sample population instances (Instances > FactTypeInstance). */
+  readonly instances?: readonly NormaFactTypeInstance[];
 }
 
 /**
@@ -178,6 +184,49 @@ export interface NormaRole {
   readonly multiplicity: NormaMultiplicity;
   /** Unary-role cardinality (CardinalityRestriction on the Role element). */
   readonly cardinality?: NormaCardinality;
+  /** Role-instance declarations (RoleInstances on the Role element). */
+  readonly roleInstances?: readonly NormaRoleInstanceDecl[];
+}
+
+// ---- Sample populations ----
+
+/**
+ * A role-instance declaration on a Role element: the use of one object-type
+ * instance by this role. Entity and fact instances reference these by id.
+ */
+export interface NormaRoleInstanceDecl {
+  readonly id: string;
+  /** ref to an EntityTypeInstance or ValueTypeInstance id. */
+  readonly objectInstanceRef: string;
+  /**
+   * Which instance kind consumes this declaration; decides the element tag
+   * (EntityTypeRoleInstance vs FactTypeRoleInstance).
+   */
+  readonly consumer: "entity" | "fact";
+}
+
+/** A ValueTypeInstance: one atomic sample value. */
+export interface NormaValueTypeInstance {
+  readonly id: string;
+  readonly value: string;
+}
+
+/**
+ * An EntityTypeInstance, identified by refs to role-instance declarations
+ * on its identifying fact's roles. Unary roles the instance populates are
+ * carried directly as role refs (EntityTypeUnaryRoleInstance) -- NORMA's
+ * unary-population seat lives on the entity instance, not the fact.
+ */
+export interface NormaEntityTypeInstance {
+  readonly id: string;
+  readonly roleInstanceRefs: readonly string[];
+  readonly unaryRoleRefs?: readonly string[];
+}
+
+/** A FactTypeInstance: one sample tuple, as refs to role-instance declarations. */
+export interface NormaFactTypeInstance {
+  readonly id: string;
+  readonly roleInstanceRefs: readonly string[];
 }
 
 /** A reading order within a NORMA fact type. */

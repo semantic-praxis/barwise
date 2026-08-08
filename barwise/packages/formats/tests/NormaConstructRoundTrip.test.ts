@@ -343,6 +343,256 @@ describe("default-value round-trip (norma-round-trip-completion WS3)", () => {
   });
 });
 
+describe("sample-population round-trip (norma-round-trip-completion WS4)", () => {
+  function populatedModel(): OrmModel {
+    const model = new OrmModel({ name: "Populated" });
+    const customer = model.addObjectType({
+      name: "Customer",
+      id: "ot-customer",
+      kind: "entity",
+      referenceMode: "customer_id",
+    });
+    const rating = model.addObjectType({
+      name: "Rating",
+      id: "ot-rating",
+      kind: "value",
+      dataType: { name: "integer" },
+    });
+    const ft = model.addFactType({
+      name: "Customer gave Rating",
+      id: "ft-rated",
+      roles: [
+        { id: "r-cust", name: "gave", playerId: customer.id },
+        { id: "r-rating", name: "was given by", playerId: rating.id },
+      ],
+      readings: ["{0} gave {1}"],
+      constraints: [{ type: "internal_uniqueness", roleIds: ["r-cust"] }],
+    });
+    model.addPopulation({
+      factTypeId: ft.id,
+      instances: [
+        { roleValues: { "r-cust": "C001", "r-rating": "5" } },
+        { roleValues: { "r-cust": "C002", "r-rating": "4" } },
+      ],
+    });
+    return model;
+  }
+
+  /** The population of the named fact, as sorted value pairs per role name. */
+  function flatten(model: OrmModel, factName: string): Record<string, string>[] {
+    const ft = model.factTypes.find((f) => f.name === factName)!;
+    const byName = new Map(ft.roles.map((r) => [r.id, r.name]));
+    const pops = model.populations.filter((p) => p.factTypeId === ft.id);
+    return pops
+      .flatMap((p) => p.instances)
+      .map((i) => {
+        const out: Record<string, string> = {};
+        for (const [roleId, value] of Object.entries(i.roleValues)) {
+          out[byName.get(roleId) ?? roleId] = value;
+        }
+        return out;
+      })
+      .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  }
+
+  it("emits the NORMA instance graph and synthesized reference expansion", () => {
+    const { xml } = roundTrip(populatedModel());
+    expect(xml).toContain("orm:FactTypeInstance");
+    expect(xml).toContain("orm:ValueTypeInstance");
+    expect(xml).toContain("orm:EntityTypeInstance");
+    expect(xml).toContain("orm:EntityTypeRoleInstance");
+    expect(xml).toContain("orm:FactTypeRoleInstance");
+    // The populated entity gains NORMA's reference expansion: the injected
+    // value type carrying the identifying values.
+    expect(xml).toContain('Name="Customer_customer_id"');
+    expect(xml).toContain(">C001<");
+    expect(xml).toContain(">5<");
+  });
+
+  it("round-trips the population, entity values recovered via the expansion", () => {
+    const { back } = roundTrip(populatedModel());
+    expect(flatten(back, "Customer gave Rating")).toEqual([
+      { "gave": "C001", "was given by": "5" },
+      { "gave": "C002", "was given by": "4" },
+    ]);
+  });
+
+  it("is stable from the second cycle on (no repeated expansion)", () => {
+    const { back } = roundTrip(populatedModel());
+    const factCount = back.factTypes.length;
+    const { back: back2 } = roundTrip(back);
+    expect(back2.factTypes.length).toBe(factCount);
+    expect(flatten(back2, "Customer gave Rating")).toEqual(
+      flatten(back, "Customer gave Rating"),
+    );
+  });
+
+  it("round-trips a unary population via the entity instances", () => {
+    const model = populatedModel();
+    const unary = model.addFactType({
+      name: "Customer is preferred",
+      id: "ft-preferred",
+      roles: [{
+        id: "r-preferred",
+        name: "is preferred",
+        playerId: model.getObjectType("ot-customer")!.id,
+      }],
+      readings: ["{0} is preferred"],
+      constraints: [{ type: "internal_uniqueness", roleIds: ["r-preferred"] }],
+    });
+    model.addPopulation({
+      factTypeId: unary.id,
+      instances: [
+        { roleValues: { "r-preferred": "C001" } },
+        { roleValues: { "r-preferred": "C003" } },
+      ],
+    });
+
+    const { xml, back } = roundTrip(model);
+    expect(xml).toContain("orm:EntityTypeUnaryRoleInstance");
+    expect(flatten(back, "Customer is preferred").map((r) => r["is preferred"]).sort())
+      .toEqual(["C001", "C003"]);
+    // The binary population is untouched by the unary rows.
+    expect(flatten(back, "Customer gave Rating")).toHaveLength(2);
+  });
+
+  it("skips a value-typed unary player (no NORMA seat), without damage", () => {
+    const model = new OrmModel({ name: "ValueUnary" });
+    const rating = model.addObjectType({
+      name: "Rating",
+      id: "ot-rating",
+      kind: "value",
+      dataType: { name: "integer" },
+    });
+    const unary = model.addFactType({
+      name: "Rating is extreme",
+      id: "ft-extreme",
+      roles: [{ id: "r-extreme", name: "is extreme", playerId: rating.id }],
+      readings: ["{0} is extreme"],
+      constraints: [{ type: "internal_uniqueness", roleIds: ["r-extreme"] }],
+    });
+    model.addPopulation({
+      factTypeId: unary.id,
+      instances: [{ roleValues: { "r-extreme": "10" } }],
+    });
+
+    const { xml, back } = roundTrip(model);
+    expect(xml).not.toContain("orm:EntityTypeUnaryRoleInstance");
+    expect(back.populations).toHaveLength(0);
+    expect(back.getFactTypeByName("Rating is extreme")).toBeDefined();
+  });
+
+  it("flattens a NORMA-authored instance graph on import", () => {
+    // Hand-authored, mirroring the structure NORMA itself writes (verified
+    // against the NORMA project's SamplePopulationTests): entity instances
+    // identified through the reference fact's role declarations, fact
+    // instances referencing role declarations.
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<ormRoot:ORM2 xmlns:orm="http://schemas.neumont.edu/ORM/2006-04/ORMCore" xmlns:ormRoot="http://schemas.neumont.edu/ORM/2006-04/ORMRoot">
+  <orm:ORMModel id="_m1" Name="Cafe">
+    <orm:Objects>
+      <orm:EntityType id="_et_person" Name="Person" _ReferenceMode="name">
+        <orm:PlayedRoles>
+          <orm:Role ref="_r_pname" />
+          <orm:Role ref="_r_drinker" />
+        </orm:PlayedRoles>
+        <orm:PreferredIdentifier ref="_uc_pref" />
+        <orm:Instances>
+          <orm:EntityTypeInstance id="_ei_1">
+            <orm:RoleInstances><orm:EntityTypeRoleInstance ref="_ri_name_1" /></orm:RoleInstances>
+          </orm:EntityTypeInstance>
+        </orm:Instances>
+      </orm:EntityType>
+      <orm:ValueType id="_vt_name" Name="Person_name">
+        <orm:PlayedRoles><orm:Role ref="_r_namev" /></orm:PlayedRoles>
+        <orm:ConceptualDataType id="_cdt1" ref="_dt_variable_length_text" />
+        <orm:Instances>
+          <orm:ValueTypeInstance id="_vi_ada"><orm:Value>Ada</orm:Value></orm:ValueTypeInstance>
+        </orm:Instances>
+      </orm:ValueType>
+      <orm:ValueType id="_vt_bev" Name="Beverage">
+        <orm:PlayedRoles><orm:Role ref="_r_bev" /></orm:PlayedRoles>
+        <orm:ConceptualDataType id="_cdt2" ref="_dt_variable_length_text" />
+        <orm:Instances>
+          <orm:ValueTypeInstance id="_vi_tea"><orm:Value>tea</orm:Value></orm:ValueTypeInstance>
+        </orm:Instances>
+      </orm:ValueType>
+    </orm:Objects>
+    <orm:Facts>
+      <orm:Fact id="_ft_hasname" _Name="PersonHasName">
+        <orm:FactRoles>
+          <orm:Role id="_r_pname" Name=""><orm:RolePlayer ref="_et_person" /></orm:Role>
+          <orm:Role id="_r_namev" Name="">
+            <orm:RolePlayer ref="_vt_name" />
+            <orm:RoleInstances>
+              <orm:EntityTypeRoleInstance id="_ri_name_1" ref="_vi_ada" />
+            </orm:RoleInstances>
+          </orm:Role>
+        </orm:FactRoles>
+        <orm:ReadingOrders>
+          <orm:ReadingOrder id="_ro1">
+            <orm:Readings><orm:Reading id="_rd1"><orm:Data>{0} has {1}</orm:Data></orm:Reading></orm:Readings>
+            <orm:RoleSequence><orm:Role ref="_r_pname" /><orm:Role ref="_r_namev" /></orm:RoleSequence>
+          </orm:ReadingOrder>
+        </orm:ReadingOrders>
+        <orm:InternalConstraints>
+          <orm:UniquenessConstraint ref="_uc_pref" />
+        </orm:InternalConstraints>
+      </orm:Fact>
+      <orm:Fact id="_ft_drinks" _Name="PersonDrinksBeverage">
+        <orm:FactRoles>
+          <orm:Role id="_r_drinker" Name="">
+            <orm:RolePlayer ref="_et_person" />
+            <orm:RoleInstances>
+              <orm:FactTypeRoleInstance id="_ri_drinker_1" ref="_ei_1" />
+            </orm:RoleInstances>
+          </orm:Role>
+          <orm:Role id="_r_bev" Name="">
+            <orm:RolePlayer ref="_vt_bev" />
+            <orm:RoleInstances>
+              <orm:FactTypeRoleInstance id="_ri_bev_1" ref="_vi_tea" />
+            </orm:RoleInstances>
+          </orm:Role>
+        </orm:FactRoles>
+        <orm:ReadingOrders>
+          <orm:ReadingOrder id="_ro2">
+            <orm:Readings><orm:Reading id="_rd2"><orm:Data>{0} drinks {1}</orm:Data></orm:Reading></orm:Readings>
+            <orm:RoleSequence><orm:Role ref="_r_drinker" /><orm:Role ref="_r_bev" /></orm:RoleSequence>
+          </orm:ReadingOrder>
+        </orm:ReadingOrders>
+        <orm:Instances>
+          <orm:FactTypeInstance id="_fi_1">
+            <orm:RoleInstances>
+              <orm:FactTypeRoleInstance ref="_ri_drinker_1" />
+              <orm:FactTypeRoleInstance ref="_ri_bev_1" />
+            </orm:RoleInstances>
+          </orm:FactTypeInstance>
+        </orm:Instances>
+      </orm:Fact>
+    </orm:Facts>
+    <orm:Constraints>
+      <orm:UniquenessConstraint id="_uc_pref" Name="" IsInternal="true" IsPreferred="true">
+        <orm:RoleSequence><orm:Role ref="_r_namev" /></orm:RoleSequence>
+      </orm:UniquenessConstraint>
+    </orm:Constraints>
+    <orm:DataTypes>
+      <orm:VariableLengthTextDataType id="_dt_variable_length_text" />
+    </orm:DataTypes>
+  </orm:ORMModel>
+</ormRoot:ORM2>`;
+
+    const model = mapNormaToOrm(parseNormaXml(xml));
+    const drinks = model.factTypes.find((f) => f.name === "PersonDrinksBeverage")!;
+    const pops = model.populations.filter((p) => p.factTypeId === drinks.id);
+    expect(pops).toHaveLength(1);
+    expect(pops[0]!.instances).toHaveLength(1);
+    expect(pops[0]!.instances[0]!.roleValues).toEqual({
+      "_r_drinker": "Ada",
+      "_r_bev": "tea",
+    });
+  });
+});
+
 describe("NORMA diagram geometry round-trip (WS2)", () => {
   const { back } = roundTrip(buildModel());
 

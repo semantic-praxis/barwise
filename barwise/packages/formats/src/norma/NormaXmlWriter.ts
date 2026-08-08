@@ -52,6 +52,7 @@ import type {
   NormaValueConstraintInline,
   NormaValueType,
 } from "./NormaXmlTypes.js";
+import { buildPopulationGraph, type PopulationGraph } from "./populationGraph.js";
 
 /**
  * Convert a model id into a NORMA-style id token. NORMA accepts any unique
@@ -81,6 +82,10 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
   // object element can list its PlayedRoles.
   const playedRoles = collectPlayedRoles(model);
 
+  // Sample populations: the NORMA instance graph, including any
+  // reference-scheme expansions synthesized for populated entities.
+  const popGraph = buildPopulationGraph(model);
+
   const entityTypes: NormaEntityType[] = [];
   const valueTypes: NormaValueType[] = [];
   const objectifiedTypes: NormaObjectifiedType[] = [];
@@ -92,7 +97,9 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
   for (const ot of model.objectTypes) {
     const refs = playedRoles.get(ot.id) ?? [];
     if (ot.kind === "value") {
-      valueTypes.push(writeValueType(ot, refs));
+      const vt = writeValueType(ot, refs);
+      const instances = popGraph.valueInstancesByOwner.get(normaId(ot.id));
+      valueTypes.push(instances ? { ...vt, instances } : vt);
       continue;
     }
     // entity
@@ -109,15 +116,19 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
         cardinality: writeCardinality(ot),
       });
     } else {
+      const extraRefs = popGraph.extraPlayedRolesByOwner.get(ot.id) ?? [];
+      const instances = popGraph.entityInstancesByOwner.get(normaId(ot.id));
       entityTypes.push({
         id: normaId(ot.id),
         name: ot.name,
         referenceMode: ot.referenceMode,
-        preferredIdentifier: preferredIdByEntity.get(ot.id),
-        playedRoleRefs: refs,
+        preferredIdentifier: preferredIdByEntity.get(ot.id)
+          ?? popGraph.syntheticPreferredIdByEntity.get(normaId(ot.id)),
+        playedRoleRefs: [...refs, ...extraRefs],
         definition: ot.definition,
         independent: ot.independent,
         cardinality: writeCardinality(ot),
+        ...(instances ? { instances } : {}),
       });
     }
   }
@@ -128,8 +139,35 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
   const seenConstraintIds = new Set<string>();
 
   for (const ft of model.factTypes) {
-    const { norma } = writeFactType(ft, constraints, seenConstraintIds);
+    const { norma } = writeFactType(ft, constraints, seenConstraintIds, popGraph);
     factTypes.push(norma);
+  }
+
+  // Synthesized reference-scheme expansions for populated entities: the
+  // injected value type (text-typed), the identifying fact (with its
+  // role-instance declarations), and its constraints.
+  for (const vt of popGraph.extraValueTypes) {
+    const instances = popGraph.valueInstancesByOwner.get(vt.id);
+    valueTypes.push({
+      ...vt,
+      dataTypeRef: dataTypeIdFor("text"),
+      ...(instances ? { instances } : {}),
+    });
+  }
+  for (const nf of popGraph.extraFactTypes) {
+    factTypes.push({
+      ...nf,
+      roles: nf.roles.map((r) => {
+        const decls = popGraph.roleDeclsByRole.get(r.id);
+        return decls ? { ...r, roleInstances: decls } : r;
+      }),
+    });
+  }
+  for (const c of popGraph.extraConstraints) {
+    if (!seenConstraintIds.has(c.id)) {
+      seenConstraintIds.add(c.id);
+      constraints.push(c);
+    }
   }
 
   // Subtype facts (+ exclusion / disjunctive-mandatory for exclusive /
@@ -242,8 +280,10 @@ function writeFactType(
   ft: FactType,
   constraints: NormaConstraint[],
   seen: Set<string>,
+  popGraph: PopulationGraph,
 ): { norma: NormaFactType; internalRefs: string[]; } {
-  const roles: NormaRole[] = ft.roles.map((role) => writeRole(ft, role));
+  const roles: NormaRole[] = ft.roles.map((role) => writeRole(ft, role, popGraph));
+  const factInstances = popGraph.factInstancesByFact.get(normaId(ft.id));
   const readingOrders: NormaReadingOrder[] = ft.readings.map((reading, i) => ({
     id: `${normaId(ft.id)}_ro${i}`,
     readings: [{ id: `${normaId(ft.id)}_rd${i}`, data: reading.template }],
@@ -310,24 +350,27 @@ function writeFactType(
       internalConstraintRefs: internalRefs,
       definition: ft.definition,
       derivationRule: writeDerivationRule(ft),
+      ...(factInstances ? { instances: factInstances } : {}),
     },
     internalRefs,
   };
 }
 
-function writeRole(ft: FactType, role: Role): NormaRole {
+function writeRole(ft: FactType, role: Role, popGraph: PopulationGraph): NormaRole {
   const isMandatory = ft.constraints.some(
     (c) => c.type === "mandatory" && c.roleId === role.id,
   );
   const card = ft.constraints.find(
     (c): c is CardinalityConstraint => c.type === "cardinality" && c.roleId === role.id,
   );
+  const roleInstances = popGraph.roleDeclsByRole.get(normaId(role.id));
   return {
     id: normaId(role.id),
     name: role.name,
     playerRef: normaId(role.playerId),
     isMandatory,
     multiplicity: "Unspecified",
+    ...(roleInstances ? { roleInstances } : {}),
     ...(card
       ? {
         cardinality: {
