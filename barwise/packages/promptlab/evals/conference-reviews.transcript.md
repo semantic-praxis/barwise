@@ -8,7 +8,7 @@ Program Chair: Reviewers have a reviewer ID. Papers have a paper number. And eac
 
 Facilitator: What do you record about a review?
 
-Program Chair: Every review has exactly one overall score. The score is always one of 1, 2, 3, 4, or 5.
+Program Chair: Every review has exactly one review score -- that is our term for the overall rating. The review score is always one of 1, 2, 3, 4, or 5.
 
 Facilitator: Is the score ever missing?
 
