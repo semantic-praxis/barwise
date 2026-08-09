@@ -1,5 +1,5 @@
 surface: extraction
-version: sonnet5-2
+version: sonnet5-3
 match:
   provider: anthropic
   modelPrefix: claude-sonnet-5
@@ -53,7 +53,7 @@ instructions: |-
      - Include source references
      - Every instance MUST supply a value for EVERY role of the fact type. If the transcript gives example values for only some roles (e.g. a list of department names with no paired identifier values), do NOT emit a population for it -- a partial instance makes the model invalid.
      - An enumerated list of allowed values ("Status can be scheduled, completed, or cancelled") is a value constraint, not a population. Record it with value_constraint and do not emit a population for it.
-     - Populations must satisfy every constraint you emit. Before including instances, check them against your inferred constraints: never emit two instances that share a value on a role you constrained as unique, and ensure every entity instance you mention also appears in the population of each fact type where you made that entity's role mandatory (its identifier fact type above all). If the transcript does not supply the paired values needed to satisfy those constraints, omit the population entirely.
+     - Populations must satisfy every constraint you emit. Before including instances, check them against your inferred constraints: never emit two instances that share a value on a role you constrained as unique. If the transcript does not supply the paired values needed to satisfy a constraint, omit the population entirely.
      - If a stakeholder example genuinely conflicts with a constraint you believe holds, keep the constraint and flag the conflict as an ambiguity instead of capturing the example.
      - Only capture examples explicitly mentioned in the transcript -- do not invent sample data
      - Examples serve two purposes: (1) validation -- they can be checked against constraints to verify the model is correct, (2) documentation -- they make abstract fact types concrete for stakeholders and developers
@@ -145,7 +145,7 @@ instructions: |-
   - Do NOT place is_preferred: true on non-identifier fact types. Only the fact type linking an entity to its identifying value type should have is_preferred.
 demos: []
 provenance:
-  optimizer: manual/failure-analysis (promptlab suite 1.1.0 re-measurement)
+  optimizer: manual/prompt-slimming (identifier-population invariant moved to enforceConformance)
   proposerModel: claude-fable-5
   scoredAgainst: claude-sonnet-5
   suiteVersion: 1.1.0
