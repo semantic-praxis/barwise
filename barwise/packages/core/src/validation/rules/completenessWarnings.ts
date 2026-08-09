@@ -18,6 +18,7 @@ export function completenessWarnings(model: OrmModel): Diagnostic[] {
 
   diagnostics.push(...checkMissingObjectTypeDefinitions(model));
   diagnostics.push(...checkFactTypesWithoutConstraints(model));
+  diagnostics.push(...checkFactTypesWithoutUniqueness(model));
   diagnostics.push(...checkIsolatedObjectTypes(model));
   diagnostics.push(...checkMissingValueTypeDataType(model));
   diagnostics.push(...checkPreferredIdentifiers(model));
@@ -118,29 +119,78 @@ function checkMissingValueTypeDataType(model: OrmModel): Diagnostic[] {
 }
 
 /**
+ * A fact type whose constraints omit internal uniqueness is usually
+ * under-specified: without a uniqueness constraint every role can fan
+ * out freely, which is rarely the intended business rule once other
+ * constraints (mandatory, value) have been stated. Unaries are exempt
+ * (their uniqueness semantics are implicit), and constraint-free fact
+ * types are already covered by fact-type-without-constraints.
+ */
+function checkFactTypesWithoutUniqueness(model: OrmModel): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+
+  for (const ft of model.factTypes) {
+    if (ft.arity < 2 || ft.constraints.length === 0) continue;
+    const hasUniqueness = ft.constraints.some(
+      (c) => c.type === "internal_uniqueness",
+    );
+    if (!hasUniqueness) {
+      diagnostics.push({
+        severity: "warning",
+        message: `Fact type "${ft.name}" has constraints but no internal `
+          + `uniqueness constraint. Without one, any combination of role values `
+          + `can repeat freely -- state the intended cardinality.`,
+        elementId: ft.id,
+        ruleId: "completeness/fact-type-without-uniqueness",
+      });
+    }
+  }
+
+  return diagnostics;
+}
+
+/**
  * Each entity type should have exactly one preferred identifier
  * (an internal uniqueness constraint with isPreferred = true on one
  * of its identifying fact types). Zero means the relational mapper
- * must guess; more than one is contradictory.
+ * must guess; more than one is contradictory. A subtype that inherits
+ * identification -- a provides_identification path to a supertype
+ * with a preferred identifier -- is identified through that chain and
+ * is not flagged.
  */
 function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
+  const preferredCounts = new Map<string, number>();
   for (const ot of model.objectTypes) {
     if (ot.kind !== "entity") continue;
-
-    const factTypes = model.factTypesForObjectType(ot.id);
-    let preferredCount = 0;
-
-    for (const ft of factTypes) {
+    let count = 0;
+    for (const ft of model.factTypesForObjectType(ot.id)) {
       for (const c of ft.constraints) {
-        if (c.type === "internal_uniqueness" && c.isPreferred) {
-          preferredCount++;
-        }
+        if (c.type === "internal_uniqueness" && c.isPreferred) count++;
       }
     }
+    preferredCounts.set(ot.id, count);
+  }
 
-    if (preferredCount === 0) {
+  /** Is this entity identified, directly or through its subtype chain? */
+  const isIdentified = (id: string, seen: Set<string>): boolean => {
+    if (seen.has(id)) return false; // subtype cycle: structural rule reports it
+    seen.add(id);
+    if ((preferredCounts.get(id) ?? 0) > 0) return true;
+    return model.subtypeFacts.some(
+      (sf) =>
+        sf.subtypeId === id
+        && sf.providesIdentification
+        && isIdentified(sf.supertypeId, seen),
+    );
+  };
+
+  for (const ot of model.objectTypes) {
+    if (ot.kind !== "entity") continue;
+    const preferredCount = preferredCounts.get(ot.id) ?? 0;
+
+    if (preferredCount === 0 && !isIdentified(ot.id, new Set())) {
       diagnostics.push({
         severity: "info",
         message: `Entity type "${ot.name}" has no preferred identifier. `

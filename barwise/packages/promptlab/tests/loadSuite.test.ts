@@ -19,7 +19,11 @@ describe("loadSuite on the packaged seed suite", () => {
   it("loads the manifest with weights and four cases in declared order", () => {
     const suite = loadSuite(defaultSuitePath());
     expect(suite.version).toBe("1.0.0");
-    expect(suite.weights).toEqual({ conformanceCorrection: 0.02, validationError: 0.1 });
+    expect(suite.weights).toEqual({
+      conformanceCorrection: 0.02,
+      validationError: 0.1,
+      validationWarning: 0.05,
+    });
     expect(suite.cases.map((c) => c.evalCase.id)).toEqual([
       "order-management",
       "university-enrollment",

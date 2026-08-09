@@ -31,8 +31,11 @@ export function constraintConsistencyRules(model: OrmModel): Diagnostic[] {
             && ft.arity > 1
             && constraint.roleIds.every((rid) => ft.hasRole(rid))
           ) {
+            // A spanning constraint on a binary is the standard
+            // many-to-many shape (informational); on a ternary or wider
+            // it usually signals a non-elementary fact type (warning).
             diagnostics.push({
-              severity: "warning",
+              severity: ft.arity === 2 ? "info" : "warning",
               message: `Internal uniqueness constraint in fact type "${ft.name}" `
                 + `spans all ${ft.arity} roles. This means each complete fact `
                 + `can only appear once, which is often redundant.`,

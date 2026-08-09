@@ -300,6 +300,19 @@
   "inferred_constraints": [
     {
       "type": "internal_uniqueness",
+      "fact_type": "Appointment has VisitReason",
+      "roles": ["Appointment"],
+      "description": "Each Appointment has at most one VisitReason.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [14, 14],
+          "excerpt": "An appointment can have a visit reason the patient gives when booking."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
       "fact_type": "Patient books Appointment",
       "roles": ["is booked by"],
       "description": "Each Appointment is booked by at most one Patient.",

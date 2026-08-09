@@ -57,7 +57,11 @@ describe("scoreExtraction over the seed suite", () => {
   });
 
   it("applies the declared weights and floors at zero", () => {
-    const heavy = { conformanceCorrection: 0.5, validationError: 0.5 };
+    const heavy = {
+      conformanceCorrection: 0.5,
+      validationError: 0.5,
+      validationWarning: 0.5,
+    };
     const result = scoreExtraction(
       payloadFor("employee-hierarchy"),
       caseFor("employee-hierarchy"),

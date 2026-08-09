@@ -310,6 +310,32 @@
   "inferred_constraints": [
     {
       "type": "internal_uniqueness",
+      "fact_type": "Student enrolls in CourseOffering",
+      "roles": ["Student", "CourseOffering"],
+      "description": "Each Student-CourseOffering enrollment is recorded at most once.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [11, 11],
+          "excerpt": "Students enroll in course offerings."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Student receives LetterGrade for CourseOffering",
+      "roles": ["Student", "CourseOffering"],
+      "description": "A student gets at most one grade per offering.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [17, 17],
+          "excerpt": "A student gets at most one grade per offering."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
       "fact_type": "CourseOffering is of Course",
       "roles": ["is of"],
       "description": "Each CourseOffering is of at most one Course.",

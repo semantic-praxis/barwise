@@ -1,6 +1,6 @@
-<REPO>/test-plan/fixtures/constraints-showcase.orm.yaml: 0 error(s), 1 warning(s)
+<REPO>/test-plan/fixtures/constraints-showcase.orm.yaml: 0 error(s), 0 warning(s)
 
-  WARNING Internal uniqueness constraint in fact type "Person is parent of Person" spans all 2 roles. This means each complete fact can only appear once, which is often redundant.
+  INFO    Internal uniqueness constraint in fact type "Person is parent of Person" spans all 2 roles. This means each complete fact can only appear once, which is often redundant.
   INFO    Object type "Person" has no definition.
   INFO    Object type "Car" has no definition.
   INFO    Object type "Bus" has no definition.

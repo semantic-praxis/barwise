@@ -77,17 +77,47 @@ describe("constraintConsistencyRules", () => {
       expect(errors).toHaveLength(2);
     });
 
-    it("warns when uniqueness spans all roles of a multi-role fact type", () => {
+    it("notes (info) a spanning uniqueness on a binary fact type", () => {
+      // A spanning constraint on a binary is the standard many-to-many
+      // shape, so it is informational rather than a warning.
       const model = buildModelWithConstraints([
         { type: "internal_uniqueness", roleIds: ["r1", "r2"] },
       ]);
 
       const diagnostics = constraintConsistencyRules(model);
-      const warnings = diagnostics.filter(
+      const flagged = diagnostics.filter(
         (d) => d.ruleId === "constraint/spanning-all-roles",
       );
-      expect(warnings).toHaveLength(1);
-      expect(warnings[0]!.severity).toBe("warning");
+      expect(flagged).toHaveLength(1);
+      expect(flagged[0]!.severity).toBe("info");
+    });
+
+    it("warns when uniqueness spans all roles of a ternary fact type", () => {
+      const model = new OrmModel({ name: "Test" });
+      const ot = model.addObjectType({
+        name: "Widget",
+        kind: "entity",
+        referenceMode: "widget_id",
+      });
+      model.addFactType({
+        name: "Widget links Widget to Widget",
+        roles: [
+          { name: "links", playerId: ot.id, id: "r1" },
+          { name: "is linked by", playerId: ot.id, id: "r2" },
+          { name: "is linked to", playerId: ot.id, id: "r3" },
+        ],
+        readings: ["{0} links {1} to {2}"],
+        constraints: [
+          { type: "internal_uniqueness", roleIds: ["r1", "r2", "r3"] },
+        ] as never,
+      });
+
+      const diagnostics = constraintConsistencyRules(model);
+      const flagged = diagnostics.filter(
+        (d) => d.ruleId === "constraint/spanning-all-roles",
+      );
+      expect(flagged).toHaveLength(1);
+      expect(flagged[0]!.severity).toBe("warning");
     });
 
     it("does not warn when uniqueness spans a subset of roles", () => {

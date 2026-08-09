@@ -16,6 +16,8 @@ export interface CaseScore {
   readonly rubricTotal: number;
   readonly conformanceCorrections: number;
   readonly validationErrors: number;
+  /** Warning-severity diagnostics (the lint tier). */
+  readonly validationWarnings: number;
   /** rubricPassed/rubricTotal minus weighted penalties, floored at 0. */
   readonly score: number;
   /** Per-check outcomes, in authored order (for delta reports). */
@@ -36,9 +38,12 @@ export function scoreExtraction(
   const { response: cleaned, corrections } = enforceConformance(extraction);
   const { model } = parseDraftModel(cleaned, loadedCase.evalCase.id);
 
-  const validationErrors = new ValidationEngine()
-    .validate(model)
+  const diagnostics = new ValidationEngine().validate(model);
+  const validationErrors = diagnostics
     .filter((d) => d.severity === "error")
+    .length;
+  const validationWarnings = diagnostics
+    .filter((d) => d.severity === "warning")
     .length;
 
   const report = evaluateCandidate(
@@ -51,7 +56,8 @@ export function scoreExtraction(
   const rubricPassed = report.results.filter((r) => r.passed).length;
   const raw = rubricPassed / rubricTotal
     - weights.conformanceCorrection * corrections.length
-    - weights.validationError * validationErrors;
+    - weights.validationError * validationErrors
+    - weights.validationWarning * validationWarnings;
 
   return {
     caseId: loadedCase.evalCase.id,
@@ -59,6 +65,7 @@ export function scoreExtraction(
     rubricTotal,
     conformanceCorrections: corrections.length,
     validationErrors,
+    validationWarnings,
     score: Math.max(0, raw),
     results: report.results,
   };
