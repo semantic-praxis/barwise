@@ -1,5 +1,19 @@
 # sonnet5-3 verification: prompt slimming holds; a bimodal case surfaces
 
+> **Correction (2026-08-09, after publication).** The
+> university-enrollment failures this report attributes to a lost
+> CourseOffering reification are not modeling failures. In all three
+> failing samples the offering is fully reified; the model named it
+> `Offering` and recorded `aliases: ["Course Offering"]`, and the
+> evaluator's alias matching compares strings exactly, so the space in
+> the alias defeats a rubric asking for `CourseOffering`. Under a
+> normalized comparison every one of these samples passes and no
+> passing sample changes. The scores below are real, but their stated
+> cause is wrong, and the backlog item calling this "the sonnet5
+> lineage's largest known failure mode" is withdrawn: the defect is in
+> `learn/src/evaluate/nameResolution.ts`, not in the prompt. See
+> `docs/prompt-eval-haiku45-2026-08-09.md`.
+
 Date: 2026-08-09
 Suite: `@barwise/promptlab` seed suite 1.1.0, weights 0.02 / 0.10 /
 0.05, scored with the conformance identifier-population repair

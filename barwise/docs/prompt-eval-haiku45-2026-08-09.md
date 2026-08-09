@@ -20,9 +20,10 @@ default prompt leaves it at 0.760 mean with two hard-failure modes;
 sample); `haiku45-2` closes the three remaining failure classes and
 reaches 0.948 with no malformed payloads and six of seven cases at
 0.97 or better. Nothing in either variant is a rubric workaround --
-every added rule targets a defect visible in the payload itself, and
-the one failure that survives is a cross-tier modeling miss the
-sonnet5 lineage shares.
+every added rule targets a defect visible in the payload itself. The
+one failure that survives is a naming miss, not a modeling miss, and
+most of what this suite recorded under that heading turns out to be a
+scoring bug in the evaluator (see Findings).
 
 ## Sampling
 
@@ -154,15 +155,20 @@ Each targeted class is gone rather than merely cheaper:
 - university-enrollment and every other case carry zero
   `completeness/fact-type-without-uniqueness` warnings.
 
-The one remaining failure is the **CourseOffering omission**: one
-sample in three modeled Student-Course directly, losing the offering
-reification and the two uniqueness checks that hang off it, for 1/6
-rubric. That is the same failure signature, at the same rate, that the
-sonnet5 lineage shows on this case
-(`docs/prompt-eval-sonnet5-3-2026-08-09.md`). It is not a Haiku
-weakness and not something haiku45-2 introduced -- it is the suite's
-one genuinely hard objectification cue, and it is now the largest
-known failure mode in both lineages.
+The one remaining failure is a **naming miss on CourseOffering**: one
+sample in three named the entity `Offering` rather than
+`CourseOffering`, and the rubric matches by name, so five of six
+checks failed at once. The offering is fully reified in that sample --
+it carries `Offering is of Course`, `Offering belongs to Semester`,
+`Offering is taught by Instructor`, and an offering identifier. What
+the rubric scored as a missing concept is a missing string.
+
+The transcript supports both names: line 3 says "course offerings",
+and from line 7 the stakeholder shortens to "offering". The sample did
+not record the fuller form as an alias, so nothing connected the two.
+The fix is the compound-term alias rule -- keep the fuller stakeholder
+term as the name, record the abbreviation as an alias -- not
+objectification guidance, which was never the problem.
 
 ## Findings for the backlog
 
@@ -182,12 +188,15 @@ known failure mode in both lineages.
   tool-use path leaves output-format failures in the sample. Any
   cross-tier comparison built on these numbers should report parsed
   and unparsed means separately, as this report does.
-- **The CourseOffering omission is cross-tier.** It now has the same
-  roughly one-in-three rate under Haiku 4.5 with haiku45-2 as it does
-  under Sonnet 5 with sonnet5-2 and sonnet5-3. A failure mode that
-  survives both a tier change and two independent prompt lineages is
-  about the transcript's objectification cue, not about the model.
-  Fixing it -- by sharpening the objectification guidance, or by
-  making the transcript's "offering" language less elidable -- is the
-  highest-value next optimization for every config, worth more than
-  any remaining polish.
+- **The evaluator's alias matching is exact-string, and that is a
+  scoring bug.** `learn/src/evaluate/nameResolution.ts` compares
+  aliases with `Array.includes`, so a candidate naming a type
+  `Offering` with alias `"Course Offering"` fails a rubric asking for
+  `CourseOffering` -- the space defeats the match. Every sonnet5
+  "CourseOffering" failure on record is of exactly this shape and
+  flips to passing under a normalized comparison (case-folded,
+  separators stripped); no currently-passing sample changes. The
+  earlier reading of these failures as lost objectification was wrong
+  and is retracted in
+  `docs/prompt-eval-sonnet5-3-2026-08-09.md`. Normalizing the
+  comparison is a `@barwise/learn` fix that ships on its own.
