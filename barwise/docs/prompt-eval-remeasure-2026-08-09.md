@@ -98,11 +98,51 @@ In priority order, from the score deltas above:
    it): the acyclicity language in project-staffing ("cannot have
    loops, not even indirectly") maps to ring/acyclic.
 
+## sonnet5-2: acting on lead 1, same day
+
+Lead 1 was applied as a variant revision (`sonnet5-2`): one added
+rule at the frequency bullet stating that the constrained role is the
+entity the rule is "per", sided like uniqueness, with the freight
+failure as the worked example. Lead 2 needed no variant change -- the
+population-completeness rules sonnet5-1 already carries are why the
+variant had zero validation errors where the default artifact leaked
+them; it is a default-artifact gap, left to a separate decision.
+
+Full-suite run of Sonnet 5 on sonnet5-2 (one sample per case, same
+channel):
+
+| Case                  | Sonnet 5 / sonnet5-2 |
+| --------------------- | -------------------- |
+| order-management      | 1.000                |
+| university-enrollment | 0.950                |
+| clinic-appointments   | 1.000                |
+| employee-hierarchy    | 1.000                |
+| project-staffing      | 0.980                |
+| conference-reviews    | 1.000                |
+| freight-corrections   | 0.950                |
+| **mean / worst**      | **0.983 / 0.950**    |
+
+- **freight-corrections 0.783 -> 0.950, full rubric passing.** The
+  frequency constraint landed on the Shipment role with the corrected
+  bound -- the role-siding rule fixed exactly the failure it targeted.
+- **No regression anywhere**: the four old cases and the other two
+  new cases hold at 0.98-1.000.
+- The two 0.950s are honest residuals, both warning penalties the
+  lint tier is right to charge: a missing spanning uniqueness on the
+  storage binary (freight) and a constraint-free enrollment fact type
+  (university). That is the suite's remaining headroom, not noise.
+
 ## Follow-ups
 
 - The keyed gate run (`barwise prompt eval --provider anthropic
   --model claude-sonnet-5 --artifacts packages/llm/prompts`, and the
-  same with `claude-fable-5`) is still the acceptance path for any
-  variant change these leads produce.
-- Old-case scores under the 1.1.0 weights were not re-collected (cost
-  of the channel); a keyed full-suite run supersedes both tables.
+  same with `claude-fable-5`) is still the acceptance path -- the
+  sonnet5-2 revision carries provenance but no recorded score until
+  it clears that gate.
+- Lead 2 (population completeness) and lead 3 (ring capture) are
+  default-artifact gaps; promoting those rules into the default
+  instructions re-baselines every config and is the maintainer's
+  call, not a variant edit.
+- Old-case scores for the other configs under the 1.1.0 weights were
+  not re-collected (cost of the channel); a keyed full-suite run
+  supersedes all tables here.
