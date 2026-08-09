@@ -2,7 +2,7 @@
   "mcpServers": {
     "barwise": {
       "command": "node",
-      "args": ["packages/mcp/dist/bundle/index.cjs"]
+      "args": ["packages/mcp/dist/bundle-entry.js"]
     }
   }
 }
