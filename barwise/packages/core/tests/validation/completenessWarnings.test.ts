@@ -288,8 +288,91 @@ describe("completenessWarnings", () => {
     });
   });
 
+  describe("fact types without uniqueness", () => {
+    it("warns when a fact type has constraints but no internal uniqueness", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Finding", {
+          referenceMode: "finding_id",
+          definition: "A finding.",
+        })
+        .withValueType("EndPosition", {
+          definition: "An offset.",
+          dataType: { name: "integer" },
+        })
+        .withBinaryFactType("Finding has EndPosition", {
+          role1: { player: "Finding", name: "has" },
+          role2: { player: "EndPosition", name: "is of" },
+          mandatory: "role1",
+        })
+        .build();
+
+      const flagged = completenessWarnings(model).filter(
+        (d) => d.ruleId === "completeness/fact-type-without-uniqueness",
+      );
+      expect(flagged).toHaveLength(1);
+      expect(flagged[0]!.severity).toBe("warning");
+      expect(flagged[0]!.message).toContain("Finding has EndPosition");
+    });
+
+    it("does not warn when an internal uniqueness constraint is present", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Finding", {
+          referenceMode: "finding_id",
+          definition: "A finding.",
+        })
+        .withValueType("EndPosition", {
+          definition: "An offset.",
+          dataType: { name: "integer" },
+        })
+        .withBinaryFactType("Finding has EndPosition", {
+          role1: { player: "Finding", name: "has" },
+          role2: { player: "EndPosition", name: "is of" },
+          uniqueness: "role1",
+          mandatory: "role1",
+        })
+        .build();
+
+      const flagged = completenessWarnings(model).filter(
+        (d) => d.ruleId === "completeness/fact-type-without-uniqueness",
+      );
+      expect(flagged).toHaveLength(0);
+    });
+
+    it("leaves constraint-free fact types to fact-type-without-constraints", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Finding", {
+          referenceMode: "finding_id",
+          definition: "A finding.",
+        })
+        .withValueType("EndPosition", {
+          definition: "An offset.",
+          dataType: { name: "integer" },
+        })
+        .withBinaryFactType("Finding has EndPosition", {
+          role1: { player: "Finding", name: "has" },
+          role2: { player: "EndPosition", name: "is of" },
+        })
+        .build();
+
+      const diagnostics = completenessWarnings(model);
+      expect(
+        diagnostics.filter(
+          (d) => d.ruleId === "completeness/fact-type-without-uniqueness",
+        ),
+      ).toHaveLength(0);
+      expect(
+        diagnostics.filter(
+          (d) => d.ruleId === "completeness/fact-type-without-constraints",
+        ),
+      ).toHaveLength(1);
+    });
+  });
+
   describe("preferred identifiers", () => {
-    it("reports entity types with no preferred identifier", () => {
+    it("reports entity types with no explicit preferred identifier", () => {
+      // Every entity carries a reference_mode (the metamodel requires
+      // it); the info nudges toward an explicit preferred uniqueness
+      // constraint so the mapper does not fall back to a heuristic.
       const model = new ModelBuilder("Test")
         .withEntityType("Customer", {
           referenceMode: "customer_id",
@@ -314,6 +397,91 @@ describe("completenessWarnings", () => {
       expect(missing[0]!.severity).toBe("info");
       expect(missing[0]!.message).toContain("Customer");
       expect(missing[0]!.message).toContain("heuristic");
+    });
+
+    it("accepts identification inherited through a provides_identification subtype chain", () => {
+      const model = new OrmModel({ name: "Test" });
+      const person = model.addObjectType({
+        name: "Person",
+        kind: "entity",
+        referenceMode: "person_id",
+        definition: "A person.",
+      });
+      const personId = model.addObjectType({
+        name: "PersonId",
+        kind: "value",
+        definition: "A person identifier.",
+        dataType: { name: "integer" },
+      });
+      model.addFactType({
+        name: "Person has PersonId",
+        roles: [
+          { name: "has", playerId: person.id, id: "p1" },
+          { name: "identifies", playerId: personId.id, id: "p2" },
+        ],
+        readings: ["{0} has {1}", "{1} identifies {0}"],
+        constraints: [
+          { type: "internal_uniqueness", roleIds: ["p1"], isPreferred: true },
+        ] as never,
+      });
+      const employee = model.addObjectType({
+        name: "Employee",
+        kind: "entity",
+        referenceMode: "person_id",
+        definition: "An employed person.",
+      });
+      const manager = model.addObjectType({
+        name: "Manager",
+        kind: "entity",
+        referenceMode: "person_id",
+        definition: "A managing employee.",
+      });
+      model.addSubtypeFact({
+        subtypeId: employee.id,
+        supertypeId: person.id,
+        providesIdentification: true,
+      });
+      model.addSubtypeFact({
+        subtypeId: manager.id,
+        supertypeId: employee.id,
+        providesIdentification: true,
+      });
+
+      const missing = completenessWarnings(model).filter(
+        (d) => d.ruleId === "completeness/missing-preferred-identifier",
+      );
+      expect(missing).toHaveLength(0);
+    });
+
+    it("still reports a subtype whose chain does not provide identification", () => {
+      const model = new OrmModel({ name: "Test" });
+      const person = model.addObjectType({
+        name: "Person",
+        kind: "entity",
+        referenceMode: "person_id",
+        definition: "A person.",
+      });
+      const contractor = model.addObjectType({
+        name: "Contractor",
+        kind: "entity",
+        referenceMode: "contractor_id",
+        definition: "An independently identified person.",
+      });
+      model.addSubtypeFact({
+        subtypeId: contractor.id,
+        supertypeId: person.id,
+        providesIdentification: false,
+      });
+
+      // Person (no explicit preferred identifier of its own) is flagged
+      // too; the point here is that the non-identifying chain does not
+      // silence Contractor.
+      const missing = completenessWarnings(model).filter(
+        (d) => d.ruleId === "completeness/missing-preferred-identifier",
+      );
+      expect(
+        missing.some((d) => d.message.includes("Contractor")),
+      ).toBe(true);
     });
 
     it("does not report entity types with a preferred identifier", () => {

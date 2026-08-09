@@ -945,7 +945,49 @@ describe("value comparison violations", () => {
     const pop = model.addPopulation({ factTypeId: ft.id });
     pop.addInstance({ id: "partial", roleValues: { r0: "T1", r1: "5" } });
 
-    expect(populationValidationRules(model)).toHaveLength(0);
+    // The value-comparison check itself skips the partial instance; the
+    // incompleteness is reported once, by its own named rule.
+    const diags = populationValidationRules(model);
+    expect(diags).toHaveLength(1);
+    expect(diags[0]!.ruleId).toBe("population/incomplete-instance");
+  });
+});
+
+describe("incomplete instances", () => {
+  it("reports each instance missing a role value, naming the unfilled role players", () => {
+    const model = new OrmModel({ name: "Test" });
+    const dept = model.addObjectType({
+      name: "Department",
+      kind: "entity",
+      referenceMode: "department_code",
+    });
+    const name = model.addObjectType({
+      name: "DepartmentName",
+      kind: "value",
+      dataType: { name: "text", length: 100 },
+    });
+    const ft = model.addFactType({
+      name: "Department has DepartmentName",
+      roles: [
+        { name: "has", playerId: dept.id, id: "r1" },
+        { name: "is of", playerId: name.id, id: "r2" },
+      ],
+      readings: ["{0} has {1}", "{1} is of {0}"],
+      constraints: [
+        { type: "internal_uniqueness", roleIds: ["r1"] },
+      ] as never,
+    });
+    const pop = model.addPopulation({ factTypeId: ft.id });
+    pop.addInstance({ id: "i1", roleValues: { r2: "Payroll" } });
+    pop.addInstance({ id: "i2", roleValues: { r2: "Field Operations" } });
+    pop.addInstance({ id: "i3", roleValues: { r1: "D1", r2: "Legal" } });
+
+    const incomplete = populationValidationRules(model).filter(
+      (d) => d.ruleId === "population/incomplete-instance",
+    );
+    expect(incomplete).toHaveLength(2);
+    expect(incomplete[0]!.severity).toBe("error");
+    expect(incomplete[0]!.message).toContain("Department");
   });
 });
 

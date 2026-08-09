@@ -135,18 +135,22 @@ function validateWeights(value: unknown, manifestPath: string): SuiteWeights {
   const obj = value as Record<string, unknown>;
   const conformanceCorrection = obj["conformanceCorrection"];
   const validationError = obj["validationError"];
+  const validationWarning = obj["validationWarning"] ?? 0;
   if (
     typeof conformanceCorrection !== "number"
     || typeof validationError !== "number"
+    || typeof validationWarning !== "number"
     || conformanceCorrection < 0
     || validationError < 0
+    || validationWarning < 0
   ) {
     throw new Error(
       `${manifestPath}: weights need non-negative numbers`
-        + ` "conformanceCorrection" and "validationError".`,
+        + ` "conformanceCorrection" and "validationError"`
+        + ` (and, when declared, "validationWarning").`,
     );
   }
-  return { conformanceCorrection, validationError };
+  return { conformanceCorrection, validationError, validationWarning };
 }
 
 function validateChecks(value: unknown, filePath: string): GymCheck[] {

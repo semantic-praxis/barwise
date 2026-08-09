@@ -601,6 +601,33 @@ report: `docs/prompt-eval-sonnet5-2026-08-08.md`. Grounding notes:
   authoring or editing prompts, re-check that each case's answer key is
   something the current prompt would actually produce.
 
+### Workstream 6, first data point (2026-08-09)
+
+First agent-output measurement, same keyless session channel as the
+workstream 4 slice: `docs/agent-eval-2026-08-09.md`, with a companion
+audit of the skills and subagents (`docs/skill-audit-2026-08-09.md`).
+Grounding notes:
+
+- **The MCP server never registered outside the maintainer's machine**
+  (`.mcp.json` pinned a machine-specific `cwd` and pointed at the
+  esbuild bundle that `npm run build` does not produce), so the
+  subagents ran without their tools and hand-authored models instead.
+  Fixed in the same PR; the true `import_transcript` + validate loop
+  remains unmeasured until a keyed session runs it.
+- **The revise step is where the agentic surface earns its keep**: one
+  hand-authored model scored 0.000 on a missed schema conditional and
+  went to 1.000 after a single revise cycle against real validator
+  output -- but the extractor agent's instructions never tell it to
+  revise (audit finding F2, diff proposed).
+- **The suite is saturating at the top**: agent hand-authoring matched
+  the tuned sonnet5-1 variant at 1.000 across the board. Harder cases
+  are the prerequisite for further conclusions at this end of the
+  scale.
+- **Eval hygiene**: the graded references are browsable by the agent
+  under measurement; one run had to be discarded for consulting them.
+  The eventual headless runner should isolate `evals/` from the
+  agent's view.
+
 ## Non-goals
 
 - **No new modeling capability and no core change.** The harness

@@ -22,7 +22,10 @@ import {
   checkSpanningExclusiveOrViolations,
   checkSpanningSubsetViolations,
 } from "./population/spanning.js";
-import { checkDanglingPopulationFactType } from "./population/structural.js";
+import {
+  checkDanglingPopulationFactType,
+  checkIncompleteInstances,
+} from "./population/structural.js";
 import {
   checkExternalUniquenessViolations,
   checkUniquenessViolations,
@@ -71,6 +74,7 @@ export function populationValidationRules(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   diagnostics.push(...checkDanglingPopulationFactType(model));
+  diagnostics.push(...checkIncompleteInstances(model));
   diagnostics.push(...checkUniquenessViolations(model));
   diagnostics.push(...checkValueConstraintViolations(model));
   diagnostics.push(...checkValueComparisonViolations(model));

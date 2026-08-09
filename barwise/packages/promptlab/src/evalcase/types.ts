@@ -17,6 +17,11 @@ export interface SuiteWeights {
   readonly conformanceCorrection: number;
   /** Score subtracted per residual error-severity validation diagnostic. */
   readonly validationError: number;
+  /**
+   * Score subtracted per residual warning-severity validation
+   * diagnostic (the lint tier). Omitted in the manifest means 0.
+   */
+  readonly validationWarning: number;
 }
 
 /** An eval case as authored in a `.eval.yaml` file. */
