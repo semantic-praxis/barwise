@@ -1,5 +1,5 @@
 surface: extraction
-version: haiku45-1
+version: haiku45-2
 match:
   provider: anthropic
   modelPrefix: claude-haiku
@@ -53,7 +53,7 @@ instructions: |-
      - Include source references
      - Every instance MUST supply a value for EVERY role of the fact type. If the transcript gives example values for only some roles (e.g. a list of department names with no paired identifier values), do NOT emit a population for it -- a partial instance makes the model invalid.
      - An enumerated list of allowed values ("Status can be scheduled, completed, or cancelled") is a value constraint, not a population. Record it with value_constraint and do not emit a population for it.
-     - Populations must satisfy every constraint you emit. Before including instances, check them against your inferred constraints: never emit two instances that share a value on a role you constrained as unique. If the transcript does not supply the paired values needed to satisfy a constraint, omit the population entirely.
+     - Populations must satisfy every constraint you emit, across the WHOLE model -- not just the fact type the example is about. Two checks before including instances: never emit two instances that share a value on a role you constrained as unique; and for every entity named in the example, make sure it plays every role you marked mandatory anywhere in the model. If a mandatory role's partner value is not in the transcript (you say "every shipment sits in a warehouse" but the example only names the shipment's products), keep the mandatory constraint and omit the population -- the constraint is the business rule, the population is only an illustration.
      - If a stakeholder example genuinely conflicts with a constraint you believe holds, keep the constraint and flag the conflict as an ambiguity instead of capturing the example.
      - Only capture examples explicitly mentioned in the transcript -- do not invent sample data
      - Examples serve two purposes: (1) validation -- they can be checked against constraints to verify the model is correct, (2) documentation -- they make abstract fact types concrete for stakeholders and developers
@@ -61,7 +61,7 @@ instructions: |-
   3. **Fact types**: Identify relationships between object types. For each:
      - Provide a descriptive name (e.g., "Customer places Order")
      - List the roles with their player (object type name) and role_name
-     - Provide at least one reading template using {0}, {1}, etc. as placeholders
+     - Provide reading templates using {0}, {1}, etc. as placeholders. Every binary fact type needs BOTH readings -- the forward "{0} verb {1}" and the inverse "{1} inverse-verb {0}". A binary with only one reading is incomplete. Even for attribute facts, write both: "{0} has {1}" and "{1} is of {0}"; "Appointment on Date" needs "{1} is the date of {0}" alongside "{0} is on {1}". Fact types with three or more roles need only the forward reading.
      - Include source references
 
      **CRITICAL -- Identifier fact types**: For EVERY entity type that has a reference_mode, you MUST emit a binary fact type linking the entity to its identifying value type. For example, if Customer has reference_mode "customer_id" and there is a value type CustomerId, emit a fact type "Customer has CustomerId" with roles [{player: "Customer", role_name: "has"}, {player: "CustomerId", role_name: "identifies"}] and readings ["{0} has {1}", "{1} identifies {0}"]. Without these fact types, identifier constraints cannot be applied and the model is incomplete.
@@ -102,7 +102,7 @@ instructions: |-
        (b) uniqueness on the value role ("Each CustomerId identifies at most one Customer")
        Both are needed to make the identifier a bijection.
      - For **ternary or higher-arity fact types**, composite uniqueness should list ALL constrained role players. For example, if each Order-Product combination has at most one Quantity, use roles: ["Order", "Product"] -- not just one of them.
-     - EVERY fact type with two or more roles must carry an internal uniqueness constraint -- decide the cardinality and state it (a many-to-many relationship gets a uniqueness constraint spanning both roles). A fact type with other constraints but no uniqueness is under-specified. For binary many-to-one relationships, the uniqueness goes on the "many" side. "Customers can place multiple orders" but "each Order belongs to one Customer" means uniqueness on the Order role, not the Customer role.
+     - EVERY fact type with two or more roles must carry an internal uniqueness constraint -- decide the cardinality and state it (a many-to-many relationship gets a uniqueness constraint spanning both roles). A fact type with other constraints but no uniqueness is under-specified. This includes plain attribute fact types: "Course has CourseTitle", "Semester has SemesterStartDate" and the like each need uniqueness on the entity role, exactly as identifier fact types do -- do not skip them because they look obvious. For binary many-to-one relationships, the uniqueness goes on the "many" side. "Customers can place multiple orders" but "each Order belongs to one Customer" means uniqueness on the Order role, not the Customer role.
      - For **subset** and **equality** constraints that span two fact types, use the "fact_type" field for one side and "superset_fact_type" for the other side. List role players in "roles" for the first fact type and "superset_roles" for the second. Both role arrays must have the same length (matching arity).
      - For **ring** constraints on self-referencing fact types (where the same entity plays both roles), specify ring_type as one of: irreflexive, asymmetric, antisymmetric, intransitive, acyclic, symmetric, transitive, purely_reflexive. The roles array must contain exactly 2 entries (both the same player name).
      - For **frequency** constraints, specify min and max (max can be the string "unbounded"). The roles array must contain exactly 1 entry: the player whose occurrences are counted -- the entity the rule is "per". Side it like uniqueness: the constraint sits on the side the sentence quantifies over. "Each Shipment sits in at most two Warehouses" bounds how many storage facts a single Shipment appears in, so use roles: ["Shipment"], NOT ["Warehouse"] -- even though the bound is a count of warehouses. Putting the frequency on the counted-thing's role states the opposite rule. min must be at least 1 -- NEVER 0. Optional participation is expressed by omitting the mandatory constraint, not by a zero minimum: "an appointment can have at most one follow-up note" is an internal uniqueness constraint (and no mandatory), not a frequency with min 0.
@@ -145,7 +145,7 @@ instructions: |-
   - Do NOT place is_preferred: true on non-identifier fact types. Only the fact type linking an entity to its identifying value type should have is_preferred.
 demos: []
 provenance:
-  optimizer: manual/failure-analysis (haiku 4.5 baseline over promptlab suite 1.1.0)
+  optimizer: manual/failure-analysis (two rounds over promptlab suite 1.1.0; baseline n=2, haiku45-1 n=5, haiku45-2 n=3)
   proposerModel: claude-fable-5
   scoredAgainst: claude-haiku-4-5
   suiteVersion: 1.1.0
