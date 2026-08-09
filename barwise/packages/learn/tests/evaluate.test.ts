@@ -170,3 +170,56 @@ describe("evaluateCandidate", () => {
     expect(report.results[1]!.passed).toBe(false); // missing uniqueness sentence
   });
 });
+
+describe("alias-aware matching", () => {
+  /** Like customerOrder(true) but the customer concept is named "Client",
+   *  recording the rubric's vocabulary ("Customer") as an alias. */
+  function clientOrder(): OrmModel {
+    return new ModelBuilder("alias")
+      .withEntityType("Client", { aliases: ["Customer"] })
+      .withEntityType("Order")
+      .withBinaryFactType("Client places Order", {
+        role1: { player: "Client", name: "places" },
+        role2: { player: "Order", name: "is placed by" },
+        uniqueness: "role2",
+      })
+      .build();
+  }
+
+  it("requires_element resolves an entity by alias", () => {
+    const report = evaluateCandidate(
+      clientOrder(),
+      exercise([{ kind: "requires_element", element: { entity: "Customer" } }]),
+    );
+    expect(report.passed).toBe(true);
+  });
+
+  it("requires_element resolves factTypeBetween endpoints by alias", () => {
+    const report = evaluateCandidate(
+      clientOrder(),
+      exercise([{ kind: "requires_element", element: { factTypeBetween: ["Customer", "Order"] } }]),
+    );
+    expect(report.passed).toBe(true);
+  });
+
+  it("forbids_population maps the reference population onto an aliased player", () => {
+    const report = evaluateCandidate(
+      clientOrder(),
+      exercise([{
+        kind: "forbids_population",
+        factType: "Customer places Order",
+        constraint: "internal_uniqueness",
+      }]),
+      customerOrder(true),
+    );
+    expect(report.passed).toBe(true);
+  });
+
+  it("still fails when neither name nor alias matches", () => {
+    const report = evaluateCandidate(
+      clientOrder(),
+      exercise([{ kind: "requires_element", element: { entity: "Purchaser" } }]),
+    );
+    expect(report.passed).toBe(false);
+  });
+});

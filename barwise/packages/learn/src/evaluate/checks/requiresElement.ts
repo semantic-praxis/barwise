@@ -1,14 +1,15 @@
 import type { OrmModel } from "@barwise/core";
 import type { ElementQuery } from "../../exercise/types.js";
 import type { CheckResult } from "../GymReport.js";
+import { getObjectTypeByNameOrAlias } from "../nameResolution.js";
 
 /**
  * Is there a fact type in the model with a role played by an object type
- * named `a` and a (distinct) role played by one named `b`?
+ * named (or aliased) `a` and a (distinct) role played by one named `b`?
  */
 function hasFactTypeBetween(model: OrmModel, a: string, b: string): boolean {
-  const otA = model.getObjectTypeByName(a);
-  const otB = model.getObjectTypeByName(b);
+  const otA = getObjectTypeByNameOrAlias(model, a);
+  const otB = getObjectTypeByNameOrAlias(model, b);
   if (!otA || !otB) return false;
 
   return model.factTypes.some((ft) => {
@@ -28,7 +29,7 @@ export function requiresElement(
   hint?: string,
 ): CheckResult {
   if ("entity" in element) {
-    const found = candidate.getObjectTypeByName(element.entity) !== undefined;
+    const found = getObjectTypeByNameOrAlias(candidate, element.entity) !== undefined;
     return {
       kind: "requires_element",
       passed: found,

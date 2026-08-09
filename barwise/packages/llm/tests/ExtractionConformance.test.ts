@@ -452,6 +452,128 @@ describe("ExtractionConformance", () => {
     });
   });
 
+  describe("identifier-population repair", () => {
+    /** Customer (identified) placing Orders, with an example population. */
+    function repairFixture(
+      extraPopulations: NonNullable<ExtractionResponse["populations"]> = [],
+    ): ExtractionResponse {
+      return makeResponse({
+        object_types: [
+          {
+            name: "Customer",
+            kind: "entity",
+            reference_mode: "customer_id",
+            source_references: REF,
+          },
+          {
+            name: "CustomerId",
+            kind: "value",
+            data_type: { name: "text", length: 20 },
+            source_references: REF,
+          },
+          { name: "Order", kind: "entity", source_references: REF },
+        ],
+        fact_types: [
+          {
+            name: "Customer has CustomerId",
+            roles: [
+              { player: "Customer", role_name: "has" },
+              { player: "CustomerId", role_name: "identifies" },
+            ],
+            readings: ["{0} has {1}"],
+            source_references: REF,
+          },
+          {
+            name: "Customer places Order",
+            roles: [
+              { player: "Customer", role_name: "places" },
+              { player: "Order", role_name: "is placed by" },
+            ],
+            readings: ["{0} places {1}"],
+            source_references: REF,
+          },
+        ],
+        populations: [
+          {
+            fact_type: "Customer places Order",
+            instances: [{ role_values: { Customer: "C-1", Order: "O-1" } }],
+            source_references: REF,
+          },
+          ...extraPopulations,
+        ],
+      });
+    }
+
+    it("appends the entailed identifier instance for an exemplified entity", () => {
+      const { response, corrections } = enforceConformance(repairFixture());
+
+      const repairs = corrections.filter((c) => c.category === "missing_identifier_population");
+      expect(repairs).toHaveLength(1);
+      expect(repairs[0]!.element).toBe("Customer has CustomerId");
+
+      const idPop = response.populations!.find((p) => p.fact_type === "Customer has CustomerId");
+      expect(idPop).toBeDefined();
+      expect(idPop!.instances).toEqual([
+        { role_values: { Customer: "C-1", CustomerId: "C-1" } },
+      ]);
+      // Order has no identifier fact type: nothing is synthesized for it.
+      expect(response.populations!.filter((p) => p.fact_type !== "Customer places Order"))
+        .toHaveLength(1);
+    });
+
+    it("is idempotent: an already-covered value triggers no repair", () => {
+      const { response, corrections } = enforceConformance(repairFixture([
+        {
+          fact_type: "Customer has CustomerId",
+          instances: [{ role_values: { Customer: "C-1", CustomerId: "C-1" } }],
+          source_references: REF,
+        },
+      ]));
+
+      expect(corrections.filter((c) => c.category === "missing_identifier_population"))
+        .toHaveLength(0);
+      const idPop = response.populations!.find((p) => p.fact_type === "Customer has CustomerId");
+      expect(idPop!.instances).toHaveLength(1);
+    });
+
+    it("leaves orphaned reference modes detect-only", () => {
+      const input = makeResponse({
+        object_types: [
+          {
+            name: "Customer",
+            kind: "entity",
+            reference_mode: "customer_id",
+            source_references: REF,
+          },
+          { name: "Order", kind: "entity", source_references: REF },
+        ],
+        fact_types: [
+          {
+            name: "Customer places Order",
+            roles: [
+              { player: "Customer", role_name: "places" },
+              { player: "Order", role_name: "is placed by" },
+            ],
+            readings: ["{0} places {1}"],
+            source_references: REF,
+          },
+        ],
+        populations: [
+          {
+            fact_type: "Customer places Order",
+            instances: [{ role_values: { Customer: "C-1", Order: "O-1" } }],
+            source_references: REF,
+          },
+        ],
+      });
+
+      const { response, corrections } = enforceConformance(input);
+      expect(corrections.some((c) => c.category === "orphaned_reference_mode")).toBe(true);
+      expect(corrections.some((c) => c.category === "missing_identifier_population")).toBe(false);
+      expect(response.populations).toHaveLength(1);
+    });
+  });
+
   describe("multiple corrections", () => {
     it("applies all applicable corrections in a single pass", () => {
       const input = makeResponse({

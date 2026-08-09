@@ -10,10 +10,27 @@
  * player name -- and, where a player is repeated (a ring), by position.
  */
 import type { FactType, OrmModel, Population, PopulationConfig, Role } from "@barwise/core";
+import { nameInVocabulary } from "./nameResolution.js";
 
 /** The object-type name each role plays, in role order (undefined if unresolved). */
 function playerNames(ft: FactType, model: OrmModel): (string | undefined)[] {
   return ft.roles.map((r) => model.getObjectType(r.playerId)?.name);
+}
+
+/**
+ * Candidate-side player names, expressed in the reference vocabulary:
+ * a candidate player whose alias matches a reference name is matched
+ * under that name, so a synonym choice does not break correspondence.
+ */
+function candidatePlayerNames(
+  ft: FactType,
+  model: OrmModel,
+  vocabulary: ReadonlySet<string>,
+): (string | undefined)[] {
+  return ft.roles.map((r) => {
+    const ot = model.getObjectType(r.playerId);
+    return ot ? nameInVocabulary(ot, vocabulary) : undefined;
+  });
 }
 
 /** Are two arrays equal as multisets? */
@@ -31,7 +48,10 @@ function correspondingFactType(
   candidate: OrmModel,
 ): FactType | undefined {
   if (refNames.some((n) => n === undefined)) return undefined;
-  return candidate.factTypes.find((ft) => sameMultiset(playerNames(ft, candidate), refNames));
+  const vocabulary = new Set(refNames.filter((n): n is string => n !== undefined));
+  return candidate.factTypes.find((ft) =>
+    sameMultiset(candidatePlayerNames(ft, candidate, vocabulary), refNames)
+  );
 }
 
 /**
@@ -46,11 +66,15 @@ function roleCorrespondence(
   candFt: FactType,
   candModel: OrmModel,
 ): Map<string, string> | null {
-  const byPlayer = (ft: FactType, model: OrmModel): Map<string, Role[]> => {
+  const refVocabulary = new Set(
+    playerNames(refFt, refModel).filter((n): n is string => n !== undefined),
+  );
+  const byPlayer = (ft: FactType, model: OrmModel, canonical: boolean): Map<string, Role[]> => {
     const groups = new Map<string, Role[]>();
     for (const r of ft.roles) {
-      const name = model.getObjectType(r.playerId)?.name;
-      if (name === undefined) return groups; // caller handles mismatch below
+      const ot = model.getObjectType(r.playerId);
+      if (!ot) return groups; // caller handles mismatch below
+      const name = canonical ? nameInVocabulary(ot, refVocabulary) : ot.name;
       const list = groups.get(name) ?? [];
       list.push(r);
       groups.set(name, list);
@@ -58,8 +82,8 @@ function roleCorrespondence(
     return groups;
   };
 
-  const refGroups = byPlayer(refFt, refModel);
-  const candGroups = byPlayer(candFt, candModel);
+  const refGroups = byPlayer(refFt, refModel, false);
+  const candGroups = byPlayer(candFt, candModel, true);
   if (refGroups.size !== candGroups.size) return null;
 
   const map = new Map<string, string>();
