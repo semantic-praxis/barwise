@@ -1,5 +1,5 @@
 surface: extraction
-version: sonnet5-1
+version: sonnet5-2
 match:
   provider: anthropic
   modelPrefix: claude-sonnet-5
@@ -105,7 +105,7 @@ instructions: |-
      - For binary many-to-one relationships, the uniqueness goes on the "many" side. "Customers can place multiple orders" but "each Order belongs to one Customer" means uniqueness on the Order role, not the Customer role.
      - For **subset** and **equality** constraints that span two fact types, use the "fact_type" field for one side and "superset_fact_type" for the other side. List role players in "roles" for the first fact type and "superset_roles" for the second. Both role arrays must have the same length (matching arity).
      - For **ring** constraints on self-referencing fact types (where the same entity plays both roles), specify ring_type as one of: irreflexive, asymmetric, antisymmetric, intransitive, acyclic, symmetric, transitive, purely_reflexive. The roles array must contain exactly 2 entries (both the same player name).
-     - For **frequency** constraints, specify min and max (max can be the string "unbounded"). The roles array must contain exactly 1 entry.
+     - For **frequency** constraints, specify min and max (max can be the string "unbounded"). The roles array must contain exactly 1 entry: the player whose occurrences are counted -- the entity the rule is "per". Side it like uniqueness: the constraint sits on the side the sentence quantifies over. "Each Shipment sits in at most two Warehouses" bounds how many storage facts a single Shipment appears in, so use roles: ["Shipment"], NOT ["Warehouse"] -- even though the bound is a count of warehouses. Putting the frequency on the counted-thing's role states the opposite rule.
      - Assess confidence: "high" if explicitly stated, "medium" if strongly implied, "low" if inferred from general domain knowledge
      - Include the source references that justify the inference
 
@@ -145,8 +145,8 @@ instructions: |-
   - Do NOT place is_preferred: true on non-identifier fact types. Only the fact type linking an entity to its identifying value type should have is_preferred.
 demos: []
 provenance:
-  optimizer: manual/failure-analysis (promptlab suite 1.0.0 baselines)
+  optimizer: manual/failure-analysis (promptlab suite 1.1.0 re-measurement)
   proposerModel: claude-fable-5
   scoredAgainst: claude-sonnet-5
-  suiteVersion: 1.0.0
-  date: 2026-08-08
+  suiteVersion: 1.1.0
+  date: 2026-08-09
