@@ -70,6 +70,10 @@ export function enforceConformance(
 
   const identifierFactTypes = new Set<string>();
   const identifierFactTypeEntities = new Set<string>();
+  const identifierFactByEntity = new Map<
+    string,
+    { readonly factType: string; readonly valueType: string; }
+  >();
   for (const ft of input.fact_types) {
     if (ft.roles.length === 2) {
       const [r0, r1] = ft.roles;
@@ -82,9 +86,21 @@ export function enforceConformance(
       if (r0IsRefEntity && r1IsValue) {
         identifierFactTypes.add(ft.name);
         identifierFactTypeEntities.add(r0!.player);
+        if (!identifierFactByEntity.has(r0!.player)) {
+          identifierFactByEntity.set(r0!.player, {
+            factType: ft.name,
+            valueType: r1!.player,
+          });
+        }
       } else if (r1IsRefEntity && r0IsValue) {
         identifierFactTypes.add(ft.name);
         identifierFactTypeEntities.add(r1!.player);
+        if (!identifierFactByEntity.has(r1!.player)) {
+          identifierFactByEntity.set(r1!.player, {
+            factType: ft.name,
+            valueType: r0!.player,
+          });
+        }
       }
     }
   }
@@ -94,6 +110,14 @@ export function enforceConformance(
     input.populations ?? [],
     factTypeNames,
     input,
+    corrections,
+  );
+
+  // --- Repair: entailed identifier-population instances ---
+  const repairedPopulations = repairIdentifierPopulations(
+    cleanedPopulations,
+    input,
+    identifierFactByEntity,
     corrections,
   );
 
@@ -126,11 +150,111 @@ export function enforceConformance(
   return {
     response: {
       ...input,
-      populations: cleanedPopulations,
+      populations: repairedPopulations,
       inferred_constraints: cleanedConstraints,
     },
     corrections,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Identifier-population repair
+// ---------------------------------------------------------------------------
+
+/**
+ * Synthesize the identifier-population instances the emitted examples
+ * entail. An entity instance denoted by a value ("S-100") has that value
+ * as its identifier by definition of its reference mode, so whenever a
+ * population mentions an entity value that no population of the entity's
+ * identifier fact type carries, the identity bijection instance
+ * (entity = value, identifier = value) is appended and a correction is
+ * recorded. Only values already present in the payload are used --
+ * nothing is invented -- and entities whose reference mode is orphaned
+ * (no identifier fact type) are untouched, staying detect-only.
+ */
+function repairIdentifierPopulations(
+  populations: readonly ExtractedPopulation[],
+  input: ExtractionResponse,
+  identifierFactByEntity: ReadonlyMap<
+    string,
+    { readonly factType: string; readonly valueType: string; }
+  >,
+  corrections: ConformanceCorrection[],
+): ExtractedPopulation[] {
+  if (populations.length === 0 || identifierFactByEntity.size === 0) {
+    return [...populations];
+  }
+
+  const factTypesByName = new Map(input.fact_types.map((ft) => [ft.name, ft]));
+
+  // Values already covered by a population of each identifier fact type.
+  // Coverage is checked against every role value of the instance, so an
+  // instance keyed by role name instead of player name still counts.
+  const covered = new Map<string, Set<string>>();
+  for (const pop of populations) {
+    for (const inst of pop.instances) {
+      let set = covered.get(pop.fact_type);
+      if (!set) {
+        set = new Set();
+        covered.set(pop.fact_type, set);
+      }
+      for (const value of Object.values(inst.role_values)) set.add(value);
+    }
+  }
+
+  // Entity values mentioned anywhere but missing from their identifier
+  // fact type's population, keyed by entity, in first-mention order.
+  const missing = new Map<string, { values: string[]; sourcePop: ExtractedPopulation; }>();
+  for (const pop of populations) {
+    const ft = factTypesByName.get(pop.fact_type);
+    if (!ft) continue;
+    for (const role of ft.roles) {
+      const identifier = identifierFactByEntity.get(role.player);
+      if (!identifier) continue;
+      for (const inst of pop.instances) {
+        const value = inst.role_values[role.player];
+        if (value === undefined) continue;
+        if (covered.get(identifier.factType)?.has(value)) continue;
+        let entry = missing.get(role.player);
+        if (!entry) {
+          entry = { values: [], sourcePop: pop };
+          missing.set(role.player, entry);
+        }
+        if (!entry.values.includes(value)) entry.values.push(value);
+      }
+    }
+  }
+  if (missing.size === 0) return [...populations];
+
+  const result = populations.map((pop) => ({ ...pop, instances: [...pop.instances] }));
+  for (const [entity, entry] of missing) {
+    const identifier = identifierFactByEntity.get(entity)!;
+    const instances = entry.values.map((value) => ({
+      role_values: { [entity]: value, [identifier.valueType]: value },
+    }));
+    for (const value of entry.values) {
+      corrections.push({
+        category: "missing_identifier_population",
+        description: `Added the entailed identifier instance "${value}" to the population of `
+          + `"${identifier.factType}": the value appears in the population of "${entry.sourcePop.fact_type}" `
+          + `but not in its identifier fact type's population.`,
+        element: identifier.factType,
+      });
+    }
+    const existing = result.find((pop) => pop.fact_type === identifier.factType);
+    if (existing) {
+      existing.instances.push(...instances);
+    } else {
+      result.push({
+        fact_type: identifier.factType,
+        description:
+          `Identifier instances entailed by the examples in "${entry.sourcePop.fact_type}".`,
+        instances,
+        source_references: entry.sourcePop.source_references,
+      });
+    }
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------
