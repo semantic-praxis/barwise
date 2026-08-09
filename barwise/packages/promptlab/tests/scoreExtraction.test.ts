@@ -29,6 +29,9 @@ describe("scoreExtraction over the seed suite", () => {
     { caseId: "university-enrollment", score: 0.96, corrections: 2 },
     { caseId: "clinic-appointments", score: 0.96, corrections: 2 },
     { caseId: "employee-hierarchy", score: 0.94, corrections: 3 },
+    { caseId: "project-staffing", score: 0.98, corrections: 1 },
+    { caseId: "conference-reviews", score: 0.96, corrections: 2 },
+    { caseId: "freight-corrections", score: 0.94, corrections: 3 },
   ];
 
   it.each(expected)(

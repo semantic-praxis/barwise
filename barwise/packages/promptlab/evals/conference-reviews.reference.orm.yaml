@@ -1,0 +1,73 @@
+orm_version: "1.1"
+model:
+  name: conference-reviews
+  object_types:
+    - id: 07be7771-8548-4878-aaca-f07c86523f9d
+      name: Reviewer
+      kind: entity
+      reference_mode: reviewer_id
+      definition: A person who reviews papers submitted to the conference.
+    - id: 655a9ca9-cf73-425e-8230-6823701105de
+      name: Paper
+      kind: entity
+      reference_mode: paper_number
+      definition: A submission to the conference.
+    - id: f2810be3-d286-4e7a-b188-51add1888b99
+      name: Review
+      kind: entity
+      reference_mode: review_id
+      definition: The act of a particular reviewer reviewing a particular paper, tracked as its own concept.
+    - id: 831395af-6838-4001-9f88-8820f9c88afd
+      name: ReviewScore
+      kind: value
+      definition: The overall score a review assigns.
+      data_type:
+        name: integer
+  fact_types:
+    - id: 57b9e7b0-7edb-4d70-a72a-144e1dde01d1
+      name: Reviewer reviews Paper
+      roles:
+        - id: 95d2bd48-e083-4ef1-af7c-4bf3ca1fe48d
+          player: 07be7771-8548-4878-aaca-f07c86523f9d
+          role_name: reviews
+        - id: 0d7b1dd1-17d4-46af-89ac-f65da96362af
+          player: 655a9ca9-cf73-425e-8230-6823701105de
+          role_name: is reviewed by
+      readings:
+        - "{0} reviews {1}"
+        - "{1} is reviewed by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 95d2bd48-e083-4ef1-af7c-4bf3ca1fe48d
+            - 0d7b1dd1-17d4-46af-89ac-f65da96362af
+    - id: b0003ce9-078e-498a-943d-ab1d22572fae
+      name: Review has ReviewScore
+      roles:
+        - id: eb28422b-2632-4027-a506-3e9a8a39ba5b
+          player: f2810be3-d286-4e7a-b188-51add1888b99
+          role_name: has
+        - id: 2fc89c1c-ee81-496b-baba-716a66a5671c
+          player: 831395af-6838-4001-9f88-8820f9c88afd
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - eb28422b-2632-4027-a506-3e9a8a39ba5b
+        - type: mandatory
+          role: eb28422b-2632-4027-a506-3e9a8a39ba5b
+        - type: value_constraint
+          values:
+            - "1"
+            - "2"
+            - "3"
+            - "4"
+            - "5"
+          role: 2fc89c1c-ee81-496b-baba-716a66a5671c
+  objectified_fact_types:
+    - id: cd5793ec-1397-4470-b82d-5a860f2f5964
+      fact_type: 57b9e7b0-7edb-4d70-a72a-144e1dde01d1
+      object_type: f2810be3-d286-4e7a-b188-51add1888b99

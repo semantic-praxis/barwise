@@ -1,4 +1,4 @@
-version: 1.0.0
+version: 1.1.0
 weights:
   conformanceCorrection: 0.02
   validationError: 0.1
@@ -8,3 +8,6 @@ cases:
   - university-enrollment.eval.yaml
   - clinic-appointments.eval.yaml
   - employee-hierarchy.eval.yaml
+  - project-staffing.eval.yaml
+  - conference-reviews.eval.yaml
+  - freight-corrections.eval.yaml

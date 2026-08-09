@@ -1,0 +1,26 @@
+id: project-staffing
+transcript: project-staffing.transcript.md
+reference: project-staffing.reference.orm.yaml
+checks:
+  - kind: must_validate
+  - kind: requires_element
+    element:
+      entity: Employee
+  - kind: requires_element
+    element:
+      entity: Project
+  - kind: requires_element
+    element:
+      factTypeBetween: [Employee, Employee]
+  - kind: forbids_population
+    factType: Project has ProjectName
+    constraint: internal_uniqueness
+    hint: Each project has exactly one project name.
+  - kind: forbids_population
+    factType: Employee mentors Employee
+    constraint: ring
+    hint: Mentoring is acyclic - no self-mentoring, no loops.
+  - kind: forbids_population
+    factType: Employee is assigned to Project
+    constraint: frequency
+    hint: Each employee is assigned to between 1 and 3 projects.

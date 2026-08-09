@@ -1,0 +1,165 @@
+{
+  "object_types": [
+    {
+      "name": "Employee",
+      "kind": "entity",
+      "definition": "A person employed by the consultancy and staffed onto projects.",
+      "reference_mode": "employee_number",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Employees have an employee number."
+        }
+      ]
+    },
+    {
+      "name": "Project",
+      "kind": "entity",
+      "definition": "A client engagement that employees are assigned to.",
+      "reference_mode": "project_code",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Projects have a project code"
+        }
+      ]
+    },
+    {
+      "name": "ProjectName",
+      "kind": "value",
+      "definition": "The name of a project.",
+      "data_type": { "name": "text", "length": 100 },
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "each project also has exactly one project name"
+        }
+      ]
+    }
+  ],
+  "fact_types": [
+    {
+      "name": "Employee mentors Employee",
+      "roles": [
+        { "player": "Employee", "role_name": "mentors" },
+        { "player": "Employee", "role_name": "is mentored by" }
+      ],
+      "readings": [
+        "{0} mentors {1}",
+        "{1} is mentored by {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [11, 11],
+          "excerpt": "employees mentor other employees"
+        }
+      ]
+    },
+    {
+      "name": "Employee is assigned to Project",
+      "roles": [
+        { "player": "Employee", "role_name": "is assigned to" },
+        { "player": "Project", "role_name": "has assigned" }
+      ],
+      "readings": [
+        "{0} is assigned to {1}",
+        "{1} has assigned {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "We staff employees onto projects."
+        }
+      ]
+    },
+    {
+      "name": "Project has ProjectName",
+      "roles": [
+        { "player": "Project", "role_name": "has" },
+        { "player": "ProjectName", "role_name": "is of" }
+      ],
+      "readings": [
+        "{0} has {1}",
+        "{1} is of {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "each project also has exactly one project name"
+        }
+      ]
+    }
+  ],
+  "subtypes": [],
+  "inferred_constraints": [
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Employee mentors Employee",
+      "roles": ["is mentored by"],
+      "description": "Each Employee is mentored by at most one Employee.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [11, 11],
+          "excerpt": "Each employee has at most one mentor"
+        }
+      ]
+    },
+    {
+      "type": "ring",
+      "fact_type": "Employee mentors Employee",
+      "roles": ["Employee", "Employee"],
+      "ring_type": "acyclic",
+      "description": "Mentoring is acyclic: no employee mentors themselves, and mentoring chains never loop back.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "you cannot have loops either -- if Alice mentors Bob, then Bob cannot mentor Alice, not even indirectly through a chain"
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Employee is assigned to Project",
+      "roles": ["Employee", "Project"],
+      "description": "An Employee is assigned to a given Project at most once (no double assignment).",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [23, 23],
+          "excerpt": "An employee is either on a project or not; there is no double assignment."
+        }
+      ]
+    },
+    {
+      "type": "frequency",
+      "fact_type": "Employee is assigned to Project",
+      "roles": ["Employee"],
+      "min": 1,
+      "max": 3,
+      "description": "Each Employee is assigned to between 1 and 3 Projects.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "Every employee is assigned to at least one project, and never more than three at a time."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Project has ProjectName",
+      "roles": ["Project"],
+      "description": "Each Project has at most one ProjectName.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "each project also has exactly one project name"
+        }
+      ]
+    }
+  ],
+  "ambiguities": []
+}
