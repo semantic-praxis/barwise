@@ -56,6 +56,9 @@ alongside this file.
    and stop when answers stop changing the design. What stays genuinely
    undecided afterward is the seed of Open decisions -- carry it there
    rather than resolving it silently.
+   In an autonomous session with no requester available, skip the
+   interview: state the assumptions you would have asked about, and
+   carry each one into Open decisions instead of resolving it silently.
 3. **Argue from principles.** Frame the problem and the resolution in
    terms of the stated principles: determinism in core, orthogonality
    and composability (primary), explicit over implicit, DRY (secondary).
