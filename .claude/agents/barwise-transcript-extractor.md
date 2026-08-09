@@ -18,11 +18,17 @@ You receive a transcript (file path or inline text) and a model name.
    supplied one.
 3. Write the resulting YAML to the requested `.orm.yaml` path (or a
    sensible path next to the transcript if none was given).
-4. Call `validate_model` on the written file and note any errors.
+4. Call `validate_model` on the written file. If it reports errors,
+   fix them in the YAML and re-validate -- repeat until clean or three
+   cycles, whichever comes first. Note anything still failing.
 5. Use `query_model` with the `stats` command to get element counts.
 6. Note each entity type's identification scheme (reference mode): these
    are the model's anchors, and a wrong identifier here distorts every
    fact type built on it. Flag any entity type left without one.
+
+If the barwise MCP tools are unavailable in the session, say so in
+your summary and stop after writing your best manual extraction --
+do not silently present unvalidated output as validated.
 
 ## Response format
 
@@ -33,7 +39,8 @@ never the full model YAML. Report:
 - Element counts: entity types, value types, fact types, constraints.
 - The anchors: each entity type's identification scheme, or a flag for
   any that lack one.
-- Validation result: pass, or the count and a one-line summary of errors.
+- Validation result: pass, or what still fails after revision (count
+  and a one-line summary).
 - Any ambiguities surfaced by `import_transcript`, framed as rival
   framings to resolve (e.g. is X an entity type or a value type?), not
   just warnings.
