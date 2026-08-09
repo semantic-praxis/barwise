@@ -1,0 +1,159 @@
+{
+  "object_types": [
+    {
+      "name": "Shipment",
+      "kind": "entity",
+      "definition": "A consignment of products moving through the warehouse network.",
+      "reference_mode": "shipment_number",
+      "aliases": ["Consignment"],
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "We track shipments -- consignments, some of the older staff say, same thing. Each shipment has a shipment number."
+        }
+      ]
+    },
+    {
+      "name": "Product",
+      "kind": "entity",
+      "definition": "A stocked item that shipments carry.",
+      "reference_mode": "sku",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Products are identified by SKU."
+        }
+      ]
+    },
+    {
+      "name": "Warehouse",
+      "kind": "entity",
+      "definition": "A physical storage location shipments sit in.",
+      "reference_mode": "warehouse_code",
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "Warehouses have a warehouse code."
+        }
+      ]
+    },
+    {
+      "name": "Quantity",
+      "kind": "value",
+      "definition": "How many units of a product a shipment contains.",
+      "data_type": { "name": "integer" },
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "A shipment contains products, each in a specific quantity."
+        }
+      ]
+    }
+  ],
+  "fact_types": [
+    {
+      "name": "Shipment contains Product in Quantity",
+      "roles": [
+        { "player": "Shipment", "role_name": "contains" },
+        { "player": "Product", "role_name": "is contained in" },
+        { "player": "Quantity", "role_name": "is the quantity for" }
+      ],
+      "readings": [
+        "{0} contains {1} in quantity {2}"
+      ],
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "A shipment contains products, each in a specific quantity."
+        }
+      ]
+    },
+    {
+      "name": "Shipment is stored in Warehouse",
+      "roles": [
+        { "player": "Shipment", "role_name": "is stored in" },
+        { "player": "Warehouse", "role_name": "stores" }
+      ],
+      "readings": [
+        "{0} is stored in {1}",
+        "{1} stores {0}"
+      ],
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "A shipment can be split across warehouses"
+        }
+      ]
+    }
+  ],
+  "subtypes": [],
+  "inferred_constraints": [
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Shipment contains Product in Quantity",
+      "roles": ["Shipment", "Product"],
+      "description": "For a given Shipment and Product there is exactly one quantity line.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [11, 11],
+          "excerpt": "for a given shipment and product there is exactly one quantity line"
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Shipment is stored in Warehouse",
+      "roles": ["Shipment", "Warehouse"],
+      "description": "A Shipment is stored in a given Warehouse at most once.",
+      "confidence": "medium",
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "A shipment can be split across warehouses"
+        }
+      ]
+    },
+    {
+      "type": "frequency",
+      "fact_type": "Shipment is stored in Warehouse",
+      "roles": ["Shipment"],
+      "min": 1,
+      "max": 2,
+      "description": "Each Shipment is stored in at least 1 and at most 2 Warehouses (the corrected policy: two, not three).",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [19, 19],
+          "excerpt": "a shipment sits in at most two warehouses now. Two, not three."
+        },
+        {
+          "lines": [23, 23],
+          "excerpt": "Every shipment is in at least one warehouse"
+        }
+      ]
+    }
+  ],
+  "populations": [
+    {
+      "fact_type": "Shipment contains Product in Quantity",
+      "description": "Worked example given in the session.",
+      "instances": [
+        {
+          "role_values": {
+            "Shipment": "S-100",
+            "Product": "P-77",
+            "Quantity": "5"
+          }
+        }
+      ],
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "For example, shipment S-100 contains product P-77 in quantity 5."
+        }
+      ]
+    }
+  ],
+  "ambiguities": []
+}

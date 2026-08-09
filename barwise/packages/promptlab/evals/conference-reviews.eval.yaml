@@ -1,0 +1,26 @@
+id: conference-reviews
+transcript: conference-reviews.transcript.md
+reference: conference-reviews.reference.orm.yaml
+checks:
+  - kind: must_validate
+  - kind: requires_element
+    element:
+      entity: Review
+  - kind: requires_element
+    element:
+      factTypeBetween: [Reviewer, Paper]
+  - kind: requires_element
+    element:
+      factTypeBetween: [Review, ReviewScore]
+  - kind: forbids_population
+    factType: Reviewer reviews Paper
+    constraint: internal_uniqueness
+    hint: A given reviewer reviews a given paper at most once.
+  - kind: forbids_population
+    factType: Review has ReviewScore
+    constraint: internal_uniqueness
+    hint: Each review has exactly one score.
+  - kind: forbids_population
+    factType: Review has ReviewScore
+    constraint: value
+    hint: A score is one of 1, 2, 3, 4, or 5.

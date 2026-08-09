@@ -1,0 +1,22 @@
+id: freight-corrections
+transcript: freight-corrections.transcript.md
+reference: freight-corrections.reference.orm.yaml
+checks:
+  - kind: must_validate
+  - kind: requires_element
+    element:
+      entity: Shipment
+  - kind: requires_element
+    element:
+      entity: Warehouse
+  - kind: requires_element
+    element:
+      factTypeBetween: [Shipment, Warehouse]
+  - kind: forbids_population
+    factType: Shipment contains Product in Quantity
+    constraint: internal_uniqueness
+    hint: For a given shipment and product there is exactly one quantity line.
+  - kind: forbids_population
+    factType: Shipment is stored in Warehouse
+    constraint: frequency
+    hint: The corrected policy is at most two warehouses per shipment, not three.

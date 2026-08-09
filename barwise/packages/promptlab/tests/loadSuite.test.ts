@@ -16,9 +16,9 @@ function tmpSuiteDir(): string {
 }
 
 describe("loadSuite on the packaged seed suite", () => {
-  it("loads the manifest with weights and four cases in declared order", () => {
+  it("loads the manifest with weights and seven cases in declared order", () => {
     const suite = loadSuite(defaultSuitePath());
-    expect(suite.version).toBe("1.0.0");
+    expect(suite.version).toBe("1.1.0");
     expect(suite.weights).toEqual({
       conformanceCorrection: 0.02,
       validationError: 0.1,
@@ -29,6 +29,9 @@ describe("loadSuite on the packaged seed suite", () => {
       "university-enrollment",
       "clinic-appointments",
       "employee-hierarchy",
+      "project-staffing",
+      "conference-reviews",
+      "freight-corrections",
     ]);
     for (const c of suite.cases) {
       expect(c.transcript.length).toBeGreaterThan(100);
