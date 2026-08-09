@@ -240,6 +240,18 @@ under test rejects the injected population.
   looser one (values 1-6 also rejects the token). Sharpening the mint
   to probe boundary values is a core follow-up, not a suite change.
 
+The first measurement run (2026-08-09, keyless channel) surfaced a
+fourth authoring rule the mutation battery cannot catch: **every name
+a rubric references must be transcript-derivable.** All three measured
+configs objectified conference-reviews correctly but named the score
+value type from their own vocabulary (`Score`, `OverallScore`) because
+the transcript said only "overall score"; the rubric's
+`requires_element` and population mapping match by player name, so a
+legitimate naming choice failed three checks. Fixed by pinning the
+stakeholder term in the transcript ("that is our term for the overall
+rating"), which turns the checks into a fair test of following
+stakeholder language. Answer-key pin unchanged (0.96).
+
 Final pins: project-staffing 0.98 (1 correction), conference-reviews
 0.96 (2), freight-corrections 0.94 (3) -- all warning-free under the
 lint tier. Existing four pins unmoved.
