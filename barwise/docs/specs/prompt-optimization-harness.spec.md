@@ -1,10 +1,22 @@
 # Prompt optimization harness: DSPy-optimized, per-provider prompt artifacts for the LLM surfaces
 
 Status: Accepted (merged in PR #289). Workstreams 1 (artifact seam)
-and 2 (promptlab: eval suite, scorer, runner, CLI) implemented; see
-Implementation notes. Workstreams 3-6 open.
+and 2 (promptlab: eval suite, scorer, runner, CLI) implemented **in
+part** -- see the correction below. Workstreams 3-6 open.
 Created: 2026-08-08
-Last-updated: 2026-08-08
+Last-updated: 2026-08-09
+
+> **Correction (2026-08-09).** Workstream 1 shipped the artifact seam
+> but not its production wiring, and two claims in this spec were
+> written as settled fact before that was true. `processTranscript`
+> accepts an artifact and renders it, but **nothing resolves one**:
+> all five production call sites omit the parameter, so every
+> extraction on every provider renders `defaultExtractionArtifact`.
+> `resolveArtifact` and `loadArtifactsFromDir` have exactly one
+> caller, `barwise prompt eval --artifacts`. The two affected claims
+> are marked inline below. Completing the wiring is specified in
+> `docs/specs/artifact-resolution-in-production.spec.md`.
+
 Tracking: `docs/ARCHITECTURE.md` open question #4 ("LLM prompt as a
 managed artifact"). No bd issue yet -- the bd binary is unavailable in
 this web session; file one before the first implementation PR.
@@ -72,6 +84,11 @@ explicit process boundary and owns its I/O. Concretely:
   resolves and renders the checked-in artifact. Production never
   imports DSPy, and a team that never runs optimization never
   installs Python.
+  **[Corrected 2026-08-09: the resolution half was never built.
+  `processTranscript` renders an artifact it is handed and resolves
+  nothing; production renders `defaultExtractionArtifact`
+  unconditionally. The DSPy-independence claim in the second sentence
+  still holds.]**
 
 The seam between the lanes is data: `.prompt.yaml` artifacts flowing
 one way, JSON scores flowing the other. DSPy's internal score during
@@ -188,21 +205,21 @@ Out of scope, deferred and named:
 
 ## Inventory
 
-| Area                                        | Change                                                                          | Verdict   |
-| ------------------------------------------- | ------------------------------------------------------------------------------- | --------- |
-| `packages/llm/src/prompt/systemPrompt.ts`   | Becomes the default extraction artifact; `buildSystemPrompt` reads an artifact  | refactor  |
-| `packages/llm/src/prompt/artifacts/`        | Artifact types, loader, resolver (surface x provider -> artifact)               | new       |
-| `packages/llm/prompts/`                     | Checked-in artifact variants (`*.prompt.yaml`) with provenance metadata         | new       |
-| `packages/promptlab/`                       | Eval-case loader, scorer, suite runner, history writer                          | new       |
-| `packages/promptlab/evals/`                 | Seed suite (`*.eval.yaml` + reference `*.orm.yaml` + transcripts)               | new       |
-| `optimizer/`                                | DSPy project: extraction program, shell-out metric, exporter (Python, uv)       | new       |
-| `packages/cli/src/commands/prompt.ts`       | New `barwise prompt` command (eval, score, schema, history); adds promptlab dep | additive  |
-| `packages/llm/src/TranscriptProcessor.ts`   | Accepts an optional artifact (default preserves current behavior)               | additive  |
-| `@barwise/learn`                            | Consumed as-is: `evaluateCandidate`, check types, `GymReport`                   | untouched |
-| `@barwise/core`                             | Consumed as-is through existing subpath exports                                 | untouched |
-| `packages/cli/src/commands/import/batch.ts` | Stays; its concern is bulk import, and eval supersedes it for scoring           | untouched |
-| `packages/mcp`, `packages/vscode`           | Pick up artifact resolution for free via `processTranscript`                    | untouched |
-| `CLAUDE.md` dependency graph                | Add the `promptlab` node; note the offline `optimizer/` lane                    | doc       |
+| Area                                        | Change                                                                                                                                   | Verdict   |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| `packages/llm/src/prompt/systemPrompt.ts`   | Becomes the default extraction artifact; `buildSystemPrompt` reads an artifact                                                           | refactor  |
+| `packages/llm/src/prompt/artifacts/`        | Artifact types, loader, resolver (surface x provider -> artifact)                                                                        | new       |
+| `packages/llm/prompts/`                     | Checked-in artifact variants (`*.prompt.yaml`) with provenance metadata                                                                  | new       |
+| `packages/promptlab/`                       | Eval-case loader, scorer, suite runner, history writer                                                                                   | new       |
+| `packages/promptlab/evals/`                 | Seed suite (`*.eval.yaml` + reference `*.orm.yaml` + transcripts)                                                                        | new       |
+| `optimizer/`                                | DSPy project: extraction program, shell-out metric, exporter (Python, uv)                                                                | new       |
+| `packages/cli/src/commands/prompt.ts`       | New `barwise prompt` command (eval, score, schema, history); adds promptlab dep                                                          | additive  |
+| `packages/llm/src/TranscriptProcessor.ts`   | Accepts an optional artifact (default preserves current behavior)                                                                        | additive  |
+| `@barwise/learn`                            | Consumed as-is: `evaluateCandidate`, check types, `GymReport`                                                                            | untouched |
+| `@barwise/core`                             | Consumed as-is through existing subpath exports                                                                                          | untouched |
+| `packages/cli/src/commands/import/batch.ts` | Stays; its concern is bulk import, and eval supersedes it for scoring                                                                    | untouched |
+| `packages/mcp`, `packages/vscode`           | **[Corrected 2026-08-09: false.]** They pick up nothing -- both call `processTranscript` without an artifact, so both render the default | untouched |
+| `CLAUDE.md` dependency graph                | Add the `promptlab` node; note the offline `optimizer/` lane                                                                             | doc       |
 
 The review prompt (`reviewModel.ts`) looks affected but is not until
 workstream 5: the artifact seam is designed for both surfaces, but
