@@ -16,9 +16,10 @@ Last-updated: 2026-08-09
 > caller, `barwise prompt eval --artifacts`. The two affected claims
 > are marked inline below. Completing the wiring is specified in
 > `docs/specs/artifact-resolution-in-production.spec.md`.
-> Tracking: `docs/ARCHITECTURE.md` open question #4 ("LLM prompt as a
-> managed artifact"). No bd issue yet -- the bd binary is unavailable in
-> this web session; file one before the first implementation PR.
+
+Tracking: `docs/ARCHITECTURE.md` open question #4 ("LLM prompt as a
+managed artifact"). No bd issue yet -- the bd binary is unavailable in
+this web session; file one before the first implementation PR.
 
 ## Principle
 
