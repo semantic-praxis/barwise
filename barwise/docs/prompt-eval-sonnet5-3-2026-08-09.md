@@ -62,10 +62,14 @@ Three cases moved; each was investigated rather than averaged over.
   artifact earlier -- it is an occasional-mode failure, not a
   slimming effect.
 - **university-enrollment 0.117 is a pre-existing bimodal mode, not a
-  regression.** Across four sonnet5-3 samples, two omitted
-  CourseOffering entirely (modeling Student-Course directly and
-  losing the offering reification and its two uniqueness checks);
-  two scored 0.950-1.000. The controlled comparison -- three fresh
+  regression.** Across four sonnet5-3 samples, two scored 0.117 and
+  two scored 0.950-1.000. (The 0.117 samples were described here as
+  omitting CourseOffering entirely and modeling Student-Course
+  directly. That is wrong -- see the correction above. They reify the
+  offering under the name `Offering` with alias `"Course Offering"`,
+  and the evaluator's exact-string alias match rejects it. The
+  bimodality is real; its cause is the scorer.) The controlled
+  comparison -- three fresh
   samples under unchanged sonnet5-2 -- reproduced the identical
   failure signature at one in three (0.117, 0.950, 0.950). The mode
   exists on both sides of the diff at statistically
@@ -74,12 +78,18 @@ Three cases moved; each was investigated rather than averaged over.
 
 ## New findings for the backlog
 
-- **CourseOffering omission is the sonnet5 lineage's largest known
-  failure mode** (~1 in 3 samples): the prompt's objectification and
-  higher-arity guidance does not reliably trigger the offering
-  reification from this transcript's phrasing. The next real
-  optimization target -- worth more than any remaining polish, since
-  it is a ~0.85-point swing when it fires.
+- ~~**CourseOffering omission is the sonnet5 lineage's largest known
+  failure mode**~~ **-- WITHDRAWN.** There is no omission. The samples
+  reify the offering and name it `Offering`; the rubric asks for
+  `CourseOffering`; `learn/src/evaluate/nameResolution.ts` compares
+  aliases with `Array.includes`, so the space in the recorded alias
+  `"Course Offering"` defeats the match. Under a normalized comparison
+  every affected sample passes and no passing sample changes. The
+  optimization target this bullet proposed -- sharpening
+  objectification guidance -- would have been work against a defect
+  that was never in the prompt. The real item is normalizing the
+  evaluator's comparison, tracked in
+  `docs/prompt-eval-haiku45-2026-08-09.md`.
 - **Single-sample runs hide bimodal modes.** Every prior report drew
   one sample per case and never saw this. The harness already has
   the `repeat` parameter for exactly this; future keyed gate runs
