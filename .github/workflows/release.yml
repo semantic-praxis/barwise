@@ -98,12 +98,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           notes="Automatically built from commit ${{ github.sha }}. Unstable preview of the latest main -- not a tagged release. For a stable build, use the latest versioned release."
+          # The tag deliberately never moves, so GitHub keeps showing the
+          # release's original published_at and target_commitish -- a date
+          # weeks older than the assets, sitting above bundles rebuilt
+          # minutes ago. The body records the real build commit, but the
+          # title is what the releases list shows, so put the currency
+          # there and stop the page claiming a stale build.
+          title="Edge build ${GITHUB_SHA::7} ($(date -u +%Y-%m-%d))"
           if gh release view edge --repo "${{ github.repository }}" >/dev/null 2>&1; then
             gh release edit edge --draft=false --prerelease --notes "$notes" \
-              --repo "${{ github.repository }}"
+              --title "$title" --repo "${{ github.repository }}"
           else
             gh release create edge --prerelease --target "${{ github.sha }}" \
-              --title "Edge build (latest main)" --notes "$notes" \
+              --title "$title" --notes "$notes" \
               --repo "${{ github.repository }}"
           fi
           gh release upload edge release-assets/* --clobber \
