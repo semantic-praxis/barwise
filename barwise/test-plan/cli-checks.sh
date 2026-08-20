@@ -82,6 +82,26 @@ section "Smoke"
 run "version" -- $BARWISE --version;        assert_exit "barwise --version" 0
 run "help"    -- $BARWISE --help;            assert_ok_contains "barwise --help lists commands" "validate"
 
+# Both built entry points carry a shebang, so both are meant to run without
+# a `node` prefix. tsc and esbuild each write mode 644, and npm cannot set
+# the bit on a bin target that does not exist yet at install time because
+# dist/ is gitignored -- so a fresh clone produced a bin that failed with
+# "Permission denied" (barwise-807). Checked here rather than in a unit test
+# because only the release gate sees the real built artifacts.
+for BIN in "$ROOT/packages/cli/dist/index.js" "$BUNDLE" \
+  "$ROOT/packages/mcp/dist/bundle/index.cjs"; do
+  REL="${BIN#"$ROOT"/}"
+  if [ ! -f "$BIN" ]; then
+    skip "$REL is executable" "not built"
+  elif [ -x "$BIN" ]; then
+    ok "$REL is executable"
+  else
+    bad "$REL is executable" "mode $(ls -l "$BIN" | cut -d' ' -f1); shebang without the bit"
+  fi
+done
+run "shebang-exec" -- "$BUNDLE" --version
+assert_exit "cli bundle runs directly, without a node prefix" 0
+
 section "Validate"
 run "v-clean" -- $BARWISE validate "$CLEAN";          assert_ok_contains "validate clean model -> 0 errors" "0 error"
 run "v-json"  -- $BARWISE validate "$CLEAN" --format json
