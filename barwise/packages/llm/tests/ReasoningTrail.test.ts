@@ -9,6 +9,8 @@ import { processTranscript } from "../src/TranscriptProcessor.js";
 
 function mockClient(json: string): LlmClient {
   return {
+    provider: "test",
+    model: undefined,
     async complete(_request: CompletionRequest) {
       return { content: json };
     },

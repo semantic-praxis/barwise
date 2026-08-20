@@ -64,7 +64,9 @@ function stubLlm(
       ...extra,
     }),
   );
-  vi.mocked(createLlmClient).mockReturnValue({ complete } as LlmClient);
+  vi.mocked(createLlmClient).mockReturnValue(
+    { provider: "test", model: undefined, complete } as LlmClient,
+  );
   return complete;
 }
 
@@ -73,7 +75,9 @@ function stubLlmFailure(error: Error): void {
   const complete = vi.fn(async (): Promise<CompletionResponse> => {
     throw error;
   });
-  vi.mocked(createLlmClient).mockReturnValue({ complete } as LlmClient);
+  vi.mocked(createLlmClient).mockReturnValue(
+    { provider: "test", model: undefined, complete } as LlmClient,
+  );
 }
 
 /** A minimal valid extraction response with no constraints. */

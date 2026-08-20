@@ -31,6 +31,7 @@ export {
 } from "./ExtractionPrompt.js";
 
 // Prompt artifacts
+export { builtinArtifacts } from "./prompt/artifacts/builtins.generated.js";
 export { loadArtifact, loadArtifactsFromDir } from "./prompt/artifacts/loadArtifact.js";
 export type {
   PromptArtifact,

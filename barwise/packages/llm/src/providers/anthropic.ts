@@ -29,9 +29,11 @@ export interface AnthropicClientOptions {
  * the output to the specified JSON shape.
  */
 export class AnthropicLlmClient implements LlmClient {
+  readonly provider = "anthropic";
+  /** Resolved at construction, so a prompt variant can be chosen before the call. */
+  readonly model: string;
   private client?: Anthropic;
   private readonly apiKey?: string;
-  private readonly model: string;
   private readonly maxTokens: number;
 
   constructor(options?: AnthropicClientOptions) {

@@ -29,6 +29,8 @@ function loadFixture(path: string): string {
  */
 function createMockClient(responseJson: string): LlmClient {
   return {
+    provider: "test",
+    model: undefined,
     async complete(_request: CompletionRequest) {
       return { content: responseJson };
     },
@@ -78,6 +80,8 @@ describe("TranscriptProcessor", () => {
     it("passes system prompt and user message to the client", async () => {
       let capturedRequest: CompletionRequest | undefined;
       const client: LlmClient = {
+        provider: "test",
+        model: undefined,
         async complete(request: CompletionRequest) {
           capturedRequest = request;
           return {
@@ -106,6 +110,8 @@ describe("TranscriptProcessor", () => {
 
     it("throws on malformed LLM response", async () => {
       const client: LlmClient = {
+        provider: "test",
+        model: undefined,
         async complete() {
           return { content: "not json at all" };
         },
@@ -131,6 +137,8 @@ describe("TranscriptProcessor", () => {
 
     it("propagates modelUsed from client response to result", async () => {
       const client: LlmClient = {
+        provider: "test",
+        model: undefined,
         async complete(_request: CompletionRequest) {
           return {
             content: JSON.stringify({

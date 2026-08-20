@@ -11,6 +11,8 @@ import { processTranscript } from "../src/TranscriptProcessor.js";
 
 function mockClient(json: string): LlmClient {
   return {
+    provider: "test",
+    model: undefined,
     async complete(_request: CompletionRequest) {
       return { content: json };
     },
@@ -88,6 +90,8 @@ describe("multi-candidate framing", () => {
   it("requests the alternatives prompt and schema branch only when enabled", async () => {
     let captured: CompletionRequest | undefined;
     const client: LlmClient = {
+      provider: "test",
+      model: undefined,
       async complete(request: CompletionRequest) {
         captured = request;
         return { content: responseWithAlternative };
@@ -102,6 +106,8 @@ describe("multi-candidate framing", () => {
   it("omits the alternatives prompt and schema branch by default", async () => {
     let captured: CompletionRequest | undefined;
     const client: LlmClient = {
+      provider: "test",
+      model: undefined,
       async complete(request: CompletionRequest) {
         captured = request;
         return { content: responseWithAlternative };

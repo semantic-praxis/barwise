@@ -20,7 +20,10 @@ import {
 } from "./ExtractionPrompt.js";
 import type { CandidateFraming, DraftModelResult, ExtractionResponse } from "./ExtractionTypes.js";
 import type { LlmClient } from "./LlmClient.js";
+import { builtinArtifacts } from "./prompt/artifacts/builtins.generated.js";
 import type { PromptArtifact } from "./prompt/artifacts/PromptArtifact.js";
+import { resolveArtifact } from "./prompt/artifacts/resolveArtifact.js";
+import { defaultExtractionArtifact } from "./prompt/systemPrompt.js";
 
 export interface ProcessorOptions {
   /** Name for the resulting model. Defaults to "Extracted Model". */
@@ -38,10 +41,14 @@ export interface ProcessorOptions {
    */
   readonly alternatives?: boolean;
   /**
-   * Prompt artifact to render instead of the built-in default -- a
-   * variant selected via `resolveArtifact`. Must be an "extraction"
-   * artifact. Omitted, the output is byte-identical to the
-   * pre-artifact pipeline.
+   * Prompt artifact to render, overriding the variant that the
+   * client's provider and model would otherwise resolve to. Must be an
+   * "extraction" artifact.
+   *
+   * This is also how a caller pins the prompt: passing
+   * `defaultExtractionArtifact` renders the default regardless of
+   * which model is about to run, which is what a reproducible
+   * regression run wants.
    */
   readonly artifact?: PromptArtifact;
 }
@@ -69,8 +76,19 @@ export async function processTranscript(
     );
   }
 
+  // An explicit artifact wins; otherwise the client's own identity
+  // picks a variant, and a model with no authored variant falls back
+  // to the default -- byte-identical to the pre-resolution output.
+  const artifact = options?.artifact
+    ?? resolveArtifact(builtinArtifacts, {
+      surface: "extraction",
+      provider: client.provider,
+      model: client.model,
+    })
+    ?? defaultExtractionArtifact;
+
   const includeAlternatives = options?.alternatives ?? false;
-  const systemPrompt = buildSystemPrompt(includeAlternatives, options?.artifact);
+  const systemPrompt = buildSystemPrompt(includeAlternatives, artifact);
   const userMessage = buildUserMessage(transcript, options?.existingModelContext);
   const responseSchema = buildResponseSchema(includeAlternatives);
 

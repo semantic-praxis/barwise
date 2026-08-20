@@ -27,5 +27,24 @@ export interface CompletionResponse {
 }
 
 export interface LlmClient {
+  /**
+   * Provider identity, e.g. "anthropic". With `model`, this is what
+   * selects a per-model prompt variant (see `resolveArtifact`).
+   */
+  readonly provider: string;
+  /**
+   * The model this client will use, where it is known before the call.
+   *
+   * Deliberately not optional: a provider that cannot say must say so,
+   * because a silently absent identity resolves to the default prompt
+   * and looks exactly like a provider that has no variant. VS Code's
+   * Copilot client is the honest `undefined` -- the host picks the
+   * model inside `complete`.
+   *
+   * Distinct from `CompletionResponse.modelUsed`, which reports what
+   * actually answered. That arrives after the call, too late to choose
+   * a system prompt.
+   */
+  readonly model: string | undefined;
   complete(request: CompletionRequest): Promise<CompletionResponse>;
 }

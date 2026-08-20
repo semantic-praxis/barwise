@@ -17,6 +17,8 @@ vi.mock("@barwise/llm", async () => {
     ...actual,
     reviewModel: vi.fn(),
     createLlmClient: vi.fn(() => ({
+      provider: "test",
+      model: undefined,
       complete: vi.fn(),
     })),
   };

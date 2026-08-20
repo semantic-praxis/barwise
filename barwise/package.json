@@ -27,7 +27,8 @@
     "regen:examples": "bash scripts/regen-example-output.sh",
     "arch:triage": "node scripts/arch-triage.mjs",
     "prepare": "cd .. && husky barwise/.husky",
-    "regen:tutorial": "node scripts/regen-tutorial.mjs"
+    "regen:tutorial": "node scripts/regen-tutorial.mjs",
+    "regen:builtins": "node scripts/regen-builtin-artifacts.mjs"
   },
   "devDependencies": {
     "@dprint/json": "0.19.4",
