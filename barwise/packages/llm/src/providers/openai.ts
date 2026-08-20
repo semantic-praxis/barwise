@@ -30,9 +30,11 @@ export interface OpenAIClientOptions {
  * response_format to constrain the output to the specified JSON shape.
  */
 export class OpenAILlmClient implements LlmClient {
+  readonly provider = "openai";
+  /** Resolved at construction, so a prompt variant can be chosen before the call. */
+  readonly model: string;
   private client?: OpenAI;
   private readonly apiKey?: string;
-  private readonly model: string;
   private readonly maxTokens: number;
 
   constructor(options?: OpenAIClientOptions) {

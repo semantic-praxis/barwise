@@ -48,6 +48,21 @@ npx tsc --noEmit            # type-check only
 
 - The `LlmClient` interface is provider-agnostic. New providers are
   added under `src/providers/` and implement the same interface.
+- **A client declares its own identity.** `LlmClient` carries a
+  `provider` and a `model`, both readable before the call, because
+  `processTranscript` uses them to resolve a per-model prompt variant
+  from `builtinArtifacts` and nothing else knows the resolved model
+  (`createLlmClient` passes `model: undefined` through and lets each
+  provider apply its default). `model` is `string | undefined` and
+  required, not optional: a provider that cannot know its model in
+  advance must say so explicitly, and gets the default artifact.
+  `CompletionResponse.modelUsed` is a different thing -- what actually
+  answered, reported too late to choose a prompt.
+- **Variants are compiled in, not read from disk.**
+  `src/prompt/artifacts/builtins.generated.ts` is generated from
+  `prompts/*.prompt.yaml` by `npm run regen:builtins` and committed;
+  a drift test guards it. The published package ships `dist` only, so
+  runtime loading is not an option.
 - The VS Code extension also provides a `CopilotLlmClient` that
   implements this interface via the GitHub Copilot chat API -- that
   implementation lives in `packages/vscode/`, not here.

@@ -22,10 +22,23 @@ export interface CopilotClientOptions {
 }
 
 export class CopilotLlmClient implements LlmClient {
+  readonly provider = "copilot";
   private readonly family: string | undefined;
 
   constructor(options?: CopilotClientOptions) {
     this.family = options?.family;
+  }
+
+  /**
+   * Copilot resolves the concrete model inside `complete()` -- the host
+   * decides from what the user has available -- so the most this client
+   * can say in advance is the family the caller asked for, and nothing
+   * at all when the caller took the default. Prompt-variant resolution
+   * treats that absence as "no variant applies" and renders the default
+   * artifact, which is the honest outcome: the model is unknown.
+   */
+  get model(): string | undefined {
+    return this.family;
   }
 
   async complete(request: CompletionRequest): Promise<CompletionResponse> {

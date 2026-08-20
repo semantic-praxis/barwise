@@ -33,9 +33,11 @@ export interface OllamaClientOptions {
  * same response_format mechanism.
  */
 export class OllamaLlmClient implements LlmClient {
+  readonly provider = "ollama";
+  /** Resolved at construction, so a prompt variant can be chosen before the call. */
+  readonly model: string;
   private client?: OpenAI;
   private readonly baseURL: string;
-  private readonly model: string;
   private readonly maxTokens: number;
 
   constructor(options?: OllamaClientOptions) {

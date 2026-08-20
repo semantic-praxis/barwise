@@ -19,6 +19,8 @@ function fixtureClient() {
   const requests: CompletionRequest[] = [];
   return {
     requests,
+    provider: "test",
+    model: undefined,
     complete: (request: CompletionRequest) => {
       requests.push(request);
       const match = suite.cases.find((c) =>
@@ -60,6 +62,8 @@ describe("runSuite", () => {
     // averaged in as if the model had scored zero (barwise-806).
     let first = true;
     const client = {
+      provider: "test",
+      model: undefined,
       complete: (request: CompletionRequest) => {
         if (first) {
           first = false;
@@ -99,6 +103,8 @@ describe("runSuite", () => {
     let calls = 0;
     const inner = fixtureClient();
     const client = {
+      provider: "test",
+      model: undefined,
       complete: (request: CompletionRequest) => {
         calls++;
         if (calls === 1) return Promise.reject(new Error("boom"));
@@ -117,6 +123,8 @@ describe("runSuite", () => {
   it("scores an unusable payload as a real zero, not a failure", async () => {
     // The model answered. The answer was garbage. That is a measurement.
     const client = {
+      provider: "test",
+      model: undefined,
       complete: () => Promise.resolve({ content: "not json at all" }),
     };
     const report = await runSuite(suite, client);
@@ -141,6 +149,8 @@ describe("runSuite", () => {
     let calls = 0;
     const inner = fixtureClient();
     const client = {
+      provider: "test",
+      model: undefined,
       complete: (request: CompletionRequest) => {
         calls++;
         if (calls === 1) {

@@ -1,6 +1,6 @@
 # Complete the prompt-artifact seam: resolve variants in production, and promote the model-agnostic rules into the default
 
-Status: Accepted (workstream 1 implemented; see Implementation notes)
+Status: Accepted (workstreams 1 and 2 implemented; see Implementation notes)
 Created: 2026-08-09
 Last-updated: 2026-08-20
 Tracking: completes workstream 1 of
@@ -350,6 +350,49 @@ confirmed the load-bearing claims and corrected one.
 - The out-of-scope note on the evaluator's exact-string alias matching
   is now resolved: it shipped separately in PR #305, as the note said
   it would.
+
+### Workstream 2 (2026-08-20)
+
+Shipped as specified. `LlmClient` gained `provider: string` and
+`model: string | undefined`; `processTranscript` resolves against
+`builtinArtifacts` and falls back to the default. Re-grounding first
+raised three things the spec did not anticipate.
+
+- **Declined: the `useBuiltinVariants: false` opt-out.** The Open
+  decision recommended it so a reproducible run could pin the prompt.
+  Grounding showed the pin already exists and is exported:
+  `buildSystemPrompt(false, defaultExtractionArtifact)` is byte-equal
+  to `buildSystemPrompt(false)`, so `artifact: defaultExtractionArtifact`
+  holds the default regardless of model. A flag would be a second
+  spelling of one thing, which is the coupling the primary principles
+  exist to avoid. The recommendation's own justification also does not
+  apply: `promptlab`'s `runSuite` builds its system prompt directly and
+  never calls `processTranscript`, so the harness was never exposed to
+  resolution. There is a test pinning the `defaultExtractionArtifact`
+  route so the alternative stays real.
+- **Copilot cannot name its model before the call.**
+  `CopilotLlmClient` resolves the model inside `complete()` via
+  `vscode.lm.selectChatModels`. The most it knows in advance is the
+  family the caller configured, so `model` is a getter over that and is
+  `undefined` when the caller took the host default. This is why
+  `model` is `string | undefined` rather than `string` -- and why it is
+  required rather than optional: a provider that cannot say has to say
+  so, since a silently absent identity is indistinguishable from a
+  provider that simply has no variant.
+- **The "breaking change" is not compiler-enforced in this repo.**
+  Every package's tsconfig excludes `tests/**`, vitest strips types
+  through esbuild, and the ESLint config is not type-aware, so a mock
+  client missing the new members would have compiled, run, and quietly
+  resolved to the default. All ~12 mocks across `llm`, `mcp`, and
+  `promptlab` were updated regardless, because a mock that lies about
+  its identity is a test asserting the wrong thing. Worth knowing
+  before relying on an interface widening to find its own call sites.
+
+Behavior change to name in the next release notes: a caller on a model
+matching a checked-in variant now gets that variant's prompt. Today
+that is `claude-haiku-*` and `claude-sonnet-5*` on Anthropic. The
+Anthropic provider's unconfigured fallback (`claude-sonnet-4-5-20250929`)
+matches neither, so the default path is unchanged.
 
 ## Non-goals
 

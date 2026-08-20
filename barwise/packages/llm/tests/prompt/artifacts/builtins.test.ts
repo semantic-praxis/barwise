@@ -63,16 +63,19 @@ describe("builtinArtifacts", () => {
     ).toBeUndefined();
   });
 
-  it("is inert: extraction still renders the default, even for a matching model", async () => {
-    // Workstream 1 is deliberately behavior-free -- it compiles the
-    // variants in without wiring them to anything. This asserts the
-    // "not yet" directly rather than by implication: a client on
-    // claude-haiku-4-5 matches the haiku45-2 variant above, and still
-    // gets the default prompt. Workstream 2 is exactly the change that
-    // makes this expectation flip.
+  it("reaches production: extraction renders the variant for a matching model", async () => {
+    // Workstream 1 compiled these in without wiring them to anything,
+    // and this test asserted the inertness. Workstream 2 wired them, so
+    // the expectation flipped: a client on claude-haiku-4-5 now gets
+    // the haiku45-2 variant. The point of asserting it here, next to
+    // the drift guard, is that it proves the compiled-in copy is what
+    // production actually reads -- not just that resolution works on
+    // some array.
     const { buildSystemPrompt, processTranscript } = await import("../../../src/index.js");
     let sent = "";
     const client = {
+      provider: "anthropic",
+      model: "claude-haiku-4-5",
       complete: (request: { systemPrompt: string; }) => {
         sent = request.systemPrompt;
         return Promise.resolve({
@@ -89,9 +92,9 @@ describe("builtinArtifacts", () => {
 
     await processTranscript("Facilitator: anything.", client, { modelName: "t" });
 
-    expect(sent).toBe(buildSystemPrompt(false));
     const haiku = builtinArtifacts.find((a) => a.match?.modelPrefix === "claude-haiku");
     expect(haiku, "the haiku variant should exist to make this meaningful").toBeDefined();
-    expect(sent).not.toBe(haiku!.instructions);
+    expect(sent).toBe(buildSystemPrompt(false, haiku));
+    expect(sent).not.toBe(buildSystemPrompt(false));
   });
 });

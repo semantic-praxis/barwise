@@ -19,6 +19,8 @@ import { reviewModel } from "../../src/review/reviewModel.js";
  */
 function createMockClient(responseJson: string): LlmClient {
   return {
+    provider: "test",
+    model: undefined,
     async complete(_request: CompletionRequest) {
       return { content: responseJson };
     },
@@ -35,6 +37,8 @@ function createCapturingClient(): {
   let captured: CompletionRequest | undefined;
   return {
     client: {
+      provider: "test",
+      model: undefined,
       async complete(request: CompletionRequest) {
         captured = request;
         return {
