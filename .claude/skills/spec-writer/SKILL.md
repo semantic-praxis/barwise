@@ -93,11 +93,21 @@ alongside this file.
    spec for review, then implement in separate PRs. Before implementing
    each workstream, ground it again and verify or correct the
    conclusions drafted ahead of time; revise the spec if the scope
-   differs from the brief. During implementation, keep a short
-   implementation-notes record of deviations from the spec (an edge
-   case that forced a different tack, a mechanism that turned out not
-   to exist); fold them into the spec's next revision so the next
-   workstream starts from reality, not the brief.
+   differs from the brief. Re-ground the claims that promise _no_ work
+   as well as the ones that promise some: an Inventory row reading
+   `untouched`, and any claim that the pieces will compose once built,
+   are predictions like any other, and they are the ones nobody
+   re-checks precisely because they ask for nothing. During
+   implementation, keep a short implementation-notes record of
+   deviations from the spec (an edge case that forced a different tack,
+   a mechanism that turned out not to exist); fold them into the spec's
+   next revision so the next workstream starts from reality, not the
+   brief. When the last workstream lands, close the spec out: work
+   `sensemaking` over its headline claims against the built system, then
+   either set `Status: Implemented` or record what did not land and why.
+   A spec whose end state is only ever asserted at design time is a
+   description of an intention, and it will be read as a description of
+   the system.
 
 ## House structure
 
