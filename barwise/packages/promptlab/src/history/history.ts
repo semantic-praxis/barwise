@@ -17,7 +17,17 @@ export interface HistoryEntry {
   readonly repeat: number;
   readonly mean: number;
   readonly worst: number;
-  readonly cases: readonly { caseId: string; mean: number; worst: number; }[];
+  /**
+   * Runs behind each case's mean. Equal to `repeat` on a healthy run;
+   * present so a later reader can tell a full sample from a partial one
+   * rather than inferring it (barwise-806).
+   */
+  readonly cases: readonly {
+    caseId: string;
+    mean: number;
+    worst: number;
+    samples?: number;
+  }[];
 }
 
 /** The history file that belongs to a suite manifest. */
@@ -39,12 +49,54 @@ export function toHistoryEntry(
     repeat: report.repeat,
     mean: report.mean,
     worst: report.worst,
-    cases: report.cases.map((c) => ({ caseId: c.caseId, mean: c.mean, worst: c.worst })),
+    cases: report.cases.map((c) => ({
+      caseId: c.caseId,
+      mean: c.mean,
+      worst: c.worst,
+      samples: c.samples,
+    })),
   };
 }
 
+/**
+ * Refuse to record a run the provider did not fully answer
+ * (barwise-806). The history file is the project's only longitudinal
+ * record, and a row whose mean rests on fewer samples than it asked
+ * for -- or on none at all -- is read later as a measurement. Better no
+ * row than a row nobody can distinguish from a real one.
+ */
 export function appendHistory(historyPath: string, entry: HistoryEntry): void {
   appendFileSync(historyPath, JSON.stringify(entry) + "\n");
+}
+
+/** Thrown instead of recording an incomplete run. */
+export class IncompleteRunError extends Error {
+  constructor(public readonly failures: number, public readonly requested: number) {
+    super(
+      `Refusing to record this run: ${failures} of ${requested} requested runs`
+        + ` never returned a payload, so the means rest on fewer samples than`
+        + ` they claim. Re-run once the provider is healthy, or record it`
+        + ` deliberately with --force.`,
+    );
+    this.name = "IncompleteRunError";
+  }
+}
+
+/**
+ * Record a completed run. Throws `IncompleteRunError` when any run
+ * failed, unless the caller explicitly overrides.
+ */
+export function appendRunHistory(
+  historyPath: string,
+  report: SuiteReport,
+  entry: HistoryEntry,
+  options?: { force?: boolean; },
+): void {
+  if (!report.complete && options?.force !== true) {
+    const requested = report.repeat * report.cases.length;
+    throw new IncompleteRunError(report.failures, requested);
+  }
+  appendHistory(historyPath, entry);
 }
 
 export function readHistory(historyPath: string): HistoryEntry[] {
