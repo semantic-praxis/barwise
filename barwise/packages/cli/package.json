@@ -18,6 +18,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "postbuild": "node scripts/chmod-bin.mjs",
     "bundle": "node esbuild.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",

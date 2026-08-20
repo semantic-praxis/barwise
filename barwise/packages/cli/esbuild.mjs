@@ -10,7 +10,7 @@
  */
 
 import * as esbuild from "esbuild";
-import { readFileSync } from "node:fs";
+import { chmodSync, readFileSync } from "node:fs";
 
 const { version } = JSON.parse(readFileSync("./package.json", "utf8"));
 
@@ -33,5 +33,12 @@ await esbuild.build({
   external: ["web-worker"],
   logLevel: "warning",
 });
+
+// The banner gives the bundle a shebang, so it is meant to run
+// directly as well as through `node`. esbuild writes mode 644, and
+// a shebang on a non-executable file is a promise the file cannot
+// keep. chmodSync rather than a shell chmod, so this works on
+// Windows (where it is a no-op) as well as CI.
+chmodSync("dist/bundle/index.cjs", 0o755);
 
 console.log("Bundle complete.");
