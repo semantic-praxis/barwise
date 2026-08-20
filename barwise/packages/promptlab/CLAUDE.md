@@ -20,10 +20,13 @@ this package; it must never depend on the CLI.
 
 ```
 src/
-  evalcase/    EvalCase/EvalSuite types; loadSuite (manifest + declared
-               cases, no directory discovery)
+  evalcase/    EvalCase/EvalSuite types; the GymCheck | PromptCheck
+               check union; loadSuite (manifest + declared cases, no
+               directory discovery)
   score/       scoreExtraction: payload -> parse -> conformance ->
                validation count -> evaluateCandidate fold -> CaseScore
+               promptChecks: the payload-side check runners
+               (requires_ambiguity) and the ambiguity-excess count
   run/         runSuite: cases x repeat through an LlmClient with the
                active prompt artifact
   history/     JSONL score history (append/read; caller supplies dates)
@@ -46,6 +49,19 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
 - **Score = rubric fraction minus declared penalties.** Weights (per
   conformance correction, per residual validation error) come from the
   suite manifest, never from code, so reweighting is a data change.
+- **Two check families, one fraction.** A case may declare `GymCheck`s,
+  which `@barwise/learn` grades against the parsed model, and
+  `PromptCheck`s, which promptlab grades against the extraction payload
+  (`docs/specs/eval-transcript-realism.spec.md`). The scorer partitions
+  by family, runs each grader, and reassembles the results in authored
+  order. A payload check never reaches `evaluateCandidate` -- it takes
+  an `OrmModel` and has no vocabulary for the payload -- which is why
+  the family lives here and not in `learn`.
+- **`requires_ambiguity` needs its budget.** The check alone is won by
+  an extraction that flags everything, so a case that declares one
+  should declare an `ambiguityBudget`, and the suite an
+  `ambiguityExcess` weight. Both default to unbounded/0, which is what
+  every case authored before the field meant.
 - **Answer-key invariant.** Each case's recorded payload in
   `tests/fixtures/responses/` must pass its full rubric; the exact
   scores are pinned in `tests/scoreExtraction.test.ts`. Changing a

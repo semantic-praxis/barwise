@@ -1,6 +1,6 @@
 # Realistic eval transcripts: disagreement, correction, and unresolved questions as scored signal
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Accepted (workstream 1 implemented; see Implementation notes)
 Created: 2026-08-20
 Last-updated: 2026-08-20
 Tracking: sibling to `docs/specs/eval-suite-hardening.spec.md`; parent
@@ -402,6 +402,46 @@ before it is verifiable without one.
   tests. Each new case ships a recorded payload in
   `tests/fixtures/responses/` that passes its full rubric, per the
   package's answer-key invariant. No live call enters CI.
+
+## Implementation notes
+
+### Workstream 1 (2026-08-20)
+
+Shipped as specified, with two additions the brief did not name and one
+correction to what "additive" turned out to mean.
+
+- **`CaseScore` gained `ambiguitiesReported` and `ambiguityExcess`.**
+  The brief widened only `results`. Folding the excess penalty into
+  `score` alone would have made it invisible in a delta report, which
+  is not how the other penalties behave -- `conformanceCorrections` and
+  `validationErrors` are both surfaced as counts beside the score. The
+  two new counts follow that precedent.
+- **Results are reassembled into authored order.** The partition runs
+  two graders, so their results arrive grouped by family rather than in
+  the order the case author wrote them. `CaseScore.results` is
+  documented "in authored order (for delta reports)", so
+  `orderAsAuthored` walks the declarations and shifts from the matching
+  queue. Without it, a mixed rubric's delta report would read in an
+  order matching nothing in the case file.
+- **Two existing tests changed, and no pinned score did.** The
+  acceptance criterion was that every pinned per-case score stay
+  byte-identical, and all seven did. What changed was the shape of the
+  weights object: `loadSuite.test.ts` asserts the parsed weights with
+  `toEqual` and now sees `ambiguityExcess: 0`, and one hand-built
+  weights literal in `scoreExtraction.test.ts` needed the new field or
+  the arithmetic produced `NaN`. Both are consequences of adding a
+  declared weight, the same edit `validationWarning` required when it
+  was added.
+- **`isPromptCheck` is a runtime export from `evalcase/types.ts`.** The
+  file otherwise holds only types. The discriminator belongs beside the
+  union it narrows, and moving it would separate the two.
+
+The `NaN` above is worth remembering: `SuiteWeights` is a required-field
+interface, so a programmatic caller that builds one by hand and misses a
+weight gets a silent `NaN` score rather than a type error, since the
+tests construct weights literals outside the loader's validation. The
+loader itself defaults every optional weight, so only hand-built objects
+are exposed.
 
 ## Non-goals
 

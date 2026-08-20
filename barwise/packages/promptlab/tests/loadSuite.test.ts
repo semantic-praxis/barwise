@@ -23,6 +23,9 @@ describe("loadSuite on the packaged seed suite", () => {
       conformanceCorrection: 0.02,
       validationError: 0.1,
       validationWarning: 0.05,
+      // Undeclared in the seed manifest, so the loader defaults it to 0
+      // and no seed case pays an ambiguity penalty.
+      ambiguityExcess: 0,
     });
     expect(suite.cases.map((c) => c.evalCase.id)).toEqual([
       "order-management",
@@ -74,6 +77,33 @@ describe("loadSuite validation", () => {
     writeFileSync(manifest, "version: 1.0.0\ncases: [a.eval.yaml]\n");
     expect(() => loadSuite(manifest)).toThrow(/weights/);
   });
+
+  it("rejects a negative ambiguityExcess weight", () => {
+    const dir = tmpSuiteDir();
+    const manifest = join(dir, "suite.yaml");
+    writeFileSync(
+      manifest,
+      "version: 1.0.0\nweights: {conformanceCorrection: 0, validationError: 0,"
+        + " ambiguityExcess: -1}\ncases: [a.eval.yaml]\n",
+    );
+    expect(() => loadSuite(manifest)).toThrow(/ambiguityExcess/);
+  });
+
+  it("reads a declared ambiguityExcess weight", () => {
+    const dir = tmpSuiteDir();
+    writeFileSync(join(dir, "t.md"), MINIMAL_TRANSCRIPT);
+    writeFileSync(
+      join(dir, "a.eval.yaml"),
+      "id: a\ntranscript: t.md\nchecks:\n  - kind: must_validate\n",
+    );
+    const manifest = join(dir, "suite.yaml");
+    writeFileSync(
+      manifest,
+      "version: 1.0.0\nweights: {conformanceCorrection: 0, validationError: 0,"
+        + " ambiguityExcess: 0.03}\ncases: [a.eval.yaml]\n",
+    );
+    expect(loadSuite(manifest).weights.ambiguityExcess).toBe(0.03);
+  });
 });
 
 describe("loadEvalCase validation", () => {
@@ -106,5 +136,52 @@ describe("loadEvalCase validation", () => {
     const file = join(dir, "case.eval.yaml");
     writeFileSync(file, "id: c\ntranscript: t.md\nchecks: []\n");
     expect(() => loadEvalCase(file)).toThrow(/non-empty/);
+  });
+
+  it("accepts a requires_ambiguity check with an ambiguityBudget", () => {
+    const dir = tmpSuiteDir();
+    writeFileSync(join(dir, "t.md"), MINIMAL_TRANSCRIPT);
+    const file = join(dir, "case.eval.yaml");
+    writeFileSync(
+      file,
+      "id: c\ntranscript: t.md\nambiguityBudget: 4\nchecks:\n"
+        + "  - kind: requires_ambiguity\n    matches: [tier]\n",
+    );
+    const loaded = loadEvalCase(file);
+    expect(loaded.evalCase.ambiguityBudget).toBe(4);
+    expect(loaded.evalCase.checks[0]).toEqual({
+      kind: "requires_ambiguity",
+      matches: ["tier"],
+    });
+  });
+
+  it("leaves ambiguityBudget absent when undeclared, meaning unbounded", () => {
+    const dir = tmpSuiteDir();
+    writeFileSync(join(dir, "t.md"), MINIMAL_TRANSCRIPT);
+    const file = join(dir, "case.eval.yaml");
+    writeFileSync(file, "id: c\ntranscript: t.md\nchecks:\n  - kind: must_validate\n");
+    expect(loadEvalCase(file).evalCase.ambiguityBudget).toBeUndefined();
+  });
+
+  it("rejects a requires_ambiguity check with no matches", () => {
+    const dir = tmpSuiteDir();
+    writeFileSync(join(dir, "t.md"), MINIMAL_TRANSCRIPT);
+    const file = join(dir, "case.eval.yaml");
+    writeFileSync(
+      file,
+      "id: c\ntranscript: t.md\nchecks:\n  - kind: requires_ambiguity\n    matches: []\n",
+    );
+    expect(() => loadEvalCase(file)).toThrow(/checks\[0\].*matches/s);
+  });
+
+  it("rejects a non-integer ambiguityBudget", () => {
+    const dir = tmpSuiteDir();
+    writeFileSync(join(dir, "t.md"), MINIMAL_TRANSCRIPT);
+    const file = join(dir, "case.eval.yaml");
+    writeFileSync(
+      file,
+      "id: c\ntranscript: t.md\nambiguityBudget: 1.5\nchecks:\n  - kind: must_validate\n",
+    );
+    expect(() => loadEvalCase(file)).toThrow(/ambiguityBudget/);
   });
 });

@@ -1,8 +1,17 @@
 // Eval-case format
 export { defaultSuitePath, loadEvalCase, loadSuite } from "./evalcase/loadSuite.js";
-export type { EvalCase, EvalSuite, LoadedEvalCase, SuiteWeights } from "./evalcase/types.js";
+export { isPromptCheck } from "./evalcase/types.js";
+export type {
+  EvalCase,
+  EvalSuite,
+  LoadedEvalCase,
+  PromptCheck,
+  SuiteWeights,
+} from "./evalcase/types.js";
 
 // Scorer
+export { ambiguityExcess, runPromptChecks } from "./score/promptChecks.js";
+export type { PromptCheckResult } from "./score/promptChecks.js";
 export { scoreExtraction } from "./score/scoreExtraction.js";
 export type { CaseScore } from "./score/scoreExtraction.js";
 
