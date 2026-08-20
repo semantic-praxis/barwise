@@ -57,6 +57,18 @@ describe("classifyFailure", () => {
     expect(classifyFailure(new Error("authentication timed out"))).toBe("terminal");
   });
 
+  it("keeps a rate limit retryable even when it names the credential", () => {
+    // Providers routinely say both. Before the precedence fix this
+    // classified as terminal, so the one failure class retry exists for
+    // was the one it refused to retry.
+    expect(classifyFailure(new Error("Rate limit exceeded for your api key")))
+      .toBe("transient");
+    expect(classifyFailure(new Error("Too many requests for this API key")))
+      .toBe("transient");
+    expect(classifyFailure(new Error("quota exceeded for api key sk-xxx")))
+      .toBe("transient");
+  });
+
   it("treats an unrecognized failure as terminal, not transient", () => {
     // Retrying an unknown error three times leaves it just as unknown.
     expect(classifyFailure(new Error("something nobody has seen"))).toBe("terminal");

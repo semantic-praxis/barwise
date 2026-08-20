@@ -30,15 +30,17 @@ export type FailureKind = "transient" | "terminal";
 const TRANSIENT_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504, 529]);
 const TERMINAL_STATUSES = new Set([400, 401, 403, 404, 422]);
 
-const TRANSIENT_PATTERNS = [
-  /\btimeout\b/i,
-  /\btimed out\b/i,
-  /\bECONNRESET\b/,
-  /\bECONNREFUSED\b/,
-  /\bETIMEDOUT\b/,
-  /\bEAI_AGAIN\b/,
-  /\bsocket hang up\b/i,
+/**
+ * Checked before the terminal patterns. Providers routinely name the
+ * credential while rejecting a request for throughput -- "rate limit
+ * exceeded for your api key" is a retryable rate limit, not an auth
+ * failure, and generic terminal wording must not capture it.
+ */
+const RETRYABLE_FIRST_PATTERNS = [
   /\brate limit/i,
+  /\brate.?limited\b/i,
+  /\bquota exceeded\b/i,
+  /\btoo many requests\b/i,
   /\boverloaded\b/i,
 ];
 
@@ -48,6 +50,16 @@ const TERMINAL_PATTERNS = [
   /\bauthentication\b/i,
   /\bunauthorized\b/i,
   /\bpermission\b/i,
+];
+
+const TRANSIENT_PATTERNS = [
+  /\btimeout\b/i,
+  /\btimed out\b/i,
+  /\bECONNRESET\b/,
+  /\bECONNREFUSED\b/,
+  /\bETIMEDOUT\b/,
+  /\bEAI_AGAIN\b/,
+  /\bsocket hang up\b/i,
 ];
 
 /**
@@ -64,8 +76,11 @@ export function classifyFailure(err: unknown): FailureKind {
   }
 
   const message = err instanceof Error ? err.message : String(err);
-  // Terminal patterns win: an auth message carrying the word "timeout"
-  // is still an auth failure.
+  // Three tiers, most specific first. Throughput rejections often name
+  // the credential, so they are matched ahead of the generic terminal
+  // wording; terminal then wins over the remaining transient patterns,
+  // so "authentication timed out" stays an auth failure.
+  if (RETRYABLE_FIRST_PATTERNS.some((p) => p.test(message))) return "transient";
   if (TERMINAL_PATTERNS.some((p) => p.test(message))) return "terminal";
   if (TRANSIENT_PATTERNS.some((p) => p.test(message))) return "transient";
   return "terminal";

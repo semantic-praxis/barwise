@@ -20,6 +20,7 @@ import {
   appendRunHistory,
   defaultSuitePath,
   historyPathFor,
+  IncompleteRunError,
   loadSuite,
   readHistory,
   runSuite,
@@ -125,21 +126,30 @@ function registerEval(promptCmd: Command): void {
             );
           }
 
+          // Print before recording. The run has already been paid for,
+          // and a refused history write must not also cost the operator
+          // the scores they just bought.
+          if (opts.format === "json") {
+            process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+          } else {
+            process.stdout.write(renderReport(report));
+          }
+
           if (opts.history) {
             const entry = toHistoryEntry(report, new Date().toISOString(), {
               ...(opts.provider !== undefined ? { provider: opts.provider } : {}),
               ...(opts.model !== undefined ? { model: opts.model } : {}),
             });
-            appendRunHistory(historyPathFor(suite.manifestPath), report, entry, {
-              ...(opts.forceHistory === true ? { force: true } : {}),
-            });
+            try {
+              appendRunHistory(historyPathFor(suite.manifestPath), report, entry, {
+                ...(opts.forceHistory === true ? { force: true } : {}),
+              });
+            } catch (err) {
+              if (!(err instanceof IncompleteRunError)) throw err;
+              process.stderr.write(`${err.message}\n`);
+            }
           }
 
-          if (opts.format === "json") {
-            process.stdout.write(JSON.stringify(report, null, 2) + "\n");
-            return;
-          }
-          process.stdout.write(renderReport(report));
           if (!report.complete) process.exitCode = 1;
         } catch (err) {
           fail(err);
