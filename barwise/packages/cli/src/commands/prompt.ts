@@ -17,9 +17,10 @@ import {
 } from "@barwise/llm";
 import type { SuiteReport } from "@barwise/promptlab";
 import {
-  appendHistory,
+  appendRunHistory,
   defaultSuitePath,
   historyPathFor,
+  IncompleteRunError,
   loadSuite,
   readHistory,
   runSuite,
@@ -69,6 +70,10 @@ function registerEval(promptCmd: Command): void {
     .option("--repeat <n>", "Samples per case", "1")
     .option("--format <format>", "Output format (text or json)", "text")
     .option("--no-history", "Do not append this run to the suite's history file")
+    .option(
+      "--force-history",
+      "Record the run even when some calls never returned a payload",
+    )
     .action(
       async (
         opts: ProviderOpts & {
@@ -77,6 +82,7 @@ function registerEval(promptCmd: Command): void {
           repeat: string;
           format: string;
           history: boolean;
+          forceHistory?: boolean;
         },
       ) => {
         try {
@@ -109,19 +115,42 @@ function registerEval(promptCmd: Command): void {
             repeat: Number(opts.repeat),
           });
 
+          // Say it before the scores, so an operator reading the tail of
+          // a sweep cannot miss that the numbers rest on fewer samples
+          // than they asked for.
+          if (!report.complete) {
+            const requested = report.repeat * report.cases.length;
+            process.stderr.write(
+              `WARNING: ${report.failures} of ${requested} runs never returned a payload.`
+                + ` Those runs are excluded from the means below, not scored zero.\n`,
+            );
+          }
+
+          // Print before recording. The run has already been paid for,
+          // and a refused history write must not also cost the operator
+          // the scores they just bought.
+          if (opts.format === "json") {
+            process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+          } else {
+            process.stdout.write(renderReport(report));
+          }
+
           if (opts.history) {
             const entry = toHistoryEntry(report, new Date().toISOString(), {
               ...(opts.provider !== undefined ? { provider: opts.provider } : {}),
               ...(opts.model !== undefined ? { model: opts.model } : {}),
             });
-            appendHistory(historyPathFor(suite.manifestPath), entry);
+            try {
+              appendRunHistory(historyPathFor(suite.manifestPath), report, entry, {
+                ...(opts.forceHistory === true ? { force: true } : {}),
+              });
+            } catch (err) {
+              if (!(err instanceof IncompleteRunError)) throw err;
+              process.stderr.write(`${err.message}\n`);
+            }
           }
 
-          if (opts.format === "json") {
-            process.stdout.write(JSON.stringify(report, null, 2) + "\n");
-            return;
-          }
-          process.stdout.write(renderReport(report));
+          if (!report.complete) process.exitCode = 1;
         } catch (err) {
           fail(err);
         }
@@ -209,12 +238,20 @@ function registerHistory(promptCmd: Command): void {
 function renderReport(report: SuiteReport): string {
   const lines: string[] = [];
   for (const c of report.cases) {
+    // n= is only interesting when it disagrees with repeat; showing it
+    // always would bury the signal it exists to carry.
+    const samples = c.samples === report.repeat ? "" : `  n=${c.samples}/${report.repeat}`;
     lines.push(
-      `${c.caseId}  mean=${c.mean.toFixed(3)}  worst=${c.worst.toFixed(3)}`,
+      `${c.caseId}  mean=${c.mean.toFixed(3)}  worst=${c.worst.toFixed(3)}${samples}`,
     );
     for (const run of c.runs) {
-      if (run.error) {
-        lines.push(`  run failed: ${run.error}`);
+      if (run.failed) {
+        lines.push(
+          `  run failed (${run.failureKind}, ${run.attempts} attempt(s), excluded):`
+            + ` ${run.error}`,
+        );
+      } else if (run.error) {
+        lines.push(`  unscorable payload (counted as 0): ${run.error}`);
       } else if (run.score) {
         for (const r of run.score.results.filter((r) => !r.passed)) {
           lines.push(`  ${r.kind}: ${r.message}`);
@@ -226,7 +263,7 @@ function renderReport(report: SuiteReport): string {
     `suite ${report.suiteVersion}  artifact=${report.artifactVersion}`
       + `  mean=${report.mean.toFixed(3)}  worst=${
         report.worst.toFixed(3)
-      }  (repeat=${report.repeat})`,
+      }  (repeat=${report.repeat}${report.complete ? "" : `, ${report.failures} failed`})`,
   );
   return lines.join("\n") + "\n";
 }

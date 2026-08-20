@@ -3,6 +3,18 @@
  * with the active prompt artifact and score each run deterministically.
  * The only non-determinism here is the LLM call itself; a score is a
  * sample, so `repeat` controls how many samples each case gets.
+ *
+ * Two kinds of bad run, deliberately kept apart (barwise-806):
+ *
+ * - The model never answered -- auth rejected, rate limited, connection
+ *   dropped. That is not a measurement of anything, so it is excluded
+ *   from the mean and counted as a failure. Folding it in as a zero is
+ *   how three junk rows reached the score history on the first keyed
+ *   run of this harness.
+ * - The model answered and the answer could not be scored. That is a
+ *   real result and stays a zero: the prompt produced something the
+ *   production parse path rejects, which is exactly what the metric
+ *   exists to catch.
  */
 import type { LlmClient, PromptArtifact } from "@barwise/llm";
 import {
@@ -14,27 +26,47 @@ import {
 import type { EvalSuite } from "../evalcase/types.js";
 import type { CaseScore } from "../score/scoreExtraction.js";
 import { scoreExtraction } from "../score/scoreExtraction.js";
+import type { FailureKind, RetryOptions } from "./retry.js";
+import { withRetry } from "./retry.js";
 
 export interface RunSuiteOptions {
   /** Variant artifact to render; omitted, the default artifact runs. */
   readonly artifact?: PromptArtifact;
   /** Samples per case (default 1). */
   readonly repeat?: number;
+  /** Retry policy for provider failures. */
+  readonly retry?: RetryOptions;
 }
 
-/** One LLM call's outcome: a score, or the error that prevented one. */
+/** One LLM call's outcome. */
 export interface CaseRun {
+  /** Present when the run produced a score, including a scored zero. */
   readonly score?: CaseScore;
-  /** Set when the call or the payload parse failed; the run counts as 0. */
+  /** The message behind a failed or unscorable run. */
   readonly error?: string;
+  /**
+   * Set when the provider never returned a payload. Such a run is
+   * excluded from the mean rather than scored zero.
+   */
+  readonly failed?: boolean;
+  /** How a failed run was judged, for the operator's diagnosis. */
+  readonly failureKind?: FailureKind;
+  /** Attempts spent on this run, including the first. */
+  readonly attempts?: number;
   readonly modelUsed?: string;
 }
 
 export interface CaseSummary {
   readonly caseId: string;
   readonly runs: readonly CaseRun[];
+  /** Mean over scored runs only; 0 when every run failed. */
   readonly mean: number;
+  /** Lowest scored run; 0 when every run failed. */
   readonly worst: number;
+  /** Runs that produced a score (the denominator behind `mean`). */
+  readonly samples: number;
+  /** Runs the provider never answered. */
+  readonly failures: number;
 }
 
 export interface SuiteReport {
@@ -42,10 +74,14 @@ export interface SuiteReport {
   readonly artifactVersion: string;
   readonly repeat: number;
   readonly cases: readonly CaseSummary[];
-  /** Mean of the per-case means. */
+  /** Mean of the per-case means, over cases with at least one sample. */
   readonly mean: number;
-  /** Lowest single-run score across the suite. */
+  /** Lowest single scored run across the suite. */
   readonly worst: number;
+  /** Total runs the provider never answered. */
+  readonly failures: number;
+  /** True when every requested run produced a score. */
+  readonly complete: boolean;
 }
 
 export async function runSuite(
@@ -68,19 +104,41 @@ export async function runSuite(
   const responseSchema = buildResponseSchema(false);
 
   const runOnce = async (loadedCase: EvalSuite["cases"][number]): Promise<CaseRun> => {
+    const attempt = await withRetry(
+      () =>
+        client.complete({
+          systemPrompt,
+          userMessage: buildUserMessage(loadedCase.transcript),
+          responseSchema,
+        }),
+      options?.retry,
+    );
+
+    if (!attempt.ok) {
+      return {
+        error: attempt.error.message,
+        failed: true,
+        failureKind: attempt.kind,
+        attempts: attempt.attempts,
+      };
+    }
+
+    const response = attempt.value;
     try {
-      const response = await client.complete({
-        systemPrompt,
-        userMessage: buildUserMessage(loadedCase.transcript),
-        responseSchema,
-      });
       const score = scoreExtraction(response.content, loadedCase, suite.weights);
       return {
         score,
+        attempts: attempt.attempts,
         ...(response.modelUsed !== undefined ? { modelUsed: response.modelUsed } : {}),
       };
     } catch (err) {
-      return { error: (err as Error).message };
+      // The model answered; the answer was unusable. A real zero.
+      return {
+        score: unscorable(loadedCase.evalCase.id),
+        error: (err as Error).message,
+        attempts: attempt.attempts,
+        ...(response.modelUsed !== undefined ? { modelUsed: response.modelUsed } : {}),
+      };
     }
   };
 
@@ -90,22 +148,51 @@ export async function runSuite(
     for (let i = 0; i < repeat; i++) {
       runs.push(await runOnce(loadedCase));
     }
-    const scores = runs.map((r) => r.score?.score ?? 0);
+    const scores = runs
+      .filter((r) => r.score !== undefined)
+      .map((r) => r.score!.score);
     cases.push({
       caseId: loadedCase.evalCase.id,
       runs,
-      mean: mean(scores),
-      worst: Math.min(...scores),
+      mean: scores.length > 0 ? mean(scores) : 0,
+      worst: scores.length > 0 ? Math.min(...scores) : 0,
+      samples: scores.length,
+      failures: runs.filter((r) => r.failed === true).length,
     });
   }
 
+  const scored = cases.filter((c) => c.samples > 0);
+  const failures = cases.reduce((sum, c) => sum + c.failures, 0);
   return {
     suiteVersion: suite.version,
     artifactVersion: (artifact ?? defaultExtractionArtifact).version,
     repeat,
     cases,
-    mean: mean(cases.map((c) => c.mean)),
-    worst: Math.min(...cases.map((c) => c.worst)),
+    mean: scored.length > 0 ? mean(scored.map((c) => c.mean)) : 0,
+    worst: scored.length > 0 ? Math.min(...scored.map((c) => c.worst)) : 0,
+    failures,
+    complete: failures === 0,
+  };
+}
+
+/**
+ * The score for a payload the production parse path rejected. Zero
+ * rubric checks passed out of zero declared is not a meaningful
+ * fraction, so the rubric totals stay at 0 and the score is 0 -- the
+ * run is counted as a sample because the model did answer.
+ */
+function unscorable(caseId: string): CaseScore {
+  return {
+    caseId,
+    rubricPassed: 0,
+    rubricTotal: 0,
+    conformanceCorrections: 0,
+    validationErrors: 0,
+    validationWarnings: 0,
+    ambiguitiesReported: 0,
+    ambiguityExcess: 0,
+    score: 0,
+    results: [],
   };
 }
 
