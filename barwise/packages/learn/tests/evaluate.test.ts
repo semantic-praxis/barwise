@@ -3,6 +3,7 @@ import { Verbalizer } from "@barwise/core/verbalization";
 import { describe, expect, it } from "vitest";
 import { mustValidate } from "../src/evaluate/checks/mustValidate.js";
 import { evaluateCandidate } from "../src/evaluate/evaluateCandidate.js";
+import { getObjectTypeByNameOrAlias } from "../src/evaluate/nameResolution.js";
 import type { GymCheck, GymExercise } from "../src/exercise/types.js";
 import { ModelBuilder } from "./helpers/ModelBuilder.js";
 
@@ -221,5 +222,82 @@ describe("alias-aware matching", () => {
       exercise([{ kind: "requires_element", element: { entity: "Purchaser" } }]),
     );
     expect(report.passed).toBe(false);
+  });
+});
+
+describe("compound-term matching across spellings", () => {
+  /** The shape the extractor actually produces on the
+   *  university-enrollment eval case: the concept is reified, named
+   *  "Offering", and records the rubric's term with a space. */
+  function spacedAlias(): OrmModel {
+    return new ModelBuilder("spacing")
+      .withEntityType("Offering", { aliases: ["Course Offering"] })
+      .withEntityType("Student")
+      .withBinaryFactType("Student enrolls in Offering", {
+        role1: { player: "Student", name: "enrolls in" },
+        role2: { player: "Offering", name: "enrolls" },
+        uniqueness: "role2",
+      })
+      .build();
+  }
+
+  it("matches an alias whose only difference is a space", () => {
+    // Before this, three checks on university-enrollment failed for a
+    // spelling difference and cost roughly 0.12 of the suite mean.
+    const report = evaluateCandidate(
+      spacedAlias(),
+      exercise([{ kind: "requires_element", element: { entity: "CourseOffering" } }]),
+    );
+    expect(report.passed).toBe(true);
+  });
+
+  it("matches factTypeBetween endpoints across the same difference", () => {
+    const report = evaluateCandidate(
+      spacedAlias(),
+      exercise([{
+        kind: "requires_element",
+        element: { factTypeBetween: ["Student", "CourseOffering"] },
+      }]),
+    );
+    expect(report.passed).toBe(true);
+  });
+
+  it("ignores case, hyphens, and underscores too", () => {
+    const model = new ModelBuilder("spelling")
+      .withEntityType("PurchaseOrder", { aliases: ["purchase-order"] })
+      .build();
+    for (const term of ["purchase order", "Purchase_Order", "PURCHASEORDER"]) {
+      const report = evaluateCandidate(
+        model,
+        exercise([{ kind: "requires_element", element: { entity: term } }]),
+      );
+      expect(report.passed, term).toBe(true);
+    }
+  });
+
+  it("does not match terms that differ by more than separators", () => {
+    // Normalization rescues spelling, not meaning: only separators and
+    // case are removed, so distinct words stay distinct.
+    const model = new ModelBuilder("distinct").withEntityType("Order").build();
+    for (const term of ["Orders", "OrderLine", "Ord"]) {
+      const report = evaluateCandidate(
+        model,
+        exercise([{ kind: "requires_element", element: { entity: term } }]),
+      );
+      expect(report.passed, term).toBe(false);
+    }
+  });
+
+  it("prefers an exact match over a normalized one", () => {
+    // Two types that normalize alike: the exact name must win, so
+    // resolution stays predictable rather than order-dependent.
+    const model = new ModelBuilder("precedence")
+      .withEntityType("Course Offering")
+      .withEntityType("CourseOffering")
+      .build();
+    expect(getObjectTypeByNameOrAlias(model, "CourseOffering")?.name)
+      .toBe("CourseOffering");
+    expect(getObjectTypeByNameOrAlias(model, "Course Offering")?.name)
+      .toBe("Course Offering");
   });
 });
