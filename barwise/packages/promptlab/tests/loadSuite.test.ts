@@ -16,6 +16,11 @@ function tmpSuiteDir(): string {
 }
 
 describe("loadSuite on the packaged seed suite", () => {
+  // The only test that loads the whole packaged suite in its body: seven
+  // transcripts read from disk and seven reference models deserialized
+  // through OrmYamlSerializer. That runs in well under a second locally
+  // and an order of magnitude slower under coverage instrumentation on a
+  // shared CI runner, so it needs more than vitest's 5s default.
   it("loads the manifest with weights and seven cases in declared order", () => {
     const suite = loadSuite(defaultSuitePath());
     expect(suite.version).toBe("1.1.0");
@@ -41,7 +46,7 @@ describe("loadSuite on the packaged seed suite", () => {
       expect(c.reference).toBeDefined();
       expect(c.evalCase.checks.length).toBeGreaterThanOrEqual(5);
     }
-  });
+  }, 30_000);
 });
 
 describe("loadSuite validation", () => {
