@@ -1,8 +1,8 @@
 # Complete the prompt-artifact seam: resolve variants in production, and promote the model-agnostic rules into the default
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Accepted (workstream 1 implemented; see Implementation notes)
 Created: 2026-08-09
-Last-updated: 2026-08-09
+Last-updated: 2026-08-20
 Tracking: completes workstream 1 of
 `docs/specs/prompt-optimization-harness.spec.md` (whose Inventory
 claims production resolution that was never wired); motivated by
@@ -314,6 +314,42 @@ the pre-promotion baseline for either tier.
   a dated report as the other prompt changes were.
 - Full gate after each workstream: `npm run build`, `test`, `lint`
   from `barwise/`.
+
+## Implementation notes
+
+### Workstream 1 (2026-08-20)
+
+Shipped as specified. Re-grounding first, per `spec-writer` step 8,
+confirmed the load-bearing claims and corrected one.
+
+- **Correction: the blast-radius estimate names the wrong packages.**
+  Workstream 2 says it updates "every mock client in the `llm`, `cli`,
+  `mcp`, and `vscode` test suites." `cli` and `vscode` have no mock
+  clients at all -- they reference `LlmClient` only in `src`, through
+  `createLlmClient` and `CopilotLlmClient`. `promptlab` has two the
+  spec does not mention. The set is `llm` (6+ files), `mcp` (2),
+  `promptlab` (2), plus `CopilotLlmClient` in vscode's `src`. The
+  design is unaffected; the estimate of what workstream 2 touches was
+  wrong.
+- **Confirmed unchanged:** `files: ["dist"]` still excludes `prompts/`,
+  so compiling in is still necessary; `LlmClient` still exposes only
+  `complete`, with `modelUsed` arriving on the response, so workstream
+  2's interface widening is still the honest route; the golden test
+  still pins the default's bytes; each provider still holds a private
+  resolved model with its own fallback.
+- **Worth knowing for workstream 2:** the Anthropic provider's fallback
+  model is `claude-sonnet-4-5-20250929`, which matches no variant
+  (`sonnet5` matches `claude-sonnet-5`). A caller who configures no
+  model therefore resolves to the default artifact, which is correct
+  but means the common unconfigured path sees no behavior change.
+- **Generated, committed, drift-guarded**, per the Open decision. The
+  generator serializes what `loadArtifactsFromDir` returns rather than
+  parsing YAML itself, so there is one parser and one set of validation
+  rules. The guard was verified by perturbing the generated file and
+  confirming it fails, then restoring and confirming it passes.
+- The out-of-scope note on the evaluator's exact-string alias matching
+  is now resolved: it shipped separately in PR #305, as the note said
+  it would.
 
 ## Non-goals
 
