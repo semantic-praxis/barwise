@@ -117,11 +117,18 @@ full monorepo build and tests after modifying core's public API.
 ## Current State
 
 All development phases are complete; the full suite passes in CI
-across all 10 packages. The CLI (`barwise`) and MCP server
-(`barwise-mcp`) provide the same capabilities as the VS Code
-extension. Core ships no interop format: the standard descriptors
-live in `@barwise/formats`, dbt in `@barwise/dbt`, and code importers
-in `@barwise/code-analysis`.
+across all 12 packages. Core ships no interop format: the standard
+descriptors live in `@barwise/formats`, dbt in `@barwise/dbt`, and
+code importers in `@barwise/code-analysis`.
+
+The three surfaces do **not** all expose the same capabilities, and
+the divergence is undocumented rather than designed
+(`docs/unwired-capability-audit-2026-08-20.md`). Six capabilities
+reach all three. `review` reaches MCP and VS Code but not the CLI;
+`merge` reaches MCP alone; `project` and `history` are CLI-only. Only
+`prompt` is deliberately CLI-only, as dev tooling. Check the audit
+before assuming a capability is reachable from the surface you are
+working on.
 
 ## Monorepo Commands
 
