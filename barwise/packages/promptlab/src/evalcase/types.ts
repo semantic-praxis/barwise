@@ -22,6 +22,40 @@ export interface SuiteWeights {
    * diagnostic (the lint tier). Omitted in the manifest means 0.
    */
   readonly validationWarning: number;
+  /**
+   * Score subtracted per ambiguity reported beyond a case's
+   * `ambiguityBudget`. Omitted in the manifest means 0. This is the
+   * precision half of `requires_ambiguity`: without it, an extraction
+   * that flags everything passes every ambiguity check by coincidence.
+   */
+  readonly ambiguityExcess: number;
+}
+
+/**
+ * A promptlab-native check, evaluated against the extraction payload
+ * rather than the parsed model
+ * (docs/specs/eval-transcript-realism.spec.md).
+ *
+ * `@barwise/learn` grades an `OrmModel` for a human learner, and
+ * `evaluateCandidate` never sees the payload -- so a check over the
+ * extractor's ambiguity list has no home in the `GymCheck` union and
+ * lives here instead.
+ */
+export type PromptCheck = {
+  readonly kind: "requires_ambiguity";
+  /**
+   * Case-insensitive substrings. An ambiguity matches when its
+   * description contains every one of them, so a multi-term match
+   * narrows rather than widens.
+   */
+  readonly matches: readonly string[];
+  /** Shown only on failure; the case author's nudge. */
+  readonly hint?: string;
+};
+
+/** True for checks promptlab evaluates itself. */
+export function isPromptCheck(check: GymCheck | PromptCheck): check is PromptCheck {
+  return check.kind === "requires_ambiguity";
 }
 
 /** An eval case as authored in a `.eval.yaml` file. */
@@ -32,7 +66,14 @@ export interface EvalCase {
   /** Path (relative to the case file) to the reference model backing
    *  `forbids_population` checks. */
   readonly reference?: string;
-  readonly checks: readonly GymCheck[];
+  /**
+   * How many ambiguities this transcript can carry before the excess
+   * penalty applies. Omitted means unbounded -- which is what every
+   * case written before this field meant, so the seed suite is
+   * unaffected.
+   */
+  readonly ambiguityBudget?: number;
+  readonly checks: readonly (GymCheck | PromptCheck)[];
 }
 
 /** An eval case with its transcript and reference loaded. */

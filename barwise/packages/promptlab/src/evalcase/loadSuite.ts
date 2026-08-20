@@ -4,14 +4,20 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
-import type { EvalCase, EvalSuite, LoadedEvalCase, SuiteWeights } from "./types.js";
+import type { EvalCase, EvalSuite, LoadedEvalCase, PromptCheck, SuiteWeights } from "./types.js";
 
-const CHECK_KINDS = [
+/** Checks `@barwise/learn` evaluates against the parsed model. */
+const GYM_CHECK_KINDS = [
   "must_validate",
   "requires_verbalization",
   "forbids_population",
   "requires_element",
 ] as const;
+
+/** Checks promptlab evaluates against the extraction payload. */
+const PROMPT_CHECK_KINDS = ["requires_ambiguity"] as const;
+
+const CHECK_KINDS = [...GYM_CHECK_KINDS, ...PROMPT_CHECK_KINDS] as const;
 
 /** The packaged seed suite's manifest path. */
 export function defaultSuitePath(): string {
@@ -85,6 +91,16 @@ export function loadEvalCase(filePath: string): LoadedEvalCase {
     throw new Error(`${absPath}: "reference" must be a file path.`);
   }
 
+  const ambiguityBudget = doc["ambiguityBudget"];
+  if (
+    ambiguityBudget !== undefined
+    && (typeof ambiguityBudget !== "number"
+      || !Number.isInteger(ambiguityBudget)
+      || ambiguityBudget < 0)
+  ) {
+    throw new Error(`${absPath}: "ambiguityBudget" must be a non-negative integer.`);
+  }
+
   const checks = validateChecks(doc["checks"], absPath);
 
   const caseDir = dirname(absPath);
@@ -110,6 +126,7 @@ export function loadEvalCase(filePath: string): LoadedEvalCase {
     id,
     transcript: transcriptPath,
     ...(referencePath !== undefined ? { reference: referencePath } : {}),
+    ...(ambiguityBudget !== undefined ? { ambiguityBudget } : {}),
     checks,
   };
   return {
@@ -136,24 +153,27 @@ function validateWeights(value: unknown, manifestPath: string): SuiteWeights {
   const conformanceCorrection = obj["conformanceCorrection"];
   const validationError = obj["validationError"];
   const validationWarning = obj["validationWarning"] ?? 0;
+  const ambiguityExcess = obj["ambiguityExcess"] ?? 0;
   if (
     typeof conformanceCorrection !== "number"
     || typeof validationError !== "number"
     || typeof validationWarning !== "number"
+    || typeof ambiguityExcess !== "number"
     || conformanceCorrection < 0
     || validationError < 0
     || validationWarning < 0
+    || ambiguityExcess < 0
   ) {
     throw new Error(
       `${manifestPath}: weights need non-negative numbers`
         + ` "conformanceCorrection" and "validationError"`
-        + ` (and, when declared, "validationWarning").`,
+        + ` (and, when declared, "validationWarning" and "ambiguityExcess").`,
     );
   }
-  return { conformanceCorrection, validationError, validationWarning };
+  return { conformanceCorrection, validationError, validationWarning, ambiguityExcess };
 }
 
-function validateChecks(value: unknown, filePath: string): GymCheck[] {
+function validateChecks(value: unknown, filePath: string): (GymCheck | PromptCheck)[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new Error(`${filePath}: "checks" must be a non-empty list.`);
   }
@@ -186,9 +206,22 @@ function validateChecks(value: unknown, filePath: string): GymCheck[] {
           throw new Error(`${filePath}: checks[${i}] needs an "element" query.`);
         }
         break;
+      case "requires_ambiguity": {
+        const matches = check["matches"];
+        if (
+          !Array.isArray(matches)
+          || matches.length === 0
+          || matches.some((m) => typeof m !== "string" || m.length === 0)
+        ) {
+          throw new Error(
+            `${filePath}: checks[${i}] needs a non-empty "matches" list of non-empty strings.`,
+          );
+        }
+        break;
+      }
       case "must_validate":
         break;
     }
-    return entry as GymCheck;
+    return entry as GymCheck | PromptCheck;
   });
 }
