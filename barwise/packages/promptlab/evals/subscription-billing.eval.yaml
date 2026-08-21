@@ -1,0 +1,31 @@
+# Tests composite uniqueness. Priya states, corrects herself, and
+# restates the rule: not one active subscription per account, but one
+# active subscription per account per product. Getting that right means
+# a fact type spanning account and product rather than a binary.
+#
+# No reference model, so no forbids_population -- see vendor-onboarding.
+id: subscription-billing
+transcript: subscription-billing.transcript.md
+ambiguityBudget: 10
+checks:
+  - kind: must_validate
+  - kind: requires_element
+    element:
+      entity: Account
+  - kind: requires_element
+    element:
+      entity: Subscription
+  - kind: requires_element
+    element:
+      entity: Product
+    hint: The per-product part of "one active subscription per account per product".
+  - kind: requires_element
+    element:
+      factTypeBetween: [Account, Subscription]
+  - kind: requires_element
+    element:
+      factTypeBetween: [Subscription, Product]
+    hint: Without this, the account-product combination cannot be constrained.
+  - kind: requires_ambiguity
+    matches: [cancel]
+    hint: The room parked what happens commercially when an annual subscription is cancelled mid-term.

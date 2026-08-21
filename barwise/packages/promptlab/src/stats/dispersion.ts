@@ -128,6 +128,29 @@ export function dispersionOf(cases: readonly CaseDispersionInput[]): Dispersion 
 }
 
 /**
+ * Split a case's scored samples at the suite's collapse floor
+ * (docs/specs/eval-metric-readiness.spec.md).
+ *
+ * A run of a case answers two questions at once -- did the extraction
+ * survive at all, and how good was it when it did -- and averaging them
+ * blends a near-Bernoulli variable with a tight one. On the recorded
+ * 2026-08-21 runs, one bimodal case carried 60% and 91% of all
+ * variance; separating the two populations moved the same comparison
+ * from unresolved to resolved without a single extra call.
+ *
+ * `quality` is empty rather than zero-filled when everything collapsed:
+ * a configuration that never produced a usable model has no quality to
+ * report, which is not the same as modelling badly.
+ */
+export function splitAtFloor(
+  scores: readonly number[],
+  floor: number,
+): { readonly collapses: number; readonly quality: readonly number[]; } {
+  const quality = scores.filter((s) => s >= floor);
+  return { collapses: scores.length - quality.length, quality };
+}
+
+/**
  * Half-width of the 95% interval around a mean -- the "+/-" that
  * belongs next to any mean this harness prints.
  *

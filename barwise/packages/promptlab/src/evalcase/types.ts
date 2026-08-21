@@ -76,9 +76,17 @@ export interface EvalCase {
   readonly checks: readonly (GymCheck | PromptCheck)[];
 }
 
+/** Which half of the suite a case belongs to. */
+export type SuiteSplit = "train" | "dev";
+
 /** An eval case with its transcript and reference loaded. */
 export interface LoadedEvalCase {
   readonly evalCase: EvalCase;
+  /**
+   * The split this case belongs to, when the manifest declares splits.
+   * Absent means the manifest declares none and every case runs.
+   */
+  readonly split?: SuiteSplit;
   /** The transcript text sent to the LLM. */
   readonly transcript: string;
   readonly reference?: OrmModel;
@@ -89,6 +97,14 @@ export interface LoadedEvalCase {
 export interface EvalSuite {
   readonly version: string;
   readonly weights: SuiteWeights;
+  /**
+   * Score below which a scored sample counts as a collapse rather than
+   * a bad model (docs/specs/eval-metric-readiness.spec.md). Declared in
+   * the manifest, not in code, for the same reason the weights are: it
+   * is a judgment, and a judgment belongs in a reviewable diff.
+   * Omitted means no split, and today's report byte for byte.
+   */
+  readonly collapseFloor?: number;
   readonly cases: readonly LoadedEvalCase[];
   readonly manifestPath: string;
 }

@@ -4,7 +4,14 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
-import type { EvalCase, EvalSuite, LoadedEvalCase, PromptCheck, SuiteWeights } from "./types.js";
+import type {
+  EvalCase,
+  EvalSuite,
+  LoadedEvalCase,
+  PromptCheck,
+  SuiteSplit,
+  SuiteWeights,
+} from "./types.js";
 
 /** Checks `@barwise/learn` evaluates against the parsed model. */
 const GYM_CHECK_KINDS = [
@@ -41,6 +48,7 @@ export function loadSuite(manifestPath: string): EvalSuite {
   }
 
   const weights = validateWeights(doc["weights"], absManifest);
+  const collapseFloor = validateCollapseFloor(doc["collapseFloor"], absManifest);
 
   const casePaths = doc["cases"];
   if (!Array.isArray(casePaths) || casePaths.length === 0) {
@@ -63,10 +71,16 @@ export function loadSuite(manifestPath: string): EvalSuite {
     ids.add(c.evalCase.id);
   }
 
+  const splits = validateSplits(doc["splits"], ids, absManifest);
+  const withSplits = splits === undefined
+    ? cases
+    : cases.map((c) => ({ ...c, split: splits.get(c.evalCase.id)! }));
+
   return {
     version,
     weights,
-    cases,
+    ...(collapseFloor !== undefined ? { collapseFloor } : {}),
+    cases: withSplits,
     manifestPath: absManifest,
   };
 }
@@ -143,6 +157,69 @@ function parseMapping(raw: string, filePath: string): Record<string, unknown> {
     throw new Error(`${filePath}: must be a YAML mapping.`);
   }
   return doc as Record<string, unknown>;
+}
+
+/**
+ * The train/dev assignment, when declared.
+ *
+ * Every declared case must appear in exactly one split. The alternative
+ * -- defaulting unlisted cases to train -- silently swallows the
+ * commonest mistake, which is adding a case and forgetting to place it,
+ * and a case that quietly joins the training set is a case that can no
+ * longer detect overfitting (eval-metric-readiness spec).
+ */
+function validateSplits(
+  value: unknown,
+  ids: ReadonlySet<string>,
+  manifestPath: string,
+): Map<string, SuiteSplit> | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${manifestPath}: "splits" must be a mapping of split name to case ids.`);
+  }
+  const obj = value as Record<string, unknown>;
+  const assigned = new Map<string, SuiteSplit>();
+  for (const name of ["train", "dev"] as const) {
+    const listed = obj[name] ?? [];
+    if (!Array.isArray(listed)) {
+      throw new Error(`${manifestPath}: "splits.${name}" must be a list of case ids.`);
+    }
+    for (const id of listed) {
+      if (typeof id !== "string") {
+        throw new Error(`${manifestPath}: "splits.${name}" must list case ids as strings.`);
+      }
+      if (!ids.has(id)) {
+        throw new Error(`${manifestPath}: "splits.${name}" names unknown case "${id}".`);
+      }
+      if (assigned.has(id)) {
+        throw new Error(`${manifestPath}: case "${id}" appears in more than one split.`);
+      }
+      assigned.set(id, name);
+    }
+  }
+  const unassigned = [...ids].filter((id) => !assigned.has(id));
+  if (unassigned.length > 0) {
+    throw new Error(
+      `${manifestPath}: every case must be assigned to a split when "splits" is declared;`
+        + ` missing: ${unassigned.join(", ")}.`,
+    );
+  }
+  return assigned;
+}
+
+/**
+ * The collapse floor, when declared. Bounded to [0, 1) because a floor
+ * of 1 would call every imperfect sample a collapse, which is not a
+ * split but a different metric wearing the same name.
+ */
+function validateCollapseFloor(value: unknown, manifestPath: string): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "number" || !(value >= 0) || value >= 1) {
+    throw new Error(
+      `${manifestPath}: "collapseFloor" must be a number in [0, 1) when declared.`,
+    );
+  }
+  return value;
 }
 
 function validateWeights(value: unknown, manifestPath: string): SuiteWeights {

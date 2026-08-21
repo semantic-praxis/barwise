@@ -1,0 +1,30 @@
+# Tests a disjunctive mandatory and an overloaded pair. Nadia corrects
+# herself into a firm rule -- an incident has an alert, or a customer
+# report, or both, and never neither -- and the room spends several
+# turns establishing that severity and priority are different things,
+# explicitly refuting "a P1 is always a SEV1". An extraction that
+# collapses them into one concept fails the last two checks.
+#
+# No reference model, so no forbids_population -- see vendor-onboarding.
+id: incident-response
+transcript: incident-response.transcript.md
+checks:
+  - kind: must_validate
+  - kind: requires_element
+    element:
+      entity: Incident
+  - kind: requires_element
+    element:
+      entity: Alert
+  - kind: requires_element
+    element:
+      factTypeBetween: [Incident, Alert]
+    hint: An incident has an alert or a customer report, and never neither.
+  - kind: requires_element
+    element:
+      entity: Severity
+    hint: Severity is blast radius; keep it distinct from priority.
+  - kind: requires_element
+    element:
+      entity: Priority
+    hint: Priority is customer urgency. "A P1 is always a SEV1" was refuted in the room.

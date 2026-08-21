@@ -70,6 +70,10 @@ function registerEval(promptCmd: Command, version: string): void {
     .option("--base-url <url>", "Ollama server URL (only for ollama provider)")
     .option("--artifacts <dir>", "Load .prompt.yaml variants from this directory")
     .option("--repeat <n>", "Samples per case", "1")
+    .option(
+      "--split <split>",
+      "Run only one half of the suite (train or dev). Omitted runs every case.",
+    )
     .option("--format <format>", "Output format (text or json)", "text")
     .option("--no-history", "Do not append this run to the suite's history file")
     .option(
@@ -82,6 +86,7 @@ function registerEval(promptCmd: Command, version: string): void {
           suite?: string;
           artifacts?: string;
           repeat: string;
+          split?: string;
           format: string;
           history: boolean;
           forceHistory?: boolean;
@@ -112,8 +117,12 @@ function registerEval(promptCmd: Command, version: string): void {
             baseUrl: opts.baseUrl,
           });
 
+          if (opts.split !== undefined && opts.split !== "train" && opts.split !== "dev") {
+            throw new Error(`Unknown split "${opts.split}". Use "train" or "dev".`);
+          }
           const report = await runSuite(suite, client, {
             ...(artifact !== undefined ? { artifact } : {}),
+            ...(opts.split !== undefined ? { split: opts.split as "train" | "dev" } : {}),
             repeat: Number(opts.repeat),
           });
 
@@ -280,8 +289,20 @@ function renderReport(report: SuiteReport): string {
     // always would bury the signal it exists to carry.
     const samples = c.samples === report.repeat ? "" : `  n=${c.samples}/${report.repeat}`;
     const sd = c.sd === undefined ? "" : `  sd=${c.sd.toFixed(3)}`;
+    // When a floor is declared, the two questions the mean was blending
+    // are shown apart: how often it survived, and how good it was when
+    // it did (eval-metric-readiness spec).
+    const survived = c.collapses === undefined
+      ? ""
+      : `  ok=${c.samples - c.collapses}/${c.samples}`
+        + (c.qualityMean === undefined
+          ? "  (no sample survived)"
+          : `  quality=${c.qualityMean.toFixed(3)}`
+            + (c.qualitySd === undefined ? "" : `+/-${c.qualitySd.toFixed(3)}`));
     lines.push(
-      `${c.caseId}  mean=${c.mean.toFixed(3)}  worst=${c.worst.toFixed(3)}${sd}${samples}`,
+      `${c.caseId}  mean=${c.mean.toFixed(3)}  worst=${
+        c.worst.toFixed(3)
+      }${sd}${samples}${survived}`,
     );
     for (const run of c.runs) {
       if (run.failed) {

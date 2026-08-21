@@ -130,6 +130,25 @@ is a sample, not a constant. The harness runs each case N times
 (default 1, configurable) and reports mean and worst-case; the
 determinism claim is scoped to the scorer, and eval reports say so.
 
+> **Correction (2026-08-21): determinism is not resolution.** "Makes
+> DSPy compilation trustworthy" above is true of the scorer's freedom
+> from judge drift and false of the suite's ability to separate two
+> candidates, and anyone building `optimizer/` will read it as the
+> stronger claim. Measured on the n=5 runs of 2026-08-21, the suite
+> resolves a difference of about 0.09 and no less; resolving 0.02 would
+> need roughly n=190 per configuration. A search whose candidates
+> differ by less than its metric can see does not converge slowly, it
+> converges to noise.
+>
+> `docs/specs/eval-metric-readiness.spec.md` is the prerequisite and
+> has landed: the suite now separates collapse from quality, carries
+> ten cases, and holds three of them out as a dev split. Build
+> `optimizer/` to search on the composite score over `train` and to
+> gate on `dev` -- an optimizer that never sees a held-out set will
+> reproduce, faster, the overfitting already visible in `haiku45-2`,
+> which improves six of seven training cases and regresses the
+> seventh beyond noise.
+
 ## Scope
 
 In scope:
