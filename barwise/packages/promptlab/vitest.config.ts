@@ -3,6 +3,10 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
+    // Loading the packaged seed suite parses seven cases with their
+    // reference models; the 5s default is too tight on a loaded CI runner
+    // under coverage instrumentation.
+    testTimeout: 30_000,
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
