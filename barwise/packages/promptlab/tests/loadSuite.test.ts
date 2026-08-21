@@ -16,14 +16,14 @@ function tmpSuiteDir(): string {
 }
 
 describe("loadSuite on the packaged seed suite", () => {
-  // The only test that loads the whole packaged suite in its body: seven
+  // The only test that loads the whole packaged suite in its body: ten
   // transcripts read from disk and seven reference models deserialized
   // through OrmYamlSerializer. That runs in well under a second locally
   // and an order of magnitude slower under coverage instrumentation on a
-  // shared CI runner, so it needs more than vitest's 5s default.
-  it("loads the manifest with weights and seven cases in declared order", () => {
+  // shared CI runner, so the package sets a 30s testTimeout.
+  it("loads the manifest with weights and ten cases in declared order", () => {
     const suite = loadSuite(defaultSuitePath());
-    expect(suite.version).toBe("1.1.0");
+    expect(suite.version).toBe("1.2.0");
     expect(suite.weights).toEqual({
       conformanceCorrection: 0.02,
       validationError: 0.1,
@@ -40,11 +40,35 @@ describe("loadSuite on the packaged seed suite", () => {
       "project-staffing",
       "conference-reviews",
       "freight-corrections",
+      "vendor-onboarding",
+      "subscription-billing",
+      "incident-response",
     ]);
+    expect(suite.collapseFloor).toBe(0.3);
     for (const c of suite.cases) {
       expect(c.transcript.length).toBeGreaterThan(100);
-      expect(c.reference).toBeDefined();
       expect(c.evalCase.checks.length).toBeGreaterThanOrEqual(5);
+      expect(c.split).toBeDefined();
+    }
+  });
+
+  it("splits seven train cases from three held-out dev cases", () => {
+    const suite = loadSuite(defaultSuitePath());
+    const dev = suite.cases.filter((c) => c.split === "dev").map((c) => c.evalCase.id);
+    const train = suite.cases.filter((c) => c.split === "train");
+    expect(dev).toEqual(["vendor-onboarding", "subscription-billing", "incident-response"]);
+    expect(train).toHaveLength(7);
+  });
+
+  it("gives every train case a reference model, and no dev case one", () => {
+    // References are generated from a recorded payload, and the dev
+    // cases have never run against a provider -- so they ship with
+    // reference-free rubrics and gain population checks later. Pinned
+    // so that stays a deliberate state rather than a forgotten one.
+    const suite = loadSuite(defaultSuitePath());
+    for (const c of suite.cases) {
+      if (c.split === "train") expect(c.reference, c.evalCase.id).toBeDefined();
+      else expect(c.reference, c.evalCase.id).toBeUndefined();
     }
   });
 });

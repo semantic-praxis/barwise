@@ -47,6 +47,11 @@ export interface HistoryEntry {
   readonly provider?: string;
   readonly model?: string;
   readonly repeat: number;
+  /**
+   * Which half of the suite ran. Absent means all of it, which is what
+   * every row written before splits existed means.
+   */
+  readonly split?: string;
   readonly mean: number;
   readonly worst: number;
   /**
@@ -89,6 +94,7 @@ export function toHistoryEntry(
     ...(target?.provider !== undefined ? { provider: target.provider } : {}),
     ...(target?.model !== undefined ? { model: target.model } : {}),
     repeat: report.repeat,
+    ...(report.split !== undefined ? { split: report.split } : {}),
     mean: report.mean,
     worst: report.worst,
     ...(report.dispersion.standardError !== undefined

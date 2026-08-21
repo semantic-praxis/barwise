@@ -1,0 +1,32 @@
+# Tests an identifier chosen against a tempting decoy. The transcript
+# offers tax ID as an identifier and then withdraws it ("we have
+# duplicates"), settling on vendor number; and Raj over-claims "exactly
+# one completed risk review" before correcting himself to "a vendor
+# accumulates reviews; at most one is current".
+#
+# No reference model, so no forbids_population: references are generated
+# from a recorded payload, and this case has never run against a
+# provider (eval-metric-readiness spec, workstream 2).
+id: vendor-onboarding
+transcript: vendor-onboarding.transcript.md
+ambiguityBudget: 10
+checks:
+  - kind: must_validate
+  - kind: requires_element
+    element:
+      entity: Vendor
+  - kind: requires_element
+    element:
+      entity: VendorNumber
+    hint: Vendor number is the identifier the room settled on, not tax ID.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Vendor, VendorNumber]
+    hint: An entity with a reference mode needs its identifier fact type.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Vendor, RiskReview]
+    hint: A vendor accumulates reviews over time; at most one is current.
+  - kind: requires_ambiguity
+    matches: [suspend]
+    hint: The room parked what happens to in-flight purchase orders when a vendor is suspended.

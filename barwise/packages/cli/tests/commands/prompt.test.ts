@@ -49,6 +49,17 @@ describe("barwise prompt score", () => {
   });
 });
 
+describe("barwise prompt eval", () => {
+  it("rejects an unknown split before spending a call", async () => {
+    // The guard runs before the client is used, so a typo costs nothing
+    // rather than a suite's worth of API calls against the wrong set.
+    const result = await runCli(["prompt", "eval", "--split", "trian"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('Unknown split "trian"');
+    expect(result.stderr).toContain("train");
+  });
+});
+
 describe("barwise prompt schema", () => {
   it("prints the extraction structured-output schema", async () => {
     const result = await runCli(["prompt", "schema"]);

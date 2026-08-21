@@ -1,8 +1,28 @@
-version: 1.1.0
+# The packaged seed suite (docs/specs/prompt-optimization-harness.spec.md).
+#
+# 1.2.0 adds three cases and splits the suite
+# (docs/specs/eval-metric-readiness.spec.md). A mean over ten cases is
+# not comparable to a mean over seven, which is what the version bump
+# is here to signal: history rows either side of it measure different
+# things.
+version: 1.2.0
+
 weights:
   conformanceCorrection: 0.02
   validationError: 0.1
   validationWarning: 0.05
+
+# Below this, a scored sample counts as a collapse rather than a bad
+# model, and is reported separately from the quality mean. A judgment,
+# so it lives in the manifest where a diff shows it changing.
+#
+# 0.3 puts the recorded 2026-08-21 collapses (university-enrollment's
+# 0.000 samples on Haiku) below the line and every other recorded sample
+# above it. That is fitted to seven cases of evidence and should be
+# revisited once ten have run: a floor that never fires is telling you
+# something, and so is one that fires everywhere.
+collapseFloor: 0.3
+
 cases:
   - order-management.eval.yaml
   - university-enrollment.eval.yaml
@@ -11,3 +31,31 @@ cases:
   - project-staffing.eval.yaml
   - conference-reviews.eval.yaml
   - freight-corrections.eval.yaml
+  - vendor-onboarding.eval.yaml
+  - subscription-billing.eval.yaml
+  - incident-response.eval.yaml
+
+# Every case must be assigned; the loader rejects a manifest that leaves
+# one out, because a case that quietly joins the training set is a case
+# that can no longer detect overfitting.
+#
+# The three new cases are the whole dev set on purpose. No prompt has
+# ever been tuned against them, which makes them the only honest test of
+# whether a variant generalises -- and haiku45-2, which was hand-tuned
+# against the seven below, improves six of them and regresses
+# conference-reviews beyond noise. The seven stay in train because their
+# scores form the entire recorded history and moving them would cost
+# that continuity.
+splits:
+  train:
+    - order-management
+    - university-enrollment
+    - clinic-appointments
+    - employee-hierarchy
+    - project-staffing
+    - conference-reviews
+    - freight-corrections
+  dev:
+    - vendor-onboarding
+    - subscription-billing
+    - incident-response

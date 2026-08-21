@@ -85,6 +85,19 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
   pins the n-1 denominator and reproduces the recorded Haiku run's
   standard error, so a change to the fold contradicts the report it
   was derived from.
+- **The suite is split, and dev is held out.** `suite.yaml` assigns
+  every case to `train` or `dev`, and the loader rejects a manifest
+  that leaves one unassigned -- a case that quietly joins train is a
+  case that can no longer detect overfitting. The three dev cases have
+  never been tuned against, which is the only honest test of whether a
+  prompt variant generalises. `runSuite({split})` and
+  `barwise prompt eval --split` select one half.
+- **A collapse is not a bad score.** `collapseFloor` in the manifest
+  separates "did the extraction survive" from "how good was it when it
+  did", reported per case as `collapses`, `qualityMean`, `qualitySd`.
+  It never changes `mean`, so every recorded history row stays
+  comparable -- search on the composite, gate on the pair. Below the
+  floor for every sample means **no** quality mean rather than zero.
 - **Two identifiers pin a run, and they answer different questions.**
   `promptHash` (`src/provenance/promptHash.ts`) fingerprints the
   rendered system prompt, so it catches a variant edited without its

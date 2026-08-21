@@ -23,12 +23,12 @@ import {
   buildUserMessage,
   defaultExtractionArtifact,
 } from "@barwise/llm";
-import type { EvalSuite } from "../evalcase/types.js";
+import type { EvalSuite, SuiteSplit } from "../evalcase/types.js";
 import { hashPrompt } from "../provenance/promptHash.js";
 import type { CaseScore } from "../score/scoreExtraction.js";
 import { scoreExtraction } from "../score/scoreExtraction.js";
 import type { Dispersion } from "../stats/dispersion.js";
-import { dispersionOf, sampleSd } from "../stats/dispersion.js";
+import { dispersionOf, sampleSd, splitAtFloor } from "../stats/dispersion.js";
 import type { FailureKind, RetryOptions } from "./retry.js";
 import { withRetry } from "./retry.js";
 
@@ -39,6 +39,15 @@ export interface RunSuiteOptions {
   readonly repeat?: number;
   /** Retry policy for provider failures. */
   readonly retry?: RetryOptions;
+  /**
+   * Run only one half of the suite. Omitted runs every case, which is
+   * what a manifest without splits means anyway.
+   *
+   * The point of selecting `dev` is that no prompt has been tuned
+   * against it: a candidate that wins on train and loses on dev fitted
+   * the suite rather than the task (eval-metric-readiness spec).
+   */
+  readonly split?: SuiteSplit;
 }
 
 /** One LLM call's outcome. */
@@ -76,6 +85,20 @@ export interface CaseSummary {
    * says everything.
    */
   readonly sd?: number;
+  /**
+   * Scored samples below the suite's `collapseFloor`. Absent when the
+   * manifest declares no floor.
+   */
+  readonly collapses?: number;
+  /**
+   * Mean over the samples at or above the floor -- how good the model
+   * was when it survived. Absent when nothing survived: a case that
+   * always collapsed has no quality to report, which is a different
+   * statement from modelling badly.
+   */
+  readonly qualityMean?: number;
+  /** Spread of those same samples; absent below two of them. */
+  readonly qualitySd?: number;
 }
 
 export interface SuiteReport {
@@ -97,6 +120,8 @@ export interface SuiteReport {
   readonly failures: number;
   /** True when every requested run produced a score. */
   readonly complete: boolean;
+  /** Which half ran, when one was selected. */
+  readonly split?: SuiteSplit;
   /**
    * How much of `mean` is sampling noise. Read this before comparing
    * two runs: a gap under `resolvableDifference` is not a result.
@@ -120,6 +145,16 @@ export async function runSuite(
       `Prompt artifact surface "${artifact.surface}" cannot drive transcript extraction.`,
     );
   }
+  const selected = options?.split;
+  const suiteCases = selected === undefined
+    ? suite.cases
+    : suite.cases.filter((c) => c.split === selected);
+  if (suiteCases.length === 0) {
+    throw new Error(
+      `No cases in split "${selected}". Declare a "splits" block in the suite manifest.`,
+    );
+  }
+
   const systemPrompt = buildSystemPrompt(false, artifact);
   const responseSchema = buildResponseSchema(false);
 
@@ -163,7 +198,7 @@ export async function runSuite(
   };
 
   const cases: CaseSummary[] = [];
-  for (const loadedCase of suite.cases) {
+  for (const loadedCase of suiteCases) {
     const runs: CaseRun[] = [];
     for (let i = 0; i < repeat; i++) {
       runs.push(await runOnce(loadedCase));
@@ -172,6 +207,18 @@ export async function runSuite(
       .filter((r) => r.score !== undefined)
       .map((r) => r.score!.score);
     const sd = sampleSd(scores);
+    // The floor separates "did it survive" from "how good when it did".
+    // Both are reported; neither replaces `mean`, so every recorded
+    // history row stays comparable (eval-metric-readiness spec).
+    // Named for the floor, not the train/dev split above -- two
+    // different senses of the word meet in this function.
+    const atFloor = suite.collapseFloor === undefined
+      ? undefined
+      : splitAtFloor(scores, suite.collapseFloor);
+    const qualityMean = atFloor && atFloor.quality.length > 0
+      ? mean(atFloor.quality)
+      : undefined;
+    const qualitySd = atFloor ? sampleSd(atFloor.quality) : undefined;
     cases.push({
       caseId: loadedCase.evalCase.id,
       runs,
@@ -180,6 +227,9 @@ export async function runSuite(
       samples: scores.length,
       failures: runs.filter((r) => r.failed === true).length,
       ...(sd !== undefined ? { sd } : {}),
+      ...(atFloor !== undefined ? { collapses: atFloor.collapses } : {}),
+      ...(qualityMean !== undefined ? { qualityMean } : {}),
+      ...(qualitySd !== undefined ? { qualitySd } : {}),
     });
   }
 
@@ -195,6 +245,7 @@ export async function runSuite(
     worst: scored.length > 0 ? Math.min(...scored.map((c) => c.worst)) : 0,
     failures,
     complete: failures === 0,
+    ...(selected !== undefined ? { split: selected } : {}),
     dispersion: dispersionOf(cases),
   };
 }

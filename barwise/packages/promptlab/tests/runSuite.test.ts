@@ -13,6 +13,15 @@ import { defaultSuitePath, loadSuite, runSuite } from "../src/index.js";
 const fixturesDir = resolve(dirname(fileURLToPath(import.meta.url)), "fixtures/responses");
 const suite = loadSuite(defaultSuitePath());
 
+/**
+ * Recorded payloads exist only for the train cases -- the three dev
+ * cases have never run against a provider, which is what makes them a
+ * held-out set. So every test that leans on the fixture client selects
+ * `train`, which exercises the split selector at the same time.
+ */
+const TRAIN = { split: "train" } as const;
+const trainCases = suite.cases.filter((c) => c.split === "train");
+
 /** Answers each call with the recorded payload for the case whose
  *  transcript is embedded in the user message. */
 function fixtureClient() {
@@ -36,8 +45,8 @@ function fixtureClient() {
 describe("runSuite", () => {
   it("scores every case in manifest order and aggregates", async () => {
     const client = fixtureClient();
-    const report = await runSuite(suite, client);
-    expect(report.cases.map((c) => c.caseId)).toEqual(suite.cases.map((c) => c.evalCase.id));
+    const report = await runSuite(suite, client, TRAIN);
+    expect(report.cases.map((c) => c.caseId)).toEqual(trainCases.map((c) => c.evalCase.id));
     expect(report.repeat).toBe(1);
     expect(report.artifactVersion).toBe("1.0.0");
     for (const c of report.cases) {
@@ -51,15 +60,15 @@ describe("runSuite", () => {
 
   it("repeat produces that many runs per case", async () => {
     const client = fixtureClient();
-    const report = await runSuite(suite, client, { repeat: 2 });
-    expect(client.requests).toHaveLength(suite.cases.length * 2);
+    const report = await runSuite(suite, client, { ...TRAIN, repeat: 2 });
+    expect(client.requests).toHaveLength(trainCases.length * 2);
     for (const c of report.cases) expect(c.runs).toHaveLength(2);
   });
 
   it("reports no error bar at the default repeat, rather than a zero one", async () => {
     // repeat defaults to 1, so nothing about the spread is knowable.
     // Reporting 0 would claim the opposite of what the run can support.
-    const report = await runSuite(suite, fixtureClient());
+    const report = await runSuite(suite, fixtureClient(), TRAIN);
     expect(report.dispersion.standardError).toBeUndefined();
     expect(report.dispersion.resolvableDifference).toBeUndefined();
     expect(report.dispersion.lowerBound).toBe(true);
@@ -70,7 +79,7 @@ describe("runSuite", () => {
     // The fixture client answers identically every time, so the spread
     // is genuinely zero -- distinct from "could not tell", which is the
     // case above.
-    const report = await runSuite(suite, fixtureClient(), { repeat: 2 });
+    const report = await runSuite(suite, fixtureClient(), { ...TRAIN, repeat: 2 });
     expect(report.dispersion.standardError).toBe(0);
     expect(report.dispersion.resolvableDifference).toBe(0);
     expect(report.dispersion.lowerBound).toBe(false);
@@ -93,7 +102,7 @@ describe("runSuite", () => {
         return inner.complete(request);
       },
     };
-    const report = await runSuite(suite, client, { repeat: 2 });
+    const report = await runSuite(suite, client, { ...TRAIN, repeat: 2 });
     expect(report.cases[0]!.samples).toBe(1);
     expect(report.cases[0]!.sd).toBeUndefined();
     expect(report.dispersion.lowerBound).toBe(true);
@@ -115,7 +124,7 @@ describe("runSuite", () => {
         return fixtureClient().complete(request);
       },
     };
-    const report = await runSuite(suite, client);
+    const report = await runSuite(suite, client, TRAIN);
     const failedCase = report.cases[0]!;
     expect(failedCase.runs[0]!.failed).toBe(true);
     expect(failedCase.runs[0]!.error).toBe("boom");
@@ -130,7 +139,7 @@ describe("runSuite", () => {
     // and is strictly higher than folding the unsampled case in as a
     // zero would give -- which is the whole point of the change.
     const sampled = report.cases.filter((c) => c.samples > 0);
-    expect(sampled).toHaveLength(suite.cases.length - 1);
+    expect(sampled).toHaveLength(trainCases.length - 1);
     const expected = sampled.reduce((s, c) => s + c.mean, 0) / sampled.length;
     expect(report.mean).toBeCloseTo(expected, 10);
     const withFabricatedZero = sampled.reduce((s, c) => s + c.mean, 0) / report.cases.length;
@@ -154,7 +163,7 @@ describe("runSuite", () => {
         return inner.complete(request);
       },
     };
-    const report = await runSuite(suite, client, { repeat: 3 });
+    const report = await runSuite(suite, client, { ...TRAIN, repeat: 3 });
     const first = report.cases[0]!;
     expect(first.failures).toBe(1);
     expect(first.samples).toBe(2);
@@ -170,7 +179,7 @@ describe("runSuite", () => {
       model: undefined,
       complete: () => Promise.resolve({ content: "not json at all" }),
     };
-    const report = await runSuite(suite, client);
+    const report = await runSuite(suite, client, TRAIN);
     const first = report.cases[0]!;
     expect(first.runs[0]!.failed).toBeUndefined();
     expect(first.runs[0]!.score?.score).toBe(0);
@@ -182,7 +191,7 @@ describe("runSuite", () => {
 
   it("reports every requested run as a sample on a healthy sweep", async () => {
     const client = fixtureClient();
-    const report = await runSuite(suite, client, { repeat: 2 });
+    const report = await runSuite(suite, client, { ...TRAIN, repeat: 2 });
     expect(report.complete).toBe(true);
     expect(report.failures).toBe(0);
     for (const c of report.cases) expect(c.samples).toBe(2);
@@ -203,6 +212,7 @@ describe("runSuite", () => {
       },
     };
     const report = await runSuite(suite, client, {
+      ...TRAIN,
       retry: { baseDelayMs: 1, sleep: () => Promise.resolve() },
     });
     expect(report.cases[0]!.runs[0]!.attempts).toBe(2);
@@ -222,5 +232,68 @@ describe("runSuite", () => {
   it("rejects a non-positive repeat", async () => {
     const client = fixtureClient();
     await expect(runSuite(suite, client, { repeat: 0 })).rejects.toThrow(/positive integer/);
+  });
+
+  it("a declared collapse floor leaves mean, worst and the error bar untouched", async () => {
+    // The load-bearing compatibility claim of the whole workstream. If a
+    // floor moved the composite, every recorded history row would become
+    // incomparable, and that longitudinal record is the only evidence
+    // this project has about whether prompts are improving.
+    const withoutFloor = await runSuite(suite, fixtureClient(), { ...TRAIN, repeat: 2 });
+    const floored = await runSuite({ ...suite, collapseFloor: 0.5 }, fixtureClient(), {
+      ...TRAIN,
+      repeat: 2,
+    });
+
+    expect(floored.mean).toBe(withoutFloor.mean);
+    expect(floored.worst).toBe(withoutFloor.worst);
+    expect(floored.dispersion).toEqual(withoutFloor.dispersion);
+    for (let i = 0; i < floored.cases.length; i++) {
+      expect(floored.cases[i]!.sd).toBe(withoutFloor.cases[i]!.sd);
+      expect(floored.cases[i]!.samples).toBe(withoutFloor.cases[i]!.samples);
+    }
+  });
+
+  it("reports nothing about collapses when the manifest declares no floor", async () => {
+    // The packaged manifest now declares 0.3, so the no-floor path is
+    // reached by removing it -- the shape any suite authored before
+    // eval-metric-readiness still has.
+    const { collapseFloor: _omitted, ...noFloor } = suite;
+    const report = await runSuite(noFloor, fixtureClient(), { ...TRAIN, repeat: 2 });
+    for (const c of report.cases) {
+      expect(c.collapses).toBeUndefined();
+      expect(c.qualityMean).toBeUndefined();
+      expect(c.qualitySd).toBeUndefined();
+    }
+  });
+
+  it("splits each case at the floor when one is declared", async () => {
+    // The fixture client answers with the recorded payloads, which all
+    // score well above any sane floor, so nothing collapses and quality
+    // equals the mean. That is the honest shape of a healthy run.
+    const report = await runSuite({ ...suite, collapseFloor: 0.3 }, fixtureClient(), {
+      ...TRAIN,
+      repeat: 2,
+    });
+    for (const c of report.cases) {
+      expect(c.collapses).toBe(0);
+      expect(c.qualityMean).toBeCloseTo(c.mean, 12);
+    }
+  });
+
+  it("reports no quality mean for a case that always collapsed", async () => {
+    // A floor above every achievable score stands in for a case that
+    // never produced a usable model: the count is reported, the quality
+    // is absent rather than zero.
+    const report = await runSuite({ ...suite, collapseFloor: 0.999 }, fixtureClient(), {
+      ...TRAIN,
+      repeat: 2,
+    });
+    const first = report.cases[0]!;
+    expect(first.collapses).toBe(first.samples);
+    expect(first.qualityMean).toBeUndefined();
+    expect(first.qualitySd).toBeUndefined();
+    // ...and the composite is still whatever it was.
+    expect(first.mean).toBeGreaterThan(0);
   });
 });
