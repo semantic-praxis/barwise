@@ -85,10 +85,20 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
   pins the n-1 denominator and reproduces the recorded Haiku run's
   standard error, so a change to the fold contradicts the report it
   was derived from.
+- **Two identifiers pin a run, and they answer different questions.**
+  `promptHash` (`src/provenance/promptHash.ts`) fingerprints the
+  rendered system prompt, so it catches a variant edited without its
+  `version:` being bumped -- which `artifactVersion`, a hand-maintained
+  string, cannot. `HistoryEntry.build` carries the barwise version, git
+  commit, and whether the tree was modified, which is what covers the
+  scorer, weights, and reference models: all of those move a score
+  without touching a prompt. Neither substitutes for the other.
 - **No clocks.** History entries take their date from the caller (the
   CLI); nothing in this package reads the system time. Provenance that
   needs I/O -- a git SHA, the running version -- follows the same seam
-  and arrives from the caller.
+  and arrives from the caller as `build`. The prompt hash is the
+  exception that proves the rule: it is pure, computed here from bytes
+  this package rendered.
 - Live LLM runs happen only through `barwise prompt eval` with keys
   configured; CI tests use mock clients and canned payloads, per the
   `llm` package convention.

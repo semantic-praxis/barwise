@@ -45,7 +45,10 @@ export function createProgram(version = "0.0.0-dev"): Command {
   registerHistoryCommand(program);
   registerImportCommand(program);
   registerLineageCommand(program);
-  registerPromptCommand(program);
+  // Takes the version because a recorded eval row states what built it,
+  // and this is the only place the version is known without reaching
+  // for `import.meta`.
+  registerPromptCommand(program, version);
 
   return program;
 }

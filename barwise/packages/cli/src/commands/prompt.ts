@@ -31,6 +31,7 @@ import {
 import type { Command } from "commander";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { describeProvenance, resolveProvenance } from "../workspace/provenance.js";
 
 interface ProviderOpts {
   provider?: string;
@@ -39,12 +40,12 @@ interface ProviderOpts {
   baseUrl?: string;
 }
 
-export function registerPromptCommand(program: Command): void {
+export function registerPromptCommand(program: Command, version = "0.0.0-dev"): void {
   const promptCmd = program
     .command("prompt")
     .description("Evaluate and manage the LLM prompt artifacts");
 
-  registerEval(promptCmd);
+  registerEval(promptCmd, version);
   registerScore(promptCmd);
   registerSchema(promptCmd);
   registerHistory(promptCmd);
@@ -55,7 +56,7 @@ function suitePath(opts: { suite?: string; }): string {
 }
 
 /** `barwise prompt eval` */
-function registerEval(promptCmd: Command): void {
+function registerEval(promptCmd: Command, version: string): void {
   promptCmd
     .command("eval")
     .description("Run the eval suite against a provider and record the scores")
@@ -147,10 +148,23 @@ function registerEval(promptCmd: Command): void {
                   + ` another row, so treat this one as a spot check, not a baseline.\n`,
               );
             }
+            const build = resolveProvenance(version);
             const entry = toHistoryEntry(report, new Date().toISOString(), {
+              build,
               ...(opts.provider !== undefined ? { provider: opts.provider } : {}),
               ...(opts.model !== undefined ? { model: opts.model } : {}),
             });
+            // Say it while the operator is watching. A row recorded off
+            // a modified tree names a commit that never produced it,
+            // and by the time anyone reads the file back the working
+            // tree is long gone.
+            if (build.dirty === true) {
+              process.stderr.write(
+                `NOTE: recording against a modified working tree`
+                  + ` (${describeProvenance(build)}). The commit alone will not`
+                  + ` reproduce this run.\n`,
+              );
+            }
             try {
               appendRunHistory(historyPathFor(suite.manifestPath), report, entry, {
                 ...(opts.forceHistory === true ? { force: true } : {}),
@@ -241,11 +255,16 @@ function registerHistory(promptCmd: Command): void {
           // an unknown precision is not the same as a tight one.
           const margin = marginOfError(e.standardError);
           const bar = margin === undefined ? " +/- ?" : ` +/- ${margin.toFixed(3)}`;
+          // The hash goes next to the artifact version it can contradict:
+          // two rows naming one version with different hashes ran
+          // different prompts, and that is the only place it shows.
+          const hash = e.promptHash === undefined ? "" : `@${e.promptHash}`;
+          const built = e.build === undefined ? "" : `  ${describeProvenance(e.build)}`;
           process.stdout.write(
-            `${e.date}  artifact=${e.artifactVersion}  ${target}`
+            `${e.date}  artifact=${e.artifactVersion}${hash}  ${target}`
               + `  mean=${e.mean.toFixed(3)}${bar}  worst=${
                 e.worst.toFixed(3)
-              }  (repeat=${e.repeat})\n`,
+              }  (repeat=${e.repeat})${built}\n`,
           );
         }
       } catch (err) {
@@ -288,6 +307,7 @@ function renderReport(report: SuiteReport): string {
     : ` +/- ${margin.toFixed(3)} (95%${report.dispersion.lowerBound ? ", at least" : ""})`;
   lines.push(
     `suite ${report.suiteVersion}  artifact=${report.artifactVersion}`
+      + `@${report.promptHash}`
       + `  mean=${report.mean.toFixed(3)}${bar}  worst=${
         report.worst.toFixed(3)
       }  (repeat=${report.repeat}${report.complete ? "" : `, ${report.failures} failed`})`,

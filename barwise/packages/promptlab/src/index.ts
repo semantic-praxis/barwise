@@ -19,6 +19,9 @@ export type { CaseScore } from "./score/scoreExtraction.js";
 export { dispersionOf, marginOfError, sampleSd } from "./stats/dispersion.js";
 export type { CaseDispersionInput, Dispersion } from "./stats/dispersion.js";
 
+// Provenance
+export { hashPrompt } from "./provenance/promptHash.js";
+
 // Suite runner
 export { classifyFailure, withRetry } from "./run/retry.js";
 export type { FailureKind, RetryOptions, RetryResult } from "./run/retry.js";
@@ -34,4 +37,4 @@ export {
   readHistory,
   toHistoryEntry,
 } from "./history/history.js";
-export type { HistoryEntry } from "./history/history.js";
+export type { BuildProvenance, HistoryEntry } from "./history/history.js";

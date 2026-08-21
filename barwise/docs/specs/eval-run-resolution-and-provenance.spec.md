@@ -1,6 +1,6 @@
 # Make an eval run report its own resolution and say what produced it
 
-Status: Accepted (workstream 1 implemented; see Implementation notes)
+Status: Implemented (all three workstreams; see Implementation notes)
 Created: 2026-08-21
 Last-updated: 2026-08-21
 Tracking: barwise-814 (dispersion reporting) and the provenance half of
@@ -348,6 +348,61 @@ Worth knowing for workstreams 2 and 3:
   that resolves nothing. The stderr note fires only when a history row
   is being written, per the Open decision, but the default itself is
   worth revisiting when workstream 3 lands.
+
+### Workstreams 2 and 3 (2026-08-21)
+
+Both shipped as specified. Re-grounding first found two constraints the
+spec did not account for, and one of them changes what workstream 3
+does.
+
+- **Correction: `provenance.ts` cannot read the version itself.** The
+  Inventory recorded `cli/src/index.ts` as "reads `version` from the
+  CLI's own package.json -- untouched", which is true and incomplete.
+  The CLI has two entry points: the tsc build reads package.json via
+  `import.meta.url`, and the esbuild CJS bundle takes an injected
+  `process.env.BARWISE_CLI_VERSION`, because `import.meta` is empty
+  there. `cli.ts` already carries the rule in a comment. A provenance
+  helper reading package.json would therefore work in development and
+  silently report `0.0.0-dev` in every released bundle. The version is
+  threaded through `registerPromptCommand` instead, and the repository
+  search starts from `process.argv[1]`, which both builds set.
+- **Correction: the git root has to be proven to be barwise's.** The
+  spec said to record "the git commit", which reads as unambiguous and
+  is not. Asking git about the current directory answers about whatever
+  repository the operator was standing in -- their own model repo,
+  say -- and a globally installed CLI can sit inside some other
+  project's `node_modules`. Both produce a confidently wrong SHA
+  attributed to barwise, which is the same class of silent lie the
+  dirty flag exists to prevent, so the implementation verifies the
+  repository root carries barwise's own `barwise/package.json` marker
+  before believing its commit. Failing that check degrades to
+  version-only, the safe direction. Two tests pin it; removing the
+  check fails both.
+- **An unreadable `git status` reports dirty, not clean.** Absence of
+  evidence is not evidence of a clean tree, and the whole value of the
+  flag is that it does not under-claim.
+- **The dirty state is announced on stderr when a row is recorded**, not
+  only stored. By the time anyone reads the file back the working tree
+  is long gone, so the moment the operator can still act on it is while
+  the run is in front of them. This was not in Scope; it costs one line
+  and follows the same reasoning the reviewer accepted for the
+  `repeat: 1` note.
+- **`promptHash` covers the system prompt alone**, not the response
+  schema or the user message. The schema moves only when source does,
+  which the commit already tracks; the user message is per case and
+  would give every case a different hash, defeating a run-level
+  identifier.
+- **`HistoryEntry.promptHash` is optional though always written.** Rows
+  predating the field have to parse, and an old row genuinely does not
+  know its prompt. `SuiteReport.promptHash` is required, since every
+  run computes one.
+
+Verified end to end against a stub provider rather than only through
+unit tests: a real `barwise prompt eval` run rendered
+`artifact=1.0.0@0eced4cda015  mean=0.980 +/- 0.000 (95%)`, wrote a row
+carrying `promptHash`, `standardError`, per-case `sd`, and
+`build: {version, commit, dirty: true}`, and printed the modified-tree
+note -- correctly, since the tree was modified at the time.
 
 ## Non-goals
 

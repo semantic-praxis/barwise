@@ -32,6 +32,7 @@ src/
   workspace/
     io.ts               File I/O helpers (loadModel, writeModel)
     format.ts           Output formatting helpers (JSON, text)
+    provenance.ts       Version/commit/dirty for recorded eval runs
 tests/
   cli.test.ts           Scaffolding tests
   commands/             Command-specific tests
@@ -54,6 +55,21 @@ npx tsc --noEmit            # type-check only
 - `--format json` is available on most commands for machine-readable
   output.
 - Exit code 1 for validation errors or failures; 0 for success.
+- **Never reach for `import.meta` in shared command code.** The CLI
+  ships two ways: a tsc build whose bin entry reads its own
+  package.json, and an esbuild CJS bundle where `import.meta` is empty
+  and the version arrives as an injected
+  `process.env.BARWISE_CLI_VERSION`. Anything a command needs from the
+  package root is threaded in from `createProgram(version)` instead --
+  code that reads package.json directly works in development and
+  silently reports `0.0.0-dev` in every release.
+- **Provenance names barwise's repository, not the current directory.**
+  `resolveProvenance` starts from `process.argv[1]` and verifies the git
+  root carries barwise's own `barwise/package.json` marker before
+  recording its commit. Asking about the working directory would record
+  whatever repo the operator was standing in, and a global install can
+  sit in another project's `node_modules`. It never throws: an eval run
+  costs money, and a missing `git` must not be what loses it.
 
 ## Dependencies
 

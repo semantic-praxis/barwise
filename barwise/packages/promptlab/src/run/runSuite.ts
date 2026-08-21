@@ -24,6 +24,7 @@ import {
   defaultExtractionArtifact,
 } from "@barwise/llm";
 import type { EvalSuite } from "../evalcase/types.js";
+import { hashPrompt } from "../provenance/promptHash.js";
 import type { CaseScore } from "../score/scoreExtraction.js";
 import { scoreExtraction } from "../score/scoreExtraction.js";
 import type { Dispersion } from "../stats/dispersion.js";
@@ -80,6 +81,12 @@ export interface CaseSummary {
 export interface SuiteReport {
   readonly suiteVersion: string;
   readonly artifactVersion: string;
+  /**
+   * Fingerprint of the system prompt this run actually sent. Unlike
+   * `artifactVersion`, which is a hand-maintained string, this cannot
+   * agree across two runs that rendered different prompts.
+   */
+  readonly promptHash: string;
   readonly repeat: number;
   readonly cases: readonly CaseSummary[];
   /** Mean of the per-case means, over cases with at least one sample. */
@@ -181,6 +188,7 @@ export async function runSuite(
   return {
     suiteVersion: suite.version,
     artifactVersion: (artifact ?? defaultExtractionArtifact).version,
+    promptHash: hashPrompt(systemPrompt),
     repeat,
     cases,
     mean: scored.length > 0 ? mean(scored.map((c) => c.mean)) : 0,
