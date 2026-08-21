@@ -21,13 +21,20 @@ const report: SuiteReport = {
   artifactVersion: "2.0.0",
   repeat: 2,
   cases: [
-    { caseId: "a", runs: [], mean: 0.9, worst: 0.8, samples: 2, failures: 0 },
-    { caseId: "b", runs: [], mean: 1, worst: 1, samples: 2, failures: 0 },
+    { caseId: "a", runs: [], mean: 0.9, worst: 0.8, samples: 2, failures: 0, sd: 0.1 },
+    { caseId: "b", runs: [], mean: 1, worst: 1, samples: 2, failures: 0, sd: 0 },
   ],
   mean: 0.95,
   worst: 0.8,
   failures: 0,
   complete: true,
+  // sqrt((0.01/2) + 0) / 2 = 0.0353553
+  dispersion: {
+    standardError: 0.0353553,
+    lowerBound: false,
+    resolvableDifference: 0.098,
+    dominantCase: { caseId: "a", share: 1 },
+  },
 };
 
 /** The same run, with one call the provider never answered. */
@@ -35,10 +42,13 @@ const incomplete: SuiteReport = {
   ...report,
   cases: [
     { caseId: "a", runs: [], mean: 0.9, worst: 0.9, samples: 1, failures: 1 },
-    { caseId: "b", runs: [], mean: 1, worst: 1, samples: 2, failures: 0 },
+    { caseId: "b", runs: [], mean: 1, worst: 1, samples: 2, failures: 0, sd: 0 },
   ],
   failures: 1,
   complete: false,
+  // Case "a" lost a run and has no spread of its own, so the interval
+  // that survives is a floor.
+  dispersion: { standardError: 0, lowerBound: true, resolvableDifference: 0 },
 };
 
 describe("history", () => {
@@ -60,11 +70,27 @@ describe("history", () => {
       repeat: 2,
       mean: 0.95,
       worst: 0.8,
+      standardError: 0.0353553,
       cases: [
-        { caseId: "a", mean: 0.9, worst: 0.8, samples: 2 },
-        { caseId: "b", mean: 1, worst: 1, samples: 2 },
+        { caseId: "a", mean: 0.9, worst: 0.8, samples: 2, sd: 0.1 },
+        { caseId: "b", mean: 1, worst: 1, samples: 2, sd: 0 },
       ],
     });
+  });
+
+  it("records no standard error when the run could not resolve one", () => {
+    // A row without an error bar is the truth about a single-sample
+    // run. Writing 0 instead would make it indistinguishable from a
+    // perfectly stable one when someone reads the file back later.
+    const unresolved: SuiteReport = {
+      ...report,
+      cases: [{ caseId: "a", runs: [], mean: 0.9, worst: 0.9, samples: 1, failures: 0 }],
+      dispersion: { lowerBound: true },
+    };
+    const entry = toHistoryEntry(unresolved, "2026-08-08T00:00:00Z");
+    expect(entry.standardError).toBeUndefined();
+    expect("standardError" in entry).toBe(false);
+    expect(entry.cases[0]!.sd).toBeUndefined();
   });
 
   it("appends and reads back entries in order", () => {

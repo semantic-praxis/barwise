@@ -15,6 +15,10 @@ export type { PromptCheckResult } from "./score/promptChecks.js";
 export { scoreExtraction } from "./score/scoreExtraction.js";
 export type { CaseScore } from "./score/scoreExtraction.js";
 
+// Dispersion
+export { dispersionOf, marginOfError, sampleSd } from "./stats/dispersion.js";
+export type { CaseDispersionInput, Dispersion } from "./stats/dispersion.js";
+
 // Suite runner
 export { classifyFailure, withRetry } from "./run/retry.js";
 export type { FailureKind, RetryOptions, RetryResult } from "./run/retry.js";

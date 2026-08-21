@@ -26,6 +26,8 @@ import {
 import type { EvalSuite } from "../evalcase/types.js";
 import type { CaseScore } from "../score/scoreExtraction.js";
 import { scoreExtraction } from "../score/scoreExtraction.js";
+import type { Dispersion } from "../stats/dispersion.js";
+import { dispersionOf, sampleSd } from "../stats/dispersion.js";
 import type { FailureKind, RetryOptions } from "./retry.js";
 import { withRetry } from "./retry.js";
 
@@ -67,6 +69,12 @@ export interface CaseSummary {
   readonly samples: number;
   /** Runs the provider never answered. */
   readonly failures: number;
+  /**
+   * Sample standard deviation of this case's scores. Absent below two
+   * samples: one run says nothing about spread, and a 0 would claim it
+   * says everything.
+   */
+  readonly sd?: number;
 }
 
 export interface SuiteReport {
@@ -82,6 +90,11 @@ export interface SuiteReport {
   readonly failures: number;
   /** True when every requested run produced a score. */
   readonly complete: boolean;
+  /**
+   * How much of `mean` is sampling noise. Read this before comparing
+   * two runs: a gap under `resolvableDifference` is not a result.
+   */
+  readonly dispersion: Dispersion;
 }
 
 export async function runSuite(
@@ -151,6 +164,7 @@ export async function runSuite(
     const scores = runs
       .filter((r) => r.score !== undefined)
       .map((r) => r.score!.score);
+    const sd = sampleSd(scores);
     cases.push({
       caseId: loadedCase.evalCase.id,
       runs,
@@ -158,6 +172,7 @@ export async function runSuite(
       worst: scores.length > 0 ? Math.min(...scores) : 0,
       samples: scores.length,
       failures: runs.filter((r) => r.failed === true).length,
+      ...(sd !== undefined ? { sd } : {}),
     });
   }
 
@@ -172,6 +187,7 @@ export async function runSuite(
     worst: scored.length > 0 ? Math.min(...scored.map((c) => c.worst)) : 0,
     failures,
     complete: failures === 0,
+    dispersion: dispersionOf(cases),
   };
 }
 

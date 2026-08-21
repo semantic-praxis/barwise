@@ -18,6 +18,13 @@ export interface HistoryEntry {
   readonly mean: number;
   readonly worst: number;
   /**
+   * Standard error of `mean`. Absent on a run whose cases had one
+   * sample each, and on every row written before this field existed --
+   * in both cases because the precision genuinely is not known, which
+   * is the honest thing for an old row to say (barwise-814).
+   */
+  readonly standardError?: number;
+  /**
    * Runs behind each case's mean. Equal to `repeat` on a healthy run;
    * present so a later reader can tell a full sample from a partial one
    * rather than inferring it (barwise-806).
@@ -27,6 +34,7 @@ export interface HistoryEntry {
     mean: number;
     worst: number;
     samples?: number;
+    sd?: number;
   }[];
 }
 
@@ -49,11 +57,15 @@ export function toHistoryEntry(
     repeat: report.repeat,
     mean: report.mean,
     worst: report.worst,
+    ...(report.dispersion.standardError !== undefined
+      ? { standardError: report.dispersion.standardError }
+      : {}),
     cases: report.cases.map((c) => ({
       caseId: c.caseId,
       mean: c.mean,
       worst: c.worst,
       samples: c.samples,
+      ...(c.sd !== undefined ? { sd: c.sd } : {}),
     })),
   };
 }
