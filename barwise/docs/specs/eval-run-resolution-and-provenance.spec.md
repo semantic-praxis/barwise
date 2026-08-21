@@ -1,6 +1,6 @@
 # Make an eval run report its own resolution and say what produced it
 
-Status: Draft
+Status: Accepted (workstream 1 implemented; see Implementation notes)
 Created: 2026-08-21
 Last-updated: 2026-08-21
 Tracking: barwise-814 (dispersion reporting) and the provenance half of
@@ -309,6 +309,45 @@ costs money; a missing `git` binary must never be what loses it.
   checkout.
 - Full gate after each workstream: `npm run build`, `test`, `lint` from
   `barwise/`.
+
+## Implementation notes
+
+### Workstream 1 (2026-08-21)
+
+Shipped as specified, with all four Open decisions resolved by the
+reviewer as recommended: normal approximation kept, the resolvable
+difference reported rather than left as algebra for the reader, the
+suite hash deferred on the strength of version control, and a stderr
+line on an unresolvable run.
+
+One deviation, deliberate:
+
+- **`dominantCase` is reported whenever any variance exists**, not only
+  "when more than one case carries variance" as Scope says. The
+  single-varying-case run is the most informative one to name -- the
+  recorded Sonnet run had 99% of its noise in one case -- so suppressing
+  the report exactly there would have withheld the finding that
+  motivated the field. The CLI still prints it only above a 50% share,
+  because naming a case that carries a third of the noise is not
+  actionable.
+
+Worth knowing for workstreams 2 and 3:
+
+- **`marginOfError` takes a standard error, not a `Dispersion`.** The
+  spec's sketch had it take the whole object, which does not serve
+  `barwise prompt history` -- a recorded row carries the error and
+  nothing else. Passing the number keeps `Z95` defined once; a caller
+  multiplying by 1.96 itself is a caller who will silently drift to a
+  different confidence level than the runner reports.
+- **A zero standard error and an absent one are different results**, and
+  the code distinguishes them: every sample scoring identically is a
+  real measurement of a stable configuration, while one sample per case
+  measured nothing. Both were nearly collapsed into `0` during
+  implementation; a test now pins each.
+- **`repeat` still defaults to 1**, so the common invocation is the one
+  that resolves nothing. The stderr note fires only when a history row
+  is being written, per the Open decision, but the default itself is
+  worth revisiting when workstream 3 lands.
 
 ## Non-goals
 

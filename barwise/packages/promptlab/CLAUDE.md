@@ -70,8 +70,25 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
   were produced by running the recorded payloads through
   `parseExtractionFromJson` and serializing -- they cannot drift from
   what the pipeline actually builds.
+- **A mean is reported with its error bar or not at all.** `runSuite`
+  folds per-case sample SD and the suite's standard error through
+  `src/stats/dispersion.ts`, and the CLI prints the 95% margin beside
+  every mean it renders, including in `barwise prompt history`. Below
+  two samples the SD is **undefined, never 0** -- one observation says
+  nothing about spread, and a 0 propagates into a standard error
+  claiming perfect precision. That distinction is the whole point of
+  the module; guard it if you touch the fold.
+- **Dispersion is pure, so it is tested against known inputs.** The
+  formulas live in their own module rather than inline in the runner
+  because a wrong denominator yields a plausible number that a
+  mock-client test walks straight past. `tests/dispersion.test.ts`
+  pins the n-1 denominator and reproduces the recorded Haiku run's
+  standard error, so a change to the fold contradicts the report it
+  was derived from.
 - **No clocks.** History entries take their date from the caller (the
-  CLI); nothing in this package reads the system time.
+  CLI); nothing in this package reads the system time. Provenance that
+  needs I/O -- a git SHA, the running version -- follows the same seam
+  and arrives from the caller.
 - Live LLM runs happen only through `barwise prompt eval` with keys
   configured; CI tests use mock clients and canned payloads, per the
   `llm` package convention.

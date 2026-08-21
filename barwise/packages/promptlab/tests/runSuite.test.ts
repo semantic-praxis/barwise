@@ -56,6 +56,49 @@ describe("runSuite", () => {
     for (const c of report.cases) expect(c.runs).toHaveLength(2);
   });
 
+  it("reports no error bar at the default repeat, rather than a zero one", async () => {
+    // repeat defaults to 1, so nothing about the spread is knowable.
+    // Reporting 0 would claim the opposite of what the run can support.
+    const report = await runSuite(suite, fixtureClient());
+    expect(report.dispersion.standardError).toBeUndefined();
+    expect(report.dispersion.resolvableDifference).toBeUndefined();
+    expect(report.dispersion.lowerBound).toBe(true);
+    for (const c of report.cases) expect(c.sd).toBeUndefined();
+  });
+
+  it("reports a real zero when a deterministic client repeats", async () => {
+    // The fixture client answers identically every time, so the spread
+    // is genuinely zero -- distinct from "could not tell", which is the
+    // case above.
+    const report = await runSuite(suite, fixtureClient(), { repeat: 2 });
+    expect(report.dispersion.standardError).toBe(0);
+    expect(report.dispersion.resolvableDifference).toBe(0);
+    expect(report.dispersion.lowerBound).toBe(false);
+    for (const c of report.cases) expect(c.sd).toBe(0);
+  });
+
+  it("marks the interval a lower bound when a case lost runs to failure", async () => {
+    // One case drops to a single sample, so its variance is unknown and
+    // the suite's interval understates. Saying so is the point.
+    let first = true;
+    const inner = fixtureClient();
+    const client = {
+      provider: "test",
+      model: undefined,
+      complete: (request: CompletionRequest) => {
+        if (first) {
+          first = false;
+          return Promise.reject(new Error("boom"));
+        }
+        return inner.complete(request);
+      },
+    };
+    const report = await runSuite(suite, client, { repeat: 2 });
+    expect(report.cases[0]!.samples).toBe(1);
+    expect(report.cases[0]!.sd).toBeUndefined();
+    expect(report.dispersion.lowerBound).toBe(true);
+  });
+
   it("excludes a failed call from the mean instead of scoring it zero", async () => {
     // The behaviour this replaces produced three junk history rows on
     // the first keyed run: a call that never reached the model was

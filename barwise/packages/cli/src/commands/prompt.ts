@@ -22,6 +22,7 @@ import {
   historyPathFor,
   IncompleteRunError,
   loadSuite,
+  marginOfError,
   readHistory,
   runSuite,
   scoreExtraction,
@@ -136,6 +137,16 @@ function registerEval(promptCmd: Command): void {
           }
 
           if (opts.history) {
+            // A row that will be compared against later should say what
+            // it cannot support. A one-off exploratory run is not
+            // nagged -- this fires only when the run is being recorded.
+            if (report.dispersion.standardError === undefined) {
+              process.stderr.write(
+                `NOTE: recording a run with no error bar (repeat=${report.repeat}).`
+                  + ` A single sample per case cannot resolve a difference against`
+                  + ` another row, so treat this one as a spot check, not a baseline.\n`,
+              );
+            }
             const entry = toHistoryEntry(report, new Date().toISOString(), {
               ...(opts.provider !== undefined ? { provider: opts.provider } : {}),
               ...(opts.model !== undefined ? { model: opts.model } : {}),
@@ -224,9 +235,17 @@ function registerHistory(promptCmd: Command): void {
         }
         for (const e of entries) {
           const target = [e.provider, e.model].filter(Boolean).join("/") || "(env default)";
+          // This listing is where two runs actually get compared, so
+          // the error bar belongs here more than anywhere. Rows written
+          // before it existed print "+/- ?" rather than a bare mean --
+          // an unknown precision is not the same as a tight one.
+          const margin = marginOfError(e.standardError);
+          const bar = margin === undefined ? " +/- ?" : ` +/- ${margin.toFixed(3)}`;
           process.stdout.write(
             `${e.date}  artifact=${e.artifactVersion}  ${target}`
-              + `  mean=${e.mean.toFixed(3)}  worst=${e.worst.toFixed(3)}  (repeat=${e.repeat})\n`,
+              + `  mean=${e.mean.toFixed(3)}${bar}  worst=${
+                e.worst.toFixed(3)
+              }  (repeat=${e.repeat})\n`,
           );
         }
       } catch (err) {
@@ -241,8 +260,9 @@ function renderReport(report: SuiteReport): string {
     // n= is only interesting when it disagrees with repeat; showing it
     // always would bury the signal it exists to carry.
     const samples = c.samples === report.repeat ? "" : `  n=${c.samples}/${report.repeat}`;
+    const sd = c.sd === undefined ? "" : `  sd=${c.sd.toFixed(3)}`;
     lines.push(
-      `${c.caseId}  mean=${c.mean.toFixed(3)}  worst=${c.worst.toFixed(3)}${samples}`,
+      `${c.caseId}  mean=${c.mean.toFixed(3)}  worst=${c.worst.toFixed(3)}${sd}${samples}`,
     );
     for (const run of c.runs) {
       if (run.failed) {
@@ -259,13 +279,62 @@ function renderReport(report: SuiteReport): string {
       }
     }
   }
+  // The error bar rides on the same line as the mean, deliberately. The
+  // defect this closes is people quoting a mean without one, and a
+  // figure parked on its own line is a figure that gets left behind.
+  const margin = marginOfError(report.dispersion.standardError);
+  const bar = margin === undefined
+    ? ""
+    : ` +/- ${margin.toFixed(3)} (95%${report.dispersion.lowerBound ? ", at least" : ""})`;
   lines.push(
     `suite ${report.suiteVersion}  artifact=${report.artifactVersion}`
-      + `  mean=${report.mean.toFixed(3)}  worst=${
+      + `  mean=${report.mean.toFixed(3)}${bar}  worst=${
         report.worst.toFixed(3)
       }  (repeat=${report.repeat}${report.complete ? "" : `, ${report.failures} failed`})`,
   );
+  lines.push(...renderResolution(report));
   return lines.join("\n") + "\n";
+}
+
+/**
+ * What the run can and cannot tell you. Printed under the suite line
+ * because a reader comparing two runs needs it before they subtract.
+ */
+function renderResolution(report: SuiteReport): string[] {
+  const { standardError, resolvableDifference, lowerBound, dominantCase } = report.dispersion;
+  const lines: string[] = [];
+
+  if (standardError === undefined) {
+    lines.push(
+      `  no case has two or more samples, so this run resolves nothing:`
+        + ` re-run with --repeat to get an error bar`,
+    );
+    return lines;
+  }
+
+  if (resolvableDifference !== undefined) {
+    lines.push(
+      resolvableDifference === 0
+        ? `  every sample scored identically; any nonzero gap is real at this sample size`
+        : `  gaps below ${resolvableDifference.toFixed(3)} are not resolvable`
+          + ` against a comparable run`,
+    );
+  }
+  if (lowerBound) {
+    lines.push(
+      `  some case has under two samples, so the interval above understates the true one`,
+    );
+  }
+  // Naming the case that carries the noise is the actionable half: when
+  // one case owns most of the variance, more samples average over a
+  // single diagnosable failure instead of measuring the prompt.
+  if (dominantCase !== undefined && dominantCase.share > 0.5) {
+    lines.push(
+      `  ${(dominantCase.share * 100).toFixed(0)}% of that noise is`
+        + ` ${dominantCase.caseId} alone`,
+    );
+  }
+  return lines;
 }
 
 function fail(err: unknown): void {
