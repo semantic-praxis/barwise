@@ -98,6 +98,13 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
   It never changes `mean`, so every recorded history row stays
   comparable -- search on the composite, gate on the pair. Below the
   floor for every sample means **no** quality mean rather than zero.
+- **A run can say what it is doing.** `runSuite({onProgress})` emits a
+  `sample` event per call and a `retry` event before each backoff; the
+  CLI renders them to stderr behind `barwise prompt eval --verbose`, so
+  `--format json` stays a clean pipe. Omitted, the run is silent, which
+  is what every caller before it got. The retry event is the one that
+  earns its keep: a rate-limited sweep and a hung one are otherwise
+  indistinguishable for as long as the backoff lasts.
 - **Two identifiers pin a run, and they answer different questions.**
   `promptHash` (`src/provenance/promptHash.ts`) fingerprints the
   rendered system prompt, so it catches a variant edited without its

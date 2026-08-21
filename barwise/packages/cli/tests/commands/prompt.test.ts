@@ -50,6 +50,16 @@ describe("barwise prompt score", () => {
 });
 
 describe("barwise prompt eval", () => {
+  it("offers --verbose, and does not turn it on by default", async () => {
+    // Opt-in on purpose: the default output is what every script and
+    // every recorded run so far has parsed. Asserted on the flag list
+    // rather than the description, which commander wraps at the
+    // terminal width and would make this a test of formatting.
+    const result = await runCli(["prompt", "eval", "--help"]);
+    expect(result.stdout).toContain("--verbose");
+    expect(result.stdout).not.toContain("--no-verbose");
+  });
+
   it("rejects an unknown split before spending a call", async () => {
     // The guard runs before the client is used, so a typo costs nothing
     // rather than a suite's worth of API calls against the wrong set.
