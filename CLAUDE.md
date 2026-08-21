@@ -169,14 +169,33 @@ across all 12 packages. Core ships no interop format: the standard
 descriptors live in `@barwise/formats`, dbt in `@barwise/dbt`, and
 code importers in `@barwise/code-analysis`.
 
-The three surfaces do **not** all expose the same capabilities, and
-the divergence is undocumented rather than designed
-(`docs/unwired-capability-audit-2026-08-20.md`). Six capabilities
-reach all three. `review` reaches MCP and VS Code but not the CLI;
-`merge` reaches MCP alone; `project` and `history` are CLI-only. Only
-`prompt` is deliberately CLI-only, as dev tooling. Check the audit
-before assuming a capability is reachable from the surface you are
-working on.
+### Capability matrix across the three surfaces
+
+The surfaces do **not** all expose the same capabilities. Consult this
+before assuming one is reachable from the surface you are working on,
+and update it in the same commit that changes a surface's reach.
+
+| Capability                                            | CLI | MCP | VS Code | Divergence                              |
+| ----------------------------------------------------- | --- | --- | ------- | --------------------------------------- |
+| validate, verbalize, diagram, export, import, analyze | yes | yes | yes     | none                                    |
+| `review`                                              | yes | yes | yes     | none                                    |
+| schema, diff, query, describe, gym, lineage, impact   | yes | yes | no      | deliberate: text-first tools            |
+| `merge`                                               | yes | yes | no      | deliberate: an editor wants a diff view |
+| `project`, `history`                                  | yes | no  | no      | deliberate: repository operations       |
+| `prompt`                                              | yes | no  | no      | deliberate: dev tooling                 |
+
+Every remaining gap is marked deliberate, which is the point: an
+unmarked gap is a bug. This table is hand-maintained and therefore the
+same kind of claim that went stale before -- it previously asserted
+parity that did not hold, for two years' worth of readers, because
+nothing checked it (`docs/unwired-capability-audit-2026-08-20.md`).
+Treat a surface change as incomplete until this table agrees with it.
+
+The `merge` and `review` rows were closed by
+`docs/specs/cli-surface-parity.spec.md`. Two audit findings remain open
+and are not surface-parity questions: `buildCodeExtractionPrompt` has
+no call site (barwise-811) and few-shot demo rendering has never run on
+real content (barwise-812).
 
 ## Monorepo Commands
 

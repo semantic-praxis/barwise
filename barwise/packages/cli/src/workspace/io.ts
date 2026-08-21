@@ -10,8 +10,12 @@ const serializer = new OrmYamlSerializer();
 /**
  * Load and deserialize an ORM model from a .orm.yaml file.
  * Throws with a user-friendly message on failure.
+ *
+ * @param options.lenient - Skip role-player reference validation, for a
+ *   fragment that references types it does not redefine. `barwise merge`
+ *   needs it for the incoming side; a whole model does not.
  */
-export function loadModel(filePath: string): OrmModel {
+export function loadModel(filePath: string, options?: { lenient?: boolean; }): OrmModel {
   let yaml: string;
   try {
     yaml = readFileSync(filePath, "utf-8");
@@ -24,7 +28,7 @@ export function loadModel(filePath: string): OrmModel {
   }
 
   try {
-    return serializer.deserialize(yaml);
+    return serializer.deserialize(yaml, options);
   } catch (err) {
     throw new Error(`Failed to parse ${filePath}: ${(err as Error).message}`, { cause: err });
   }

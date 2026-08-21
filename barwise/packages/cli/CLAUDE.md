@@ -23,6 +23,8 @@ src/
     export.ts           barwise export <file> --format <name>
     diagram.ts          barwise diagram <file>
     diff.ts             barwise diff <file1> <file2>
+    merge.ts            barwise merge <base> <incoming> (non-interactive; stdout by default)
+    review.ts           barwise review <file> (LLM semantic review; always exits 0)
     gym.ts              barwise gym list|show|check (modeling gym; miss-card
                         emission + session log at $XDG_STATE_HOME/barwise/)
     import.ts           barwise import (orchestrator over import/)
