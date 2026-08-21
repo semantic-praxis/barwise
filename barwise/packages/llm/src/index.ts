@@ -44,6 +44,10 @@ export { resolveArtifact } from "./prompt/artifacts/resolveArtifact.js";
 export type { ArtifactQuery } from "./prompt/artifacts/resolveArtifact.js";
 export { defaultExtractionArtifact } from "./prompt/systemPrompt.js";
 
+// Call observability
+export { withCallLog } from "./observe/callLog.js";
+export type { CallLogOptions, CallLogSink, LlmCallRecord } from "./observe/callLog.js";
+
 // Conformance validation
 export { enforceConformance } from "./ExtractionConformance.js";
 export type { ConformanceCorrection, ConformanceResult } from "./ExtractionConformance.js";
