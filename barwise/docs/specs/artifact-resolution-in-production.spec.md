@@ -228,6 +228,11 @@ suites. That diff is larger than the resolution logic it enables.
 
 ### 3. Promote the model-agnostic rules into the default
 
+> **Read the workstream 3 note under Implementation notes before
+> acting on this section.** The table below does not describe what is
+> actually in the variant files, and the acceptance criterion is not
+> measurable at the sample sizes used so far. Both are corrected there.
+
 Move the rules below from the variants into
 `defaultExtractionArtifact`, delete them from the variants, and
 re-measure. Candidates, each traceable to a measured defect:
@@ -393,6 +398,79 @@ matching a checked-in variant now gets that variant's prompt. Today
 that is `claude-haiku-*` and `claude-sonnet-5*` on Anthropic. The
 Anthropic provider's unconfigured fallback (`claude-sonnet-4-5-20250929`)
 matches neither, so the default path is unchanged.
+
+### Workstream 3 (2026-08-21) -- not implemented; two corrections first
+
+Deferred by the reviewer pending a sized measurement round. Diffing the
+rendered variants against the rendered default first, rather than
+trusting the workstream's own table, found that the table does not
+describe the files. Recorded here because an implementer who follows
+the table as written would ship something different from what it
+claims.
+
+**The variants differ from the default in eleven lines, not six.**
+
+| Bullet                                                  | haiku45-2                           | sonnet5-3       |
+| ------------------------------------------------------- | ----------------------------------- | --------------- |
+| Populations intro ("concrete, complete example fact")   | yes                                 | identical       |
+| Every instance supplies a value for every role          | yes                                 | identical       |
+| Enumerated list is a value constraint, not a population | yes                                 | identical       |
+| Conflict keeps the constraint, flags an ambiguity       | yes                                 | identical       |
+| Critical rule: populations are optional                 | yes                                 | identical       |
+| Frequency sits on the quantified-over role              | yes                                 | identical       |
+| Frequency `min` at least 1, never 0                     | yes                                 | **no**          |
+| Populations satisfy constraints                         | uniqueness + mandatory, whole model | uniqueness only |
+| Every binary carries both readings                      | yes                                 | **no**          |
+| Every 2+-role fact type carries internal uniqueness     | yes                                 | **no**          |
+| Attribute fact types included in that rule              | yes                                 | **no**          |
+
+Three consequences.
+
+- **Five of the six named rules are Haiku-only.** Only frequency siding
+  is in both. Promoting them is not consolidating what two independent
+  passes agreed on; it is applying Haiku-derived text to every tier,
+  including the tiers that have no variant and were never measured with
+  it. That is a materially different risk than "already measured," and
+  it is the thing the gate has to catch.
+- **The table omits five bullets that are byte-identical in both
+  variants.** By this spec's own reasoning those are the strongest
+  promotion candidates -- two optimization passes, run months and tiers
+  apart, converged on the same wording.
+- **The Open decision "sonnet5 retains objectification and ring
+  guidance" is wrong.** `sonnet5-3` differs from the default in exactly
+  two lines, neither about objectification or rings, and both subsets
+  of what `haiku45-2` says. Promoting the union empties both files. The
+  live question is therefore whether the variants get retired, not
+  whether they stay thin.
+
+**The acceptance criterion is not measurable as written.** "A mean no
+lower than the pre-promotion baseline for either tier" needs a
+resolution the recorded runs do not have. Computing the standard error
+of the suite mean from the samples in the dated reports:
+
+| Run            | SE of suite mean | Gap needed to be real at 95% |
+| -------------- | ---------------- | ---------------------------- |
+| haiku45-2, n=5 | 0.0318           | 0.088                        |
+| sonnet5-2, n=3 | 0.0398           | 0.110                        |
+
+Those thresholds exceed every gap that has been used to rank a
+configuration, which is the arithmetic behind the run-to-run swing
+already observed empirically. Detecting a 0.02 regression at n=5 would
+need roughly n=190 per config.
+
+Raising `n` is the wrong lever, because the noise is not a spread --
+it is one sample. A single collapsed sample out of 35 carries 77% of
+all variance in the Haiku run (`project-staffing`, 0.000 among 0.98s);
+a single one of 21 carries 99% in the Sonnet run
+(`university-enrollment`, 0.167 among 1.000s). The suite mean is mostly
+an estimator of whether a collapse happened. Separating collapse rate
+from quality-given-no-collapse tightens the Sonnet SE 13x and drops the
+n needed to resolve 0.02 from ~190 to single digits.
+
+So workstream 3 needs, in order: the harness reporting its own standard
+error (barwise-814), then a sized round with the promotion candidates
+settled (barwise-813). Neither is code this workstream can write
+blind.
 
 ## Non-goals
 
