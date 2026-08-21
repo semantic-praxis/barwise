@@ -124,4 +124,54 @@ describe("barwise prompt history", () => {
     // 1.96 * 0.0318 = 0.0623
     expect(current).toContain("mean=0.916 +/- 0.062");
   });
+
+  it("shows the prompt hash beside the artifact version, and what built the run", () => {
+    // The hash sits next to the version it can contradict: two rows
+    // naming one artifact with different hashes ran different prompts,
+    // and this listing is the only place that shows.
+    const dir = mkdtempSync(join(tmpdir(), "barwise-prompt-"));
+    writeFileSync(join(dir, "t.md"), "Facilitator: hi.\n");
+    writeFileSync(
+      join(dir, "case.eval.yaml"),
+      "id: c\ntranscript: t.md\nchecks:\n  - kind: must_validate\n",
+    );
+    const manifest = join(dir, "suite.yaml");
+    writeFileSync(
+      manifest,
+      "version: 1.0.0\nweights: {conformanceCorrection: 0.02, validationError: 0.1}\n"
+        + "cases: [case.eval.yaml]\n",
+    );
+    const base = {
+      date: "2026-08-20T00:00:00Z",
+      suiteVersion: "1.0.0",
+      artifactVersion: "haiku45-2",
+      repeat: 5,
+      mean: 0.916,
+      worst: 0.0,
+      cases: [],
+    };
+    writeFileSync(
+      join(dir, "history.jsonl"),
+      JSON.stringify({
+        ...base,
+        promptHash: "aaaaaaaaaaaa",
+        build: { version: "1.7.0", commit: "deadbeefcafe", dirty: false },
+      }) + "\n"
+        + JSON.stringify({
+          ...base,
+          promptHash: "bbbbbbbbbbbb",
+          build: { version: "1.7.0", commit: "deadbeefcafe", dirty: true },
+        }) + "\n",
+    );
+
+    return runCli(["prompt", "history", "--suite", manifest]).then((result) => {
+      expect(result.exitCode).toBe(0);
+      const [first, second] = result.stdout.trim().split("\n");
+      // Same artifact version, different prompt: only the hash shows it.
+      expect(first).toContain("artifact=haiku45-2@aaaaaaaaaaaa");
+      expect(second).toContain("artifact=haiku45-2@bbbbbbbbbbbb");
+      expect(first).toContain("1.7.0 (deadbee)");
+      expect(second).toContain("1.7.0 (deadbee-dirty)");
+    });
+  });
 });

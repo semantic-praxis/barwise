@@ -19,6 +19,7 @@ import {
 const report: SuiteReport = {
   suiteVersion: "1.0.0",
   artifactVersion: "2.0.0",
+  promptHash: "abc123def456",
   repeat: 2,
   cases: [
     { caseId: "a", runs: [], mean: 0.9, worst: 0.8, samples: 2, failures: 0, sd: 0.1 },
@@ -67,6 +68,7 @@ describe("history", () => {
       artifactVersion: "2.0.0",
       provider: "anthropic",
       model: "claude-sonnet-5",
+      promptHash: "abc123def456",
       repeat: 2,
       mean: 0.95,
       worst: 0.8,
@@ -76,6 +78,55 @@ describe("history", () => {
         { caseId: "b", mean: 1, worst: 1, samples: 2, sd: 0 },
       ],
     });
+  });
+
+  it("carries the build provenance the caller supplies, and omits it otherwise", () => {
+    // Same seam as the date: this package computes the prompt hash from
+    // bytes it rendered, and takes everything requiring I/O from the
+    // caller.
+    const withBuild = toHistoryEntry(report, "2026-08-21T00:00:00Z", {
+      build: { version: "1.7.0", commit: "deadbeef", dirty: false },
+    });
+    expect(withBuild.build).toEqual({ version: "1.7.0", commit: "deadbeef", dirty: false });
+    expect(withBuild.promptHash).toBe("abc123def456");
+
+    const without = toHistoryEntry(report, "2026-08-21T00:00:00Z");
+    expect("build" in without).toBe(false);
+    // The hash is not the caller's to supply, so it survives regardless.
+    expect(without.promptHash).toBe("abc123def456");
+  });
+
+  it("round-trips provenance through the JSONL file", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "barwise-history-")), "history.jsonl");
+    appendHistory(
+      path,
+      toHistoryEntry(report, "2026-08-21T00:00:00Z", {
+        build: { version: "1.7.0", commit: "deadbeef", dirty: true },
+      }),
+    );
+    const [back] = readHistory(path);
+    expect(back!.build?.commit).toBe("deadbeef");
+    expect(back!.build?.dirty).toBe(true);
+    expect(back!.promptHash).toBe("abc123def456");
+  });
+
+  it("reads a row written before provenance existed", () => {
+    // Backward compatibility is the whole reason these fields are
+    // optional: an old row is not broken, it just knows less.
+    const path = join(mkdtempSync(join(tmpdir(), "barwise-history-")), "history.jsonl");
+    appendHistory(path, {
+      date: "2026-08-09T00:00:00Z",
+      suiteVersion: "1.0.0",
+      artifactVersion: "1.0.0",
+      repeat: 1,
+      mean: 0.76,
+      worst: 0.3,
+      cases: [],
+    });
+    const [back] = readHistory(path);
+    expect(back!.promptHash).toBeUndefined();
+    expect(back!.build).toBeUndefined();
+    expect(back!.mean).toBe(0.76);
   });
 
   it("records no standard error when the run could not resolve one", () => {

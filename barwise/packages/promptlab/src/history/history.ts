@@ -7,11 +7,43 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { SuiteReport } from "../run/runSuite.js";
 
+/**
+ * What built the run, supplied by the caller.
+ *
+ * Separate from `promptHash` because the two have different authors and
+ * answer different questions. The hash is computed by this package from
+ * bytes it rendered and says whether the prompt was the same; `build`
+ * is handed in by the CLI and says whether the rest of the system was
+ * -- the scorer, the weights, the reference models and the evaluator
+ * all move a score without touching a prompt. Keeping the seam visible
+ * in the shape lets a reader tell which fields this package vouches
+ * for.
+ */
+export interface BuildProvenance {
+  /** The barwise version that ran. Always known to the CLI. */
+  readonly version: string;
+  /** Git commit, absent when the run was not from a barwise checkout. */
+  readonly commit?: string;
+  /**
+   * Whether the working tree carried uncommitted changes. Load-bearing:
+   * a commit recorded against a modified tree names a revision that
+   * never produced the run, and nothing downstream could detect it.
+   */
+  readonly dirty?: boolean;
+}
+
 export interface HistoryEntry {
   /** ISO date of the run, supplied by the caller (no clock in here). */
   readonly date: string;
   readonly suiteVersion: string;
   readonly artifactVersion: string;
+  /**
+   * Fingerprint of the prompt that ran. Optional only because rows
+   * written before the field exist; every new row carries one.
+   */
+  readonly promptHash?: string;
+  /** What built the run. Absent on rows written before the field. */
+  readonly build?: BuildProvenance;
   readonly provider?: string;
   readonly model?: string;
   readonly repeat: number;
@@ -46,12 +78,14 @@ export function historyPathFor(manifestPath: string): string {
 export function toHistoryEntry(
   report: SuiteReport,
   date: string,
-  target?: { provider?: string; model?: string; },
+  target?: { provider?: string; model?: string; build?: BuildProvenance; },
 ): HistoryEntry {
   return {
     date,
     suiteVersion: report.suiteVersion,
     artifactVersion: report.artifactVersion,
+    promptHash: report.promptHash,
+    ...(target?.build !== undefined ? { build: target.build } : {}),
     ...(target?.provider !== undefined ? { provider: target.provider } : {}),
     ...(target?.model !== undefined ? { model: target.model } : {}),
     repeat: report.repeat,
