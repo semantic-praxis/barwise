@@ -43,6 +43,54 @@ provides the theoretical foundation for fact-based modeling.
   When DRY conflicts with the primary principles, the duplication
   stays.
 
+### Shared vocabulary (Ousterhout)
+
+The principles above are the rules. These terms, from Ousterhout's
+_A Philosophy of Software Design_, are shared words for discussing
+them -- descriptive, not a further gate. A change is not rejected for
+being a shallow module; the term just lets a reviewer say in two words
+what would otherwise take a paragraph. Read the book for the argument;
+what follows is only the vocabulary, anchored to this codebase.
+
+- **Deep versus shallow modules.** A deep module hides substantial
+  functionality behind a simple interface. This is what
+  "narrow primitives that compose" is reaching for, stated from the
+  caller's side. `resolveArtifact` and the `FormatDescriptor` registry
+  are deep: small surface, real work behind it. A wrapper that renames
+  three parameters is shallow -- it adds an interface to learn without
+  removing anything to think about.
+
+- **Complexity is what the reader pays**, in three forms worth naming
+  separately: _change amplification_ (one decision edited in many
+  places), _cognitive load_ (how much you must hold to make a change),
+  and _unknown unknowns_ (you cannot tell what you needed to know).
+  The third is the dangerous one and the hardest to see in review. It
+  is what two recent specs kept hitting: nothing told a reader that the
+  prompt variants had converged, or that the eval harness could not
+  resolve the differences it was being used to rank.
+
+- **Define errors out of existence.** Prefer designing away a failure
+  case over requiring every caller to handle it. This is a deliberate
+  counterweight to "explicit over implicit" above: taken alone, that
+  principle can argue for pushing work onto callers, which is how a
+  shallow interface gets justified. Explicit declaration is right for
+  things a caller genuinely decides; it is wrong as a way to avoid
+  solving something once, centrally. `runSuite` reporting its own
+  resolvable difference rather than making every reader compute
+  `SE * sqrt(2)` is this principle applied.
+
+- **Comments describe what the code cannot.** Not what a line does --
+  what a reader could not recover from the code: why a rule exists,
+  what was tried and rejected, which failure a guard prevents. This is
+  the criterion behind the comment style already used throughout.
+
+- **Strategic over tactical, and design it twice.** Tactical work
+  optimizes for getting this change in; strategic work leaves the
+  design better than it found it. "Design it twice" -- develop two or
+  three real alternatives before committing -- is already what the
+  `spec-writer` skill's sensemaking step asks for, and naming the
+  source ties them together.
+
 ## Essential Context
 
 Read `barwise/docs/ARCHITECTURE.md` before making any changes. It
@@ -121,14 +169,33 @@ across all 12 packages. Core ships no interop format: the standard
 descriptors live in `@barwise/formats`, dbt in `@barwise/dbt`, and
 code importers in `@barwise/code-analysis`.
 
-The three surfaces do **not** all expose the same capabilities, and
-the divergence is undocumented rather than designed
-(`docs/unwired-capability-audit-2026-08-20.md`). Six capabilities
-reach all three. `review` reaches MCP and VS Code but not the CLI;
-`merge` reaches MCP alone; `project` and `history` are CLI-only. Only
-`prompt` is deliberately CLI-only, as dev tooling. Check the audit
-before assuming a capability is reachable from the surface you are
-working on.
+### Capability matrix across the three surfaces
+
+The surfaces do **not** all expose the same capabilities. Consult this
+before assuming one is reachable from the surface you are working on,
+and update it in the same commit that changes a surface's reach.
+
+| Capability                                            | CLI | MCP | VS Code | Divergence                              |
+| ----------------------------------------------------- | --- | --- | ------- | --------------------------------------- |
+| validate, verbalize, diagram, export, import, analyze | yes | yes | yes     | none                                    |
+| `review`                                              | yes | yes | yes     | none                                    |
+| schema, diff, query, describe, gym, lineage, impact   | yes | yes | no      | deliberate: text-first tools            |
+| `merge`                                               | yes | yes | no      | deliberate: an editor wants a diff view |
+| `project`, `history`                                  | yes | no  | no      | deliberate: repository operations       |
+| `prompt`                                              | yes | no  | no      | deliberate: dev tooling                 |
+
+Every remaining gap is marked deliberate, which is the point: an
+unmarked gap is a bug. This table is hand-maintained and therefore the
+same kind of claim that went stale before -- it previously asserted
+parity that did not hold, for two years' worth of readers, because
+nothing checked it (`docs/unwired-capability-audit-2026-08-20.md`).
+Treat a surface change as incomplete until this table agrees with it.
+
+The `merge` and `review` rows were closed by
+`docs/specs/cli-surface-parity.spec.md`. Two audit findings remain open
+and are not surface-parity questions: `buildCodeExtractionPrompt` has
+no call site (barwise-811) and few-shot demo rendering has never run on
+real content (barwise-812).
 
 ## Monorepo Commands
 

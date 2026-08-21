@@ -136,6 +136,61 @@ Options:
 - `--format <text|json>` -- output format (default: text)
 - `--no-synonyms` -- hide synonym/rename candidates
 
+### merge
+
+Merge an incoming model into a base model: the sibling of `diff`, the
+same comparison read in the other direction.
+
+```sh
+barwise merge base.orm.yaml incoming.orm.yaml
+barwise merge base.orm.yaml incoming.orm.yaml --output merged.orm.yaml
+barwise merge base.orm.yaml incoming.orm.yaml --format json
+```
+
+The merge is non-interactive: additions and modifications are accepted,
+removals are rejected. A removal you meant is a deliberate edit, not
+something a merge should infer.
+
+Neither input file is modified. The merged model goes to stdout unless
+`--output` names a file. If the merge produces structural errors,
+nothing is written anywhere and the command exits 1 -- a broken model
+on disk is worse than no model.
+
+Options:
+
+- `--output <file>` -- write the merged model to a file instead of stdout
+- `--format <yaml|json>` -- output format (default: yaml)
+
+### review
+
+Review a model's semantic quality using an LLM. Distinct from
+`validate`, which checks structural rules deterministically: review
+returns advice, and advice can be wrong.
+
+```sh
+barwise review model.orm.yaml
+barwise review model.orm.yaml --focus Customer
+barwise review model.orm.yaml --format json
+```
+
+Requires an LLM provider, configured the same way as
+`import transcript` (see below).
+
+`review` always exits 0 when the review completes, whatever it says. It
+is deliberately not a CI gate: failing a build on model-generated
+suggestions would put an LLM in your merge path, where a bad day for
+the provider becomes a red build for everyone. To gate on review
+output, pipe `--format json` through `jq` and decide your own policy.
+
+Options:
+
+- `--focus <name>` -- review only this entity or fact type
+- `--provider <anthropic|openai|ollama>` -- auto-detects from env vars if omitted
+- `--model <model>` -- model override for the provider
+- `--api-key <key>` -- falls back to env vars
+- `--base-url <url>` -- Ollama server URL
+- `--format <text|json>` -- output format (default: text)
+
 ### project
 
 Scaffold and manage multi-domain projects. A project ties several

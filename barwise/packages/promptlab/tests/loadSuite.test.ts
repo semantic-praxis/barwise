@@ -46,7 +46,7 @@ describe("loadSuite on the packaged seed suite", () => {
       expect(c.reference).toBeDefined();
       expect(c.evalCase.checks.length).toBeGreaterThanOrEqual(5);
     }
-  }, 30_000);
+  });
 });
 
 describe("loadSuite validation", () => {
