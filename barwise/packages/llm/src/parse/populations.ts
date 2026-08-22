@@ -27,6 +27,17 @@ export function parsePopulations(
       const population = model.addPopulation({
         factTypeId: factType.id,
         description: ext.description,
+        // A transcript names far more entities than it gives complete
+        // facts about, so what an extraction can populate is a sample
+        // by construction, never the full extension. Marking it says
+        // so: the instances remain evidence a constraint is satisfied,
+        // and stop being grounds for reporting one violated. Without
+        // this, every entity a long transcript merely mentioned raised
+        // a mandatory violation on the draft model -- six of them sank
+        // one dev case to zero, and the same errors reached anyone
+        // importing a long transcript in the editor
+        // (docs/specs/sample-populations.spec.md).
+        sample: true,
       });
 
       // Add instances to the population

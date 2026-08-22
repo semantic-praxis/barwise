@@ -38,6 +38,27 @@ export interface PopulationConfig {
   readonly description?: string;
   /** Initial set of fact instances. */
   readonly instances?: readonly FactInstanceConfig[];
+  /**
+   * Whether these instances are an illustrative sample rather than the
+   * complete extension of the fact type.
+   *
+   * A sample is **positive evidence only**: it can satisfy a constraint
+   * but never creates the obligation that one be satisfied. Concretely,
+   * its instances are excluded from the object universe, so a mandatory
+   * constraint is not reported as violated merely because an entity the
+   * sample happens to mention plays no role in it.
+   *
+   * Defaults to false, which is what every population authored before
+   * this field meant: a significant population, complete for the fact
+   * type it covers, and checkable as a closed world.
+   *
+   * LLM extraction sets it. A transcript names far more entities than
+   * it gives complete facts about, so an extracted population is a
+   * sample by construction -- and treating one as complete reported a
+   * violation for every entity the transcript merely mentioned
+   * (docs/specs/sample-populations.spec.md).
+   */
+  readonly sample?: boolean;
 }
 
 /**
@@ -59,12 +80,15 @@ export class Population {
   readonly id: string;
   readonly factTypeId: string;
   description: string | undefined;
+  /** See `PopulationConfig.sample`. Positive evidence only when true. */
+  readonly sample: boolean;
   private readonly _instances: FactInstance[] = [];
 
   constructor(config: PopulationConfig) {
     this.id = config.id ?? generateId();
     this.factTypeId = config.factTypeId;
     this.description = config.description;
+    this.sample = config.sample ?? false;
 
     if (config.instances) {
       for (const inst of config.instances) {
