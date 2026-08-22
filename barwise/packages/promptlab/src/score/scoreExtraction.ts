@@ -45,6 +45,18 @@ export interface CaseScore {
    * errored, for the same reason as warnings.
    */
   readonly errorsByRule: Readonly<Record<string, number>>;
+  /**
+   * Which conformance checks fired, and how many times each.
+   *
+   * The third tally, and the one the barwise-813 diagnostic round needs
+   * most: three of the promotion candidates are now handled by
+   * conformance rather than by prompt text, so pricing them means
+   * counting `invalid_bounds` and its siblings. A lump
+   * `conformanceCorrections` number cannot separate a category worth
+   * attacking from one that is merely noticed -- and on the recorded
+   * answer keys all fourteen corrections are a single category.
+   */
+  readonly correctionsByCategory: Readonly<Record<string, number>>;
   /** Ambiguities reported in the payload, whatever the budget. */
   readonly ambiguitiesReported: number;
   /** Ambiguities beyond the case's budget; 0 when none is declared. */
@@ -86,6 +98,10 @@ export function scoreExtraction(
   // the record said how many errors a run had and never which
   // (docs/specs/pipeline-observability.spec.md).
   const errorsByRule = tallyByRule(errors);
+  const correctionsByCategory: Record<string, number> = {};
+  for (const c of corrections) {
+    correctionsByCategory[c.category] = (correctionsByCategory[c.category] ?? 0) + 1;
+  }
 
   // One payload, two graders: the model half runs through the gym's
   // check runners, the payload half through promptlab's own. Both fold
@@ -125,6 +141,7 @@ export function scoreExtraction(
     validationWarnings,
     warningsByRule,
     errorsByRule,
+    correctionsByCategory,
     ambiguitiesReported,
     ambiguityExcess: excess,
     score: Math.max(0, raw),

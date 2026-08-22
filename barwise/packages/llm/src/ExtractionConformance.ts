@@ -11,6 +11,7 @@
 import type {
   ExtractedPopulation,
   ExtractedRole,
+  ExtractedSubtype,
   ExtractionResponse,
   InferredConstraint,
 } from "./ExtractionTypes.js";
@@ -145,6 +146,9 @@ export function enforceConformance(
     corrections,
   );
 
+  // --- Check subtype cycles ---
+  const cleanedSubtypes = cleanSubtypes(input.subtypes, corrections);
+
   // --- Check reference_mode without identifier fact type ---
   checkOrphanedReferenceModes(
     entityRefModes,
@@ -155,6 +159,7 @@ export function enforceConformance(
   return {
     response: {
       ...input,
+      subtypes: cleanedSubtypes,
       populations: repairedPopulations,
       inferred_constraints: cleanedConstraints,
     },
@@ -665,6 +670,76 @@ function expectedArityDescription(type: InferredConstraint["type"]): string {
 function constraintKey(ic: InferredConstraint): string {
   const sortedRoles = [...ic.roles].sort().join(",");
   return `${ic.type}|${ic.fact_type}|${sortedRoles}`;
+}
+
+// ---------------------------------------------------------------------------
+// Subtype checks
+// ---------------------------------------------------------------------------
+
+/**
+ * Drop any subtype edge that closes a cycle.
+ *
+ * `structural/subtype-cycle` is an error and was the one gap the wider
+ * validator audit turned up (barwise-834). Both edges of "Order is-a
+ * Customer" / "Customer is-a Order" resolve perfectly well -- each names
+ * an object type that exists and is an entity -- so the parser builds
+ * them and the model carries a cycle it is then rejected for.
+ *
+ * Decidable here without a model: `subtypes` is a list of name pairs,
+ * and a cycle in a name graph needs nothing else.
+ *
+ * Declarations are processed in order and an edge is rejected when the
+ * supertype already reaches the subtype, which keeps every relationship
+ * declared before it. That is the least destructive reading -- the
+ * earlier edges are the ones the extraction committed to first -- and it
+ * is deterministic, which matters because the alternative (drop the
+ * whole hierarchy) would discard a correct taxonomy to punish one
+ * contradictory edge.
+ *
+ * A diamond is not a cycle: two paths from A to D is legal ORM and
+ * survives, which is why reachability is tested per edge rather than
+ * with a visited set across the whole walk.
+ */
+function cleanSubtypes(
+  subtypes: readonly ExtractedSubtype[],
+  corrections: ConformanceCorrection[],
+): ExtractedSubtype[] {
+  const result: ExtractedSubtype[] = [];
+  // supertype -> subtypes declared under it, built as we go.
+  const children = new Map<string, string[]>();
+
+  const reaches = (from: string, target: string): boolean => {
+    const seen = new Set<string>();
+    const stack = [from];
+    while (stack.length > 0) {
+      const node = stack.pop()!;
+      if (node === target) return true;
+      if (seen.has(node)) continue;
+      seen.add(node);
+      stack.push(...(children.get(node) ?? []));
+    }
+    return false;
+  };
+
+  for (const st of subtypes) {
+    // A self-edge is a cycle of length one; `reaches` catches it because
+    // the walk starts by comparing the node with itself.
+    if (reaches(st.supertype, st.subtype)) {
+      corrections.push({
+        category: "subtype_cycle",
+        description: `Removed subtype "${st.subtype}" of "${st.supertype}" -- it closes a cycle `
+          + `in the subtype hierarchy.`,
+        element: st.subtype,
+      });
+      continue;
+    }
+    const list = children.get(st.subtype);
+    if (list) list.push(st.supertype);
+    else children.set(st.subtype, [st.supertype]);
+    result.push(st);
+  }
+
+  return result;
 }
 
 // ---------------------------------------------------------------------------

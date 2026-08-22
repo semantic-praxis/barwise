@@ -113,6 +113,15 @@ export interface HistoryEntry {
    * (docs/specs/pipeline-observability.spec.md).
    */
   readonly errorsByRule?: Readonly<Record<string, number>>;
+  /**
+   * Which conformance checks fired across the run, and how often.
+   *
+   * Completes the trio: a row can now say why a mean is what it is
+   * across all three penalty kinds rather than two. On the recorded
+   * answer keys every correction is one category, which a lump count
+   * could never have shown.
+   */
+  readonly correctionsByCategory?: Readonly<Record<string, number>>;
   readonly cases: readonly {
     caseId: string;
     mean: number;
@@ -164,6 +173,9 @@ export function toHistoryEntry(
       : {}),
     ...(Object.keys(report.errorsByRule ?? {}).length > 0
       ? { errorsByRule: report.errorsByRule }
+      : {}),
+    ...(Object.keys(report.correctionsByCategory ?? {}).length > 0
+      ? { correctionsByCategory: report.correctionsByCategory }
       : {}),
     cases: report.cases.map((c) => ({
       caseId: c.caseId,

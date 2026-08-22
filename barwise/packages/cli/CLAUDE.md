@@ -31,10 +31,12 @@ src/
     import/             one module per import subcommand + shared helpers
     prompt.ts           barwise prompt eval|score|schema|history (prompt
                         evaluation over @barwise/promptlab)
+    llmUsage.ts         barwise llm-usage (report over the call log)
   workspace/
     io.ts               File I/O helpers (loadModel, writeModel)
     format.ts           Output formatting helpers (JSON, text)
     provenance.ts       Version/commit/dirty for recorded eval runs
+    callLogSink.ts      JSONL sink for the observability records
 tests/
   cli.test.ts           Scaffolding tests
   commands/             Command-specific tests
@@ -72,6 +74,20 @@ npx tsc --noEmit            # type-check only
   whatever repo the operator was standing in, and a global install can
   sit in another project's `node_modules`. It never throws: an eval run
   costs money, and a missing `git` must not be what loses it.
+
+- **Observability is opt-in and writes one file.** `BARWISE_CALL_LOG`
+  gates it: unset or empty is off, `1`/`true` is
+  `$XDG_STATE_HOME/barwise/calls.jsonl`, anything else is that path.
+  One log holds three record kinds -- call cost, what the pipeline
+  changed, what validation found -- correlated by a per-operation id,
+  and `barwise llm-usage` reads back the calls. **No prices ship with
+  the repo**: `--rates <file>` takes a user-maintained JSON, because a
+  stale rate produces a confidently wrong number.
+
+  `barwise validate` emits a validation record; the export formats and
+  the gym's check runners do not, deliberately -- they validate as an
+  internal gate, and logging them would turn one `barwise export` into
+  several validation events.
 
 ## Dependencies
 

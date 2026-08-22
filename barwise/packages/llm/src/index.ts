@@ -61,6 +61,12 @@ export { withCallLog } from "./observe/callLog.js";
 export type { CallLogOptions, CallLogSink, LlmCallRecord } from "./observe/callLog.js";
 export { emitExtractionRecord, summariseExtraction } from "./observe/extractionLog.js";
 export type { ExtractionLogSink, ExtractionRecord } from "./observe/extractionLog.js";
+export { emitValidationRecord, summariseValidation } from "./observe/validationLog.js";
+export type {
+  DiagnosticLike,
+  ValidationLogSink,
+  ValidationRecord,
+} from "./observe/validationLog.js";
 
 // Conformance validation
 export { enforceConformance } from "./ExtractionConformance.js";

@@ -1,6 +1,6 @@
 # Keep the call records the providers already hand us
 
-Status: Accepted (workstreams 1 and 2 implemented; see Implementation notes)
+Status: Implemented (all three workstreams; see Implementation notes)
 Created: 2026-08-21
 Last-updated: 2026-08-21
 Tracking: barwise-815. Related: task #2 (model-tier economics), which
@@ -309,5 +309,29 @@ correlated by a per-import id.
   depends on `llm` and not the reverse, and the honest fix is moving the
   hasher into `llm` rather than duplicating it. Not worth doing inside
   a workstream about persistence.
-- **Workstream 3 remains unbuilt.** The log accumulates and nothing
-  reads it. Task #2 is unblocked, not answered.
+- **Workstream 3 shipped separately, below.**
+
+### Workstream 3 (2026-08-22)
+
+`barwise llm-usage` reads the log and reports per model: calls,
+failures by kind, token totals, and median and p95 latency. Task #2 is
+now answerable rather than merely unblocked.
+
+- **No prices ship with the repo**, per the open decision. `--rates
+  <file>` takes a small user-maintained JSON of per-million rates. A
+  checked-in table with a "last verified" date is friendlier for one
+  release and misleading for every release after -- and a confidently
+  wrong cost is the exact defect class this work exists to stop.
+- **Percentiles, not a mean.** A mean latency hides the tail, and the
+  tail is what a timeout is set against. Nearest-rank, and **undefined
+  rather than 0** for an empty sample, the same distinction the
+  dispersion module makes: no observations is not a fast call.
+- **The reader tolerates the file it actually gets.** One log holds
+  three record kinds and an append-only file can end mid-line when a
+  process dies. Non-call records are skipped on a field only a call
+  carries (`ok`), and an unparseable line is skipped rather than fatal
+  -- losing ten thousand good rows to one bad one would be the wrong
+  trade. Both are tested.
+- **Grouped by `modelUsed`, falling back to `model`.** The first is the
+  truth about the bill; the second is all a provider that cannot name
+  its model in advance can offer, and a failed call reports neither.

@@ -561,11 +561,22 @@ function renderReport(report: SuiteReport): string {
       `  errors:   ${errored.map(([id, n]) => `${id} x${n}`).join(", ")}`,
     );
   }
+  // Corrections last: cheapest at 0.02, and the line exists to separate
+  // a category worth attacking from one that is merely noticed. On the
+  // recorded answer keys every correction is `orphaned_reference_mode`,
+  // which a lump count could never have shown.
+  const corrected = Object.entries(report.correctionsByCategory ?? {})
+    .sort((a, b) => b[1] - a[1]);
   const warned = Object.entries(report.warningsByRule ?? {})
     .sort((a, b) => b[1] - a[1]);
   if (warned.length > 0) {
     lines.push(
       `  warnings: ${warned.map(([id, n]) => `${id} x${n}`).join(", ")}`,
+    );
+  }
+  if (corrected.length > 0) {
+    lines.push(
+      `  fixed:    ${corrected.map(([id, n]) => `${id} x${n}`).join(", ")}`,
     );
   }
   if (report.cache !== undefined) {

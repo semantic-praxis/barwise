@@ -205,6 +205,14 @@ the repo root -- the root holds no package.json. `npm run build`,
 per-package runs use `npx vitest run` / `npx tsc --noEmit` from the
 package directory.
 
+**A per-package `tsc --noEmit` reads its dependencies' `dist`, not
+their source.** After changing an exported type in `core` or `llm`, a
+type-check in `cli` or `promptlab` passes against the _previous_ build
+and reports clean on code that cannot compile -- then fails in CI or
+the pre-commit hook with "Property X does not exist on type Y" naming
+something you plainly just added. Run `npm run build` from `barwise/`
+first whenever a change crossed a package boundary.
+
 ## Versioning and Releases
 
 The project uses a single version number across all packages, tracked

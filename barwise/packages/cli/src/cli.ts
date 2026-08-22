@@ -14,6 +14,7 @@ import { registerGymCommand } from "./commands/gym.js";
 import { registerHistoryCommand } from "./commands/history.js";
 import { registerImportCommand } from "./commands/import.js";
 import { registerLineageCommand } from "./commands/lineage.js";
+import { registerLlmUsageCommand } from "./commands/llmUsage.js";
 import { registerMergeCommand } from "./commands/merge.js";
 import { registerProjectCommand } from "./commands/project.js";
 import { registerPromptCommand } from "./commands/prompt.js";
@@ -53,6 +54,7 @@ export function createProgram(version = "0.0.0-dev"): Command {
   // and this is the only place the version is known without reaching
   // for `import.meta`.
   registerPromptCommand(program, version);
+  registerLlmUsageCommand(program);
 
   return program;
 }
