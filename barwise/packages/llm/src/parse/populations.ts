@@ -2,8 +2,36 @@
  * Pass 5 of the draft-model parse: create populations.
  */
 
-import type { OrmModel } from "@barwise/core";
+import type { FactType, OrmModel } from "@barwise/core";
 import type { ExtractedPopulation } from "../ExtractionTypes.js";
+
+/**
+ * The role a `role_values` key names, or undefined when nothing matches.
+ *
+ * Role name first (case-insensitively), then player name (exactly),
+ * skipping any role already claimed by an earlier key of the same
+ * instance. Mirrors `resolveRolesByPlayerName` deliberately: the same
+ * package resolving the same kind of name two different ways is how a
+ * population came to be unable to express what a constraint could.
+ */
+function resolveInstanceRole(
+  factType: FactType,
+  model: OrmModel,
+  hint: string,
+  claimed: Readonly<Record<string, string>>,
+): string | undefined {
+  const lower = hint.toLowerCase();
+
+  const byRoleName = factType.roles.find(
+    (r) => r.name.toLowerCase() === lower && claimed[r.id] === undefined,
+  );
+  if (byRoleName) return byRoleName.id;
+
+  const player = model.getObjectTypeByName(hint);
+  if (!player) return undefined;
+  return factType.rolesForPlayer(player.id)
+    .find((r) => claimed[r.id] === undefined)?.id;
+}
 
 /**
  * Create populations and their instances in the model from the extracted
@@ -42,32 +70,35 @@ export function parsePopulations(
 
       // Add instances to the population
       for (const instData of ext.instances) {
-        // Map role player names to role IDs
+        // Map role hints to role IDs. A hint is a role name or a player
+        // name, resolved in that order and consuming the role it
+        // matches -- the same discipline `resolveRolesByPlayerName`
+        // applies to constraints.
+        //
+        // Both halves are load-bearing for one shape. On a
+        // self-referencing fact type ("Employee mentors Employee") a
+        // JSON object cannot carry the key "Employee" twice, so the
+        // only way to name both roles is by role name; and resolving
+        // without consuming would hand both keys the same role.
+        // Player-name-only resolution against `rolesForPlayer(...)[0]`
+        // did neither, which made a population of any ring or
+        // self-referencing fact type impossible to express -- one
+        // spelling lost a role to `population/incomplete-instance`, the
+        // other was dropped as unresolvable
+        // (docs/specs/population-instance-completeness.spec.md).
         const roleValues: Record<string, string> = {};
         let resolutionFailed = false;
 
-        for (const [playerName, value] of Object.entries(instData.role_values)) {
-          // Find role by player name
-          const player = model.getObjectTypeByName(playerName);
-          if (!player) {
+        for (const [hint, value] of Object.entries(instData.role_values)) {
+          const role = resolveInstanceRole(factType, model, hint, roleValues);
+          if (!role) {
             warnings.push(
-              `Population instance for "${ext.fact_type}": player "${playerName}" not found.`,
+              `Population instance for "${ext.fact_type}": could not resolve role "${hint}" in this fact type.`,
             );
             resolutionFailed = true;
             break;
           }
-
-          const roles = factType.rolesForPlayer(player.id);
-          if (roles.length === 0) {
-            warnings.push(
-              `Population instance for "${ext.fact_type}": player "${playerName}" does not play a role in this fact type.`,
-            );
-            resolutionFailed = true;
-            break;
-          }
-
-          // Use first matching role (for simplicity)
-          roleValues[roles[0]!.id] = value;
+          roleValues[role] = value;
         }
 
         if (!resolutionFailed && Object.keys(roleValues).length > 0) {

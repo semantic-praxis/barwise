@@ -107,10 +107,13 @@ export function enforceConformance(
   }
 
   // --- Check populations ---
+  const rolesByFactType = new Map(input.fact_types.map((ft) => [ft.name, ft.roles]));
+
   const cleanedPopulations = cleanPopulations(
     input.populations ?? [],
     factTypeNames,
     input,
+    rolesByFactType,
     corrections,
   );
 
@@ -138,7 +141,7 @@ export function enforceConformance(
     objectTypeNames,
     validRoleIdentifiers,
     identifierFactTypes,
-    new Map(input.fact_types.map((ft) => [ft.name, ft.roles])),
+    rolesByFactType,
     corrections,
   );
 
@@ -267,6 +270,7 @@ function cleanPopulations(
   populations: readonly ExtractedPopulation[],
   factTypeNames: Set<string>,
   input: ExtractionResponse,
+  rolesByFactType: ReadonlyMap<string, readonly ExtractedRole[]>,
   corrections: ConformanceCorrection[],
 ): ExtractedPopulation[] {
   const result: ExtractedPopulation[] = [];
@@ -303,10 +307,69 @@ function cleanPopulations(
       continue;
     }
 
-    result.push(pop);
+    // Check 3b: Instances that cannot fill every role
+    //
+    // `population/incomplete-instance` is an error in the validator, so
+    // an instance short a role value cost 0.1 and nothing here caught
+    // it -- the fourth instance of the class barwise-826 named. The
+    // instance is dropped rather than the population: a population of
+    // five good instances and one bad one is mostly evidence, and
+    // discarding the five to punish the one is the opposite of what
+    // sample semantics were introduced to do
+    // (docs/specs/population-instance-completeness.spec.md).
+    const roles = rolesByFactType.get(pop.fact_type) ?? [];
+    const complete = pop.instances.filter((inst) => {
+      const missing = missingRoles(roles, inst.role_values);
+      if (missing.length === 0) return true;
+      corrections.push({
+        category: "incomplete_instance",
+        description: `Removed an incomplete instance of "${pop.fact_type}" -- no value for `
+          + `${missing.map((m) => `"${m}"`).join(", ")}. Every instance must fill every role.`,
+        element: pop.fact_type,
+      });
+      return false;
+    });
+
+    // Dropping every instance takes the population with it, but charges
+    // nothing further: the instance corrections above already name the
+    // defect, and an empty population here is our own consequence
+    // rather than a second thing the extraction did wrong. Check 1
+    // charges for a population the model itself emitted empty, which is
+    // a different claim.
+    if (complete.length === 0) continue;
+
+    result.push(complete.length === pop.instances.length ? pop : { ...pop, instances: complete });
   }
 
   return result;
+}
+
+/**
+ * Which roles an instance supplies no value for.
+ *
+ * A key may name a role or a player, and a role already claimed by an
+ * earlier key cannot be claimed again -- the resolution `parsePopulations`
+ * performs, mirrored here so conformance judges what the parser will
+ * actually build. On a self-referencing fact type the two disagree
+ * loudly: `{"Employee": "Alice"}` fills one role of two, which is the
+ * case this check exists to price at 0.02 instead of 0.1.
+ */
+function missingRoles(
+  roles: readonly ExtractedRole[],
+  roleValues: Readonly<Record<string, string>>,
+): string[] {
+  const claimed = new Set<number>();
+  for (const hint of Object.keys(roleValues)) {
+    const lower = hint.toLowerCase();
+    let i = roles.findIndex(
+      (r, idx) => !claimed.has(idx) && r.role_name?.toLowerCase() === lower,
+    );
+    if (i === -1) i = roles.findIndex((r, idx) => !claimed.has(idx) && r.player === hint);
+    if (i !== -1) claimed.add(i);
+  }
+  return roles
+    .map((r, idx) => (claimed.has(idx) ? undefined : (r.role_name || r.player)))
+    .filter((n): n is string => n !== undefined);
 }
 
 /**
