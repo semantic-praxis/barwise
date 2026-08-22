@@ -76,6 +76,21 @@ describe("barwise prompt eval", () => {
     expect(result.stdout).toContain("--max-tokens");
   });
 
+  it("offers --context-window, and reaches the client with it", async () => {
+    // The flag exists to be reachable: an option parsed and then not
+    // passed to the provider is the built-but-unwired class this repo
+    // audits for. Asserted here on the flag; the wiring itself is
+    // covered by the provider tests reading num_ctx off the request.
+    const result = await runCli(["prompt", "eval", "--help"]);
+    expect(result.stdout).toContain("--context-window");
+  });
+
+  it("rejects a nonsense context window before spending a call", async () => {
+    const result = await runCli(["prompt", "eval", "--context-window", "wide"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("--context-window must be a positive integer");
+  });
+
   it("rejects a nonsense budget before spending a call", async () => {
     // Same reasoning as the split guard. A budget that reaches the
     // provider as NaN costs a sweep to discover.

@@ -7,8 +7,9 @@ ORM models using structured LLM output.
 ## Dependency Rule
 
 This package depends on `@barwise/core` (model types, serializers) and
-the provider SDKs `@anthropic-ai/sdk` and `openai` (the latter also
-powers the Ollama provider via its OpenAI-compatible API). It has ZERO
+the provider SDKs `@anthropic-ai/sdk` and `openai`. The Ollama provider
+uses neither: it talks to Ollama's native `/api/chat` over `fetch` from
+Node core, so it adds no dependency at all. It has ZERO
 dependencies on VS Code. The LLM integration is intentionally kept at
 the boundary of the system -- the core model and validation logic know
 nothing about LLMs.
@@ -107,6 +108,34 @@ npx tsc --noEmit            # type-check only
   monotonic across generations: Haiku 4.5 requires 4,096 where Opus 5
   requires 512. A trimmed prompt could disable caching on the model the
   eval suite runs against, with a bill as the only symptom.
+- **Ollama gets the native endpoint, not the OpenAI-compatible one.**
+  `/v1/chat/completions` cannot set `num_ctx`, and Ollama's own docs
+  say so -- the documented workarounds are a Modelfile or a server-wide
+  `OLLAMA_CONTEXT_LENGTH`, neither reachable from a library. That is
+  disqualifying here rather than inconvenient: Ollama defaults to a
+  4,096-token context and silently drops what does not fit, and the
+  extraction system prompt alone is about 4,540 tokens, so on the
+  default the _instructions_ are truncated before the transcript is
+  read and the model is scored on a prompt it never saw.
+  `suggestContextWindow` derives a window per call from the prompt
+  length plus the output budget; `OllamaClientOptions.contextWindow`
+  (reachable as `barwise prompt eval --context-window`) overrides it
+  for a machine that cannot afford the derived size.
+
+  Both endpoints do report truncation, contrary to a first reading of
+  the compat layer: it passes `done_reason` through unchanged, and
+  Ollama's vocabulary matches OpenAI's -- `"length"` when generation
+  hits `num_predict` or exhausts the context. `describeOpenAiStop`
+  therefore serves both. An empty `done_reason`, which Ollama writes on
+  some paths, is mapped to absent rather than passed through: `""` as a
+  stop reason looks like an answer.
+
+  This provider streams for the same reason the Anthropic one does and
+  more acutely -- a local model generating tens of thousands of tokens
+  runs for many minutes, and a non-streaming request sends no headers
+  until it finishes, straight past Node's 300-second header timeout.
+  The NDJSON reader buffers partial lines: assuming a chunk boundary
+  falls on a newline works right up until a long generation.
 - **Variants are compiled in, not read from disk.**
   `src/prompt/artifacts/builtins.generated.ts` is generated from
   `prompts/*.prompt.yaml` by `npm run regen:builtins` and committed;

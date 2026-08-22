@@ -85,3 +85,32 @@ export function suggestMaxTokens(
   );
   return Math.max(floor, Math.min(cap, needed));
 }
+
+/**
+ * Smallest context window that can hold a prompt and its answer.
+ *
+ * Only local runtimes need this. A hosted API sizes its own context
+ * from the model; Ollama does not -- it applies a server default of
+ * 4,096 tokens and silently drops whatever does not fit, oldest first.
+ * The extraction system prompt alone is about 4,540 tokens, so that
+ * default truncates the instructions before the transcript is even
+ * read, and the model is then scored on a prompt it never saw.
+ *
+ * A 20% margin covers the gap between the chars/4 estimate and a real
+ * tokenizer. Erring high costs memory; erring low costs the run and
+ * says nothing about why.
+ */
+export function suggestContextWindow(
+  promptChars: number,
+  maxOutputTokens: number,
+): number {
+  const inputTokens = Math.ceil((promptChars / CHARS_PER_TOKEN) * 1.2);
+  // Rounded to a multiple of 2,048 because that is how context windows
+  // are actually sized, and an odd number here reads as a computed
+  // quantity when it is really a floor.
+  const block = 2048;
+  return Math.max(
+    DEFAULT_MAX_OUTPUT_TOKENS,
+    Math.ceil((inputTokens + maxOutputTokens) / block) * block,
+  );
+}

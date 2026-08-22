@@ -28,6 +28,7 @@ export {
   DEFAULT_MAX_OUTPUT_TOKENS,
   MAX_OUTPUT_TOKEN_CAP,
   OBSERVED_PAYLOAD_RATIO,
+  suggestContextWindow,
   suggestMaxTokens,
 } from "./budget.js";
 export type { BudgetOptions } from "./budget.js";
