@@ -438,6 +438,22 @@ function cleanConstraints(
   return result;
 }
 
+/**
+ * Whether a constraint covers a number of roles its own type allows.
+ *
+ * The three multi-role types are listed explicitly rather than falling
+ * through to the permissive default, because that default put this
+ * module in direct contradiction with the validator: conformance waved
+ * through a single-role `disjunctive_mandatory` and
+ * `constraintConsistency` then rejected it as an error. Every such
+ * constraint became a validation error the extraction could not avoid,
+ * and on the dev split that was the whole story -- `incident-response`
+ * scored 0.000 on seven of them and `subscription-billing` lost 0.1 to
+ * one (docs/specs/constraint-arity.spec.md).
+ *
+ * Any rule the validator enforces on arity has to be enforced here too,
+ * or the pipeline produces models it knows are invalid.
+ */
 function isValidArity(ic: InferredConstraint): boolean {
   switch (ic.type) {
     case "ring":
@@ -445,6 +461,13 @@ function isValidArity(ic: InferredConstraint): boolean {
     case "frequency":
     case "mandatory":
       return ic.roles.length === 1;
+    // A disjunction, an exclusion, or an exclusive-or over a single
+    // role is not a weaker constraint -- it is a contradiction in
+    // terms. There is nothing for the role to be disjoint from.
+    case "disjunctive_mandatory":
+    case "exclusion":
+    case "exclusive_or":
+      return ic.roles.length >= 2;
     default:
       // Other constraint types accept 1 or more roles.
       return ic.roles.length >= 1;
@@ -458,6 +481,10 @@ function expectedArityDescription(type: InferredConstraint["type"]): string {
     case "frequency":
     case "mandatory":
       return "exactly 1";
+    case "disjunctive_mandatory":
+    case "exclusion":
+    case "exclusive_or":
+      return "at least 2";
     default:
       return "at least 1";
   }
