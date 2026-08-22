@@ -13,11 +13,23 @@ import type { CompletionRequest } from "../../src/LlmClient.js";
 const mockCreate = vi.fn();
 let capturedApiKey: string | undefined;
 let constructed = false;
+let streamCalls = 0;
 
+// The provider streams every call and takes `finalMessage()`, so the
+// mock mirrors that shape: `stream` returns a handle whose
+// finalMessage() resolves to whatever the test queued on mockCreate.
+// Keeping one queue means the existing assertions on request bodies
+// carry over unchanged.
 vi.mock("@anthropic-ai/sdk", () => {
   return {
     default: class MockAnthropic {
-      messages = { create: mockCreate };
+      messages = {
+        create: mockCreate,
+        stream: (body: unknown) => {
+          streamCalls++;
+          return { finalMessage: () => mockCreate(body) };
+        },
+      };
       constructor(options?: { apiKey?: string; }) {
         capturedApiKey = options?.apiKey;
         constructed = true;
@@ -41,6 +53,7 @@ describe("AnthropicLlmClient", () => {
     mockCreate.mockReset();
     capturedApiKey = undefined;
     constructed = false;
+    streamCalls = 0;
   });
 
   describe("constructor", () => {
@@ -171,6 +184,48 @@ describe("AnthropicLlmClient", () => {
           responseSchema: { type: "object" },
         }),
       ).rejects.toThrow(/max_tokens/);
+    });
+  });
+
+  describe("streaming", () => {
+    it("streams every call, including a small one", async () => {
+      // Not for incremental display -- nothing renders these tokens.
+      // The SDK simply refuses a non-streaming request whose max_tokens
+      // implies over ten minutes of generation, and throws before a
+      // byte reaches the wire. One path avoids branching on a threshold
+      // constant that lives in someone else's package.
+      const client = new AnthropicLlmClient();
+      mockCreate.mockResolvedValueOnce(textResponse("hi"));
+
+      await client.complete({ systemPrompt: "s", userMessage: "u" });
+
+      expect(streamCalls).toBe(1);
+    });
+
+    it("accepts a budget past the SDK's non-streaming limit", async () => {
+      // The regression that sent three dev-split runs to FAILED: at
+      // this SDK version any max_tokens over 21,333 throws on the
+      // non-streaming path, and no timeout argument escapes it. The
+      // derived budget for a 17 KB transcript is roughly twice that.
+      const client = new AnthropicLlmClient();
+      mockCreate.mockResolvedValueOnce({
+        content: [{ type: "tool_use", input: { object_types: [] } }],
+        usage: { input_tokens: 5000, output_tokens: 30000 },
+        stop_reason: "tool_use",
+      });
+
+      const result = await client.complete({
+        systemPrompt: "s",
+        userMessage: "u",
+        responseSchema: { type: "object" },
+        maxTokens: 41_600,
+      });
+
+      expect(streamCalls).toBe(1);
+      expect(result.truncated).toBe(false);
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ max_tokens: 41_600 }),
+      );
     });
   });
 

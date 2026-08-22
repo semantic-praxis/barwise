@@ -4,6 +4,20 @@
  * Uses Claude's tool_use capability to get structured JSON output
  * conforming to the extraction response schema.
  *
+ * Every call streams, and takes the assembled message. Not for
+ * incremental display -- nothing here renders tokens as they arrive --
+ * but because the SDK refuses a non-streaming request whose
+ * `max_tokens` implies more than ten minutes of generation, and throws
+ * before a byte reaches the wire. In this SDK version the threshold
+ * works out at 21,333 tokens and no timeout argument escapes it.
+ *
+ * That is squarely in the range the extraction budget now derives for a
+ * long transcript (docs/specs/output-budget.spec.md), so a non-streaming
+ * path would fail every large extraction with an error about streaming.
+ * Streaming unconditionally defines the failure out of existence rather
+ * than branching on a threshold constant that lives in someone else's
+ * package and can move without warning.
+ *
  * The SDK is loaded lazily (dynamic import on first use) so that
  * importing this module -- or the provider factory -- does not pull
  * `@anthropic-ai/sdk` into memory for callers that never select the
@@ -64,12 +78,12 @@ export class AnthropicLlmClient implements LlmClient {
   ): Promise<CompletionResponse> {
     const client = await this.getClient();
     const start = Date.now();
-    const response = await client.messages.create({
+    const response = await client.messages.stream({
       model: this.model,
       max_tokens: request.maxTokens ?? this.maxTokens,
       system: request.systemPrompt,
       messages: [{ role: "user", content: request.userMessage }],
-    });
+    }).finalMessage();
     const latencyMs = Date.now() - start;
 
     const textBlock = response.content.find((b) => b.type === "text");
@@ -92,7 +106,12 @@ export class AnthropicLlmClient implements LlmClient {
     const toolName = "extract_orm_model";
 
     const start = Date.now();
-    const response = await client.messages.create({
+    // `finalMessage()` assembles the streamed input_json_deltas back
+    // into a complete tool_use block, so the rest of this method sees
+    // exactly what the non-streaming call used to return -- including
+    // a partial `input` when the stream was cut off, which is the case
+    // `describeAnthropicStop` exists to label.
+    const response = await client.messages.stream({
       model: this.model,
       max_tokens: request.maxTokens ?? this.maxTokens,
       system: request.systemPrompt,
@@ -105,7 +124,7 @@ export class AnthropicLlmClient implements LlmClient {
         },
       ],
       tool_choice: { type: "tool", name: toolName },
-    });
+    }).finalMessage();
     const latencyMs = Date.now() - start;
 
     const toolBlock = response.content.find((b) => b.type === "tool_use");
