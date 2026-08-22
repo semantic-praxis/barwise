@@ -28,11 +28,34 @@ export const OBSERVED_PAYLOAD_RATIO = 9.7;
 /** Rule-of-thumb bytes per token for JSON in the Latin alphabet. */
 export const CHARS_PER_TOKEN = 4;
 
-/**
- * Every provider here defaults to this, and the derivation never goes
- * below it: a case that fit before must behave exactly as it did.
- */
+/** Every provider's own default, applied when a call names no budget. */
 export const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+
+/**
+ * Floor for a *derived* budget, distinct from the provider default
+ * above and deliberately well clear of it.
+ *
+ * The first live sweep after the derivation shipped truncated
+ * `university-enrollment` at exactly 8,192 -- a 1.5 KB transcript, one
+ * of the smallest in the suite, whose recorded answer key is only about
+ * 3,500 tokens. Live extraction generated more than twice that.
+ *
+ * The measurements that follow are why this is a floor and not a
+ * steeper ratio. Output tokens across the whole suite:
+ *
+ *     transcript      output      implied ratio
+ *      1.0-1.6 KB    3.7k-8.2k+      12 to 22+
+ *     13.1-17.2 KB   12.2k-14.4k       3 to 4
+ *
+ * Output barely moves across a seventeen-fold range of input. It is
+ * governed by how much *model* the transcript implies, not by how many
+ * bytes it took to say it, so a quantity proportional to input length
+ * is the wrong shape -- and it is wrongest at the small end, where the
+ * ratio it needs is highest. The ratio below still covers the genuinely
+ * large case; this floor covers everything else, at 14% above the
+ * largest output yet observed.
+ */
+export const MIN_DERIVED_OUTPUT_TOKENS = 16_384;
 
 /**
  * Upper bound on a derived budget, so a pathological input cannot ask
@@ -57,9 +80,9 @@ export const MAX_OUTPUT_TOKEN_CAP = 64_000;
 
 export interface BudgetOptions {
   /**
-   * Never return less than this. Defaults to the shared provider
-   * default; pass the client's own when it was constructed with a
-   * different `maxTokens`.
+   * Never return less than this. Defaults to
+   * `MIN_DERIVED_OUTPUT_TOKENS`, which is above every provider's own
+   * default for the reasons recorded there.
    */
   readonly floor?: number;
   /** Never return more than this. Defaults to `MAX_OUTPUT_TOKEN_CAP`. */
@@ -78,7 +101,7 @@ export function suggestMaxTokens(
   transcript: string,
   options?: BudgetOptions,
 ): number {
-  const floor = options?.floor ?? DEFAULT_MAX_OUTPUT_TOKENS;
+  const floor = options?.floor ?? MIN_DERIVED_OUTPUT_TOKENS;
   const cap = options?.cap ?? MAX_OUTPUT_TOKEN_CAP;
   const needed = Math.ceil(
     (transcript.length * OBSERVED_PAYLOAD_RATIO) / CHARS_PER_TOKEN,
@@ -110,7 +133,7 @@ export function suggestContextWindow(
   // quantity when it is really a floor.
   const block = 2048;
   return Math.max(
-    DEFAULT_MAX_OUTPUT_TOKENS,
+    MIN_DERIVED_OUTPUT_TOKENS,
     Math.ceil((inputTokens + maxOutputTokens) / block) * block,
   );
 }

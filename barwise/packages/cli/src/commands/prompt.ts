@@ -390,7 +390,7 @@ function renderProgress(e: RunProgress): string {
 
   if (e.truncated === true) {
     return `${position} ${e.caseId.padEnd(22)} ${run}  TRUNCATED, excluded`
-      + `${took}${tokens}  raise --max-tokens\n`;
+      + `${took}${tokens}${cached}  raise --max-tokens\n`;
   }
   if (e.failed === true) {
     return `${position} ${e.caseId.padEnd(22)} ${run}  FAILED, excluded`
@@ -401,6 +401,33 @@ function renderProgress(e: RunProgress): string {
   const unscorable = e.score !== undefined && e.error !== undefined ? "  unscorable" : "";
   return `${position} ${e.caseId.padEnd(22)} ${run} ${score}${took}${tokens}${cached}${tries}`
     + `${collapse}${unscorable}\n`;
+}
+
+/**
+ * The penalty terms behind a case's mean, averaged over its scored
+ * samples. Printed only when something was actually charged: on a clean
+ * case it would be four zeroes of noise.
+ *
+ * Score is `rubric fraction - 0.02 x corrections - 0.1 x errors
+ * - 0.05 x warnings`, with the weights coming from the suite manifest.
+ * A reader who can see the rubric checks pass but not these cannot
+ * account for the number in front of them.
+ */
+function renderPenalties(c: SuiteReport["cases"][number]): string {
+  const scored = c.runs.filter((r) => r.score !== undefined).map((r) => r.score!);
+  if (scored.length === 0) return "";
+  const mean = (pick: (s: (typeof scored)[number]) => number): number =>
+    scored.reduce((sum, s) => sum + pick(s), 0) / scored.length;
+
+  const parts: string[] = [];
+  const push = (label: string, value: number): void => {
+    if (value > 0) parts.push(`${label}=${value % 1 === 0 ? value : value.toFixed(1)}`);
+  };
+  push("corrections", mean((s) => s.conformanceCorrections));
+  push("errors", mean((s) => s.validationErrors));
+  push("warnings", mean((s) => s.validationWarnings));
+  push("excessAmbiguity", mean((s) => s.ambiguityExcess));
+  return parts.length > 0 ? `  [${parts.join(" ")}]` : "";
 }
 
 /** Requested runs, which is what the cache warning counts against. */
@@ -425,10 +452,15 @@ function renderReport(report: SuiteReport): string {
           ? "  (no sample survived)"
           : `  quality=${c.qualityMean.toFixed(3)}`
             + (c.qualitySd === undefined ? "" : `+/-${c.qualitySd.toFixed(3)}`));
+    // Where a score below 1.0 came from, when no rubric check failed.
+    // Without it a case reading `mean=0.900` with nothing listed under
+    // it is unexplained output -- and the two penalty sources differ
+    // fivefold in price, so which one is running changes what to do
+    // about it.
     lines.push(
       `${c.caseId}  mean=${c.mean.toFixed(3)}  worst=${
         c.worst.toFixed(3)
-      }${sd}${samples}${survived}`,
+      }${sd}${samples}${survived}${renderPenalties(c)}`,
     );
     for (const run of c.runs) {
       if (run.truncated) {

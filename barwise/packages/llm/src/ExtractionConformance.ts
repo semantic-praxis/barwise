@@ -393,6 +393,26 @@ function cleanConstraints(
       continue;
     }
 
+    // Check 5b: Frequency bounds
+    //
+    // Same class as the arity check above and found the same way: the
+    // validator rejects a frequency constraint with min < 1 or a max
+    // below its min, conformance did not, and the difference became an
+    // unavoidable validation error on every extraction that produced
+    // one (docs/specs/constraint-bounds.spec.md). A frequency of "at
+    // least 0" is not a weak constraint, it is no constraint -- every
+    // population satisfies it -- so removing it loses nothing a reader
+    // could have relied on.
+    const bounds = invalidBounds(ic);
+    if (bounds !== undefined) {
+      corrections.push({
+        category: "invalid_bounds",
+        description: `Removed constraint "${ic.description}" -- ${bounds}.`,
+        element: ic.fact_type,
+      });
+      continue;
+    }
+
     // Check 6: is_preferred on non-identifier fact type
     let constraint = ic;
     if (ic.is_preferred && !identifierFactTypes.has(ic.fact_type)) {
@@ -472,6 +492,25 @@ function isValidArity(ic: InferredConstraint): boolean {
       // Other constraint types accept 1 or more roles.
       return ic.roles.length >= 1;
   }
+}
+
+/**
+ * Why a frequency constraint's bounds are unusable, or undefined when
+ * they are fine. Only `frequency` carries bounds; every other type
+ * ignores the fields entirely.
+ */
+function invalidBounds(ic: InferredConstraint): string | undefined {
+  if (ic.type !== "frequency") return undefined;
+  if (ic.min !== undefined && ic.min < 1) {
+    return `frequency min is ${ic.min}, which must be at least 1`;
+  }
+  if (
+    ic.max !== undefined && ic.max !== "unbounded" && ic.min !== undefined
+    && ic.max < ic.min
+  ) {
+    return `frequency max ${ic.max} is below its min ${ic.min}`;
+  }
+  return undefined;
 }
 
 function expectedArityDescription(type: InferredConstraint["type"]): string {

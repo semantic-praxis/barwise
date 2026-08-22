@@ -137,3 +137,73 @@ describe("conformance and validation agree", () => {
     expect(errors).toEqual([]);
   });
 });
+
+/**
+ * Frequency bounds, found the same way and the same class of defect:
+ * the validator rejects min < 1 and a max below its min, conformance
+ * checked neither, and the gap became an unavoidable validation error.
+ *
+ * `clinic-appointments` lost 0.1 to exactly this on the first clean
+ * train sweep -- "Frequency constraint in fact type 'Appointment has
+ * FollowUpNote' has min 0, which must be at least 1."
+ */
+describe("a frequency constraint with unusable bounds", () => {
+  function frequency(min: number, max?: number | "unbounded"): ExtractionResponse {
+    const base = responseWith("frequency", ["Incident"]);
+    return {
+      ...base,
+      inferred_constraints: [{
+        type: "frequency",
+        fact_type: "Incident originates from Alert",
+        roles: ["Incident"],
+        description: `frequency ${min}..${String(max)}`,
+        confidence: "high",
+        min,
+        ...(max !== undefined ? { max } : {}),
+      }],
+    };
+  }
+
+  it("is removed when its minimum is below one", () => {
+    // "At least 0" is not a weak constraint, it is no constraint --
+    // every population satisfies it -- so nothing a reader could have
+    // relied on is lost by dropping it.
+    const { response, corrections } = enforceConformance(frequency(0));
+
+    expect(response.inferred_constraints).toHaveLength(0);
+    expect(corrections.filter((c) => c.category === "invalid_bounds")).toHaveLength(1);
+  });
+
+  it("is removed when its maximum is below its minimum", () => {
+    const { response, corrections } = enforceConformance(frequency(3, 2));
+
+    expect(response.inferred_constraints).toHaveLength(0);
+    expect(corrections.filter((c) => c.category === "invalid_bounds")).toHaveLength(1);
+  });
+
+  it("survives with usable bounds", () => {
+    const { response, corrections } = enforceConformance(frequency(1, 5));
+
+    expect(response.inferred_constraints).toHaveLength(1);
+    expect(corrections.filter((c) => c.category === "invalid_bounds")).toEqual([]);
+  });
+
+  it("survives an unbounded maximum", () => {
+    const { response } = enforceConformance(frequency(2, "unbounded"));
+
+    expect(response.inferred_constraints).toHaveLength(1);
+  });
+
+  it("leaves the model free of frequency errors, end to end", () => {
+    // The invariant again, as a property of the pair rather than of
+    // either module: whatever survives conformance must not trip the
+    // validator's frequency rules.
+    for (const bad of [frequency(0), frequency(3, 2)]) {
+      const { response } = enforceConformance(bad);
+      const { model } = parseDraftModel(response, "Bounds");
+      const errors = new ValidationEngine().validate(model)
+        .filter((d) => d.severity === "error" && /Frequency constraint/.test(d.message));
+      expect(errors).toEqual([]);
+    }
+  });
+});

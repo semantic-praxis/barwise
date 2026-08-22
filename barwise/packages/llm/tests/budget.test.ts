@@ -9,8 +9,8 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_MAX_OUTPUT_TOKENS,
   MAX_OUTPUT_TOKEN_CAP,
+  MIN_DERIVED_OUTPUT_TOKENS,
   suggestMaxTokens,
 } from "../src/budget.js";
 
@@ -20,18 +20,23 @@ const DEV_SMALLEST = 13072; // incident-response
 const DEV_LARGEST = 17171; // vendor-onboarding
 
 describe("suggestMaxTokens", () => {
-  it("leaves every seed case at the provider default", () => {
-    // The whole seed suite fit in 8,192 and its recorded history is
-    // built on that. If this ever returns more, every historical row
-    // stops being comparable to a new one.
-    expect(suggestMaxTokens("x".repeat(SEED_LARGEST))).toBe(DEFAULT_MAX_OUTPUT_TOKENS);
+  it("gives every seed case the derived floor, not the provider default", () => {
+    // This test previously asserted the provider's 8,192, on the
+    // reasoning that the seed suite fit inside it and recorded history
+    // depended on it. Both halves were wrong: no history had in fact
+    // been recorded, and the first live sweep truncated
+    // `university-enrollment` -- a 1.5 KB transcript -- at exactly
+    // 8,192. The floor is the answer to that, and the old figure is
+    // kept nowhere, because nothing was ever measured under it.
+    expect(suggestMaxTokens("x".repeat(SEED_LARGEST))).toBe(MIN_DERIVED_OUTPUT_TOKENS);
   });
 
-  it("clears the default for every dev-split transcript", () => {
-    // The bug, stated as a test: at 8,192 these three scored 0.000,
-    // 0.000 and 0.133 and nothing said why.
+  it("clears the floor for every dev-split transcript", () => {
+    // The original bug, stated as a test: at 8,192 these three scored
+    // 0.000, 0.000 and 0.133 and nothing said why. They must stay
+    // clear of the floor too, or the ratio is doing no work at all.
     for (const size of [DEV_SMALLEST, 14538, DEV_LARGEST]) {
-      expect(suggestMaxTokens("x".repeat(size))).toBeGreaterThan(DEFAULT_MAX_OUTPUT_TOKENS);
+      expect(suggestMaxTokens("x".repeat(size))).toBeGreaterThan(MIN_DERIVED_OUTPUT_TOKENS);
     }
   });
 
@@ -48,12 +53,20 @@ describe("suggestMaxTokens", () => {
   });
 
   it("never returns less than the floor, however short the transcript", () => {
-    expect(suggestMaxTokens("")).toBe(DEFAULT_MAX_OUTPUT_TOKENS);
-    expect(suggestMaxTokens("hello")).toBe(DEFAULT_MAX_OUTPUT_TOKENS);
+    // Output is governed by how much model a transcript implies, not by
+    // its length, so a short one is no reason to budget small.
+    expect(suggestMaxTokens("")).toBe(MIN_DERIVED_OUTPUT_TOKENS);
+    expect(suggestMaxTokens("hello")).toBe(MIN_DERIVED_OUTPUT_TOKENS);
   });
 
   it("honours a caller's own floor, for a client built with a larger default", () => {
     expect(suggestMaxTokens("hello", { floor: 20_000 })).toBe(20_000);
+  });
+
+  it("covers the largest output observed in a live sweep", () => {
+    // 14,393 tokens, from subscription-billing. A floor below the
+    // biggest real answer is a floor that will truncate again.
+    expect(MIN_DERIVED_OUTPUT_TOKENS).toBeGreaterThan(14_393);
   });
 
   it("lets the floor win over a lower cap", () => {
