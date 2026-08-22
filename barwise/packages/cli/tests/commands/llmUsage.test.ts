@@ -11,32 +11,36 @@
  * append-only, holds three record kinds, and can end mid-line when a
  * process dies; a reader that choked on any of that would lose the
  * operator ten thousand good rows to one bad one.
+ *
+ * Run through `runCli`, in process, like every other command test.
+ * The first version drove the built binary through `execFileSync` and
+ * all seven passed while covering nothing -- a subprocess is not
+ * instrumented by the parent's coverage collector, so the file read
+ * 11% and dragged the package under its threshold. Passing tests that
+ * measure nothing are worse than no tests, because they also look
+ * like reassurance.
  */
-import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const cli = resolve(__dirname, "../../dist/index.js");
+import { runCli } from "../workspace/run.js";
 
 let tmp: string;
+const SAVED = process.env["BARWISE_CALL_LOG"];
+
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), "barwise-usage-"));
-});
-afterEach(() => {
-  rmSync(tmp, { recursive: true, force: true });
+  // Off by default, so a test that means to exercise "not configured"
+  // is not quietly reading the developer's own log.
+  delete process.env["BARWISE_CALL_LOG"];
 });
 
-function run(args: string[]): string {
-  return execFileSync("node", [cli, "llm-usage", ...args], {
-    encoding: "utf-8",
-    stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, BARWISE_CALL_LOG: "" },
-  });
-}
+afterEach(() => {
+  rmSync(tmp, { recursive: true, force: true });
+  if (SAVED === undefined) delete process.env["BARWISE_CALL_LOG"];
+  else process.env["BARWISE_CALL_LOG"] = SAVED;
+});
 
 const CALLS = [
   {
@@ -74,15 +78,22 @@ function writeLog(rows: readonly unknown[], extra = ""): string {
   return path;
 }
 
-describe("barwise llm-usage", () => {
-  it("groups by model with tokens, failures, and percentiles", () => {
-    const out = run(["--log", writeLog(CALLS), "--format", "json"]);
-    const { models } = JSON.parse(out) as {
-      models: Array<Record<string, unknown>>;
-    };
+async function usage(args: string[]): Promise<{ stdout: string; stderr: string; }> {
+  const result = await runCli(["llm-usage", ...args]);
+  return { stdout: result.stdout, stderr: result.stderr };
+}
 
-    expect(models).toHaveLength(1);
-    expect(models[0]).toMatchObject({
+async function models(args: string[]): Promise<Array<Record<string, unknown>>> {
+  const { stdout } = await usage([...args, "--format", "json"]);
+  return (JSON.parse(stdout) as { models: Array<Record<string, unknown>>; }).models;
+}
+
+describe("barwise llm-usage", () => {
+  it("groups by model with tokens and failures", async () => {
+    const found = await models(["--log", writeLog(CALLS)]);
+
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({
       model: "claude-haiku-4-5",
       calls: 3,
       failures: 1,
@@ -92,19 +103,17 @@ describe("barwise llm-usage", () => {
     });
   });
 
-  it("reports a latency tail, not just an average", () => {
+  it("reports a latency tail, not just an average", async () => {
     // A mean hides the tail, and the tail is what a timeout is set
     // against. Nearest-rank on two samples puts the median at the lower
     // and p95 at the upper.
-    const { models } = JSON.parse(run(["--log", writeLog(CALLS), "--format", "json"])) as {
-      models: Array<{ medianLatencyMs: number; p95LatencyMs: number; }>;
-    };
+    const found = await models(["--log", writeLog(CALLS)]);
 
-    expect(models[0]!.medianLatencyMs).toBe(20000);
-    expect(models[0]!.p95LatencyMs).toBe(40000);
+    expect(found[0]!["medianLatencyMs"]).toBe(20000);
+    expect(found[0]!["p95LatencyMs"]).toBe(40000);
   });
 
-  it("skips records that are not calls, and a corrupt trailing line", () => {
+  it("skips records that are not calls, and a corrupt trailing line", async () => {
     // One file carries call, extraction and validation records, and an
     // append-only log can end mid-write. Neither may cost the report.
     const path = writeLog(
@@ -122,59 +131,100 @@ describe("barwise llm-usage", () => {
       ],
       '{"startedAt":"t6","prov',
     );
-    const { models } = JSON.parse(run(["--log", path, "--format", "json"])) as {
-      models: Array<{ calls: number; }>;
-    };
+    const found = await models(["--log", path]);
 
-    expect(models).toHaveLength(1);
-    expect(models[0]!.calls).toBe(3);
+    expect(found).toHaveLength(1);
+    expect(found[0]!["calls"]).toBe(3);
   });
 
-  it("computes cost only from supplied rates", () => {
+  it("computes cost only from supplied rates", async () => {
     const rates = join(tmp, "rates.json");
     writeFileSync(rates, JSON.stringify({ "claude-haiku-4-5": { input: 1, output: 5 } }));
 
-    const { models } = JSON.parse(
-      run(["--log", writeLog(CALLS), "--rates", rates, "--format", "json"]),
-    ) as { models: Array<{ cost: number; }>; };
+    const found = await models(["--log", writeLog(CALLS), "--rates", rates]);
 
     // 2000/1e6 * 1 + 10000/1e6 * 5
-    expect(models[0]!.cost).toBeCloseTo(0.052, 6);
+    expect(found[0]!["cost"]).toBeCloseTo(0.052, 6);
   });
 
-  it("omits cost entirely when no rates are given", () => {
+  it("omits cost entirely when no rates are given", async () => {
     // No prices ship with the repo: a stale rate produces a
     // confidently wrong number, which is worse than none.
-    const { models } = JSON.parse(run(["--log", writeLog(CALLS), "--format", "json"])) as {
-      models: Array<Record<string, unknown>>;
-    };
+    const found = await models(["--log", writeLog(CALLS)]);
 
-    expect("cost" in models[0]!).toBe(false);
+    expect("cost" in found[0]!).toBe(false);
   });
 
-  it("says so rather than printing an empty table when nothing is recorded", () => {
-    const out = execFileSync("node", [cli, "llm-usage"], {
-      encoding: "utf-8",
-      stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, BARWISE_CALL_LOG: "" },
-    });
+  it("renders text with the tail, the failures, and the cost note", async () => {
+    const { stdout } = await usage(["--log", writeLog(CALLS)]);
 
-    expect(out).toBe("");
+    expect(stdout).toContain("claude-haiku-4-5");
+    expect(stdout).toContain("1 failed");
+    expect(stdout).toContain("rate_limit x1");
+    expect(stdout).toContain("p95");
+    expect(stdout).toContain("--rates");
   });
 
-  it("falls back to the requested model when the provider named none", () => {
+  it("says n/a rather than 0 ms when nothing reported a latency", async () => {
+    // Copilot reports none, and "0 ms" would be a claim the log never
+    // made -- the same distinction the dispersion module draws between
+    // "no observations" and "zero".
+    const { stdout } = await usage([
+      "--log",
+      writeLog([{ startedAt: "t", provider: "copilot", model: "gpt-4o", ok: true }]),
+    ]);
+
+    expect(stdout).toContain("n/a");
+    expect(stdout).not.toContain("0 ms");
+  });
+
+  it("names the model that cannot be priced rather than omitting it", async () => {
+    const rates = join(tmp, "rates.json");
+    writeFileSync(rates, JSON.stringify({ "some-other-model": { input: 1, output: 5 } }));
+
+    const { stdout } = await usage(["--log", writeLog(CALLS), "--rates", rates]);
+
+    expect(stdout).toContain("no rate for this model");
+  });
+
+  it("says so rather than printing an empty table when recording is off", async () => {
+    const { stdout, stderr } = await usage([]);
+
+    expect(stdout).toBe("");
+    expect(stderr).toContain("No call log configured");
+  });
+
+  it("says so when the log has not been written yet", async () => {
+    process.env["BARWISE_CALL_LOG"] = join(tmp, "never-written.jsonl");
+    const { stderr } = await usage([]);
+
+    expect(stderr).toContain("written on the first recorded call");
+  });
+
+  it("reports an empty log as no calls rather than crashing", async () => {
+    const { stdout } = await usage(["--log", writeLog([])]);
+
+    expect(stdout).toContain("No calls recorded");
+  });
+
+  it("falls back to the requested model when the provider named none", async () => {
     // Copilot cannot name its model before the call, and a failed call
     // never reports one. A row saying a call happened at all is still
     // worth more than a gap.
-    const { models } = JSON.parse(
-      run([
-        "--log",
-        writeLog([{ startedAt: "t", provider: "copilot", ok: true, latencyMs: 100 }]),
-        "--format",
-        "json",
-      ]),
-    ) as { models: Array<{ model: string; }>; };
+    const found = await models([
+      "--log",
+      writeLog([{ startedAt: "t", provider: "copilot", ok: true, latencyMs: 100 }]),
+    ]);
 
-    expect(models[0]!.model).toContain("copilot");
+    expect(found[0]!["model"]).toContain("copilot");
+  });
+
+  it("reports a bad rates file as an error rather than a stack trace", async () => {
+    const rates = join(tmp, "rates.json");
+    writeFileSync(rates, "{ not json");
+
+    const { stderr } = await usage(["--log", writeLog(CALLS), "--rates", rates]);
+
+    expect(stderr).toContain("Error:");
   });
 });

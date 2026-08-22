@@ -75,6 +75,15 @@ npx tsc --noEmit            # type-check only
   sit in another project's `node_modules`. It never throws: an eval run
   costs money, and a missing `git` must not be what loses it.
 
+- **Command tests go through `runCli`, never a subprocess.**
+  `tests/workspace/run.ts` builds the program in process and captures
+  stdout, stderr and the exit code. Driving the built binary through
+  `execFileSync` works and is a trap: the child is not instrumented by
+  the parent's coverage collector, so the tests pass while the command
+  reads near-zero coverage and the package silently slides under its
+  threshold. That is how `llm-usage` shipped seven green tests covering
+  11% of the file. In process is also ~200x faster here, which is the
+  smaller reason.
 - **Observability is opt-in and writes one file.** `BARWISE_CALL_LOG`
   gates it: unset or empty is off, `1`/`true` is
   `$XDG_STATE_HOME/barwise/calls.jsonl`, anything else is that path.
