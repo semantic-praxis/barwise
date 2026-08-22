@@ -34,6 +34,17 @@ export interface CaseScore {
    * have to distinguish "no warnings" from "not measured".
    */
   readonly warningsByRule: Readonly<Record<string, number>>;
+  /**
+   * Which validation rules errored, and how many times each.
+   *
+   * The sibling of `warningsByRule`, and the one that was missing.
+   * An error costs 0.1 against a warning's 0.05, so the record named
+   * the cheaper signal and counted the dearer one -- which is how
+   * "did that fix move the baseline" became a question only a paid
+   * re-run could answer. Empty rather than absent when nothing
+   * errored, for the same reason as warnings.
+   */
+  readonly errorsByRule: Readonly<Record<string, number>>;
   /** Ambiguities reported in the payload, whatever the budget. */
   readonly ambiguitiesReported: number;
   /** Ambiguities beyond the case's budget; 0 when none is declared. */
@@ -59,19 +70,22 @@ export function scoreExtraction(
   const { model } = parseDraftModel(cleaned, loadedCase.evalCase.id);
 
   const diagnostics = new ValidationEngine().validate(model);
-  const validationErrors = diagnostics
-    .filter((d) => d.severity === "error")
-    .length;
+  const errors = diagnostics.filter((d) => d.severity === "error");
+  const validationErrors = errors.length;
   const warnings = diagnostics.filter((d) => d.severity === "warning");
   const validationWarnings = warnings.length;
   // Every rule that fired is listed, not a top-N. The tally exists to
   // find the dominant rule, but a rule firing once here is still the
   // difference between a passing and a failing case elsewhere.
-  const warningsByRule: Record<string, number> = {};
-  for (const w of warnings) {
-    const id = w.ruleId ?? "(unattributed)";
-    warningsByRule[id] = (warningsByRule[id] ?? 0) + 1;
-  }
+  const warningsByRule = tallyByRule(warnings);
+  // Errors get the same treatment, and needed it more: they weigh 0.1
+  // against a warning's 0.05, so the more expensive signal was the one
+  // recorded as a bare count. That asymmetry made a real question
+  // unanswerable -- whether the ring-player and population fixes moved
+  // the recorded baselines could not be read off the record, because
+  // the record said how many errors a run had and never which
+  // (docs/specs/pipeline-observability.spec.md).
+  const errorsByRule = tallyByRule(errors);
 
   // One payload, two graders: the model half runs through the gym's
   // check runners, the payload half through promptlab's own. Both fold
@@ -110,6 +124,7 @@ export function scoreExtraction(
     validationErrors,
     validationWarnings,
     warningsByRule,
+    errorsByRule,
     ambiguitiesReported,
     ambiguityExcess: excess,
     score: Math.max(0, raw),
@@ -162,4 +177,22 @@ function asExercise(
     brief: "n/a (prompt eval)",
     checks,
   };
+}
+
+/**
+ * Count diagnostics by rule id.
+ *
+ * Shared by the warning and error tallies rather than written twice --
+ * two copies of this is exactly how the two came to disagree, one
+ * naming its rules and the other not.
+ */
+function tallyByRule(
+  diagnostics: readonly { readonly ruleId?: string; }[],
+): Record<string, number> {
+  const total: Record<string, number> = {};
+  for (const d of diagnostics) {
+    const id = d.ruleId ?? "(unattributed)";
+    total[id] = (total[id] ?? 0) + 1;
+  }
+  return total;
 }

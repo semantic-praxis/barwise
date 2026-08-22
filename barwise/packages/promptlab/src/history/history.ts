@@ -101,6 +101,18 @@ export interface HistoryEntry {
    * forty-nine numbers answering a question nobody asks per case.
    */
   readonly warningsByRule?: Readonly<Record<string, number>>;
+  /**
+   * Which validation rules errored, and how often, across the run.
+   *
+   * Recorded for the same reason as the warning tally and with a
+   * stronger case: an error weighs 0.1 against a warning's 0.05, and
+   * the row carried the count without the identity. Comparing two rows
+   * could say the errors went from four to one and never which three
+   * stopped firing -- so a fix could not be credited from the record,
+   * only from a fresh paid run
+   * (docs/specs/pipeline-observability.spec.md).
+   */
+  readonly errorsByRule?: Readonly<Record<string, number>>;
   readonly cases: readonly {
     caseId: string;
     mean: number;
@@ -149,6 +161,9 @@ export function toHistoryEntry(
       : {}),
     ...(Object.keys(report.warningsByRule ?? {}).length > 0
       ? { warningsByRule: report.warningsByRule }
+      : {}),
+    ...(Object.keys(report.errorsByRule ?? {}).length > 0
+      ? { errorsByRule: report.errorsByRule }
       : {}),
     cases: report.cases.map((c) => ({
       caseId: c.caseId,

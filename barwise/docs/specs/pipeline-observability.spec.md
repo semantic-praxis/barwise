@@ -1,6 +1,6 @@
 # Record what the pipeline changed and what it could not fix
 
-Status: Draft (design proposal -- not implemented)
+Status: Implemented (see Implementation notes)
 Created: 2026-08-22
 Last-updated: 2026-08-22
 Tracking: barwise-836, extending barwise-815 (workstream 1 shipped the
@@ -140,3 +140,61 @@ is **not** what gets stored. The `category` and the element name are.
 - No change to any validation rule or conformance check.
 - No change to the scoring weights.
 - No prompt change.
+
+## Implementation notes (2026-08-22)
+
+Shipped in one pass with barwise-837 and workstream 2 of barwise-815,
+since all three are the same seam and splitting them would have left the
+record half-written.
+
+- **`observe/extractionLog.ts`**, sibling to `callLog.ts`. Corrections
+  are recorded by **category**, and a test asserts the serialised record
+  contains none of the prose -- over `JSON.stringify`, not field by
+  field, because a field added later without thought is exactly how the
+  transcript text would leak.
+- **`processTranscript` gained `observer`, `now`, and `correlationId`.**
+  Nothing was added to `DraftModelResult`, and a test asserts that
+  directly rather than leaving it to review. The prose warnings are
+  untouched: surfaces render them to users, and additive was the whole
+  requirement.
+- **Both import commands are wired, not one.** `transcript.ts` was the
+  obvious one; `batch.ts` builds a client the same way, and wiring one
+  of two is the divergence pattern this project keeps finding. A sweep
+  is also where the log earns most, since comparing models is what a
+  batch is for.
+- **`errorsByRule` landed in the scorer, the suite report, the history
+  row, and the CLI.** All four, because the spec's own risk note said
+  both or neither -- adding it to the scorer alone would have repeated
+  the original defect one level up.
+- **The two rule tallies now share one helper**, in both the scorer and
+  the runner. Two copies is how the warning and error paths came to
+  differ in the first place.
+- **Recording is opt-in via `BARWISE_CALL_LOG`**, per the spec's open
+  decision. Unset or empty is off; `1`/`true` is the default path under
+  the state directory the gym already uses; any other value is taken as
+  the path, so a single run can be pointed elsewhere. The negative tests
+  are the ones that matter and they are the ones written.
+
+### Not done, and not silently
+
+**The validation-side record did not ship.** Scope asked `observe/` for
+a record of what validation found, carrying each diagnostic's `ruleId`
+and severity. What shipped names validation findings in **promptlab** --
+`errorsByRule` in the scorer, the suite report, the history row and the
+CLI -- which covers the eval harness and nothing else. There is no
+`observe/` validation record, so the case this spec used to argue for
+two moments is precisely the case still unserved: `barwise validate` on
+a hand-written model records nothing, and it is exactly as worth
+recording as one that came from a transcript.
+
+Called out here rather than left for a reader to discover, because a
+scope item silently unimplemented is the same defect as a capability
+matrix asserting parity that does not hold -- and this spec is the one
+that says so. Tracked as barwise-838.
+
+Workstream 3 of barwise-815 -- the `barwise llm-usage` report over the
+log -- is **not** built. The records now exist and accumulate; nothing
+aggregates them yet, so task #2 (model-tier economics) is unblocked but
+not answered. Said here because a spec claiming observability while the
+report is missing is the same shape of stale claim this work exists to
+stop.

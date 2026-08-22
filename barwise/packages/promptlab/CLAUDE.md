@@ -128,6 +128,16 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
   request id is worth keeping precisely because it is useless locally
   -- it is the only handle on a call that has already happened when
   asking the provider about it.
+- **A penalty is named, never only counted.** `CaseScore` carries
+  `warningsByRule` and `errorsByRule`, the `SuiteReport` sums both, and
+  the history row records both. The error half was missing and cost
+  more: an error weighs 0.1 against a warning's 0.05, so the record
+  named the cheaper signal and counted the dearer one -- which is how
+  "did the ring-player fix move the baseline" became a question only a
+  paid re-run could answer. **Both or neither** if you add a third
+  severity: a tally in the scorer without one in the history row
+  repeats the defect one level up, which is exactly how these two came
+  to differ. The two tallies share one helper for the same reason.
 - **Two identifiers pin a run, and they answer different questions.**
   `promptHash` (`src/provenance/promptHash.ts`) fingerprints the
   rendered system prompt, so it catches a variant edited without its

@@ -1,6 +1,6 @@
 # Keep the call records the providers already hand us
 
-Status: Accepted (workstream 1 implemented; see Implementation notes)
+Status: Accepted (workstreams 1 and 2 implemented; see Implementation notes)
 Created: 2026-08-21
 Last-updated: 2026-08-21
 Tracking: barwise-815. Related: task #2 (model-tier economics), which
@@ -290,3 +290,24 @@ than the call sites.
 - No prompt or response text, ever, under any flag.
 - No change to `promptlab`'s score history, which measures something
   else on a different clock.
+
+### Workstream 2 (2026-08-22)
+
+Shipped, fourteen months of inertness later measured in days: the
+decorator had zero call sites from the moment it landed until now.
+
+`cli/src/workspace/callLogSink.ts` supplies the JSONL sink under the
+state directory the gym already uses, gated on `BARWISE_CALL_LOG`. Both
+`barwise import transcript` and `barwise import batch` wrap their client
+and pass the same sink as `ProcessorOptions.observer`, so what a call
+cost and what the pipeline did with its answer land in one file,
+correlated by a per-import id.
+
+- **The deferred `promptHash` is still deferred.** Workstream 1 left it
+  for "when a sink will actually consume it". The sink exists now and
+  still does not consume it: `hashPrompt` lives in `promptlab`, which
+  depends on `llm` and not the reverse, and the honest fix is moving the
+  hasher into `llm` rather than duplicating it. Not worth doing inside
+  a workstream about persistence.
+- **Workstream 3 remains unbuilt.** The log accumulates and nothing
+  reads it. Task #2 is unblocked, not answered.

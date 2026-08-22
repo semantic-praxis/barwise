@@ -1,9 +1,11 @@
 import { annotateOrmYaml } from "@barwise/core/annotation";
-import { createLlmClient, processTranscript } from "@barwise/llm";
+import { createLlmClient, processTranscript, withCallLog } from "@barwise/llm";
 import type { ProviderName } from "@barwise/llm";
 import type { Command } from "commander";
+import { randomUUID } from "node:crypto";
 import { existsSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
+import { callLogSink } from "../../workspace/callLogSink.js";
 import { readFile } from "../../workspace/io.js";
 import { serializer, slugifyModel } from "./shared.js";
 
@@ -116,15 +118,26 @@ export function addBatchSubcommand(importCmd: Command): void {
             );
 
             try {
-              const client = createLlmClient({
+              // A sweep is where the log earns most: the whole point of
+              // a batch is comparing models, and the per-call cost is
+              // the comparison nobody could make. One correlation id
+              // per cell, so a row is attributable to a file and model.
+              const sink = callLogSink();
+              const correlationId = randomUUID();
+
+              const bare = createLlmClient({
                 provider: opts.provider as ProviderName | undefined,
                 apiKey: opts.apiKey,
                 model,
                 baseUrl: opts.baseUrl,
               });
+              const client = sink === undefined
+                ? bare
+                : withCallLog(bare, sink, { correlationId });
 
               const result = await processTranscript(transcriptText, client, {
                 modelName: transcriptName,
+                ...(sink !== undefined ? { observer: sink, correlationId } : {}),
               });
 
               // Serialize.

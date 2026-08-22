@@ -157,6 +157,29 @@ npx tsc --noEmit            # type-check only
   `parse/helpers.ts` does -- role name first, case-insensitively, then
   player name, each match consuming a role. Resolving differently is the
   same bug one level down.
+- **Observability records identities, never content, and never lives on
+  the result type.** `observe/` holds two records: `callLog.ts` for what
+  a call cost, `extractionLog.ts` for what the pipeline changed
+  (conformance corrections **by category**, parser warnings and skipped
+  constraints as counts). Neither hangs off `DraftModelResult` --
+  that type answers what model a transcript produced and where each
+  part came from, and corrections answer what a cleanup pass changed.
+  (`modelUsed`, `usage` and `latencyMs` are still on it and are the
+  counter-example, not the precedent: they are call telemetry on an
+  extraction result, which is why `withCallLog` exists.)
+
+  **A correction's `description` must never reach a record.** It quotes
+  the constraint's own description, which is transcript-derived wording,
+  and a telemetry file accumulating the transcripts users feed it is
+  that mistake written to disk. `tests/observe/extractionLog.test.ts`
+  asserts this over the serialised record rather than field by field,
+  because a field added later without thought is how it would leak.
+
+  Both emitters swallow a throwing sink deliberately: observability that
+  can fail the operation it observes is worse than none, and an
+  extraction that cost a paid call must not be lost to an unwritable
+  log. The sink and the clock are supplied by the caller, like the
+  history writer's date and build provenance.
 - **Variants are compiled in, not read from disk.**
   `src/prompt/artifacts/builtins.generated.ts` is generated from
   `prompts/*.prompt.yaml` by `npm run regen:builtins` and committed;
