@@ -2,7 +2,7 @@
 
 Status: Implemented
 Created: 2026-08-22
-Last-updated: 2026-08-22
+Last-updated: 2026-08-22 (amended: the calibration below was falsified)
 Tracking: barwise-818. Found while running the dev split for the first
 time (2026-08-22).
 
@@ -221,3 +221,41 @@ finished:
 - No change to the scorer, the rubrics, or the suite.
 - No retry-on-truncation.
 - No per-model token tables.
+
+## Amendment: the calibration was wrong in shape, not degree
+
+The first clean train sweep truncated `university-enrollment` at
+exactly 8,192 -- a 1.5 KB transcript, the third largest of the seven
+train cases, whose recorded answer key is about 3,500 tokens. Live
+extraction generated more than twice that (barwise-829).
+
+Live output across the whole suite:
+
+| Transcript   | Output      | Implied ratio |
+| ------------ | ----------- | ------------- |
+| 1.0-1.6 KB   | 3.7k-8.2k+  | 12 to 22+     |
+| 13.1-17.2 KB | 12.2k-14.4k | 3 to 4        |
+
+Output barely moves across a seventeen-fold range of input, and two
+nearly identical train transcripts (1,589 B and 1,529 B) produced 7,220
+and 4,735 tokens. **A quantity proportional to input length is the
+wrong shape for this**, not merely a mis-tuned constant. Output is
+governed by how much model the domain implies; university enrollment is
+a rich domain stated briefly.
+
+Two things this spec asserted are therefore retracted:
+
+- **"The densest observed ratio, 9.69."** That was measured from
+  recorded fixtures, which are two to four times smaller than what the
+  model now produces. The ratio is wrongest at the small end, where the
+  required ratio is _highest_ -- the opposite of the assumption that
+  made 9.69 look conservative.
+- **"Floored at the client default, so anything that fit before behaves
+  exactly as it did."** The comparability this protected did not exist:
+  `main` carried no recorded history at all. The argument was
+  protecting nothing while the truncation it permitted was real.
+
+`MIN_DERIVED_OUTPUT_TOKENS` (16,384) now splits from the provider
+default and sits 14% above the largest output observed anywhere. The
+ratio is kept for genuinely large transcripts, where it still binds
+above the floor.

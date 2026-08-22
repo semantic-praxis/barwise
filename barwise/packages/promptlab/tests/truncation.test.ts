@@ -13,7 +13,7 @@
  * the caller's token budget is not measuring the prompt.
  */
 import type { CompletionRequest, CompletionResponse } from "@barwise/llm";
-import { DEFAULT_MAX_OUTPUT_TOKENS } from "@barwise/llm";
+import { MIN_DERIVED_OUTPUT_TOKENS } from "@barwise/llm";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -100,7 +100,7 @@ describe("a truncated run", () => {
     );
     const run = report.cases[0]!.runs[0]!;
 
-    expect(run.maxTokens).toBe(DEFAULT_MAX_OUTPUT_TOKENS);
+    expect(run.maxTokens).toBe(MIN_DERIVED_OUTPUT_TOKENS);
     expect(run.outputTokens).toBe(8192);
     expect(run.stopReason).toBe("max_tokens");
   });
@@ -143,7 +143,7 @@ describe("an untruncated run", () => {
     expect(run.stopReason).toBe("tool_use");
     expect(run.promptTokens).toBe(2000);
     expect(run.outputTokens).toBe(8192);
-    expect(run.maxTokens).toBe(DEFAULT_MAX_OUTPUT_TOKENS);
+    expect(run.maxTokens).toBe(MIN_DERIVED_OUTPUT_TOKENS);
   });
 });
 
@@ -155,14 +155,15 @@ describe("the derived budget", () => {
     expect(client.requests.every((r) => r.maxTokens !== undefined)).toBe(true);
   });
 
-  it("leaves the seed cases at the provider default", async () => {
-    // Every recorded history row was produced at 8,192. A derivation
-    // that quietly raised it for these cases would make new runs
-    // incomparable to the whole existing record.
+  it("gives the seed cases the derived floor", async () => {
+    // Was pinned to the provider's 8,192 on a comparability argument
+    // that did not survive contact: no history had been recorded under
+    // it, and a live sweep truncated a seed case at exactly that
+    // ceiling.
     const client = fixtureClient();
     await runSuite(suite, client, TRAIN);
 
-    expect(client.requests.every((r) => r.maxTokens === DEFAULT_MAX_OUTPUT_TOKENS)).toBe(true);
+    expect(client.requests.every((r) => r.maxTokens === MIN_DERIVED_OUTPUT_TOKENS)).toBe(true);
   });
 
   it("yields to an explicit budget, for every case in the run", async () => {
