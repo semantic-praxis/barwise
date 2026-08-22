@@ -10,6 +10,7 @@
 
 import type {
   ExtractedPopulation,
+  ExtractedRole,
   ExtractionResponse,
   InferredConstraint,
 } from "./ExtractionTypes.js";
@@ -137,6 +138,7 @@ export function enforceConformance(
     objectTypeNames,
     validRoleIdentifiers,
     identifierFactTypes,
+    new Map(input.fact_types.map((ft) => [ft.name, ft.roles])),
     corrections,
   );
 
@@ -360,6 +362,7 @@ function cleanConstraints(
   objectTypeNames: Set<string>,
   validRoleIdentifiers: Set<string>,
   identifierFactTypes: Set<string>,
+  rolesByFactType: ReadonlyMap<string, readonly ExtractedRole[]>,
   corrections: ConformanceCorrection[],
 ): InferredConstraint[] {
   const result: InferredConstraint[] = [];
@@ -408,6 +411,29 @@ function cleanConstraints(
       corrections.push({
         category: "invalid_bounds",
         description: `Removed constraint "${ic.description}" -- ${bounds}.`,
+        element: ic.fact_type,
+      });
+      continue;
+    }
+
+    // Check 5c: Ring constraints relate an object type to itself
+    //
+    // Third instance of the class barwise-826 named, and found by the
+    // audit rather than by a live run (barwise-831). The validator
+    // rejects a ring whose two roles are played by different object
+    // types; conformance checked only that there were two of them.
+    //
+    // Removal rather than repair is easiest to defend here of the
+    // three: a ring type -- irreflexive, acyclic, symmetric -- names a
+    // property of a relation on a single set, so a ring across two
+    // object types is not a weak constraint but a meaningless one.
+    // There is no repair that preserves the author's intent, because no
+    // coherent intent can be recovered from it.
+    if (ic.type === "ring" && ringSpansTwoPlayers(ic, rolesByFactType)) {
+      corrections.push({
+        category: "ring_different_players",
+        description: `Removed constraint "${ic.description}" -- a ring constraint requires both `
+          + `roles to be played by the same object type.`,
         element: ic.fact_type,
       });
       continue;
@@ -492,6 +518,50 @@ function isValidArity(ic: InferredConstraint): boolean {
       // Other constraint types accept 1 or more roles.
       return ic.roles.length >= 1;
   }
+}
+
+/**
+ * Whether a ring constraint's two roles are played by different object
+ * types -- which the validator rejects as an error.
+ *
+ * The resolution here deliberately mirrors `resolveRolesByPlayerName`
+ * in `parse/helpers.ts`: role name first (case-insensitively), then
+ * player name, with each match consuming a role so it cannot be picked
+ * twice. Resolving differently from the parser would be this same bug
+ * one level down -- conformance judging a constraint the parser will
+ * build differently. The consuming rule is what makes the common live
+ * shape work: `Employee mentors Employee` arrives with roles named
+ * `["Employee", "Employee"]`, and the repeated player name has to
+ * select two distinct roles rather than the same one twice.
+ *
+ * Anything that cannot be resolved is left alone rather than removed.
+ * The unresolvable-role check (check 4) runs ahead of this one, and the
+ * parser skips what it still cannot resolve; guessing here would only
+ * add a second opinion.
+ */
+function ringSpansTwoPlayers(
+  ic: InferredConstraint,
+  rolesByFactType: ReadonlyMap<string, readonly ExtractedRole[]>,
+): boolean {
+  const roles = rolesByFactType.get(ic.fact_type);
+  if (roles === undefined || ic.roles.length !== 2) return false;
+
+  const taken = new Set<number>();
+  const players: string[] = [];
+  for (const hint of ic.roles) {
+    const lower = hint.toLowerCase();
+    let index = roles.findIndex(
+      (r, i) => !taken.has(i) && r.role_name?.toLowerCase() === lower,
+    );
+    if (index === -1) {
+      index = roles.findIndex((r, i) => !taken.has(i) && r.player === hint);
+    }
+    if (index === -1) continue;
+    taken.add(index);
+    players.push(roles[index]!.player);
+  }
+
+  return players.length === 2 && players[0] !== players[1];
 }
 
 /**
