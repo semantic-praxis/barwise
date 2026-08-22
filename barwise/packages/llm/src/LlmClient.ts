@@ -22,6 +22,32 @@ export interface CompletionRequest {
    * See `suggestMaxTokens`.
    */
   readonly maxTokens?: number;
+  /**
+   * Ask the provider to cache the system prompt and tool schema, so a
+   * later call with a byte-identical prefix reuses the prefill.
+   *
+   * Worth it from the second call that reads the cache: a write costs
+   * about 1.25x the input price and a read about 0.1x. A caller making
+   * one request should leave this off.
+   *
+   * A hint, not a command. Providers that cache server-side with no
+   * client control (OpenAI) or that have no cache at all (Ollama)
+   * ignore it, which is why setting it is never wrong -- only
+   * sometimes pointless.
+   */
+  readonly cacheSystemPrompt?: boolean;
+  /**
+   * Also cache the user message, extending the cached prefix past the
+   * system prompt to cover the transcript.
+   *
+   * Separate from `cacheSystemPrompt` because the two break even under
+   * different conditions. The system prompt repeats across every call
+   * a process makes; a user message only repeats when the identical
+   * one is sent again, which in practice means sampling the same case
+   * more than once. Setting this for a single call pays the write
+   * premium on the whole transcript and reads it back never.
+   */
+  readonly cacheUserMessage?: boolean;
 }
 
 export interface CompletionResponse {

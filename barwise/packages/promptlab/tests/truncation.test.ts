@@ -211,3 +211,48 @@ describe("a provider failure", () => {
     expect(report.truncations).toBe(0);
   });
 });
+
+/**
+ * Caching is requested where it pays and not where it does not
+ * (docs/specs/prompt-caching.spec.md). Both conditions are break-even
+ * calculations: a write costs ~1.25x and a read ~0.1x, so a breakpoint
+ * only earns its keep from the second request that reads it.
+ */
+describe("prompt caching in a sweep", () => {
+  it("asks for system caching, which every call in the run reads", async () => {
+    const client = fixtureClient();
+    await runSuite(suite, client, TRAIN);
+
+    expect(client.requests.every((r) => r.cacheSystemPrompt === true)).toBe(true);
+  });
+
+  it("does not ask for user-message caching at repeat 1", async () => {
+    // A transcript sent once is read back never, so caching it pays the
+    // write premium on the whole transcript for nothing.
+    const client = fixtureClient();
+    await runSuite(suite, client, TRAIN);
+
+    expect(client.requests.every((r) => r.cacheUserMessage !== true)).toBe(true);
+  });
+
+  it("asks for user-message caching once a case is sampled more than once", async () => {
+    // The runner iterates case-outer, repeat-inner, so the samples of
+    // one case send a byte-identical transcript back to back -- which
+    // is exactly the prefix a second breakpoint captures.
+    const client = fixtureClient();
+    await runSuite(suite, client, { ...TRAIN, repeat: 3 });
+
+    expect(client.requests.every((r) => r.cacheUserMessage === true)).toBe(true);
+  });
+
+  it("asks for nothing when the whole run is a single call", async () => {
+    // One call reads no cache back, so both breakpoints are pure cost.
+    const oneCase = { ...suite, cases: suite.cases.slice(0, 1) };
+    const client = fixtureClient();
+    await runSuite(oneCase, client, { repeat: 1 });
+
+    expect(client.requests).toHaveLength(1);
+    expect(client.requests[0]!.cacheSystemPrompt).toBe(false);
+    expect(client.requests[0]!.cacheUserMessage).toBe(false);
+  });
+});

@@ -310,4 +310,112 @@ describe("AnthropicLlmClient", () => {
       expect(result.stopReason).toBe("end_turn");
     });
   });
+  describe("prompt caching", () => {
+    it("sends the system prompt unchanged when caching was not asked for", async () => {
+      // The default must serialize exactly as it did before this option
+      // existed. A bare string and a one-element block array are
+      // different bytes, and caching is a byte-exact prefix match.
+      const client = new AnthropicLlmClient();
+      mockCreate.mockResolvedValueOnce(textResponse("hi"));
+
+      await client.complete({ systemPrompt: "sys", userMessage: "user" });
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          system: "sys",
+          messages: [{ role: "user", content: "user" }],
+        }),
+      );
+    });
+
+    it("marks the system block when caching was asked for", async () => {
+      // The breakpoint goes on the system block and covers the tool
+      // schema too: the API renders tools before system, and a
+      // breakpoint caches everything preceding it.
+      const client = new AnthropicLlmClient();
+      mockCreate.mockResolvedValueOnce(textResponse("hi"));
+
+      await client.complete({
+        systemPrompt: "sys",
+        userMessage: "user",
+        cacheSystemPrompt: true,
+      });
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          system: [{
+            type: "text",
+            text: "sys",
+            cache_control: { type: "ephemeral" },
+          }],
+        }),
+      );
+    });
+
+    it("leaves the user message alone when only the system prompt is cached", async () => {
+      // The two are decided separately on purpose: caching a transcript
+      // that is never sent twice pays the write premium for no read.
+      const client = new AnthropicLlmClient();
+      mockCreate.mockResolvedValueOnce(textResponse("hi"));
+
+      await client.complete({
+        systemPrompt: "sys",
+        userMessage: "user",
+        cacheSystemPrompt: true,
+      });
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: [{ role: "user", content: "user" }],
+        }),
+      );
+    });
+
+    it("marks the user message when that was asked for too", async () => {
+      const client = new AnthropicLlmClient();
+      mockCreate.mockResolvedValueOnce(textResponse("hi"));
+
+      await client.complete({
+        systemPrompt: "sys",
+        userMessage: "user",
+        cacheSystemPrompt: true,
+        cacheUserMessage: true,
+      });
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: [{
+            role: "user",
+            content: [{
+              type: "text",
+              text: "user",
+              cache_control: { type: "ephemeral" },
+            }],
+          }],
+        }),
+      );
+    });
+
+    it("applies both on the structured path, which is the one extraction takes", async () => {
+      const client = new AnthropicLlmClient();
+      mockCreate.mockResolvedValueOnce({
+        content: [{ type: "tool_use", input: { a: 1 } }],
+        usage: { input_tokens: 1, output_tokens: 1 },
+      });
+
+      await client.complete({
+        systemPrompt: "sys",
+        userMessage: "user",
+        responseSchema: { type: "object" },
+        cacheSystemPrompt: true,
+        cacheUserMessage: true,
+      });
+
+      const body = mockCreate.mock.calls[0]![0] as Record<string, unknown>;
+      expect(body["system"]).toEqual([
+        { type: "text", text: "sys", cache_control: { type: "ephemeral" } },
+      ]);
+      expect(body["tools"]).toBeDefined();
+    });
+  });
 });

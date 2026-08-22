@@ -81,6 +81,32 @@ npx tsc --noEmit            # type-check only
   three dev-split cases scored near-zero as bad prompts when they were
   complete extractions cut off at 8,192 tokens
   (`docs/specs/output-budget.spec.md`).
+- **The prompt prefix is cacheable, and its ordering is load-bearing.**
+  The API renders a request `tools` -> `system` -> `messages`, and a
+  cache breakpoint covers everything before it. The extraction call
+  happens to put its stable content first -- the schema rides in
+  `tools` as the extraction tool's `input_schema`, the prompt is
+  `system` -- and the per-case transcript last, which is exactly the
+  shape caching wants. **Do not move the transcript earlier or
+  interpolate anything dynamic (a date, an id, a mode) into the system
+  prompt**: caching is a byte-exact prefix match, so either change
+  makes every request a unique prefix that pays the write premium and
+  never reads.
+
+  `CompletionRequest.cacheSystemPrompt` and `cacheUserMessage` are
+  separate because their break-even conditions differ -- a write costs
+  ~1.25x and a read ~0.1x, so a breakpoint pays only from the second
+  request that reads it. The preamble repeats across every call a run
+  makes; a transcript only repeats when the same input is sent again.
+  Both are hints: OpenAI caches server-side with no client control and
+  Ollama has no cache, so both providers ignore them.
+
+  `tests/prompt/cacheablePrefix.test.ts` guards the one silent failure
+  here. Below a model's minimum cacheable length nothing errors --
+  `cache_creation_input_tokens` is simply 0 -- and the minimum is _not_
+  monotonic across generations: Haiku 4.5 requires 4,096 where Opus 5
+  requires 512. A trimmed prompt could disable caching on the model the
+  eval suite runs against, with a bill as the only symptom.
 - **Variants are compiled in, not read from disk.**
   `src/prompt/artifacts/builtins.generated.ts` is generated from
   `prompts/*.prompt.yaml` by `npm run regen:builtins` and committed;

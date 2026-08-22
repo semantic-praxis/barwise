@@ -73,6 +73,40 @@ export class AnthropicLlmClient implements LlmClient {
     return this.completeText(request);
   }
 
+  /**
+   * The system prompt, as a bare string unless caching was asked for.
+   *
+   * Kept byte-identical to the previous shape when it was not: a
+   * request that asks for nothing must serialize exactly as it did
+   * before this option existed, or every existing cache entry and
+   * every recorded run stops corresponding to what runs now.
+   */
+  private systemFor(request: CompletionRequest): Anthropic.MessageCreateParams["system"] {
+    if (request.cacheSystemPrompt !== true) return request.systemPrompt;
+    // A breakpoint on the last system block covers the tool schema too:
+    // the API renders tools before system, and a breakpoint caches
+    // everything preceding it.
+    return [{
+      type: "text",
+      text: request.systemPrompt,
+      cache_control: { type: "ephemeral" },
+    }];
+  }
+
+  private messagesFor(request: CompletionRequest): Anthropic.MessageParam[] {
+    if (request.cacheUserMessage !== true) {
+      return [{ role: "user", content: request.userMessage }];
+    }
+    return [{
+      role: "user",
+      content: [{
+        type: "text",
+        text: request.userMessage,
+        cache_control: { type: "ephemeral" },
+      }],
+    }];
+  }
+
   private async completeText(
     request: CompletionRequest,
   ): Promise<CompletionResponse> {
@@ -81,8 +115,8 @@ export class AnthropicLlmClient implements LlmClient {
     const response = await client.messages.stream({
       model: this.model,
       max_tokens: request.maxTokens ?? this.maxTokens,
-      system: request.systemPrompt,
-      messages: [{ role: "user", content: request.userMessage }],
+      system: this.systemFor(request),
+      messages: this.messagesFor(request),
     }).finalMessage();
     const latencyMs = Date.now() - start;
 
@@ -114,8 +148,8 @@ export class AnthropicLlmClient implements LlmClient {
     const response = await client.messages.stream({
       model: this.model,
       max_tokens: request.maxTokens ?? this.maxTokens,
-      system: request.systemPrompt,
-      messages: [{ role: "user", content: request.userMessage }],
+      system: this.systemFor(request),
+      messages: this.messagesFor(request),
       tools: [
         {
           name: toolName,
