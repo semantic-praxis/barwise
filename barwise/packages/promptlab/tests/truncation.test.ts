@@ -18,7 +18,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { defaultSuitePath, loadSuite, runSuite } from "../src/index.js";
+import { defaultSuitePath, loadSuite, runSuite, toHistoryEntry } from "../src/index.js";
 
 const fixturesDir = resolve(dirname(fileURLToPath(import.meta.url)), "fixtures/responses");
 const suite = loadSuite(defaultSuitePath());
@@ -314,5 +314,77 @@ describe("cache reporting", () => {
     expect(
       events.every((e) => (e as { cacheReadTokens?: number; }).cacheReadTokens === 500),
     ).toBe(true);
+  });
+});
+
+/**
+ * A score that explains itself (docs/specs/eval-diagnosis.spec.md).
+ *
+ * The first repeat=5 baseline produced a mean it could defend
+ * statistically and not explain mechanically: six warnings costing 0.30
+ * on every university-enrollment run, with nothing saying which six,
+ * and a one-in-five collapse owning 76% of the suite's noise whose
+ * payload had already been discarded.
+ */
+describe("naming the warnings", () => {
+  it("tallies them by rule across the run", async () => {
+    const report = await runSuite(suite, fixtureClient(), TRAIN);
+
+    // The answer keys are clean, which is what makes the live warnings
+    // addressable rather than a floor -- so an empty tally here is the
+    // assertion, not an absent one.
+    expect(report.warningsByRule).toEqual({});
+  });
+
+  it("reaches the history row, because warnings are score-constitutive", async () => {
+    // Distinct from `tokens`, which needed a cost argument because
+    // caching is score-neutral. These are ~80% of what a run loses, so
+    // a row without them cannot say why a mean moved.
+    const report = await runSuite(suite, fixtureClient(), TRAIN);
+    const entry = toHistoryEntry(report, "2026-08-22T00:00:00Z");
+
+    // One conformance correction, which is exactly the 0.02 between
+    // this answer key's pinned 0.98 and a clean 1.0. That figure has
+    // been asserted since the scorer existed without anything saying
+    // where it came from; the field is what says it.
+    expect(entry.cases[0]!.penalties).toEqual({
+      corrections: 1,
+      errors: 0,
+      warnings: 0,
+    });
+  });
+});
+
+describe("keeping what cannot be explained", () => {
+  it("keeps the payload of a run below the collapse floor", async () => {
+    // A floor above every achievable score stands in for a collapse.
+    const report = await runSuite(
+      { ...suite, collapseFloor: 0.999 },
+      fixtureClient(),
+      TRAIN,
+    );
+
+    expect(report.cases.every((c) => typeof c.runs[0]!.payload === "string")).toBe(true);
+  });
+
+  it("does not keep the payload of a healthy run", async () => {
+    // Thirty-five payloads to explain the one that needs explaining is
+    // how a diagnostic becomes clutter.
+    const report = await runSuite(suite, fixtureClient(), TRAIN);
+
+    expect(report.cases.every((c) => c.runs[0]!.payload === undefined)).toBe(true);
+  });
+
+  it("keeps the payload of an unscorable run, which is the only clue to why", async () => {
+    const client = {
+      provider: "test",
+      model: undefined,
+      complete: () => Promise.resolve({ content: "{not json" }),
+    };
+    const report = await runSuite(suite, client, TRAIN);
+    const run = report.cases[0]!.runs[0]!;
+
+    expect(run.payload).toBe("{not json");
+    expect(run.error).toBeDefined();
   });
 });

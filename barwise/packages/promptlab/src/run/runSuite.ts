@@ -182,6 +182,17 @@ export interface CaseRun {
    * slightly longer transcript will not fit.
    */
   readonly maxTokens?: number;
+  /**
+   * The raw payload, kept only when the run cannot be explained from
+   * its score: below the suite's collapse floor, or unscorable.
+   *
+   * A one-in-five collapse owning most of a suite's noise is exactly
+   * the event worth evidence of, and it was being scored and dropped.
+   * Kept for the rare case by construction rather than for every run --
+   * thirty-five payloads to explain the one that needs explaining is
+   * how a diagnostic becomes clutter (docs/specs/eval-diagnosis.spec.md).
+   */
+  readonly payload?: string;
   /** HTTP status behind a failure, where the SDK reported one. */
   readonly status?: number;
   /** The provider's error taxonomy, e.g. "rate_limit_error". */
@@ -269,6 +280,15 @@ export interface SuiteReport {
     readonly readTokens: number;
     readonly writeTokens: number;
   };
+  /**
+   * Which validation rules warned across the whole run, and how often.
+   *
+   * Suite level rather than per case on purpose: seven rules across
+   * seven cases is forty-nine numbers answering a question nobody asks
+   * per case. This one answers "which class of defect dominates", which
+   * is what a prompt change is aimed at.
+   */
+  readonly warningsByRule: Readonly<Record<string, number>>;
   /** True when every requested run produced a score. */
   readonly complete: boolean;
   /** Which half ran, when one was selected. */
@@ -414,13 +434,22 @@ export async function runSuite(
     }
 
     try {
-      return { ...said, score: scoreExtraction(response.content, loadedCase, suite.weights) };
+      const score = scoreExtraction(response.content, loadedCase, suite.weights);
+      // Kept only when the number cannot speak for itself.
+      const collapsed = suite.collapseFloor !== undefined && score.score < suite.collapseFloor;
+      return {
+        ...said,
+        score,
+        ...(collapsed ? { payload: response.content } : {}),
+      };
     } catch (err) {
-      // The model answered in full; the answer was unusable. A real zero.
+      // The model answered in full; the answer was unusable. A real
+      // zero -- and the payload is the only way to find out why.
       return {
         ...said,
         score: unscorable(loadedCase.evalCase.id),
         error: (err as Error).message,
+        payload: response.content,
       };
     }
   };
@@ -501,6 +530,7 @@ export async function runSuite(
     failures,
     truncations: cases.reduce((sum, c) => sum + c.truncations, 0),
     ...(cacheTotals(cases, cacheSystemPrompt) ?? {}),
+    warningsByRule: tallyWarnings(cases),
     complete: failures === 0,
     ...(selected !== undefined ? { split: selected } : {}),
     dispersion: dispersionOf(cases),
@@ -523,6 +553,7 @@ function unscorable(caseId: string): CaseScore {
     validationWarnings: 0,
     ambiguitiesReported: 0,
     ambiguityExcess: 0,
+    warningsByRule: {},
     score: 0,
     results: [],
   };
@@ -556,4 +587,17 @@ function cacheTotals(
       writeTokens: runs.reduce((sum, r) => sum + (r.cacheWriteTokens ?? 0), 0),
     },
   };
+}
+
+/** Fold every scored run's per-rule warnings into one suite tally. */
+function tallyWarnings(cases: readonly CaseSummary[]): Record<string, number> {
+  const total: Record<string, number> = {};
+  for (const c of cases) {
+    for (const run of c.runs) {
+      for (const [id, n] of Object.entries(run.score?.warningsByRule ?? {})) {
+        total[id] = (total[id] ?? 0) + n;
+      }
+    }
+  }
+  return total;
 }
