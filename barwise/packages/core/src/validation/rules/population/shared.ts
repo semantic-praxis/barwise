@@ -16,13 +16,31 @@ export function severityForModality(
 
 /**
  * The universe of an object type: every distinct value that appears in any
- * role played by that type across all of the model's populations. This is
- * the closed-world set of "instances that exist" for cross-fact-type
+ * role played by that type across the model's *significant* populations.
+ * This is the closed-world set of "instances that exist" for cross-fact-type
  * mandatory checks.
+ *
+ * Sample populations are excluded, and that exclusion is the whole of the
+ * open-world story -- the rules that ask "does everything that exists
+ * satisfy X" (mandatory, disjunctive mandatory, cardinality, spanning,
+ * join paths) all reach existence through this function, while the rules
+ * that judge data already present (uniqueness, exclusion, value and ring
+ * constraints) read the populations directly and are untouched.
+ *
+ * That split is the intended semantics, stated once: **a sample is
+ * positive evidence only.** It can satisfy a constraint but never creates
+ * the obligation that one be satisfied. Note that `valuesPlayedInRole`
+ * deliberately still counts sample instances -- a sample may discharge an
+ * obligation raised by a significant population, just never raise one.
+ *
+ * Treating extracted samples as complete is what reported a mandatory
+ * violation for every entity a transcript merely mentioned in passing
+ * (docs/specs/sample-populations.spec.md).
  */
 export function buildObjectUniverse(model: OrmModel): Map<string, Set<string>> {
   const universe = new Map<string, Set<string>>();
   for (const pop of model.populations) {
+    if (pop.sample) continue;
     const ft = model.getFactType(pop.factTypeId);
     if (!ft) continue;
     for (const inst of pop.instances) {

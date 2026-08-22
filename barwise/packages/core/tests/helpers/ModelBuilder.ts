@@ -87,6 +87,7 @@ export class ModelBuilder {
     objectTypeName: string;
   }> = [];
   private readonly populationConfigs: Array<{
+    sample?: boolean;
     factTypeName: string;
     description?: string;
     instances: FactInstanceConfig[];
@@ -189,6 +190,21 @@ export class ModelBuilder {
     description?: string,
   ): this {
     this.populationConfigs.push({ factTypeName, instances, description });
+    return this;
+  }
+
+  /**
+   * Add a population marked as an illustrative sample rather than the
+   * complete extension of the fact type. Its instances are positive
+   * evidence only -- they can satisfy a constraint but never create the
+   * obligation that one be satisfied.
+   */
+  withSamplePopulation(
+    factTypeName: string,
+    instances: FactInstanceConfig[],
+    description?: string,
+  ): this {
+    this.populationConfigs.push({ factTypeName, instances, description, sample: true });
     return this;
   }
 
@@ -371,7 +387,7 @@ export class ModelBuilder {
     }
 
     // Add populations (which reference fact types by name).
-    for (const { factTypeName, instances, description } of this.populationConfigs) {
+    for (const { factTypeName, instances, description, sample } of this.populationConfigs) {
       const factType = model.getFactTypeByName(factTypeName);
       if (!factType) {
         throw new Error(
@@ -382,6 +398,7 @@ export class ModelBuilder {
       const pop = model.addPopulation({
         factTypeId: factType.id,
         description,
+        ...(sample === true ? { sample: true } : {}),
       });
       for (const inst of instances) {
         pop.addInstance(inst);

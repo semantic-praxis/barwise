@@ -280,3 +280,72 @@ model:
     });
   });
 });
+
+describe("the sample flag", () => {
+  it("round-trips, so a draft stays a draft after a save and reload", () => {
+    // The flag decides whether mandatory checks treat these instances
+    // as a closed world. Losing it on save would turn every reopened
+    // extraction back into a wall of false violations.
+    const model = new OrmModel({ name: "Sample" });
+    const incident = model.addObjectType({
+      name: "Incident",
+      kind: "entity",
+      referenceMode: "incident_id",
+    });
+    const severity = model.addObjectType({
+      name: "Severity",
+      kind: "entity",
+      referenceMode: "severity_code",
+    });
+    const ft = model.addFactType({
+      name: "Incident has Severity",
+      readings: ["{0} has {1}"],
+      roles: [
+        { name: "incident", playerId: incident.id },
+        { name: "severity", playerId: severity.id },
+      ],
+    });
+    const pop = model.addPopulation({ factTypeId: ft.id, sample: true });
+    pop.addInstance({
+      roleValues: { [ft.roles[0]!.id]: "INC-001", [ft.roles[1]!.id]: "P1" },
+    });
+
+    const yaml = new OrmYamlSerializer().serialize(model);
+    const reloaded = new OrmYamlSerializer().deserialize(yaml);
+
+    expect(reloaded.populations[0]!.sample).toBe(true);
+  });
+
+  it("is absent from the yaml when the population is significant", () => {
+    // Every model authored before the field must serialize
+    // byte-identically rather than gaining `sample: false`, or the
+    // first save after upgrading shows a diff on every population.
+    const model = new OrmModel({ name: "Significant" });
+    const incident = model.addObjectType({
+      name: "Incident",
+      kind: "entity",
+      referenceMode: "incident_id",
+    });
+    const severity = model.addObjectType({
+      name: "Severity",
+      kind: "entity",
+      referenceMode: "severity_code",
+    });
+    const ft = model.addFactType({
+      name: "Incident has Severity",
+      readings: ["{0} has {1}"],
+      roles: [
+        { name: "incident", playerId: incident.id },
+        { name: "severity", playerId: severity.id },
+      ],
+    });
+    model.addPopulation({ factTypeId: ft.id }).addInstance({
+      roleValues: { [ft.roles[0]!.id]: "INC-001", [ft.roles[1]!.id]: "P1" },
+    });
+
+    const yaml = new OrmYamlSerializer().serialize(model);
+
+    expect(yaml).not.toContain("sample:");
+    expect(new OrmYamlSerializer().deserialize(yaml).populations[0]!.sample).toBe(false);
+  });
+});

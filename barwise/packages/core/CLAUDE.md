@@ -60,6 +60,23 @@ Lint is run from the repo root: `npm run lint`.
   hierarchies.
 - `OrmModel` is the root aggregate for a single-domain model.
   `OrmProject` is the root aggregate for multi-domain projects.
+- **A population declares whether it is a sample.** `Population.sample`
+  (default false) separates a _significant_ population -- tuples a
+  modeller chose to check a rule against, complete for its fact type --
+  from an illustrative one. The semantics is one sentence: **a sample is
+  positive evidence only.** It can satisfy a constraint but never
+  creates the obligation that one be satisfied. Mechanically, sample
+  instances are excluded from `buildObjectUniverse` and still counted by
+  `valuesPlayedInRole`, which is the whole of the open-world story: the
+  rules that fail on _absent_ data (mandatory, disjunctive mandatory,
+  cardinality, spanning, join paths) all reach existence through that
+  one function, while the rules that fail on data _present_ (uniqueness,
+  exclusion, value and ring constraints) read populations directly and
+  are untouched. Do not exclude samples from `valuesPlayedInRole` -- that
+  inverts the asymmetry and makes the rule punish evidence for existing.
+  LLM extraction marks its populations as samples; a transcript names
+  far more entities than it gives complete facts about
+  (`docs/specs/sample-populations.spec.md`).
 - Serialization round-trips must be lossless. Any new model field must
   have a corresponding serialization path and a round-trip test.
 - JSON Schemas in `schemas/` are first-class artifacts used for file

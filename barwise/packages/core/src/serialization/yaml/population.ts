@@ -14,6 +14,8 @@ export interface OrmYamlPopulation {
   id: string;
   fact_type: string;
   description?: string;
+  /** Absent means a significant (complete) population -- see PopulationConfig.sample. */
+  sample?: boolean;
   instances: OrmYamlFactInstance[];
 }
 
@@ -33,6 +35,11 @@ export function serializePopulation(pop: Population): OrmYamlPopulation {
   if (pop.description) {
     result.description = pop.description;
   }
+  // Written only when true, so every model authored before this field
+  // round-trips byte-identically rather than gaining `sample: false`.
+  if (pop.sample) {
+    result.sample = true;
+  }
   return result;
 }
 
@@ -46,6 +53,7 @@ export function deserializePopulation(popDoc: OrmYamlPopulation): PopulationConf
     id: popDoc.id,
     factTypeId: popDoc.fact_type,
     description: popDoc.description,
+    ...(popDoc.sample !== undefined ? { sample: popDoc.sample } : {}),
   };
 }
 
