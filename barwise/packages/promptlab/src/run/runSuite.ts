@@ -275,6 +275,20 @@ export async function runSuite(
   const systemPrompt = buildSystemPrompt(false, artifact);
   const responseSchema = buildResponseSchema(false);
 
+  // Every call in a sweep sends the same ~5,780-token preamble -- the
+  // system prompt plus the schema riding in the tool definition -- so
+  // caching it turns fifty full-price copies into one write and
+  // forty-nine reads (docs/specs/prompt-caching.spec.md).
+  //
+  // Both conditions are about break-even, and they differ. A cache
+  // write costs about 1.25x and a read 0.1x, so a breakpoint only pays
+  // from the second request that reads it. The preamble repeats across
+  // every call the run makes; a transcript only repeats when the same
+  // case is sampled again. A run of one call reads neither back.
+  const totalCalls = suiteCases.length * repeat;
+  const cacheSystemPrompt = totalCalls >= 2;
+  const cacheUserMessage = repeat >= 2;
+
   const report = options?.onProgress;
 
   const runOnce = async (
@@ -293,6 +307,8 @@ export async function runSuite(
           userMessage: buildUserMessage(loadedCase.transcript),
           responseSchema,
           maxTokens,
+          cacheSystemPrompt,
+          cacheUserMessage,
         }),
       {
         ...options?.retry,
