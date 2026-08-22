@@ -23,10 +23,21 @@
  * accident.
  */
 
-import type { ExtractionRecord, LlmCallRecord } from "@barwise/llm";
+import type { ExtractionRecord, LlmCallRecord, ValidationRecord } from "@barwise/llm";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+
+/**
+ * Everything the log can hold.
+ *
+ * One file, three record kinds, correlated by the caller's id: what a
+ * call cost, what the pipeline changed, and what validation found. They
+ * are distinguishable on read -- a call record carries `ok`, the others
+ * do not -- which is what lets `barwise llm-usage` skip what it does
+ * not understand rather than choke on it.
+ */
+export type Observation = LlmCallRecord | ExtractionRecord | ValidationRecord;
 
 /** `$XDG_STATE_HOME/barwise/`, falling back to `~/.local/state/barwise/`. */
 export function stateDir(): string {
@@ -62,9 +73,7 @@ export function callLogPath(): string | undefined {
  * Observability that can fail the operation it observes is worse than
  * none.
  */
-export function jsonlSink(path: string): {
-  record(entry: LlmCallRecord | ExtractionRecord): void;
-} {
+export function jsonlSink(path: string): { record(entry: Observation): void; } {
   let ready = false;
   return {
     record(entry): void {
@@ -89,10 +98,7 @@ export function jsonlSink(path: string): {
  * what the pipeline did with its answer land in one file, correlated
  * by the id the caller supplies.
  */
-export function callLogSink():
-  | { record(entry: LlmCallRecord | ExtractionRecord): void; }
-  | undefined
-{
+export function callLogSink(): { record(entry: Observation): void; } | undefined {
   const path = callLogPath();
   return path === undefined ? undefined : jsonlSink(path);
 }

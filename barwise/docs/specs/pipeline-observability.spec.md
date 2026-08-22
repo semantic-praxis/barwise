@@ -83,6 +83,13 @@ In scope:
 
 Out of scope, deferred and named:
 
+- **A third tally for corrections shipped too**, at the reviewer's
+  request: `correctionsByCategory` in the scorer, the suite report, the
+  history row, and the CLI. It turned out to matter more than the
+  others for the barwise-813 round, because on the recorded answer keys
+  **all fourteen corrections are one category**,
+  `orphaned_reference_mode` -- the entire gap between those payloads
+  and 1.0, invisible behind a lump count.
 - **Moving `modelUsed`/`usage`/`latencyMs` off `DraftModelResult`.**
   They belong in `observe/` by this same argument, but removing them is
   a breaking change to a type three surfaces read, and it is not what
@@ -177,20 +184,21 @@ record half-written.
 
 ### Not done, and not silently
 
-**The validation-side record did not ship.** Scope asked `observe/` for
-a record of what validation found, carrying each diagnostic's `ruleId`
-and severity. What shipped names validation findings in **promptlab** --
-`errorsByRule` in the scorer, the suite report, the history row and the
-CLI -- which covers the eval harness and nothing else. There is no
-`observe/` validation record, so the case this spec used to argue for
-two moments is precisely the case still unserved: `barwise validate` on
-a hand-written model records nothing, and it is exactly as worth
-recording as one that came from a transcript.
+**The validation-side record shipped in a follow-up** (barwise-838).
+`observe/validationLog.ts` carries `errorsByRule` and `warningsByRule`
+by severity, and `barwise validate` emits it. The `info` tier is
+deliberately neither counted nor tallied: it carries no weight in any
+score, and recording it would grow every row for a tier nobody acts on.
 
-Called out here rather than left for a reader to discover, because a
-scope item silently unimplemented is the same defect as a capability
-matrix asserting parity that does not hold -- and this spec is the one
-that says so. Tracked as barwise-838.
+Wired at `barwise validate` and nowhere else, deliberately. Of the
+thirteen sites that construct a `ValidationEngine`, most are internal
+gates rather than operations an operator asked for -- the export
+formats validate before writing, `learn`'s check runners validate as
+part of grading, and `scoreExtraction` already records the same tallies
+through the eval harness. Recording those would log a user's single
+`barwise export` as several validation events, which is noise rather
+than observability. `mcp` is the one worth revisiting when a sink
+exists on that surface.
 
 Workstream 3 of barwise-815 -- the `barwise llm-usage` report over the
 log -- is **not** built. The records now exist and accumulate; nothing
