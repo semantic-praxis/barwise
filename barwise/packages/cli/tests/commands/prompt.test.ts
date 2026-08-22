@@ -68,6 +68,23 @@ describe("barwise prompt eval", () => {
     expect(result.stderr).toContain('Unknown split "trian"');
     expect(result.stderr).toContain("train");
   });
+
+  it("offers --max-tokens", async () => {
+    // Asserted on the flag name alone: commander wraps the description
+    // at the terminal width, which would make this a formatting test.
+    const result = await runCli(["prompt", "eval", "--help"]);
+    expect(result.stdout).toContain("--max-tokens");
+  });
+
+  it("rejects a nonsense budget before spending a call", async () => {
+    // Same reasoning as the split guard. A budget that reaches the
+    // provider as NaN costs a sweep to discover.
+    for (const value of ["lots", "0", "-1", "8192.5"]) {
+      const result = await runCli(["prompt", "eval", "--max-tokens", value]);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain("--max-tokens must be a positive integer");
+    }
+  });
 });
 
 describe("barwise prompt schema", () => {

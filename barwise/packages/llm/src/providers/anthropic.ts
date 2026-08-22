@@ -12,6 +12,7 @@
 
 import type Anthropic from "@anthropic-ai/sdk";
 import type { CompletionRequest, CompletionResponse, LlmClient } from "../LlmClient.js";
+import { describeAnthropicStop } from "./stopReason.js";
 
 export interface AnthropicClientOptions {
   /** Anthropic API key. Falls back to ANTHROPIC_API_KEY env var. */
@@ -65,7 +66,7 @@ export class AnthropicLlmClient implements LlmClient {
     const start = Date.now();
     const response = await client.messages.create({
       model: this.model,
-      max_tokens: this.maxTokens,
+      max_tokens: request.maxTokens ?? this.maxTokens,
       system: request.systemPrompt,
       messages: [{ role: "user", content: request.userMessage }],
     });
@@ -80,6 +81,7 @@ export class AnthropicLlmClient implements LlmClient {
         completionTokens: response.usage.output_tokens,
       },
       latencyMs,
+      ...describeAnthropicStop(response.stop_reason),
     };
   }
 
@@ -92,7 +94,7 @@ export class AnthropicLlmClient implements LlmClient {
     const start = Date.now();
     const response = await client.messages.create({
       model: this.model,
-      max_tokens: this.maxTokens,
+      max_tokens: request.maxTokens ?? this.maxTokens,
       system: request.systemPrompt,
       messages: [{ role: "user", content: request.userMessage }],
       tools: [
@@ -108,8 +110,13 @@ export class AnthropicLlmClient implements LlmClient {
 
     const toolBlock = response.content.find((b) => b.type === "tool_use");
     if (!toolBlock || toolBlock.type !== "tool_use") {
+      // Naming the stop reason turns "the API misbehaved" into a
+      // diagnosis: `max_tokens` here means the response ran out of room
+      // before the tool call started, which is a budget to raise rather
+      // than a bug to file.
       throw new Error(
-        "Anthropic API did not return a tool_use response block.",
+        "Anthropic API did not return a tool_use response block"
+          + ` (stop_reason: ${response.stop_reason ?? "none reported"}).`,
       );
     }
 
@@ -121,6 +128,7 @@ export class AnthropicLlmClient implements LlmClient {
         completionTokens: response.usage.output_tokens,
       },
       latencyMs,
+      ...describeAnthropicStop(response.stop_reason),
     };
   }
 }

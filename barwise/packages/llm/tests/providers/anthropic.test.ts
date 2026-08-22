@@ -141,6 +141,7 @@ describe("AnthropicLlmClient", () => {
       mockCreate.mockResolvedValueOnce({
         content: [{ type: "text", text: "no tool here" }],
         usage: { input_tokens: 1, output_tokens: 1 },
+        stop_reason: "max_tokens",
       });
 
       await expect(
@@ -150,6 +151,108 @@ describe("AnthropicLlmClient", () => {
           responseSchema: { type: "object" },
         }),
       ).rejects.toThrow(/did not return a tool_use/);
+    });
+
+    it("names the stop reason when no tool block came back", async () => {
+      // "The API misbehaved" and "the budget ran out before the tool
+      // call began" call for completely different responses, and only
+      // the stop reason separates them.
+      const client = new AnthropicLlmClient();
+      mockCreate.mockResolvedValueOnce({
+        content: [],
+        usage: { input_tokens: 1, output_tokens: 1 },
+        stop_reason: "max_tokens",
+      });
+
+      await expect(
+        client.complete({
+          systemPrompt: "Extract.",
+          userMessage: "Transcript.",
+          responseSchema: { type: "object" },
+        }),
+      ).rejects.toThrow(/max_tokens/);
+    });
+  });
+
+  describe("output-token budget", () => {
+    it("uses a request's budget in place of the client's default", async () => {
+      const client = new AnthropicLlmClient();
+      mockCreate.mockResolvedValueOnce(textResponse("hi"));
+
+      await client.complete({ systemPrompt: "s", userMessage: "u", maxTokens: 40_000 });
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ max_tokens: 40_000 }),
+      );
+    });
+
+    it("applies the request budget on the structured path too", async () => {
+      // The path every extraction actually takes; a budget honoured
+      // only on the text path would fix nothing that matters.
+      const client = new AnthropicLlmClient();
+      mockCreate.mockResolvedValueOnce({
+        content: [{ type: "tool_use", input: { name: "T" } }],
+        usage: { input_tokens: 1, output_tokens: 1 },
+      });
+
+      await client.complete({
+        systemPrompt: "s",
+        userMessage: "u",
+        responseSchema: { type: "object" },
+        maxTokens: 40_000,
+      });
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ max_tokens: 40_000 }),
+      );
+    });
+
+    it("falls back to the client default when the request names none", async () => {
+      const client = new AnthropicLlmClient({ maxTokens: 1234 });
+      mockCreate.mockResolvedValueOnce(textResponse("hi"));
+
+      await client.complete({ systemPrompt: "s", userMessage: "u" });
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ max_tokens: 1234 }),
+      );
+    });
+  });
+
+  describe("stop reason", () => {
+    it("reports a response cut off at the ceiling", async () => {
+      // The case that motivated all of this: a truncated tool_use block
+      // arrives as well-formed JSON holding whatever fields completed,
+      // so nothing but this flag can tell it from a sparse extraction.
+      const client = new AnthropicLlmClient();
+      mockCreate.mockResolvedValueOnce({
+        content: [{ type: "tool_use", input: { object_types: [] } }],
+        usage: { input_tokens: 4000, output_tokens: 8192 },
+        stop_reason: "max_tokens",
+      });
+
+      const result = await client.complete({
+        systemPrompt: "s",
+        userMessage: "u",
+        responseSchema: { type: "object" },
+      });
+
+      expect(result.truncated).toBe(true);
+      expect(result.stopReason).toBe("max_tokens");
+      expect(result.content).toBe(JSON.stringify({ object_types: [] }));
+    });
+
+    it("does not mark a normal completion as truncated", async () => {
+      const client = new AnthropicLlmClient();
+      mockCreate.mockResolvedValueOnce({
+        ...textResponse("all done"),
+        stop_reason: "end_turn",
+      });
+
+      const result = await client.complete({ systemPrompt: "s", userMessage: "u" });
+
+      expect(result.truncated).toBe(false);
+      expect(result.stopReason).toBe("end_turn");
     });
   });
 });

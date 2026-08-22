@@ -74,6 +74,11 @@ function registerEval(promptCmd: Command, version: string): void {
       "--split <split>",
       "Run only one half of the suite (train or dev). Omitted runs every case.",
     )
+    .option(
+      "--max-tokens <n>",
+      "Output-token ceiling for every call. Omitted, each case derives one"
+        + " from its transcript length.",
+    )
     .option("--format <format>", "Output format (text or json)", "text")
     .option(
       "--verbose",
@@ -91,6 +96,7 @@ function registerEval(promptCmd: Command, version: string): void {
           artifacts?: string;
           repeat: string;
           split?: string;
+          maxTokens?: string;
           format: string;
           verbose?: boolean;
           history: boolean;
@@ -125,12 +131,24 @@ function registerEval(promptCmd: Command, version: string): void {
           if (opts.split !== undefined && opts.split !== "train" && opts.split !== "dev") {
             throw new Error(`Unknown split "${opts.split}". Use "train" or "dev".`);
           }
+          // Validated before the first call, like the split above: a
+          // typo that reaches the provider costs a sweep to discover.
+          let maxTokens: number | undefined;
+          if (opts.maxTokens !== undefined) {
+            maxTokens = Number(opts.maxTokens);
+            if (!Number.isInteger(maxTokens) || maxTokens < 1) {
+              throw new Error(
+                `--max-tokens must be a positive integer, got "${opts.maxTokens}".`,
+              );
+            }
+          }
           // Progress goes to stderr so `--format json` stays a clean
           // pipe. A sweep is dozens of sequential calls; without this a
           // rate-limited run and a hung one look the same from outside.
           const report = await runSuite(suite, client, {
             ...(artifact !== undefined ? { artifact } : {}),
             ...(opts.split !== undefined ? { split: opts.split as "train" | "dev" } : {}),
+            ...(maxTokens !== undefined ? { maxTokens } : {}),
             repeat: Number(opts.repeat),
             ...(opts.verbose === true
               ? { onProgress: (e: RunProgress) => process.stderr.write(renderProgress(e)) }
@@ -143,8 +161,25 @@ function registerEval(promptCmd: Command, version: string): void {
           if (!report.complete) {
             const requested = report.repeat * report.cases.length;
             process.stderr.write(
-              `WARNING: ${report.failures} of ${requested} runs never returned a payload.`
+              `WARNING: ${report.failures} of ${requested} runs produced no usable payload.`
                 + ` Those runs are excluded from the means below, not scored zero.\n`,
+            );
+          }
+          // Named separately from the failure count because it is the
+          // one an operator fixes without touching the provider, and
+          // because a truncated answer is the failure that looks least
+          // like one: it arrives as well-formed JSON holding almost
+          // nothing.
+          if (report.truncations > 0) {
+            const ceiling = Math.max(
+              ...report.cases.flatMap((c) =>
+                c.runs.filter((r) => r.truncated === true).map((r) => r.maxTokens ?? 0)
+              ),
+            );
+            process.stderr.write(
+              `WARNING: ${report.truncations} run(s) were cut off at the output-token`
+                + ` ceiling, so what they measured was the budget, not the prompt.`
+                + ` Re-run with --max-tokens above ${ceiling}.\n`,
             );
           }
 
@@ -310,7 +345,17 @@ function renderProgress(e: RunProgress): string {
   const run = `run ${e.run}/${e.repeat}`;
   const took = e.latencyMs === undefined ? "" : `  ${(e.latencyMs / 1000).toFixed(1)}s`;
   const tries = e.attempts > 1 ? `  ${e.attempts} attempts` : "";
+  // Shown on every line, not just the truncated ones: the run before
+  // the first truncation is the one that could have warned, and it can
+  // only do that if the pair is always visible.
+  const tokens = e.outputTokens === undefined
+    ? ""
+    : `  ${e.outputTokens}${e.maxTokens === undefined ? "" : `/${e.maxTokens}`} out`;
 
+  if (e.truncated === true) {
+    return `${position} ${e.caseId.padEnd(22)} ${run}  TRUNCATED, excluded`
+      + `${took}${tokens}  raise --max-tokens\n`;
+  }
   if (e.failed === true) {
     return `${position} ${e.caseId.padEnd(22)} ${run}  FAILED, excluded`
       + `${tries}  ${e.error ?? ""}\n`;
@@ -318,7 +363,7 @@ function renderProgress(e: RunProgress): string {
   const score = e.score === undefined ? "  ----" : e.score.toFixed(3).padStart(6);
   const collapse = e.collapsed === true ? "  COLLAPSE" : "";
   const unscorable = e.score !== undefined && e.error !== undefined ? "  unscorable" : "";
-  return `${position} ${e.caseId.padEnd(22)} ${run} ${score}${took}${tries}`
+  return `${position} ${e.caseId.padEnd(22)} ${run} ${score}${took}${tokens}${tries}`
     + `${collapse}${unscorable}\n`;
 }
 
@@ -345,11 +390,25 @@ function renderReport(report: SuiteReport): string {
       }${sd}${samples}${survived}`,
     );
     for (const run of c.runs) {
-      if (run.failed) {
+      if (run.truncated) {
+        lines.push(
+          `  run truncated at ${run.outputTokens ?? "?"}/${run.maxTokens ?? "?"}`
+            + ` output tokens (excluded): ${run.error}`,
+        );
+      } else if (run.failed) {
+        // The identifiers go on their own line rather than into the
+        // message: they are what a provider's support asks for, and the
+        // SDK message is the field most likely to be reworded.
         lines.push(
           `  run failed (${run.failureKind}, ${run.attempts} attempt(s), excluded):`
             + ` ${run.error}`,
         );
+        const detail = [
+          run.status === undefined ? undefined : `status=${run.status}`,
+          run.errorType === undefined ? undefined : `type=${run.errorType}`,
+          run.requestId === undefined ? undefined : `request=${run.requestId}`,
+        ].filter((d) => d !== undefined);
+        if (detail.length > 0) lines.push(`    ${detail.join("  ")}`);
       } else if (run.error) {
         lines.push(`  unscorable payload (counted as 0): ${run.error}`);
       } else if (run.score) {

@@ -105,6 +105,29 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
   is what every caller before it got. The retry event is the one that
   earns its keep: a rate-limited sweep and a hung one are otherwise
   indistinguishable for as long as the backoff lasts.
+- **Three kinds of bad run, and only one of them is a score.** A call
+  the provider never answered is excluded (barwise-806). A payload the
+  production parse path rejects is a real zero. A payload cut off at
+  the output-token ceiling is **excluded**, because what it measures is
+  the caller's budget, not the prompt. The third is the dangerous one:
+  it raises no error at all, since a truncated tool_use block arrives
+  as well-formed JSON holding whatever fields completed. It scored
+  0.000, 0.000 and 0.133 on the dev split before anything said why.
+  `runSuite` derives a per-case budget from the transcript
+  (`suggestMaxTokens`), reports `truncations` apart from `failures`,
+  and labels the run `failureKind: "truncated"` -- the two call for
+  opposite responses, one "look at the provider" and the other "raise
+  `--max-tokens` and re-run".
+- **Keep what the provider said, especially when nothing went wrong.**
+  `CaseRun` carries `stopReason`, `promptTokens`, `outputTokens`, and
+  the `maxTokens` the call was given, plus `status`, `errorType` and
+  `requestId` on a failure. The token pair is the point: equal values
+  are a truncation, and a _near_-equal pair on a healthy run is the
+  only warning that the next slightly longer transcript will not fit,
+  which is why it is recorded and rendered when nothing is wrong. The
+  request id is worth keeping precisely because it is useless locally
+  -- it is the only handle on a call that has already happened when
+  asking the provider about it.
 - **Two identifiers pin a run, and they answer different questions.**
   `promptHash` (`src/provenance/promptHash.ts`) fingerprints the
   rendered system prompt, so it catches a variant edited without its

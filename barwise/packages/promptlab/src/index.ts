@@ -23,8 +23,8 @@ export type { CaseDispersionInput, Dispersion } from "./stats/dispersion.js";
 export { hashPrompt } from "./provenance/promptHash.js";
 
 // Suite runner
-export { classifyFailure, withRetry } from "./run/retry.js";
-export type { FailureKind, RetryOptions, RetryResult } from "./run/retry.js";
+export { classifyFailure, describeProviderError, withRetry } from "./run/retry.js";
+export type { FailureKind, ProviderErrorInfo, RetryOptions, RetryResult } from "./run/retry.js";
 export { runSuite } from "./run/runSuite.js";
 export type {
   CaseRun,

@@ -35,8 +35,16 @@ export interface RetryOptions {
   }) => void;
 }
 
-/** What a failed attempt was judged to be. */
-export type FailureKind = "transient" | "terminal";
+/**
+ * What a failed attempt was judged to be.
+ *
+ * `truncated` never comes out of `classifyFailure` -- a response cut
+ * off at the output ceiling is a successful call, not an exception, and
+ * the runner labels it after the fact. It lives in this union anyway so
+ * that everything reading `failureKind` gets the real reason instead of
+ * a "terminal" that sends the operator looking for a broken credential.
+ */
+export type FailureKind = "transient" | "terminal" | "truncated";
 
 const TRANSIENT_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504, 529]);
 const TERMINAL_STATUSES = new Set([400, 401, 403, 404, 422]);
@@ -95,6 +103,81 @@ export function classifyFailure(err: unknown): FailureKind {
   if (TERMINAL_PATTERNS.some((p) => p.test(message))) return "terminal";
   if (TRANSIENT_PATTERNS.some((p) => p.test(message))) return "transient";
   return "terminal";
+}
+
+/**
+ * What the provider said about a failure, past the message.
+ *
+ * The message alone is a poor bug report: it is the one field the SDKs
+ * reword between releases, and it never carries the request id, which
+ * is the first thing a provider's support asks for and the only handle
+ * on a call that has already happened. All three fields are optional
+ * because a connection that never opened has none of them.
+ */
+export interface ProviderErrorInfo {
+  readonly message: string;
+  readonly status?: number;
+  /** The provider's own error taxonomy, e.g. "rate_limit_error". */
+  readonly errorType?: string;
+  /** Provider-side identifier for the call, for support and for logs. */
+  readonly requestId?: string;
+}
+
+/**
+ * Pull the diagnostics off a provider error, tolerating every shape the
+ * SDKs use. Deliberately forgiving: this runs while an operator is
+ * looking at a failed sweep, so a field it cannot find must be absent,
+ * never a thrown error on top of the one being reported.
+ */
+export function describeProviderError(err: unknown): ProviderErrorInfo {
+  const message = err instanceof Error ? err.message : String(err);
+  const status = statusOf(err);
+  return {
+    message,
+    ...(status !== undefined ? { status } : {}),
+    ...(errorTypeOf(err) !== undefined ? { errorType: errorTypeOf(err)! } : {}),
+    ...(requestIdOf(err) !== undefined ? { requestId: requestIdOf(err)! } : {}),
+  };
+}
+
+/**
+ * Anthropic nests it under `error.error.type`; OpenAI exposes both a
+ * top-level `type` and the same nested shape.
+ */
+function errorTypeOf(err: unknown): string | undefined {
+  if (typeof err !== "object" || err === null) return undefined;
+  const obj = err as Record<string, unknown>;
+  const direct = obj["type"];
+  if (typeof direct === "string") return direct;
+  const body = obj["error"];
+  if (typeof body === "object" && body !== null) {
+    const nested = (body as Record<string, unknown>)["type"];
+    if (typeof nested === "string") return nested;
+  }
+  return undefined;
+}
+
+/** Property naming differs per SDK and per major version; try them all. */
+function requestIdOf(err: unknown): string | undefined {
+  if (typeof err !== "object" || err === null) return undefined;
+  const obj = err as Record<string, unknown>;
+  for (const key of ["request_id", "requestID", "requestId"]) {
+    const value = obj[key];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  // The header is the last resort, and the one that survives an SDK
+  // that stopped surfacing the property.
+  const headers = obj["headers"];
+  if (typeof headers === "object" && headers !== null) {
+    const get = (headers as { get?: (name: string) => unknown; }).get;
+    if (typeof get === "function") {
+      const value = get.call(headers, "x-request-id");
+      if (typeof value === "string" && value.length > 0) return value;
+    }
+    const value = (headers as Record<string, unknown>)["x-request-id"];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return undefined;
 }
 
 /** The provider SDKs surface HTTP status on the error; shapes vary. */

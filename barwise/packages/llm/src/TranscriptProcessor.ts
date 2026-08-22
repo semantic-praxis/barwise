@@ -10,6 +10,7 @@
 
 import type { OrmModel } from "@barwise/core";
 import { diffModels } from "@barwise/core/diff";
+import { suggestMaxTokens } from "./budget.js";
 import { parseDraftModel } from "./DraftModelParser.js";
 import { enforceConformance } from "./ExtractionConformance.js";
 import {
@@ -51,6 +52,13 @@ export interface ProcessorOptions {
    * regression run wants.
    */
   readonly artifact?: PromptArtifact;
+  /**
+   * Output-token ceiling for the extraction call. Omitted, one is
+   * derived from the transcript's own length (`suggestMaxTokens`),
+   * which is never below the client's default -- a transcript that fit
+   * before still fits.
+   */
+  readonly maxTokens?: number;
 }
 
 /**
@@ -96,6 +104,7 @@ export async function processTranscript(
     systemPrompt,
     userMessage,
     responseSchema,
+    maxTokens: options?.maxTokens ?? suggestMaxTokens(transcript),
   });
 
   let extraction: ExtractionResponse;
@@ -121,9 +130,28 @@ export async function processTranscript(
     ? buildCandidateFramings(extraction, result.model, modelName, altWarnings)
     : [];
 
+  // A truncated extraction still parses -- a cut-off tool_use block
+  // arrives as well-formed JSON holding whatever fields completed -- so
+  // without this the user gets half a model and no indication that half
+  // is missing. A warning rather than an error: the partial model is
+  // still the best available answer, and discarding it would cost the
+  // call for nothing.
+  const truncationWarnings = response.truncated === true
+    ? [
+      "The model's response was cut off at the output-token limit, so this"
+      + " model is incomplete. Re-run with a higher maxTokens, or split the"
+      + " transcript.",
+    ]
+    : [];
+
   return {
     ...result,
-    warnings: [...conformanceWarnings, ...result.warnings, ...altWarnings],
+    warnings: [
+      ...truncationWarnings,
+      ...conformanceWarnings,
+      ...result.warnings,
+      ...altWarnings,
+    ],
     ...(alternatives.length > 0 ? { alternatives } : {}),
     modelUsed: response.modelUsed,
     usage: response.usage,

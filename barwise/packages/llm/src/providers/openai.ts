@@ -13,6 +13,7 @@
 
 import type OpenAI from "openai";
 import type { CompletionRequest, CompletionResponse, LlmClient } from "../LlmClient.js";
+import { describeOpenAiStop } from "./stopReason.js";
 
 export interface OpenAIClientOptions {
   /** OpenAI API key. Falls back to OPENAI_API_KEY env var. */
@@ -66,7 +67,7 @@ export class OpenAILlmClient implements LlmClient {
     const start = Date.now();
     const response = await client.chat.completions.create({
       model: this.model,
-      max_tokens: this.maxTokens,
+      max_tokens: request.maxTokens ?? this.maxTokens,
       messages: [
         { role: "system", content: request.systemPrompt },
         { role: "user", content: request.userMessage },
@@ -84,6 +85,7 @@ export class OpenAILlmClient implements LlmClient {
         }
         : undefined,
       latencyMs,
+      ...describeOpenAiStop(response.choices[0]?.finish_reason),
     };
   }
 
@@ -94,7 +96,7 @@ export class OpenAILlmClient implements LlmClient {
     const start = Date.now();
     const response = await client.chat.completions.create({
       model: this.model,
-      max_tokens: this.maxTokens,
+      max_tokens: request.maxTokens ?? this.maxTokens,
       messages: [
         { role: "system", content: request.systemPrompt },
         { role: "user", content: request.userMessage },
@@ -120,6 +122,7 @@ export class OpenAILlmClient implements LlmClient {
         }
         : undefined,
       latencyMs,
+      ...describeOpenAiStop(response.choices[0]?.finish_reason),
     };
   }
 }
