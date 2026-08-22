@@ -21,6 +21,19 @@ export interface CaseScore {
   readonly validationErrors: number;
   /** Warning-severity diagnostics (the lint tier). */
   readonly validationWarnings: number;
+  /**
+   * Which validation rules warned, and how many times each.
+   *
+   * The count alone says a run lost 0.30 without saying to what. On the
+   * first `repeat=5` baseline warnings were roughly 80% of everything
+   * lost across the suite, and the recorded answer keys produce none at
+   * all -- so the cost is addressable, and this is what says which rule
+   * to address (docs/specs/eval-diagnosis.spec.md).
+   *
+   * Empty rather than absent when nothing warned: a reader should not
+   * have to distinguish "no warnings" from "not measured".
+   */
+  readonly warningsByRule: Readonly<Record<string, number>>;
   /** Ambiguities reported in the payload, whatever the budget. */
   readonly ambiguitiesReported: number;
   /** Ambiguities beyond the case's budget; 0 when none is declared. */
@@ -49,9 +62,16 @@ export function scoreExtraction(
   const validationErrors = diagnostics
     .filter((d) => d.severity === "error")
     .length;
-  const validationWarnings = diagnostics
-    .filter((d) => d.severity === "warning")
-    .length;
+  const warnings = diagnostics.filter((d) => d.severity === "warning");
+  const validationWarnings = warnings.length;
+  // Every rule that fired is listed, not a top-N. The tally exists to
+  // find the dominant rule, but a rule firing once here is still the
+  // difference between a passing and a failing case elsewhere.
+  const warningsByRule: Record<string, number> = {};
+  for (const w of warnings) {
+    const id = w.ruleId ?? "(unattributed)";
+    warningsByRule[id] = (warningsByRule[id] ?? 0) + 1;
+  }
 
   // One payload, two graders: the model half runs through the gym's
   // check runners, the payload half through promptlab's own. Both fold
@@ -89,6 +109,7 @@ export function scoreExtraction(
     conformanceCorrections: corrections.length,
     validationErrors,
     validationWarnings,
+    warningsByRule,
     ambiguitiesReported,
     ambiguityExcess: excess,
     score: Math.max(0, raw),

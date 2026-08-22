@@ -182,6 +182,24 @@ export interface CaseRun {
    * slightly longer transcript will not fit.
    */
   readonly maxTokens?: number;
+  /**
+   * The raw payload, kept for the runs worth reading: each case's
+   * best and worst scored sample, and every unscorable one.
+   *
+   * Tied to the collapse floor at first, which was wrong. The dev
+   * split's most diagnosable run scored 0.327 against a floor of 0.30
+   * -- `ok=5/5`, no collapse, and nothing kept -- while its sibling
+   * scored 0.950 on the same transcript. The interesting failure is
+   * not "below a threshold", it is "far from the others", and a
+   * threshold cannot see that.
+   *
+   * Best as well as worst because diagnosis is comparative: the
+   * question is what the 0.950 run did that the 0.327 run did not, and
+   * one payload cannot answer it. Two per case, not two per run, so the
+   * cost stays bounded by the suite rather than by `repeat`
+   * (docs/specs/eval-diagnosis.spec.md).
+   */
+  readonly payload?: string;
   /** HTTP status behind a failure, where the SDK reported one. */
   readonly status?: number;
   /** The provider's error taxonomy, e.g. "rate_limit_error". */
@@ -269,6 +287,15 @@ export interface SuiteReport {
     readonly readTokens: number;
     readonly writeTokens: number;
   };
+  /**
+   * Which validation rules warned across the whole run, and how often.
+   *
+   * Suite level rather than per case on purpose: seven rules across
+   * seven cases is forty-nine numbers answering a question nobody asks
+   * per case. This one answers "which class of defect dominates", which
+   * is what a prompt change is aimed at.
+   */
+  readonly warningsByRule: Readonly<Record<string, number>>;
   /** True when every requested run produced a score. */
   readonly complete: boolean;
   /** Which half ran, when one was selected. */
@@ -414,13 +441,19 @@ export async function runSuite(
     }
 
     try {
-      return { ...said, score: scoreExtraction(response.content, loadedCase, suite.weights) };
+      // Carried through scoring and pruned to the extremes once the
+      // case finishes: which run is worst is not knowable until the
+      // others have run.
+      const score = scoreExtraction(response.content, loadedCase, suite.weights);
+      return { ...said, score, payload: response.content };
     } catch (err) {
-      // The model answered in full; the answer was unusable. A real zero.
+      // The model answered in full; the answer was unusable. A real
+      // zero -- and the payload is the only way to find out why.
       return {
         ...said,
         score: unscorable(loadedCase.evalCase.id),
         error: (err as Error).message,
+        payload: response.content,
       };
     }
   };
@@ -475,7 +508,7 @@ export async function runSuite(
     const qualitySd = atFloor ? sampleSd(atFloor.quality) : undefined;
     cases.push({
       caseId: loadedCase.evalCase.id,
-      runs,
+      runs: keepDiagnosticPayloads(runs),
       mean: scores.length > 0 ? mean(scores) : 0,
       worst: scores.length > 0 ? Math.min(...scores) : 0,
       samples: scores.length,
@@ -501,6 +534,7 @@ export async function runSuite(
     failures,
     truncations: cases.reduce((sum, c) => sum + c.truncations, 0),
     ...(cacheTotals(cases, cacheSystemPrompt) ?? {}),
+    warningsByRule: tallyWarnings(cases),
     complete: failures === 0,
     ...(selected !== undefined ? { split: selected } : {}),
     dispersion: dispersionOf(cases),
@@ -523,6 +557,7 @@ function unscorable(caseId: string): CaseScore {
     validationWarnings: 0,
     ambiguitiesReported: 0,
     ambiguityExcess: 0,
+    warningsByRule: {},
     score: 0,
     results: [],
   };
@@ -556,4 +591,52 @@ function cacheTotals(
       writeTokens: runs.reduce((sum, r) => sum + (r.cacheWriteTokens ?? 0), 0),
     },
   };
+}
+
+/** Fold every scored run's per-rule warnings into one suite tally. */
+function tallyWarnings(cases: readonly CaseSummary[]): Record<string, number> {
+  const total: Record<string, number> = {};
+  for (const c of cases) {
+    for (const run of c.runs) {
+      for (const [id, n] of Object.entries(run.score?.warningsByRule ?? {})) {
+        total[id] = (total[id] ?? 0) + n;
+      }
+    }
+  }
+  return total;
+}
+
+/**
+ * Drop every payload except the ones worth reading: the case's best and
+ * worst scored samples, and any run that could not be scored at all.
+ *
+ * Pruning here rather than at capture time because which run is worst
+ * is not knowable until the rest have run. The alternative -- a fixed
+ * threshold -- was tried and missed the case it was built for: a run
+ * scoring 0.327 against a 0.30 floor is not a collapse and is exactly
+ * what needs explaining when its sibling scored 0.950.
+ */
+function keepDiagnosticPayloads(runs: readonly CaseRun[]): CaseRun[] {
+  const scored = runs
+    .map((run, index) => ({ run, index }))
+    .filter((r) => r.run.score !== undefined && r.run.error === undefined);
+
+  const keep = new Set<number>();
+  if (scored.length > 0) {
+    const by = (pick: (a: number, b: number) => boolean) =>
+      scored.reduce((best, r) => pick(r.run.score!.score, best.run.score!.score) ? r : best);
+    keep.add(by((a, b) => a < b).index);
+    keep.add(by((a, b) => a > b).index);
+  }
+  // An unscorable run keeps its payload regardless: it has no score to
+  // rank, and the payload is the only account of why it failed.
+  runs.forEach((run, index) => {
+    if (run.score !== undefined && run.error !== undefined) keep.add(index);
+  });
+
+  return runs.map((run, index) => {
+    if (run.payload === undefined || keep.has(index)) return run;
+    const { payload: _dropped, ...rest } = run;
+    return rest;
+  });
 }

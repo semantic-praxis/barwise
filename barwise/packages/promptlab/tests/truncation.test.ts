@@ -18,7 +18,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { defaultSuitePath, loadSuite, runSuite } from "../src/index.js";
+import { defaultSuitePath, loadSuite, runSuite, toHistoryEntry } from "../src/index.js";
 
 const fixturesDir = resolve(dirname(fileURLToPath(import.meta.url)), "fixtures/responses");
 const suite = loadSuite(defaultSuitePath());
@@ -314,5 +314,123 @@ describe("cache reporting", () => {
     expect(
       events.every((e) => (e as { cacheReadTokens?: number; }).cacheReadTokens === 500),
     ).toBe(true);
+  });
+});
+
+/**
+ * A score that explains itself (docs/specs/eval-diagnosis.spec.md).
+ *
+ * The first repeat=5 baseline produced a mean it could defend
+ * statistically and not explain mechanically: six warnings costing 0.30
+ * on every university-enrollment run, with nothing saying which six,
+ * and a one-in-five collapse owning 76% of the suite's noise whose
+ * payload had already been discarded.
+ */
+describe("naming the warnings", () => {
+  it("tallies them by rule across the run", async () => {
+    const report = await runSuite(suite, fixtureClient(), TRAIN);
+
+    // The answer keys are clean, which is what makes the live warnings
+    // addressable rather than a floor -- so an empty tally here is the
+    // assertion, not an absent one.
+    expect(report.warningsByRule).toEqual({});
+  });
+
+  it("reaches the history row, because warnings are score-constitutive", async () => {
+    // Distinct from `tokens`, which needed a cost argument because
+    // caching is score-neutral. These are ~80% of what a run loses, so
+    // a row without them cannot say why a mean moved.
+    const report = await runSuite(suite, fixtureClient(), TRAIN);
+    const entry = toHistoryEntry(report, "2026-08-22T00:00:00Z");
+
+    // One conformance correction, which is exactly the 0.02 between
+    // this answer key's pinned 0.98 and a clean 1.0. That figure has
+    // been asserted since the scorer existed without anything saying
+    // where it came from; the field is what says it.
+    expect(entry.cases[0]!.penalties).toEqual({
+      corrections: 1,
+      errors: 0,
+      warnings: 0,
+    });
+  });
+});
+
+describe("keeping what is worth reading", () => {
+  /** One case, where the second sample scores lower than the others. */
+  function varyingClient() {
+    const inner = fixtureClient();
+    let call = 0;
+    return {
+      provider: "test",
+      model: undefined,
+      complete: async (request: CompletionRequest) => {
+        call++;
+        const res = await inner.complete(request);
+        if (call !== 2) return res;
+        // Strips the constraints: still parses, scores lower. A
+        // degraded sample rather than a broken one, which is the case
+        // a threshold cannot see.
+        const parsed = JSON.parse(res.content) as Record<string, unknown>;
+        parsed["inferred_constraints"] = [];
+        return { ...res, content: JSON.stringify(parsed) };
+      },
+    };
+  }
+
+  const oneCase = () => ({ ...suite, cases: suite.cases.slice(0, 1) });
+
+  it("keeps the worst sample even when it never collapsed", async () => {
+    // The miss this replaces: capture was tied to the collapse floor,
+    // and the dev split's most diagnosable run scored 0.327 against a
+    // floor of 0.30 -- no collapse, nothing kept, while its sibling on
+    // the same transcript scored 0.950.
+    const report = await runSuite(oneCase(), varyingClient(), { repeat: 3 });
+    const runs = report.cases[0]!.runs;
+    const scores = runs.map((r) => r.score!.score);
+
+    expect(Math.min(...scores)).toBeLessThan(Math.max(...scores));
+    const worst = scores.indexOf(Math.min(...scores));
+    expect(runs[worst]!.payload).toBeDefined();
+  });
+
+  it("keeps the best one too, because diagnosis is comparative", async () => {
+    // One payload cannot answer what the good run did that the bad one
+    // did not.
+    const report = await runSuite(oneCase(), varyingClient(), { repeat: 3 });
+    const runs = report.cases[0]!.runs;
+    const scores = runs.map((r) => r.score!.score);
+    const best = scores.indexOf(Math.max(...scores));
+
+    expect(runs[best]!.payload).toBeDefined();
+  });
+
+  it("drops the samples between them, so the cost stays bounded", async () => {
+    // Two per case, not two per run: `repeat` must not decide how much
+    // is held in memory.
+    const report = await runSuite(oneCase(), varyingClient(), { repeat: 3 });
+    const kept = report.cases[0]!.runs.filter((r) => r.payload !== undefined);
+
+    expect(kept).toHaveLength(2);
+  });
+
+  it("keeps at most two per case however many samples were taken", async () => {
+    const report = await runSuite(suite, fixtureClient(), { ...TRAIN, repeat: 5 });
+
+    for (const c of report.cases) {
+      expect(c.runs.filter((r) => r.payload !== undefined).length).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("keeps an unscorable payload, which is the only account of why", async () => {
+    const client = {
+      provider: "test",
+      model: undefined,
+      complete: () => Promise.resolve({ content: "{not json" }),
+    };
+    const report = await runSuite(suite, client, TRAIN);
+    const run = report.cases[0]!.runs[0]!;
+
+    expect(run.payload).toBe("{not json");
+    expect(run.error).toBeDefined();
   });
 });

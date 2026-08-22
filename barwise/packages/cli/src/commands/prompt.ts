@@ -29,8 +29,8 @@ import {
   toHistoryEntry,
 } from "@barwise/promptlab";
 import type { Command } from "commander";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { describeProvenance, resolveProvenance } from "../workspace/provenance.js";
 
 interface ProviderOpts {
@@ -80,6 +80,11 @@ function registerEval(promptCmd: Command, version: string): void {
         + " from its transcript length.",
     )
     .option(
+      "--save-payloads <dir>",
+      "Write the payload of any collapsed or unscorable run to this directory,"
+        + " so a rare failure leaves something to read.",
+    )
+    .option(
       "--context-window <n>",
       "Context window in tokens (ollama only). Omitted, one is derived per"
         + " call; set it when the machine cannot afford the derived size.",
@@ -103,6 +108,7 @@ function registerEval(promptCmd: Command, version: string): void {
           split?: string;
           maxTokens?: string;
           contextWindow?: string;
+          savePayloads?: string;
           format: string;
           verbose?: boolean;
           history: boolean;
@@ -222,6 +228,18 @@ function registerEval(promptCmd: Command, version: string): void {
             process.stdout.write(JSON.stringify(report, null, 2) + "\n");
           } else {
             process.stdout.write(renderReport(report));
+          }
+
+          // Written before the history decision: a collapse is the run
+          // most worth keeping and the least likely to be recorded,
+          // since an incomplete sweep is refused.
+          if (opts.savePayloads !== undefined) {
+            const written = savePayloads(report, resolve(opts.savePayloads));
+            process.stderr.write(
+              written === 0
+                ? `No collapsed or unscorable runs, so no payloads were written.\n`
+                : `Wrote ${written} payload(s) to ${resolve(opts.savePayloads)}.\n`,
+            );
           }
 
           if (opts.history) {
@@ -430,6 +448,28 @@ function renderPenalties(c: SuiteReport["cases"][number]): string {
   return parts.length > 0 ? `  [${parts.join(" ")}]` : "";
 }
 
+/**
+ * Write the payloads the runner kept -- the collapsed and unscorable
+ * runs -- one file per run, named for the case and sample it came from.
+ *
+ * Only those runs carry a payload at all: keeping thirty-five to
+ * explain the one that needs explaining is how a diagnostic becomes
+ * clutter. A collapse that happens one run in five is exactly the event
+ * that cannot be reasoned about from its score.
+ */
+function savePayloads(report: SuiteReport, dir: string): number {
+  let written = 0;
+  for (const c of report.cases) {
+    c.runs.forEach((run, index) => {
+      if (run.payload === undefined) return;
+      if (written === 0) mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, `${c.caseId}-run${index + 1}.json`), run.payload);
+      written++;
+    });
+  }
+  return written;
+}
+
 /** Requested runs, which is what the cache warning counts against. */
 function totalCalls(report: SuiteReport): number {
   return report.repeat * report.cases.length;
@@ -507,6 +547,16 @@ function renderReport(report: SuiteReport): string {
   );
   // On its own line under the suite figure: it says nothing about the
   // score, only about what the run cost to produce.
+  // Which rule to attack. The count alone said a run lost 0.30 without
+  // saying to what, and the answer keys produce no warnings at all --
+  // so this is addressable cost, not a floor.
+  const warned = Object.entries(report.warningsByRule ?? {})
+    .sort((a, b) => b[1] - a[1]);
+  if (warned.length > 0) {
+    lines.push(
+      `  warnings: ${warned.map(([id, n]) => `${id} x${n}`).join(", ")}`,
+    );
+  }
   if (report.cache !== undefined) {
     lines.push(
       `  cache: ${report.cache.readTokens} read, ${report.cache.writeTokens} written`

@@ -87,12 +87,37 @@ export interface HistoryEntry {
    * present so a later reader can tell a full sample from a partial one
    * rather than inferring it (barwise-806).
    */
+  /**
+   * Which validation rules warned across the run, and how often.
+   *
+   * Unlike `tokens`, which needed an argument because caching is
+   * score-neutral, this needs none: warnings are score-constitutive and
+   * were roughly 80% of everything lost on the first baseline. A row
+   * carrying a mean without them cannot answer whether the score moved
+   * because warnings fell or because a rubric check began passing --
+   * different achievements that one number conflates.
+   *
+   * Suite level, not per case: seven rules across seven cases is
+   * forty-nine numbers answering a question nobody asks per case.
+   */
+  readonly warningsByRule?: Readonly<Record<string, number>>;
   readonly cases: readonly {
     caseId: string;
     mean: number;
     worst: number;
     samples?: number;
     sd?: number;
+    /**
+     * What the case paid, averaged over its scored samples. These
+     * decompose the mean beside it: a case can lose to a failed rubric
+     * check, to conformance corrections, or to warnings, and the three
+     * call for entirely different work.
+     */
+    penalties?: {
+      corrections: number;
+      errors: number;
+      warnings: number;
+    };
   }[];
 }
 
@@ -122,12 +147,16 @@ export function toHistoryEntry(
     ...(report.dispersion.standardError !== undefined
       ? { standardError: report.dispersion.standardError }
       : {}),
+    ...(Object.keys(report.warningsByRule ?? {}).length > 0
+      ? { warningsByRule: report.warningsByRule }
+      : {}),
     cases: report.cases.map((c) => ({
       caseId: c.caseId,
       mean: c.mean,
       worst: c.worst,
       samples: c.samples,
       ...(c.sd !== undefined ? { sd: c.sd } : {}),
+      ...(penaltiesOf(c) ?? {}),
     })),
   };
 }
@@ -205,6 +234,27 @@ function tokenTotals(
       ...(report.cache !== undefined
         ? { cacheRead: report.cache.readTokens, cacheWrite: report.cache.writeTokens }
         : {}),
+    },
+  };
+}
+
+/**
+ * A case's average penalty counts, or nothing when it produced no
+ * scored sample. Averaged rather than totalled so the figures sit on
+ * the same scale as the mean they explain, whatever `repeat` was.
+ */
+function penaltiesOf(
+  c: SuiteReport["cases"][number],
+): { penalties: { corrections: number; errors: number; warnings: number; }; } | undefined {
+  const scored = c.runs.filter((r) => r.score !== undefined).map((r) => r.score!);
+  if (scored.length === 0) return undefined;
+  const mean = (pick: (s: (typeof scored)[number]) => number): number =>
+    scored.reduce((sum, s) => sum + pick(s), 0) / scored.length;
+  return {
+    penalties: {
+      corrections: mean((s) => s.conformanceCorrections),
+      errors: mean((s) => s.validationErrors),
+      warnings: mean((s) => s.validationWarnings),
     },
   };
 }

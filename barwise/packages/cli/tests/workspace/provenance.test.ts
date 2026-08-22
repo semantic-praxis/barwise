@@ -64,6 +64,36 @@ describe("resolveProvenance", () => {
     expect(resolveProvenance("1.7.0", dir)).toEqual({ version: "1.7.0" });
   });
 
+  it("does not call an untracked file a modification", () => {
+    // `git status --porcelain` lists untracked files as `??` entries, so
+    // the bare form marked every run dirty over a scratch note. Worse,
+    // `history.jsonl` is untracked itself: the first recorded run wrote
+    // the file that made every later run report an unreproducible
+    // commit. Dirty must mean the tracked source moved.
+    const dir = mkdtempSync(join(tmpdir(), "barwise-prov-"));
+    try {
+      execGit(dir, ["init", "-q"]);
+      mkdirSync(join(dir, "barwise"));
+      writeFileSync(join(dir, "barwise", "package.json"), JSON.stringify({ name: "barwise" }));
+      execGit(dir, ["add", "-A"]);
+      execGit(dir, ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init"]);
+    } catch {
+      return; // No usable git here; the point is moot.
+    }
+
+    expect(resolveProvenance("1.7.0", dir).dirty).toBe(false);
+
+    // The exact shape that was misreporting: an unversioned history file
+    // sitting beside the suite it records.
+    writeFileSync(join(dir, "history.jsonl"), "{}\n");
+    expect(resolveProvenance("1.7.0", dir).dirty).toBe(false);
+
+    // A tracked file that actually changed still counts, which is the
+    // half of the behaviour worth keeping.
+    writeFileSync(join(dir, "barwise", "package.json"), JSON.stringify({ name: "barwise", x: 1 }));
+    expect(resolveProvenance("1.7.0", dir).dirty).toBe(true);
+  });
+
   it("survives a directory that does not exist", () => {
     expect(resolveProvenance("1.7.0", join(tmpdir(), "barwise-does-not-exist-9137")))
       .toEqual({ version: "1.7.0" });

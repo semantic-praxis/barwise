@@ -51,7 +51,19 @@ export function resolveProvenance(version: string, fromDir?: string): BuildProve
   const commit = git(root, ["rev-parse", "HEAD"]);
   if (commit === undefined) return { version };
 
-  const status = git(root, ["status", "--porcelain"]);
+  // `--untracked-files=no` matters more than it looks. Bare
+  // `--porcelain` lists untracked files as `??` entries, so a scratch
+  // note or an editor swap file marked every run modified -- and worse,
+  // `history.jsonl` is itself untracked, so the first recorded run
+  // created the file that made every later run report dirty. The flag
+  // exists to say the *tracked source* differed from the commit, which
+  // is what decides whether that commit reproduces the run.
+  //
+  // Untracked files are not entirely irrelevant -- an unversioned
+  // variant under `--artifacts` really would change what ran -- but
+  // `promptHash` catches exactly that, by fingerprinting the prompt
+  // actually sent rather than guessing from the working tree.
+  const status = git(root, ["status", "--porcelain", "--untracked-files=no"]);
   return {
     version,
     commit,
