@@ -183,14 +183,21 @@ export interface CaseRun {
    */
   readonly maxTokens?: number;
   /**
-   * The raw payload, kept only when the run cannot be explained from
-   * its score: below the suite's collapse floor, or unscorable.
+   * The raw payload, kept for the runs worth reading: each case's
+   * best and worst scored sample, and every unscorable one.
    *
-   * A one-in-five collapse owning most of a suite's noise is exactly
-   * the event worth evidence of, and it was being scored and dropped.
-   * Kept for the rare case by construction rather than for every run --
-   * thirty-five payloads to explain the one that needs explaining is
-   * how a diagnostic becomes clutter (docs/specs/eval-diagnosis.spec.md).
+   * Tied to the collapse floor at first, which was wrong. The dev
+   * split's most diagnosable run scored 0.327 against a floor of 0.30
+   * -- `ok=5/5`, no collapse, and nothing kept -- while its sibling
+   * scored 0.950 on the same transcript. The interesting failure is
+   * not "below a threshold", it is "far from the others", and a
+   * threshold cannot see that.
+   *
+   * Best as well as worst because diagnosis is comparative: the
+   * question is what the 0.950 run did that the 0.327 run did not, and
+   * one payload cannot answer it. Two per case, not two per run, so the
+   * cost stays bounded by the suite rather than by `repeat`
+   * (docs/specs/eval-diagnosis.spec.md).
    */
   readonly payload?: string;
   /** HTTP status behind a failure, where the SDK reported one. */
@@ -434,14 +441,11 @@ export async function runSuite(
     }
 
     try {
+      // Carried through scoring and pruned to the extremes once the
+      // case finishes: which run is worst is not knowable until the
+      // others have run.
       const score = scoreExtraction(response.content, loadedCase, suite.weights);
-      // Kept only when the number cannot speak for itself.
-      const collapsed = suite.collapseFloor !== undefined && score.score < suite.collapseFloor;
-      return {
-        ...said,
-        score,
-        ...(collapsed ? { payload: response.content } : {}),
-      };
+      return { ...said, score, payload: response.content };
     } catch (err) {
       // The model answered in full; the answer was unusable. A real
       // zero -- and the payload is the only way to find out why.
@@ -504,7 +508,7 @@ export async function runSuite(
     const qualitySd = atFloor ? sampleSd(atFloor.quality) : undefined;
     cases.push({
       caseId: loadedCase.evalCase.id,
-      runs,
+      runs: keepDiagnosticPayloads(runs),
       mean: scores.length > 0 ? mean(scores) : 0,
       worst: scores.length > 0 ? Math.min(...scores) : 0,
       samples: scores.length,
@@ -600,4 +604,39 @@ function tallyWarnings(cases: readonly CaseSummary[]): Record<string, number> {
     }
   }
   return total;
+}
+
+/**
+ * Drop every payload except the ones worth reading: the case's best and
+ * worst scored samples, and any run that could not be scored at all.
+ *
+ * Pruning here rather than at capture time because which run is worst
+ * is not knowable until the rest have run. The alternative -- a fixed
+ * threshold -- was tried and missed the case it was built for: a run
+ * scoring 0.327 against a 0.30 floor is not a collapse and is exactly
+ * what needs explaining when its sibling scored 0.950.
+ */
+function keepDiagnosticPayloads(runs: readonly CaseRun[]): CaseRun[] {
+  const scored = runs
+    .map((run, index) => ({ run, index }))
+    .filter((r) => r.run.score !== undefined && r.run.error === undefined);
+
+  const keep = new Set<number>();
+  if (scored.length > 0) {
+    const by = (pick: (a: number, b: number) => boolean) =>
+      scored.reduce((best, r) => pick(r.run.score!.score, best.run.score!.score) ? r : best);
+    keep.add(by((a, b) => a < b).index);
+    keep.add(by((a, b) => a > b).index);
+  }
+  // An unscorable run keeps its payload regardless: it has no score to
+  // rank, and the payload is the only account of why it failed.
+  runs.forEach((run, index) => {
+    if (run.score !== undefined && run.error !== undefined) keep.add(index);
+  });
+
+  return runs.map((run, index) => {
+    if (run.payload === undefined || keep.has(index)) return run;
+    const { payload: _dropped, ...rest } = run;
+    return rest;
+  });
 }

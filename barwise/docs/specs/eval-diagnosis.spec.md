@@ -55,15 +55,15 @@ In scope:
 - The report shall name them, so a reader can see which rule to attack.
 - A history row shall carry each case's penalty counts and the suite's
   warnings by rule.
-- A run whose payload could not be scored, or which fell below the
-  collapse floor, shall keep that payload so it can be examined.
+- Each case shall keep the payload of its best and worst scored sample,
+  and of any sample that could not be scored at all.
 - The operator shall be able to write kept payloads to a directory.
 
 Out of scope, deferred and named:
 
 - **Keeping every payload.** Thirty-five files per sweep to explain the
-  one or two that need explaining. Sub-floor and unscorable runs are the
-  ones that cannot be reasoned about from their score alone.
+  one or two that need explaining. Two per case bounds the cost by the
+  suite rather than by `repeat`.
 - **Automatic writes to a default location.** An eval run should not
   surprise anyone with files. The flag is explicit.
 - **Diffing a collapse against a healthy run.** Obvious next step once
@@ -109,11 +109,19 @@ does not warn, the field shall be empty rather than absent-and-ambiguous.
 
 ### 2. Keep what cannot be explained
 
-`CaseRun.payload`, populated for a sub-floor or unscorable run, plus
-`--save-payloads <dir>`. Acceptance: when a run falls below the collapse
-floor, its payload shall be retained; when it scores above, it shall not;
-and when the operator names a directory, the retained payloads shall be
-written there.
+`CaseRun.payload`, kept for each case's extremes and for unscorable
+runs, plus `--save-payloads <dir>`. Acceptance: when a case is sampled
+more than twice, the samples between its best and worst shall not retain
+a payload; when the operator names a directory, the retained payloads
+shall be written there.
+
+**Corrected after the first dev run.** Capture was first tied to the
+collapse floor, and the sweep it was built for defeated it:
+`subscription-billing` ranged 0.327 to 0.950 on the same transcript,
+`ok=5/5`, no collapse, nothing kept. The interesting failure is not
+"below a threshold" but "far from its siblings", which a threshold
+cannot see. Best as well as worst because the question is what the good
+run did that the bad one did not, and one payload cannot answer it.
 
 ### 3. Record the decomposition
 
@@ -124,8 +132,9 @@ say why the mean is what it is.
 ## Risks and testing
 
 - **Memory.** Payloads are tens of kilobytes and a sweep is dozens of
-  runs. Keeping only sub-floor and unscorable ones bounds this to the
-  rare case by construction; keeping all of them would not.
+  runs. Two per case bounds this by the suite, so `repeat` cannot grow
+  it -- asserted directly, since the pruning happens after scoring and a
+  regression would be invisible until a long sweep.
 - **A tally that hides a rule firing once.** The point is to find the
   dominant rule, but a rule firing once is still the difference between
   a passing and failing case elsewhere. Every rule that fired is listed,

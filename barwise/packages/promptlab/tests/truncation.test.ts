@@ -355,27 +355,73 @@ describe("naming the warnings", () => {
   });
 });
 
-describe("keeping what cannot be explained", () => {
-  it("keeps the payload of a run below the collapse floor", async () => {
-    // A floor above every achievable score stands in for a collapse.
-    const report = await runSuite(
-      { ...suite, collapseFloor: 0.999 },
-      fixtureClient(),
-      TRAIN,
-    );
+describe("keeping what is worth reading", () => {
+  /** One case, where the second sample scores lower than the others. */
+  function varyingClient() {
+    const inner = fixtureClient();
+    let call = 0;
+    return {
+      provider: "test",
+      model: undefined,
+      complete: async (request: CompletionRequest) => {
+        call++;
+        const res = await inner.complete(request);
+        if (call !== 2) return res;
+        // Strips the constraints: still parses, scores lower. A
+        // degraded sample rather than a broken one, which is the case
+        // a threshold cannot see.
+        const parsed = JSON.parse(res.content) as Record<string, unknown>;
+        parsed["inferred_constraints"] = [];
+        return { ...res, content: JSON.stringify(parsed) };
+      },
+    };
+  }
 
-    expect(report.cases.every((c) => typeof c.runs[0]!.payload === "string")).toBe(true);
+  const oneCase = () => ({ ...suite, cases: suite.cases.slice(0, 1) });
+
+  it("keeps the worst sample even when it never collapsed", async () => {
+    // The miss this replaces: capture was tied to the collapse floor,
+    // and the dev split's most diagnosable run scored 0.327 against a
+    // floor of 0.30 -- no collapse, nothing kept, while its sibling on
+    // the same transcript scored 0.950.
+    const report = await runSuite(oneCase(), varyingClient(), { repeat: 3 });
+    const runs = report.cases[0]!.runs;
+    const scores = runs.map((r) => r.score!.score);
+
+    expect(Math.min(...scores)).toBeLessThan(Math.max(...scores));
+    const worst = scores.indexOf(Math.min(...scores));
+    expect(runs[worst]!.payload).toBeDefined();
   });
 
-  it("does not keep the payload of a healthy run", async () => {
-    // Thirty-five payloads to explain the one that needs explaining is
-    // how a diagnostic becomes clutter.
-    const report = await runSuite(suite, fixtureClient(), TRAIN);
+  it("keeps the best one too, because diagnosis is comparative", async () => {
+    // One payload cannot answer what the good run did that the bad one
+    // did not.
+    const report = await runSuite(oneCase(), varyingClient(), { repeat: 3 });
+    const runs = report.cases[0]!.runs;
+    const scores = runs.map((r) => r.score!.score);
+    const best = scores.indexOf(Math.max(...scores));
 
-    expect(report.cases.every((c) => c.runs[0]!.payload === undefined)).toBe(true);
+    expect(runs[best]!.payload).toBeDefined();
   });
 
-  it("keeps the payload of an unscorable run, which is the only clue to why", async () => {
+  it("drops the samples between them, so the cost stays bounded", async () => {
+    // Two per case, not two per run: `repeat` must not decide how much
+    // is held in memory.
+    const report = await runSuite(oneCase(), varyingClient(), { repeat: 3 });
+    const kept = report.cases[0]!.runs.filter((r) => r.payload !== undefined);
+
+    expect(kept).toHaveLength(2);
+  });
+
+  it("keeps at most two per case however many samples were taken", async () => {
+    const report = await runSuite(suite, fixtureClient(), { ...TRAIN, repeat: 5 });
+
+    for (const c of report.cases) {
+      expect(c.runs.filter((r) => r.payload !== undefined).length).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("keeps an unscorable payload, which is the only account of why", async () => {
     const client = {
       provider: "test",
       model: undefined,
