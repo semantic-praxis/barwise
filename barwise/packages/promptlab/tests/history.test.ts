@@ -190,3 +190,105 @@ describe("history", () => {
     expect(entry.repeat).toBe(2);
   });
 });
+
+describe("token totals in a history row", () => {
+  it("records the four counts, so cost stays reconstructable later", () => {
+    // These do not bear on comparability -- caching is score-neutral.
+    // They are here because cost is a longitudinal question and no
+    // price table belongs in this package.
+    const entry = toHistoryEntry(
+      {
+        suiteVersion: "1.0.0",
+        artifactVersion: "1.0.0",
+        promptHash: "abc",
+        repeat: 2,
+        cases: [{
+          caseId: "c",
+          runs: [
+            { promptTokens: 100, outputTokens: 50 },
+            { promptTokens: 120, outputTokens: 60 },
+          ],
+          mean: 1,
+          worst: 1,
+          samples: 2,
+          failures: 0,
+          truncations: 0,
+        }],
+        mean: 1,
+        worst: 1,
+        failures: 0,
+        truncations: 0,
+        complete: true,
+        cache: { requested: true, readTokens: 900, writeTokens: 300 },
+        dispersion: {},
+      },
+      "2026-08-22T00:00:00Z",
+    );
+
+    expect(entry.tokens).toEqual({
+      prompt: 220,
+      completion: 110,
+      cacheRead: 900,
+      cacheWrite: 300,
+    });
+  });
+
+  it("omits the cache figures when no provider reported them", () => {
+    // A row from a provider with no cache must not claim it read zero.
+    const entry = toHistoryEntry(
+      {
+        suiteVersion: "1.0.0",
+        artifactVersion: "1.0.0",
+        promptHash: "abc",
+        repeat: 1,
+        cases: [{
+          caseId: "c",
+          runs: [{ promptTokens: 10, outputTokens: 5 }],
+          mean: 1,
+          worst: 1,
+          samples: 1,
+          failures: 0,
+          truncations: 0,
+        }],
+        mean: 1,
+        worst: 1,
+        failures: 0,
+        truncations: 0,
+        complete: true,
+        dispersion: {},
+      },
+      "2026-08-22T00:00:00Z",
+    );
+
+    expect(entry.tokens).toEqual({ prompt: 10, completion: 5 });
+  });
+
+  it("is absent entirely when no usage was reported at all", () => {
+    const entry = toHistoryEntry(
+      {
+        suiteVersion: "1.0.0",
+        artifactVersion: "1.0.0",
+        promptHash: "abc",
+        repeat: 1,
+        cases: [{
+          caseId: "c",
+          runs: [{}],
+          mean: 1,
+          worst: 1,
+          samples: 1,
+          failures: 0,
+          truncations: 0,
+        }],
+        mean: 1,
+        worst: 1,
+        failures: 0,
+        truncations: 0,
+        complete: true,
+        dispersion: {},
+      },
+      "2026-08-22T00:00:00Z",
+    );
+
+    expect(entry.tokens).toBeUndefined();
+  });
+});

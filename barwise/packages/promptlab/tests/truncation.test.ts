@@ -256,3 +256,62 @@ describe("prompt caching in a sweep", () => {
     expect(client.requests[0]!.cacheUserMessage).toBe(false);
   });
 });
+
+/**
+ * Caching is confirmed, not assumed (docs/specs/cache-reporting.spec.md).
+ *
+ * The failure this reporting exists to catch is silent by construction:
+ * below a model's minimum cacheable length nothing errors, the run
+ * succeeds, and every call pays the 1.25x write premium for a read that
+ * never comes -- costing more than not caching at all.
+ */
+describe("cache reporting", () => {
+  const cached = (read: number, write: number) => (r: CompletionResponse) => ({
+    ...r,
+    usage: { ...r.usage, cacheReadTokens: read, cacheWriteTokens: write },
+  });
+
+  it("totals what the provider reported across the run", async () => {
+    const report = await runSuite(suite, fixtureClient(cached(500, 20)), TRAIN);
+
+    expect(report.cache).toEqual({ requested: true, readTokens: 3500, writeTokens: 140 });
+  });
+
+  it("says nothing at all when no provider reported on caching", async () => {
+    // Ollama has no prompt cache. Absent and zero are different facts,
+    // and only zero is a fault worth naming -- reporting 0 here would
+    // claim a measurement nobody made.
+    const report = await runSuite(suite, fixtureClient(), TRAIN);
+
+    expect(report.cache).toBeUndefined();
+  });
+
+  it("reports zero reads rather than hiding them", async () => {
+    // The whole point: a provider that cached nothing must say so.
+    const report = await runSuite(suite, fixtureClient(cached(0, 5780)), TRAIN);
+
+    expect(report.cache?.readTokens).toBe(0);
+    expect(report.cache?.requested).toBe(true);
+  });
+
+  it("records that caching was never requested, for a single-call run", async () => {
+    // A one-call run deliberately asks for nothing (barwise-822), so a
+    // zero-read warning against it would be a false alarm.
+    const oneCase = { ...suite, cases: suite.cases.slice(0, 1) };
+    const report = await runSuite(oneCase, fixtureClient(cached(0, 0)), { repeat: 1 });
+
+    expect(report.cache?.requested).toBe(false);
+  });
+
+  it("carries reads into the live progress event", async () => {
+    const events: unknown[] = [];
+    await runSuite(suite, fixtureClient(cached(500, 20)), {
+      ...TRAIN,
+      onProgress: (e) => events.push(e),
+    });
+
+    expect(
+      events.every((e) => (e as { cacheReadTokens?: number; }).cacheReadTokens === 500),
+    ).toBe(true);
+  });
+});

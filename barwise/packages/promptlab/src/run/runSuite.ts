@@ -79,6 +79,12 @@ export type RunProgress =
     /** Tokens generated, against the ceiling this call was given. */
     readonly outputTokens?: number;
     readonly maxTokens?: number;
+    /**
+     * Input tokens served from cache. Shown live because a sweep that
+     * is not caching should be stopped in its first minute, not
+     * discovered on the bill.
+     */
+    readonly cacheReadTokens?: number;
     /** Why a run failed, or why a payload could not be scored. */
     readonly error?: string;
   }
@@ -155,9 +161,20 @@ export interface CaseRun {
    * documentation is written against.
    */
   readonly stopReason?: string;
-  /** Tokens the provider billed for this call, where it reported them. */
+  /**
+   * Tokens the provider billed for this call, where it reported them.
+   *
+   * `promptTokens` is the provider's own input count; on Anthropic that
+   * excludes anything served from cache, so it is not the prompt size
+   * once caching is on. Read it beside the two cache counters, never
+   * alone.
+   */
   readonly promptTokens?: number;
   readonly outputTokens?: number;
+  /** Input tokens served from the prompt cache, where reported. */
+  readonly cacheReadTokens?: number;
+  /** Input tokens written to the cache, where reported. */
+  readonly cacheWriteTokens?: number;
   /**
    * The ceiling this call was given. Meaningless alone and the whole
    * story next to `outputTokens`: equal values are a truncation, and a
@@ -235,6 +252,23 @@ export interface SuiteReport {
   readonly failures: number;
   /** The subset of those cut off at the output ceiling. */
   readonly truncations: number;
+  /**
+   * What the prompt cache did over the run, when the provider reported
+   * anything at all.
+   *
+   * Absent means no provider said anything about caching -- Ollama has
+   * no cache, and that is not a fault. Present with `readTokens: 0`
+   * across a multi-call run *is* a fault: the prefix either fell below
+   * the model's minimum cacheable length or changed between calls, and
+   * every call paid the write premium for a read that never came
+   * (docs/specs/cache-reporting.spec.md).
+   */
+  readonly cache?: {
+    /** Whether the run asked for its prompt prefix to be cached. */
+    readonly requested: boolean;
+    readonly readTokens: number;
+    readonly writeTokens: number;
+  };
   /** True when every requested run produced a score. */
   readonly complete: boolean;
   /** Which half ran, when one was selected. */
@@ -356,6 +390,12 @@ export async function runSuite(
       ...(response.usage?.completionTokens !== undefined
         ? { outputTokens: response.usage.completionTokens }
         : {}),
+      ...(response.usage?.cacheReadTokens !== undefined
+        ? { cacheReadTokens: response.usage.cacheReadTokens }
+        : {}),
+      ...(response.usage?.cacheWriteTokens !== undefined
+        ? { cacheWriteTokens: response.usage.cacheWriteTokens }
+        : {}),
     };
 
     if (response.truncated === true) {
@@ -411,6 +451,9 @@ export async function runSuite(
         ...(run.latencyMs !== undefined ? { latencyMs: run.latencyMs } : {}),
         ...(run.outputTokens !== undefined ? { outputTokens: run.outputTokens } : {}),
         ...(run.maxTokens !== undefined ? { maxTokens: run.maxTokens } : {}),
+        ...(run.cacheReadTokens !== undefined
+          ? { cacheReadTokens: run.cacheReadTokens }
+          : {}),
         ...(run.error !== undefined ? { error: run.error } : {}),
       });
     }
@@ -457,6 +500,7 @@ export async function runSuite(
     worst: scored.length > 0 ? Math.min(...scored.map((c) => c.worst)) : 0,
     failures,
     truncations: cases.reduce((sum, c) => sum + c.truncations, 0),
+    ...(cacheTotals(cases, cacheSystemPrompt) ?? {}),
     complete: failures === 0,
     ...(selected !== undefined ? { split: selected } : {}),
     dispersion: dispersionOf(cases),
@@ -486,4 +530,30 @@ function unscorable(caseId: string): CaseScore {
 
 function mean(values: readonly number[]): number {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
+}
+
+/**
+ * Cache totals across the run, or nothing when no provider reported on
+ * caching at all.
+ *
+ * The distinction is the point. A provider with no cache says nothing
+ * and gets no row; a provider that cached nothing says zero and gets
+ * one, because zero across a repeated prefix is a fault worth naming.
+ */
+function cacheTotals(
+  cases: readonly CaseSummary[],
+  requested: boolean,
+): { cache: NonNullable<SuiteReport["cache"]>; } | undefined {
+  const runs = cases.flatMap((c) => c.runs);
+  const reported = runs.some((r) =>
+    r.cacheReadTokens !== undefined || r.cacheWriteTokens !== undefined
+  );
+  if (!reported) return undefined;
+  return {
+    cache: {
+      requested,
+      readTokens: runs.reduce((sum, r) => sum + (r.cacheReadTokens ?? 0), 0),
+      writeTokens: runs.reduce((sum, r) => sum + (r.cacheWriteTokens ?? 0), 0),
+    },
+  };
 }

@@ -82,6 +82,7 @@ export class OpenAILlmClient implements LlmClient {
         ? {
           promptTokens: response.usage.prompt_tokens,
           completionTokens: response.usage.completion_tokens,
+          ...describeCacheUsage(response.usage),
         }
         : undefined,
       latencyMs,
@@ -119,10 +120,32 @@ export class OpenAILlmClient implements LlmClient {
         ? {
           promptTokens: response.usage.prompt_tokens,
           completionTokens: response.usage.completion_tokens,
+          ...describeCacheUsage(response.usage),
         }
         : undefined,
       latencyMs,
       ...describeOpenAiStop(response.choices[0]?.finish_reason),
     };
   }
+}
+
+/**
+ * OpenAI's cached-input count, where it reports one.
+ *
+ * Only a read counter exists: caching is automatic and server-side, so
+ * there is no client-controlled write to bill or report. A model or
+ * account without caching omits the field, and absent stays absent
+ * rather than becoming zero -- "cached nothing" and "does not cache"
+ * are different facts.
+ *
+ * Note this provider's `prompt_tokens` INCLUDES the cached portion,
+ * unlike Anthropic's `input_tokens`, which excludes it. The two are not
+ * summed anywhere for that reason; each is reported as the provider
+ * meant it.
+ */
+function describeCacheUsage(
+  usage: { prompt_tokens_details?: { cached_tokens?: number | null; } | null; },
+): { cacheReadTokens?: number; } {
+  const cached = usage.prompt_tokens_details?.cached_tokens;
+  return typeof cached === "number" ? { cacheReadTokens: cached } : {};
 }

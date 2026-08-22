@@ -201,6 +201,20 @@ function registerEval(promptCmd: Command, version: string): void {
             );
           }
 
+          // Caching fails silently by construction: below a model's
+          // minimum cacheable length nothing errors, the run succeeds,
+          // and the only symptom is a bill. Worse than not caching --
+          // every call pays the 1.25x write for a read that never comes.
+          const cache = report.cache;
+          if (cache?.requested === true && cache.readTokens === 0 && totalCalls(report) > 1) {
+            process.stderr.write(
+              `WARNING: caching was requested but nothing was read back across`
+                + ` ${totalCalls(report)} calls, so every call paid the write premium`
+                + ` for nothing. Either the prompt prefix fell below the model's`
+                + ` minimum cacheable length, or it changed between calls.\n`,
+            );
+          }
+
           // Print before recording. The run has already been paid for,
           // and a refused history write must not also cost the operator
           // the scores they just bought.
@@ -369,6 +383,10 @@ function renderProgress(e: RunProgress): string {
   const tokens = e.outputTokens === undefined
     ? ""
     : `  ${e.outputTokens}${e.maxTokens === undefined ? "" : `/${e.maxTokens}`} out`;
+  // A sweep that is not caching should be stopped in its first minute,
+  // not discovered on the bill. Zero is printed rather than hidden --
+  // that is the number worth seeing.
+  const cached = e.cacheReadTokens === undefined ? "" : `  ${e.cacheReadTokens} cached`;
 
   if (e.truncated === true) {
     return `${position} ${e.caseId.padEnd(22)} ${run}  TRUNCATED, excluded`
@@ -381,8 +399,13 @@ function renderProgress(e: RunProgress): string {
   const score = e.score === undefined ? "  ----" : e.score.toFixed(3).padStart(6);
   const collapse = e.collapsed === true ? "  COLLAPSE" : "";
   const unscorable = e.score !== undefined && e.error !== undefined ? "  unscorable" : "";
-  return `${position} ${e.caseId.padEnd(22)} ${run} ${score}${took}${tokens}${tries}`
+  return `${position} ${e.caseId.padEnd(22)} ${run} ${score}${took}${tokens}${cached}${tries}`
     + `${collapse}${unscorable}\n`;
+}
+
+/** Requested runs, which is what the cache warning counts against. */
+function totalCalls(report: SuiteReport): number {
+  return report.repeat * report.cases.length;
 }
 
 function renderReport(report: SuiteReport): string {
@@ -450,6 +473,14 @@ function renderReport(report: SuiteReport): string {
         report.worst.toFixed(3)
       }  (repeat=${report.repeat}${report.complete ? "" : `, ${report.failures} failed`})`,
   );
+  // On its own line under the suite figure: it says nothing about the
+  // score, only about what the run cost to produce.
+  if (report.cache !== undefined) {
+    lines.push(
+      `  cache: ${report.cache.readTokens} read, ${report.cache.writeTokens} written`
+        + (report.cache.requested ? "" : " (not requested)"),
+    );
+  }
   lines.push(...renderResolution(report));
   return lines.join("\n") + "\n";
 }

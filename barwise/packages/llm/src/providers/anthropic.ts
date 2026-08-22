@@ -127,6 +127,7 @@ export class AnthropicLlmClient implements LlmClient {
       usage: {
         promptTokens: response.usage.input_tokens,
         completionTokens: response.usage.output_tokens,
+        ...describeCacheUsage(response.usage),
       },
       latencyMs,
       ...describeAnthropicStop(response.stop_reason),
@@ -179,9 +180,30 @@ export class AnthropicLlmClient implements LlmClient {
       usage: {
         promptTokens: response.usage.input_tokens,
         completionTokens: response.usage.output_tokens,
+        ...describeCacheUsage(response.usage),
       },
       latencyMs,
       ...describeAnthropicStop(response.stop_reason),
     };
   }
+}
+
+/**
+ * The two cache counters, when the SDK reports them.
+ *
+ * Kept out of the response entirely when null rather than reported as
+ * zero: a provider that cached nothing and a provider with no cache are
+ * different facts, and only the first is a fault worth chasing.
+ */
+function describeCacheUsage(
+  usage: { cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null; },
+): { cacheReadTokens?: number; cacheWriteTokens?: number; } {
+  return {
+    ...(typeof usage.cache_read_input_tokens === "number"
+      ? { cacheReadTokens: usage.cache_read_input_tokens }
+      : {}),
+    ...(typeof usage.cache_creation_input_tokens === "number"
+      ? { cacheWriteTokens: usage.cache_creation_input_tokens }
+      : {}),
+  };
 }
