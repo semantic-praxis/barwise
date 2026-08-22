@@ -62,6 +62,27 @@ export interface HistoryEntry {
    */
   readonly standardError?: number;
   /**
+   * Tokens the run consumed, totalled across every call.
+   *
+   * Unlike every other field here, this says nothing about whether two
+   * rows are comparable -- caching is score-neutral, since the model
+   * sees identical tokens either way. It earns its place on a different
+   * ground: cost is a longitudinal question, and these four numbers let
+   * a later reader reconstruct it against whatever price table exists
+   * then, without this package committing to one now.
+   *
+   * `prompt` is the provider's own input count and excludes the cached
+   * portion on Anthropic, so the input a run actually sent is roughly
+   * `prompt + cacheRead + cacheWrite`. Absent on rows written before
+   * this field, and on providers that report no usage.
+   */
+  readonly tokens?: {
+    readonly prompt: number;
+    readonly completion: number;
+    readonly cacheRead?: number;
+    readonly cacheWrite?: number;
+  };
+  /**
    * Runs behind each case's mean. Equal to `repeat` on a healthy run;
    * present so a later reader can tell a full sample from a partial one
    * rather than inferring it (barwise-806).
@@ -95,6 +116,7 @@ export function toHistoryEntry(
     ...(target?.model !== undefined ? { model: target.model } : {}),
     repeat: report.repeat,
     ...(report.split !== undefined ? { split: report.split } : {}),
+    ...(tokenTotals(report) ?? {}),
     mean: report.mean,
     worst: report.worst,
     ...(report.dispersion.standardError !== undefined
@@ -157,4 +179,32 @@ export function readHistory(historyPath: string): HistoryEntry[] {
     .split("\n")
     .filter((line) => line.trim().length > 0)
     .map((line) => JSON.parse(line) as HistoryEntry);
+}
+
+/**
+ * Totals across every call of the run, or nothing when no provider
+ * reported usage at all. Cache figures are folded in only when a
+ * provider reported them, so a row from a provider with no cache does
+ * not claim it read zero.
+ */
+function tokenTotals(
+  report: SuiteReport,
+): { tokens: NonNullable<HistoryEntry["tokens"]>; } | undefined {
+  const runs = report.cases.flatMap((c) => c.runs);
+  const sum = (pick: (r: (typeof runs)[number]) => number | undefined): number =>
+    runs.reduce((total, r) => total + (pick(r) ?? 0), 0);
+
+  const prompt = sum((r) => r.promptTokens);
+  const completion = sum((r) => r.outputTokens);
+  if (prompt === 0 && completion === 0) return undefined;
+
+  return {
+    tokens: {
+      prompt,
+      completion,
+      ...(report.cache !== undefined
+        ? { cacheRead: report.cache.readTokens, cacheWrite: report.cache.writeTokens }
+        : {}),
+    },
+  };
 }

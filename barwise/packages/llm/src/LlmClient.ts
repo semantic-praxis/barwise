@@ -56,8 +56,29 @@ export interface CompletionResponse {
   readonly modelUsed?: string;
   /** Token usage reported by the provider, if available. */
   readonly usage?: {
+    /**
+     * Input tokens processed at full price.
+     *
+     * Read this carefully once caching is in play: it is the **uncached
+     * remainder**, not the size of the prompt. The prompt is
+     * `promptTokens + cacheReadTokens + cacheWriteTokens`, and after a
+     * cache hit the first term is the small one. Cost arithmetic that
+     * uses this field alone under-reports by whatever was cached, which
+     * on the extraction path is most of the input.
+     */
     readonly promptTokens?: number;
     readonly completionTokens?: number;
+    /**
+     * Input tokens served from the prompt cache, billed at about 0.1x.
+     *
+     * Absent when the provider does not report caching at all (Ollama
+     * has no prompt cache). Absent and zero mean different things: zero
+     * is a provider that cached nothing, which on a repeated prefix is
+     * a fault worth chasing; absent is a provider that was never asked.
+     */
+    readonly cacheReadTokens?: number;
+    /** Input tokens written to the cache, billed at about 1.25x. */
+    readonly cacheWriteTokens?: number;
   };
   /** Wall-clock time of the LLM call in milliseconds, if measured. */
   readonly latencyMs?: number;
