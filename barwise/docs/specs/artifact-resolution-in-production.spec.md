@@ -472,6 +472,76 @@ error (barwise-814), then a sized round with the promotion candidates
 settled (barwise-813). Neither is code this workstream can write
 blind.
 
+### Workstream 3, revisited (2026-08-22) -- the instrument was wrong
+
+barwise-814 shipped, so the sized round this note asked for is now
+runnable. Re-grounding before spending on it found three things that
+change what the round should be, and one that changes whether it is
+needed at all.
+
+**The motivating gap is not resolvable, and has shrunk.** The Principle
+section above cites the default at 0.760 against a tuned variant at
+0.948 -- a gap of 0.188. Two later rounds of the same comparison, both
+recorded:
+
+| Round | default | haiku45-2 | gap   | resolvable at 95% |
+| ----- | ------- | --------- | ----- | ----------------- |
+| n=3   | 0.725   | 0.828     | 0.103 | not computed then |
+| n=5   | 0.783   | 0.855     | 0.072 | 0.090             |
+
+At n=5 the difference of the two suite means has a standard error of
+0.046, so the 0.072 gap gives z = 1.56 and p = 0.12. The variant is
+ahead in both rounds and in neither is it ahead by a resolvable margin.
+Scaling from that: resolving 0.03 needs n = 45 per configuration, about
+644 calls; resolving 0.02 needs n = 102, about 1,442.
+
+**Three of the nine promotable lines were written against failures that
+deterministic code now prevents.** Diffing the rendered variants against
+the rendered default gives nine lines in `haiku45-2` and seven in
+`sonnet5-3` that the default lacks. Since those prompts were written,
+three conformance and population fixes shipped:
+
+| Line                                       | What now handles it                | Value now                             |
+| ------------------------------------------ | ---------------------------------- | ------------------------------------- |
+| frequency `min` at least 1, never 0        | conformance check 5b (barwise-830) | 0.02 correction, was a 0.1 error      |
+| populations satisfy mandatory, whole model | `sample: true` (barwise-827)       | mandatory half is moot                |
+| enumerated list is a value constraint      | conformance check 3 (partial)      | cleans a duplicate, cannot substitute |
+
+The third is only half absorbed, and the half matters: check 3 removes a
+population that duplicates a value constraint already emitted, but
+nothing converts a population into a value constraint when none was
+emitted. The prompt still carries that half.
+
+**A comparative test of means is the wrong instrument.** Scoring the
+seven recorded answer keys is free and deterministic, and they come back
+full-rubric with **zero validation errors and zero validation warnings**
+between them -- 1 to 3 conformance corrections each is the entire
+penalty. So every warning a live run incurs is an addressable defect
+rather than irreducible noise, `warningsByRule` names which rule
+produced it, and each promotion candidate maps to a specific named rule:
+
+| Candidate                                | Rule it addresses                           | Can code do it?            |
+| ---------------------------------------- | ------------------------------------------- | -------------------------- |
+| every 2+-role fact type has uniqueness   | `completeness/fact-type-without-uniqueness` | detect yes, invent no      |
+| every binary carries both readings       | `structural/binary-missing-inverse-reading` | detect yes, generate no    |
+| every instance supplies every role value | none yet                                    | **yes -- not yet written** |
+| populations optional; conflict flags     | none                                        | no, a judgement            |
+
+That reframes the round. Asking "which prompt scores higher" needs 644
+calls to resolve 0.03 and returns one blended number. Asking "which
+rules fire, how often" is a count rather than a difference of two noisy
+means, is attributable per rule, and prices each candidate directly at
+0.05 x its count. One diagnostic run of the default over both splits --
+10 cases x 5 = 50 calls -- answers which bullets are worth promoting and
+which are worth nothing, which the comparative round could not have told
+apart.
+
+The order that follows: move what can move into code (the per-instance
+role-completeness check, barwise-835, in the same family as the three
+that already shipped and testable with no API calls at all), then run
+the diagnostic round against the default, then promote only the lines
+whose rule actually fires.
+
 ## Non-goals
 
 - No new extraction capability; the rules promoted are already written
