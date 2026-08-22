@@ -211,3 +211,46 @@ describe("extractJson", () => {
     expect(extractJson("```\n\n```")).toBe("");
   });
 });
+
+describe("Ollama output budget and stop reason", () => {
+  beforeEach(() => {
+    mockCreate.mockReset();
+  });
+
+  it("uses a request's budget in place of the client's default", async () => {
+    const client = new OllamaLlmClient();
+    mockCreate.mockResolvedValueOnce({ choices: [{ message: { content: "hi" } }] });
+
+    await client.complete({ systemPrompt: "s", userMessage: "u", maxTokens: 30_000 });
+
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ max_tokens: 30_000 }),
+    );
+  });
+
+  it("reports a response cut off at the ceiling", async () => {
+    const client = new OllamaLlmClient();
+    mockCreate.mockResolvedValueOnce({
+      choices: [{ message: { content: "{}" }, finish_reason: "length" }],
+    });
+
+    const result = await client.complete({
+      systemPrompt: "s",
+      userMessage: "u",
+      responseSchema: { type: "object" },
+    });
+
+    expect(result.truncated).toBe(true);
+  });
+
+  it("says nothing when the backend reported no finish reason", async () => {
+    // Ollama fronts many backends and they do not all fill this in. An
+    // absent reason must not be read as "the answer was whole".
+    const client = new OllamaLlmClient();
+    mockCreate.mockResolvedValueOnce({ choices: [{ message: { content: "{}" } }] });
+
+    const result = await client.complete({ systemPrompt: "s", userMessage: "u" });
+
+    expect(result.truncated).toBeUndefined();
+  });
+});

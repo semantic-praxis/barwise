@@ -276,3 +276,76 @@ describe("TranscriptProcessor", () => {
     });
   });
 });
+
+/**
+ * A truncated extraction still parses -- a cut-off tool_use block
+ * arrives as well-formed JSON holding whatever fields completed -- so
+ * without a warning the user gets half a model and nothing says half is
+ * missing (docs/specs/output-budget.spec.md).
+ */
+describe("a response cut off at the output ceiling", () => {
+  const transcript = loadFixture("transcripts/order-management.md");
+  const response = loadFixture("responses/order-management.json");
+
+  function truncatingClient(): LlmClient {
+    return {
+      provider: "test",
+      model: undefined,
+      async complete(_request: CompletionRequest) {
+        return { content: response, truncated: true, stopReason: "max_tokens" };
+      },
+    };
+  }
+
+  it("warns, and warns first", async () => {
+    // Ahead of the conformance warnings on purpose: it is the one that
+    // changes what the whole result means.
+    const result = await processTranscript(transcript, truncatingClient());
+
+    expect(result.warnings[0]).toMatch(/cut off at the output-token limit/);
+  });
+
+  it("still returns the partial model rather than throwing", async () => {
+    // The partial model is the best answer available and the call has
+    // already been paid for; discarding it would cost both.
+    const result = await processTranscript(transcript, truncatingClient());
+
+    expect(result.model.objectTypes.length).toBeGreaterThan(0);
+  });
+
+  it("says nothing when the response was whole", async () => {
+    const result = await processTranscript(transcript, createMockClient(response));
+
+    expect(result.warnings.some((w) => /cut off/.test(w))).toBe(false);
+  });
+});
+
+describe("the extraction budget", () => {
+  const transcript = loadFixture("transcripts/order-management.md");
+  const response = loadFixture("responses/order-management.json");
+
+  function recordingClient(seen: CompletionRequest[]): LlmClient {
+    return {
+      provider: "test",
+      model: undefined,
+      async complete(request: CompletionRequest) {
+        seen.push(request);
+        return { content: response };
+      },
+    };
+  }
+
+  it("derives one from the transcript's own length", async () => {
+    const seen: CompletionRequest[] = [];
+    await processTranscript(transcript, recordingClient(seen));
+
+    expect(seen[0]!.maxTokens).toBeGreaterThanOrEqual(8192);
+  });
+
+  it("yields to an explicit one", async () => {
+    const seen: CompletionRequest[] = [];
+    await processTranscript(transcript, recordingClient(seen), { maxTokens: 20_000 });
+
+    expect(seen[0]!.maxTokens).toBe(20_000);
+  });
+});

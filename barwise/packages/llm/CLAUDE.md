@@ -58,6 +58,29 @@ npx tsc --noEmit            # type-check only
   advance must say so explicitly, and gets the default artifact.
   `CompletionResponse.modelUsed` is a different thing -- what actually
   answered, reported too late to choose a prompt.
+- **The output budget belongs to the call, not the client.** A client
+  holds one `maxTokens` for its lifetime, which is the wrong grain: the
+  same client runs a 1 KB transcript and a 17 KB one, and a
+  client-lifetime constant has to be set for the largest to be safe for
+  any of them. `CompletionRequest.maxTokens` overrides it per call, and
+  `suggestMaxTokens` (`src/budget.ts`) derives one from the
+  transcript's own length, floored at the client default so anything
+  that fit before behaves exactly as it did. The ratio in that module
+  is calibrated from `promptlab/tests/fixtures/responses/`, not from
+  intuition, and it uses the **densest** observed case rather than the
+  mean: under-budgeting silently corrupts a measurement while
+  over-budgeting only permits one, so the two errors are not symmetric.
+- **A provider must say why it stopped.** Both SDKs report it and this
+  code discarded it until `providers/stopReason.ts`. Two fields come
+  back and they are not redundant: `stopReason` is the provider's own
+  word passed through unmapped, and `truncated` is the one derived
+  question every caller has, so no caller learns each provider's
+  spelling of it. A reason the provider never reported stays **absent**
+  rather than becoming `truncated: false` -- silence is not a claim
+  that the answer was whole. The cost of not having this was measured:
+  three dev-split cases scored near-zero as bad prompts when they were
+  complete extractions cut off at 8,192 tokens
+  (`docs/specs/output-budget.spec.md`).
 - **Variants are compiled in, not read from disk.**
   `src/prompt/artifacts/builtins.generated.ts` is generated from
   `prompts/*.prompt.yaml` by `npm run regen:builtins` and committed;

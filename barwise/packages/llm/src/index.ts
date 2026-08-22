@@ -22,6 +22,16 @@ export type {
 // LLM client interface
 export type { CompletionRequest, CompletionResponse, LlmClient } from "./LlmClient.js";
 
+// Output-token budget
+export {
+  CHARS_PER_TOKEN,
+  DEFAULT_MAX_OUTPUT_TOKENS,
+  MAX_OUTPUT_TOKEN_CAP,
+  OBSERVED_PAYLOAD_RATIO,
+  suggestMaxTokens,
+} from "./budget.js";
+export type { BudgetOptions } from "./budget.js";
+
 // Prompt construction
 export {
   buildResponseSchema,

@@ -182,3 +182,74 @@ describe("OpenAILlmClient", () => {
     });
   });
 });
+
+describe("OpenAI output budget and stop reason", () => {
+  beforeEach(() => {
+    mockCreate.mockReset();
+  });
+
+  it("uses a request's budget in place of the client's default", async () => {
+    const client = new OpenAILlmClient();
+    mockCreate.mockResolvedValueOnce({ choices: [{ message: { content: "hi" } }] });
+
+    await client.complete({ systemPrompt: "s", userMessage: "u", maxTokens: 30_000 });
+
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ max_tokens: 30_000 }),
+    );
+  });
+
+  it("applies the request budget on the structured path too", async () => {
+    const client = new OpenAILlmClient();
+    mockCreate.mockResolvedValueOnce({ choices: [{ message: { content: "{}" } }] });
+
+    await client.complete({
+      systemPrompt: "s",
+      userMessage: "u",
+      responseSchema: { type: "object" },
+      maxTokens: 30_000,
+    });
+
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ max_tokens: 30_000 }),
+    );
+  });
+
+  it("reports a response cut off at the ceiling", async () => {
+    const client = new OpenAILlmClient();
+    mockCreate.mockResolvedValueOnce({
+      choices: [{ message: { content: '{"object_types":[' }, finish_reason: "length" }],
+    });
+
+    const result = await client.complete({
+      systemPrompt: "s",
+      userMessage: "u",
+      responseSchema: { type: "object" },
+    });
+
+    expect(result.truncated).toBe(true);
+    expect(result.stopReason).toBe("length");
+  });
+
+  it("does not mark a normal completion as truncated", async () => {
+    const client = new OpenAILlmClient();
+    mockCreate.mockResolvedValueOnce({
+      choices: [{ message: { content: "done" }, finish_reason: "stop" }],
+    });
+
+    const result = await client.complete({ systemPrompt: "s", userMessage: "u" });
+
+    expect(result.truncated).toBe(false);
+    expect(result.stopReason).toBe("stop");
+  });
+
+  it("says nothing when the response carried no finish reason", async () => {
+    const client = new OpenAILlmClient();
+    mockCreate.mockResolvedValueOnce({ choices: [{ message: { content: "done" } }] });
+
+    const result = await client.complete({ systemPrompt: "s", userMessage: "u" });
+
+    expect(result.truncated).toBeUndefined();
+    expect(result.stopReason).toBeUndefined();
+  });
+});

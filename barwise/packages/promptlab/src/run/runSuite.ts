@@ -15,6 +15,15 @@
  *   real result and stays a zero: the prompt produced something the
  *   production parse path rejects, which is exactly what the metric
  *   exists to catch.
+ *
+ * A third kind joined them: the model answered and the answer was cut
+ * off at the output-token ceiling. That measures the budget the caller
+ * set, not the prompt, so it is excluded with the first group rather
+ * than scored with the second (docs/specs/output-budget.spec.md). It is
+ * the most dangerous of the three, because a truncated tool_use block
+ * still parses -- it arrives as well-formed JSON containing almost
+ * nothing, and scored a near-zero three runs running before anything
+ * said why.
  */
 import type { LlmClient, PromptArtifact } from "@barwise/llm";
 import {
@@ -22,6 +31,7 @@ import {
   buildSystemPrompt,
   buildUserMessage,
   defaultExtractionArtifact,
+  suggestMaxTokens,
 } from "@barwise/llm";
 import type { EvalSuite, SuiteSplit } from "../evalcase/types.js";
 import { hashPrompt } from "../provenance/promptHash.js";
@@ -30,7 +40,7 @@ import { scoreExtraction } from "../score/scoreExtraction.js";
 import type { Dispersion } from "../stats/dispersion.js";
 import { dispersionOf, sampleSd, splitAtFloor } from "../stats/dispersion.js";
 import type { FailureKind, RetryOptions } from "./retry.js";
-import { withRetry } from "./retry.js";
+import { describeProviderError, withRetry } from "./retry.js";
 
 /**
  * What a run says about itself while it is still running.
@@ -56,9 +66,19 @@ export type RunProgress =
     readonly score?: number;
     /** True when the provider never answered; the sample is excluded. */
     readonly failed?: boolean;
+    /**
+     * True when the answer was cut off at the output ceiling. Also
+     * `failed`, and reported separately because the two call for
+     * opposite responses: a failure means look at the provider, a
+     * truncation means raise `--max-tokens` and re-run.
+     */
+    readonly truncated?: boolean;
     /** True when the score fell below the suite's collapse floor. */
     readonly collapsed?: boolean;
     readonly latencyMs?: number;
+    /** Tokens generated, against the ceiling this call was given. */
+    readonly outputTokens?: number;
+    readonly maxTokens?: number;
     /** Why a run failed, or why a payload could not be scored. */
     readonly error?: string;
   }
@@ -88,6 +108,15 @@ export interface RunSuiteOptions {
    */
   readonly split?: SuiteSplit;
   /**
+   * Output-token ceiling for every call in the run, overriding the
+   * budget each case would otherwise derive from its own transcript
+   * length. One number for the whole sweep on purpose: the derived
+   * budget is a floor against truncation, and an operator raising it
+   * is answering "was this run starved", which is a question about the
+   * run and not about one case.
+   */
+  readonly maxTokens?: number;
+  /**
    * Called as each sample finishes and before each retry backoff.
    * Omitted, the run is silent, which is what every caller before this
    * got.
@@ -102,12 +131,15 @@ export interface CaseRun {
   /** The message behind a failed or unscorable run. */
   readonly error?: string;
   /**
-   * Set when the provider never returned a payload. Such a run is
-   * excluded from the mean rather than scored zero.
+   * Set when the run produced no usable payload -- the provider never
+   * answered, or the answer was cut off. Such a run is excluded from
+   * the mean rather than scored zero.
    */
   readonly failed?: boolean;
   /** How a failed run was judged, for the operator's diagnosis. */
   readonly failureKind?: FailureKind;
+  /** Set when the answer stopped at the output-token ceiling. */
+  readonly truncated?: boolean;
   /** Attempts spent on this run, including the first. */
   readonly attempts?: number;
   readonly modelUsed?: string;
@@ -117,6 +149,32 @@ export interface CaseRun {
    * progress output can show a run getting slower.
    */
   readonly latencyMs?: number;
+  /**
+   * The provider's own word for why it stopped. `truncated` is the
+   * derived answer; this is the evidence, and it is what a provider's
+   * documentation is written against.
+   */
+  readonly stopReason?: string;
+  /** Tokens the provider billed for this call, where it reported them. */
+  readonly promptTokens?: number;
+  readonly outputTokens?: number;
+  /**
+   * The ceiling this call was given. Meaningless alone and the whole
+   * story next to `outputTokens`: equal values are a truncation, and a
+   * near-equal pair on a healthy run is the warning that the next,
+   * slightly longer transcript will not fit.
+   */
+  readonly maxTokens?: number;
+  /** HTTP status behind a failure, where the SDK reported one. */
+  readonly status?: number;
+  /** The provider's error taxonomy, e.g. "rate_limit_error". */
+  readonly errorType?: string;
+  /**
+   * Provider-side identifier for the call. Worth keeping precisely
+   * because it is useless locally: it is the only handle anyone has on
+   * a call that already happened when asking the provider about it.
+   */
+  readonly requestId?: string;
 }
 
 export interface CaseSummary {
@@ -128,8 +186,14 @@ export interface CaseSummary {
   readonly worst: number;
   /** Runs that produced a score (the denominator behind `mean`). */
   readonly samples: number;
-  /** Runs the provider never answered. */
+  /** Runs that produced no usable payload, truncations included. */
   readonly failures: number;
+  /**
+   * The subset of `failures` that were cut off at the output ceiling.
+   * Broken out because it is the one failure an operator fixes without
+   * touching the provider: raise the budget and re-run.
+   */
+  readonly truncations: number;
   /**
    * Sample standard deviation of this case's scores. Absent below two
    * samples: one run says nothing about spread, and a 0 would claim it
@@ -167,8 +231,10 @@ export interface SuiteReport {
   readonly mean: number;
   /** Lowest single scored run across the suite. */
   readonly worst: number;
-  /** Total runs the provider never answered. */
+  /** Total runs that produced no usable payload. */
   readonly failures: number;
+  /** The subset of those cut off at the output ceiling. */
+  readonly truncations: number;
   /** True when every requested run produced a score. */
   readonly complete: boolean;
   /** Which half ran, when one was selected. */
@@ -216,12 +282,17 @@ export async function runSuite(
     run: number,
   ): Promise<CaseRun> => {
     const caseId = loadedCase.evalCase.id;
+    // Derived per case, not per run: the transcript does not change
+    // between samples, so neither should the budget -- two samples of
+    // one case must stay comparable to each other.
+    const maxTokens = options?.maxTokens ?? suggestMaxTokens(loadedCase.transcript);
     const attempt = await withRetry(
       () =>
         client.complete({
           systemPrompt,
           userMessage: buildUserMessage(loadedCase.transcript),
           responseSchema,
+          maxTokens,
         }),
       {
         ...options?.retry,
@@ -240,31 +311,60 @@ export async function runSuite(
     );
 
     if (!attempt.ok) {
+      const info = describeProviderError(attempt.error);
       return {
-        error: attempt.error.message,
+        error: info.message,
         failed: true,
         failureKind: attempt.kind,
         attempts: attempt.attempts,
+        maxTokens,
+        ...(info.status !== undefined ? { status: info.status } : {}),
+        ...(info.errorType !== undefined ? { errorType: info.errorType } : {}),
+        ...(info.requestId !== undefined ? { requestId: info.requestId } : {}),
       };
     }
 
     const response = attempt.value;
-    try {
-      const score = scoreExtraction(response.content, loadedCase, suite.weights);
+    // Everything the provider said about the call, kept whether it
+    // succeeded or not: on a healthy run the token pair is the early
+    // warning that the next transcript will not fit.
+    const said: CaseRun = {
+      attempts: attempt.attempts,
+      maxTokens,
+      ...(response.modelUsed !== undefined ? { modelUsed: response.modelUsed } : {}),
+      ...(response.latencyMs !== undefined ? { latencyMs: response.latencyMs } : {}),
+      ...(response.stopReason !== undefined ? { stopReason: response.stopReason } : {}),
+      ...(response.usage?.promptTokens !== undefined
+        ? { promptTokens: response.usage.promptTokens }
+        : {}),
+      ...(response.usage?.completionTokens !== undefined
+        ? { outputTokens: response.usage.completionTokens }
+        : {}),
+    };
+
+    if (response.truncated === true) {
+      // Excluded, not scored. What a truncated payload measures is the
+      // ceiling this call was given; scoring it would put the caller's
+      // budget into a number that reads as prompt quality.
       return {
-        score,
-        attempts: attempt.attempts,
-        ...(response.modelUsed !== undefined ? { modelUsed: response.modelUsed } : {}),
-        ...(response.latencyMs !== undefined ? { latencyMs: response.latencyMs } : {}),
+        ...said,
+        error: `the answer was cut off at the ${maxTokens}-token output ceiling`
+          + ` (stop reason: ${response.stopReason ?? "unreported"}).`
+          + ` Re-run with a larger --max-tokens.`,
+        failed: true,
+        failureKind: "truncated",
+        truncated: true,
       };
+    }
+
+    try {
+      return { ...said, score: scoreExtraction(response.content, loadedCase, suite.weights) };
     } catch (err) {
-      // The model answered; the answer was unusable. A real zero.
+      // The model answered in full; the answer was unusable. A real zero.
       return {
+        ...said,
         score: unscorable(loadedCase.evalCase.id),
         error: (err as Error).message,
-        attempts: attempt.attempts,
-        ...(response.modelUsed !== undefined ? { modelUsed: response.modelUsed } : {}),
-        ...(response.latencyMs !== undefined ? { latencyMs: response.latencyMs } : {}),
       };
     }
   };
@@ -287,11 +387,14 @@ export async function runSuite(
         attempts: run.attempts ?? 1,
         ...(score !== undefined ? { score } : {}),
         ...(run.failed === true ? { failed: true } : {}),
+        ...(run.truncated === true ? { truncated: true } : {}),
         ...(score !== undefined && suite.collapseFloor !== undefined
             && score < suite.collapseFloor
           ? { collapsed: true }
           : {}),
         ...(run.latencyMs !== undefined ? { latencyMs: run.latencyMs } : {}),
+        ...(run.outputTokens !== undefined ? { outputTokens: run.outputTokens } : {}),
+        ...(run.maxTokens !== undefined ? { maxTokens: run.maxTokens } : {}),
         ...(run.error !== undefined ? { error: run.error } : {}),
       });
     }
@@ -318,6 +421,7 @@ export async function runSuite(
       worst: scores.length > 0 ? Math.min(...scores) : 0,
       samples: scores.length,
       failures: runs.filter((r) => r.failed === true).length,
+      truncations: runs.filter((r) => r.truncated === true).length,
       ...(sd !== undefined ? { sd } : {}),
       ...(atFloor !== undefined ? { collapses: atFloor.collapses } : {}),
       ...(qualityMean !== undefined ? { qualityMean } : {}),
@@ -336,6 +440,7 @@ export async function runSuite(
     mean: scored.length > 0 ? mean(scored.map((c) => c.mean)) : 0,
     worst: scored.length > 0 ? Math.min(...scored.map((c) => c.worst)) : 0,
     failures,
+    truncations: cases.reduce((sum, c) => sum + c.truncations, 0),
     complete: failures === 0,
     ...(selected !== undefined ? { split: selected } : {}),
     dispersion: dispersionOf(cases),
