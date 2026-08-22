@@ -21,6 +21,15 @@ export interface ProviderOptions {
   readonly model?: string;
   /** Ollama server URL. Only used when provider is "ollama". */
   readonly baseUrl?: string;
+  /**
+   * Context window in tokens. Only used when provider is "ollama" --
+   * hosted providers size their own context from the model, and only
+   * Ollama needs telling.
+   *
+   * Omitted, the provider derives one per call from the prompt length
+   * and the output budget. Set it when the machine cannot afford that.
+   */
+  readonly contextWindow?: number;
 }
 
 /**
@@ -49,6 +58,9 @@ export function createLlmClient(options?: ProviderOptions): LlmClient {
       return new OllamaLlmClient({
         baseUrl: options?.baseUrl,
         model: options?.model,
+        ...(options?.contextWindow !== undefined
+          ? { contextWindow: options.contextWindow }
+          : {}),
       });
   }
 }

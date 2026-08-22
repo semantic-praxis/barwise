@@ -79,6 +79,11 @@ function registerEval(promptCmd: Command, version: string): void {
       "Output-token ceiling for every call. Omitted, each case derives one"
         + " from its transcript length.",
     )
+    .option(
+      "--context-window <n>",
+      "Context window in tokens (ollama only). Omitted, one is derived per"
+        + " call; set it when the machine cannot afford the derived size.",
+    )
     .option("--format <format>", "Output format (text or json)", "text")
     .option(
       "--verbose",
@@ -97,6 +102,7 @@ function registerEval(promptCmd: Command, version: string): void {
           repeat: string;
           split?: string;
           maxTokens?: string;
+          contextWindow?: string;
           format: string;
           verbose?: boolean;
           history: boolean;
@@ -121,13 +127,6 @@ function registerEval(promptCmd: Command, version: string): void {
               : "Using the default prompt artifact.\n",
           );
 
-          const client = createLlmClient({
-            provider: opts.provider as ProviderName | undefined,
-            apiKey: opts.apiKey,
-            model: opts.model,
-            baseUrl: opts.baseUrl,
-          });
-
           if (opts.split !== undefined && opts.split !== "train" && opts.split !== "dev") {
             throw new Error(`Unknown split "${opts.split}". Use "train" or "dev".`);
           }
@@ -142,6 +141,25 @@ function registerEval(promptCmd: Command, version: string): void {
               );
             }
           }
+          let contextWindow: number | undefined;
+          if (opts.contextWindow !== undefined) {
+            contextWindow = Number(opts.contextWindow);
+            if (!Number.isInteger(contextWindow) || contextWindow < 1) {
+              throw new Error(
+                `--context-window must be a positive integer, got "${opts.contextWindow}".`,
+              );
+            }
+          }
+          // Constructed after the guards, so a typo in a flag costs
+          // nothing rather than a client and a sweep.
+          const client = createLlmClient({
+            provider: opts.provider as ProviderName | undefined,
+            apiKey: opts.apiKey,
+            model: opts.model,
+            baseUrl: opts.baseUrl,
+            ...(contextWindow !== undefined ? { contextWindow } : {}),
+          });
+
           // Progress goes to stderr so `--format json` stays a clean
           // pipe. A sweep is dozens of sequential calls; without this a
           // rate-limited run and a hung one look the same from outside.
