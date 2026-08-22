@@ -136,6 +136,27 @@ npx tsc --noEmit            # type-check only
   until it finishes, straight past Node's 300-second header timeout.
   The NDJSON reader buffers partial lines: assuming a chunk boundary
   falls on a newline works right up until a long generation.
+- **Conformance mirrors every structural rule the validator enforces.**
+  `enforceConformance` exists to hand the parser something
+  `constraintConsistency` will accept, so a purely structural rule with
+  no counterpart here becomes a validation error the extraction cannot
+  avoid -- and the eval charges 0.1 for it rather than the 0.02 a
+  dropped malformed constraint costs. This went wrong three times
+  (arity, frequency bounds, ring player identity), and the first two
+  were each found by a live run rather than a test.
+  `tests/ConstraintCorrespondence.test.ts` now asserts the property
+  across the whole constraint vocabulary, so **a new rule in
+  `constraintConsistency` should fail that test before it costs a
+  sweep**. It asserts on severity `error` on purpose: two `constraint/*`
+  rules are modeling advisories that conformance is deliberately silent
+  about, and a stricter assertion would force the wrong fix. The
+  enumeration and the structural/semantic split are in
+  `docs/specs/constraint-conformance-audit.spec.md`.
+
+  Anything resolving constraint roles here must resolve them the way
+  `parse/helpers.ts` does -- role name first, case-insensitively, then
+  player name, each match consuming a role. Resolving differently is the
+  same bug one level down.
 - **Variants are compiled in, not read from disk.**
   `src/prompt/artifacts/builtins.generated.ts` is generated from
   `prompts/*.prompt.yaml` by `npm run regen:builtins` and committed;
