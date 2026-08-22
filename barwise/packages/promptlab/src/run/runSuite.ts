@@ -32,6 +32,45 @@ import { dispersionOf, sampleSd, splitAtFloor } from "../stats/dispersion.js";
 import type { FailureKind, RetryOptions } from "./retry.js";
 import { withRetry } from "./retry.js";
 
+/**
+ * What a run says about itself while it is still running.
+ *
+ * A sweep is dozens of sequential provider calls and used to print
+ * nothing until all of them finished, which makes a rate-limited run
+ * and a hung one look identical. The events are pushed to a caller-
+ * supplied sink rather than written here, for the same reason the date
+ * and the build provenance are: this package does no I/O.
+ */
+export type RunProgress =
+  | {
+    readonly kind: "sample";
+    readonly caseId: string;
+    /** 1-based position of this case among those being run. */
+    readonly caseIndex: number;
+    readonly caseCount: number;
+    /** 1-based sample number within the case. */
+    readonly run: number;
+    readonly repeat: number;
+    readonly attempts: number;
+    /** Absent when the provider never answered. */
+    readonly score?: number;
+    /** True when the provider never answered; the sample is excluded. */
+    readonly failed?: boolean;
+    /** True when the score fell below the suite's collapse floor. */
+    readonly collapsed?: boolean;
+    readonly latencyMs?: number;
+    /** Why a run failed, or why a payload could not be scored. */
+    readonly error?: string;
+  }
+  | {
+    readonly kind: "retry";
+    readonly caseId: string;
+    readonly run: number;
+    readonly attempt: number;
+    readonly delayMs: number;
+    readonly error: string;
+  };
+
 export interface RunSuiteOptions {
   /** Variant artifact to render; omitted, the default artifact runs. */
   readonly artifact?: PromptArtifact;
@@ -48,6 +87,12 @@ export interface RunSuiteOptions {
    * the suite rather than the task (eval-metric-readiness spec).
    */
   readonly split?: SuiteSplit;
+  /**
+   * Called as each sample finishes and before each retry backoff.
+   * Omitted, the run is silent, which is what every caller before this
+   * got.
+   */
+  readonly onProgress?: (event: RunProgress) => void;
 }
 
 /** One LLM call's outcome. */
@@ -66,6 +111,12 @@ export interface CaseRun {
   /** Attempts spent on this run, including the first. */
   readonly attempts?: number;
   readonly modelUsed?: string;
+  /**
+   * Wall-clock time the provider reported for this call. Measured by
+   * every provider already and dropped on the floor until now; kept so
+   * progress output can show a run getting slower.
+   */
+  readonly latencyMs?: number;
 }
 
 export interface CaseSummary {
@@ -158,7 +209,13 @@ export async function runSuite(
   const systemPrompt = buildSystemPrompt(false, artifact);
   const responseSchema = buildResponseSchema(false);
 
-  const runOnce = async (loadedCase: EvalSuite["cases"][number]): Promise<CaseRun> => {
+  const report = options?.onProgress;
+
+  const runOnce = async (
+    loadedCase: EvalSuite["cases"][number],
+    run: number,
+  ): Promise<CaseRun> => {
+    const caseId = loadedCase.evalCase.id;
     const attempt = await withRetry(
       () =>
         client.complete({
@@ -166,7 +223,20 @@ export async function runSuite(
           userMessage: buildUserMessage(loadedCase.transcript),
           responseSchema,
         }),
-      options?.retry,
+      {
+        ...options?.retry,
+        onRetry: (info) => {
+          options?.retry?.onRetry?.(info);
+          report?.({
+            kind: "retry",
+            caseId,
+            run,
+            attempt: info.attempt,
+            delayMs: info.delayMs,
+            error: info.error.message,
+          });
+        },
+      },
     );
 
     if (!attempt.ok) {
@@ -185,6 +255,7 @@ export async function runSuite(
         score,
         attempts: attempt.attempts,
         ...(response.modelUsed !== undefined ? { modelUsed: response.modelUsed } : {}),
+        ...(response.latencyMs !== undefined ? { latencyMs: response.latencyMs } : {}),
       };
     } catch (err) {
       // The model answered; the answer was unusable. A real zero.
@@ -193,6 +264,7 @@ export async function runSuite(
         error: (err as Error).message,
         attempts: attempt.attempts,
         ...(response.modelUsed !== undefined ? { modelUsed: response.modelUsed } : {}),
+        ...(response.latencyMs !== undefined ? { latencyMs: response.latencyMs } : {}),
       };
     }
   };
@@ -200,8 +272,28 @@ export async function runSuite(
   const cases: CaseSummary[] = [];
   for (const loadedCase of suiteCases) {
     const runs: CaseRun[] = [];
+    const caseIndex = suiteCases.indexOf(loadedCase) + 1;
     for (let i = 0; i < repeat; i++) {
-      runs.push(await runOnce(loadedCase));
+      const run = await runOnce(loadedCase, i + 1);
+      runs.push(run);
+      const score = run.score?.score;
+      report?.({
+        kind: "sample",
+        caseId: loadedCase.evalCase.id,
+        caseIndex,
+        caseCount: suiteCases.length,
+        run: i + 1,
+        repeat,
+        attempts: run.attempts ?? 1,
+        ...(score !== undefined ? { score } : {}),
+        ...(run.failed === true ? { failed: true } : {}),
+        ...(score !== undefined && suite.collapseFloor !== undefined
+            && score < suite.collapseFloor
+          ? { collapsed: true }
+          : {}),
+        ...(run.latencyMs !== undefined ? { latencyMs: run.latencyMs } : {}),
+        ...(run.error !== undefined ? { error: run.error } : {}),
+      });
     }
     const scores = runs
       .filter((r) => r.score !== undefined)

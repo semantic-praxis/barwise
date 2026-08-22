@@ -22,6 +22,17 @@ export interface RetryOptions {
   readonly baseDelayMs?: number;
   /** Injected for tests, so the suite does not actually sleep. */
   readonly sleep?: (ms: number) => Promise<void>;
+  /**
+   * Called before each backoff, so a caller can say out loud that it is
+   * waiting. Without it a rate-limited sweep is indistinguishable from a
+   * hung one for as long as the backoff lasts, which is exactly when an
+   * operator most wants to know.
+   */
+  readonly onRetry?: (info: {
+    readonly attempt: number;
+    readonly delayMs: number;
+    readonly error: Error;
+  }) => void;
 }
 
 /** What a failed attempt was judged to be. */
@@ -137,7 +148,9 @@ export async function withRetry<T>(
       lastError = err instanceof Error ? err : new Error(String(err));
       lastKind = classifyFailure(err);
       if (lastKind === "terminal" || attempts >= maxAttempts) break;
-      await sleep(baseDelayMs * 2 ** (attempts - 1));
+      const delayMs = baseDelayMs * 2 ** (attempts - 1);
+      options?.onRetry?.({ attempt: attempts, delayMs, error: lastError });
+      await sleep(delayMs);
     }
   }
 

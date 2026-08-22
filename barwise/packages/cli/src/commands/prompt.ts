@@ -15,7 +15,7 @@ import {
   loadArtifactsFromDir,
   resolveArtifact,
 } from "@barwise/llm";
-import type { SuiteReport } from "@barwise/promptlab";
+import type { RunProgress, SuiteReport } from "@barwise/promptlab";
 import {
   appendRunHistory,
   defaultSuitePath,
@@ -75,6 +75,10 @@ function registerEval(promptCmd: Command, version: string): void {
       "Run only one half of the suite (train or dev). Omitted runs every case.",
     )
     .option("--format <format>", "Output format (text or json)", "text")
+    .option(
+      "--verbose",
+      "Report each sample as it completes, and each retry as it happens",
+    )
     .option("--no-history", "Do not append this run to the suite's history file")
     .option(
       "--force-history",
@@ -88,6 +92,7 @@ function registerEval(promptCmd: Command, version: string): void {
           repeat: string;
           split?: string;
           format: string;
+          verbose?: boolean;
           history: boolean;
           forceHistory?: boolean;
         },
@@ -120,10 +125,16 @@ function registerEval(promptCmd: Command, version: string): void {
           if (opts.split !== undefined && opts.split !== "train" && opts.split !== "dev") {
             throw new Error(`Unknown split "${opts.split}". Use "train" or "dev".`);
           }
+          // Progress goes to stderr so `--format json` stays a clean
+          // pipe. A sweep is dozens of sequential calls; without this a
+          // rate-limited run and a hung one look the same from outside.
           const report = await runSuite(suite, client, {
             ...(artifact !== undefined ? { artifact } : {}),
             ...(opts.split !== undefined ? { split: opts.split as "train" | "dev" } : {}),
             repeat: Number(opts.repeat),
+            ...(opts.verbose === true
+              ? { onProgress: (e: RunProgress) => process.stderr.write(renderProgress(e)) }
+              : {}),
           });
 
           // Say it before the scores, so an operator reading the tail of
@@ -280,6 +291,35 @@ function registerHistory(promptCmd: Command): void {
         fail(err);
       }
     });
+}
+
+/**
+ * One line per event, on stderr, while the sweep is still running.
+ *
+ * Deliberately shows the score of each sample rather than a bare
+ * counter: a rubric that no extraction can pass is visible three calls
+ * in, which is when stopping still saves something. The collapse marker
+ * needs the suite's floor, which the runner has already applied.
+ */
+function renderProgress(e: RunProgress): string {
+  if (e.kind === "retry") {
+    return `  ${e.caseId} run ${e.run}: attempt ${e.attempt} failed`
+      + ` (${e.error}); waiting ${(e.delayMs / 1000).toFixed(1)}s\n`;
+  }
+  const position = `[${String(e.caseIndex).padStart(2)}/${e.caseCount}]`;
+  const run = `run ${e.run}/${e.repeat}`;
+  const took = e.latencyMs === undefined ? "" : `  ${(e.latencyMs / 1000).toFixed(1)}s`;
+  const tries = e.attempts > 1 ? `  ${e.attempts} attempts` : "";
+
+  if (e.failed === true) {
+    return `${position} ${e.caseId.padEnd(22)} ${run}  FAILED, excluded`
+      + `${tries}  ${e.error ?? ""}\n`;
+  }
+  const score = e.score === undefined ? "  ----" : e.score.toFixed(3).padStart(6);
+  const collapse = e.collapsed === true ? "  COLLAPSE" : "";
+  const unscorable = e.score !== undefined && e.error !== undefined ? "  unscorable" : "";
+  return `${position} ${e.caseId.padEnd(22)} ${run} ${score}${took}${tries}`
+    + `${collapse}${unscorable}\n`;
 }
 
 function renderReport(report: SuiteReport): string {
