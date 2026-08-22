@@ -296,6 +296,15 @@ export interface SuiteReport {
    * is what a prompt change is aimed at.
    */
   readonly warningsByRule: Readonly<Record<string, number>>;
+  /**
+   * Which validation rules errored across the sweep, and how often.
+   *
+   * The sibling tally, and the one a reader reaches for first: an error
+   * costs twice a warning, and until now the report could say a sweep
+   * hit four of them without saying which four
+   * (docs/specs/pipeline-observability.spec.md).
+   */
+  readonly errorsByRule: Readonly<Record<string, number>>;
   /** True when every requested run produced a score. */
   readonly complete: boolean;
   /** Which half ran, when one was selected. */
@@ -534,7 +543,8 @@ export async function runSuite(
     failures,
     truncations: cases.reduce((sum, c) => sum + c.truncations, 0),
     ...(cacheTotals(cases, cacheSystemPrompt) ?? {}),
-    warningsByRule: tallyWarnings(cases),
+    warningsByRule: tallyByRule(cases, (s) => s.warningsByRule),
+    errorsByRule: tallyByRule(cases, (s) => s.errorsByRule),
     complete: failures === 0,
     ...(selected !== undefined ? { split: selected } : {}),
     dispersion: dispersionOf(cases),
@@ -558,6 +568,7 @@ function unscorable(caseId: string): CaseScore {
     ambiguitiesReported: 0,
     ambiguityExcess: 0,
     warningsByRule: {},
+    errorsByRule: {},
     score: 0,
     results: [],
   };
@@ -593,12 +604,22 @@ function cacheTotals(
   };
 }
 
-/** Fold every scored run's per-rule warnings into one suite tally. */
-function tallyWarnings(cases: readonly CaseSummary[]): Record<string, number> {
+/**
+ * Sum one per-case rule tally across every scored run in the sweep.
+ *
+ * Parameterised over which tally rather than written twice: two copies
+ * of this is how the warning and error paths came to differ in the
+ * first place, one naming its rules and the other counting them.
+ */
+function tallyByRule(
+  cases: readonly CaseSummary[],
+  pick: (score: CaseScore) => Readonly<Record<string, number>>,
+): Record<string, number> {
   const total: Record<string, number> = {};
   for (const c of cases) {
     for (const run of c.runs) {
-      for (const [id, n] of Object.entries(run.score?.warningsByRule ?? {})) {
+      if (run.score === undefined) continue;
+      for (const [id, n] of Object.entries(pick(run.score))) {
         total[id] = (total[id] ?? 0) + n;
       }
     }

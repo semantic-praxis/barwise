@@ -59,6 +59,8 @@ export { defaultExtractionArtifact } from "./prompt/systemPrompt.js";
 // Call observability
 export { withCallLog } from "./observe/callLog.js";
 export type { CallLogOptions, CallLogSink, LlmCallRecord } from "./observe/callLog.js";
+export { emitExtractionRecord, summariseExtraction } from "./observe/extractionLog.js";
+export type { ExtractionLogSink, ExtractionRecord } from "./observe/extractionLog.js";
 
 // Conformance validation
 export { enforceConformance } from "./ExtractionConformance.js";

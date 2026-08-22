@@ -21,6 +21,8 @@ import {
 } from "./ExtractionPrompt.js";
 import type { CandidateFraming, DraftModelResult, ExtractionResponse } from "./ExtractionTypes.js";
 import type { LlmClient } from "./LlmClient.js";
+import type { ExtractionLogSink } from "./observe/extractionLog.js";
+import { emitExtractionRecord, summariseExtraction } from "./observe/extractionLog.js";
 import { builtinArtifacts } from "./prompt/artifacts/builtins.generated.js";
 import type { PromptArtifact } from "./prompt/artifacts/PromptArtifact.js";
 import { resolveArtifact } from "./prompt/artifacts/resolveArtifact.js";
@@ -29,6 +31,29 @@ import { defaultExtractionArtifact } from "./prompt/systemPrompt.js";
 export interface ProcessorOptions {
   /** Name for the resulting model. Defaults to "Extracted Model". */
   readonly modelName?: string;
+  /**
+   * Where to record what this extraction changed, and when.
+   *
+   * Conformance rewrites the payload before the parser sees it, and
+   * until now the only trace was prose folded into `warnings` -- so no
+   * caller could count corrections by category, and "did that fix
+   * land" was answerable only by paying for a fresh eval run. The sink
+   * is supplied rather than chosen here for the same reason the run
+   * date and the build provenance are: this package does no I/O.
+   *
+   * Omitted, nothing is recorded and nothing is computed, which is
+   * what every caller before this got
+   * (docs/specs/pipeline-observability.spec.md).
+   */
+  readonly observer?: ExtractionLogSink;
+  /**
+   * Clock for the observation record. Injected so this package keeps
+   * its no-clocks rule; defaults to the wall clock only when an
+   * observer is present and the caller did not supply one.
+   */
+  readonly now?: () => string;
+  /** Groups this extraction with the calls of the same operation. */
+  readonly correlationId?: string;
   /**
    * Summary of entity/value/fact types that already exist in the base
    * model.  When provided, the LLM is instructed to reference these
@@ -123,7 +148,36 @@ export async function processTranscript(
 
   const modelName = options?.modelName ?? "Extracted Model";
   const result = parseDraftModel(cleaned, modelName);
+  // The prose stays: surfaces render these to users, and a user who
+  // stopped being told their constraint was dropped would be worse off
+  // than before. The record below is additive, not a replacement.
   const conformanceWarnings = corrections.map((c) => c.description);
+
+  // What this extraction changed, for whoever is keeping the log.
+  // Computed only when someone is listening.
+  if (options?.observer !== undefined) {
+    const clock = options.now ?? (() => new Date().toISOString());
+    emitExtractionRecord(
+      options.observer,
+      summariseExtraction({
+        startedAt: clock(),
+        ...(options.correlationId !== undefined
+          ? { correlationId: options.correlationId }
+          : {}),
+        corrections,
+        parserWarnings: result.warnings,
+        constraintsSkipped: result.constraintProvenance.filter((p) => !p.applied).length,
+        built: {
+          objectTypes: result.model.objectTypes.length,
+          factTypes: result.model.factTypes.length,
+          constraints: result.model.factTypes.reduce(
+            (n, ft) => n + ft.constraints.length,
+            0,
+          ),
+        },
+      }),
+    );
+  }
 
   const altWarnings: string[] = [];
   const alternatives = includeAlternatives

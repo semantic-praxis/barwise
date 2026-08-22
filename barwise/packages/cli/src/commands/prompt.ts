@@ -550,6 +550,17 @@ function renderReport(report: SuiteReport): string {
   // Which rule to attack. The count alone said a run lost 0.30 without
   // saying to what, and the answer keys produce no warnings at all --
   // so this is addressable cost, not a floor.
+  // Errors first: they cost twice a warning, and this line is the one
+  // that says whether a conformance fix actually landed. Without it the
+  // report could say a sweep hit four errors and never which four, so
+  // crediting a fix meant paying for a fresh run.
+  const errored = Object.entries(report.errorsByRule ?? {})
+    .sort((a, b) => b[1] - a[1]);
+  if (errored.length > 0) {
+    lines.push(
+      `  errors:   ${errored.map(([id, n]) => `${id} x${n}`).join(", ")}`,
+    );
+  }
   const warned = Object.entries(report.warningsByRule ?? {})
     .sort((a, b) => b[1] - a[1]);
   if (warned.length > 0) {

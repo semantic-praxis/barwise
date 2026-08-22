@@ -1,10 +1,12 @@
 import { annotateOrmYaml } from "@barwise/core/annotation";
 import { diffModels, mergeAndValidate } from "@barwise/core/diff";
-import { buildReasoningTrail, createLlmClient, processTranscript } from "@barwise/llm";
+import { buildReasoningTrail, createLlmClient, processTranscript, withCallLog } from "@barwise/llm";
 import type { ProviderName } from "@barwise/llm";
 import type { Command } from "commander";
+import { randomUUID } from "node:crypto";
 import { existsSync, writeFileSync } from "node:fs";
 import { basename, extname } from "node:path";
+import { callLogSink } from "../../workspace/callLogSink.js";
 import { readFile, writeOutput } from "../../workspace/io.js";
 import { formatAlternativeFramings, serializer } from "./shared.js";
 
@@ -57,12 +59,22 @@ export function addTranscriptSubcommand(importCmd: Command): void {
             return;
           }
 
-          const client = createLlmClient({
+          // One sink for both records, correlated by this import, so a
+          // call's cost and what the pipeline did with its answer sit
+          // together in the log. Undefined unless BARWISE_CALL_LOG is
+          // set, in which case nothing is wrapped and nothing computed.
+          const sink = callLogSink();
+          const correlationId = randomUUID();
+
+          const bare = createLlmClient({
             provider: opts.provider as ProviderName | undefined,
             apiKey: opts.apiKey,
             model: opts.model,
             baseUrl: opts.baseUrl,
           });
+          const client = sink === undefined
+            ? bare
+            : withCallLog(bare, sink, { correlationId });
 
           const modelName = opts.name ?? basename(file, extname(file));
 
@@ -71,6 +83,7 @@ export function addTranscriptSubcommand(importCmd: Command): void {
           const result = await processTranscript(transcript, client, {
             modelName,
             alternatives: opts.alternatives,
+            ...(sink !== undefined ? { observer: sink, correlationId } : {}),
           });
 
           // If --output targets an existing file, do a non-interactive merge.
