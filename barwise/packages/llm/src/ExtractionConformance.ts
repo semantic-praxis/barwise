@@ -363,15 +363,7 @@ function missingRoles(
   roles: readonly ExtractedRole[],
   roleValues: Readonly<Record<string, string>>,
 ): string[] {
-  const claimed = new Set<number>();
-  for (const hint of Object.keys(roleValues)) {
-    const lower = hint.toLowerCase();
-    let i = roles.findIndex(
-      (r, idx) => !claimed.has(idx) && r.role_name?.toLowerCase() === lower,
-    );
-    if (i === -1) i = roles.findIndex((r, idx) => !claimed.has(idx) && r.player === hint);
-    if (i !== -1) claimed.add(i);
-  }
+  const claimed = new Set(resolveRoleIndices(roles, Object.keys(roleValues)));
   return roles
     .map((r, idx) => (claimed.has(idx) ? undefined : (r.role_name || r.player)))
     .filter((n): n is string => n !== undefined);
@@ -462,6 +454,49 @@ function cleanConstraints(
         element: ic.fact_type,
       });
       continue;
+    }
+
+    // Check 5c: Arity of the roles that will actually RESOLVE
+    //
+    // Check 5 above counts the role *hints* the model emitted;
+    // `resolveRolesByPlayerName` counts the roles it can actually match,
+    // consuming each one. Those differ, and the gap reached the
+    // validator three ways (barwise-840): two hints naming the same
+    // player, a hint naming an object type that plays no role in *this*
+    // fact type (check 4's name set is global, not per fact type), and
+    // a role name plus a player name that select the same role.
+    //
+    // Only these three types can carry the gap into a model. Every
+    // other type the parser skips outright when the resolved count is
+    // wrong -- mandatory, value_constraint and frequency want exactly
+    // one, ring exactly two, subset and equality a matching pair -- and
+    // a skipped constraint never reaches the validator. The two
+    // uniqueness types do build on a short resolution, but a uniqueness
+    // constraint over one role is perfectly valid.
+    //
+    // Checking the others here would charge 0.02 for constraints the
+    // parser already drops for free, which is a score change dressed up
+    // as a correctness fix.
+    if (
+      ic.type === "disjunctive_mandatory" || ic.type === "exclusion"
+      || ic.type === "exclusive_or"
+    ) {
+      const factRoles = rolesByFactType.get(ic.fact_type);
+      // Absent means the fact type does not exist; the parser reports
+      // that itself, and guessing here would double-charge it.
+      if (factRoles !== undefined) {
+        const resolved = resolveRoleIndices(factRoles, ic.roles).length;
+        if (resolved < 2) {
+          corrections.push({
+            category: "arity_mismatch",
+            description: `Removed constraint "${ic.description}" -- ${ic.type} requires at least 2 `
+              + `role(s) and only ${resolved} of ${ic.roles.length} named role(s) resolve in fact `
+              + `type "${ic.fact_type}".`,
+            element: ic.fact_type,
+          });
+          continue;
+        }
+      }
     }
 
     // Check 5b: Frequency bounds
@@ -614,22 +649,42 @@ function ringSpansTwoPlayers(
   const roles = rolesByFactType.get(ic.fact_type);
   if (roles === undefined || ic.roles.length !== 2) return false;
 
-  const taken = new Set<number>();
-  const players: string[] = [];
-  for (const hint of ic.roles) {
-    const lower = hint.toLowerCase();
-    let index = roles.findIndex(
-      (r, i) => !taken.has(i) && r.role_name?.toLowerCase() === lower,
-    );
-    if (index === -1) {
-      index = roles.findIndex((r, i) => !taken.has(i) && r.player === hint);
-    }
-    if (index === -1) continue;
-    taken.add(index);
-    players.push(roles[index]!.player);
-  }
-
+  const players = resolveRoleIndices(roles, ic.roles).map((i) => roles[i]!.player);
   return players.length === 2 && players[0] !== players[1];
+}
+
+/**
+ * Which of a fact type's roles a list of hints selects, in hint order.
+ *
+ * The one resolver in this module, mirroring
+ * `resolveRolesByPlayerName` in `parse/helpers.ts`: role name first and
+ * case-insensitively, then player name exactly, with each match
+ * consuming the role so a repeated name selects distinct roles and an
+ * unmatchable hint contributes nothing.
+ *
+ * Shared rather than written per check because the divergence it guards
+ * against is exactly the kind that grows between two copies -- and did:
+ * `isValidArity` counted hints while the parser counted resolutions,
+ * and every constraint where those disagreed became a validation error
+ * the extraction could not avoid (barwise-840).
+ */
+function resolveRoleIndices(
+  roles: readonly ExtractedRole[],
+  hints: readonly string[],
+): number[] {
+  const claimed = new Set<number>();
+  const resolved: number[] = [];
+  for (const hint of hints) {
+    const lower = hint.toLowerCase();
+    let i = roles.findIndex(
+      (r, idx) => !claimed.has(idx) && r.role_name?.toLowerCase() === lower,
+    );
+    if (i === -1) i = roles.findIndex((r, idx) => !claimed.has(idx) && r.player === hint);
+    if (i === -1) continue;
+    claimed.add(i);
+    resolved.push(i);
+  }
+  return resolved;
 }
 
 /**
