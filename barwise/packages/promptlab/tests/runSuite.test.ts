@@ -54,8 +54,11 @@ describe("runSuite", () => {
       expect(c.runs[0]!.score?.rubricPassed).toBe(c.runs[0]!.score?.rubricTotal);
       expect(c.runs[0]!.modelUsed).toBe("fixture-model");
     }
-    expect(report.mean).toBeCloseTo((0.98 + 0.96 + 0.96 + 0.94) / 4, 10);
-    expect(report.worst).toBeCloseTo(0.94, 10);
+    // Every answer key scores exactly 1.000 since barwise-839 removed
+    // the one check that charged them. Before that they ran 0.94-0.98,
+    // and the whole spread was that check.
+    expect(report.mean).toBeCloseTo(1, 10);
+    expect(report.worst).toBeCloseTo(1, 10);
   });
 
   it("repeat produces that many runs per case", async () => {
@@ -168,7 +171,7 @@ describe("runSuite", () => {
     expect(first.failures).toBe(1);
     expect(first.samples).toBe(2);
     // The mean is over the two runs that answered, not over three.
-    expect(first.mean).toBeCloseTo(0.98, 10);
+    expect(first.mean).toBeCloseTo(1, 10);
     expect(report.complete).toBe(false);
   });
 
@@ -285,7 +288,11 @@ describe("runSuite", () => {
     // A floor above every achievable score stands in for a case that
     // never produced a usable model: the count is reported, the quality
     // is absent rather than zero.
-    const report = await runSuite({ ...suite, collapseFloor: 0.999 }, fixtureClient(), {
+    //
+    // Above 1.0, not 0.999: the answer keys score exactly 1.000 since
+    // barwise-839, so a floor inside the unit interval no longer sits
+    // above every achievable score.
+    const report = await runSuite({ ...suite, collapseFloor: 1.001 }, fixtureClient(), {
       ...TRAIN,
       repeat: 2,
     });

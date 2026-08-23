@@ -562,9 +562,10 @@ function renderReport(report: SuiteReport): string {
     );
   }
   // Corrections last: cheapest at 0.02, and the line exists to separate
-  // a category worth attacking from one that is merely noticed. On the
-  // recorded answer keys every correction is `orphaned_reference_mode`,
-  // which a lump count could never have shown.
+  // a category worth attacking from one that is merely noticed. Its
+  // first use retired a check: every correction on every recorded
+  // answer key was `orphaned_reference_mode`, which a lump count could
+  // never have shown, and barwise-839 removed it.
   const corrected = Object.entries(report.correctionsByCategory ?? {})
     .sort((a, b) => b[1] - a[1]);
   const warned = Object.entries(report.warningsByRule ?? {})

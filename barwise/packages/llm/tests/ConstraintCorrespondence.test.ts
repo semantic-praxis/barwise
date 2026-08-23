@@ -226,6 +226,24 @@ const MALFORMED: ReadonlyArray<
     min: 1,
     max: 3,
   }],
+  // barwise-840: the sweep's probes all used distinct resolvable names,
+  // so it asserted the arity check existed without ever exercising its
+  // arithmetic. These are the shapes that got past it.
+  ["disjunctive_mandatory whose hints resolve to one role", {
+    type: "disjunctive_mandatory",
+    fact_type: "Employee works on Project",
+    roles: ["Employee", "Employee"],
+  }],
+  ["exclusion whose hints resolve to one role", {
+    type: "exclusion",
+    fact_type: "Employee works on Project",
+    roles: ["worker", "Employee"],
+  }],
+  ["exclusive_or naming a player absent from the fact type", {
+    type: "exclusive_or",
+    fact_type: "Employee mentors Employee",
+    roles: ["Employee", "Project"],
+  }],
 ];
 
 describe("nothing surviving conformance produces a constraint error", () => {
@@ -245,6 +263,131 @@ describe("nothing surviving conformance produces a constraint error", () => {
       .filter((d) => d.severity === "error" && d.ruleId?.startsWith("constraint/"));
 
     expect(errors.map((d) => `${d.ruleId}: ${d.message}`)).toEqual([]);
+  });
+});
+
+/**
+ * Arity measured on the roles that resolve, not the hints emitted
+ * (barwise-840).
+ *
+ * The first diagnostic round with `errorsByRule` reported one
+ * `constraint/disjunctive-mandatory-too-few-roles` in fifteen dev runs
+ * -- a rule conformance is supposed to make impossible. `isValidArity`
+ * counted `ic.roles.length`; `resolveRolesByPlayerName` consumes each
+ * role it matches, so the two disagree and the difference reached the
+ * validator.
+ *
+ * Three ways in, all producing the same unavoidable error, and the
+ * sweep below missed every one because its probes used distinct
+ * resolvable names. It tested that the check existed, never that its
+ * arithmetic was right.
+ */
+describe("hints that do not resolve to as many roles as they name", () => {
+  const MULTI = ["disjunctive_mandatory", "exclusion", "exclusive_or"] as const;
+
+  it.each(MULTI)("%s: two hints naming the same player", (type) => {
+    // `Employee` plays exactly one role in this fact type, so a second
+    // hint naming it again finds nothing unclaimed.
+    const { response, corrections } = enforceConformance(responseWith({
+      type,
+      fact_type: "Employee works on Project",
+      roles: ["Employee", "Employee"],
+    }));
+
+    expect(response.inferred_constraints).toHaveLength(0);
+    const fixed = corrections.filter((c) => c.category === "arity_mismatch");
+    expect(fixed).toHaveLength(1);
+    // The message must distinguish this from a model that emitted one
+    // hint, or a reader sees "requires at least 2" beside two names and
+    // concludes the check is broken.
+    expect(fixed[0]!.description).toContain("resolve in fact type");
+  });
+
+  it("a hint naming an object type that plays no role in this fact type", () => {
+    // Check 4 validates hints against a set of every object type and
+    // role name in the payload -- global, not per fact type -- so
+    // `Project` passes it and then resolves to nothing here.
+    const { response, corrections } = enforceConformance(responseWith({
+      type: "disjunctive_mandatory",
+      fact_type: "Employee mentors Employee",
+      roles: ["Employee", "Project"],
+    }));
+
+    expect(response.inferred_constraints).toHaveLength(0);
+    expect(corrections.filter((c) => c.category === "arity_mismatch")).toHaveLength(1);
+  });
+
+  it("a role name and a player name that select the same role", () => {
+    const { response, corrections } = enforceConformance(responseWith({
+      type: "disjunctive_mandatory",
+      fact_type: "Employee works on Project",
+      roles: ["worker", "Employee"],
+    }));
+
+    expect(response.inferred_constraints).toHaveLength(0);
+    expect(corrections.filter((c) => c.category === "arity_mismatch")).toHaveLength(1);
+  });
+
+  it("leaves the model free of arity errors, end to end", () => {
+    const { response } = enforceConformance(responseWith({
+      type: "disjunctive_mandatory",
+      fact_type: "Employee works on Project",
+      roles: ["Employee", "Employee"],
+    }));
+    const { model } = parseDraftModel(response, "Resolved");
+
+    expect(new ValidationEngine().validate(model).filter((d) => d.severity === "error"))
+      .toEqual([]);
+  });
+});
+
+describe("the resolved-arity check does not overreach", () => {
+  it("keeps a genuine two-role disjunction", () => {
+    const { response, corrections } = enforceConformance(responseWith({
+      type: "disjunctive_mandatory",
+      fact_type: "Employee works on Project",
+      roles: ["Employee", "Project"],
+    }));
+
+    expect(response.inferred_constraints).toHaveLength(1);
+    expect(corrections.filter((c) => c.category === "arity_mismatch")).toEqual([]);
+  });
+
+  it.each(["internal_uniqueness", "external_uniqueness"] as const)(
+    "keeps a %s that resolves to one role, which is valid",
+    (type) => {
+      // These two also build on a short resolution, but uniqueness over
+      // a single role is ordinary ORM -- the validator has no minimum
+      // for them, so removing them would be conformance inventing a
+      // rule.
+      const { response, corrections } = enforceConformance(responseWith({
+        type,
+        fact_type: "Employee works on Project",
+        roles: ["Employee", "Employee"],
+      }));
+
+      expect(response.inferred_constraints).toHaveLength(1);
+      expect(corrections.filter((c) => c.category === "arity_mismatch")).toEqual([]);
+    },
+  );
+
+  it("does not start charging for a ring the parser already drops for free", () => {
+    // ring wants exactly two resolved roles and the parser skips it
+    // when it cannot get them, so the constraint never reaches the
+    // validator. Charging 0.02 here would be a score change dressed up
+    // as a correctness fix, and it would land on every recorded
+    // baseline at once.
+    const { response, corrections } = enforceConformance(responseWith({
+      type: "ring",
+      fact_type: "Employee works on Project",
+      roles: ["Employee", "Employee"],
+      ring_type: "irreflexive",
+    }));
+    const { model } = parseDraftModel(response, "Ring");
+
+    expect(corrections.filter((c) => c.category === "arity_mismatch")).toEqual([]);
+    expect(response.inferred_constraints).toHaveLength(1);
+    expect(model.factTypes.flatMap((ft) => ft.constraints)).toEqual([]);
   });
 });
 

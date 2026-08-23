@@ -136,9 +136,12 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
   signal and counted the dearer one -- which is how "did the ring-player
   fix move the baseline" became a question only a paid re-run could
   answer. The corrections tally then turned out to matter most of all:
-  on the recorded answer keys **all fourteen corrections are one
-  category**, `orphaned_reference_mode`, which is the entire gap between
-  those payloads and 1.0 and was invisible behind a lump count.
+  on the recorded answer keys **all fourteen corrections were one
+  category**, `orphaned_reference_mode`, which was the entire gap
+  between those payloads and 1.0 and was invisible behind a lump count.
+  That check is now gone (barwise-839) and the answer keys score exactly
+  1.000, which is the tally's best argument for itself: a lump count
+  would have shown a stable 0.94-0.98 forever and named nothing to fix.
 
   **All of them or none** if you add a fourth: a tally in the scorer
   without one in the history row repeats the defect one level up, which

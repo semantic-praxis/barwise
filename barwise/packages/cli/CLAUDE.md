@@ -84,6 +84,28 @@ npx tsc --noEmit            # type-check only
   threshold. That is how `llm-usage` shipped seven green tests covering
   11% of the file. In process is also ~200x faster here, which is the
   smaller reason.
+- **`prompt eval` is rehearsed offline, against a fake server rather
+  than a fake client.** `tests/workspace/fakeOllama.ts` answers
+  `/api/chat` on loopback with the recorded fixtures, so
+  `tests/commands/promptEvalOffline.test.ts` drives the whole command --
+  `createLlmClient` from the flags, the derived budget, the streaming
+  reader, conformance, scoring, the warnings, the history append --
+  without an API key. Seven train cases in about half a second, against
+  roughly twenty minutes and real money for the same sweep against
+  Anthropic.
+
+  Handing the command a mock `LlmClient` would have been easier and
+  wrong: the CLI builds its own client from its own flags, and that
+  construction is part of what needed covering. **Add to the fake
+  server, not to a seam in `prompt.ts`** -- production code existing
+  only for a test is how this stops being a rehearsal.
+
+  Two traps, both of which cost time to find. Node's `fetch` pools
+  connections, so a plain `server.close()` hangs the test process after
+  the assertions pass; teardown must call `closeAllConnections()`. And
+  a suite's history file lives beside its manifest, so any test that
+  runs the packaged suite in place appends to the repository's own
+  recorded scores -- copy `evals/` to a temp directory first.
 - **Observability is opt-in and writes one file.** `BARWISE_CALL_LOG`
   gates it: unset or empty is off, `1`/`true` is
   `$XDG_STATE_HOME/barwise/calls.jsonl`, anything else is that path.

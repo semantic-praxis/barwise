@@ -23,7 +23,7 @@ describe("loadSuite on the packaged seed suite", () => {
   // shared CI runner, so the package sets a 30s testTimeout.
   it("loads the manifest with weights and ten cases in declared order", () => {
     const suite = loadSuite(defaultSuitePath());
-    expect(suite.version).toBe("1.2.0");
+    expect(suite.version).toBe("1.3.0");
     expect(suite.weights).toEqual({
       conformanceCorrection: 0.02,
       validationError: 0.1,

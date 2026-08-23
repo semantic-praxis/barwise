@@ -176,3 +176,40 @@ were found, and this one asserts the property they were instances of.
 - No change to `constraintConsistency` itself.
 - No change to the scoring weights.
 - No prompt change.
+
+## Follow-up: the sweep tested the check, not its arithmetic (barwise-840)
+
+The first diagnostic round to run with `errorsByRule` reported a single
+`constraint/disjunctive-mandatory-too-few-roles` in fifteen dev runs --
+a rule this spec's own check is supposed to make impossible.
+
+`isValidArity` counted `ic.roles.length`, the role _hints_ the model
+emitted. `resolveRolesByPlayerName` consumes each role it matches, so
+the two disagree, and three shapes carried the difference into a model:
+
+| Shape                             | Why it resolved short                               |
+| --------------------------------- | --------------------------------------------------- |
+| `["Incident", "Incident"]`        | one role, named twice                               |
+| `["Incident", "Customer"]`        | check 4's name set is **global**, not per fact type |
+| `["originates from", "Incident"]` | a role name and a player name, one role             |
+
+**The sweep passed throughout**, because every probe used distinct
+resolvable names. It asserted the check existed and never that its
+arithmetic was right -- the same failure mode one level in from the one
+this spec was written about.
+
+The check now measures the resolved count, and only for
+`disjunctive_mandatory`, `exclusion` and `exclusive_or`. That scope is
+not an approximation: every other type the parser skips outright when
+the resolved count is wrong, and a skipped constraint never reaches the
+validator, so checking them here would charge 0.02 for constraints
+already dropped for free -- a score change dressed as a correctness fix.
+The two uniqueness types do build on a short resolution, and a
+uniqueness constraint over one role is valid ORM.
+
+One resolver now serves the arity check, the ring-player check and
+population completeness. Three copies of a consuming name match is how
+this divergence grows.
+
+Verified by mutation: disabling it fails 9 tests, 3 of them sweep
+entries.

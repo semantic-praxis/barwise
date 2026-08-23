@@ -87,9 +87,11 @@ Out of scope, deferred and named:
   request: `correctionsByCategory` in the scorer, the suite report, the
   history row, and the CLI. It turned out to matter more than the
   others for the barwise-813 round, because on the recorded answer keys
-  **all fourteen corrections are one category**,
+  **all fourteen corrections were one category**,
   `orphaned_reference_mode` -- the entire gap between those payloads
-  and 1.0, invisible behind a lump count.
+  and 1.0, invisible behind a lump count. barwise-839 then removed that
+  check, which is the strongest thing that can be said for naming a
+  penalty rather than counting it.
 - **Moving `modelUsed`/`usage`/`latencyMs` off `DraftModelResult`.**
   They belong in `observe/` by this same argument, but removing them is
   a breaking change to a type three surfaces read, and it is not what

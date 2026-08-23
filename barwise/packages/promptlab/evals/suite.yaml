@@ -5,7 +5,21 @@
 # not comparable to a mean over seven, which is what the version bump
 # is here to signal: history rows either side of it measure different
 # things.
-version: 1.2.0
+#
+# 1.3.0 changes no case, no weight and no floor. It marks a change
+# OUTSIDE this file that has the same consequence: barwise-839 removed
+# `orphaned_reference_mode` from conformance, a check that fired on
+# every recorded answer key and charged 0.02 for it. Every score under
+# 1.3.0 is therefore up to a few hundredths higher than the same
+# extraction would have scored under 1.2.0, and the seven answer keys
+# moved from 0.94-0.98 to exactly 1.000.
+#
+# The version is bumped anyway because it is the field a reader uses to
+# decide whether two history rows can be compared, and after this they
+# cannot. A bump that names no case change is the honest signal here;
+# leaving it alone would make the record quietly wrong, which is the
+# failure barwise-836 exists to prevent.
+version: 1.3.0
 
 weights:
   conformanceCorrection: 0.02
