@@ -183,6 +183,7 @@ and update it in the same commit that changes a surface's reach.
 | `merge`                                               | yes | yes | no      | deliberate: an editor wants a diff view |
 | `project`, `history`                                  | yes | no  | no      | deliberate: repository operations       |
 | `prompt`                                              | yes | no  | no      | deliberate: dev tooling                 |
+| `llm-usage`                                           | yes | no  | no      | deliberate: reads a local operator log  |
 
 Every remaining gap is marked deliberate, which is the point: an
 unmarked gap is a bug. This table is hand-maintained and therefore the
@@ -190,6 +191,13 @@ same kind of claim that went stale before -- it previously asserted
 parity that did not hold, for two years' worth of readers, because
 nothing checked it (`docs/unwired-capability-audit-2026-08-20.md`).
 Treat a surface change as incomplete until this table agrees with it.
+
+`llm-usage` reports over the JSONL call log under the operator's own
+state directory (`docs/specs/llm-call-observability.spec.md`). It stays
+CLI-only for a reason the other dev-tooling rows do not share: the log
+is written by whichever process made the calls, so a report from the
+MCP server or the editor would summarise that surface's own log and
+quietly answer a different question than the operator asked.
 
 The `merge` and `review` rows were closed by
 `docs/specs/cli-surface-parity.spec.md`. Two audit findings remain open
