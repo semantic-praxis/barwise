@@ -63,8 +63,14 @@ const TRAIN = [
   "freight-corrections",
 ] as const;
 
-/** The recorded answer-key scores, which this path must reproduce. */
-const ANSWER_KEY_MEAN = 0.96;
+/**
+ * The recorded answer-key scores, which this path must reproduce.
+ *
+ * Exactly 1.000 since barwise-839 removed `orphaned_reference_mode`,
+ * the one check that charged these payloads. They ran 0.94-0.98 before
+ * it, and the whole spread was that check.
+ */
+const ANSWER_KEY_MEAN = 1;
 
 let tmp: string;
 let suitePath: string;
@@ -131,7 +137,7 @@ describe("barwise prompt eval, against a loopback provider", () => {
     expect(report.complete).toBe(true);
     expect(report.cases.map((c) => c.caseId)).toEqual([...TRAIN]);
     expect(report.mean).toBeCloseTo(ANSWER_KEY_MEAN, 10);
-    expect(report.worst).toBeCloseTo(0.94, 10);
+    expect(report.worst).toBeCloseTo(1, 10);
     expect(fake!.requests).toHaveLength(TRAIN.length);
   });
 
@@ -196,8 +202,12 @@ describe("barwise prompt eval, against a loopback provider", () => {
     const report = JSON.parse(stdout) as { complete: boolean; failures: number; mean: number; };
     expect(report.complete).toBe(false);
     expect(report.failures).toBe(1);
-    // The six that answered, over six -- not over seven.
-    expect(report.mean).toBeCloseTo((0.98 + 0.96 + 0.96 + 0.98 + 0.96 + 0.94) / 6, 10);
+    // The six that answered, over six -- not over seven. Both come to
+    // 1.000 now that the answer keys are clean, so the sharp assertion
+    // is the failure count above plus `complete: false`; a mean of 0
+    // would be the tell if a failed run were scored rather than
+    // excluded.
+    expect(report.mean).toBeCloseTo(1, 10);
   });
 
   it("warns that a truncated answer measured the budget, not the prompt", async () => {

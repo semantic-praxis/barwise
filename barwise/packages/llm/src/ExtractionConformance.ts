@@ -71,7 +71,6 @@ export function enforceConformance(
   }
 
   const identifierFactTypes = new Set<string>();
-  const identifierFactTypeEntities = new Set<string>();
   const identifierFactByEntity = new Map<
     string,
     { readonly factType: string; readonly valueType: string; }
@@ -87,7 +86,6 @@ export function enforceConformance(
       const r1IsValue = valueTypeNames.has(r1!.player);
       if (r0IsRefEntity && r1IsValue) {
         identifierFactTypes.add(ft.name);
-        identifierFactTypeEntities.add(r0!.player);
         if (!identifierFactByEntity.has(r0!.player)) {
           identifierFactByEntity.set(r0!.player, {
             factType: ft.name,
@@ -96,7 +94,6 @@ export function enforceConformance(
         }
       } else if (r1IsRefEntity && r0IsValue) {
         identifierFactTypes.add(ft.name);
-        identifierFactTypeEntities.add(r1!.player);
         if (!identifierFactByEntity.has(r1!.player)) {
           identifierFactByEntity.set(r1!.player, {
             factType: ft.name,
@@ -149,13 +146,6 @@ export function enforceConformance(
   // --- Check subtype cycles ---
   const cleanedSubtypes = cleanSubtypes(input.subtypes, corrections);
 
-  // --- Check reference_mode without identifier fact type ---
-  checkOrphanedReferenceModes(
-    entityRefModes,
-    identifierFactTypeEntities,
-    corrections,
-  );
-
   return {
     response: {
       ...input,
@@ -179,8 +169,10 @@ export function enforceConformance(
  * identifier fact type carries, the identity bijection instance
  * (entity = value, identifier = value) is appended and a correction is
  * recorded. Only values already present in the payload are used --
- * nothing is invented -- and entities whose reference mode is orphaned
- * (no identifier fact type) are untouched, staying detect-only.
+ * nothing is invented -- and an entity with no identifier fact type at
+ * all is simply absent from the map, so it is never repaired and never
+ * charged. That used to be "detect-only" and is now nothing at all:
+ * barwise-839 removed the check that charged for it.
  */
 function repairIdentifierPopulations(
   populations: readonly ExtractedPopulation[],
@@ -795,26 +787,4 @@ function cleanSubtypes(
   }
 
   return result;
-}
-
-// ---------------------------------------------------------------------------
-// Reference mode checks
-// ---------------------------------------------------------------------------
-
-function checkOrphanedReferenceModes(
-  entityRefModes: Map<string, string>,
-  identifierFactTypeEntities: Set<string>,
-  corrections: ConformanceCorrection[],
-): void {
-  // Check 8: Entity has reference_mode but no identifier fact type
-  for (const [entityName] of entityRefModes) {
-    if (!identifierFactTypeEntities.has(entityName)) {
-      corrections.push({
-        category: "orphaned_reference_mode",
-        description:
-          `Entity "${entityName}" has a reference_mode but no identifier fact type was found.`,
-        element: entityName,
-      });
-    }
-  }
 }

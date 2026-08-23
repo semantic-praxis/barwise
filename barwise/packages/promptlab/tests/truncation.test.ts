@@ -46,9 +46,34 @@ function fixtureClient(decorate: (r: CompletionResponse) => CompletionResponse =
   };
 }
 
+/**
+ * The answer keys are clean, so a run that must show a penalty has to
+ * introduce one. An exclusion constraint over a single role is the
+ * cheapest: conformance removes it and records exactly one correction,
+ * and the validator never sees it.
+ */
+function malformedConstraintClient() {
+  return fixtureClient((r) => {
+    const payload = JSON.parse(r.content!) as {
+      fact_types: Array<{ name: string; roles: Array<{ player: string; }>; }>;
+      inferred_constraints: unknown[];
+    };
+    const ft = payload.fact_types[0]!;
+    payload.inferred_constraints.push({
+      type: "exclusion",
+      fact_type: ft.name,
+      roles: [ft.roles[0]!.player],
+      description: "malformed: exclusion over a single role",
+      confidence: "high",
+      source_references: [{ lines: [1, 2], excerpt: "test" }],
+    });
+    return { ...r, content: JSON.stringify(payload) };
+  });
+}
+
 describe("a truncated run", () => {
   it("is excluded from the mean rather than scored", async () => {
-    // The payload is a perfect answer key -- it would score 0.98. If
+    // The payload is a perfect answer key -- it would score 1.000. If
     // truncation were scored instead of excluded, this suite would come
     // back with a mean near 1 and no indication anything was wrong.
     const report = await runSuite(
@@ -126,7 +151,7 @@ describe("an untruncated run", () => {
 
     expect(report.truncations).toBe(0);
     expect(report.complete).toBe(true);
-    expect(report.cases[0]!.mean).toBeCloseTo(0.98, 10);
+    expect(report.cases[0]!.mean).toBeCloseTo(1, 10);
   });
 
   it("still carries the provider's diagnostics", async () => {
@@ -340,13 +365,15 @@ describe("naming the warnings", () => {
     // Distinct from `tokens`, which needed a cost argument because
     // caching is score-neutral. These are ~80% of what a run loses, so
     // a row without them cannot say why a mean moved.
-    const report = await runSuite(suite, fixtureClient(), TRAIN);
+    //
+    // The penalty is manufactured. Until barwise-839 this test read the
+    // one correction every answer key happened to carry, which made it
+    // hostage to a check nobody had chosen to keep -- and a row of
+    // three zeroes demonstrates nothing about whether penalties are
+    // carried at all.
+    const report = await runSuite(suite, malformedConstraintClient(), TRAIN);
     const entry = toHistoryEntry(report, "2026-08-22T00:00:00Z");
 
-    // One conformance correction, which is exactly the 0.02 between
-    // this answer key's pinned 0.98 and a clean 1.0. That figure has
-    // been asserted since the scorer existed without anything saying
-    // where it came from; the field is what says it.
     expect(entry.cases[0]!.penalties).toEqual({
       corrections: 1,
       errors: 0,

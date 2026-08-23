@@ -400,8 +400,23 @@ describe("ExtractionConformance", () => {
     });
   });
 
-  describe("reference mode checks", () => {
-    it("warns when entity has reference_mode but no identifier fact type", () => {
+  describe("reference modes", () => {
+    it("does not charge an entity for a reference mode with no identifier fact type", () => {
+      // barwise-839 removed the check that did. It was the only
+      // conformance check mirroring no validator rule, it charged 0.02
+      // for a condition core rates `info` (and therefore prices at
+      // zero), and it flagged precisely what ORM reference-mode
+      // notation abbreviates: `Customer (customer_id)` IS the shorthand
+      // for the identifier fact type.
+      //
+      // The parser also manufactures a reference mode for every entity
+      // that lacks one -- `ObjectType` throws without one -- so "has a
+      // reference mode" was never evidence of anything.
+      //
+      // Kept as a regression guard rather than deleted: the check fired
+      // 14 times across the 7 recorded answer keys and was their entire
+      // penalty, so reintroducing it would silently reprice every
+      // recorded history row.
       const input = makeResponse({
         object_types: [
           {
@@ -415,40 +430,7 @@ describe("ExtractionConformance", () => {
       });
 
       const { corrections } = enforceConformance(input);
-      expect(corrections).toHaveLength(1);
-      expect(corrections[0]!.category).toBe("orphaned_reference_mode");
-      expect(corrections[0]!.element).toBe("Customer");
-    });
-
-    it("does not warn when identifier fact type exists", () => {
-      const input = makeResponse({
-        object_types: [
-          {
-            name: "Customer",
-            kind: "entity",
-            reference_mode: "customer_id",
-            source_references: REF,
-          },
-          { name: "CustomerId", kind: "value", source_references: REF },
-        ],
-        fact_types: [
-          {
-            name: "Customer has CustomerId",
-            roles: [
-              { player: "Customer", role_name: "has" },
-              { player: "CustomerId", role_name: "identifies" },
-            ],
-            readings: ["{0} has {1}"],
-            source_references: REF,
-          },
-        ],
-      });
-
-      const { corrections } = enforceConformance(input);
-      const refModeCorrections = corrections.filter(
-        (c) => c.category === "orphaned_reference_mode",
-      );
-      expect(refModeCorrections).toHaveLength(0);
+      expect(corrections).toHaveLength(0);
     });
   });
 
@@ -536,7 +518,7 @@ describe("ExtractionConformance", () => {
       expect(idPop!.instances).toHaveLength(1);
     });
 
-    it("leaves orphaned reference modes detect-only", () => {
+    it("does not invent an identifier population for an entity that has no identifier", () => {
       const input = makeResponse({
         object_types: [
           {
@@ -568,8 +550,12 @@ describe("ExtractionConformance", () => {
       });
 
       const { response, corrections } = enforceConformance(input);
-      expect(corrections.some((c) => c.category === "orphaned_reference_mode")).toBe(true);
+      // Customer declares a reference mode but no fact type identifies
+      // it, so it never enters identifierFactByEntity and the repair has
+      // nothing to key on. Nothing is invented, and since barwise-839
+      // nothing is charged either.
       expect(corrections.some((c) => c.category === "missing_identifier_population")).toBe(false);
+      expect(corrections).toHaveLength(0);
       expect(response.populations).toHaveLength(1);
     });
   });
@@ -628,11 +614,6 @@ describe("ExtractionConformance", () => {
       expect(response.populations).toHaveLength(0);
       expect(response.inferred_constraints).toHaveLength(0);
       // 2 population corrections + 1 constraint correction.
-      // Note: Patient has reference_mode "mrn" and "Patient has Status"
-      // is a binary with Patient (entity) + Status (value), so the
-      // identifier fact type heuristic incorrectly considers it an
-      // identifier fact type. The orphaned_reference_mode check is
-      // therefore not triggered here.
       expect(corrections).toHaveLength(3);
 
       const categories = corrections.map((c) => c.category);

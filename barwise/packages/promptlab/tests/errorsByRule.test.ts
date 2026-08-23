@@ -78,7 +78,7 @@ describe("CaseScore.errorsByRule", () => {
 
 describe("HistoryEntry.errorsByRule", () => {
   const base: SuiteReport = {
-    suiteVersion: "1.2.0",
+    suiteVersion: "1.3.0",
     artifactVersion: "test",
     repeat: 1,
     mean: 0.9,

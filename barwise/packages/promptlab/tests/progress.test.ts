@@ -76,7 +76,7 @@ describe("runSuite progress", () => {
     const first = events[0]!;
     expect(first.kind).toBe("sample");
     if (first.kind !== "sample") return;
-    expect(first.score).toBeCloseTo(0.98, 10);
+    expect(first.score).toBeCloseTo(1, 10);
     expect(first.latencyMs).toBe(1234);
     expect(first.failed).toBeUndefined();
   });
@@ -85,8 +85,12 @@ describe("runSuite progress", () => {
     // A floor above every achievable score stands in for a collapse.
     // Seeing it live is the point: three calls in, an operator can stop
     // a run whose rubric nothing can pass.
+    //
+    // Above 1.0, not 0.999: the answer keys score exactly 1.000 since
+    // barwise-839, so a floor inside the unit interval no longer sits
+    // above every achievable score.
     const events: RunProgress[] = [];
-    await runSuite({ ...suite, collapseFloor: 0.999 }, fixtureClient(), {
+    await runSuite({ ...suite, collapseFloor: 1.001 }, fixtureClient(), {
       ...TRAIN,
       onProgress: (e) => events.push(e),
     });

@@ -31,7 +31,7 @@ describe("barwise prompt score", () => {
     const score = JSON.parse(result.stdout);
     expect(score.caseId).toBe("order-management");
     expect(score.rubricPassed).toBe(score.rubricTotal);
-    expect(score.score).toBeCloseTo(0.98, 10);
+    expect(score.score).toBeCloseTo(1, 10);
   });
 
   it("reports an unknown case id with the available ids", async () => {

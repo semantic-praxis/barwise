@@ -25,14 +25,23 @@ function caseFor(caseId: string) {
 }
 
 describe("scoreExtraction over the seed suite", () => {
+  // Every answer key scores exactly 1.000 as of barwise-839. It did not
+  // before: the seven ran 0.94-0.98, and all fourteen of the
+  // corrections between them were `orphaned_reference_mode` -- a check
+  // that mirrored no validator rule and charged 0.02 for what ORM
+  // reference-mode notation is for. Removing it left these payloads
+  // scoring what a hand-curated reference payload should score.
+  //
+  // A 1.000 row is a stronger pin than a 0.94 one, because there is now
+  // exactly one way to be right and any regression moves the number.
   const expected = [
-    { caseId: "order-management", score: 0.98, corrections: 1 },
-    { caseId: "university-enrollment", score: 0.96, corrections: 2 },
-    { caseId: "clinic-appointments", score: 0.96, corrections: 2 },
-    { caseId: "employee-hierarchy", score: 0.94, corrections: 3 },
-    { caseId: "project-staffing", score: 0.98, corrections: 1 },
-    { caseId: "conference-reviews", score: 0.96, corrections: 2 },
-    { caseId: "freight-corrections", score: 0.94, corrections: 3 },
+    { caseId: "order-management", score: 1, corrections: 0 },
+    { caseId: "university-enrollment", score: 1, corrections: 0 },
+    { caseId: "clinic-appointments", score: 1, corrections: 0 },
+    { caseId: "employee-hierarchy", score: 1, corrections: 0 },
+    { caseId: "project-staffing", score: 1, corrections: 0 },
+    { caseId: "conference-reviews", score: 1, corrections: 0 },
+    { caseId: "freight-corrections", score: 1, corrections: 0 },
   ];
 
   it.each(expected)(
@@ -61,18 +70,37 @@ describe("scoreExtraction over the seed suite", () => {
   });
 
   it("applies the declared weights and floors at zero", () => {
+    // The penalty has to be manufactured now that every answer key is
+    // clean. That is the honest form of this test anyway: it was always
+    // about the weights and the floor, and leaning on a reference
+    // payload happening to be imperfect made it hostage to an unrelated
+    // decision -- which is exactly how barwise-839 came to be load
+    // bearing without anyone choosing it.
+    const payload = JSON.parse(payloadFor("order-management")) as {
+      inferred_constraints: unknown[];
+    };
+    payload.inferred_constraints.push({
+      type: "exclusion",
+      fact_type: "Customer places Order",
+      roles: ["Customer"],
+      description: "malformed: exclusion over a single role",
+      confidence: "high",
+      source_references: [{ lines: [1, 2], excerpt: "test" }],
+    });
     const heavy = {
-      conformanceCorrection: 0.5,
+      conformanceCorrection: 2,
       validationError: 0.5,
       validationWarning: 0.5,
       ambiguityExcess: 0.5,
     };
     const result = scoreExtraction(
-      payloadFor("employee-hierarchy"),
-      caseFor("employee-hierarchy"),
+      JSON.stringify(payload),
+      caseFor("order-management"),
       heavy,
     );
-    // 3 corrections at 0.5 overwhelm a perfect rubric: 1.0 - 1.5 -> 0.
+
+    expect(result.conformanceCorrections).toBe(1);
+    // One correction at 2.0 overwhelms a perfect rubric: 1.0 - 2.0 -> 0.
     expect(result.score).toBe(0);
   });
 
