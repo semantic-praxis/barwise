@@ -305,6 +305,13 @@ export interface SuiteReport {
    * (docs/specs/pipeline-observability.spec.md).
    */
   readonly errorsByRule: Readonly<Record<string, number>>;
+  /**
+   * Which conformance checks fired across the sweep, and how often.
+   *
+   * What the barwise-813 diagnostic round reads to price a promotion
+   * candidate that deterministic code now handles.
+   */
+  readonly correctionsByCategory: Readonly<Record<string, number>>;
   /** True when every requested run produced a score. */
   readonly complete: boolean;
   /** Which half ran, when one was selected. */
@@ -545,6 +552,7 @@ export async function runSuite(
     ...(cacheTotals(cases, cacheSystemPrompt) ?? {}),
     warningsByRule: tallyByRule(cases, (s) => s.warningsByRule),
     errorsByRule: tallyByRule(cases, (s) => s.errorsByRule),
+    correctionsByCategory: tallyByRule(cases, (s) => s.correctionsByCategory),
     complete: failures === 0,
     ...(selected !== undefined ? { split: selected } : {}),
     dispersion: dispersionOf(cases),
@@ -569,6 +577,7 @@ function unscorable(caseId: string): CaseScore {
     ambiguityExcess: 0,
     warningsByRule: {},
     errorsByRule: {},
+    correctionsByCategory: {},
     score: 0,
     results: [],
   };

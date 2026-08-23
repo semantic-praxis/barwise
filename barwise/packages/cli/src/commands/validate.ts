@@ -6,7 +6,9 @@
  */
 
 import { type Diagnostic, projectRules, ValidationEngine } from "@barwise/core";
+import { emitValidationRecord, summariseValidation } from "@barwise/llm";
 import type { Command } from "commander";
+import { callLogSink } from "../workspace/callLogSink.js";
 import { formatDiagnostics, formatDiagnosticsJson } from "../workspace/format.js";
 import { isProjectFile, loadModel } from "../workspace/io.js";
 import { loadProject } from "../workspace/projectLoader.js";
@@ -28,6 +30,17 @@ export function registerValidateCommand(program: Command): void {
         const diagnostics = isProjectFile(file)
           ? collectProjectDiagnostics(file)
           : new ValidationEngine().validate(loadModel(file));
+        // Recorded under the command name, not the path: a path is the
+        // user's directory layout, which is theirs and not ours to
+        // accumulate (docs/specs/pipeline-observability.spec.md).
+        emitValidationRecord(
+          callLogSink(),
+          summariseValidation({
+            startedAt: new Date().toISOString(),
+            source: isProjectFile(file) ? "validate:project" : "validate:model",
+            diagnostics,
+          }),
+        );
         report(file, diagnostics, opts);
       } catch (err) {
         process.stderr.write(`Error: ${(err as Error).message}\n`);
