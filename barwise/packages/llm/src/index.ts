@@ -99,5 +99,9 @@ export { createLlmClient, detectProvider } from "./providers/factory.js";
 export type { ProviderName, ProviderOptions } from "./providers/factory.js";
 
 // Review
-export { reviewModel } from "./review/reviewModel.js";
+export {
+  buildReviewSystemPrompt,
+  defaultReviewArtifact,
+  reviewModel,
+} from "./review/reviewModel.js";
 export type { ReviewOptions, ReviewResult, ReviewSuggestion } from "./review/reviewModel.js";

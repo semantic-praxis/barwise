@@ -196,6 +196,131 @@ describe("reviewModel", () => {
     await expect(reviewModel(model, client)).rejects.toThrow("missing 'summary'");
   });
 
+  it("drops a suggestion whose category is outside the declared enum", async () => {
+    // The cast this replaces made `category: "style"` a typed lie: the
+    // value claimed to be one of five and was not. It matters beyond
+    // tidiness because the review eval matches a planted defect on
+    // category (docs/specs/review-surface-evals.spec.md).
+    const model = buildTestModel();
+
+    const client = createMockClient(JSON.stringify({
+      suggestions: [
+        {
+          category: "style",
+          severity: "suggestion",
+          element: "Customer",
+          description: "Rename for style",
+          rationale: "Style matters",
+        },
+        {
+          category: "naming",
+          severity: "suggestion",
+          element: "Customer",
+          description: "Rename for clarity",
+          rationale: "Clarity matters",
+        },
+      ],
+      summary: "Mixed.",
+    }));
+
+    const result = await reviewModel(model, client);
+
+    // The well-formed suggestion beside it survives: one bad entry is
+    // not a reason to discard a whole review.
+    expect(result.suggestions).toHaveLength(1);
+    expect(result.suggestions[0]!.category).toBe("naming");
+  });
+
+  it("drops a suggestion whose severity is outside the declared enum", async () => {
+    const model = buildTestModel();
+
+    const client = createMockClient(JSON.stringify({
+      suggestions: [
+        {
+          category: "naming",
+          severity: "critical",
+          element: "Customer",
+          description: "Rename",
+          rationale: "Because",
+        },
+      ],
+      summary: "One suggestion.",
+    }));
+
+    const result = await reviewModel(model, client);
+
+    expect(result.suggestions).toEqual([]);
+    expect(result.summary).toBe("One suggestion.");
+  });
+
+  it("drops a suggestion missing a required string field", async () => {
+    const model = buildTestModel();
+
+    const client = createMockClient(JSON.stringify({
+      suggestions: [
+        { category: "naming", severity: "info", description: "No rationale given" },
+        { category: "naming", severity: "info", rationale: "No description given" },
+        { category: "naming", severity: "info", description: 7, rationale: "Not a string" },
+        "a bare string, not a suggestion",
+        null,
+      ],
+      summary: "All malformed.",
+    }));
+
+    const result = await reviewModel(model, client);
+
+    expect(result.suggestions).toEqual([]);
+  });
+
+  it("keeps a valid suggestion that omits the optional element", async () => {
+    // `element` is optional in the response schema; absent is not
+    // malformed, and the eval falls back to matching on description.
+    const model = buildTestModel();
+
+    const client = createMockClient(JSON.stringify({
+      suggestions: [
+        {
+          category: "normalization",
+          severity: "warning",
+          description: "Customer and Client look like the same concept",
+          rationale: "Redundant fact types",
+        },
+      ],
+      summary: "One issue.",
+    }));
+
+    const result = await reviewModel(model, client);
+
+    expect(result.suggestions).toHaveLength(1);
+    expect(result.suggestions[0]!.element).toBeUndefined();
+    expect("element" in result.suggestions[0]!).toBe(false);
+  });
+
+  it("keeps every declared category and severity", async () => {
+    // Guards the other direction: validation must not narrow the enum
+    // the prompt and the response schema both declare.
+    const model = buildTestModel();
+    const categories = ["naming", "completeness", "normalization", "constraint", "definition"];
+    const severities = ["info", "suggestion", "warning"];
+
+    const client = createMockClient(JSON.stringify({
+      suggestions: categories.flatMap((category) =>
+        severities.map((severity) => ({
+          category,
+          severity,
+          element: "Customer",
+          description: `${category}/${severity}`,
+          rationale: "Because",
+        }))
+      ),
+      summary: "Everything.",
+    }));
+
+    const result = await reviewModel(model, client);
+
+    expect(result.suggestions).toHaveLength(categories.length * severities.length);
+  });
+
   it("serializes model with entity types and definitions", async () => {
     const model = buildMultiEntityModel();
 
