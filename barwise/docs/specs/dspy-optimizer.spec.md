@@ -195,6 +195,18 @@ there, the seam would be wrong.
      believing they had just gated the candidate they paid to compile.
      `match` is now required and derived from the target model.
 
+  A third, found while preparing the first real compilation: the
+  `--max-calls` ceiling reached only GEPA. `bootstrap` and `mipro` took
+  nothing, so the flag the operator was required to supply -- and by
+  which they judged what a run would cost -- enforced nothing for two of
+  the three choices, and the thing not enforced was money. Now a
+  `CallBudget` callback counting at `on_lm_start`. Enforcing it needed
+  two further corrections: DSPy swallows callback exceptions and
+  `BootstrapFewShot` swallows per-attempt ones, so `BudgetExceeded`
+  derives from `BaseException`; and `run()` restores the global callback
+  list in a `finally`, since a second run would otherwise count against
+  the first run's ceiling.
+
   The second is the same failure class as barwise-842, one layer out:
   a resolution that quietly falls back and reports success. It was
   found by round-tripping an export through the real loader rather than

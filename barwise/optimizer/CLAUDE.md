@@ -91,6 +91,17 @@ The tests require the CLI to be **built** (`npm run build` from
   loads fine and is then silently skipped -- the gating run measures
   the default while reporting on the candidate. `write_candidate`
   requires it and `match_for_target` derives it from `provider/model`.
+- **The call ceiling is enforced, and enforcing it took three tries.**
+  `--max-calls` originally reached only GEPA's `max_metric_calls`, so
+  for `bootstrap` and `mipro` the required flag enforced nothing. It is
+  now a `CallBudget` callback counting at `on_lm_start`. Two traps on
+  the way: DSPy wraps callbacks in `except Exception` and
+  `BootstrapFewShot` wraps each attempt the same way, so
+  **`BudgetExceeded` derives from `BaseException`** -- the idiom that
+  keeps `KeyboardInterrupt` out of blanket handlers. And `run()`
+  restores `dspy.settings.callbacks` in a `finally`, because a second
+  run in one process would otherwise still be counting against the
+  first run's ceiling.
 - **Two DSPy facts that cost a debugging round if unknown.** `MIPROv2`
   reads `dspy.settings.lm` in its constructor and raises without one,
   while `BootstrapFewShot` constructs happily and fails much later --

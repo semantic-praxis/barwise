@@ -27,6 +27,7 @@ from pathlib import Path
 
 import dspy
 
+from .budget import BudgetExceeded, CallBudget
 from .dataset import compile_set, load_suite, report_set
 from .export import (
     Provenance,
@@ -151,10 +152,30 @@ def evaluate(program, examples, metric, samples: int) -> MetricLog:
 
 
 def run(config: RunConfig, out_dir: Path) -> dict:
-    """Compile, evaluate on the held-out split, and write the artifacts."""
+    """Compile, evaluate on the held-out split, and write the artifacts.
+
+    The budget is registered as a DSPy callback rather than threaded
+    through the program, because the optimizer deep-copies the student
+    during compilation and a counter living on the program would stop
+    being shared exactly when it started mattering.
+    """
     config.validate()
     suite = load_suite()
 
+    budget = CallBudget(config.max_calls)
+    previous_callbacks = list(dspy.settings.callbacks or [])
+    dspy.settings.configure(callbacks=[*previous_callbacks, budget])
+    try:
+        return _run_under_budget(config, out_dir, suite, budget)
+    finally:
+        # Restored, not left appended. `dspy.settings` is global, so a
+        # second run in the same process would otherwise still be
+        # counting against the first run's ceiling -- and would trip it
+        # partway through for reasons nothing in that run explains.
+        dspy.settings.configure(callbacks=previous_callbacks)
+
+
+def _run_under_budget(config: RunConfig, out_dir: Path, suite, budget: CallBudget) -> dict:
     baseline_log = MetricLog()
     candidate_log = MetricLog()
 
@@ -207,6 +228,7 @@ def run(config: RunConfig, out_dir: Path) -> dict:
         "baseline": baseline_log.summary(),
         "candidate": candidate_log.summary(),
         "resolvable": resolvable,
+        "budget": budget.summary(),
     }
 
 
@@ -221,7 +243,11 @@ def main(argv: list[str] | None = None) -> int:
         "--max-calls",
         type=int,
         required=True,
-        help="Hard ceiling on LLM calls. Required: there is no safe default.",
+        help=(
+            "Hard ceiling on LLM calls, enforced for every optimizer. The run "
+            "stops mid-compile rather than overspending. Required: there is no "
+            "safe default."
+        ),
     )
     parser.add_argument(
         "--samples-per-candidate",
@@ -252,7 +278,13 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     dspy.configure(lm=dspy.LM(config.target_model))
-    result = run(config, Path(args.out))
+    try:
+        result = run(config, Path(args.out))
+    except BudgetExceeded as exhausted:
+        # Deliberately not a traceback: the operator set this ceiling
+        # and hitting it is an answer, not a crash.
+        print(f"Stopped: {exhausted}")
+        return 2
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 
