@@ -114,6 +114,9 @@ working in a package:
 - `barwise/packages/cli/CLAUDE.md` -- CLI tool (validate, verbalize, schema, export, diagram, diff, import, gym, prompt)
 - `barwise/packages/mcp/CLAUDE.md` -- MCP server (tools, resources, prompts)
 - `barwise/packages/vscode/CLAUDE.md` -- VS Code extension integration
+- `barwise/optimizer/CLAUDE.md` -- the DSPy optimization lane (Python,
+  offline, dev-time only; not an npm package and not a dependency
+  of one)
 - `AGENTS.md` -- General guidance on development practices.
 
 ## Dependency Graph
@@ -147,6 +150,15 @@ working in a package:
   |--- @barwise/mcp             (core, diagram, llm, code-analysis, dbt, formats, learn)
   |--- barwise-vscode           (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, mcp)
 ```
+
+The one thing outside that graph is `barwise/optimizer/`: the DSPy
+prompt-optimization lane. It is Python, it is dev-time only, and it
+depends on the workspace **as a subprocess** (`barwise prompt schema`,
+`barwise prompt score`) rather than by import. Turborepo does not know
+it exists and CI does not run it. Nothing there may become a runtime
+dependency -- if a capability built in that lane turns out to be needed
+at run time, it moves into `@barwise/llm` as TypeScript. That is the
+determinism rule applied one layer further out than `core`.
 
 `@barwise/code-analysis` is the template for the connector convention:
 a package outside `core` that keeps its own I/O (LSP sessions, repo

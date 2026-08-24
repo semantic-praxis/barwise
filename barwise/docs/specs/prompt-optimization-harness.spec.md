@@ -1,10 +1,12 @@
 # Prompt optimization harness: DSPy-optimized, per-provider prompt artifacts for the LLM surfaces
 
-Status: Accepted (merged in PR #289). Workstreams 1 (artifact seam)
-and 2 (promptlab: eval suite, scorer, runner, CLI) implemented **in
-part** -- see the correction below. Workstreams 3-6 open.
+Status: Accepted (merged in PR #289). Workstreams 1 (artifact seam),
+2 (promptlab: eval suite, scorer, runner, CLI) and **3 (the DSPy
+`optimizer/` project, 2026-08-23 -- see
+`docs/specs/dspy-optimizer.spec.md`)** implemented. Workstreams 4-6
+open.
 Created: 2026-08-08
-Last-updated: 2026-08-09
+Last-updated: 2026-08-23
 
 > **Correction (2026-08-09).** Workstream 1 shipped the artifact seam
 > but not its production wiring, and two claims in this spec were
@@ -405,7 +407,16 @@ calls happen only when the user runs `eval` with keys configured; the
 package's CI tests use mock `LlmClient`s with canned responses, per
 `llm` convention.
 
-### 3. `optimizer/`: the DSPy project (provisional: not yet grounded)
+### 3. `optimizer/`: the DSPy project (implemented 2026-08-23)
+
+> **Grounded, and two of the three notes below changed the design.**
+> DSPy renders its own field protocol around the instructions, so the
+> compiled program's score is a search signal and never the accepted
+> number. And demos do not fit naively: the system prompt is ~4,540
+> tokens against demo payloads of 1,103-3,851 (mean 1,984), so
+> `BootstrapFewShot`'s 4-16 default is a 3x to 8x prompt paid on every
+> call -- the exporter budgets and truncates, and the compile step caps
+> demos at 2. Full spec: `docs/specs/dspy-optimizer.spec.md`.
 
 The Python project: the extraction signature constrained by
 `barwise prompt schema` output, the metric shelling to
