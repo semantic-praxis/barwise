@@ -136,6 +136,56 @@ The one result the run did establish: **demos fix format adherence**,
 `unparseable` 5 to 0 across 15 evaluations. That is barwise-812's
 question answered on real content.
 
+## The second compilation, and what the two together say
+
+`--seed-from default` produced a clean run: no saturation, no
+unparseable answers, both arms reconciling to the digit.
+
+|                      | mean  | penalty/run |
+| -------------------- | ----- | ----------- |
+| baseline (haiku45-2) | 0.870 | 0.130       |
+| candidate (+2 demos) | 0.840 | 0.160       |
+
+Margin -0.030 against a resolvable difference of 0.0999: inside the
+noise band, so the run is evidence of nothing either way, with a
+negative point estimate. **Not adopted.** The demos drove
+`arity_mismatch` 5 to 20 -- a count, so a real pattern -- while fixing
+`duplicate_constraint` 5 to 0.
+
+The exact reconciliation carries the more useful finding:
+`rubricPassed == rubricTotal` on every evaluation of both arms. Haiku
+passes the whole rubric on all three held-out cases, every time, so
+**the entire gap from 1.0 is penalty rather than missing content** --
+and 77% of that penalty is one rule,
+`completeness/fact-type-without-constraints`, at 30 occurrences.
+
+### What this says about the lane's usefulness
+
+Worth stating plainly, because it bears on how much to invest here.
+
+**The measurement is the binding constraint, not the search.** At n=5
+the resolvable difference is ~0.10 and the entire remaining headroom on
+the shipped prompt is 0.13. An optimizer cannot hill-climb on a signal
+coarser than the hill; almost any real improvement it found would be
+reported as noise. Buying resolution is possible but expensive -- n=45
+per configuration to resolve 0.03.
+
+**The rule counts do not have that problem**, and they are the half of
+this design that has paid every time. 30 occurrences of one rule is a
+hard number at the same sample size where a 0.03 shift in a mean is
+invisible. Nothing about that requires an optimizer.
+
+**Bootstrap is the wrong tool for what remains.** It selects demos from
+the model's own traces, so it propagates their defects, and it cannot
+touch instructions -- which is where the one remaining rule lives.
+`mipro`/`gepa` are the untested half and the only ones with a plausible
+case.
+
+**Headroom is what makes an optimizer worth running**, and extraction
+has little left. The argument for the lane is strongest on a surface
+that has had no prompt engineering at all -- which is `review`, once it
+has a metric (see the Out of scope note above).
+
 ## Scope
 
 In scope, as `optimizer/` (uv-managed, outside the npm workspace):
