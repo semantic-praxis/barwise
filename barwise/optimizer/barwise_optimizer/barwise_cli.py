@@ -65,12 +65,35 @@ def resolve_cli() -> list[str]:
     )
 
 
+#: Commander's wording when a subcommand or flag does not exist. The
+#: only way a *correct* call reaches it is a CLI older than this lane.
+_STALE_MARKERS = ("unknown command", "unknown option")
+
+
 def _run(args: list[str]) -> str:
     cmd = resolve_cli() + args
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
+        stderr = proc.stderr.strip()
+        if any(marker in stderr.lower() for marker in _STALE_MARKERS):
+            # The seam runs `packages/cli/dist/index.js` -- built output,
+            # not sources -- so pulling a branch that adds a command
+            # leaves this lane calling a CLI that does not have it yet.
+            # The raw commander error names the symptom and not the
+            # cause, and it costs an attempted run to work out.
+            raise BarwiseCliError(
+                f"The barwise CLI does not recognise this call:\n  {stderr}\n\n"
+                "This lane runs the CLI's BUILT output "
+                "(packages/cli/dist/index.js), so a freshly pulled branch "
+                "that adds a command still has the previous build on disk. "
+                "Rebuild it:\n\n"
+                "    cd barwise && npm run build\n\n"
+                "If the command genuinely does not exist in this checkout, "
+                "the lane is newer than the CLI it is pointed at -- check "
+                "BARWISE_CLI."
+            )
         raise BarwiseCliError(
-            f"`{' '.join(cmd)}` exited {proc.returncode}.\n{proc.stderr.strip()}"
+            f"`{' '.join(cmd)}` exited {proc.returncode}.\n{stderr}"
         )
     return proc.stdout
 

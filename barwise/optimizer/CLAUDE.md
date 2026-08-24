@@ -39,7 +39,7 @@ tests/                    all offline: no API key, no network
 
 ```sh
 uv sync --extra dev        # install
-uv run pytest -q           # the whole suite, offline, ~9s
+uv run pytest -q           # the whole suite, offline, ~75s
 
 # A real compilation. Costs money. Requires a key in the environment --
 # never pass one as an argument.
@@ -48,9 +48,13 @@ uv run python -m barwise_optimizer.compile \
   --optimizer bootstrap --max-calls 200 --samples-per-candidate 5
 ```
 
-The tests require the CLI to be **built** (`npm run build` from
-`barwise/`), because the seam runs `packages/cli/dist/index.js`.
-`BARWISE_CLI` overrides what gets run.
+**Rebuild the CLI after pulling.** The seam runs
+`packages/cli/dist/index.js` -- built output, not sources -- so a branch
+that adds a command still has the previous build on disk until
+`npm run build` runs from `barwise/`. That bit once, as
+`error: unknown command 'artifact'` mid-compile; `_run` now recognises
+commander's wording and says to rebuild instead of passing the raw error
+through. `BARWISE_CLI` overrides what gets run.
 
 ## Key Conventions
 

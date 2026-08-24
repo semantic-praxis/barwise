@@ -14,7 +14,13 @@ from pathlib import Path
 
 import pytest
 
-from barwise_optimizer.barwise_cli import CaseScore, extraction_schema, score_extraction
+from barwise_optimizer.barwise_cli import (
+    BarwiseCliError,
+    CaseScore,
+    default_instructions,
+    extraction_schema,
+    score_extraction,
+)
 from barwise_optimizer.metric import (
     MetricLog,
     make_metric,
@@ -195,3 +201,42 @@ def test_the_log_counts_floored_evaluations():
 
     assert log.floored == 1
     assert log.summary()["floored"] == 1
+
+
+def test_a_stale_cli_build_is_diagnosed_rather_than_raised_raw(tmp_path, monkeypatch):
+    """A CLI older than this lane says so, and says how to fix it.
+
+    The seam runs `packages/cli/dist/index.js` -- built output, not
+    sources -- so pulling a branch that adds a command leaves this lane
+    calling a CLI without it. Commander answers "unknown command
+    'artifact'", which names the symptom and not the cause; the first
+    time it happened it cost an attempted compilation to work out.
+    """
+    stub = tmp_path / "old-cli.js"
+    stub.write_text(
+        "console.error(\"error: unknown command 'artifact'\");\nprocess.exit(1);\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("BARWISE_CLI", f"node {stub}")
+
+    with pytest.raises(BarwiseCliError) as raised:
+        default_instructions(provider="anthropic", model="claude-haiku-4-5")
+
+    assert "npm run build" in str(raised.value)
+    assert "BUILT output" in str(raised.value)
+
+
+def test_an_ordinary_cli_failure_still_reports_plainly(tmp_path, monkeypatch):
+    # Only the stale-build shape gets the special message; everything
+    # else must not be dressed up as one.
+    stub = tmp_path / "broken-cli.js"
+    stub.write_text(
+        'console.error("Error: no such eval case");\nprocess.exit(1);\n', encoding="utf-8"
+    )
+    monkeypatch.setenv("BARWISE_CLI", f"node {stub}")
+
+    with pytest.raises(BarwiseCliError) as raised:
+        default_instructions()
+
+    assert "npm run build" not in str(raised.value)
+    assert "no such eval case" in str(raised.value)
