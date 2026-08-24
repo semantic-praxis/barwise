@@ -19,12 +19,49 @@
 # cannot. A bump that names no case change is the honest signal here;
 # leaving it alone would make the record quietly wrong, which is the
 # failure barwise-836 exists to prevent.
-version: 1.3.0
+#
+# 2.0.0 changes no case either, and bumps the major for the same reason
+# 1.3.0 bumped the minor: what moved is the meaning of every score
+# (docs/specs/eval-split-stratification.spec.md, workstream 1).
+# `scoreExtraction` now divides each rule's occurrence count by the
+# scored model's element count (object types plus fact types) before
+# applying the weight. Penalties used to be counted absolutely while the
+# rubric half was a fraction bounded to [0, 1], so the penalty side grew
+# with transcript length and the reward side did not: the dev cases were
+# charged a measured 0.53 for one rule that costs a median train case at
+# most 0.15 at a 100% defect rate, and three of the four recorded
+# compilation arms floored at 0.000, where every difference below the
+# clamp is discarded.
+#
+# Every score recorded before this line is therefore incomparable to
+# every score after it, which is exactly what a major bump is for. The
+# splits and the ten cases are untouched here; stratifying them is
+# barwise-846.
+version: 2.0.0
 
+# Re-fitted for the rated form, because rating changed what a weight
+# means. A weight is now the cost of a model in which EVERY element
+# carries that kind of defect -- not the cost of one occurrence, which
+# was only interpretable once you knew how many occurrences were
+# possible, and that number was different for every case.
+#
+# Chosen from that reading rather than to preserve any existing number,
+# then checked against the recorded dev run: at an estimated 24 elements
+# the two dominant rules cost about 0.27 together under these weights,
+# against 0.81 under the 1.3.0 weights. That is close to the 3x
+# distortion being removed, and it leaves the whole [0, 1] range in use.
+# Fitting them so a median train case scores what it scored yesterday
+# was rejected -- that picks numbers to preserve a number, which is what
+# the version bump exists to make unnecessary. A post-baseline
+# adjustment is a further bump, not a tweak.
 weights:
-  conformanceCorrection: 0.02
-  validationError: 0.1
-  validationWarning: 0.05
+  conformanceCorrection: 0.2
+  validationError: 0.8
+  validationWarning: 0.4
+  # Unrated, alone among the four: it is charged against a per-case
+  # authored `ambiguityBudget`, so it is a rate already and dividing it
+  # by element count would divide twice.
+  ambiguityExcess: 0.02
 
 # Below this, a scored sample counts as a collapse rather than a bad
 # model, and is reported separately from the quality mean. A judgment,

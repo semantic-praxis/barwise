@@ -49,6 +49,32 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
 - **Score = rubric fraction minus declared penalties.** Weights (per
   conformance correction, per residual validation error) come from the
   suite manifest, never from code, so reweighting is a data change.
+- **Penalties are rates, not counts** (suite 2.0.0,
+  `docs/specs/eval-split-stratification.spec.md`). `scoreExtraction`
+  divides each rule's occurrence count by the scored model's
+  `elementCount` -- object types plus fact types -- before applying the
+  weight, so a weight reads as _the cost of a model in which every
+  element carries that kind of defect_. Counted absolutely, the penalty
+  side grew with transcript length while the rubric side stayed a
+  fraction in [0, 1], and three of four recorded compilation arms
+  floored at 0.000 where the clamp discards every difference. One
+  denominator serves every rule on purpose: per-rule denominators would
+  make each new validator rule a promptlab change. `ambiguityExcess` is
+  the exception and stays unrated -- it is charged against a per-case
+  authored budget, so it is a rate already. A model with no elements
+  charges nothing rather than dividing by zero.
+- **`elementCount` is recorded, not recomputed.** It is on `CaseScore`
+  for the reason `MetricLog.scored` exists: a denominator each consumer
+  derives for itself is one two consumers will eventually derive
+  differently. It is also the tripwire on what rating leaves unpunished
+  -- a candidate whose mean `elementCount` climbs alongside its score is
+  inflating its own denominator.
+- **A weight's meaning is versioned; its type is not.** `SuiteWeights`
+  looked identical before and after rating, so nothing a compiler sees
+  distinguishes a count-era manifest from a rate-era one. The manifest
+  `version` is the only signal, which is why `loadSuite` defaults the
+  omittable weights to the 2.0.0 values rather than to 0, and why a
+  re-fit is a version bump rather than a tweak.
 - **Two check families, one fraction.** A case may declare `GymCheck`s,
   which `@barwise/learn` grades against the parsed model, and
   `PromptCheck`s, which promptlab grades against the extraction payload
@@ -60,8 +86,9 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
 - **`requires_ambiguity` needs its budget.** The check alone is won by
   an extraction that flags everything, so a case that declares one
   should declare an `ambiguityBudget`, and the suite an
-  `ambiguityExcess` weight. Both default to unbounded/0, which is what
-  every case authored before the field meant.
+  `ambiguityExcess` weight. A missing budget means unbounded, which is
+  what every case authored before the field meant; a missing weight now
+  means the 2.0.0 default rather than 0.
 - **Answer-key invariant.** Each case's recorded payload in
   `tests/fixtures/responses/` must pass its full rubric; the exact
   scores are pinned in `tests/scoreExtraction.test.ts`. Changing a
@@ -138,7 +165,7 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
   `warningsByRule`, `errorsByRule` and `correctionsByCategory`; the
   `SuiteReport` sums all three and the history row records all three.
   The error tally was the one missing, and it cost the most: an error
-  weighs 0.1 against a warning's 0.05, so the record named the cheaper
+  weighs 0.8 against a warning's 0.4, so the record named the cheaper
   signal and counted the dearer one -- which is how "did the ring-player
   fix move the baseline" became a question only a paid re-run could
   answer. The corrections tally then turned out to matter most of all:
