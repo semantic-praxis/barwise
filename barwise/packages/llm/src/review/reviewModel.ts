@@ -9,14 +9,44 @@
 
 import type { OrmModel } from "@barwise/core";
 import type { LlmClient } from "../LlmClient.js";
+import { builtinArtifacts } from "../prompt/artifacts/builtins.generated.js";
+import type { PromptArtifact } from "../prompt/artifacts/PromptArtifact.js";
+import { renderDemos } from "../prompt/artifacts/render.js";
+import { resolveArtifact } from "../prompt/artifacts/resolveArtifact.js";
 
 export interface ReviewOptions {
   readonly focus?: string; // Focus on specific entity/fact type, or undefined for full review
+  /**
+   * Prompt artifact to render, overriding the variant that the
+   * client's provider and model would otherwise resolve to. Must be a
+   * "review" artifact.
+   *
+   * Matches `ProcessorOptions.artifact`, including how a caller pins
+   * the prompt: passing `defaultReviewArtifact` renders the default
+   * regardless of which model is about to run, which is what a
+   * reproducible regression run wants.
+   */
+  readonly artifact?: PromptArtifact;
 }
 
+/**
+ * The categories and severities the prompt asks for, declared once so
+ * the response schema, the `ReviewSuggestion` type, and the validation
+ * that rejects an out-of-enum answer cannot drift apart.
+ */
+const REVIEW_CATEGORIES = [
+  "naming",
+  "completeness",
+  "normalization",
+  "constraint",
+  "definition",
+] as const;
+
+const REVIEW_SEVERITIES = ["info", "suggestion", "warning"] as const;
+
 export interface ReviewSuggestion {
-  readonly category: "naming" | "completeness" | "normalization" | "constraint" | "definition";
-  readonly severity: "info" | "suggestion" | "warning";
+  readonly category: (typeof REVIEW_CATEGORIES)[number];
+  readonly severity: (typeof REVIEW_SEVERITIES)[number];
   readonly element?: string; // Which model element this applies to
   readonly description: string; // Human-readable description
   readonly rationale: string; // Why this is a potential issue
@@ -28,10 +58,10 @@ export interface ReviewResult {
 }
 
 /**
- * Build the system prompt for model review.
+ * The built-in review prompt: the historical literal, unchanged.
  */
-function buildReviewSystemPrompt(): string {
-  return `You are an expert ORM 2 (Object-Role Modeling) consultant reviewing a conceptual model for semantic quality. Your task is to provide constructive suggestions that go beyond structural validation.
+const REVIEW_INSTRUCTIONS =
+  `You are an expert ORM 2 (Object-Role Modeling) consultant reviewing a conceptual model for semantic quality. Your task is to provide constructive suggestions that go beyond structural validation.
 
 ## What to review
 
@@ -80,6 +110,35 @@ function buildReviewSystemPrompt(): string {
 - Consider domain context. A model about hospital operations likely needs different rigor than a simple todo app.
 - Don't flag issues that are genuinely ambiguous without domain knowledge. If you can't tell whether something is wrong, don't suggest it.
 - Prefer practical suggestions over theoretical purity.`;
+
+/**
+ * The built-in review artifact: the historical prompt text with no
+ * demos. Rendering it reproduces the pre-artifact review prompt byte
+ * for byte (guarded by the golden test), which is what makes wiring
+ * the resolver a no-op until a review variant is authored.
+ */
+export const defaultReviewArtifact: PromptArtifact = {
+  surface: "review",
+  version: "1.0.0",
+  instructions: REVIEW_INSTRUCTIONS,
+  demos: [],
+};
+
+/**
+ * Build the system prompt for model review.
+ *
+ * @param artifact - Prompt artifact to render instead of the built-in
+ *   default (a variant selected via `resolveArtifact`).
+ *
+ * Demos render through the same `renderDemos` the extraction surface
+ * uses. `PromptDemo` is shaped for extraction -- a transcript excerpt
+ * and its payload -- so no review artifact is expected to carry any,
+ * and none does; rendering them anyway keeps one path for demos rather
+ * than silently discarding a field an author declared.
+ */
+export function buildReviewSystemPrompt(artifact?: PromptArtifact): string {
+  const active = artifact ?? defaultReviewArtifact;
+  return active.instructions + renderDemos(active.demos);
 }
 
 /**
@@ -221,11 +280,11 @@ function buildReviewResponseSchema(): Record<string, unknown> {
           properties: {
             category: {
               type: "string",
-              enum: ["naming", "completeness", "normalization", "constraint", "definition"],
+              enum: [...REVIEW_CATEGORIES],
             },
             severity: {
               type: "string",
-              enum: ["info", "suggestion", "warning"],
+              enum: [...REVIEW_SEVERITIES],
             },
             element: { type: "string" },
             description: { type: "string" },
@@ -237,6 +296,46 @@ function buildReviewResponseSchema(): Record<string, unknown> {
       summary: { type: "string" },
     },
     required: ["suggestions", "summary"],
+  };
+}
+
+function isMember<T extends string>(
+  allowed: readonly T[],
+  value: unknown,
+): value is T {
+  return typeof value === "string" && (allowed as readonly string[]).includes(value);
+}
+
+/**
+ * Narrow one element of the response's `suggestions` array.
+ *
+ * The array arrives as `unknown[]` and used to be cast whole, so a
+ * model answering `category: "style"` -- outside the five the prompt
+ * declares -- produced a value the type system swore was a
+ * `ReviewSuggestion` and was not. That is load-bearing beyond
+ * tidiness now that the review eval matches a planted defect on its
+ * category (docs/specs/review-surface-evals.spec.md): an uninspected
+ * category matches nothing and the score blames the model for a defect
+ * it may well have found.
+ *
+ * A malformed suggestion is dropped rather than thrown, so one bad
+ * entry does not discard the well-formed ones beside it.
+ */
+function toReviewSuggestion(value: unknown): ReviewSuggestion | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const s = value as Record<string, unknown>;
+  if (!isMember(REVIEW_CATEGORIES, s.category)) return undefined;
+  if (!isMember(REVIEW_SEVERITIES, s.severity)) return undefined;
+  if (typeof s.description !== "string") return undefined;
+  if (typeof s.rationale !== "string") return undefined;
+  if (s.element !== undefined && typeof s.element !== "string") return undefined;
+
+  return {
+    category: s.category,
+    severity: s.severity,
+    ...(s.element !== undefined ? { element: s.element } : {}),
+    description: s.description,
+    rationale: s.rationale,
   };
 }
 
@@ -269,7 +368,9 @@ function parseReviewResponse(responseContent: string): ReviewResult {
   }
 
   return {
-    suggestions: obj.suggestions as ReviewSuggestion[],
+    suggestions: obj.suggestions
+      .map(toReviewSuggestion)
+      .filter((s): s is ReviewSuggestion => s !== undefined),
     summary: obj.summary,
   };
 }
@@ -290,7 +391,24 @@ export async function reviewModel(
   llmClient: LlmClient,
   options?: ReviewOptions,
 ): Promise<ReviewResult> {
-  const systemPrompt = buildReviewSystemPrompt();
+  if (options?.artifact !== undefined && options.artifact.surface !== "review") {
+    throw new Error(
+      `Prompt artifact surface "${options.artifact.surface}" cannot drive model review.`,
+    );
+  }
+
+  // An explicit artifact wins; otherwise the client's own identity
+  // picks a variant, and a model with no authored variant falls back
+  // to the default -- byte-identical to the pre-resolution output.
+  const artifact = options?.artifact
+    ?? resolveArtifact(builtinArtifacts, {
+      surface: "review",
+      provider: llmClient.provider,
+      model: llmClient.model,
+    })
+    ?? defaultReviewArtifact;
+
+  const systemPrompt = buildReviewSystemPrompt(artifact);
   const userMessage = buildReviewUserMessage(model, options?.focus);
   const responseSchema = buildReviewResponseSchema();
 

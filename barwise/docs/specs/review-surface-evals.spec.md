@@ -1,6 +1,8 @@
 # Review-surface evals: an artifact-driven review prompt scored on seeded defects
 
-Status: Accepted (all decisions resolved 2026-08-24; no implementation in this PR)
+Status: Accepted (all decisions resolved 2026-08-24). Workstream 1
+(the artifact seam in `reviewModel` and response validation)
+implemented 2026-08-24; workstreams 2-4 open.
 Created: 2026-08-24
 Last-updated: 2026-08-24
 Tracking: barwise-847, barwise-848, barwise-849. Grounds workstream 5

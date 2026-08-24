@@ -51,8 +51,9 @@ npx tsc --noEmit            # type-check only
   added under `src/providers/` and implement the same interface.
 - **A client declares its own identity.** `LlmClient` carries a
   `provider` and a `model`, both readable before the call, because
-  `processTranscript` uses them to resolve a per-model prompt variant
-  from `builtinArtifacts` and nothing else knows the resolved model
+  `processTranscript` and `reviewModel` use them to resolve a
+  per-model prompt variant from `builtinArtifacts` and nothing else
+  knows the resolved model
   (`createLlmClient` passes `model: undefined` through and lets each
   provider apply its default). `model` is `string | undefined` and
   required, not optional: a provider that cannot know its model in
@@ -180,6 +181,22 @@ npx tsc --noEmit            # type-check only
   extraction that cost a paid call must not be lost to an unwritable
   log. The sink and the clock are supplied by the caller, like the
   history writer's date and build provenance.
+- **Both LLM surfaces resolve their prompt the same way.**
+  `processTranscript` and `reviewModel` each take an optional
+  `artifact`, and when none is given they query `builtinArtifacts` with
+  their own surface plus the client's provider and model, falling back
+  to `defaultExtractionArtifact` / `defaultReviewArtifact`. A golden
+  test per surface pins the default's rendered bytes, so wiring a
+  surface up is a no-op until a variant for it is authored. An artifact
+  whose `surface` does not match the call is rejected before the LLM
+  call rather than rendered.
+- **A review suggestion is validated, not cast.** `parseReviewResponse`
+  drops any suggestion whose `category` or `severity` falls outside the
+  enums the response schema declares, and any that is missing
+  `description` or `rationale`. The rest of the array survives: one
+  malformed entry is not a reason to discard a whole review. The
+  enums are declared once (`REVIEW_CATEGORIES`, `REVIEW_SEVERITIES`) so
+  the type, the response schema, and the check cannot drift.
 - **Variants are compiled in, not read from disk.**
   `src/prompt/artifacts/builtins.generated.ts` is generated from
   `prompts/*.prompt.yaml` by `npm run regen:builtins` and committed;
