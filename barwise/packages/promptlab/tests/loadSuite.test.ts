@@ -23,14 +23,16 @@ describe("loadSuite on the packaged seed suite", () => {
   // shared CI runner, so the package sets a 30s testTimeout.
   it("loads the manifest with weights and ten cases in declared order", () => {
     const suite = loadSuite(defaultSuitePath());
-    expect(suite.version).toBe("1.3.0");
+    expect(suite.version).toBe("2.0.0");
+    // Re-fitted for suite 2.0.0, where a weight is the cost of a model
+    // in which every element carries that kind of defect rather than
+    // the cost of one occurrence
+    // (docs/specs/eval-split-stratification.spec.md).
     expect(suite.weights).toEqual({
-      conformanceCorrection: 0.02,
-      validationError: 0.1,
-      validationWarning: 0.05,
-      // Undeclared in the seed manifest, so the loader defaults it to 0
-      // and no seed case pays an ambiguity penalty.
-      ambiguityExcess: 0,
+      conformanceCorrection: 0.2,
+      validationError: 0.8,
+      validationWarning: 0.4,
+      ambiguityExcess: 0.02,
     });
     expect(suite.cases.map((c) => c.evalCase.id)).toEqual([
       "order-management",
@@ -132,6 +134,31 @@ describe("loadSuite validation", () => {
         + " ambiguityExcess: 0.03}\ncases: [a.eval.yaml]\n",
     );
     expect(loadSuite(manifest).weights.ambiguityExcess).toBe(0.03);
+  });
+
+  it("defaults the omitted weights to the 2.0.0 values, not to zero", () => {
+    // These two are the only weights with a default, and the default
+    // matters more than it looks: rating the penalties changed what a
+    // weight means without changing its type, so no compiler and no
+    // schema separates a count-era manifest from a rate-era one. A
+    // manifest omitting a weight would inherit whatever the loader last
+    // believed, and 0 is what it believed under 1.3.0
+    // (docs/specs/eval-split-stratification.spec.md).
+    const dir = tmpSuiteDir();
+    writeFileSync(join(dir, "t.md"), MINIMAL_TRANSCRIPT);
+    writeFileSync(
+      join(dir, "a.eval.yaml"),
+      "id: a\ntranscript: t.md\nchecks:\n  - kind: must_validate\n",
+    );
+    const manifest = join(dir, "suite.yaml");
+    writeFileSync(
+      manifest,
+      "version: 1.0.0\nweights: {conformanceCorrection: 0, validationError: 0}"
+        + "\ncases: [a.eval.yaml]\n",
+    );
+    const { weights } = loadSuite(manifest);
+    expect(weights.validationWarning).toBe(0.4);
+    expect(weights.ambiguityExcess).toBe(0.02);
   });
 });
 

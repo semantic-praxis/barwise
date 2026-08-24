@@ -229,8 +229,15 @@ function validateWeights(value: unknown, manifestPath: string): SuiteWeights {
   const obj = value as Record<string, unknown>;
   const conformanceCorrection = obj["conformanceCorrection"];
   const validationError = obj["validationError"];
-  const validationWarning = obj["validationWarning"] ?? 0;
-  const ambiguityExcess = obj["ambiguityExcess"] ?? 0;
+  // The defaults track the 2.0.0 manifest rather than 0, and that is
+  // deliberate. Rating the penalties changed what a weight *means*
+  // without changing its type, so nothing a compiler can see separates
+  // a count-era manifest from a rate-era one; a manifest that omits a
+  // weight would otherwise inherit a number fitted to the old scale and
+  // score on a third scale that is neither
+  // (docs/specs/eval-split-stratification.spec.md).
+  const validationWarning = obj["validationWarning"] ?? 0.4;
+  const ambiguityExcess = obj["ambiguityExcess"] ?? 0.02;
   if (
     typeof conformanceCorrection !== "number"
     || typeof validationError !== "number"

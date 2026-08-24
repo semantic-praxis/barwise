@@ -61,7 +61,23 @@ export interface CaseScore {
   readonly ambiguitiesReported: number;
   /** Ambiguities beyond the case's budget; 0 when none is declared. */
   readonly ambiguityExcess: number;
-  /** rubricPassed/rubricTotal minus weighted penalties, floored at 0. */
+  /**
+   * Object types plus fact types in the scored model: the denominator
+   * every size-rated penalty is divided by.
+   *
+   * Recorded rather than left for readers to recompute, for the reason
+   * `MetricLog.scored` exists -- a denominator each consumer derives
+   * for itself is a denominator two consumers will eventually derive
+   * differently. It is also the tripwire on the one thing rating leaves
+   * unpunished: a candidate whose mean `elementCount` climbs alongside
+   * its score is inflating its own denominator
+   * (docs/specs/eval-split-stratification.spec.md).
+   */
+  readonly elementCount: number;
+  /**
+   * rubricPassed/rubricTotal minus size-rated weighted penalties,
+   * floored at 0.
+   */
   readonly score: number;
   /** Per-check outcomes, in authored order (for delta reports). */
   readonly results: readonly PromptCheckResult[];
@@ -126,10 +142,40 @@ export function scoreExtraction(
 
   const rubricTotal = results.length;
   const rubricPassed = results.filter((r) => r.passed).length;
+
+  // Penalties are rated by model size, not counted. The rubric half of
+  // the score is a fraction bounded to [0, 1] by construction; charging
+  // the penalty half per occurrence made the two halves scale
+  // differently, so a longer transcript paid more for the same defect
+  // *rate* and the clamp below swallowed the difference. Three of the
+  // four recorded compilation arms floored at 0.000 and compared equal
+  // (docs/specs/eval-split-stratification.spec.md).
+  //
+  // One denominator serves every rule, knowingly: rating each rule
+  // against the population it can actually fire on would make every new
+  // validator rule a promptlab change, and across the seven reference
+  // models fact types are a near-constant 33-50% of elements, so a
+  // single denominator is off by a constant factor for the rules that
+  // dominate the tallies -- which is what a weight absorbs.
+  //
+  // A weight therefore reads as the cost of a model in which *every*
+  // element carries that kind of defect. `ambiguityExcess` is left
+  // unrated: it is charged against a per-case authored budget, so it is
+  // a rate already and rating it again would divide twice.
+  //
+  // A model with no elements charges nothing rather than dividing by
+  // zero. Falling back to the raw count there would make the emptiest
+  // possible extraction the one case still scored the old way, and it
+  // is already scored by the rubric fraction, which no empty model
+  // satisfies.
+  const elementCount = model.objectTypes.length + model.factTypes.length;
+  const rated = (occurrences: number): number =>
+    elementCount === 0 ? 0 : occurrences / elementCount;
+
   const raw = rubricPassed / rubricTotal
-    - weights.conformanceCorrection * corrections.length
-    - weights.validationError * validationErrors
-    - weights.validationWarning * validationWarnings
+    - weights.conformanceCorrection * rated(corrections.length)
+    - weights.validationError * rated(validationErrors)
+    - weights.validationWarning * rated(validationWarnings)
     - weights.ambiguityExcess * excess;
 
   return {
@@ -144,6 +190,7 @@ export function scoreExtraction(
     correctionsByCategory,
     ambiguitiesReported,
     ambiguityExcess: excess,
+    elementCount,
     score: Math.max(0, raw),
     results,
   };

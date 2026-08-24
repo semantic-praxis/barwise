@@ -575,6 +575,8 @@ function unscorable(caseId: string): CaseScore {
     validationWarnings: 0,
     ambiguitiesReported: 0,
     ambiguityExcess: 0,
+    // No model was parsed, so there is nothing to rate against.
+    elementCount: 0,
     warningsByRule: {},
     errorsByRule: {},
     correctionsByCategory: {},

@@ -11,22 +11,38 @@
 import type { OrmModel } from "@barwise/core";
 import type { GymCheck } from "@barwise/learn";
 
-/** Penalty sizes applied by the scorer, declared in the suite manifest. */
+/**
+ * Penalty sizes applied by the scorer, declared in the suite manifest.
+ *
+ * As of suite 2.0.0 the first three are **rates**, not per-occurrence
+ * charges: the scorer divides each rule's occurrence count by the
+ * scored model's element count before applying the weight, so a weight
+ * reads as the cost of a model in which every element carries that kind
+ * of defect (docs/specs/eval-split-stratification.spec.md). The types
+ * did not change when the meaning did, so the manifest `version` is the
+ * only signal that a weight authored against the old scale is wrong.
+ */
 export interface SuiteWeights {
-  /** Score subtracted per deterministic conformance correction. */
+  /** Rated cost of conformance corrections, per element. */
   readonly conformanceCorrection: number;
-  /** Score subtracted per residual error-severity validation diagnostic. */
+  /** Rated cost of residual error-severity validation diagnostics, per element. */
   readonly validationError: number;
   /**
-   * Score subtracted per residual warning-severity validation
-   * diagnostic (the lint tier). Omitted in the manifest means 0.
+   * Rated cost of residual warning-severity validation diagnostics (the
+   * lint tier), per element. Omitted in the manifest means the 2.0.0
+   * default rather than 0.
    */
   readonly validationWarning: number;
   /**
    * Score subtracted per ambiguity reported beyond a case's
-   * `ambiguityBudget`. Omitted in the manifest means 0. This is the
-   * precision half of `requires_ambiguity`: without it, an extraction
-   * that flags everything passes every ambiguity check by coincidence.
+   * `ambiguityBudget`. Omitted in the manifest means the 2.0.0 default
+   * rather than 0. This is the precision half of `requires_ambiguity`:
+   * without it, an extraction that flags everything passes every
+   * ambiguity check by coincidence.
+   *
+   * Unrated, alone among the four: it is charged against a per-case
+   * authored budget, so it is a rate already and dividing it by element
+   * count would divide twice.
    */
   readonly ambiguityExcess: number;
 }

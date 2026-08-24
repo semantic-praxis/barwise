@@ -34,23 +34,36 @@ describe("scoreExtraction over the seed suite", () => {
   //
   // A 1.000 row is a stronger pin than a 0.94 one, because there is now
   // exactly one way to be right and any regression moves the number.
+  //
+  // These seven rows cannot detect a wrong denominator, and it is worth
+  // saying so where a reader will look for the guarantee. Suite 2.0.0
+  // rates every penalty by element count, but a payload that produces
+  // no occurrences scores 1.000 under any denominator -- including a
+  // multiplied one. The arithmetic is asserted in "size-rated
+  // penalties" below, on hand-built payloads that do produce
+  // occurrences (docs/specs/eval-split-stratification.spec.md).
+  //
+  // `elements` is pinned here anyway, because it is what those seven
+  // divisions would have been measured against and a payload edited
+  // without noticing should show up as a diff.
   const expected = [
-    { caseId: "order-management", score: 1, corrections: 0 },
-    { caseId: "university-enrollment", score: 1, corrections: 0 },
-    { caseId: "clinic-appointments", score: 1, corrections: 0 },
-    { caseId: "employee-hierarchy", score: 1, corrections: 0 },
-    { caseId: "project-staffing", score: 1, corrections: 0 },
-    { caseId: "conference-reviews", score: 1, corrections: 0 },
-    { caseId: "freight-corrections", score: 1, corrections: 0 },
+    { caseId: "order-management", score: 1, corrections: 0, elements: 10 },
+    { caseId: "university-enrollment", score: 1, corrections: 0, elements: 21 },
+    { caseId: "clinic-appointments", score: 1, corrections: 0, elements: 19 },
+    { caseId: "employee-hierarchy", score: 1, corrections: 0, elements: 8 },
+    { caseId: "project-staffing", score: 1, corrections: 0, elements: 6 },
+    { caseId: "conference-reviews", score: 1, corrections: 0, elements: 6 },
+    { caseId: "freight-corrections", score: 1, corrections: 0, elements: 6 },
   ];
 
   it.each(expected)(
     "$caseId: the recorded payload passes its full rubric",
-    ({ caseId, score, corrections }) => {
+    ({ caseId, score, corrections, elements }) => {
       const result = scoreExtraction(payloadFor(caseId), caseFor(caseId), suite.weights);
       expect(result.rubricPassed).toBe(result.rubricTotal);
       expect(result.conformanceCorrections).toBe(corrections);
       expect(result.validationErrors).toBe(0);
+      expect(result.elementCount).toBe(elements);
       expect(result.score).toBeCloseTo(score, 10);
     },
   );
@@ -87,8 +100,13 @@ describe("scoreExtraction over the seed suite", () => {
       confidence: "high",
       source_references: [{ lines: [1, 2], excerpt: "test" }],
     });
+    // The weight needed to reach the floor moved with the rating, which
+    // is the whole point: one correction on a ten-element model is a
+    // 10% defect rate, so it costs a tenth of its weight rather than
+    // all of it. Under 1.3.0 a weight of 2 flattened this payload; it
+    // now takes 20.
     const heavy = {
-      conformanceCorrection: 2,
+      conformanceCorrection: 20,
       validationError: 0.5,
       validationWarning: 0.5,
       ambiguityExcess: 0.5,
@@ -100,7 +118,8 @@ describe("scoreExtraction over the seed suite", () => {
     );
 
     expect(result.conformanceCorrections).toBe(1);
-    // One correction at 2.0 overwhelms a perfect rubric: 1.0 - 2.0 -> 0.
+    expect(result.elementCount).toBe(10);
+    // 1.0 - 20 * (1 / 10) = -1.0, floored to 0.
     expect(result.score).toBe(0);
   });
 
@@ -121,6 +140,9 @@ describe("scoreExtraction over the seed suite", () => {
     });
     const result = scoreExtraction(empty, caseFor("order-management"), suite.weights);
     expect(result.rubricPassed).toBeLessThan(result.rubricTotal);
+    expect(result.elementCount).toBe(0);
+    // No division happened, so the score is the bare rubric fraction.
+    expect(result.score).toBeCloseTo(result.rubricPassed / result.rubricTotal, 10);
     expect(result.score).toBeLessThan(0.5);
   });
 });
@@ -238,5 +260,167 @@ describe("scoreExtraction with both check families", () => {
     );
     expect(result.rubricTotal).toBe(1);
     expect(result.rubricPassed).toBe(1);
+  });
+});
+
+/**
+ * The rate arithmetic, asserted rather than assumed.
+ *
+ * Suite 2.0.0 divides each rule's occurrence count by the scored
+ * model's element count before applying the weight
+ * (docs/specs/eval-split-stratification.spec.md). The seven answer keys
+ * cannot check that: they produce no occurrences, so they score 1.000
+ * under any denominator, and a scorer that multiplied by element count
+ * instead of dividing would pass every one of them. These payloads are
+ * hand-built to produce a known number of occurrences at a known
+ * element count, so the division is pinned.
+ *
+ * Mutation check for anyone touching the fold: change `rated` to
+ * multiply instead of divide and every assertion in this block must
+ * fail. If they still pass, the block is decorative.
+ */
+describe("scoreExtraction: size-rated penalties", () => {
+  /**
+   * `n` copies of a two-object-type binary fact type, each carrying
+   * exactly two warnings: one reading on a binary
+   * (`structural/binary-missing-inverse-reading`) and no constraints
+   * (`completeness/fact-type-without-constraints`). So the model holds
+   * `3n` elements and `2n` warnings -- a defect rate that does not move
+   * with `n`, which is the property rating exists to preserve.
+   */
+  function repeatedDefect(n: number): string {
+    const objectTypes = [];
+    const factTypes = [];
+    for (let i = 0; i < n; i++) {
+      objectTypes.push(
+        {
+          name: `Customer${i}`,
+          kind: "entity",
+          reference_mode: "customer_id",
+          source_references: [],
+        },
+        {
+          name: `Order${i}`,
+          kind: "entity",
+          reference_mode: "order_number",
+          source_references: [],
+        },
+      );
+      factTypes.push({
+        name: `Customer${i} places Order${i}`,
+        roles: [
+          { player: `Customer${i}`, role_name: "places" },
+          { player: `Order${i}`, role_name: "is placed by" },
+        ],
+        readings: ["{0} places {1}"],
+        source_references: [],
+      });
+    }
+    return JSON.stringify({
+      object_types: objectTypes,
+      fact_types: factTypes,
+      subtypes: [],
+      inferred_constraints: [],
+      objectified_fact_types: [],
+      populations: [],
+      ambiguities: [],
+    });
+  }
+
+  /**
+   * A rubric of one `must_validate` check, which these payloads pass.
+   * The rubric fraction is then a fixed 1.0 and every movement in the
+   * score is the penalty, which is what this block is measuring.
+   */
+  function validateOnly(): LoadedEvalCase {
+    const base = caseFor("order-management");
+    return {
+      ...base,
+      evalCase: { ...base.evalCase, checks: [{ kind: "must_validate" }] },
+    };
+  }
+
+  const weights = {
+    conformanceCorrection: 0.2,
+    validationError: 0.8,
+    validationWarning: 0.4,
+    ambiguityExcess: 0.02,
+  };
+
+  it("charges a rule at its rate over element count, not at its count", () => {
+    const result = scoreExtraction(repeatedDefect(1), validateOnly(), weights);
+
+    // Two object types plus one fact type.
+    expect(result.elementCount).toBe(3);
+    expect(result.validationWarnings).toBe(2);
+    expect(result.warningsByRule).toEqual({
+      "structural/binary-missing-inverse-reading": 1,
+      "completeness/fact-type-without-constraints": 1,
+    });
+    // 1.0 - 0.4 * (2 / 3) = 0.7333...  Counted rather than rated it
+    // would be 1.0 - 0.4 * 2 = 0.2, and multiplied it would floor at 0.
+    expect(result.score).toBeCloseTo(1 - 0.4 * (2 / 3), 10);
+  });
+
+  it("scores the same defect rate the same, whatever the model's size", () => {
+    const small = scoreExtraction(repeatedDefect(1), validateOnly(), weights);
+    const medium = scoreExtraction(repeatedDefect(2), validateOnly(), weights);
+    const large = scoreExtraction(repeatedDefect(4), validateOnly(), weights);
+
+    expect([small.elementCount, medium.elementCount, large.elementCount])
+      .toEqual([3, 6, 12]);
+    expect([small.validationWarnings, medium.validationWarnings, large.validationWarnings])
+      .toEqual([2, 4, 8]);
+
+    // This is the defect the spec was written against. Under 1.3.0's
+    // counted penalties these three scored 0.90, 0.80 and 0.60 -- the
+    // same modelling mistake charged four times over for describing
+    // four times as much domain, which is how the long dev transcripts
+    // came to floor at 0.000 and compare equal to each other.
+    // Above the clamp, and asserted rather than assumed: three floored
+    // scores are also equal to each other, and equality bought that way
+    // is the exact pathology being removed rather than evidence against
+    // it. Anything below 1.0 here also refutes a scorer that dropped
+    // the penalty term altogether.
+    expect(small.score).toBeGreaterThan(0);
+    expect(small.score).toBeLessThan(1);
+    expect(medium.score).toBeCloseTo(small.score, 10);
+    expect(large.score).toBeCloseTo(small.score, 10);
+  });
+
+  it("charges nothing on a model with no elements rather than dividing by zero", () => {
+    // An extraction with no object or fact types can still produce a
+    // conformance correction: this constraint names a fact type that is
+    // not there. Rating it would divide by zero, so the scorer charges
+    // nothing and lets the rubric fraction carry the verdict -- which
+    // it does, since no empty model satisfies a rubric.
+    const emptyWithCorrection = JSON.stringify({
+      object_types: [],
+      fact_types: [],
+      subtypes: [],
+      inferred_constraints: [{
+        type: "exclusion",
+        fact_type: "Customer places Order",
+        roles: ["Customer"],
+        description: "malformed: names a fact type the model does not hold",
+        confidence: "high",
+        source_references: [{ lines: [1, 2], excerpt: "test" }],
+      }],
+      objectified_fact_types: [],
+      populations: [],
+      ambiguities: [],
+    });
+    const ruinous = {
+      conformanceCorrection: 1000,
+      validationError: 1000,
+      validationWarning: 1000,
+      ambiguityExcess: 1000,
+    };
+    const result = scoreExtraction(emptyWithCorrection, validateOnly(), ruinous);
+
+    expect(result.elementCount).toBe(0);
+    expect(result.conformanceCorrections).toBe(1);
+    expect(Number.isFinite(result.score)).toBe(true);
+    expect(result.score).toBe(1);
   });
 });
