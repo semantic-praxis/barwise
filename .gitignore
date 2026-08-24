@@ -143,3 +143,16 @@ vite.config.ts.timestamp-*
 .dolt/
 *.db
 .beads-credential-key
+
+# Python: the DSPy optimization lane (barwise/optimizer/).
+# uv.lock IS committed -- a compile run costs money, and reproducing one
+# means pinning what produced it.
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Optimizer working output: candidate artifacts and delta reports.
+# Adoption is a human act -- a candidate is copied into
+# packages/llm/prompts/ deliberately, never by being left lying around.
+barwise/optimizer/out/

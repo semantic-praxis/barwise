@@ -70,6 +70,12 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
   were produced by running the recorded payloads through
   `parseExtractionFromJson` and serializing -- they cannot drift from
   what the pipeline actually builds.
+- **No client-derived material in `evals/`.** Transcripts and fixture
+  models are invented domains, always. Everything here is checked in,
+  published in the npm package, and read by anyone who clones the repo,
+  so this is a property of the directory rather than a judgment call per
+  file. Recommended in `docs/specs/eval-transcript-realism.spec.md` and
+  settled in `docs/specs/eval-split-stratification.spec.md`.
 - **A mean is reported with its error bar or not at all.** `runSuite`
   folds per-case sample SD and the suite's standard error through
   `src/stats/dispersion.ts`, and the CLI prints the 95% margin beside
