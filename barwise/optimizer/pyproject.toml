@@ -5,6 +5,10 @@ description = "DSPy optimization lane for the barwise extraction prompt (offline
 requires-python = ">=3.11"
 dependencies = [
     "dspy==3.3.1",
+    # MIPROv2 imports optuna lazily, at the optimization step -- after the
+    # bootstrap and instruction-proposal calls have already been paid for.
+    # Declared here so a compile cannot die a dozen paid calls in.
+    "optuna>=3.6",
     "pyyaml>=6.0",
 ]
 

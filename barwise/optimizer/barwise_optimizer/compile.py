@@ -130,6 +130,18 @@ def build_optimizer(config: RunConfig, metric):
     proposer = dspy.LM(config.proposer_model) if config.proposer_model else None
 
     if config.optimizer == "mipro":
+        # MIPROv2 imports optuna at the optimization step, which is after
+        # its bootstrap and instruction-proposal calls have been spent.
+        # Checking here turns a dozen wasted paid calls into a message.
+        try:
+            import optuna  # noqa: F401
+        except ImportError as missing:
+            raise BudgetError(
+                "mipro needs optuna, which DSPy imports only at the "
+                "optimization step -- so without it a run dies after paying "
+                "for bootstrapping and instruction proposal. Install it with "
+                "`uv sync` (it is declared in pyproject.toml)."
+            ) from missing
         return dspy.MIPROv2(
             metric=metric,
             max_bootstrapped_demos=config.max_demos,
@@ -157,6 +169,28 @@ def evaluate(program, examples, metric, samples: int) -> MetricLog:
             prediction = program(transcript=example.transcript)
             metric(example, prediction)
     return log
+
+
+def compile_kwargs(config: RunConfig) -> dict:
+    """Per-optimizer arguments to `compile`, for this suite's size.
+
+    MIPROv2 only. Two of its defaults do not survive a seven-case train
+    split:
+
+    `requires_permission_to_run` prompts on stdin for confirmation of
+    the estimated cost. `--max-calls` is already a hard ceiling and is
+    mandatory, so the prompt is a weaker duplicate of a gate we enforce
+    ourselves -- and a run left waiting on stdin is a run that hangs in
+    anything non-interactive.
+
+    `minibatch` samples 35 examples per trial from a set that has seven,
+    which is not a minibatch. Turning it off evaluates the full split,
+    which is what happens anyway, and avoids the library's small-set
+    edge cases (its own MIN_MINIBATCH_SIZE is 50).
+    """
+    if config.optimizer != "mipro":
+        return {}
+    return {"requires_permission_to_run": False, "minibatch": False}
 
 
 def seed_instructions(config: RunConfig) -> str:
@@ -219,7 +253,7 @@ def _run_under_budget(config: RunConfig, out_dir: Path, suite, budget: CallBudge
     evaluate(baseline, dev, make_metric(baseline_log), config.samples_per_candidate)
 
     optimizer = build_optimizer(config, make_metric())
-    compiled = optimizer.compile(ExtractionProgram(seed), trainset=train)
+    compiled = optimizer.compile(ExtractionProgram(seed), trainset=train, **compile_kwargs(config))
 
     evaluate(compiled, dev, make_metric(candidate_log), config.samples_per_candidate)
 

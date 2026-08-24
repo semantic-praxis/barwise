@@ -127,6 +127,20 @@ through. `BARWISE_CLI` overrides what gets run.
   restores `dspy.settings.callbacks` in a `finally`, because a second
   run in one process would otherwise still be counting against the
   first run's ceiling.
+- **`mipro` costs about 3x `bootstrap`, and two of its defaults do not
+  survive a seven-case split.** Measured offline with both models
+  stubbed: **103 calls** at `auto='light'` and
+  `--samples-per-candidate 5`, against bootstrap's 32. Some of those go
+  to the **proposer** model, which is a second, usually dearer model.
+  `compile_kwargs` turns off `requires_permission_to_run` (a stdin
+  prompt duplicating the `--max-calls` gate, and a hang anywhere
+  non-interactive) and `minibatch` (35 samples drawn from a set of
+  seven; DSPy's own MIN_MINIBATCH_SIZE is 50).
+- **`mipro` needs `optuna`, imported at the optimization step** -- after
+  bootstrapping and instruction proposal have been paid for. It is
+  declared in `pyproject.toml` and `build_optimizer` checks for it
+  anyway, because a stale venv would otherwise lose a dozen paid calls
+  to an ImportError.
 - **Two DSPy facts that cost a debugging round if unknown.** `MIPROv2`
   reads `dspy.settings.lm` in its constructor and raises without one,
   while `BootstrapFewShot` constructs happily and fails much later --

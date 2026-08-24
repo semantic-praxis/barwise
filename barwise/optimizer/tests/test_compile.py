@@ -176,3 +176,43 @@ def test_the_version_records_which_seed_produced_the_candidate():
     # experiments, and a shared version string would make the recorded
     # artifacts indistinguishable.
     assert config(seed_from="default").seed_from == "default"
+
+
+def test_mipro_compile_kwargs_suit_a_seven_case_split(configured_lm):
+    from barwise_optimizer.compile import compile_kwargs
+
+    kwargs = compile_kwargs(config(optimizer="mipro"))
+
+    # A prompt on stdin is a weaker duplicate of --max-calls, which is
+    # mandatory -- and a run waiting on stdin hangs anywhere
+    # non-interactive.
+    assert kwargs["requires_permission_to_run"] is False
+    # DSPy samples 35 per trial from a set of seven. Its own
+    # MIN_MINIBATCH_SIZE is 50.
+    assert kwargs["minibatch"] is False
+
+
+def test_the_other_optimizers_take_no_compile_kwargs(configured_lm):
+    from barwise_optimizer.compile import compile_kwargs
+
+    assert compile_kwargs(config(optimizer="bootstrap")) == {}
+    assert compile_kwargs(config(optimizer="gepa", proposer_model="x/y")) == {}
+
+
+def test_mipro_checks_for_optuna_before_spending_anything(configured_lm, monkeypatch):
+    # DSPy imports optuna at the OPTIMIZATION step, which is after the
+    # bootstrap and instruction-proposal calls are paid for. Measured:
+    # a mipro run dies about a dozen paid calls in without this.
+    import builtins
+
+    real_import = builtins.__import__
+
+    def no_optuna(name, *args, **kwargs):
+        if name == "optuna":
+            raise ImportError("stubbed: optuna missing")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", no_optuna)
+
+    with pytest.raises(BudgetError, match="optuna"):
+        build_optimizer(config(optimizer="mipro"), metric=lambda *a, **k: 1.0)
