@@ -1,6 +1,6 @@
 # Review-surface evals: an artifact-driven review prompt scored on seeded defects
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Accepted (all decisions resolved 2026-08-24; no implementation in this PR)
 Created: 2026-08-24
 Last-updated: 2026-08-24
 Tracking: barwise-847, barwise-848, barwise-849. Grounds workstream 5
@@ -88,7 +88,11 @@ In scope:
   rather than casting it into the typed result.
 - When a review eval case declares a planted defect with an element and
   a category, the system shall count it found if at least one suggestion
-  in the payload names that element in that category, case-insensitively.
+  in that category names the element case-insensitively, either in its
+  `element` field or, when that field is absent, in its `description`.
+- When a suggestion names the declared element in neither field, the
+  system shall not count it as finding that defect, whatever its
+  category.
 - When a payload reports more suggestions than a case's planted defects
   plus its declared budget, the system shall charge the declared
   per-excess weight.
@@ -96,7 +100,11 @@ In scope:
   1.0 and score it on the excess term alone, so a clean control is an
   ordinary case with an empty defect list rather than a second mode.
 - When review cases are loaded, they shall come from a manifest separate
-  from the extraction suite, carrying its own version.
+  from the extraction suite, carrying its own version and declaring
+  `surface: review`.
+- When `barwise prompt eval` is given a manifest, it shall read that
+  manifest's declared surface to choose the scorer and the report shape,
+  rather than taking a surface from a flag.
 
 Out of scope, deferred and named:
 
@@ -166,7 +174,9 @@ fixtures are therefore authored, not generated; see Alternatives.
     PlantedDefect    { element, category, hint? }
   score/
     scoreReview(payload, case, weights) -> ReviewCaseScore
-      found       = defects matched by (element, category), case-insensitive
+      a defect is found when some suggestion in its category names the
+      element case-insensitively, in `element` or -- when that field is
+      absent -- in `description`; naming it nowhere matches nothing
       recall      = defects ? found / defects : 1.0    <- nothing to find, nothing missed
       excess      = max(0, suggestions - defects - budget)
       score       = recall - suggestionExcess * excess
@@ -175,10 +185,11 @@ fixtures are therefore authored, not generated; see Alternatives.
     runSuite  generalized over surface; same repeat, same dispersion fold
 
 evals/review/
-  suite.yaml                    own version, own weights
-  customer-order.clean.orm.yaml       <- the control: defects: []
-  customer-order.defects.orm.yaml     <- same model, defects planted
-  customer-order-definitions.eval.yaml
+  suite.yaml                          surface: review, own version, own weights
+  customer-order.clean.orm.yaml       <- the shared base, and the control
+  customer-order.control.eval.yaml    <- defects: []
+  customer-order.naming.orm.yaml      <- base + one naming defect
+  customer-order.naming.eval.yaml     ... and one pair per category, five in all
 ```
 
 The pairing is the design. A defective fixture and its clean twin differ
@@ -258,16 +269,21 @@ review.
 
 ### 3. The seed corpus: paired fixtures and their rubrics (data; provisional: not yet grounded)
 
-Author clean and defective model pairs covering all five review
-categories, with a control case per pair. How many pairs, and whether
-one model carries all five categories or one each, is an Open decision.
+Two domains. Each gets one clean base model, five defective twins (one
+per review category, each the base with a single edit), and one control
+case scoring the clean base with an empty defect list -- twelve cases in
+all. Four of the five categories are a mechanical edit to the base;
+`normalization` is the one that needs a modelling judgment, since a
+missing subtype or a redundant fact type is a claim about the domain
+rather than a deletion.
 
 Provisional because the number of planted defects a case can carry
 before they interfere is unknown until the first pair runs -- a model
 with a stripped definition and a dropped constraint on the same element
 may draw one suggestion that names both, and whether that counts as one
 find or two is a question the fixtures will answer rather than the
-design.
+design. One defect per twin is the shape chosen partly to keep that
+question small.
 
 ### 4. Baseline, then decide whether to optimize (needs a key)
 
@@ -293,49 +309,52 @@ program is authorized by this workstream's evidence, not by this spec.
 - `packages/llm/prompts/` gains review artifacts, which are compiled
   into `builtins.generated.ts` by `npm run regen:builtins`. The drift
   test guards the regeneration.
-- `@barwise/cli` gains nothing required. `barwise prompt eval` selecting
-  a review suite is desirable and is an Open decision, not a
-  requirement.
+- `@barwise/cli`: `barwise prompt eval` learns to read the manifest's
+  declared surface and dispatch to the matching scorer and report shape.
+  No new flag and no new subcommand; a manifest with no declared surface
+  means extraction, which is what every existing manifest means today.
 - `@barwise/core` and `@barwise/learn` are untouched.
 
-## Open decisions (for review)
+## Decisions (resolved 2026-08-24)
 
-- **How the corpus is shaped.** Recommend one clean base model per
-  domain with a separate defective twin per category -- five defective
-  fixtures and one control per domain -- so a recall figure can be read
-  per category. The alternative, one defective model carrying all five,
-  is a fifth of the authoring and yields a single blended recall number
-  that cannot say which category the prompt is weak in. Recommend the
-  former for two domains, which is ten defective fixtures plus two
-  controls.
-- **Whether excess is charged against a budget or reported alongside.**
-  Recommend charging it, matching `ambiguityExcess`, so the search has
-  one scalar to optimize. The alternative -- report recall and
-  suggestion count as a pair and never combine them -- is more
-  informative and hands every consumer the collapse decision, which is
-  the shape `eval-split-stratification.spec.md` rejects for the
-  extraction score.
-- **Whether `barwise prompt eval` grows a `--suite` flag** to select the
-  review manifest, or the review suite gets its own subcommand.
-  Recommend the flag: the run mechanics, dispersion reporting, and
-  history format are identical, and a second subcommand would duplicate
-  all three. Cost: `prompt eval` grows a mode, and its output shape
-  differs per mode.
-- **Whether the review call should request prompt caching.** The
-  extraction path sets `cacheSystemPrompt` and review does not. Once the
-  review prompt is artifact-driven it is stable across calls, and an
-  eval sweep makes many, so the break-even is comfortably cleared.
-  Recommend enabling it in workstream 4 rather than workstream 1, so the
-  golden byte-identity test in workstream 1 is not entangled with a
-  request-shape change. Named because the Haiku 4.5 minimum cacheable
-  length is 4,096 tokens and the review prompt is well under it, so this
-  may buy nothing on the model the suite runs against -- measure before
-  claiming it.
-- **Whether a defect may be matched by a suggestion with no `element`.**
-  `element` is optional in the schema, so a model-wide suggestion
-  carries none. Recommend no: an unaddressed suggestion cannot be shown
-  to have found a specific planted defect, and counting it would let a
-  vague summary claim every find.
+- **One clean base model per domain, one defective twin per category:**
+  five defective fixtures and one control per domain, over two domains.
+  The authoring cost is dominated by the clean base, which is shared,
+  and each twin is that base with a single edit -- so this costs barely
+  more than one defective model carrying all five categories, and it
+  yields recall per category. That is the number that says what to fix:
+  weak `normalization` recall and weak `definition` recall call for
+  different prompt changes, and a blended figure cannot tell them apart.
+- **Excess is charged, not reported alongside.** One scalar, matching
+  `ambiguityExcess`. Reporting recall and suggestion count as a pair is
+  more informative and hands every consumer the collapse decision, which
+  is the shape `eval-split-stratification.spec.md` rejects for the same
+  reason on the extraction score.
+- **The manifest declares its own surface and `barwise prompt eval`
+  reads it** -- no `--suite` flag and no second subcommand. A flag and a
+  manifest can disagree about what a suite is; a manifest alone cannot.
+  This also answers the objection against a flag, that one command would
+  emit two JSON shapes: the shape becomes a property of the file the
+  operator named rather than of a flag they might forget.
+- **No prompt caching on the review call, for now.** Measured before
+  deciding: the review system prompt is 2,609 characters, about 650
+  tokens, and Haiku 4.5's minimum cacheable prefix is 4,096. A
+  breakpoint there buys exactly nothing on the model the suite runs
+  against; it would help only on a model with a lower minimum, such as
+  Opus 5 at 512. Revisit if the review prompt grows past 4,096 tokens.
+- **A defect is matched on `element` when the suggestion carries one,
+  and otherwise on the defect's element name appearing in the
+  suggestion's `description`. A suggestion that names the element
+  nowhere matches nothing.** Strict field-only matching would score a
+  model that names the element in prose as having missed the defect,
+  which measures formatting rather than review quality; matching on
+  category alone would let a vague summary claim every find. The line
+  belongs where the element is actually named, in whichever field.
+
+The one question these leave open belongs to workstream 3 and cannot be
+answered from the design: how many planted defects a single fixture can
+carry before they interfere. Until it is answered, plant at most one
+defect per element.
 
 ## Risks and testing
 
@@ -369,6 +388,10 @@ program is authorized by this workstream's evidence, not by this spec.
 ## Non-goals
 
 - No LLM in the scoring path, no judge, no network in any test.
+- No `cacheSystemPrompt` on the review call. Decided on measurement,
+  not deferred: at ~650 tokens the prompt is far below Haiku 4.5's
+  4,096-token minimum cacheable prefix, so a breakpoint would be inert
+  on the model the suite runs against.
 - No change to `ReviewSuggestion`'s five categories or three severities.
 - No change to `serializeModelForReview` or to how `focus` filters.
 - No change to `@barwise/core` or `@barwise/learn`.

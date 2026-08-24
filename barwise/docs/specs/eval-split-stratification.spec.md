@@ -1,6 +1,6 @@
 # Comparable eval splits: rate-based penalties and cases stratified across train and dev
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Accepted (all decisions resolved 2026-08-24; no implementation in this PR)
 Created: 2026-08-24
 Last-updated: 2026-08-24
 Tracking: barwise-844, barwise-845, barwise-846. Parent
@@ -142,6 +142,15 @@ penalty(rule) = weight(rule) * occurrences(rule) / max(elementCount, 1)
 elementCount  = objectTypes + factTypes
 ```
 
+One denominator serves every rule. It is an approximation -- a rule that
+can only fire on binary fact types is rated against a denominator that
+includes value types -- and the size of the approximation is known:
+across the seven reference models fact types are 33% to 50% of total
+elements, so for the rules that dominate the tallies the denominator is
+wrong by a near-constant factor, which a weight absorbs. The alternative
+of a per-rule denominator is more correct and would make every new
+validator rule a promptlab change; see Decisions.
+
 The weight then means something a reviewer can hold: _the cost of a
 model in which every element carries this kind of defect_. Under the
 current form a weight means the cost of one occurrence, which is only
@@ -199,8 +208,8 @@ Out of scope, deferred and named:
 - Review-surface evals. Specified separately in
   `docs/specs/review-surface-evals.spec.md`.
 - Any transcript derived from client material. The exclusion recorded
-  in `eval-transcript-realism.spec.md` stands and this spec promotes it
-  to a stated rule (see Open decisions).
+  in `eval-transcript-realism.spec.md` stands, and this spec promotes it
+  to a stated rule in `packages/promptlab/CLAUDE.md`.
 
 ## Inventory
 
@@ -240,13 +249,13 @@ check it again before starting.
 ```
 suite.yaml  (2.0.0)
   weights:                       meaning changes: cost at a 100% defect rate
-    conformanceCorrection        rated over elementCount
-    validationError              rated over elementCount
-    validationWarning            rated over elementCount
-    ambiguityExcess              unrated -- a budget overrun is already a rate
+    conformanceCorrection: 0.2   rated over elementCount
+    validationError:       0.8   rated over elementCount
+    validationWarning:     0.4   rated over elementCount
+    ambiguityExcess:       0.02  unrated -- a budget overrun is already a rate
   splits:
-    train: [ ... ]               both splits stratified over size class
-    dev:   [ ... ]               and drawing on the same check vocabulary
+    train: 4 short + 3 long      both splits stratified over size class
+    dev:   3 short + 3 long      and drawing on the same check vocabulary
 
 scoreExtraction(payload, case, weights) -> CaseScore
   parse payload -> ExtractionResponse
@@ -290,9 +299,8 @@ it from the score.
   `fact-type-without-constraints`). More correct, and rejected for now
   on orthogonality: it requires promptlab to know each validator rule's
   firing population, which couples the scorer to the rule set and makes
-  every new rule a promptlab change. Carried in Open decisions, because
-  the single denominator is an approximation and a reviewer should get
-  to weigh that.
+  every new rule a promptlab change. Weighed and rejected on
+  2026-08-24 with the size of the approximation measured; see Decisions.
 - **Leave the metric and only fix the dataset.** Rejected on the
   measured evidence: the flooring is driven by model size, so it would
   reappear on whichever new cases are largest, and the new realistic
@@ -311,9 +319,10 @@ it from the score.
 ### 1. Rate the penalties (code only)
 
 Change the fold in `scoreExtraction` to divide occurrences by
-`elementCount`, add `elementCount` to `CaseScore`, and re-fit the four
-weights in `suite.yaml` under their new meaning. No case file changes,
-no split changes.
+`elementCount`, add `elementCount` to `CaseScore`, and set the weights
+to `validationWarning: 0.4`, `validationError: 0.8`,
+`conformanceCorrection: 0.2`, leaving `ambiguityExcess` at 0.02 and
+unrated. No case file changes, no split changes.
 
 The acceptance criterion is the answer-key invariant: all seven recorded
 payloads still score exactly 1.000, which holds by construction because
@@ -351,18 +360,24 @@ artifact and the scorer that grades it makes no call.
 
 ### 3. Stratify the splits and add cases (data; provisional: not yet grounded)
 
-Author new long transcripts so that each split carries cases of both
-size classes, then reassign splits so train and dev are two samples of
-one population. The deficit is smaller than it looks: the suite already
-holds seven short cases and three long ones, so the minimum
-stratification (two of each class per split) needs exactly **one** new
-long case. How many beyond that, and which domains, is an Open
-decision; the structural requirement is that neither split be
-identifiable from its rubric or its transcript length.
+Author **three** new long transcripts meeting the authoring rules in
+`eval-transcript-realism.spec.md`, then reassign splits to train 4 short
+plus 3 long and dev 3 short plus 3 long. The structural requirement is
+that neither split be identifiable from its rubric or its transcript
+length; the count is a judgment about how tight the dev mean should be,
+and one new long case would already remove the confound.
 
-Provisional because the number of new cases needed depends on the
-dispersion measured after workstream 1, which is not yet observable.
-Ground it against that baseline before authoring.
+Also in this workstream: write "no client-derived material in `evals/`"
+into `packages/promptlab/CLAUDE.md`. It is one line and it was settled
+on 2026-08-24, so land it with the first commit here rather than at the
+end -- a convention waiting on a workstream is not yet in force.
+
+Provisional because the case count was chosen before the dispersion at
+2.0.0 could be observed. Ground it against the workstream 1 baseline
+before authoring: if the dev error bar is comfortable at four or five
+cases, the third transcript is not worth writing, and if it is wide at
+six, raise `repeat` rather than authoring a seventh -- samples cost API
+calls and cases cost authored domains.
 
 ### 4. Re-baseline, re-fit the collapse floor, and record (needs a key)
 
@@ -390,43 +405,46 @@ because everything before it is verifiable without a key.
   under `docs/`, becomes incomparable to anything measured after the
   bump. The delta report already refuses a cross-version comparison.
 
-## Open decisions (for review)
+## Decisions (resolved 2026-08-24)
 
-- **The re-fitted weight values.** The form is settled; the numbers are
-  not. Recommend `validationWarning: 0.4`, `validationError: 0.8`,
-  `conformanceCorrection: 0.2` -- read as "a model in which every
-  element carries a warning loses 0.4". The alternative is to fit them
-  so a median train case scores roughly what it does today, which
-  preserves intuition about the scale at the cost of choosing weights
-  to flatter a number rather than on their meaning. Recommend against.
-- **Single denominator or per-rule denominators.** Recommend the single
-  `elementCount` denominator for this change: it removes the size bias,
-  costs one field, and keeps the scorer ignorant of the validator's rule
-  semantics. It is an approximation -- a rule that can only fire on
-  binary fact types is rated against a denominator including value types
-  -- so a reviewer who wants per-rule denominators should say so now,
-  because retrofitting them is a second re-baselining.
-- **How many new cases, and which domains.** The minimum is one new
-  long case: two short and two long per split needs four of each, and
-  the suite holds seven short and three long. Recommend three new long
-  cases instead, giving train four short plus three long and dev three
-  short plus three long -- a dev half of six cases rather than four, at
-  three transcripts of authoring. The minimum is a defensible trade if
-  authoring is the constraint -- it still widens dev from three cases to
-  four and makes both halves comparable, which is the whole point; the
-  extra two buy a tighter dev mean, not a different conclusion. Domains
-  are open; the constraint is that they be invented and mutually
-  distinct.
-- **Whether `ambiguityExcess` stays unrated.** Recommend yes: it is
-  charged against a per-case declared budget, so it is already a rate
-  against an authored denominator, and rating it again would double-
-  count. Named because it is the one weight this change leaves alone
-  and that asymmetry should be a decision rather than an oversight.
-- **Promoting the client-material exclusion to a stated rule.**
-  Recommended in `eval-transcript-realism.spec.md` and never resolved.
-  Eval content is checked in and published in the npm package.
-  Recommend writing "no client-derived material in `evals/`" into
-  `packages/promptlab/CLAUDE.md` as part of workstream 3.
+- **The re-fitted weights are `validationWarning: 0.4`,
+  `validationError: 0.8`, `conformanceCorrection: 0.2`**, read as "a
+  model in which every element carries a warning loses 0.4". Checked
+  against the recorded dev run before choosing: at an estimated 24
+  elements the two dominant rules cost about 0.27 together under these
+  weights, against 0.81 under today's, which is close to the 3x
+  distortion being removed and leaves the whole [0, 1] range in use.
+  The rejected alternative was fitting them so a median train case
+  scores what it does today -- that picks numbers to preserve a number,
+  which is what the version bump exists to make unnecessary.
+- **One denominator, not per-rule denominators.** `elementCount` is
+  `objectTypes + factTypes` for every rule. The approximation was
+  measured rather than assumed: across the seven reference models fact
+  types are 33-50% of total elements, and the rules that dominate the
+  tallies all fire on fact types, so a single denominator is off by a
+  near-constant factor for exactly the rules that matter -- and a
+  constant factor is what a weight absorbs. Per-rule denominators would
+  make every new validator rule a promptlab change, which is the
+  coupling the package boundary exists to prevent. Retrofitting them
+  later costs a second re-baselining, and that was accepted knowingly.
+- **Three new long cases**, giving 7 short and 6 long: train 4 short
+  plus 3 long, dev 3 short plus 3 long. The minimum that removes the
+  confound is one new long case, and the extra two were chosen for a
+  six-case dev half over a four-case one. Note for whoever implements
+  workstream 3: the confound is what makes the number wrong, and
+  dispersion is a separate problem with a cheaper lever -- if the dev
+  error bar is still too wide at six cases, raise `repeat` before
+  authoring a seventh.
+- **`ambiguityExcess` stays unrated.** It is charged against a per-case
+  authored budget, so it is a rate already and rating it again would
+  divide twice.
+- **The client-material exclusion becomes a stated rule.** "No
+  client-derived material in `evals/`" goes into
+  `packages/promptlab/CLAUDE.md`. Eval content is checked in and ships
+  in the npm package, so the rule belongs where an author will read it
+  rather than in a spec they may not. Written down when the decision
+  was made rather than deferred to workstream 3, because a convention
+  waiting on a workstream is a convention that is not yet in force.
 
 ## Risks and testing
 
