@@ -440,13 +440,20 @@ process, not code; it proves the resolver's fallback story, exercises
 the export-then-gate loop end to end, and populates the score history
 with a baseline.
 
-### 5. Review-surface evals (provisional: not yet grounded)
+### 5. Review-surface evals (grounded 2026-08-24; see `docs/specs/review-surface-evals.spec.md`)
 
 Seeded-defect eval cases for `reviewModel`: fixture models with
 planted defects per review category, metric = recall of planted
 defects. Wires the artifact seam (already designed for both surfaces)
-into `buildReviewSystemPrompt` and adds a review program to
-`optimizer/`. Deferred until the extraction harness proves the shape.
+into `buildReviewSystemPrompt`.
+
+Grounding corrected the brief in two places. The clean twin of each
+defective fixture, run through the same scorer, measures precision for
+free -- the brief had only recall, which is winnable by flagging
+everything. And the review program in `optimizer/` is **not** part of
+this workstream: whether the shipped prompt has headroom is what the
+baseline measures, so authorising the optimizer here would commit to
+building it before the evidence exists.
 
 ### 6. Agent-output evals for the `.claude/` subagents (provisional: not yet grounded)
 
