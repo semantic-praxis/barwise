@@ -48,12 +48,27 @@ class MetricLog:
         self.corrections_by_category.update(case.corrections_by_category)
 
     @property
+    def scored(self) -> int:
+        """Evaluations that produced rule tallies.
+
+        Not the same as `len(scores)`. A run that failed or came back
+        unparseable is appended as a 0.0 and contributes NO tallies, so
+        counting rule occurrences over `evaluations` divides by a
+        denominator that includes runs which could not have contributed
+        to it. Two arms with different failure counts are then compared
+        as though their raw counts were commensurate, which they are
+        not.
+        """
+        return len(self.scores) - self.unparseable - self.failed
+
+    @property
     def mean(self) -> float:
         return sum(self.scores) / len(self.scores) if self.scores else 0.0
 
     def summary(self) -> dict:
         return {
             "evaluations": len(self.scores),
+            "scored": self.scored,
             "mean": self.mean,
             "unparseable": self.unparseable,
             "failed": self.failed,

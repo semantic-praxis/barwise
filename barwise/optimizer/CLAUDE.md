@@ -116,6 +116,15 @@ through. `BARWISE_CLI` overrides what gets run.
   still passed something is the evidence of a clamp, and above
   `SATURATION_SHARE` of them the report says the margin means nothing
   and sends the reader to the rule counts.
+- **Rule counts need their denominator, and it is not `evaluations`.**
+  A run that fails or comes back unparseable is scored 0 and
+  contributes **no** tallies -- so an arm with more failures produces
+  fewer occurrences of everything and reads as _better_ on every rule
+  while being worse per run. The first mipro report did exactly that:
+  `binary-missing-inverse-reading` showed 160 to 145, an apparent
+  improvement, which was 10.67 to 14.50 per scored run. `MetricLog`
+  now carries `scored`, and the report switches to per-run rates and
+  says so whenever the two arms scored different numbers of runs.
 - **The call ceiling is enforced, and enforcing it took three tries.**
   `--max-calls` originally reached only GEPA's `max_metric_calls`, so
   for `bootstrap` and `mipro` the required flag enforced nothing. It is

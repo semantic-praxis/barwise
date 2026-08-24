@@ -285,3 +285,68 @@ def test_an_unsaturated_run_still_reports_normally():
 
     assert "floored rather than measured" not in body
     assert "exceeds what this run can resolve" in body
+
+
+def test_uneven_scored_counts_are_reported_as_rates_not_raw_counts():
+    """The flaw the mipro run exposed in this very report.
+
+    A run that fails to score contributes no rule tallies but still
+    counts as an evaluation. So an arm with more failures produces
+    fewer occurrences of everything and looks *better* on every rule
+    while being worse per run. The first mipro report did exactly that:
+    `binary-missing-inverse-reading` read 160 -> 145, an apparent
+    improvement, when it was 10.67 -> 14.50 per scored run.
+    """
+    body = render_delta_report(
+        candidate_version="dspy-1",
+        baseline={
+            "mean": 0.0, "evaluations": 15, "scored": 15,
+            "warningsByRule": {"structural/binary-missing-inverse-reading": 160},
+        },
+        candidate={
+            "mean": 0.0, "evaluations": 15, "scored": 10,
+            "warningsByRule": {"structural/binary-missing-inverse-reading": 145},
+        },
+        samples_per_candidate=5,
+        resolvable=0.09,
+        artifact_path=Path("out/x.prompt.yaml"),
+    )
+
+    assert "raw counts are not comparable" in body
+    assert "5 produced nothing scorable" in body
+    # The rates, and a delta that points the right way.
+    assert "10.67" in body and "14.50" in body
+    assert "+3.83" in body
+
+
+def test_even_scored_counts_keep_the_plain_table():
+    body = render_delta_report(
+        candidate_version="dspy-1",
+        baseline={
+            "mean": 0.7, "evaluations": 15, "scored": 15,
+            "warningsByRule": {"completeness/fact-type-without-uniqueness": 18},
+        },
+        candidate={
+            "mean": 0.9, "evaluations": 15, "scored": 15,
+            "warningsByRule": {"completeness/fact-type-without-uniqueness": 4},
+        },
+        samples_per_candidate=5,
+        resolvable=0.086,
+        artifact_path=Path("out/x.prompt.yaml"),
+    )
+
+    assert "raw counts are not comparable" not in body
+    assert "-14" in body
+
+
+def test_a_summary_without_scored_still_renders():
+    # Reports written before `scored` existed must not crash a re-read.
+    body = render_delta_report(
+        candidate_version="dspy-1",
+        baseline={"mean": 0.7, "evaluations": 15, "warningsByRule": {"a": 3}},
+        candidate={"mean": 0.9, "evaluations": 15, "warningsByRule": {"a": 1}},
+        samples_per_candidate=5,
+        resolvable=0.086,
+        artifact_path=Path("out/x.prompt.yaml"),
+    )
+    assert "raw counts are not comparable" not in body

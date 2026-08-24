@@ -214,6 +214,17 @@ def _rule_delta(before: dict, after: dict) -> list[tuple[str, int, int]]:
     return [r for r in rows if r[1] != r[2]]
 
 
+def _scored(summary: dict) -> int:
+    """Evaluations behind an arm's rule counts.
+
+    Falls back to `evaluations` for summaries written before `scored`
+    existed, so an old run still renders.
+    """
+    if "scored" in summary:
+        return int(summary["scored"])
+    return int(summary.get("evaluations", 0))
+
+
 def render_delta_report(
     *,
     candidate_version: str,
@@ -259,6 +270,15 @@ def render_delta_report(
     if floored:
         lines.append(f"- evaluations floored at zero: {floored} of {total}")
     lines.append(f"- resolvable difference at that sample count: {resolvable:.3f}")
+    for label, arm in (("baseline", baseline), ("candidate", candidate)):
+        evaluations = int(arm.get("evaluations", 0))
+        scored = _scored(arm)
+        if scored != evaluations:
+            lines.append(
+                f"- {label} runs behind the rule counts: {scored} of "
+                f"{evaluations} ({evaluations - scored} produced nothing "
+                "scorable)"
+            )
     lines.append("")
     if saturated:
         lines.append(
@@ -288,6 +308,18 @@ def render_delta_report(
     lines.append("")
     lines.append("## What moved, by name")
     lines.append("")
+    base_n, cand_n = _scored(baseline), _scored(candidate)
+    uneven = base_n != cand_n and base_n > 0 and cand_n > 0
+    if uneven:
+        # Raw counts across different denominators are not a comparison.
+        # A candidate whose runs fail more often produces fewer tallies
+        # and can look *better* on every rule while being worse per run.
+        lines.append(
+            f"**The two arms scored a different number of runs ({base_n} and "
+            f"{cand_n}), so the raw counts are not comparable.** Per-run rates "
+            "are given alongside; read those."
+        )
+        lines.append("")
     for label, key in (
         ("Validation errors", "errorsByRule"),
         ("Validation warnings", "warningsByRule"),
@@ -298,6 +330,17 @@ def render_delta_report(
         lines.append("")
         if not rows:
             lines.append("No change.")
+        elif uneven:
+            lines.append(
+                "| rule | baseline | /run | candidate | /run | delta /run |"
+            )
+            lines.append("| --- | ---: | ---: | ---: | ---: | ---: |")
+            for name, was, now in rows:
+                was_rate, now_rate = was / base_n, now / cand_n
+                lines.append(
+                    f"| `{name}` | {was} | {was_rate:.2f} | {now} | "
+                    f"{now_rate:.2f} | {now_rate - was_rate:+.2f} |"
+                )
         else:
             lines.append("| rule | baseline | candidate | delta |")
             lines.append("| --- | ---: | ---: | ---: |")

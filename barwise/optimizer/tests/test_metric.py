@@ -240,3 +240,19 @@ def test_an_ordinary_cli_failure_still_reports_plainly(tmp_path, monkeypatch):
 
     assert "npm run build" not in str(raised.value)
     assert "no such eval case" in str(raised.value)
+
+
+def test_scored_excludes_runs_that_produced_no_tallies():
+    # The denominator behind every rule count. A failed or unparseable
+    # run is appended as 0.0 and contributes nothing to the tallies, so
+    # dividing occurrences by `evaluations` divides by runs that could
+    # not have contributed to them.
+    log = MetricLog()
+    log.record(CaseScore(case_id="a", score=0.9, rubric_passed=6, rubric_total=6))
+    log.unparseable += 1
+    log.scores.append(0.0)
+    log.failed += 1
+    log.scores.append(0.0)
+
+    assert log.summary()["evaluations"] == 3
+    assert log.summary()["scored"] == 1
