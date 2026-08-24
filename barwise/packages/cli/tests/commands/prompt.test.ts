@@ -118,6 +118,55 @@ describe("barwise prompt schema", () => {
   });
 });
 
+describe("barwise prompt artifact", () => {
+  it("prints the default artifact's instructions when no target is given", async () => {
+    const { stdout, exitCode } = await runCli(["prompt", "artifact"]);
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("Object-Role Modeling");
+    expect(stdout.length).toBeGreaterThan(10000);
+  });
+
+  it("resolves the variant for a provider and model", async () => {
+    const { stdout } = await runCli([
+      "prompt",
+      "artifact",
+      "--provider",
+      "anthropic",
+      "--model",
+      "claude-haiku-4-5",
+      "--format",
+      "json",
+    ]);
+
+    expect((JSON.parse(stdout) as { version: string; }).version).toBe("haiku45-2");
+  });
+
+  it("shows the barwise-842 trap rather than requiring a paid run to find it", async () => {
+    // Artifact resolution keys on the (provider, model) pair. Omitting
+    // --provider silently falls back to the default, which during an
+    // eval sweep reads as a one-line stderr note in the middle of a
+    // twenty-minute run. Here it costs nothing to see.
+    const { stdout } = await runCli([
+      "prompt",
+      "artifact",
+      "--model",
+      "claude-haiku-4-5",
+      "--format",
+      "json",
+    ]);
+
+    expect((JSON.parse(stdout) as { version: string; }).version).not.toBe("haiku45-2");
+  });
+
+  it("rejects a surface it cannot print", async () => {
+    const { stderr, exitCode } = await runCli(["prompt", "artifact", "--surface", "review"]);
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("extraction only");
+  });
+});
+
 describe("barwise prompt history", () => {
   it("reports an empty history for a fresh suite", async () => {
     const dir = mkdtempSync(join(tmpdir(), "barwise-prompt-"));

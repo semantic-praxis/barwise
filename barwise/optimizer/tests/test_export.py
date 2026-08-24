@@ -235,3 +235,53 @@ def test_demos_from_an_uncompiled_program_are_empty():
         pass
 
     assert demos_from_program(Program()) == []
+
+
+def test_a_saturated_comparison_refuses_to_call_the_margin_anything():
+    # The first real compilation: means of 0.000 and 0.001 against a
+    # resolvable of 0.002 that the flooring itself manufactured. Both
+    # arms had exceeded the maximum penalty, so they compared equal
+    # while being nothing of the sort.
+    body = render_delta_report(
+        candidate_version="dspy-1",
+        baseline={"mean": 0.0, "evaluations": 15, "floored": 10},
+        candidate={"mean": 0.001, "evaluations": 15, "floored": 12},
+        samples_per_candidate=5,
+        resolvable=0.002,
+        artifact_path=Path("out/x.prompt.yaml"),
+    )
+
+    assert "floored rather than measured" in body
+    assert "means nothing" in body
+    # And it must not also claim the margin resolved.
+    assert "exceeds what this run can resolve" not in body
+
+
+def test_saturation_outranks_a_margin_that_would_otherwise_resolve():
+    # The dangerous case: flooring collapses the SD, so a wide-looking
+    # margin can clear a threshold that no longer means anything.
+    body = render_delta_report(
+        candidate_version="dspy-1",
+        baseline={"mean": 0.0, "evaluations": 15, "floored": 15},
+        candidate={"mean": 0.4, "evaluations": 15, "floored": 8},
+        samples_per_candidate=5,
+        resolvable=0.001,
+        artifact_path=Path("out/x.prompt.yaml"),
+    )
+
+    assert "floored rather than measured" in body
+    assert "exceeds what this run can resolve" not in body
+
+
+def test_an_unsaturated_run_still_reports_normally():
+    body = render_delta_report(
+        candidate_version="dspy-1",
+        baseline={"mean": 0.70, "evaluations": 15, "floored": 0},
+        candidate={"mean": 0.90, "evaluations": 15, "floored": 1},
+        samples_per_candidate=5,
+        resolvable=0.086,
+        artifact_path=Path("out/x.prompt.yaml"),
+    )
+
+    assert "floored rather than measured" not in body
+    assert "exceeds what this run can resolve" in body

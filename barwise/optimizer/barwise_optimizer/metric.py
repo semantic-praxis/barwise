@@ -37,9 +37,12 @@ class MetricLog:
     corrections_by_category: Counter = field(default_factory=Counter)
     unparseable: int = 0
     failed: int = 0
+    floored: int = 0
 
     def record(self, case: CaseScore) -> None:
         self.scores.append(case.score)
+        if case.floored:
+            self.floored += 1
         self.errors_by_rule.update(case.errors_by_rule)
         self.warnings_by_rule.update(case.warnings_by_rule)
         self.corrections_by_category.update(case.corrections_by_category)
@@ -54,6 +57,7 @@ class MetricLog:
             "mean": self.mean,
             "unparseable": self.unparseable,
             "failed": self.failed,
+            "floored": self.floored,
             "errorsByRule": dict(self.errors_by_rule),
             "warningsByRule": dict(self.warnings_by_rule),
             "correctionsByCategory": dict(self.corrections_by_category),

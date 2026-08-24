@@ -26,7 +26,7 @@ non-determinism out of `core`, applied one layer further out.
 pyproject.toml            uv-managed; dspy pinned exactly
 uv.lock                   committed -- a run costs money, so pin what produced it
 barwise_optimizer/
-  barwise_cli.py          THE seam: subprocess to `prompt schema` / `prompt score`
+  barwise_cli.py          THE seam: `prompt schema` / `prompt artifact` / `prompt score`
   dataset.py              evals/ -> dspy.Example, honouring the manifest splits
   program.py              signature + module; schema fetched, never embedded
   metric.py               candidate -> score, plus the rule tallies behind it
@@ -91,6 +91,27 @@ The tests require the CLI to be **built** (`npm run build` from
   loads fine and is then silently skipped -- the gating run measures
   the default while reporting on the candidate. `write_candidate`
   requires it and `match_for_target` derives it from `provider/model`.
+- **`--seed-from` decides which prompt the search starts from, and the
+  right answer differs by optimizer.** `minimal` is a 137-token summary
+  -- right for `mipro`/`gepa`, which propose replacements, because
+  seeding them with the shipped 4,540-token prompt biases the search
+  toward paraphrases of it. `default` fetches what the target would
+  actually be sent today (via `barwise prompt artifact`, keyed on the
+  provider/model pair) -- right for `bootstrap`, which never rewrites
+  instructions and only selects demos, so from a weak seed it selects
+  demos generated _by_ that weak seed and amplifies its defects. The
+  first real compilation showed exactly that: `misplaced_is_preferred`
+  10 to 70, and a floored score throughout. The seed source is part of
+  the candidate's version string, because two seeds are two experiments.
+- **The report refuses to compare saturated arms.** `scoreExtraction`
+  clamps at zero, so runs whose penalties exceed 1.0 all report 0.000
+  however much worse they were -- and the clamping also collapses the
+  SD, shrinking `resolvable` so a meaningless margin looks decisive.
+  The first real compilation hit it precisely: means of 0.000 and 0.001
+  against a manufactured threshold of 0.002. A zero with a rubric that
+  still passed something is the evidence of a clamp, and above
+  `SATURATION_SHARE` of them the report says the margin means nothing
+  and sends the reader to the rule counts.
 - **The call ceiling is enforced, and enforcing it took three tries.**
   `--max-calls` originally reached only GEPA's `max_metric_calls`, so
   for `bootstrap` and `mipro` the required flag enforced nothing. It is
@@ -125,7 +146,11 @@ The tests require the CLI to be **built** (`npm run build` from
   accepts it. That found the missing `match` block; asserting on the
   exporter's own YAML would only have proved this package agrees with
   itself.
-- Assertions here have been mutation-checked: eight deliberate
-  breakages (demo budget, truncation marker, clobber refusal, train/dev
-  disjointness, the noise-band branch, the sample floor, the omitted
-  `match`, and the schema back in the instructions), each caught.
+- Assertions here have been mutation-checked: twelve deliberate
+  breakages, each caught. Two are worth naming. Omitting `match` is
+  caught only by the loader round trip. And making `CaseScore.floored`
+  always return False was caught by **nothing** until a direct test was
+  added -- the report tests supply the floored count as a literal, so
+  they assert the consumer and never the computation. That is the
+  barwise-840 shape, and a good reason to mutate the _producer_ of any
+  value a test feeds in by hand.

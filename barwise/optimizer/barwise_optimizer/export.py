@@ -39,6 +39,12 @@ DEMO_TOKEN_BUDGET = 1500
 #: large payload cannot crowd out every other example.
 MAX_DEMO_TOKENS = 900
 
+#: Share of floored evaluations above which the means stop being
+#: comparable at all. A quarter is a judgement, deliberately low: one
+#: floored run in four already means the mean is averaging a clamp with
+#: a measurement, and no threshold makes that meaningful.
+SATURATION_SHARE = 0.25
+
 
 class ExportError(RuntimeError):
     """The candidate could not be written."""
@@ -225,7 +231,19 @@ def render_delta_report(
     the margin does not.
     """
     margin = float(candidate.get("mean", 0.0)) - float(baseline.get("mean", 0.0))
-    resolved = abs(margin) > resolvable
+
+    # Saturation beats resolvability, and has to be checked first.
+    # `scoreExtraction` floors at zero, so runs whose penalties exceed
+    # 1.0 all report 0.000 however much worse than that they were. Two
+    # such arms compare equal while being nothing of the sort -- and the
+    # flooring also collapses the SD, which shrinks `resolvable` toward
+    # zero and makes a meaningless margin look decisive. The first real
+    # compilation hit exactly this: means of 0.000 and 0.001 against a
+    # manufactured threshold of 0.002.
+    floored = int(baseline.get("floored", 0)) + int(candidate.get("floored", 0))
+    total = int(baseline.get("evaluations", 0)) + int(candidate.get("evaluations", 0))
+    saturated = total > 0 and floored / total >= SATURATION_SHARE
+    resolved = (not saturated) and abs(margin) > resolvable
 
     lines: list[str] = []
     lines.append(f"# Candidate {candidate_version}")
@@ -238,9 +256,23 @@ def render_delta_report(
     lines.append(f"- candidate mean: {candidate.get('mean', 0.0):.3f}")
     lines.append(f"- margin: {margin:+.3f}")
     lines.append(f"- samples per candidate: {samples_per_candidate}")
+    if floored:
+        lines.append(f"- evaluations floored at zero: {floored} of {total}")
     lines.append(f"- resolvable difference at that sample count: {resolvable:.3f}")
     lines.append("")
-    if resolved:
+    if saturated:
+        lines.append(
+            f"**{floored} of {total} evaluations scored zero with a rubric that "
+            "passed something, so the score was floored rather than measured.** "
+            "Penalties exceeded the maximum, and `scoreExtraction` clamps at "
+            "zero -- so these arms compare equal while being nothing of the "
+            "sort, and the flooring collapses the spread that "
+            f"`resolvable` ({resolvable:.3f}) is derived from. **The margin "
+            "above means nothing.** Read the rule deltas below, which are "
+            "counts and remain legible, and fix what they name before "
+            "comparing means again."
+        )
+    elif resolved:
         lines.append(
             f"**The margin ({abs(margin):.3f}) exceeds what this run can "
             f"resolve ({resolvable:.3f}).** It is a real difference at 95%."

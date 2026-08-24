@@ -102,12 +102,47 @@ This is the honest form of the harness spec's claim that the scorer
 determinism, and the run report is what keeps it from being read as a
 claim about resolution.
 
+## What the first real compilation changed (2026-08-24)
+
+Run against Haiku 4.5, `bootstrap`, 32 calls of a 60 ceiling. Two
+corrections came out of it, and one addition to the seam.
+
+**The metric saturates, and the report did not notice.** Both arms
+scored ~0 because penalties (~0.98 and ~1.02 per run) exceeded what the
+rubric can offset, and `scoreExtraction` clamps at zero. Clamped arms
+compare equal while being nothing of the sort -- and the clamping also
+collapses the SD, so `resolvable` shrank to 0.002 and a meaningless
+0.001 margin came within a hair of reading as decisive. The report now
+detects it: a zero with a rubric that still passed something is the
+evidence of a clamp, and above a quarter of them the report says the
+margin means nothing and sends the reader to the rule counts.
+
+**Bootstrap amplifies whatever the seed does wrong**, because its demos
+are the seed's own outputs. `misplaced_is_preferred` went 10 to 70.
+That makes the hard-coded minimal seed wrong for this optimizer, so
+`--seed-from minimal|default` now chooses, and the seed source is part
+of the candidate's version string because two seeds are two experiments.
+
+**A third CLI command joins the seam.** `default` needs the shipped
+instructions, and the default artifact is compiled into TypeScript --
+there is no `.prompt.yaml` for Python to read, and parsing the generated
+module would be the worst kind of second copy. So `barwise prompt
+artifact` prints the artifact a given target would resolve. It earns its
+place independently: it answers the barwise-842 question -- _which
+prompt would this configuration actually send?_ -- for free, where
+previously that took a sweep to observe.
+
+The one result the run did establish: **demos fix format adherence**,
+`unparseable` 5 to 0 across 15 evaluations. That is barwise-812's
+question answered on real content.
+
 ## Scope
 
 In scope, as `optimizer/` (uv-managed, outside the npm workspace):
 
 - `barwise_cli.py` -- the only crossing point: subprocess wrappers for
-  `barwise prompt schema` and `barwise prompt score`.
+  `barwise prompt schema`, `barwise prompt artifact` and
+  `barwise prompt score`.
 - `dataset.py` -- read `packages/promptlab/evals/` into DSPy examples,
   honouring the manifest's `splits`. Compile on **train** only.
 - `program.py` -- the extraction signature and module, its schema
@@ -147,8 +182,11 @@ Out of scope, deferred and named:
 | `packages/llm/prompts/`     | Where a candidate lands                    | none    |
 | `.gitignore`                | No Python entries                          | modify  |
 
-Nothing in TypeScript changes. If this spec had required a change
-there, the seam would be wrong.
+Nothing in TypeScript changed when this lane was built. The one later
+addition -- `barwise prompt artifact` -- is a named, read-only CLI
+command, which is what the seam is _made of_; it is not a hook carved
+out for Python. The test is whether a human would run it, and they
+would: it answers which prompt a given target resolves.
 
 ## Risks and testing
 

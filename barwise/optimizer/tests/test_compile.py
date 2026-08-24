@@ -137,3 +137,42 @@ def test_the_cli_requires_the_budget_flags(capsys):
     with pytest.raises(SystemExit):
         main(["--target-model", "anthropic/claude-haiku-4-5"])
     assert "--max-calls" in capsys.readouterr().err
+
+
+def test_seed_from_defaults_to_minimal():
+    assert config().seed_from == "minimal"
+
+
+def test_an_unknown_seed_source_is_refused():
+    with pytest.raises(BudgetError, match="Unknown --seed-from"):
+        config(seed_from="the-good-one").validate()
+
+
+def test_seed_from_minimal_is_the_short_summary():
+    from barwise_optimizer.compile import seed_instructions
+    from barwise_optimizer.program import SEED_INSTRUCTIONS
+
+    assert seed_instructions(config()) == SEED_INSTRUCTIONS
+
+
+def test_seed_from_default_fetches_what_the_target_would_actually_be_sent():
+    # Through the CLI, because the default artifact is compiled into
+    # TypeScript and there is no file for Python to read. And keyed on
+    # the (provider, model) pair, so a target with a variant seeds from
+    # the variant rather than the fallback.
+    from barwise_optimizer.compile import seed_instructions
+
+    text = seed_instructions(config(seed_from="default"))
+
+    assert len(text) > 10000
+    assert "Object-Role Modeling" in text
+    # The haiku variant, not the generic default -- the target model is
+    # anthropic/claude-haiku-4-5.
+    assert text != seed_instructions(config()).strip()
+
+
+def test_the_version_records_which_seed_produced_the_candidate():
+    # Two runs of the same optimizer from different seeds are different
+    # experiments, and a shared version string would make the recorded
+    # artifacts indistinguishable.
+    assert config(seed_from="default").seed_from == "default"

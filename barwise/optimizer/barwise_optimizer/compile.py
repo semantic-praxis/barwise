@@ -37,10 +37,12 @@ from .export import (
     write_candidate,
     write_delta_report,
 )
+from .barwise_cli import default_instructions
 from .metric import MetricLog, make_metric, resolvable_difference, sample_sd
 from .program import SEED_INSTRUCTIONS, ExtractionProgram
 
 OPTIMIZERS = ("bootstrap", "mipro", "gepa")
+SEED_SOURCES = ("minimal", "default")
 
 
 class BudgetError(RuntimeError):
@@ -55,8 +57,14 @@ class RunConfig:
     samples_per_candidate: int
     max_demos: int = 2
     proposer_model: str | None = None
+    seed_from: str = "minimal"
 
     def validate(self) -> None:
+        if self.seed_from not in SEED_SOURCES:
+            raise BudgetError(
+                f"Unknown --seed-from {self.seed_from!r}. Choose one of: "
+                f"{', '.join(SEED_SOURCES)}."
+            )
         if self.optimizer not in OPTIMIZERS:
             raise BudgetError(
                 f"Unknown optimizer {self.optimizer!r}. Choose one of: "
@@ -151,6 +159,29 @@ def evaluate(program, examples, metric, samples: int) -> MetricLog:
     return log
 
 
+def seed_instructions(config: RunConfig) -> str:
+    """The instruction text a compile starts from.
+
+    `minimal` is a 137-token summary. It is the right start for the
+    instruction-rewriting optimizers, which propose replacements --
+    seeding those with the shipped 4,540-token prompt biases the search
+    toward paraphrases of what already exists.
+
+    `default` is what the target model would actually be sent today,
+    fetched through the CLI. It is the right start for `bootstrap`,
+    which never rewrites instructions and only selects demos: from the
+    minimal seed, bootstrap selects demos generated *by* the minimal
+    seed, so it amplifies that prompt's defects rather than improving on
+    anything. The first real compilation showed this -- `misplaced_is_preferred`
+    went 10 to 70 -- and it also floored the score, because a 137-token
+    prompt earns more penalty than the rubric can offset.
+    """
+    if config.seed_from == "default":
+        provider, _, model = config.target_model.partition("/")
+        return default_instructions(provider=provider or None, model=model or None)
+    return SEED_INSTRUCTIONS
+
+
 def run(config: RunConfig, out_dir: Path) -> dict:
     """Compile, evaluate on the held-out split, and write the artifacts.
 
@@ -182,18 +213,20 @@ def _run_under_budget(config: RunConfig, out_dir: Path, suite, budget: CallBudge
     train = compile_set()
     dev = report_set()
 
-    baseline = ExtractionProgram(SEED_INSTRUCTIONS)
+    seed = seed_instructions(config)
+
+    baseline = ExtractionProgram(seed)
     evaluate(baseline, dev, make_metric(baseline_log), config.samples_per_candidate)
 
     optimizer = build_optimizer(config, make_metric())
-    compiled = optimizer.compile(ExtractionProgram(SEED_INSTRUCTIONS), trainset=train)
+    compiled = optimizer.compile(ExtractionProgram(seed), trainset=train)
 
     evaluate(compiled, dev, make_metric(candidate_log), config.samples_per_candidate)
 
     sd = sample_sd(candidate_log.scores)
     resolvable = resolvable_difference(sd, config.samples_per_candidate)
 
-    version = f"dspy-{config.optimizer}-1"
+    version = f"dspy-{config.optimizer}-{config.seed_from}-1"
     artifact_path = out_dir / f"extraction.{version}.prompt.yaml"
     write_candidate(
         artifact_path,
@@ -256,6 +289,18 @@ def main(argv: list[str] | None = None) -> int:
         help="Evaluations per case. Below 2 the run cannot report a spread.",
     )
     parser.add_argument("--max-demos", type=int, default=2)
+    parser.add_argument(
+        "--seed-from",
+        default="minimal",
+        choices=SEED_SOURCES,
+        help=(
+            "Instruction text to start from. 'minimal' is a short summary, "
+            "right for mipro/gepa which propose replacements. 'default' is "
+            "the shipped prompt for the target model, right for bootstrap, "
+            "which only selects demos and otherwise amplifies whatever the "
+            "seed does wrong."
+        ),
+    )
     parser.add_argument("--proposer-model", default=None)
     parser.add_argument("--out", default="out", help="Directory for candidate + report.")
     args = parser.parse_args(argv)
@@ -267,6 +312,7 @@ def main(argv: list[str] | None = None) -> int:
         samples_per_candidate=args.samples_per_candidate,
         max_demos=args.max_demos,
         proposer_model=args.proposer_model,
+        seed_from=args.seed_from,
     )
     config.validate()
 

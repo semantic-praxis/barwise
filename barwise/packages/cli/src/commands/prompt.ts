@@ -11,7 +11,9 @@
 import type { PromptArtifact, ProviderName } from "@barwise/llm";
 import {
   buildResponseSchema,
+  builtinArtifacts,
   createLlmClient,
+  defaultExtractionArtifact,
   loadArtifactsFromDir,
   resolveArtifact,
 } from "@barwise/llm";
@@ -48,6 +50,7 @@ export function registerPromptCommand(program: Command, version = "0.0.0-dev"): 
   registerEval(promptCmd, version);
   registerScore(promptCmd);
   registerSchema(promptCmd);
+  registerArtifact(promptCmd);
   registerHistory(promptCmd);
 }
 
@@ -331,6 +334,57 @@ function registerSchema(promptCmd: Command): void {
         fail(err);
       }
     });
+}
+
+/** `barwise prompt artifact` */
+function registerArtifact(promptCmd: Command): void {
+  promptCmd
+    .command("artifact")
+    .description("Print the prompt artifact a given target would actually resolve")
+    .option("--surface <surface>", "Prompt surface (extraction)", "extraction")
+    .option("--provider <provider>", "Provider to resolve for (anthropic, openai, ollama)")
+    .option("--model <model>", "Model to resolve for")
+    .option("--artifacts <dir>", "Also consider .prompt.yaml variants in this directory")
+    .option("--format <format>", "Output format (text or json)", "text")
+    .action(
+      (opts: {
+        surface: string;
+        provider?: string;
+        model?: string;
+        artifacts?: string;
+        format: string;
+      }) => {
+        try {
+          if (opts.surface !== "extraction") {
+            throw new Error(
+              `Surface "${opts.surface}" has no artifact to print yet (extraction only).`,
+            );
+          }
+          // Built-ins first, then the directory, so a local variant can
+          // win against a shipped one of equal specificity rather than
+          // colliding with it.
+          const candidates = [
+            ...builtinArtifacts,
+            ...(opts.artifacts ? loadArtifactsFromDir(resolve(opts.artifacts)) : []),
+          ];
+          const resolved = resolveArtifact(candidates, {
+            surface: "extraction",
+            ...(opts.provider !== undefined ? { provider: opts.provider } : {}),
+            ...(opts.model !== undefined ? { model: opts.model } : {}),
+          }) ?? defaultExtractionArtifact;
+
+          if (opts.format === "json") {
+            process.stdout.write(JSON.stringify(resolved, null, 2) + "\n");
+          } else {
+            // The instructions alone, because that is the thing a
+            // reader is asking about: what text would be sent.
+            process.stdout.write(resolved.instructions + "\n");
+          }
+        } catch (err) {
+          fail(err);
+        }
+      },
+    );
 }
 
 /** `barwise prompt history` */

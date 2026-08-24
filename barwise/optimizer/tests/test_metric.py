@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from barwise_optimizer.barwise_cli import extraction_schema, score_extraction
+from barwise_optimizer.barwise_cli import CaseScore, extraction_schema, score_extraction
 from barwise_optimizer.metric import (
     MetricLog,
     make_metric,
@@ -136,3 +136,62 @@ def test_one_sample_resolves_nothing():
 def test_sample_sd_uses_n_minus_one():
     assert sample_sd([1.0, 2.0, 3.0]) == pytest.approx(1.0)
     assert sample_sd([1.0]) == 0.0
+
+
+def test_a_floored_score_is_distinguished_from_a_genuine_zero():
+    """The detector the saturation guard rests on, exercised for real.
+
+    `scoreExtraction` clamps at zero, so a run whose penalties exceed
+    1.0 reports 0.000 however much worse than that it was -- and two
+    such runs compare equal while being nothing of the sort. The
+    evidence that a zero is a clamp is a rubric that still passed
+    something.
+
+    Added because a mutation making `floored` always False was caught by
+    nothing: the report tests supply the count as a literal, so they
+    assert the consumer and never the computation. The same shape as the
+    barwise-840 sweep.
+    """
+    doc = json.loads(payload("order-management"))
+    fact = doc["fact_types"][0]
+    # Enough malformed constraints to drive the penalty past 1.0 at
+    # 0.02 each, while the rubric keeps passing.
+    for i in range(60):
+        doc["inferred_constraints"].append(
+            {
+                "type": "exclusion",
+                "fact_type": fact["name"],
+                "roles": [fact["roles"][0]["player"]],
+                "description": f"malformed {i}: exclusion over a single role",
+                "confidence": "high",
+                "source_references": [{"lines": [1, 2], "excerpt": "test"}],
+            }
+        )
+
+    case = score_extraction("order-management", json.dumps(doc))
+
+    assert case.score == 0.0
+    assert case.rubric_passed > 0
+    assert case.floored is True
+
+
+def test_an_answer_key_is_not_floored():
+    case = score_extraction("order-management", payload("order-management"))
+    assert case.score == pytest.approx(1.0)
+    assert case.floored is False
+
+
+def test_a_zero_with_nothing_passing_is_not_called_floored():
+    # A genuine nothing, not a clamp. Distinguishing the two is the
+    # whole job.
+    case = CaseScore(case_id="x", score=0.0, rubric_passed=0, rubric_total=6)
+    assert case.floored is False
+
+
+def test_the_log_counts_floored_evaluations():
+    log = MetricLog()
+    log.record(CaseScore(case_id="x", score=0.0, rubric_passed=4, rubric_total=6))
+    log.record(CaseScore(case_id="y", score=0.9, rubric_passed=6, rubric_total=6))
+
+    assert log.floored == 1
+    assert log.summary()["floored"] == 1

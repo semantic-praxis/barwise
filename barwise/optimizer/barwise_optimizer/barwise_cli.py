@@ -85,6 +85,27 @@ def extraction_schema() -> dict:
     return json.loads(_run(["prompt", "schema", "--surface", "extraction"]))
 
 
+def default_instructions(provider: str | None = None, model: str | None = None) -> str:
+    """The instructions the shipped artifact would actually send.
+
+    Fetched, like the schema, because the default artifact is compiled
+    into TypeScript rather than living in a `.prompt.yaml` -- there is no
+    file for Python to read, and parsing the generated module would be
+    a second copy of the worst kind.
+
+    Resolution keys on the (provider, model) pair, so this returns the
+    *variant* when one matches. That is deliberate: seeding a compile
+    from "the shipped prompt" should mean the prompt that model actually
+    gets, not the fallback.
+    """
+    args = ["prompt", "artifact", "--surface", "extraction"]
+    if provider:
+        args += ["--provider", provider]
+    if model:
+        args += ["--model", model]
+    return _run(args).rstrip("\n")
+
+
 @dataclass(frozen=True)
 class CaseScore:
     """What `barwise prompt score` returns, as this lane reads it.
@@ -102,6 +123,19 @@ class CaseScore:
     errors_by_rule: dict[str, int] = field(default_factory=dict)
     warnings_by_rule: dict[str, int] = field(default_factory=dict)
     corrections_by_category: dict[str, int] = field(default_factory=dict)
+
+    @property
+    def floored(self) -> bool:
+        """The score hit zero with a rubric that was not entirely failed.
+
+        The distinction the mean cannot make. `scoreExtraction` floors at
+        zero, so a run whose penalties exceed 1.0 reports 0.000 no matter
+        how much worse than that it was -- and two such runs compare
+        equal while being nothing of the sort. A rubric that passed
+        something is the evidence that the zero is a floor rather than a
+        genuine nothing.
+        """
+        return self.score == 0.0 and self.rubric_passed > 0
 
     @staticmethod
     def from_json(payload: dict) -> "CaseScore":

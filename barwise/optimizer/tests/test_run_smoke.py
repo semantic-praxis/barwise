@@ -1,5 +1,10 @@
 """The whole compile path, run offline.
 
+The version string carries the seed source (`dspy-bootstrap-minimal-1`)
+because two runs of the same optimizer from different seeds are
+different experiments, and a shared version would make the recorded
+artifacts indistinguishable.
+
 `run()` was the last thing here that had never executed: compile,
 evaluate, export, report. Smoke-running it found two bugs that would
 otherwise have surfaced only after a paid compilation --
@@ -63,8 +68,8 @@ def compiled(tmp_path: Path) -> dict:
 
 def test_the_run_writes_a_candidate_and_a_report(compiled):
     out = compiled["dir"]
-    assert (out / f"extraction.dspy-bootstrap-1.prompt.yaml").is_file()
-    assert (out / "delta-dspy-bootstrap-1.md").is_file()
+    assert (out / "extraction.dspy-bootstrap-minimal-1.prompt.yaml").is_file()
+    assert (out / "delta-dspy-bootstrap-minimal-1.md").is_file()
     assert compiled["baseline"]["evaluations"] > 0
     assert compiled["candidate"]["evaluations"] > 0
 
@@ -111,5 +116,5 @@ def test_the_candidate_resolves_through_the_production_loader(compiled):
         env={"PATH": "/usr/bin:/bin:/usr/local/bin", "HOME": "/tmp"},
     )
 
-    assert "Using artifact version dspy-bootstrap-1." in proc.stderr
+    assert "Using artifact version dspy-bootstrap-minimal-1." in proc.stderr
     assert "Using the default prompt artifact." not in proc.stderr
