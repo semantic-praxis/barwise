@@ -8,13 +8,12 @@
  * point); `schema` prints the structured-output JSON Schema the Python
  * lane must reuse; `history` shows the checked-in score record.
  */
-import type { PromptArtifact, ProviderName } from "@barwise/llm";
+import type { ProviderName } from "@barwise/llm";
 import {
   buildResponseSchema,
-  builtinArtifacts,
   createLlmClient,
   defaultExtractionArtifact,
-  loadArtifactsFromDir,
+  defaultReviewArtifact,
   resolveArtifact,
 } from "@barwise/llm";
 import type { RunProgress, SuiteReport } from "@barwise/promptlab";
@@ -33,6 +32,7 @@ import {
 import type { Command } from "commander";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { artifactCandidates } from "../workspace/promptArtifacts.js";
 import { describeProvenance, resolveProvenance } from "../workspace/provenance.js";
 
 interface ProviderOpts {
@@ -121,21 +121,6 @@ function registerEval(promptCmd: Command, version: string): void {
         try {
           const suite = loadSuite(suitePath(opts));
 
-          let artifact: PromptArtifact | undefined;
-          if (opts.artifacts) {
-            const artifacts = loadArtifactsFromDir(resolve(opts.artifacts));
-            artifact = resolveArtifact(artifacts, {
-              surface: "extraction",
-              ...(opts.provider !== undefined ? { provider: opts.provider } : {}),
-              ...(opts.model !== undefined ? { model: opts.model } : {}),
-            });
-          }
-          process.stderr.write(
-            artifact
-              ? `Using artifact version ${artifact.version}.\n`
-              : "Using the default prompt artifact.\n",
-          );
-
           if (opts.split !== undefined && opts.split !== "train" && opts.split !== "dev") {
             throw new Error(`Unknown split "${opts.split}". Use "train" or "dev".`);
           }
@@ -168,6 +153,27 @@ function registerEval(promptCmd: Command, version: string): void {
             baseUrl: opts.baseUrl,
             ...(contextWindow !== undefined ? { contextWindow } : {}),
           });
+
+          // Resolved from the CLIENT, not from the flags, and therefore
+          // only after it exists (barwise-842). `createLlmClient`
+          // auto-detects the provider from the environment and every
+          // provider resolves its own default model, so a client built
+          // with neither flag still knows both -- which is the documented
+          // reason `LlmClient` carries them. Keying on the flags instead
+          // meant omitting `--provider` produced a working client and an
+          // unmatched query, and the run silently measured the default.
+          const artifact = resolveArtifact(artifactCandidates(opts.artifacts), {
+            surface: "extraction",
+            ...(client.provider !== undefined ? { provider: client.provider } : {}),
+            ...(client.model !== undefined ? { model: client.model } : {}),
+          });
+          process.stderr.write(
+            artifact
+              ? `Using artifact version ${artifact.version}`
+                + ` (${client.provider}/${client.model ?? "default model"}).\n`
+              : `Using the default prompt artifact`
+                + ` (${client.provider}/${client.model ?? "default model"} matches no variant).\n`,
+          );
 
           // Progress goes to stderr so `--format json` stays a clean
           // pipe. A sweep is dozens of sequential calls; without this a
@@ -341,7 +347,7 @@ function registerArtifact(promptCmd: Command): void {
   promptCmd
     .command("artifact")
     .description("Print the prompt artifact a given target would actually resolve")
-    .option("--surface <surface>", "Prompt surface (extraction)", "extraction")
+    .option("--surface <surface>", "Prompt surface (extraction or review)", "extraction")
     .option("--provider <provider>", "Provider to resolve for (anthropic, openai, ollama)")
     .option("--model <model>", "Model to resolve for")
     .option("--artifacts <dir>", "Also consider .prompt.yaml variants in this directory")
@@ -355,23 +361,43 @@ function registerArtifact(promptCmd: Command): void {
         format: string;
       }) => {
         try {
-          if (opts.surface !== "extraction") {
+          // Both surfaces, because both are artifact-driven: review was
+          // wired to the seam by barwise-847, and refusing it here left
+          // the one command whose job is "which prompt would this
+          // configuration send" unable to answer for the surface that
+          // had just started having an answer.
+          if (opts.surface !== "extraction" && opts.surface !== "review") {
             throw new Error(
-              `Surface "${opts.surface}" has no artifact to print yet (extraction only).`,
+              `Unknown surface "${opts.surface}". Use "extraction" or "review".`,
             );
           }
-          // Built-ins first, then the directory, so a local variant can
-          // win against a shipped one of equal specificity rather than
-          // colliding with it.
-          const candidates = [
-            ...builtinArtifacts,
-            ...(opts.artifacts ? loadArtifactsFromDir(resolve(opts.artifacts)) : []),
-          ];
-          const resolved = resolveArtifact(candidates, {
-            surface: "extraction",
+          const surface = opts.surface;
+          const fallback = surface === "review"
+            ? defaultReviewArtifact
+            : defaultExtractionArtifact;
+
+          // Keyed on the flags on purpose, unlike `eval`: this command
+          // answers a hypothetical -- what would THIS configuration be
+          // sent -- and building a client to ask would demand a key for
+          // a question that needs none.
+          const matched = resolveArtifact(artifactCandidates(opts.artifacts), {
+            surface,
             ...(opts.provider !== undefined ? { provider: opts.provider } : {}),
             ...(opts.model !== undefined ? { model: opts.model } : {}),
-          }) ?? defaultExtractionArtifact;
+          });
+          const resolved = matched ?? fallback;
+
+          // Say which of the two answers this is. Printing the default's
+          // text and a matched variant's text identically is the same
+          // silence `eval` carried: an operator reading a prompt has no
+          // way to tell "this is your variant" from "nothing matched".
+          if (matched === undefined) {
+            process.stderr.write(
+              `No ${surface} variant matches`
+                + ` ${opts.provider ?? "any provider"}/${opts.model ?? "any model"};`
+                + ` printing the default (${fallback.version}).\n`,
+            );
+          }
 
           if (opts.format === "json") {
             process.stdout.write(JSON.stringify(resolved, null, 2) + "\n");

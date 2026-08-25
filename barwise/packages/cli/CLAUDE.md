@@ -36,6 +36,7 @@ src/
     io.ts               File I/O helpers (loadModel, writeModel)
     format.ts           Output formatting helpers (JSON, text)
     provenance.ts       Version/commit/dirty for recorded eval runs
+    promptArtifacts.ts  The artifact candidate set `prompt` resolves over
     callLogSink.ts      JSONL sink for the observability records
 tests/
   cli.test.ts           Scaffolding tests
@@ -106,6 +107,40 @@ npx tsc --noEmit            # type-check only
   a suite's history file lives beside its manifest, so any test that
   runs the packaged suite in place appends to the repository's own
   recorded scores -- copy `evals/` to a temp directory first.
+- **One candidate set, and `prompt eval` resolves it from the client.**
+  `workspace/promptArtifacts.ts` is the only place either `prompt`
+  command builds the artifacts it resolves over: every built-in, plus
+  `--artifacts`, the directory winning on a version collision. It is a
+  module rather than a helper because neither consumer can pin it --
+  both fall back to `defaultExtractionArtifact`, so a candidate set that
+  loses the built-ins still yields a plausible run and a plausible
+  printout. That is exactly what happened: resolution in `eval` sat
+  behind `if (opts.artifacts)`, so `haiku45-2` and `sonnet5-3` -- the
+  prompts production sends -- were never once measured by the command
+  built to measure them, while every run echoed the operator's provider
+  and model back at them (barwise-850). `artifact` had the opposite
+  bug, concatenating `packages/llm/prompts/` on top of the builtins
+  generated from it and refusing the duplicate as ambiguous
+  (barwise-851).
+
+  **`prompt artifact` covers every artifact-driven surface, and says
+  when it fell back.** Both are the same lesson one level up: it refused
+  `--surface review` for as long as review had been artifact-driven, so
+  the tool built to answer "which prompt would this configuration send"
+  could not answer for the newest surface that had one -- and an
+  existing test asserted the refusal was correct, which is how a gap
+  survives a green suite. It also printed a matched variant and a
+  fallback identically, the same silence `eval` carried. Adding a
+  surface to `PromptSurface` means wiring it here in the same change.
+
+  **`eval` resolves from the CLIENT, `artifact` from the flags**, and
+  the asymmetry is deliberate. `createLlmClient` auto-detects the
+  provider and every provider resolves its own default model, so a
+  client knows both when the flags say neither -- which is the
+  documented reason `LlmClient` carries them, and why keying on flags
+  let `--model` alone silently measure the default (barwise-842).
+  `artifact` answers a hypothetical about a configuration, and building
+  a client would demand a key for a question that needs none.
 - **Observability is opt-in and writes one file.** `BARWISE_CALL_LOG`
   gates it: unset or empty is off, `1`/`true` is
   `$XDG_STATE_HOME/barwise/calls.jsonl`, anything else is that path.
