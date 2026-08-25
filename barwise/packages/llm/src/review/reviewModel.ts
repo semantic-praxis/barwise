@@ -268,8 +268,13 @@ function serializeModelForReview(model: OrmModel, focus?: string): string {
 
 /**
  * Response schema for LLM review output.
+ *
+ * Exported for the same reason `buildResponseSchema` is: `barwise
+ * prompt schema` prints the structured-output contract per surface, and
+ * a surface whose schema only exists inside its own call site cannot be
+ * printed (barwise-855).
  */
-function buildReviewResponseSchema(): Record<string, unknown> {
+export function buildReviewResponseSchema(): Record<string, unknown> {
   return {
     type: "object",
     properties: {

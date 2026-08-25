@@ -100,6 +100,7 @@ export type { ProviderName, ProviderOptions } from "./providers/factory.js";
 
 // Review
 export {
+  buildReviewResponseSchema,
   buildReviewSystemPrompt,
   defaultReviewArtifact,
   reviewModel,

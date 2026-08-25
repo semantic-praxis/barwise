@@ -14,7 +14,7 @@
  * here. The reasoning for that choice, and why an injected mock client
  * would have been the wrong instrument, is in the spec.
  *
- * Mutation-checked: eight breakages, each caught by exactly one test.
+ * Mutation-checked: ten breakages, each caught by exactly one test.
  * One-for-one is the result worth recording -- a mutation that trips
  * four tests says they overlap, and one that trips none says the
  * assertion was decorative.
@@ -27,6 +27,8 @@
  *   drop the truncation warning                -> the truncation test
  *   make `--save-payloads` write nothing       -> the payload test
  *   append history despite `--no-history`      -> the no-history test
+ *   drop the --max-tokens passthrough          -> the request-body test
+ *   drop the --context-window passthrough      -> the request-body test
  *
  * The two artifact mutations landing on the same test is the point of
  * that test: the first breaks the stderr line, the second leaves the
@@ -282,6 +284,35 @@ describe("barwise prompt eval, against a loopback provider", () => {
 
     expect(stderr).toContain("cut off at the output-token");
     expect(stderr).toMatch(/--max-tokens above \d+/);
+  });
+
+  it("carries --max-tokens and --context-window all the way into the request", async () => {
+    // Asserted on the request body, not the flag list: deleting either
+    // passthrough in prompt.ts left every test green (the 2026-08-25
+    // assertion audit ran exactly those mutations), because the --help
+    // tests pin that the flags parse and nothing pinned that their
+    // values reach the provider. An option parsed and then dropped is
+    // the built-but-unwired class this repo audits for, and the guard
+    // tests alone would keep validating a value that goes nowhere.
+    await serve(fixtureAnswerer(EVALS, FIXTURES, TRAIN));
+
+    const { exitCode } = await runCli(
+      evalArgs([
+        "--split",
+        "train",
+        "--no-history",
+        "--max-tokens",
+        "9000",
+        "--context-window",
+        "32768",
+      ]),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(fake!.requests.length).toBeGreaterThan(0);
+    for (const request of fake!.requests) {
+      expect(request["options"]).toEqual({ num_ctx: 32768, num_predict: 9000 });
+    }
   });
 
   it("saves the payload of a run that could not be scored", async () => {
