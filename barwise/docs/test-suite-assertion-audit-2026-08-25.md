@@ -1,6 +1,10 @@
 # Test-suite assertion audit, 2026-08-25
 
-Tracking: barwise-859. Sibling of
+Tracking: barwise-859, opened as Finding 5 of
+`unwired-capability-audit-2026-08-25.md` (merged after this branch was
+cut, which is why it is cited here rather than built on directly; the
+method below matches it -- same grep heuristic, same discriminator,
+same four Pass 1 hits with the same verdicts). Sibling of
 `unwired-capability-audit-2026-08-20.md`, which asked whether a built
 capability can be reached; this one asks whether a green test is
 evidence of the right thing. The motivating case is PR #338: `prompt
