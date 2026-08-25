@@ -15,6 +15,23 @@
  * opposite responses: either the parse path changed and the references
  * should be regenerated, or the parse path regressed and the diff is
  * the bug report.
+ *
+ * WHAT THIS DOES NOT GUARD, because the natural reading is that it
+ * guards the references and it only guards half of that. Both sides of
+ * the comparison derive from the same payload, so a payload that
+ * degrades takes the reference with it and the two still agree. Tried:
+ * replacing a payload with `{"object_types": "not an array"}` renders
+ * an empty model -- a reference carrying nothing but a name -- and
+ * every test in this file passes.
+ *
+ * The answer-key invariant in `scoreExtraction.test.ts` is what catches
+ * that: an empty reference makes `forbids_population` fail and the
+ * pinned 1.000 drops. Three tests fail on that payload, none of them
+ * here. The two guards ask different questions -- "does the reference
+ * match what the pipeline builds from this payload" versus "does this
+ * payload still pass its rubric" -- and only the pair covers the
+ * ground. Do not read a green run of this file as the references being
+ * sound.
  */
 import { generateId } from "@barwise/core";
 import { existsSync, readFileSync } from "node:fs";

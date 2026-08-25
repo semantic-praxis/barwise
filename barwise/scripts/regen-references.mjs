@@ -59,7 +59,22 @@ for (const caseId of declaredCaseIds()) {
     skipped.push(caseId);
     continue;
   }
-  const yaml = promptlab.renderReference(readFileSync(payloadPath, "utf8"), caseId);
+  let yaml;
+  try {
+    yaml = promptlab.renderReference(readFileSync(payloadPath, "utf8"), caseId);
+  } catch (err) {
+    // Rethrown, never swallowed -- a reference that cannot be rendered
+    // must stop the run, or the next line writes a stale file and says
+    // it succeeded. What this adds is the case name: without it a
+    // malformed payload surfaces as a bare parser stack, and which of
+    // ten payloads it came from is the one thing the stack cannot say.
+    throw new Error(
+      `${caseId}: could not render a reference from ${caseId}.json -- ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+      { cause: err },
+    );
+  }
   writeFileSync(join(EVALS, `${caseId}.reference.orm.yaml`), yaml, "utf8");
   console.log(`wrote ${caseId}.reference.orm.yaml`);
   wrote += 1;
