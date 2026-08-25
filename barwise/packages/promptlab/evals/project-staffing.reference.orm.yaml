@@ -2,17 +2,17 @@ orm_version: "1.1"
 model:
   name: project-staffing
   object_types:
-    - id: dcf3b3fe-fff5-4fb4-98ca-bd67eea423d4
+    - id: 00000000-0000-7001-ad34-3b424950575e
       name: Employee
       kind: entity
       reference_mode: employee_number
       definition: A person employed by the consultancy and staffed onto projects.
-    - id: a1c036ac-8cd9-45c1-bc41-ee2a914be274
+    - id: 00000000-0000-7002-8c53-5a61686f767d
       name: Project
       kind: entity
       reference_mode: project_code
       definition: A client engagement that employees are assigned to.
-    - id: 97b33e6f-0cca-4cc0-97ff-5a0b0d660c77
+    - id: 00000000-0000-7003-ab72-7980878e959c
       name: ProjectName
       kind: value
       definition: The name of a project.
@@ -20,14 +20,14 @@ model:
         name: text
         length: 100
   fact_types:
-    - id: 05875554-99ca-4f2e-b4d3-570184520765
+    - id: 00000000-0000-7004-8a91-989fa6adb4bb
       name: Employee mentors Employee
       roles:
-        - id: 7db9bff6-e33c-4921-ad04-2b78d212e7b1
-          player: dcf3b3fe-fff5-4fb4-98ca-bd67eea423d4
+        - id: 00000000-0000-7005-a9b0-b7bec5ccd3da
+          player: 00000000-0000-7001-ad34-3b424950575e
           role_name: mentors
-        - id: 769e5f58-b5d7-4149-8b26-1b75d38a15e2
-          player: dcf3b3fe-fff5-4fb4-98ca-bd67eea423d4
+        - id: 00000000-0000-7006-88cf-d6dde4ebf2f9
+          player: 00000000-0000-7001-ad34-3b424950575e
           role_name: is mentored by
       readings:
         - "{0} mentors {1}"
@@ -35,19 +35,19 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 769e5f58-b5d7-4149-8b26-1b75d38a15e2
+            - 00000000-0000-7006-88cf-d6dde4ebf2f9
         - type: ring
-          role_1: 7db9bff6-e33c-4921-ad04-2b78d212e7b1
-          role_2: 769e5f58-b5d7-4149-8b26-1b75d38a15e2
+          role_1: 00000000-0000-7005-a9b0-b7bec5ccd3da
+          role_2: 00000000-0000-7006-88cf-d6dde4ebf2f9
           ring_type: acyclic
-    - id: 82011b78-e0ba-4eec-ba40-dc9652a8367c
+    - id: 00000000-0000-7007-a7ee-f5fc030a1118
       name: Employee is assigned to Project
       roles:
-        - id: 8732e81d-ad66-421f-a59e-222e6ce22bf0
-          player: dcf3b3fe-fff5-4fb4-98ca-bd67eea423d4
+        - id: 00000000-0000-7008-860d-141b22293037
+          player: 00000000-0000-7001-ad34-3b424950575e
           role_name: is assigned to
-        - id: 0e3aca88-e4b5-46d0-8bd4-cd6a8bca807d
-          player: a1c036ac-8cd9-45c1-bc41-ee2a914be274
+        - id: 00000000-0000-7009-a52c-333a41484f56
+          player: 00000000-0000-7002-8c53-5a61686f767d
           role_name: has assigned
       readings:
         - "{0} is assigned to {1}"
@@ -55,20 +55,20 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 8732e81d-ad66-421f-a59e-222e6ce22bf0
-            - 0e3aca88-e4b5-46d0-8bd4-cd6a8bca807d
+            - 00000000-0000-7008-860d-141b22293037
+            - 00000000-0000-7009-a52c-333a41484f56
         - type: frequency
-          role: 8732e81d-ad66-421f-a59e-222e6ce22bf0
+          role: 00000000-0000-7008-860d-141b22293037
           min: 1
           max: 3
-    - id: 0da25f5e-670f-4905-af1a-42da6ddea0da
+    - id: 00000000-0000-700a-844b-525960676e75
       name: Project has ProjectName
       roles:
-        - id: 50612b57-acfd-4411-bb60-1753b349ba8c
-          player: a1c036ac-8cd9-45c1-bc41-ee2a914be274
+        - id: 00000000-0000-700b-a36a-71787f868d94
+          player: 00000000-0000-7002-8c53-5a61686f767d
           role_name: has
-        - id: 8b9c1f54-aa8d-4220-ad53-07d763786d5c
-          player: 97b33e6f-0cca-4cc0-97ff-5a0b0d660c77
+        - id: 00000000-0000-700c-8289-90979ea5acb3
+          player: 00000000-0000-7003-ab72-7980878e959c
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -76,4 +76,4 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 50612b57-acfd-4411-bb60-1753b349ba8c
+            - 00000000-0000-700b-a36a-71787f868d94

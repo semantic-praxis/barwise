@@ -343,10 +343,13 @@ so the rate is asserted rather than assumed.
 ### 2. Give the three realism cases a reference and the full rubric (data only)
 
 Record an extraction payload for `vendor-onboarding`,
-`subscription-billing`, and `incident-response`; generate their
-`.reference.orm.yaml` files through `parseExtractionFromJson` per the
-package's standing rule; add `forbids_population` checks where the
-transcript settles a constraint, and a `requires_ambiguity` check to
+`subscription-billing`, and `incident-response` under
+`packages/promptlab/tests/fixtures/responses/`, then run
+`npm run regen:references` -- which since barwise-856 is the
+implementation of the package's standing rule, and names exactly these
+three as the cases still lacking a payload. Add `reference:` to each
+case file, then `forbids_population` checks where the transcript
+settles a constraint, and a `requires_ambiguity` check to
 `incident-response`, which has none despite being a realism case.
 
 This closes the vocabulary half of the confound without touching the

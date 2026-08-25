@@ -2,39 +2,39 @@ orm_version: "1.1"
 model:
   name: employee-hierarchy
   object_types:
-    - id: 2bbb8e39-fe75-407e-ab1d-b19206359512
+    - id: 00000000-0000-7001-ad34-3b424950575e
       name: Person
       kind: entity
       reference_mode: person_id
       definition: Any individual tracked by the HR system.
-    - id: 9d99458c-2973-4631-b750-5de06b20d567
+    - id: 00000000-0000-7002-8c53-5a61686f767d
       name: Employee
       kind: entity
       reference_mode: employee_id
       definition: A person who works for the company.
-    - id: 23cd1c4f-ee05-43b7-856f-4329246659ff
+    - id: 00000000-0000-7003-ab72-7980878e959c
       name: Manager
       kind: entity
       reference_mode: manager_id
       definition: An employee who manages other employees.
-    - id: 4844e5db-41e6-4cd6-ae58-9de8bdadb388
+    - id: 00000000-0000-7004-8a91-989fa6adb4bb
       name: Department
       kind: entity
       reference_mode: department_code
       definition: An organizational unit within the company.
-    - id: 55acbcee-abea-47b2-ad3d-bd63acee126b
+    - id: 00000000-0000-7005-a9b0-b7bec5ccd3da
       name: DepartmentName
       kind: value
       definition: The name of a department.
   fact_types:
-    - id: 56f97cc8-41c5-4613-a840-35c76870e20a
+    - id: 00000000-0000-7006-88cf-d6dde4ebf2f9
       name: Employee works in Department
       roles:
-        - id: bab83513-22df-42fc-ba59-301b80476290
-          player: 9d99458c-2973-4631-b750-5de06b20d567
+        - id: 00000000-0000-7007-a7ee-f5fc030a1118
+          player: 00000000-0000-7002-8c53-5a61686f767d
           role_name: works in
-        - id: e01ea576-764e-45a8-9ae0-0dd47945bfc1
-          player: 4844e5db-41e6-4cd6-ae58-9de8bdadb388
+        - id: 00000000-0000-7008-860d-141b22293037
+          player: 00000000-0000-7004-8a91-989fa6adb4bb
           role_name: has
       readings:
         - "{0} works in {1}"
@@ -42,17 +42,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - bab83513-22df-42fc-ba59-301b80476290
+            - 00000000-0000-7007-a7ee-f5fc030a1118
         - type: mandatory
-          role: bab83513-22df-42fc-ba59-301b80476290
-    - id: fe4dc0f1-06be-4901-b846-272c92215a96
+          role: 00000000-0000-7007-a7ee-f5fc030a1118
+    - id: 00000000-0000-7009-a52c-333a41484f56
       name: Manager manages Department
       roles:
-        - id: b3de8f64-dc5f-4cbf-b24c-8426d7f84cf1
-          player: 23cd1c4f-ee05-43b7-856f-4329246659ff
+        - id: 00000000-0000-700a-844b-525960676e75
+          player: 00000000-0000-7003-ab72-7980878e959c
           role_name: manages
-        - id: 92a7fb33-8440-402f-bfa8-6abb468a3521
-          player: 4844e5db-41e6-4cd6-ae58-9de8bdadb388
+        - id: 00000000-0000-700b-a36a-71787f868d94
+          player: 00000000-0000-7004-8a91-989fa6adb4bb
           role_name: is managed by
       readings:
         - "{0} manages {1}"
@@ -60,15 +60,15 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 92a7fb33-8440-402f-bfa8-6abb468a3521
-    - id: 5c5db3b3-1841-4a0d-ad4e-ccfe05735793
+            - 00000000-0000-700b-a36a-71787f868d94
+    - id: 00000000-0000-700c-8289-90979ea5acb3
       name: Department has DepartmentName
       roles:
-        - id: ab3677d8-f152-4e9f-82c2-d4caf9aa7c67
-          player: 4844e5db-41e6-4cd6-ae58-9de8bdadb388
+        - id: 00000000-0000-700d-a1a8-afb6bdc4cbd2
+          player: 00000000-0000-7004-8a91-989fa6adb4bb
           role_name: has
-        - id: 89ceb7aa-740e-4cdd-a0b0-9882469d9843
-          player: 55acbcee-abea-47b2-ad3d-bd63acee126b
+        - id: 00000000-0000-700e-80c7-ced5dce3eaf1
+          player: 00000000-0000-7005-a9b0-b7bec5ccd3da
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -76,12 +76,12 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - ab3677d8-f152-4e9f-82c2-d4caf9aa7c67
+            - 00000000-0000-700d-a1a8-afb6bdc4cbd2
   subtype_facts:
-    - id: a74f822c-5130-420e-8713-b0c5c7deda8b
-      subtype: 9d99458c-2973-4631-b750-5de06b20d567
-      supertype: 2bbb8e39-fe75-407e-ab1d-b19206359512
+    - id: 00000000-0000-700f-9fe6-edf4fb020910
+      subtype: 00000000-0000-7002-8c53-5a61686f767d
+      supertype: 00000000-0000-7001-ad34-3b424950575e
       provides_identification: false
-    - id: d3ef705c-264f-431d-a24b-3b909b7d01f1
-      subtype: 23cd1c4f-ee05-43b7-856f-4329246659ff
-      supertype: 9d99458c-2973-4631-b750-5de06b20d567
+    - id: 00000000-0000-7010-be05-0c131a21282f
+      subtype: 00000000-0000-7003-ab72-7980878e959c
+      supertype: 00000000-0000-7002-8c53-5a61686f767d
