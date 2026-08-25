@@ -14,7 +14,7 @@
  * here. The reasoning for that choice, and why an injected mock client
  * would have been the wrong instrument, is in the spec.
  *
- * Mutation-checked: eight breakages, each caught by exactly one test.
+ * Mutation-checked: ten breakages, each caught by exactly one test.
  * One-for-one is the result worth recording -- a mutation that trips
  * four tests says they overlap, and one that trips none says the
  * assertion was decorative.
@@ -27,6 +27,8 @@
  *   drop the truncation warning                -> the truncation test
  *   make `--save-payloads` write nothing       -> the payload test
  *   append history despite `--no-history`      -> the no-history test
+ *   drop the --max-tokens passthrough          -> the request-body test
+ *   drop the --context-window passthrough      -> the request-body test
  *
  * The two artifact mutations landing on the same test is the point of
  * that test: the first breaks the stderr line, the second leaves the
