@@ -104,12 +104,20 @@ Confirmed: with `--artifacts /tmp/default-only`, both
 
 ## The runs
 
-Six runs: three arms across two splits. Train is 7 cases, dev is 3, so
-`repeat 5` is 35 and 15 calls. Watch the first three lines of each --
-the artifact line, and whether tokens are being read from cache.
+Eight runs: two prompts against two models, each on both splits. Train
+is 7 cases, dev is 3, so `repeat 5` is 35 and 15 calls. Watch the first
+three lines of each -- the artifact line, and whether tokens are being
+read from cache.
+
+The default arm is run on **both** models, not just one. Each variant
+has to be judged against the default _on its own model_: a default
+baseline measured only on haiku answers "did haiku45-2 beat the default"
+and says nothing about sonnet5-3, and comparing sonnet5-3 against a
+haiku default moves the model and the prompt at once -- the confound
+the shadow directory exists to remove.
 
 ```sh
-# Arm 1: haiku45-2
+# The two shipped variants
 npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \
   --split dev   --repeat 5 --verbose --no-history \
   --save-payloads /tmp/eval-payloads/haiku45-2-dev   2>&1 | tee /tmp/eval-logs/haiku45-2-dev.log
@@ -117,7 +125,6 @@ npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \
   --split train --repeat 5 --verbose --no-history \
   --save-payloads /tmp/eval-payloads/haiku45-2-train 2>&1 | tee /tmp/eval-logs/haiku45-2-train.log
 
-# Arm 2: sonnet5-3
 npx barwise prompt eval --provider anthropic --model claude-sonnet-5 \
   --split dev   --repeat 5 --verbose --no-history \
   --save-payloads /tmp/eval-payloads/sonnet5-3-dev   2>&1 | tee /tmp/eval-logs/sonnet5-3-dev.log
@@ -125,15 +132,24 @@ npx barwise prompt eval --provider anthropic --model claude-sonnet-5 \
   --split train --repeat 5 --verbose --no-history \
   --save-payloads /tmp/eval-payloads/sonnet5-3-train 2>&1 | tee /tmp/eval-logs/sonnet5-3-train.log
 
-# Arm 3: the default artifact, same models
+# The default artifact, one control per model
 npx barwise prompt eval --artifacts /tmp/default-only \
   --provider anthropic --model claude-haiku-4-5 \
   --split dev   --repeat 5 --verbose --no-history \
-  --save-payloads /tmp/eval-payloads/default-haiku-dev   2>&1 | tee /tmp/eval-logs/default-haiku-dev.log
+  --save-payloads /tmp/eval-payloads/default-haiku-dev    2>&1 | tee /tmp/eval-logs/default-haiku-dev.log
 npx barwise prompt eval --artifacts /tmp/default-only \
   --provider anthropic --model claude-haiku-4-5 \
   --split train --repeat 5 --verbose --no-history \
-  --save-payloads /tmp/eval-payloads/default-haiku-train 2>&1 | tee /tmp/eval-logs/default-haiku-train.log
+  --save-payloads /tmp/eval-payloads/default-haiku-train  2>&1 | tee /tmp/eval-logs/default-haiku-train.log
+
+npx barwise prompt eval --artifacts /tmp/default-only \
+  --provider anthropic --model claude-sonnet-5 \
+  --split dev   --repeat 5 --verbose --no-history \
+  --save-payloads /tmp/eval-payloads/default-sonnet-dev   2>&1 | tee /tmp/eval-logs/default-sonnet-dev.log
+npx barwise prompt eval --artifacts /tmp/default-only \
+  --provider anthropic --model claude-sonnet-5 \
+  --split train --repeat 5 --verbose --no-history \
+  --save-payloads /tmp/eval-payloads/default-sonnet-train 2>&1 | tee /tmp/eval-logs/default-sonnet-train.log
 ```
 
 Run the dev arms first. They are the cheap half by call count and they
@@ -163,6 +179,26 @@ Why each flag is there:
   the warning names.
 - Not passed: `--format json`. The text report names the failing rubric
   checks; `tee` keeps both halves of the output together.
+
+### Why `--artifacts packages/llm/prompts` is not in these commands
+
+It was the instruction until barwise-850, and it is the most likely
+thing for a reader to add back. It is now a no-op on a clean tree, and
+CI is what makes that true:
+`packages/llm/tests/prompt/artifacts/builtins.test.ts` asserts that
+`builtinArtifacts` deep-equals what `loadArtifactsFromDir` reads from
+`prompts/`, element for element, and that both resolve identically for
+the same queries. Since `prompt eval` now consults the builtins
+unconditionally, `--provider`/`--model` alone select the shipped
+variant. Verified both ways: `claude-haiku-4-5` gives haiku45-2 and
+`claude-sonnet-5` gives sonnet5-3, with and without the flag.
+
+Pass `--artifacts` when the prompt you want to measure is **not** the
+one compiled in -- an unshipped variant, DSPy optimizer output, or a
+`.prompt.yaml` you edited without running `npm run regen:builtins`.
+A directory entry sharing a builtin's version replaces it, which is what
+makes "a local edit wins" true, and is the same mechanism the shadow
+directory above uses.
 
 ## Record or not
 
