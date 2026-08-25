@@ -1,8 +1,11 @@
 # Comparable eval splits: rate-based penalties and cases stratified across train and dev
 
-Status: Accepted (all decisions resolved 2026-08-24; no implementation in this PR)
+Status: Accepted (all decisions resolved 2026-08-24). Workstream 1
+(rate-based penalties, suite 2.0.0, including the `evals/`
+client-material rule in the package CLAUDE.md) implemented 2026-08-24
+in PR #336; workstreams 2-4 open.
 Created: 2026-08-24
-Last-updated: 2026-08-24
+Last-updated: 2026-08-25
 Tracking: barwise-844, barwise-845, barwise-846. Parent
 `docs/specs/prompt-optimization-harness.spec.md`; corrects a split
 decision made in `docs/specs/eval-metric-readiness.spec.md` and a
