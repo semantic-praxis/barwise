@@ -11,6 +11,7 @@
 import type { ProviderName } from "@barwise/llm";
 import {
   buildResponseSchema,
+  buildReviewResponseSchema,
   createLlmClient,
   defaultExtractionArtifact,
   defaultReviewArtifact,
@@ -327,15 +328,22 @@ function registerSchema(promptCmd: Command): void {
   promptCmd
     .command("schema")
     .description("Print the structured-output JSON Schema for a surface")
-    .option("--surface <surface>", "Prompt surface (extraction)", "extraction")
+    .option("--surface <surface>", "Prompt surface (extraction or review)", "extraction")
     .action((opts: { surface: string; }) => {
       try {
-        if (opts.surface !== "extraction") {
+        // Both structured-output surfaces, for the same reason `prompt
+        // artifact` covers both: a test pinned the refusal of `review`
+        // as if it were a requirement, and the refusal outlived the
+        // surface gaining a schema (barwise-855).
+        if (opts.surface !== "extraction" && opts.surface !== "review") {
           throw new Error(
-            `Surface "${opts.surface}" has no schema export yet (extraction only).`,
+            `Unknown surface "${opts.surface}". Use "extraction" or "review".`,
           );
         }
-        process.stdout.write(JSON.stringify(buildResponseSchema(false), null, 2) + "\n");
+        const schema = opts.surface === "review"
+          ? buildReviewResponseSchema()
+          : buildResponseSchema(false);
+        process.stdout.write(JSON.stringify(schema, null, 2) + "\n");
       } catch (err) {
         fail(err);
       }

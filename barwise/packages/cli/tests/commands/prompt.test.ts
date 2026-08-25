@@ -111,10 +111,25 @@ describe("barwise prompt schema", () => {
     expect(schema.properties).toHaveProperty("fact_types");
   });
 
-  it("rejects an unknown surface", async () => {
+  it("prints the review structured-output schema", async () => {
+    // The previous test here asserted the opposite: it pinned the
+    // refusal of `--surface review` as if the refusal were a
+    // requirement, when it was a limitation that outlived the review
+    // surface gaining a schema (barwise-855, the same shape as PR #338
+    // on `prompt artifact`).
     const result = await runCli(["prompt", "schema", "--surface", "review"]);
+    expect(result.exitCode).toBe(0);
+    const schema = JSON.parse(result.stdout);
+    expect(schema.properties).toHaveProperty("suggestions");
+    expect(schema.properties).toHaveProperty("summary");
+    // The extraction schema by mistake would be the silent failure.
+    expect(schema.properties).not.toHaveProperty("object_types");
+  });
+
+  it("rejects a surface that is not a surface", async () => {
+    const result = await runCli(["prompt", "schema", "--surface", "agent"]);
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain("extraction only");
+    expect(result.stderr).toContain('Use "extraction" or "review"');
   });
 });
 

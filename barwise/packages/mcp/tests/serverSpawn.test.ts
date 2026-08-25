@@ -31,13 +31,34 @@ describe("MCP server stdio spawn", () => {
     await client?.close();
   });
 
-  it("answers the handshake and lists the registered tools", async () => {
+  it("answers the handshake and lists every registered tool", async () => {
+    // The complete list, not a sample: with four names sampled, the
+    // whole suite stayed green while `review_model` and `merge_models`
+    // were unregistered (the 2026-08-25 assertion audit ran exactly
+    // that mutation). Per-tool tests call executeX directly, so this
+    // is the only test that fails when a registration is dropped --
+    // it is the executable form of the capability matrix's MCP column.
     const { tools } = await client.listTools();
-    const names = tools.map((t) => t.name);
-    expect(names).toContain("validate_model");
-    expect(names).toContain("verbalize_model");
-    expect(names).toContain("gym_check");
-    expect(names).toContain("analyze_repository");
+    const names = tools.map((t) => t.name).sort();
+    expect(names).toEqual([
+      "analyze_repository",
+      "describe_domain",
+      "diff_models",
+      "export_model",
+      "generate_diagram",
+      "generate_schema",
+      "gym_check",
+      "gym_list",
+      "impact_analysis",
+      "import_model",
+      "import_transcript",
+      "lineage_status",
+      "merge_models",
+      "query_model",
+      "review_model",
+      "validate_model",
+      "verbalize_model",
+    ]);
   });
 
   it("executes a tool end-to-end over the transport", async () => {

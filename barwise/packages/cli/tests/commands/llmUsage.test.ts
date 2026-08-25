@@ -20,6 +20,7 @@
  * measure nothing are worse than no tests, because they also look
  * like reassurance.
  */
+import { withCallLog } from "@barwise/llm";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -89,6 +90,45 @@ async function models(args: string[]): Promise<Array<Record<string, unknown>>> {
 }
 
 describe("barwise llm-usage", () => {
+  it("reads a record the real emitter wrote, not just this file's fixtures", async () => {
+    // Every other test here feeds hand-written rows, and the reader
+    // deliberately declares its own row shape rather than importing
+    // `LlmCallRecord` -- so the emitter and this report agree only by
+    // convention, and a field renamed in @barwise/llm (with its own
+    // in-package tests updated in the same change) would leave both
+    // suites green while this command quietly reported zero tokens.
+    // One record produced by `withCallLog` itself pins the
+    // correspondence.
+    const recorded: unknown[] = [];
+    const client = withCallLog(
+      {
+        provider: "anthropic",
+        model: "claude-haiku-4-5",
+        async complete() {
+          return {
+            content: "{}",
+            modelUsed: "claude-haiku-4-5",
+            usage: { promptTokens: 700, completionTokens: 300 },
+          };
+        },
+      },
+      { record: (entry) => recorded.push(entry) },
+      { now: () => "2026-08-25T00:00:00Z" },
+    );
+    await client.complete({ systemPrompt: "s", userMessage: "u" });
+
+    const found = await models(["--log", writeLog(recorded)]);
+
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({
+      model: "claude-haiku-4-5",
+      calls: 1,
+      failures: 0,
+      promptTokens: 700,
+      completionTokens: 300,
+    });
+  });
+
   it("groups by model with tokens and failures", async () => {
     const found = await models(["--log", writeLog(CALLS)]);
 
