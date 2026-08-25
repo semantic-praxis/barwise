@@ -93,10 +93,32 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
   `tests/fixtures/responses/` must pass its full rubric; the exact
   scores are pinned in `tests/scoreExtraction.test.ts`. Changing a
   rubric, reference, or the scorer shows up as a visible diff there.
-- **References are generated, not hand-written.** The seed references
-  were produced by running the recorded payloads through
-  `parseExtractionFromJson` and serializing -- they cannot drift from
-  what the pipeline actually builds.
+- **References are generated, not hand-written, and now something
+  enforces it.** `renderReference` runs a recorded payload through
+  `parseExtractionFromJson` and serializes the result;
+  `npm run regen:references` writes every case that has a payload, and
+  `tests/referenceDrift.test.ts` fails when a committed reference stops
+  matching a fresh render.
+
+  This was a rule with no implementation for the suite's whole life, and
+  it had drifted: the regenerator's first run found
+  `freight-corrections` missing a `sample: true` the parser has emitted
+  since the sample-populations work. Nothing caught it because a
+  reference is consumed by `forbids_population`, which asks about
+  constraints and never reads populations -- so the stale field changed
+  no score and produced no symptom.
+
+  `withDeterministicIds` is what makes the guard exact rather than
+  approximate: ids are minted fresh on every parse, so without a fixed
+  generator only structure could be compared. It restores the previous
+  generator in a `finally`, because `setIdGenerator` is process-wide and
+  a leak would leave every later test in the worker minting fixture ids
+  while still passing.
+
+  A drift failure means one of two things and they call for opposite
+  responses: the parse path changed and the references should be
+  regenerated, or the parse path regressed and the diff is the bug
+  report.
 - **No client-derived material in `evals/`.** Transcripts and fixture
   models are invented domains, always. Everything here is checked in,
   published in the npm package, and read by anyone who clones the repo,

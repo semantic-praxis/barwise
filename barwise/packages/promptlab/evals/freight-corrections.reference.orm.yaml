@@ -2,57 +2,57 @@ orm_version: "1.1"
 model:
   name: freight-corrections
   object_types:
-    - id: b49e707d-ffa2-4132-949f-a9544696137f
+    - id: 00000000-0000-7001-ad34-3b424950575e
       name: Shipment
       kind: entity
       reference_mode: shipment_number
       definition: A consignment of products moving through the warehouse network.
       aliases:
         - Consignment
-    - id: cd0a3268-ee53-4bb8-8412-d7bde8f46c55
+    - id: 00000000-0000-7002-8c53-5a61686f767d
       name: Product
       kind: entity
       reference_mode: sku
       definition: A stocked item that shipments carry.
-    - id: bb68aeef-5c30-445f-b46d-7020cbb1f9d6
+    - id: 00000000-0000-7003-ab72-7980878e959c
       name: Warehouse
       kind: entity
       reference_mode: warehouse_code
       definition: A physical storage location shipments sit in.
-    - id: 265e285d-5be1-45bf-891e-c3a26730ca8d
+    - id: 00000000-0000-7004-8a91-989fa6adb4bb
       name: Quantity
       kind: value
       definition: How many units of a product a shipment contains.
       data_type:
         name: integer
   fact_types:
-    - id: 08a39c94-d182-4892-a69b-f6d76e6bf2fb
+    - id: 00000000-0000-7005-a9b0-b7bec5ccd3da
       name: Shipment contains Product in Quantity
       roles:
-        - id: 4487b1fb-ae9b-47f5-94d7-eebeb933a9ac
-          player: b49e707d-ffa2-4132-949f-a9544696137f
+        - id: 00000000-0000-7006-88cf-d6dde4ebf2f9
+          player: 00000000-0000-7001-ad34-3b424950575e
           role_name: contains
-        - id: 08b07627-201e-41b4-a304-6cd70956fb2c
-          player: cd0a3268-ee53-4bb8-8412-d7bde8f46c55
+        - id: 00000000-0000-7007-a7ee-f5fc030a1118
+          player: 00000000-0000-7002-8c53-5a61686f767d
           role_name: is contained in
-        - id: 924cff08-53f0-4a7b-bd01-69373de41c59
-          player: 265e285d-5be1-45bf-891e-c3a26730ca8d
+        - id: 00000000-0000-7008-860d-141b22293037
+          player: 00000000-0000-7004-8a91-989fa6adb4bb
           role_name: is the quantity for
       readings:
         - "{0} contains {1} in quantity {2}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - 4487b1fb-ae9b-47f5-94d7-eebeb933a9ac
-            - 08b07627-201e-41b4-a304-6cd70956fb2c
-    - id: 0d455915-80ea-4249-b6b8-0a69612ab8b1
+            - 00000000-0000-7006-88cf-d6dde4ebf2f9
+            - 00000000-0000-7007-a7ee-f5fc030a1118
+    - id: 00000000-0000-7009-a52c-333a41484f56
       name: Shipment is stored in Warehouse
       roles:
-        - id: 5ab95109-e73a-44cc-8a8b-be9e9da4e330
-          player: b49e707d-ffa2-4132-949f-a9544696137f
+        - id: 00000000-0000-700a-844b-525960676e75
+          player: 00000000-0000-7001-ad34-3b424950575e
           role_name: is stored in
-        - id: 53e79b58-67af-4171-9a82-f144c4b23fc0
-          player: bb68aeef-5c30-445f-b46d-7020cbb1f9d6
+        - id: 00000000-0000-700b-a36a-71787f868d94
+          player: 00000000-0000-7003-ab72-7980878e959c
           role_name: stores
       readings:
         - "{0} is stored in {1}"
@@ -60,19 +60,20 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 5ab95109-e73a-44cc-8a8b-be9e9da4e330
-            - 53e79b58-67af-4171-9a82-f144c4b23fc0
+            - 00000000-0000-700a-844b-525960676e75
+            - 00000000-0000-700b-a36a-71787f868d94
         - type: frequency
-          role: 5ab95109-e73a-44cc-8a8b-be9e9da4e330
+          role: 00000000-0000-700a-844b-525960676e75
           min: 1
           max: 2
   populations:
-    - id: 2fe24fa6-3b90-4845-bcd4-f207b53b7289
-      fact_type: 08a39c94-d182-4892-a69b-f6d76e6bf2fb
+    - id: 00000000-0000-700c-8289-90979ea5acb3
+      fact_type: 00000000-0000-7005-a9b0-b7bec5ccd3da
       instances:
-        - id: 3d72607b-103c-4674-9c63-62b23215a438
+        - id: 00000000-0000-700d-a1a8-afb6bdc4cbd2
           role_values:
-            4487b1fb-ae9b-47f5-94d7-eebeb933a9ac: S-100
-            08b07627-201e-41b4-a304-6cd70956fb2c: P-77
-            924cff08-53f0-4a7b-bd01-69373de41c59: "5"
+            00000000-0000-7006-88cf-d6dde4ebf2f9: S-100
+            00000000-0000-7007-a7ee-f5fc030a1118: P-77
+            00000000-0000-7008-860d-141b22293037: "5"
       description: Worked example given in the session.
+      sample: true
