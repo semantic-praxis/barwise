@@ -8,13 +8,11 @@
  * point); `schema` prints the structured-output JSON Schema the Python
  * lane must reuse; `history` shows the checked-in score record.
  */
-import type { PromptArtifact, ProviderName } from "@barwise/llm";
+import type { ProviderName } from "@barwise/llm";
 import {
   buildResponseSchema,
-  builtinArtifacts,
   createLlmClient,
   defaultExtractionArtifact,
-  loadArtifactsFromDir,
   resolveArtifact,
 } from "@barwise/llm";
 import type { RunProgress, SuiteReport } from "@barwise/promptlab";
@@ -33,6 +31,7 @@ import {
 import type { Command } from "commander";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { artifactCandidates } from "../workspace/promptArtifacts.js";
 import { describeProvenance, resolveProvenance } from "../workspace/provenance.js";
 
 interface ProviderOpts {
@@ -121,21 +120,6 @@ function registerEval(promptCmd: Command, version: string): void {
         try {
           const suite = loadSuite(suitePath(opts));
 
-          let artifact: PromptArtifact | undefined;
-          if (opts.artifacts) {
-            const artifacts = loadArtifactsFromDir(resolve(opts.artifacts));
-            artifact = resolveArtifact(artifacts, {
-              surface: "extraction",
-              ...(opts.provider !== undefined ? { provider: opts.provider } : {}),
-              ...(opts.model !== undefined ? { model: opts.model } : {}),
-            });
-          }
-          process.stderr.write(
-            artifact
-              ? `Using artifact version ${artifact.version}.\n`
-              : "Using the default prompt artifact.\n",
-          );
-
           if (opts.split !== undefined && opts.split !== "train" && opts.split !== "dev") {
             throw new Error(`Unknown split "${opts.split}". Use "train" or "dev".`);
           }
@@ -168,6 +152,27 @@ function registerEval(promptCmd: Command, version: string): void {
             baseUrl: opts.baseUrl,
             ...(contextWindow !== undefined ? { contextWindow } : {}),
           });
+
+          // Resolved from the CLIENT, not from the flags, and therefore
+          // only after it exists (barwise-842). `createLlmClient`
+          // auto-detects the provider from the environment and every
+          // provider resolves its own default model, so a client built
+          // with neither flag still knows both -- which is the documented
+          // reason `LlmClient` carries them. Keying on the flags instead
+          // meant omitting `--provider` produced a working client and an
+          // unmatched query, and the run silently measured the default.
+          const artifact = resolveArtifact(artifactCandidates(opts.artifacts), {
+            surface: "extraction",
+            ...(client.provider !== undefined ? { provider: client.provider } : {}),
+            ...(client.model !== undefined ? { model: client.model } : {}),
+          });
+          process.stderr.write(
+            artifact
+              ? `Using artifact version ${artifact.version}`
+                + ` (${client.provider}/${client.model ?? "default model"}).\n`
+              : `Using the default prompt artifact`
+                + ` (${client.provider}/${client.model ?? "default model"} matches no variant).\n`,
+          );
 
           // Progress goes to stderr so `--format json` stays a clean
           // pipe. A sweep is dozens of sequential calls; without this a
@@ -360,14 +365,11 @@ function registerArtifact(promptCmd: Command): void {
               `Surface "${opts.surface}" has no artifact to print yet (extraction only).`,
             );
           }
-          // Built-ins first, then the directory, so a local variant can
-          // win against a shipped one of equal specificity rather than
-          // colliding with it.
-          const candidates = [
-            ...builtinArtifacts,
-            ...(opts.artifacts ? loadArtifactsFromDir(resolve(opts.artifacts)) : []),
-          ];
-          const resolved = resolveArtifact(candidates, {
+          // Keyed on the flags on purpose, unlike `eval`: this command
+          // answers a hypothetical -- what would THIS configuration be
+          // sent -- and building a client to ask would demand a key for
+          // a question that needs none.
+          const resolved = resolveArtifact(artifactCandidates(opts.artifacts), {
             surface: "extraction",
             ...(opts.provider !== undefined ? { provider: opts.provider } : {}),
             ...(opts.model !== undefined ? { model: opts.model } : {}),

@@ -14,13 +14,14 @@
  * here. The reasoning for that choice, and why an injected mock client
  * would have been the wrong instrument, is in the spec.
  *
- * Mutation-checked: seven breakages, each caught by exactly one test.
+ * Mutation-checked: eight breakages, each caught by exactly one test.
  * One-for-one is the result worth recording -- a mutation that trips
  * four tests says they overlap, and one that trips none says the
  * assertion was decorative.
  *
  *   always claim the default artifact          -> the variant test
  *   resolve the artifact, never pass it on     -> the variant test
+ *   resolve from the flags, not the client     -> the client-model test
  *   score a failed run 0 instead of excluding  -> the exclusion test
  *   drop `process.exitCode = 1` when incomplete -> the exclusion test
  *   drop the truncation warning                -> the truncation test
@@ -141,12 +142,19 @@ describe("barwise prompt eval, against a loopback provider", () => {
     expect(fake!.requests).toHaveLength(TRAIN.length);
   });
 
-  it("names the default artifact when none is given", async () => {
+  it("says which provider and model failed to match when it falls back", async () => {
+    // "Using the default prompt artifact." on its own read as a
+    // statement about the suite rather than about this configuration,
+    // and it printed identically whether no variant existed or the
+    // query had been built without a model to match on. Naming the pair
+    // is what distinguishes a deliberate default from a resolution that
+    // quietly missed.
     await serve(fixtureAnswerer(EVALS, FIXTURES, TRAIN));
 
     const { stderr } = await runCli(evalArgs(["--split", "train", "--no-history"]));
 
-    expect(stderr).toContain("Using the default prompt artifact.");
+    expect(stderr).toContain("Using the default prompt artifact");
+    expect(stderr).toContain("ollama/fake-local matches no variant");
   });
 
   it("sends the variant it says it resolved, not just the name of one", async () => {
@@ -174,10 +182,60 @@ describe("barwise prompt eval, against a loopback provider", () => {
       evalArgs(["--split", "train", "--no-history", "--artifacts", artifactsDir]),
     );
 
-    expect(stderr).toContain("Using artifact version rehearsal-1.");
+    expect(stderr).toContain("Using artifact version rehearsal-1");
     const first = fake!.requests[0] as { messages: Array<{ role: string; content: string; }>; };
     const system = first.messages.find((m) => m.role === "system")!.content;
     expect(system).toContain("UNMISTAKABLE-VARIANT-MARKER");
+  });
+
+  it("resolves the variant from the client's model, not from the --model flag", async () => {
+    // barwise-842. Resolution keyed on `opts.model`, so omitting the flag
+    // produced a working client -- every provider resolves its own
+    // default model -- and an artifact query with no model at all. A
+    // `modelPrefix` cannot match an undefined model, so the run fell
+    // through to the default prompt while reporting the provider back.
+    //
+    // Ollama defaults to `llama3.1`, which the flag never mentions, so
+    // only a resolution reading the CLIENT can find this variant.
+    const artifactsDir = join(tmp, "artifacts-from-client");
+    mkdirSync(artifactsDir);
+    writeFileSync(
+      join(artifactsDir, "extraction.default-model.prompt.yaml"),
+      [
+        "surface: extraction",
+        "version: client-resolved-1",
+        "match:",
+        "  provider: ollama",
+        "  modelPrefix: llama3",
+        "instructions: |-",
+        "  RESOLVED-FROM-THE-CLIENT",
+        "  Extract an ORM model from the transcript.",
+        "",
+      ].join("\n"),
+    );
+    await serve(fixtureAnswerer(EVALS, FIXTURES, TRAIN));
+
+    const { stderr } = await runCli([
+      "prompt",
+      "eval",
+      "--provider",
+      "ollama",
+      "--base-url",
+      fake!.url,
+      // deliberately no --model
+      "--suite",
+      suitePath,
+      "--split",
+      "train",
+      "--no-history",
+      "--artifacts",
+      artifactsDir,
+    ]);
+
+    expect(stderr).toContain("Using artifact version client-resolved-1");
+    const first = fake!.requests[0] as { messages: Array<{ role: string; content: string; }>; };
+    const system = first.messages.find((m) => m.role === "system")!.content;
+    expect(system).toContain("RESOLVED-FROM-THE-CLIENT");
   });
 
   it("excludes a failed run from the mean rather than scoring it zero", async () => {
