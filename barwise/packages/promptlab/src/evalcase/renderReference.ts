@@ -41,6 +41,10 @@ import { parseExtractionFromJson } from "@barwise/llm";
  * rather than as anything minted by a real run.
  */
 export function withDeterministicIds<T>(fn: () => T): T {
+  // Exported for its own test, not from the package barrel:
+  // `renderReference` is the only caller, and a second public name with
+  // no consumer is the defect the audit that produced this file was
+  // about (barwise-856's own PR shipped it that way for one commit).
   let n = 0;
   setIdGenerator(() => {
     n += 1;

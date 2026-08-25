@@ -1,6 +1,6 @@
 // Eval-case format
 export { defaultSuitePath, loadEvalCase, loadSuite } from "./evalcase/loadSuite.js";
-export { renderReference, withDeterministicIds } from "./evalcase/renderReference.js";
+export { renderReference } from "./evalcase/renderReference.js";
 export { isPromptCheck } from "./evalcase/types.js";
 export type {
   EvalCase,
