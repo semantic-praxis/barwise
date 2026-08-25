@@ -123,6 +123,16 @@ npx tsc --noEmit            # type-check only
   generated from it and refusing the duplicate as ambiguous
   (barwise-851).
 
+  **`prompt artifact` covers every artifact-driven surface, and says
+  when it fell back.** Both are the same lesson one level up: it refused
+  `--surface review` for as long as review had been artifact-driven, so
+  the tool built to answer "which prompt would this configuration send"
+  could not answer for the newest surface that had one -- and an
+  existing test asserted the refusal was correct, which is how a gap
+  survives a green suite. It also printed a matched variant and a
+  fallback identically, the same silence `eval` carried. Adding a
+  surface to `PromptSurface` means wiring it here in the same change.
+
   **`eval` resolves from the CLIENT, `artifact` from the flags**, and
   the asymmetry is deliberate. `createLlmClient` auto-detects the
   provider and every provider resolves its own default model, so a

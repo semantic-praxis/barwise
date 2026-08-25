@@ -143,11 +143,12 @@ describe("barwise prompt artifact", () => {
   });
 
   it("shows the barwise-842 trap rather than requiring a paid run to find it", async () => {
-    // Artifact resolution keys on the (provider, model) pair. Omitting
-    // --provider silently falls back to the default, which during an
-    // eval sweep reads as a one-line stderr note in the middle of a
-    // twenty-minute run. Here it costs nothing to see.
-    const { stdout } = await runCli([
+    // Artifact resolution here keys on the (provider, model) pair, so
+    // omitting --provider falls back to the default. `prompt eval` no
+    // longer behaves this way -- it resolves from the client, which
+    // knows its own provider -- but this command deliberately answers a
+    // hypothetical about the flags it was given.
+    const { stdout, stderr } = await runCli([
       "prompt",
       "artifact",
       "--model",
@@ -157,13 +158,61 @@ describe("barwise prompt artifact", () => {
     ]);
 
     expect((JSON.parse(stdout) as { version: string; }).version).not.toBe("haiku45-2");
+    // And it must SAY that is what happened. Printing a fallback and a
+    // match identically is what let the same silence live in `eval`.
+    expect(stderr).toContain("No extraction variant matches");
   });
 
-  it("rejects a surface it cannot print", async () => {
-    const { stderr, exitCode } = await runCli(["prompt", "artifact", "--surface", "review"]);
+  it("prints the review surface, which is artifact-driven too", async () => {
+    // barwise-847 wired reviewModel to the artifact seam and this
+    // command went on refusing the surface, so the one tool whose job
+    // is "which prompt would this configuration send" could not answer
+    // for the surface that had just started having an answer.
+    const { stdout, exitCode } = await runCli([
+      "prompt",
+      "artifact",
+      "--surface",
+      "review",
+      "--provider",
+      "anthropic",
+      "--model",
+      "claude-haiku-4-5",
+    ]);
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("reviewing a conceptual model for semantic quality");
+    // Not the extraction prompt, which is what a surface-blind
+    // resolution would have printed.
+    expect(stdout).not.toContain("extract a structured ORM conceptual model");
+  });
+
+  it("rejects a surface that is not a surface", async () => {
+    const { stderr, exitCode } = await runCli(["prompt", "artifact", "--surface", "agent"]);
 
     expect(exitCode).toBe(1);
-    expect(stderr).toContain("extraction only");
+    expect(stderr).toContain('Use "extraction" or "review"');
+  });
+
+  it("takes --artifacts pointed at the directory the built-ins come from", async () => {
+    // barwise-851: this is the documented way to evaluate a shipped
+    // variant, and it was the one way that could not work -- every
+    // variant loaded twice and the resolver refused as ambiguous.
+    const prompts = resolve(__dirname, "../../../llm/prompts");
+    const { stdout, exitCode } = await runCli([
+      "prompt",
+      "artifact",
+      "--provider",
+      "anthropic",
+      "--model",
+      "claude-haiku-4-5",
+      "--artifacts",
+      prompts,
+      "--format",
+      "json",
+    ]);
+
+    expect(exitCode).toBe(0);
+    expect((JSON.parse(stdout) as { version: string; }).version).toBe("haiku45-2");
   });
 });
 

@@ -13,6 +13,7 @@ import {
   buildResponseSchema,
   createLlmClient,
   defaultExtractionArtifact,
+  defaultReviewArtifact,
   resolveArtifact,
 } from "@barwise/llm";
 import type { RunProgress, SuiteReport } from "@barwise/promptlab";
@@ -346,7 +347,7 @@ function registerArtifact(promptCmd: Command): void {
   promptCmd
     .command("artifact")
     .description("Print the prompt artifact a given target would actually resolve")
-    .option("--surface <surface>", "Prompt surface (extraction)", "extraction")
+    .option("--surface <surface>", "Prompt surface (extraction or review)", "extraction")
     .option("--provider <provider>", "Provider to resolve for (anthropic, openai, ollama)")
     .option("--model <model>", "Model to resolve for")
     .option("--artifacts <dir>", "Also consider .prompt.yaml variants in this directory")
@@ -360,20 +361,43 @@ function registerArtifact(promptCmd: Command): void {
         format: string;
       }) => {
         try {
-          if (opts.surface !== "extraction") {
+          // Both surfaces, because both are artifact-driven: review was
+          // wired to the seam by barwise-847, and refusing it here left
+          // the one command whose job is "which prompt would this
+          // configuration send" unable to answer for the surface that
+          // had just started having an answer.
+          if (opts.surface !== "extraction" && opts.surface !== "review") {
             throw new Error(
-              `Surface "${opts.surface}" has no artifact to print yet (extraction only).`,
+              `Unknown surface "${opts.surface}". Use "extraction" or "review".`,
             );
           }
+          const surface = opts.surface;
+          const fallback = surface === "review"
+            ? defaultReviewArtifact
+            : defaultExtractionArtifact;
+
           // Keyed on the flags on purpose, unlike `eval`: this command
           // answers a hypothetical -- what would THIS configuration be
           // sent -- and building a client to ask would demand a key for
           // a question that needs none.
-          const resolved = resolveArtifact(artifactCandidates(opts.artifacts), {
-            surface: "extraction",
+          const matched = resolveArtifact(artifactCandidates(opts.artifacts), {
+            surface,
             ...(opts.provider !== undefined ? { provider: opts.provider } : {}),
             ...(opts.model !== undefined ? { model: opts.model } : {}),
-          }) ?? defaultExtractionArtifact;
+          });
+          const resolved = matched ?? fallback;
+
+          // Say which of the two answers this is. Printing the default's
+          // text and a matched variant's text identically is the same
+          // silence `eval` carried: an operator reading a prompt has no
+          // way to tell "this is your variant" from "nothing matched".
+          if (matched === undefined) {
+            process.stderr.write(
+              `No ${surface} variant matches`
+                + ` ${opts.provider ?? "any provider"}/${opts.model ?? "any model"};`
+                + ` printing the default (${fallback.version}).\n`,
+            );
+          }
 
           if (opts.format === "json") {
             process.stdout.write(JSON.stringify(resolved, null, 2) + "\n");
