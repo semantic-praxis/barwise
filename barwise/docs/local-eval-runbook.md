@@ -152,9 +152,24 @@ npx barwise prompt eval --artifacts /tmp/default-only \
   --save-payloads /tmp/eval-payloads/default-sonnet-train 2>&1 | tee /tmp/eval-logs/default-sonnet-train.log
 ```
 
-Run the dev arms first. They are the cheap half by call count and they
-are what barwise-845 needs; if the sweep has to stop early, stopping
-after dev leaves something usable behind.
+**Run the two haiku arms first, and stop there.** Every arm run before
+the re-split is re-run at workstream 4 on the new split, so the only
+runs worth making today are the ones that settle something before it:
+the dev payloads barwise-845 needs, and the dispersion that decides how
+many long transcripts barwise-846 workstream 3 should author. Both are
+satisfiable on haiku, and haiku is the noisier of the two models -- a
+dev error bar that is tight there is tight on sonnet, which is the
+conservative direction for a decision about adding cases.
+
+What the sonnet arms buy is the variant-versus-default comparison for
+sonnet5-3, and no pending decision turns on it. One thing would change
+that: if haiku's best dev sample does not pass its case's full rubric,
+it cannot serve as an answer key, and the sonnet **dev** arm (15 calls)
+is then worth running for better payloads. Not the train arm, which
+buys nothing at that point.
+
+Within a stage, run dev before train: it is the cheap half by call
+count, and stopping after it still leaves the payloads behind.
 
 Why each flag is there:
 
