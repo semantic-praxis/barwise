@@ -1,6 +1,7 @@
 # A generative property for the conformance/validator correspondence
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Accepted (all decisions resolved 2026-08-25; both workstreams
+open -- design only, no implementation in this PR)
 Created: 2026-08-25
 Last-updated: 2026-08-25
 Tracking: follow-up to `constraint-conformance-audit.spec.md` (its
@@ -134,7 +135,7 @@ it("nothing surviving conformance produces a constraint error, for generated res
         );
       expect(errors.map((d) => `${d.ruleId}: ${d.message}`)).toEqual([]);
     }),
-    { seed: SEED, numRuns: RUNS }, // fixed in CI; see Open decisions
+    { seed: SEED, numRuns: RUNS }, // named constants: SEED fixed, RUNS = 250 (see Decisions)
   );
 });
 ```
@@ -199,23 +200,32 @@ own.
 - No CI changes: the property runs inside `npx vitest run` like every
   other test.
 
-## Open decisions (for review)
+## Decisions (all resolved 2026-08-25)
 
-- **Seed policy.** Fixed seed in CI (deterministic, explores the same
-  cases every run) versus fresh seed per run (more exploration, but a
-  red CI that a re-run turns green -- exactly the flake posture this
-  repo rejects). Recommend: fixed seed and `numRuns` in CI, with the
-  seed a named constant so a developer can override locally for
-  soak-style exploration. New ground is then covered when the seed or
-  the generator changes, not when CI feels lucky.
-- **Run count.** Recommend starting at 250: the pipeline per case is
-  parse-plus-validate over a small model, and the existing llm suite
-  budget (about 5s) has room. Tune downward only if measured, not
-  preemptively.
-- **Where the arbitraries live.** Recommend
-  `llm/tests/arbitraries/extraction.ts` as specced. The alternative --
-  a shared test-utils package -- buys nothing until a second package
-  wants them, and couples packages through test code.
+Each was an open decision; the requester adopted the recommended
+default. The rejected side stays recorded so a later reader can see
+what was weighed.
+
+- **Seed policy (resolved: fixed seed in CI).** The alternative --
+  a fresh seed per run -- buys more exploration at the cost of a red
+  CI that a re-run turns green, exactly the flake posture this repo
+  rejects. The seed is a named constant (`SEED`) so a developer can
+  override it locally for soak-style exploration; new ground is
+  covered when the seed or the generator changes, not when CI feels
+  lucky. A fast-check failure prints the seed and the shrunk
+  counterexample either way, so reproduction never depends on the
+  policy.
+- **Run count (resolved: 250, tuned only if measured).** The pipeline
+  per case is parse-plus-validate over a deliberately small model, and
+  the llm suite's current budget (about 5s) has room. `RUNS` is a
+  named constant beside `SEED`; lower it only on a measured CI-time
+  regression, never preemptively.
+- **Where the arbitraries live (resolved:
+  `llm/tests/arbitraries/extraction.ts`).** The alternative -- a
+  shared test-utils package -- buys nothing until a second package
+  wants the arbitraries, and couples packages through test code. If
+  the core `OrmModel` arbitrary is ever specced, sharing is that
+  spec's question to reopen, with an actual second consumer in hand.
 
 ## Risks and testing
 
