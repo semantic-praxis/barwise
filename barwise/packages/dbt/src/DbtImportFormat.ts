@@ -16,56 +16,18 @@
 
 import type { ImportFormat, ImportOptions, ImportResult, OrmModel } from "@barwise/core";
 import { parseSqlFile, type SqlDialect } from "@barwise/core/sql";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { type DbtDialectOptions, detectDbtDialect } from "./DbtDialectDetector.js";
 import { ReportBuilder } from "./DbtImportReport.js";
 import { mergeSqlPatterns, type MinedSqlFile } from "./dbtMapping/sqlPatterns.js";
 import { importDbtProject } from "./DbtProjectImporter.js";
 import { compileDbtSql } from "./DbtSqlCompiler.js";
+import { findProjectFiles } from "./projectWalk.js";
 import { normalizeCascadeResult, parseSqlWithSqlglot } from "./sql/SqlglotBridge.js";
 
-/**
- * Recursively find all .yml and .yaml files under a directory.
- */
 function findYamlFiles(dir: string): string[] {
-  const results: string[] = [];
-
-  let entries: string[];
-  try {
-    entries = readdirSync(dir);
-  } catch {
-    return results;
-  }
-
-  for (const entry of entries) {
-    const fullPath = join(dir, entry);
-
-    let stat;
-    try {
-      stat = statSync(fullPath);
-    } catch {
-      continue;
-    }
-
-    if (stat.isDirectory()) {
-      // Skip common non-model directories.
-      if (
-        entry === "node_modules"
-        || entry === ".git"
-        || entry === "target"
-        || entry === "dbt_packages"
-        || entry === "logs"
-      ) {
-        continue;
-      }
-      results.push(...findYamlFiles(fullPath));
-    } else if (/\.ya?ml$/i.test(entry)) {
-      results.push(fullPath);
-    }
-  }
-
-  return results;
+  return findProjectFiles(dir, (name) => /\.ya?ml$/i.test(name));
 }
 
 /**

@@ -12,8 +12,9 @@
  * JOINs, WHERE clauses, and CASE branches.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { findProjectFiles } from "./projectWalk.js";
 
 /**
  * A compiled SQL file with its source path and resolved SQL content.
@@ -163,38 +164,6 @@ export function stubRenderJinja(sql: string): string {
   return result.trim();
 }
 
-/**
- * Recursively find all .sql files under a directory.
- */
 function findSqlFiles(dir: string): string[] {
-  const results: string[] = [];
-
-  let entries: string[];
-  try {
-    entries = readdirSync(dir);
-  } catch {
-    return results;
-  }
-
-  for (const entry of entries) {
-    const fullPath = join(dir, entry);
-
-    let stat;
-    try {
-      stat = statSync(fullPath);
-    } catch {
-      continue;
-    }
-
-    if (stat.isDirectory()) {
-      if (entry === "node_modules" || entry === ".git" || entry === "dbt_packages") {
-        continue;
-      }
-      results.push(...findSqlFiles(fullPath));
-    } else if (entry.endsWith(".sql")) {
-      results.push(fullPath);
-    }
-  }
-
-  return results;
+  return findProjectFiles(dir, (name) => name.endsWith(".sql"));
 }
