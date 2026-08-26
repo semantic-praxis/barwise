@@ -54,6 +54,7 @@ export type {
 } from "./prompt/artifacts/PromptArtifact.js";
 export { resolveArtifact } from "./prompt/artifacts/resolveArtifact.js";
 export type { ArtifactQuery } from "./prompt/artifacts/resolveArtifact.js";
+export { hashPrompt } from "./prompt/promptHash.js";
 export { buildReviewSystemPrompt, defaultReviewArtifact } from "./prompt/reviewPrompt.js";
 export { assertArtifactSurface, selectArtifact } from "./prompt/selectArtifact.js";
 export type { ArtifactTarget } from "./prompt/selectArtifact.js";

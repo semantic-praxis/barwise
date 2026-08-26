@@ -19,8 +19,10 @@
  */
 
 import type { ProviderName, ReviewResult, ReviewSuggestion } from "@barwise/llm";
-import { createLlmClient, reviewModel } from "@barwise/llm";
+import { createLlmClient, reviewModel, withCallLog } from "@barwise/llm";
 import type { Command } from "commander";
+import { randomUUID } from "node:crypto";
+import { callLogSink } from "../workspace/callLogSink.js";
 import { loadModel } from "../workspace/io.js";
 
 export function registerReviewCommand(program: Command): void {
@@ -51,12 +53,24 @@ export function registerReviewCommand(program: Command): void {
       ) => {
         try {
           const model = loadModel(file);
-          const client = createLlmClient({
+
+          // Recorded like the import commands are. The call-log spec's
+          // Inventory marked this command `modify`, and only `import`
+          // was ever wired -- so a review cost real tokens and left no
+          // row at all, and `barwise llm-usage` under-reported by
+          // however many reviews had been run. Undefined unless
+          // BARWISE_CALL_LOG is set, in which case nothing is wrapped
+          // and nothing is computed.
+          const sink = callLogSink();
+          const bare = createLlmClient({
             provider: opts.provider as ProviderName | undefined,
             apiKey: opts.apiKey,
             model: opts.model,
             baseUrl: opts.baseUrl,
           });
+          const client = sink === undefined
+            ? bare
+            : withCallLog(bare, sink, { correlationId: randomUUID() });
 
           process.stderr.write(
             opts.focus

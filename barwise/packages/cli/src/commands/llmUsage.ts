@@ -35,6 +35,7 @@ interface CallRow {
   readonly latencyMs?: number;
   readonly ok?: boolean;
   readonly errorKind?: string;
+  readonly promptHash?: string;
 }
 
 interface Rates {
@@ -49,6 +50,16 @@ interface Bucket {
   completionTokens: number;
   latencies: number[];
   errorKinds: Record<string, number>;
+  /**
+   * Distinct system prompts seen for this model.
+   *
+   * A count, not a history: the question it answers is "did these calls
+   * all send the same prompt", which is the one that decides whether
+   * their latencies and token counts are comparable at all. More than
+   * one means the window spans a prompt change, and a mean across it is
+   * a mean over two different things.
+   */
+  promptHashes: Set<string>;
 }
 
 export function registerLlmUsageCommand(program: Command): void {
@@ -140,6 +151,7 @@ function summarise(rows: readonly CallRow[]): Map<string, Bucket> {
         completionTokens: 0,
         latencies: [],
         errorKinds: {},
+        promptHashes: new Set<string>(),
       };
       buckets.set(key, b);
     }
@@ -152,6 +164,10 @@ function summarise(rows: readonly CallRow[]): Map<string, Bucket> {
     b.promptTokens += r.promptTokens ?? 0;
     b.completionTokens += r.completionTokens ?? 0;
     if (r.latencyMs !== undefined) b.latencies.push(r.latencyMs);
+    // Absent on rows written before the field existed, which is not the
+    // same as one prompt -- so those rows add nothing rather than
+    // collapsing into a phantom single hash.
+    if (r.promptHash !== undefined) b.promptHashes.add(r.promptHash);
   }
   return buckets;
 }
@@ -190,6 +206,7 @@ function renderJson(buckets: Map<string, Bucket>, rates: Rates | undefined): unk
       completionTokens: b.completionTokens,
       medianLatencyMs: percentile(b.latencies, 50),
       p95LatencyMs: percentile(b.latencies, 95),
+      ...(b.promptHashes.size > 0 ? { promptHashes: [...b.promptHashes].sort() } : {}),
       ...(Object.keys(b.errorKinds).length > 0 ? { errorKinds: b.errorKinds } : {}),
       ...(costOf(b, model, rates) !== undefined ? { cost: costOf(b, model, rates) } : {}),
     })),
@@ -215,6 +232,18 @@ function renderText(buckets: Map<string, Bucket>, rates: Rates | undefined): str
       `  latency  median ${med === undefined ? "n/a" : `${med} ms`}`
         + `   p95 ${p95 === undefined ? "n/a" : `${p95} ms`}`,
     );
+    // Named rather than counted when there are few: the hash is what
+    // `barwise prompt artifact` prints, so an operator can go read the
+    // prompt a row was sent. Beyond a handful the list stops being
+    // readable and the count is the useful part.
+    if (b.promptHashes.size > 0) {
+      const hashes = [...b.promptHashes].sort();
+      lines.push(
+        hashes.length <= 3
+          ? `  prompt   ${hashes.join(", ")}`
+          : `  prompt   ${hashes.length} distinct (${hashes.slice(0, 3).join(", ")}, ...)`,
+      );
+    }
     const kinds = Object.entries(b.errorKinds).sort((x, y) => y[1] - x[1]);
     if (kinds.length > 0) {
       lines.push(`  failures ${kinds.map(([k, n]) => `${k} x${n}`).join(", ")}`);

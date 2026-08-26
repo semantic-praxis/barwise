@@ -19,6 +19,7 @@ import {
   defaultExtractionArtifact,
   defaultReviewArtifact,
   resolveArtifact,
+  withCallLog,
 } from "@barwise/llm";
 import type { RunProgress, SuiteReport } from "@barwise/promptlab";
 import {
@@ -35,8 +36,10 @@ import {
   toHistoryEntry,
 } from "@barwise/promptlab";
 import type { Command } from "commander";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { callLogSink } from "../workspace/callLogSink.js";
 import { artifactCandidates } from "../workspace/promptArtifacts.js";
 import { describeProvenance, resolveProvenance } from "../workspace/provenance.js";
 
@@ -151,13 +154,21 @@ function registerEval(promptCmd: Command, version: string): void {
           }
           // Constructed after the guards, so a typo in a flag costs
           // nothing rather than a client and a sweep.
-          const client = createLlmClient({
+          const bare = createLlmClient({
             provider: opts.provider as ProviderName | undefined,
             apiKey: opts.apiKey,
             model: opts.model,
             baseUrl: opts.baseUrl,
             ...(contextWindow !== undefined ? { contextWindow } : {}),
           });
+          // A sweep is where the log earns most -- dozens of calls that
+          // are worth costing as a unit, which is what the correlation
+          // id is for. This was the third command the call-log spec
+          // marked `modify` and never wired.
+          const sink = callLogSink();
+          const client = sink === undefined
+            ? bare
+            : withCallLog(bare, sink, { correlationId: randomUUID() });
 
           // Resolved from the CLIENT, not from the flags, and therefore
           // only after it exists (barwise-842). `createLlmClient`
