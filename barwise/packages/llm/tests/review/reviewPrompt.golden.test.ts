@@ -13,11 +13,8 @@ import { describe, expect, it } from "vitest";
 import type { CompletionRequest, LlmClient } from "../../src/LlmClient.js";
 import { builtinArtifacts } from "../../src/prompt/artifacts/builtins.generated.js";
 import type { PromptArtifact } from "../../src/prompt/artifacts/PromptArtifact.js";
-import {
-  buildReviewSystemPrompt,
-  defaultReviewArtifact,
-  reviewModel,
-} from "../../src/review/reviewModel.js";
+import { buildReviewSystemPrompt, defaultReviewArtifact } from "../../src/prompt/reviewPrompt.js";
+import { reviewModel } from "../../src/review/reviewModel.js";
 
 const goldenPath = resolve(
   dirname(fileURLToPath(import.meta.url)),

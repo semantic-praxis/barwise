@@ -181,15 +181,32 @@ npx tsc --noEmit            # type-check only
   extraction that cost a paid call must not be lost to an unwritable
   log. The sink and the clock are supplied by the caller, like the
   history writer's date and build provenance.
-- **Both LLM surfaces resolve their prompt the same way.**
-  `processTranscript` and `reviewModel` each take an optional
-  `artifact`, and when none is given they query `builtinArtifacts` with
-  their own surface plus the client's provider and model, falling back
-  to `defaultExtractionArtifact` / `defaultReviewArtifact`. A golden
+- **Both LLM surfaces resolve their prompt through one function.**
+  `selectArtifact(surface, client, options?.artifact)` in
+  `src/prompt/selectArtifact.ts` owns the whole answer: the candidate
+  set (`builtinArtifacts`, and nothing else), the surface guard, and
+  the surface-to-default table. `processTranscript` and `reviewModel`
+  each call it once and hold no resolution logic of their own. A golden
   test per surface pins the default's rendered bytes, so wiring a
-  surface up is a no-op until a variant for it is authored. An artifact
-  whose `surface` does not match the call is rejected before the LLM
-  call rather than rendered.
+  surface up is a no-op until a variant for it is authored.
+
+  Do not re-answer any part of it at a call site. It was answered
+  separately in three places, with the surface-to-default mapping
+  spread across three files and restated here in prose, and the cost
+  was change amplification: `PromptSurface` is shaped to grow, and a
+  third surface meant editing every copy. barwise-850 is what that
+  costs when it goes wrong -- two commands, one question, two answers,
+  unnoticed for months, because falling back to the default is
+  indistinguishable from choosing it.
+
+  `resolveArtifact` remains the pure matcher over a caller-supplied
+  list, and the `select` / `resolve` split in the names is
+  load-bearing: production asks the narrow question over the shipped
+  set, while `barwise prompt eval --artifacts` asks a wider one over
+  candidates that are not shipped, and a reader can tell which from the
+  call site. `promptlab`'s `runSuite` receives an already-resolved
+  artifact and so uses the exported `assertArtifactSurface` rather than
+  a fourth copy of the guard.
 - **A review suggestion is validated, not cast.** `parseReviewResponse`
   drops any suggestion whose `category` or `severity` falls outside the
   enums the response schema declares, and any that is missing

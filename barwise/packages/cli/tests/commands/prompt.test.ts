@@ -4,7 +4,7 @@
  * eval` needs a live provider and is exercised manually per the
  * tests/live policy.
  */
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -228,6 +228,83 @@ describe("barwise prompt artifact", () => {
 
     expect(exitCode).toBe(0);
     expect((JSON.parse(stdout) as { version: string; }).version).toBe("haiku45-2");
+  });
+
+  it("prints the prompt hash beside the version, on both surfaces", async () => {
+    // The version is authored by hand and can be edited without being
+    // bumped; the hash is derived and cannot. It is what joins a
+    // call-log row back to a prompt someone can read
+    // (docs/specs/artifact-resolution-parity.spec.md).
+    const extraction = await runCli(["prompt", "artifact"]);
+    const review = await runCli(["prompt", "artifact", "--surface", "review"]);
+
+    expect(extraction.stderr).toMatch(/Artifact 1\.0\.0@[0-9a-f]{12}\./);
+    expect(review.stderr).toMatch(/Artifact 1\.0\.0@[0-9a-f]{12}\./);
+
+    // Two surfaces whose default instructions differ, so two different
+    // hashes. Note what this does NOT prove: with no alternatives
+    // section, the two renderers reduce to the same expression, so a
+    // hash computed through the wrong one would be identical. The
+    // distinction here comes from the artifacts, not the renderers.
+    const hashOf = (stderr: string): string => /Artifact \S+@([0-9a-f]{12})/.exec(stderr)![1]!;
+    expect(hashOf(extraction.stderr)).not.toBe(hashOf(review.stderr));
+  });
+
+  it("says a --artifacts answer is byte-identical to the shipped one when it is", async () => {
+    // `packages/llm/prompts/` holds the very files the built-ins are
+    // generated from, so this is the ordinary case and the command must
+    // not cry wolf about it.
+    const prompts = resolve(__dirname, "../../../llm/prompts");
+    const { stderr, exitCode } = await runCli([
+      "prompt",
+      "artifact",
+      "--provider",
+      "anthropic",
+      "--model",
+      "claude-haiku-4-5",
+      "--artifacts",
+      prompts,
+    ]);
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toContain("byte-identical to the shipped haiku45-2");
+    expect(stderr).not.toContain("NOT shipped");
+  });
+
+  it("says a --artifacts answer is not shipped when production could not send it", async () => {
+    // The claim this command makes about itself -- "the artifact a
+    // given target would actually resolve" -- is false for a candidate
+    // production cannot reach, and it used to make it silently.
+    const dir = mkdtempSync(join(tmpdir(), "barwise-variants-"));
+    const shipped = readFileSync(
+      resolve(__dirname, "../../../llm/prompts/extraction.haiku45.prompt.yaml"),
+      "utf8",
+    );
+    // Same version, so it overrides the built-in rather than colliding
+    // with it; different bytes, so it is genuinely unshipped.
+    writeFileSync(
+      join(dir, "edited.prompt.yaml"),
+      shipped.replace(
+        "  You are an expert data modeler",
+        "  EDITED. You are an expert data modeler",
+      ),
+    );
+
+    const { stderr, exitCode } = await runCli([
+      "prompt",
+      "artifact",
+      "--provider",
+      "anthropic",
+      "--model",
+      "claude-haiku-4-5",
+      "--artifacts",
+      dir,
+    ]);
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toContain("NOT shipped");
+    expect(stderr).toContain("regen:builtins");
+    expect(stderr).not.toContain("byte-identical");
   });
 });
 

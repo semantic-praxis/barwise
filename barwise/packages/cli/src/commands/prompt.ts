@@ -8,10 +8,13 @@
  * point); `schema` prints the structured-output JSON Schema the Python
  * lane must reuse; `history` shows the checked-in score record.
  */
-import type { ProviderName } from "@barwise/llm";
+import type { PromptArtifact, ProviderName } from "@barwise/llm";
 import {
   buildResponseSchema,
   buildReviewResponseSchema,
+  buildReviewSystemPrompt,
+  buildSystemPrompt,
+  builtinArtifacts,
   createLlmClient,
   defaultExtractionArtifact,
   defaultReviewArtifact,
@@ -21,6 +24,7 @@ import type { RunProgress, SuiteReport } from "@barwise/promptlab";
 import {
   appendRunHistory,
   defaultSuitePath,
+  hashPrompt,
   historyPathFor,
   IncompleteRunError,
   loadSuite,
@@ -407,6 +411,44 @@ function registerArtifact(promptCmd: Command): void {
             );
           }
 
+          // The version is authored by hand and can be edited without
+          // being bumped; the hash is derived from the bytes and cannot.
+          // Printing both is what lets an operator join a call-log row
+          // back to a prompt they can read
+          // (docs/specs/artifact-resolution-parity.spec.md).
+          process.stderr.write(
+            `Artifact ${resolved.version}@${hashPrompt(render(surface, resolved))}.\n`,
+          );
+
+          // This command's whole job is "which prompt would this target
+          // be sent", and with `--artifacts` it can answer with one no
+          // production run could resolve: production reads
+          // `builtinArtifacts` and nothing else. Saying so is the
+          // difference between a hypothetical and a false claim.
+          //
+          // Which of the two it is gets checked rather than assumed. A
+          // directory entry that is byte-identical to the shipped
+          // artifact of the same version IS what production sends --
+          // pointing at `packages/llm/prompts/`, the very files the
+          // built-ins are generated from, is the ordinary case -- and
+          // claiming otherwise would be the same unchecked assertion
+          // this line exists to remove. The two answers also happen to
+          // make `regen:builtins` drift visible at the point of use.
+          if (opts.artifacts !== undefined && !builtinArtifacts.includes(resolved)) {
+            const target = `${opts.provider ?? "any provider"}/${opts.model ?? "any model"}`;
+            const shipped = builtinArtifacts.find(
+              (a) => a.surface === surface && a.version === resolved.version,
+            );
+            process.stderr.write(
+              shipped !== undefined && render(surface, shipped) === render(surface, resolved)
+                ? `Loaded from ${opts.artifacts}, and byte-identical to the shipped`
+                  + ` ${resolved.version}: a production run on ${target} sends this.\n`
+                : `Loaded from ${opts.artifacts} and NOT shipped: a production run on`
+                  + ` ${target} would not send it.`
+                  + ` Promote it with npm run regen:builtins.\n`,
+            );
+          }
+
           if (opts.format === "json") {
             process.stdout.write(JSON.stringify(resolved, null, 2) + "\n");
           } else {
@@ -419,6 +461,29 @@ function registerArtifact(promptCmd: Command): void {
         }
       },
     );
+}
+
+/**
+ * Render an artifact the way its surface will send it.
+ *
+ * Extraction is rendered without the alternatives section, matching
+ * what `runSuite` hashes into the score history -- so a hash printed
+ * here compares directly against a recorded one. An extraction run made
+ * with `--alternatives` renders a longer prompt and hashes differently;
+ * that is a second rendering of the same artifact, not a mismatch.
+ *
+ * The branch is not observable today and is kept deliberately: with
+ * `includeAlternatives` false, `buildSystemPrompt` and
+ * `buildReviewSystemPrompt` both reduce to instructions plus rendered
+ * demos, so they agree byte for byte on every artifact. No test can
+ * catch swapping one for the other, which is exactly why the branch
+ * should not be "simplified" to a single call -- the day extraction
+ * grows another suffix, review would silently start carrying it.
+ */
+function render(surface: "extraction" | "review", artifact: PromptArtifact): string {
+  return surface === "review"
+    ? buildReviewSystemPrompt(artifact)
+    : buildSystemPrompt(false, artifact);
 }
 
 /** `barwise prompt history` */

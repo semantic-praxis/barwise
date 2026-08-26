@@ -23,10 +23,8 @@ import type { CandidateFraming, DraftModelResult, ExtractionResponse } from "./E
 import type { LlmClient } from "./LlmClient.js";
 import type { ExtractionLogSink } from "./observe/extractionLog.js";
 import { emitExtractionRecord, summariseExtraction } from "./observe/extractionLog.js";
-import { builtinArtifacts } from "./prompt/artifacts/builtins.generated.js";
 import type { PromptArtifact } from "./prompt/artifacts/PromptArtifact.js";
-import { resolveArtifact } from "./prompt/artifacts/resolveArtifact.js";
-import { defaultExtractionArtifact } from "./prompt/systemPrompt.js";
+import { selectArtifact } from "./prompt/selectArtifact.js";
 
 export interface ProcessorOptions {
   /** Name for the resulting model. Defaults to "Extracted Model". */
@@ -103,22 +101,12 @@ export async function processTranscript(
     throw new Error("Transcript is empty.");
   }
 
-  if (options?.artifact !== undefined && options.artifact.surface !== "extraction") {
-    throw new Error(
-      `Prompt artifact surface "${options.artifact.surface}" cannot drive transcript extraction.`,
-    );
-  }
-
   // An explicit artifact wins; otherwise the client's own identity
   // picks a variant, and a model with no authored variant falls back
   // to the default -- byte-identical to the pre-resolution output.
-  const artifact = options?.artifact
-    ?? resolveArtifact(builtinArtifacts, {
-      surface: "extraction",
-      provider: client.provider,
-      model: client.model,
-    })
-    ?? defaultExtractionArtifact;
+  // The surface guard and the fallback both live in `selectArtifact`,
+  // so this call site and `reviewModel` cannot answer differently.
+  const artifact = selectArtifact("extraction", client, options?.artifact);
 
   const includeAlternatives = options?.alternatives ?? false;
   const systemPrompt = buildSystemPrompt(includeAlternatives, artifact);

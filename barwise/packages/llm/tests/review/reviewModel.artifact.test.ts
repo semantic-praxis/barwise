@@ -13,11 +13,8 @@ import { OrmModel } from "@barwise/core";
 import { describe, expect, it, vi } from "vitest";
 import type { CompletionRequest, LlmClient } from "../../src/LlmClient.js";
 import type { PromptArtifact } from "../../src/prompt/artifacts/PromptArtifact.js";
-import {
-  buildReviewSystemPrompt,
-  defaultReviewArtifact,
-  reviewModel,
-} from "../../src/review/reviewModel.js";
+import { buildReviewSystemPrompt, defaultReviewArtifact } from "../../src/prompt/reviewPrompt.js";
+import { reviewModel } from "../../src/review/reviewModel.js";
 
 // Hoisted so the mock factory -- which vitest lifts above the imports
 // -- and the assertions below read the same two artifacts rather than
