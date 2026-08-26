@@ -97,8 +97,20 @@ Run over a clean checkout of main. Deliverable is a dated findings
 doc under `barwise/docs/` (`logic-duplication-audit-2026-08-26.md` is
 the format): the rubric verdicts, findings with file:line evidence,
 negative results (what was checked and cleared bounds the coverage),
-and a follow-up index. The five passes, independent and
-parallelizable:
+and a follow-up index.
+
+The sweep splits into deterministic **detection** (emitting
+candidates) and human **classification** (assigning verdicts), and
+only the second is this skill's job. Detection belongs to
+`npm run audit:duplication`
+(`docs/specs/duplication-drift-guards.spec.md`, workstream 5): run it
+and classify its candidate report against the rubric. Until that
+script lands, the five passes below are the manual detection
+procedure -- and they remain the statement of what the script must
+cover. Passes 1 and the shape-hunt half of 5 are inherently
+judgment-loaded (comparing wirings, recognizing semantic clones);
+even with the script, expect to read code there, seeded by its
+candidates.
 
 1. **Cross-surface wiring.** For each capability the CLAUDE.md matrix
    puts on 2+ surfaces, compare the CLI command, MCP tool, and VS

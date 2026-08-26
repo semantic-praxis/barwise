@@ -93,6 +93,9 @@ In scope:
 - When a switch over a core vocabulary union omits a member and the
   code's intent is exhaustive handling, the system shall fail to
   compile (via `assertNever` from `@barwise/core`).
+- When `npm run audit:duplication` runs twice over the same tree, the
+  system shall emit byte-identical candidate reports (detection is
+  deterministic; only classification is judgment).
 - When a contributor adds a copy that must agree with existing code,
   the convention (root `CLAUDE.md`) shall direct them to share,
   derive, register the pair in the manifest, or add a drift test in
@@ -130,9 +133,10 @@ Out of scope, deferred and named:
 | `scripts/regen-example-output.sh`                 | One of two disagreeing regenerators                            | modify (W4)                                    |
 | `packages/llm/tests/Pipeline.integration.test.ts` | The other regenerator (`UPDATE_GOLDEN=1`)                      | modify (W4)                                    |
 | `examples/README.md`                              | Claims a version stamp the files do not carry                  | modify (W4)                                    |
-| Root `CLAUDE.md` Conventions                      | No rule about must-agree copies                                | modify (W5)                                    |
-| `.claude/skills/spec-writer/` pre-push gate       | No parity item                                                 | modify (W5)                                    |
-| `.claude/skills/duplication-audit/`               | New skill; lands with the audit, referenced by W5              | untouched                                      |
+| `scripts/audit-duplication.mjs`                   | Does not exist; the sweep's deterministic detection half       | new (W5)                                       |
+| Root `CLAUDE.md` Conventions                      | No rule about must-agree copies                                | modify (W6)                                    |
+| `.claude/skills/spec-writer/` pre-push gate       | No parity item                                                 | modify (W6)                                    |
+| `.claude/skills/duplication-audit/`               | Carries detection as prose; shrinks to judgment once W5 lands  | modify (W5)                                    |
 | `packages/*/src` byte-identical pairs (audit C)   | Agree by construction                                          | untouched (W2 registers them; no source edits) |
 
 `turbo.json` is untouched: `check:parity` and `depcruise` are
@@ -180,7 +184,16 @@ barwise/
                               permitted docblock difference do not
                               false-positive; unresolvable member -> error
 
+  scripts/audit-duplication.mjs
+                              the sweep's detection half, deterministic:
+                              emits the candidate report (duplicate
+                              literals, union restatements, parity-claim
+                              prose, generated files and their guards,
+                              clone runs) for an auditor to classify;
+                              run on demand, not in CI
+
   package.json                "check:parity": "node scripts/check-parity.mjs"
+                              "audit:duplication": "node scripts/audit-duplication.mjs"
   .github/workflows/ci.yml    runs check:parity with lint
 
   tsconfig.depcruise.json     per-subpath paths entries (or a resolver
@@ -199,8 +212,9 @@ the capability matrix -- with two properties that matrix lacks: an
 entry that stops resolving fails the build (staleness is loud), and
 an entry that is present does its whole job mechanically. What the
 manifest cannot do is know about pairs never registered; that is what
-W5's convention line and the `duplication-audit` skill's periodic
-re-sweep are for.
+W6's convention line and the periodic re-sweep are for -- with W5
+making the re-sweep's detection a deterministic script rather than a
+procedure an agent re-interprets each run.
 
 ## Alternatives considered
 
@@ -313,7 +327,35 @@ regeneration command runs on a clean tree, `git status` shall be
 clean; when the four citing sites are read, each shall point at a
 guard that exists.
 
-### 5. Write the rule where authors will meet it
+### 5. Mechanize the sweep's detection half
+
+The audit's five passes divide cleanly into deterministic detection
+and human classification, and only the second belongs in skill prose.
+Add `scripts/audit-duplication.mjs` (`npm run audit:duplication`)
+covering the detection that is mechanical: cross-file duplicate
+string-literal extraction, union-restatement candidates (bare enums,
+`Set`/array re-listings, and switches over each core union, flagged
+with their guard shape), the parity-claim grep vocabulary over docs
+and CLAUDE.md files, the generated-file inventory with each file's
+regeneration script and guard-test presence, and the jscpd run with
+pinned flags. The script emits a candidate report (stable order,
+stable format -- same tree, same bytes); it assigns no verdicts.
+Classification against the rubric stays with the auditor, which is
+why this is **not** a CI gate -- the jscpd-in-CI rejection in
+Alternatives stands, because candidates are not findings. Rewrite the
+`duplication-audit` skill's method section to run the script for
+detection and keep only the judgment layer: the rubric, verification
+discipline, and the findings-doc format. Passes that are inherently
+judgment (cross-surface wiring comparison, semantic-clone shape
+hunts) stay in the skill, seeded by the script's candidates.
+
+Acceptance: when `audit:duplication` runs twice on one tree, the
+reports shall be byte-identical; when it runs on the audit's tree, it
+shall surface the class-B/C/D candidates the audit found by hand
+(spot-checked against the audit doc); when the skill's method section
+is read, detection shall be one command, not a grep procedure.
+
+### 6. Write the rule where authors will meet it
 
 Add the invariant to root `CLAUDE.md` Conventions ("a copy that must
 agree with other code is shared, derived, registered in
@@ -326,7 +368,7 @@ Acceptance: when the Conventions section is read, it shall carry the
 rule and name the manifest; when the spec-writer gate is run, it
 shall ask the parity question.
 
-Last because its content depends on the mechanisms of W1-W4 existing
+Last because its content depends on the mechanisms of W1-W5 existing
 under the names it cites.
 
 ## API and migration impact
@@ -387,7 +429,7 @@ under the names it cites.
   entries fail (unresolvable member -> error), and every entry carries
   a `why` so a future editor can retire it deliberately. Retiring an
   entry requires either a share/derive change or a behavioral parity
-  test in the same commit -- the W5 convention states this.
+  test in the same commit -- the W6 convention states this.
 - **W3 changes behavior at the NORMA coercion site.** Deliberate and
   called out; needs a fixture with an unknown ring type asserting the
   new rejection, and a check of round-trip tests that may have relied
