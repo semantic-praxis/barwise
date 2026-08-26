@@ -24,9 +24,12 @@ Barwise assumes familiarity with Object-Role Modeling. The definitive reference 
 git clone <repo-url> barwise
 cd barwise/barwise
 npm install
+npm run prepare
 ```
 
 The repository is an npm workspace. `npm install` at the monorepo root handles all four packages (`core`, `llm`, `diagram`, `vscode`).
+
+`npm run prepare` is a separate step because `.npmrc` sets `ignore-scripts=true`, which blocks install-time scripts from dependencies -- and, unavoidably, our own `prepare` hook along with them. It installs the git hooks (husky); skip it and commits bypass the formatting gate. See `docs/specs/supply-chain-hardening.spec.md`.
 
 ### 2. Build everything
 

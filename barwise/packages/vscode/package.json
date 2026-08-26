@@ -749,8 +749,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:unit": "vitest run",
-    "pretest:integration": "tsc -p tsconfig.test.json",
-    "test:integration": "vscode-test"
+    "test:integration": "tsc -p tsconfig.test.json && vscode-test"
   },
   "dependencies": {
     "@barwise/code-analysis": "1.7.0",
@@ -774,14 +773,14 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@types/vscode": "^1.99.0",
-    "@vitest/coverage-v8": "^3.0.0",
+    "@vitest/coverage-v8": "^3.2.7",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
-    "esbuild": "^0.27.3",
+    "esbuild": "^0.28.2",
     "mocha": "^11.7.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "^5.7.0",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.7"
   }
 }

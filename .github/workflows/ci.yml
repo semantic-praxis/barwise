@@ -144,10 +144,10 @@ jobs:
         if: steps.changes.outputs.docs_only != 'true'
         continue-on-error: true
 
-      # Reports known advisories without gating the build. There is an
-      # existing backlog of dependency vulnerabilities (mostly dev deps);
-      # dependabot opens PRs to chip away at it. Tighten to a blocking
-      # step once the backlog is cleared.
-      - run: npm audit --audit-level=high
+      # Blocking advisory gate (docs/specs/supply-chain-hardening.spec.md).
+      # The backlog this step used to tolerate is cleared, so it no longer
+      # runs with continue-on-error. High and critical advisories fail the
+      # build unless written down in the ACCEPTED list in
+      # scripts/audit-gate.mjs with a reason and an expiry date.
+      - run: npm run audit
         if: steps.changes.outputs.docs_only != 'true'
-        continue-on-error: true
