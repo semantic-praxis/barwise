@@ -144,12 +144,23 @@ so the metric cannot rest on it.
 Until one of those lands, this case's 0.460 SD is measuring word choice,
 and every mean that includes it inherits that.
 
-### The same check is owed to conference-reviews
+### conference-reviews is not the same defect
 
-`conference-reviews`, sd=0.158, three of five samples missing
-`Reviewer reviews Paper` and failing its `requires_element` and
-`forbids_population` together -- the identical shape. Its retained
-payloads should be read before assuming it is a different problem.
+Its payloads were read in the same pass and the answer is no: it fails
+structurally, not lexically. The 1.000 run carries the binary
+`Reviewer reviews Paper` and objectifies it into `Review`; the 0.684 run
+has no fact type with players `{Reviewer, Paper}` at all, making
+`Review` a standalone entity over two binaries -- `Reviewer conducts
+Review` and `Review is of Paper` -- and then needing an external
+uniqueness spanning both to say "a given reviewer reviews a given paper
+at most once". That is the associative-entity workaround objectification
+exists to remove, against a transcript that says "the score hangs off
+that pairing, not off the paper alone".
+
+So its sd of 0.158 is signal, and the case should be left alone. It is
+also the contrast that makes `university-enrollment` an anomaly rather
+than a pattern: a well-authored case in this suite does discriminate on
+modelling.
 
 ## Operational notes
 
