@@ -96,6 +96,10 @@ In scope:
 - When `npm run audit:duplication` runs twice over the same tree, the
   system shall emit byte-identical candidate reports (detection is
   deterministic; only classification is judgment).
+- When `audit:duplication --check` runs, the system shall fail on any
+  candidate absent from the committed baseline and on any baseline
+  entry no longer detected, so the baseline's `tracked` entries
+  always enumerate exactly the detectable findings still open.
 - When a contributor adds a copy that must agree with existing code,
   the convention (root `CLAUDE.md`) shall direct them to share,
   derive, register the pair in the manifest, or add a drift test in
@@ -134,6 +138,7 @@ Out of scope, deferred and named:
 | `packages/llm/tests/Pipeline.integration.test.ts` | The other regenerator (`UPDATE_GOLDEN=1`)                      | modify (W4)                                    |
 | `examples/README.md`                              | Claims a version stamp the files do not carry                  | modify (W4)                                    |
 | `scripts/audit-duplication.mjs`                   | Does not exist; the sweep's deterministic detection half       | new (W5)                                       |
+| `audit-baseline.json` (repo `barwise/`)           | Does not exist; classified candidates, the unaddressed ledger  | new (W5)                                       |
 | Root `CLAUDE.md` Conventions                      | No rule about must-agree copies                                | modify (W6)                                    |
 | `.claude/skills/spec-writer/` pre-push gate       | No parity item                                                 | modify (W6)                                    |
 | `.claude/skills/duplication-audit/`               | Carries detection as prose; shrinks to judgment once W5 lands  | modify (W5)                                    |
@@ -190,7 +195,17 @@ barwise/
                               literals, union restatements, parity-claim
                               prose, generated files and their guards,
                               clone runs) for an auditor to classify;
-                              run on demand, not in CI
+                              --check diffs the report against the
+                              baseline and fails both ways (new
+                              unclassified candidate; stale entry)
+
+  audit-baseline.json         every known candidate, stably keyed
+                              (file + symbol or content hash, never
+                              line numbers), each carrying its verdict:
+                              accepted-benign, or tracked + bd issue id
+                              -- the tracked entries ARE the open
+                              findings list; cadence and detector
+                              scope for CI: Open decision 5
 
   package.json                "check:parity": "node scripts/check-parity.mjs"
                               "audit:duplication": "node scripts/audit-duplication.mjs"
@@ -340,19 +355,46 @@ and CLAUDE.md files, the generated-file inventory with each file's
 regeneration script and guard-test presence, and the jscpd run with
 pinned flags. The script emits a candidate report (stable order,
 stable format -- same tree, same bytes); it assigns no verdicts.
-Classification against the rubric stays with the auditor, which is
-why this is **not** a CI gate -- the jscpd-in-CI rejection in
-Alternatives stands, because candidates are not findings. Rewrite the
-`duplication-audit` skill's method section to run the script for
-detection and keep only the judgment layer: the rubric, verification
-discipline, and the findings-doc format. Passes that are inherently
-judgment (cross-surface wiring comparison, semantic-clone shape
-hunts) stay in the skill, seeded by the script's candidates.
+Classification against the rubric stays with the auditor.
+
+What makes the report _gateable_ despite that is a committed
+baseline, `audit-baseline.json`: every known candidate keyed by a
+stable identity (file plus symbol or content hash -- never line
+numbers, which churn) and carrying its classification --
+`accepted-benign`, or `tracked` with the bd issue id. Then
+`audit:duplication --check` diffs the fresh report against the
+baseline and fails in both directions: a candidate absent from the
+baseline is new, unclassified duplication (classify it: share,
+derive, register, accept); a baseline entry no longer detected is a
+resolved finding whose entry must be removed and issue closed. This
+is the ratchet that answers "which findings are unaddressed": at any
+moment, the `tracked` entries _are_ the open list, and the baseline
+cannot silently rot in either direction -- the same staleness-is-loud
+property the parity manifest has. The jscpd-in-CI rejection in
+Alternatives stands for raw detection (candidates are not findings);
+the baseline diff is sound to gate on precisely because every gated
+item carries a verdict someone assigned once. Cost is not the
+concern it appears: detection is seconds against a CI that builds 12
+packages and runs the full suite -- the per-PR cost is baseline-touch
+_friction_ from the fuzzier detectors, which is why cadence and
+detector scope are Open decision 5, not decided here.
+
+Rewrite the `duplication-audit` skill's method section to run the
+script for detection and keep only the judgment layer: the rubric,
+verification discipline, and the findings-doc format. Passes that
+are inherently judgment (cross-surface wiring comparison,
+semantic-clone shape hunts) stay in the skill, seeded by the
+script's candidates.
 
 Acceptance: when `audit:duplication` runs twice on one tree, the
 reports shall be byte-identical; when it runs on the audit's tree, it
 shall surface the class-B/C/D candidates the audit found by hand
-(spot-checked against the audit doc); when the skill's method section
+(spot-checked against the audit doc); when `--check` runs against a
+tree containing a candidate absent from the baseline, it shall exit
+nonzero naming it; when `--check` runs after a baselined candidate
+is resolved, it shall exit nonzero naming the stale entry; when the
+baseline is read, its `tracked` entries shall enumerate exactly the
+detectable findings still open; and when the skill's method section
 is read, detection shall be one command, not a grep procedure.
 
 ### 6. Write the rule where authors will meet it
@@ -418,6 +460,22 @@ under the names it cites.
   Recommend the small `ignore` vocabulary, capped at those named
   forms -- an open-ended normalizer would slowly stop checking
   anything.
+- **Baseline-ratchet cadence and detector scope.** Detection is cheap
+  (seconds); the per-PR cost is baseline-touch friction, and it is
+  not uniform across detectors. Options: (1) full `--check` on every
+  PR -- maximum catch-at-introduction, but the fuzzy detectors (clone
+  runs, prose-claim greps) will force baseline edits for incidental
+  hits and teach contributors to resent the gate; (2) split by
+  signal-to-noise **(recommended)** -- per-PR `--check` over the crisp
+  detectors only (duplicate literals above threshold, union
+  restatements, generated-files-without-guards), with the full sweep
+  including jscpd and prose passes on a schedule (weekly or
+  pre-release, diffed against the same baseline); (3) scheduled-only
+  -- zero PR friction, but new duplication lands unclassified for up
+  to a cycle, which is the window the invariant exists to close. The
+  trade is friction against catch-at-introduction; recommend 2, and
+  revisit toward 1 only if the fuzzy detectors prove quieter than
+  expected on real PRs.
 
 ## Risks and testing
 
