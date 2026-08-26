@@ -3,6 +3,17 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
+      "@barwise/core/annotation": ["packages/core/src/annotation/index.ts"],
+      "@barwise/core/counterexample": ["packages/core/src/counterexample/index.ts"],
+      "@barwise/core/describe": ["packages/core/src/describe/index.ts"],
+      "@barwise/core/diff": ["packages/core/src/diff/index.ts"],
+      "@barwise/core/lineage": ["packages/core/src/lineage/index.ts"],
+      "@barwise/core/mapping": ["packages/core/src/mapping/index.ts"],
+      "@barwise/core/query": ["packages/core/src/query/index.ts"],
+      "@barwise/core/sql": ["packages/core/src/sql/index.ts"],
+      "@barwise/core/verbalization": ["packages/core/src/verbalization/index.ts"],
+      "@barwise/diagram/theme": ["packages/diagram/src/render/theme.ts"],
+      "@barwise/diagram-ui/server": ["packages/diagram-ui/src/server.ts"],
       "@barwise/*": ["packages/*/src/index.ts", "packages/*/src"]
     }
   },

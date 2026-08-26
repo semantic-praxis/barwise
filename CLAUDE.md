@@ -146,8 +146,8 @@ working in a package:
   |                                        evaluation: eval suite, scorer,
   |                                        runner, score history (the DSPy
   |                                        optimizer lane's metric)
-  |--- @barwise/cli             (core, diagram, llm, code-analysis, dbt, formats, learn, promptlab)
-  |--- @barwise/mcp             (core, diagram, llm, code-analysis, dbt, formats, learn)
+  |--- @barwise/cli             (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, learn, promptlab)
+  |--- @barwise/mcp             (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, learn)
   |--- barwise-vscode           (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, mcp)
 ```
 

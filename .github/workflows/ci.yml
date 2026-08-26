@@ -101,6 +101,12 @@ jobs:
       - run: npm run depcruise
         if: steps.changes.outputs.docs_only != 'true'
 
+      # Guards the gate itself: subpath-export coverage in
+      # tsconfig.depcruise.json, plus a hostile-import probe proving a
+      # forbidden subpath edge is actually reported (barwise-862).
+      - run: npm run check:depcruise-gate
+        if: steps.changes.outputs.docs_only != 'true'
+
       - run: npm run purity
         if: steps.changes.outputs.docs_only != 'true'
 
