@@ -219,6 +219,30 @@ npx tsc --noEmit            # type-check only
   `prompts/*.prompt.yaml` by `npm run regen:builtins` and committed;
   a drift test guards it. The published package ships `dist` only, so
   runtime loading is not an option.
+
+  **What may bypass that promotion path, and what may not.** Nothing on
+  a production path may: `selectArtifact` reads `builtinArtifacts` and
+  has no directory override, so `barwise import transcript`, `barwise
+  review`, the MCP tools and the VS Code commands can only ever send an
+  artifact that went through `regen:builtins`, the drift test and
+  review. The dev lane may, and that is where the seam belongs --
+  `barwise prompt eval --artifacts`, `prompt artifact --artifacts` and
+  `prompt run --artifacts` all resolve over `artifactCandidates(dir)`,
+  which is the built-ins plus a directory. `processTranscript` and
+  `reviewModel` still accept an explicit `artifact`, so an embedder can
+  pass one; what does not exist is a CLI flag that makes a production
+  command do it by accident.
+
+  This is what keeps a recorded prompt identifiable. `withCallLog`
+  records `hashPrompt` of the system prompt and deliberately not an
+  `artifactVersion`, because with production narrow the version is
+  recoverable: render every shipped artifact and match the hash. Two
+  renderings per extraction artifact, since `--alternatives` appends a
+  section and hashes differently -- a small search, not an ambiguity.
+  `barwise prompt artifact` prints `version@hash` for exactly this
+  join. Widen the override to a production surface and that recovery
+  stops working, which is why the decision is recorded in the root
+  `CLAUDE.md` capability matrix rather than left to taste.
 - The VS Code extension also provides a `CopilotLlmClient` that
   implements this interface via the GitHub Copilot chat API -- that
   implementation lives in `packages/vscode/`, not here.

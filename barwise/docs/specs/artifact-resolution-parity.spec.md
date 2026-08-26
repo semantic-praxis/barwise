@@ -1,6 +1,6 @@
 # Resolve the prompt in one place, record which one ran, and keep the candidate override in the eval lane
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Implemented (all three workstreams; see Implementation notes)
 Created: 2026-08-26
 Last-updated: 2026-08-26
 Tracking: barwise-855, item 2 -- this spec answers it differently than
@@ -390,7 +390,7 @@ candidate once and print the review it returned.
 ## Open decisions (for review)
 
 - **Does `--artifacts` belong on `barwise import transcript` and
-  `barwise review`?** Three options.
+  `barwise review`?** RESOLVED 2026-08-26: option 2. Three options.
 
   1. _Widen production._ Add the flag to both commands, as barwise-855
      item 2 proposes for review. Honest about what an author needs, and
@@ -424,7 +424,8 @@ candidate once and print the review it returned.
   structural property rather than a convention. Recommend 2, and edit
   barwise-855 item 2 to name the runner rather than the flag.
 
-- **Does the review surface get its own pipeline record?**
+- **Does the review surface get its own pipeline record?** RESOLVED
+  2026-08-26: not now.
   `ExtractionRecord` exists because conformance silently rewrites the
   payload before the parser sees it. Review has no equivalent pass;
   `parseReviewResponse` drops malformed suggestions, which is arguably
@@ -434,7 +435,8 @@ candidate once and print the review it returned.
   -- but a reviewer who reads the drop as the same defect class that
   motivated `ExtractionRecord` would be consistent to ask for it.
 
-- **A matrix row, or a note under the matrix?** The capability matrix's
+- **A matrix row, or a note under the matrix?** RESOLVED 2026-08-26:
+  both. The capability matrix's
   axis is per surface, and the sharp asymmetry here is within the CLI:
   `prompt eval` can override, `import transcript` and `review` cannot.
   A row records the surface story (`CLI dev-lane only / no / no`) and
@@ -488,3 +490,77 @@ candidate once and print the review it returned.
 - No change to `@barwise/mcp`, `barwise-vscode`, or the DSPy lane.
 - No prompt or response text in any record, under any flag.
 - No pricing, and no change to how `llm-usage` groups by model.
+
+## Implementation notes (2026-08-26)
+
+All three workstreams shipped in one session, in the specified order.
+Re-grounding first confirmed every load-bearing claim against the code
+at `c844ad5`; `main` had not moved under any package since the spec was
+written. What follows is what the spec did not anticipate.
+
+### Deviations from the design
+
+- **`selectArtifact` landed in `prompt/`, not `prompt/artifacts/`.**
+  The Target architecture put it under `artifacts/`. Grounding showed
+  that would have made it the first module in that directory to import
+  from its parent, since it needs both surface defaults. `prompt/` is
+  strictly downward and sits it beside `systemPrompt.ts` and
+  `reviewPrompt.ts`, which is also where a reader asking "which prompt
+  gets sent" opens first.
+- **`buildReviewSystemPrompt` moved too.** The spec said to move
+  `defaultReviewArtifact` and its literal. Leaving the renderer behind
+  would have split one surface's prompt across two directories, so
+  `prompt/reviewPrompt.ts` is now the exact sibling of
+  `prompt/systemPrompt.ts`. Both golden tests still pin the same bytes;
+  only the test import paths changed.
+- **`prompt artifact` checks rather than asserts.** The spec said it
+  should state that a `--artifacts` answer is not what production would
+  send. That claim is false for a directory entry byte-identical to the
+  shipped artifact of the same version -- which is the ordinary case,
+  since `packages/llm/prompts/` holds the very files the built-ins are
+  generated from. It now compares the rendered bytes and says which of
+  the two it is, so it also makes `regen:builtins` drift visible at the
+  point of use.
+
+### Worth knowing
+
+- **One mutation survives, and is documented rather than papered over.**
+  With `includeAlternatives` false, `buildSystemPrompt` and
+  `buildReviewSystemPrompt` both reduce to instructions plus rendered
+  demos, so they agree byte for byte on every artifact and no test can
+  catch swapping one for the other. The surface branch in the CLI's
+  `render` helper is kept anyway, with a comment saying why it must not
+  be "simplified" to one call. The test that looked like it proved the
+  branch had its comment corrected instead: the two hashes differ
+  because the artifacts differ, not because the renderers do.
+- **A first draft of `promptRun.test.ts` did not test what it claimed.**
+  Its candidate copied a shipped variant's `match` block, targeting
+  anthropic while the loopback provider is ollama, so nothing resolved
+  and the run silently sent the default. Reading the system prompt off
+  the wire is what caught it; the stderr line alone would not have.
+- **`review` had no coverage of client construction at all**, because
+  its test file mocks `createLlmClient` and `reviewModel` wholesale. The
+  mock's `complete` returned `undefined`, which is fine until a real
+  decorator wraps it -- it now resolves a minimal response so the
+  call-logging tests exercise `withCallLog` for real.
+- **The three `llm-usage` prompt-hash branches are per-model**, so a log
+  spanning a prompt change reports two hashes for one model. That is the
+  question the field exists to answer: whether the rows in a window are
+  comparable at all.
+
+### Not done, and not silently
+
+- **No artifact provenance travels with a model.** Out of scope as
+  specified, and still the right call: `ReasoningTrail` is derived from
+  model content and has no provenance header, and hanging telemetry on
+  `DraftModelResult` is what `pipeline-observability.spec.md` already
+  rejected. A `.orm.yaml` handed to a colleague still says nothing about
+  the prompt that produced it. Worth filing against
+  `docs/specs/model-history.spec.md` rather than folding in here.
+- **MCP and VS Code still record nothing.** Unchanged and still
+  deferred, on the ground `llm-call-observability.spec.md` gave.
+- **No bd issues were filed or closed** -- `bd` is unavailable in this
+  container. barwise-855 item 2 needs editing rather than
+  implementing: it is answered by `barwise prompt run`, not by
+  `--artifacts` on `barwise review`, and its item 1 had already
+  shipped.

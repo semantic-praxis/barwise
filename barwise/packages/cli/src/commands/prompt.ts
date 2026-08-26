@@ -1,5 +1,5 @@
 /**
- * barwise prompt eval|score|schema|history
+ * barwise prompt eval|score|schema|artifact|run|history
  *
  * Prompt evaluation for the LLM surfaces
  * (docs/specs/prompt-optimization-harness.spec.md). `eval` sweeps the
@@ -18,7 +18,9 @@ import {
   createLlmClient,
   defaultExtractionArtifact,
   defaultReviewArtifact,
+  processTranscript,
   resolveArtifact,
+  reviewModel,
   withCallLog,
 } from "@barwise/llm";
 import type { RunProgress, SuiteReport } from "@barwise/promptlab";
@@ -38,10 +40,12 @@ import {
 import type { Command } from "commander";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, extname, join, resolve } from "node:path";
 import { callLogSink } from "../workspace/callLogSink.js";
+import { loadModel, readFile } from "../workspace/io.js";
 import { artifactCandidates } from "../workspace/promptArtifacts.js";
 import { describeProvenance, resolveProvenance } from "../workspace/provenance.js";
+import { renderReview } from "./review.js";
 
 interface ProviderOpts {
   provider?: string;
@@ -59,6 +63,7 @@ export function registerPromptCommand(program: Command, version = "0.0.0-dev"): 
   registerScore(promptCmd);
   registerSchema(promptCmd);
   registerArtifact(promptCmd);
+  registerRun(promptCmd);
   registerHistory(promptCmd);
 }
 
@@ -798,4 +803,113 @@ function renderResolution(report: SuiteReport): string[] {
 function fail(err: unknown): void {
   process.stderr.write(`Error: ${(err as Error).message}\n`);
   process.exitCode = 1;
+}
+
+/**
+ * `barwise prompt run`
+ *
+ * Send a candidate artifact once and print what came back
+ * (docs/specs/artifact-resolution-parity.spec.md, workstream 3).
+ *
+ * This is the answer to barwise-855 item 2, and deliberately not the
+ * one it asked for. That issue proposed `--artifacts` on `barwise
+ * review`, on the ground that there is otherwise no way to try a review
+ * variant without editing `packages/llm/prompts/` and rebuilding. The
+ * need is real; putting the flag on the production command is not the
+ * way to meet it. Production resolving over `builtinArtifacts` alone is
+ * what makes the prompt any run sent recoverable afterwards -- a pure
+ * function of version, surface, provider and model, which `prompt
+ * artifact` computes offline. A directory override on `review` or
+ * `import transcript` would let an unreviewed prompt do real modelling
+ * work and make the recorded hash resolve to nothing.
+ *
+ * So the override stays in the lane whose job is candidates. `prompt
+ * artifact` says what would be sent, `prompt run` sends it once, and
+ * `prompt eval` scores it over the suite. The middle one exists because
+ * the review metric refuses to grade prose by design, so the only way
+ * to judge a review prompt's advice is to read it.
+ */
+function registerRun(promptCmd: Command): void {
+  promptCmd
+    .command("run")
+    .description("Send a prompt artifact once and print the answer (candidates included)")
+    .argument("<file>", "Transcript for extraction, or .orm.yaml for review")
+    .option("--surface <surface>", "Prompt surface (extraction or review)", "extraction")
+    .option("--artifacts <dir>", "Also consider .prompt.yaml variants in this directory")
+    .option(
+      "--provider <provider>",
+      "LLM provider (anthropic, openai, ollama). Auto-detects from env vars if omitted.",
+    )
+    .option("--model <model>", "Model override for the LLM provider")
+    .option("--api-key <key>", "API key (falls back to env vars)")
+    .option("--base-url <url>", "Ollama server URL (only for ollama provider)")
+    .action(
+      async (
+        file: string,
+        opts: ProviderOpts & { surface: string; artifacts?: string; },
+      ) => {
+        try {
+          if (opts.surface !== "extraction" && opts.surface !== "review") {
+            throw new Error(
+              `Unknown surface "${opts.surface}". Use "extraction" or "review".`,
+            );
+          }
+          const surface = opts.surface;
+
+          const bare = createLlmClient({
+            provider: opts.provider as ProviderName | undefined,
+            apiKey: opts.apiKey,
+            model: opts.model,
+            baseUrl: opts.baseUrl,
+          });
+          const sink = callLogSink();
+          const client = sink === undefined
+            ? bare
+            : withCallLog(bare, sink, { correlationId: randomUUID() });
+
+          // Resolved from the client for the same reason `eval` is
+          // (barwise-842): `createLlmClient` detects the provider from
+          // the environment and each provider applies its own default
+          // model, so keying on the flags would silently send the
+          // default whenever one was omitted.
+          const artifact = resolveArtifact(artifactCandidates(opts.artifacts), {
+            surface,
+            ...(client.provider !== undefined ? { provider: client.provider } : {}),
+            ...(client.model !== undefined ? { model: client.model } : {}),
+          }) ?? (surface === "review" ? defaultReviewArtifact : defaultExtractionArtifact);
+
+          // Named before the call, not after: this command exists to
+          // judge one prompt, and an operator who cannot tell which one
+          // ran has spent a call for nothing.
+          process.stderr.write(
+            `Sending ${surface} artifact ${artifact.version}`
+              + `@${hashPrompt(render(surface, artifact))}`
+              + ` (${client.provider}/${client.model ?? "default model"}).\n`,
+          );
+
+          if (surface === "review") {
+            const result = await reviewModel(loadModel(file), client, { artifact });
+            process.stdout.write(renderReview(result));
+            return;
+          }
+
+          const transcript = readFile(file);
+          if (!transcript.trim()) {
+            throw new Error("Transcript file is empty.");
+          }
+          const result = await processTranscript(transcript, client, {
+            modelName: basename(file, extname(file)),
+            artifact,
+          });
+          // The raw payload, because that is what an extraction prompt
+          // author is judging: the scorer grades this JSON, and
+          // serializing to YAML first would hide the shape questions --
+          // a missing uniqueness block, a frequency `min: 0` -- that the
+          // prompt is being changed to fix.
+          process.stdout.write((result.rawResponse ?? "") + "\n");
+        } catch (err) {
+          fail(err);
+        }
+      },
+    );
 }

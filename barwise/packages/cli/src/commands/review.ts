@@ -95,7 +95,14 @@ export function registerReviewCommand(program: Command): void {
     );
 }
 
-function renderReview(result: ReviewResult): string {
+/**
+ * Exported for `barwise prompt run --surface review`, which sends a
+ * candidate artifact once and prints what came back. One renderer, so
+ * the prose an author judges a candidate by is the prose the shipped
+ * command produces -- two would drift, and the drift would be invisible
+ * because both would look like reviews.
+ */
+export function renderReview(result: ReviewResult): string {
   const lines: string[] = [];
   if (result.suggestions.length === 0) {
     lines.push("No suggestions.");

@@ -29,8 +29,8 @@ src/
                         emission + session log at $XDG_STATE_HOME/barwise/)
     import.ts           barwise import (orchestrator over import/)
     import/             one module per import subcommand + shared helpers
-    prompt.ts           barwise prompt eval|score|schema|history (prompt
-                        evaluation over @barwise/promptlab)
+    prompt.ts           barwise prompt eval|score|schema|artifact|run|history
+                        (prompt evaluation over @barwise/promptlab)
     llmUsage.ts         barwise llm-usage (report over the call log)
   workspace/
     io.ts               File I/O helpers (loadModel, writeModel)
@@ -141,6 +141,20 @@ npx tsc --noEmit            # type-check only
   let `--model` alone silently measure the default (barwise-842).
   `artifact` answers a hypothetical about a configuration, and building
   a client would demand a key for a question that needs none.
+
+  **`prompt run` is where a candidate meets a live model, and the
+  reason the production commands need no `--artifacts`.** The lane now
+  reads as three questions about one prompt: `artifact` says what would
+  be sent, `run` sends it once and prints the answer, `eval` scores it
+  over the suite. `run` exists because the review metric refuses to
+  grade prose by design, so the only way to judge review advice is to
+  read it -- which barwise-855 item 2 filed as a request for
+  `--artifacts` on `barwise review`. Meeting it there would let an
+  unreviewed prompt do real modelling work and make the recorded
+  `promptHash` resolve to no shipped artifact
+  (`docs/specs/artifact-resolution-parity.spec.md`, open decision 1).
+  `tests/commands/promptRun.test.ts` pins both halves, including that
+  `review` and `import transcript` still have no such flag.
 - **Observability is opt-in and writes one file.** `BARWISE_CALL_LOG`
   gates it: unset or empty is off, `1`/`true` is
   `$XDG_STATE_HOME/barwise/calls.jsonl`, anything else is that path.
