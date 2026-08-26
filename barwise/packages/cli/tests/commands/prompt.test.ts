@@ -127,7 +127,11 @@ describe("barwise prompt schema", () => {
   });
 
   it("rejects a surface that is not a surface", async () => {
-    const result = await runCli(["prompt", "schema", "--surface", "agent"]);
+    // Not "agent": the harness spec plans an agent surface, so that
+    // probe would turn this into a pinned limitation the day
+    // PromptSurface grows. The guard now derives from PROMPT_SURFACES,
+    // so growth is accepted without editing anything here.
+    const result = await runCli(["prompt", "schema", "--surface", "not-a-surface"]);
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain('Use "extraction" or "review"');
   });
@@ -202,7 +206,12 @@ describe("barwise prompt artifact", () => {
   });
 
   it("rejects a surface that is not a surface", async () => {
-    const { stderr, exitCode } = await runCli(["prompt", "artifact", "--surface", "agent"]);
+    const { stderr, exitCode } = await runCli([
+      "prompt",
+      "artifact",
+      "--surface",
+      "not-a-surface",
+    ]);
 
     expect(exitCode).toBe(1);
     expect(stderr).toContain('Use "extraction" or "review"');

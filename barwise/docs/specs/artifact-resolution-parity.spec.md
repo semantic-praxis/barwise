@@ -373,9 +373,13 @@ candidate once and print the review it returned.
 
 ## API and migration impact
 
-- `@barwise/llm` gains `selectArtifact` and `assertArtifactSurface`,
-  and re-homes `defaultReviewArtifact` (same export name from the
-  barrel, different module). `hashPrompt` becomes an `llm` export.
+- `@barwise/llm` gains `selectArtifact`, `assertArtifactSurface` and
+  `PROMPT_SURFACES`, and re-homes `defaultReviewArtifact` (same export
+  name from the barrel, different module). `hashPrompt` becomes an
+  `llm` export. `PromptSurface` is now derived from `PROMPT_SURFACES`
+  rather than declared as a bare union -- same type, same members, but
+  the members are now readable at run time (added by the assertion
+  audit; see Implementation notes).
 - `@barwise/promptlab` keeps exporting `hashPrompt`, now as a
   re-export. No consumer changes; history rows keep the same semantics
   because it is the same function over the same input.
@@ -564,3 +568,39 @@ written. What follows is what the spec did not anticipate.
   implementing: it is answered by `barwise prompt run`, not by
   `--artifacts` on `barwise review`, and its item 1 had already
   shipped.
+
+### Assertion audit (2026-08-26)
+
+Run over the workstreams after they were green in CI, per the
+`assertion-audit` skill. Full findings in
+`docs/test-suite-assertion-audit-2026-08-26.md`; what it changed in
+this spec's territory:
+
+- **The three CLI surface guards no longer name their surfaces by
+  hand.** `PROMPT_SURFACES` is declared once in `PromptArtifact.ts`
+  with `PromptSurface` derived from it, and `prompt schema`, `prompt
+  artifact` and `prompt run` share one `parseSurface` that validates
+  against the list and builds its error message from it. Adding a
+  surface to the union now makes the commands accept it with no edit,
+  and `selectArtifact`'s two `Record<PromptSurface, ...>` tables fail
+  the build until the new member is wired -- so a surface cannot be
+  half-added. This is the barwise-855 defect class designed out rather
+  than tested for, and it was worth doing here because the workstream
+  had just reproduced it: all three commands probed with `--surface
+  agent`, which the harness spec's workstream 6 plans to make valid.
+- **`loadArtifact.ts` was carrying a second copy of the surface list**,
+  typed `readonly PromptSurface[]` -- which catches a removed member
+  and silently lags on an added one. Collapsed into the one
+  declaration. Pre-existing, found by the audit rather than introduced
+  by these workstreams.
+- **`prompt run` could drop its `--model` passthrough with every test
+  still green.** Fixed by asserting the model on the wire. Not
+  cosmetic here specifically: resolution keys on `client.model`, so a
+  `--model` that never reaches the client changes which artifact this
+  spec's own machinery selects.
+
+None of the three changed a design decision; the Target architecture
+and the Open decisions stand as resolved. The `selectArtifact` seam in
+particular came through unchanged, and the audit's structural fix
+strengthened it -- which is the outcome an Inventory row promising "one
+place to encode the decision" was predicting.

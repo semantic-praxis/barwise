@@ -8,7 +8,7 @@
  * point); `schema` prints the structured-output JSON Schema the Python
  * lane must reuse; `history` shows the checked-in score record.
  */
-import type { PromptArtifact, ProviderName } from "@barwise/llm";
+import type { PromptArtifact, PromptSurface, ProviderName } from "@barwise/llm";
 import {
   buildResponseSchema,
   buildReviewResponseSchema,
@@ -19,6 +19,7 @@ import {
   defaultExtractionArtifact,
   defaultReviewArtifact,
   processTranscript,
+  PROMPT_SURFACES,
   resolveArtifact,
   reviewModel,
   withCallLog,
@@ -355,12 +356,7 @@ function registerSchema(promptCmd: Command): void {
         // artifact` covers both: a test pinned the refusal of `review`
         // as if it were a requirement, and the refusal outlived the
         // surface gaining a schema (barwise-855).
-        if (opts.surface !== "extraction" && opts.surface !== "review") {
-          throw new Error(
-            `Unknown surface "${opts.surface}". Use "extraction" or "review".`,
-          );
-        }
-        const schema = opts.surface === "review"
+        const schema = parseSurface(opts.surface) === "review"
           ? buildReviewResponseSchema()
           : buildResponseSchema(false);
         process.stdout.write(JSON.stringify(schema, null, 2) + "\n");
@@ -394,12 +390,7 @@ function registerArtifact(promptCmd: Command): void {
           // the one command whose job is "which prompt would this
           // configuration send" unable to answer for the surface that
           // had just started having an answer.
-          if (opts.surface !== "extraction" && opts.surface !== "review") {
-            throw new Error(
-              `Unknown surface "${opts.surface}". Use "extraction" or "review".`,
-            );
-          }
-          const surface = opts.surface;
+          const surface = parseSurface(opts.surface);
           const fallback = surface === "review"
             ? defaultReviewArtifact
             : defaultExtractionArtifact;
@@ -500,6 +491,27 @@ function render(surface: "extraction" | "review", artifact: PromptArtifact): str
   return surface === "review"
     ? buildReviewSystemPrompt(artifact)
     : buildSystemPrompt(false, artifact);
+}
+
+/**
+ * Validate a `--surface` value against the declared surfaces.
+ *
+ * Derived from `PROMPT_SURFACES` rather than written out, so a surface
+ * added to the union is accepted here without anyone remembering to
+ * edit three commands. That is the barwise-855 defect designed out:
+ * `prompt artifact` and `prompt schema` refused `--surface review` for
+ * as long as review had been artifact-driven, because the guards named
+ * their surfaces by hand and tests pinned the refusal as intent.
+ */
+function parseSurface(value: string): PromptSurface {
+  if ((PROMPT_SURFACES as readonly string[]).includes(value)) {
+    return value as PromptSurface;
+  }
+  const quoted = PROMPT_SURFACES.map((s) => `"${s}"`);
+  const known = quoted.length <= 2
+    ? quoted.join(" or ")
+    : `${quoted.slice(0, -1).join(", ")} or ${quoted.at(-1)}`;
+  throw new Error(`Unknown surface "${value}". Use ${known}.`);
 }
 
 /** `barwise prompt history` */
@@ -849,12 +861,7 @@ function registerRun(promptCmd: Command): void {
         opts: ProviderOpts & { surface: string; artifacts?: string; },
       ) => {
         try {
-          if (opts.surface !== "extraction" && opts.surface !== "review") {
-            throw new Error(
-              `Unknown surface "${opts.surface}". Use "extraction" or "review".`,
-            );
-          }
-          const surface = opts.surface;
+          const surface = parseSurface(opts.surface);
 
           const bare = createLlmClient({
             provider: opts.provider as ProviderName | undefined,

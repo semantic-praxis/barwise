@@ -107,6 +107,11 @@ function systemPromptSent(): string {
   return messages.find((m) => m.role === "system")?.content ?? "";
 }
 
+/** The model the provider was actually asked for. */
+function modelSent(): unknown {
+  return fake!.requests[0]!["model"];
+}
+
 describe("barwise prompt run", () => {
   it("sends an unshipped extraction candidate, not the shipped artifact", async () => {
     // The reason this command exists. Reading the prompt off the wire
@@ -131,6 +136,12 @@ describe("barwise prompt run", () => {
     expect(stderr).toMatch(/Sending extraction artifact \S+@[0-9a-f]{12}/);
     // The raw payload, because that is what an extraction author judges.
     expect(JSON.parse(stdout)).toHaveProperty("object_types");
+    // The flag observed at the far end, not merely parsed. Dropping the
+    // --model passthrough left every other assertion here green, and it
+    // is not a cosmetic gap: artifact resolution keys on `client.model`
+    // (barwise-842), so a --model that never reaches the client
+    // silently changes which prompt is measured.
+    expect(modelSent()).toBe("fake-local");
   });
 
   it("sends an unshipped review candidate and prints the prose", async () => {
@@ -170,13 +181,19 @@ describe("barwise prompt run", () => {
     expect(systemPromptSent()).toContain("Object-Role Modeling");
   });
 
-  it("rejects a surface it cannot run", async () => {
+  it("rejects a surface that is not a surface", async () => {
+    // The probe is nonsense on purpose. "agent" would be the obvious
+    // choice and is the wrong one: the harness spec's workstream 6
+    // plans an agent surface, so a test using it would start defending
+    // a refusal the day PromptSurface grows -- which is barwise-855
+    // exactly. Named for why the input is invalid, not for what is
+    // currently built.
     const { stderr, exitCode } = await runCli([
       "prompt",
       "run",
       modelFile,
       "--surface",
-      "agent",
+      "not-a-surface",
     ]);
 
     expect(exitCode).toBe(1);

@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "yaml";
+import { PROMPT_SURFACES } from "./PromptArtifact.js";
 import type {
   PromptArtifact,
   PromptArtifactMatch,
@@ -8,8 +9,6 @@ import type {
   PromptProvenance,
   PromptSurface,
 } from "./PromptArtifact.js";
-
-const SURFACES: readonly PromptSurface[] = ["extraction", "review"];
 
 /** Load and validate a single `.prompt.yaml` artifact file. */
 export function loadArtifact(filePath: string): PromptArtifact {
@@ -36,9 +35,9 @@ function validateArtifact(doc: unknown, filePath: string): PromptArtifact {
   const obj = doc as Record<string, unknown>;
 
   const surface = obj["surface"];
-  if (typeof surface !== "string" || !SURFACES.includes(surface as PromptSurface)) {
+  if (typeof surface !== "string" || !(PROMPT_SURFACES as readonly string[]).includes(surface)) {
     throw new Error(
-      `${filePath}: "surface" must be one of ${SURFACES.join(", ")}.`,
+      `${filePath}: "surface" must be one of ${PROMPT_SURFACES.join(", ")}.`,
     );
   }
 

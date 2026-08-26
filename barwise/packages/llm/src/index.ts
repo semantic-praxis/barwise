@@ -45,6 +45,7 @@ export {
 // Prompt artifacts
 export { builtinArtifacts } from "./prompt/artifacts/builtins.generated.js";
 export { loadArtifact, loadArtifactsFromDir } from "./prompt/artifacts/loadArtifact.js";
+export { PROMPT_SURFACES } from "./prompt/artifacts/PromptArtifact.js";
 export type {
   PromptArtifact,
   PromptArtifactMatch,
