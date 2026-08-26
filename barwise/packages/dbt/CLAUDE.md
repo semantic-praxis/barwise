@@ -36,6 +36,9 @@ src/
   DbtYamlAnnotator.ts    Annotate dbt YAML with import findings
   DbtDialectDetector.ts  Resolve SQL dialect from profiles.yml/options
   DbtSqlCompiler.ts      Compile SQL models (dbt compile / stub Jinja)
+  projectWalk.ts         The one file walk over a project tree; owns the
+                         skip-list of never-source directories (target/,
+                         dbt_packages/, logs/, ...)
   DbtExportFormat.ts     ExportFormatAdapter: ORM model -> dbt schema YAML
   sql/SqlglotBridge.ts   Optional sqlglot sidecar for SQL mining (parallel
                          to formats' bridge by design; connectors own

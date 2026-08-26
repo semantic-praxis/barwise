@@ -131,6 +131,24 @@ describe("compileDbtSql", () => {
     expect(results).toHaveLength(0);
   });
 
+  it("does not mine dbt's own outputs when the project has no models/ directory", () => {
+    // Without models/, the stub walk starts at the project root. dbt's
+    // target/ (run artifacts, leftover compiled SQL outside
+    // target/compiled) and logs/ hold SQL that is output, not source.
+    writeFileSync(join(testDir, "orders.sql"), "SELECT * FROM raw.orders");
+    mkdirSync(join(testDir, "target", "run", "project"), { recursive: true });
+    writeFileSync(
+      join(testDir, "target", "run", "project", "orders.sql"),
+      "CREATE TABLE analytics.orders AS SELECT * FROM raw.orders",
+    );
+    mkdirSync(join(testDir, "logs"), { recursive: true });
+    writeFileSync(join(testDir, "logs", "replay.sql"), "SELECT 1");
+
+    const results = compileDbtSql(testDir);
+
+    expect(results.map((r) => r.sourcePath)).toEqual(["orders.sql"]);
+  });
+
   it("handles multiple SQL files", () => {
     mkdirSync(join(testDir, "models"), { recursive: true });
     writeFileSync(
