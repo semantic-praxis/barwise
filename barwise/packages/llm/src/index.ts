@@ -45,6 +45,7 @@ export {
 // Prompt artifacts
 export { builtinArtifacts } from "./prompt/artifacts/builtins.generated.js";
 export { loadArtifact, loadArtifactsFromDir } from "./prompt/artifacts/loadArtifact.js";
+export { PROMPT_SURFACES } from "./prompt/artifacts/PromptArtifact.js";
 export type {
   PromptArtifact,
   PromptArtifactMatch,
@@ -54,6 +55,10 @@ export type {
 } from "./prompt/artifacts/PromptArtifact.js";
 export { resolveArtifact } from "./prompt/artifacts/resolveArtifact.js";
 export type { ArtifactQuery } from "./prompt/artifacts/resolveArtifact.js";
+export { hashPrompt } from "./prompt/promptHash.js";
+export { buildReviewSystemPrompt, defaultReviewArtifact } from "./prompt/reviewPrompt.js";
+export { assertArtifactSurface, selectArtifact } from "./prompt/selectArtifact.js";
+export type { ArtifactTarget } from "./prompt/selectArtifact.js";
 export { defaultExtractionArtifact } from "./prompt/systemPrompt.js";
 
 // Call observability
@@ -99,10 +104,5 @@ export { createLlmClient, detectProvider } from "./providers/factory.js";
 export type { ProviderName, ProviderOptions } from "./providers/factory.js";
 
 // Review
-export {
-  buildReviewResponseSchema,
-  buildReviewSystemPrompt,
-  defaultReviewArtifact,
-  reviewModel,
-} from "./review/reviewModel.js";
+export { buildReviewResponseSchema, reviewModel } from "./review/reviewModel.js";
 export type { ReviewOptions, ReviewResult, ReviewSuggestion } from "./review/reviewModel.js";

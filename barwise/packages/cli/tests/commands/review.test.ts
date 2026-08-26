@@ -9,9 +9,11 @@
  * and a command that failed the build on model-generated advice would
  * put an LLM in the merge path.
  */
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const fixtures = resolve(dirname(fileURLToPath(import.meta.url)), "../fixtures");
 const model = join(fixtures, "simple.orm.yaml");
@@ -40,12 +42,20 @@ vi.mock("@barwise/llm", async () => {
   const actual = await vi.importActual<typeof import("@barwise/llm")>("@barwise/llm");
   return {
     ...actual,
-    createLlmClient: vi.fn(() => ({ provider: "test", model: undefined, complete: vi.fn() })),
+    // `complete` resolves a minimal response rather than undefined: the
+    // call-logging tests below wrap this client for real, and a
+    // decorator reading `response.modelUsed` off undefined would fail
+    // for a reason that has nothing to do with what they assert.
+    createLlmClient: vi.fn(() => ({
+      provider: "test",
+      model: undefined,
+      complete: vi.fn(() => Promise.resolve({ content: "{}" })),
+    })),
     reviewModel: vi.fn(() => Promise.resolve(reviewPayload)),
   };
 });
 
-const { reviewModel } = await import("@barwise/llm");
+const { createLlmClient, reviewModel } = await import("@barwise/llm");
 const { runCli } = await import("../workspace/run.js");
 
 describe("barwise review", () => {
@@ -101,5 +111,76 @@ describe("barwise review", () => {
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain("no API key configured");
     expect(result.stdout).toBe("");
+  });
+});
+
+describe("barwise review call logging", () => {
+  // The call-log spec's Inventory marked this command `modify` and only
+  // `import` was ever wired, so a review cost real tokens and left no
+  // row -- `barwise llm-usage` under-reported by every review ever run
+  // (docs/specs/artifact-resolution-parity.spec.md, workstream 2).
+  let tmp: string;
+  const SAVED = process.env["BARWISE_CALL_LOG"];
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "barwise-review-log-"));
+    vi.mocked(reviewModel).mockClear();
+    vi.mocked(createLlmClient).mockClear();
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+    if (SAVED === undefined) delete process.env["BARWISE_CALL_LOG"];
+    else process.env["BARWISE_CALL_LOG"] = SAVED;
+  });
+
+  /** Make the mocked reviewer actually spend a call, as the real one does. */
+  function spendsACall(): void {
+    vi.mocked(reviewModel).mockImplementationOnce(async (_model, client) => {
+      await client.complete({ systemPrompt: "REVIEW-SYSTEM-PROMPT", userMessage: "the model" });
+      return reviewPayload;
+    });
+  }
+
+  it("records the call, with the hash of the prompt it sent", async () => {
+    const log = join(tmp, "calls.jsonl");
+    process.env["BARWISE_CALL_LOG"] = log;
+    spendsACall();
+
+    const result = await runCli(["review", model]);
+
+    expect(result.exitCode).toBe(0);
+    const rows = readFileSync(log, "utf-8").trim().split("\n").map((l) => JSON.parse(l));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].ok).toBe(true);
+    expect(rows[0].promptHash).toMatch(/^[0-9a-f]{12}$/);
+    // The rule the whole log turns on, asserted over the serialised row.
+    expect(JSON.stringify(rows)).not.toContain("REVIEW-SYSTEM-PROMPT");
+    expect(JSON.stringify(rows)).not.toContain("the model");
+  });
+
+  it("wraps nothing when recording is off", async () => {
+    // The negative is the one worth having: an operator who never asked
+    // for a log must not acquire one, and must not pay for a wrapper.
+    // Asserted by identity -- the reviewer gets the very object
+    // `createLlmClient` returned, so nothing decorated it.
+    delete process.env["BARWISE_CALL_LOG"];
+    spendsACall();
+
+    const result = await runCli(["review", model]);
+
+    expect(result.exitCode).toBe(0);
+    const built = vi.mocked(createLlmClient).mock.results.at(-1)!.value;
+    expect(vi.mocked(reviewModel).mock.calls[0]![1]).toBe(built);
+  });
+
+  it("hands the reviewer a wrapper, not the bare client, when recording is on", async () => {
+    process.env["BARWISE_CALL_LOG"] = join(tmp, "calls.jsonl");
+    spendsACall();
+
+    await runCli(["review", model]);
+
+    const built = vi.mocked(createLlmClient).mock.results.at(-1)!.value;
+    expect(vi.mocked(reviewModel).mock.calls[0]![1]).not.toBe(built);
   });
 });

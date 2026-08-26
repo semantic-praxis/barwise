@@ -196,9 +196,24 @@ and update it in the same commit that changes a surface's reach.
 | `project`, `history`                                  | yes | no  | no      | deliberate: repository operations       |
 | `prompt`                                              | yes | no  | no      | deliberate: dev tooling                 |
 | `llm-usage`                                           | yes | no  | no      | deliberate: reads a local operator log  |
+| prompt-artifact override (`--artifacts`)              | yes | no  | no      | deliberate: candidates are measured, not sent |
 
 Every remaining gap is marked deliberate, which is the point: an
-unmarked gap is a bug. This table is hand-maintained and therefore the
+unmarked gap is a bug.
+
+The `--artifacts` row hides a boundary the table's own axis cannot
+show, because it falls *within* the CLI rather than between surfaces:
+`barwise prompt eval`, `prompt artifact` and `prompt run` accept a
+directory of unshipped prompt candidates; `barwise import transcript`
+and `barwise review` do not, and must not
+(`docs/specs/artifact-resolution-parity.spec.md`). Production resolves
+over `builtinArtifacts` alone, which is what makes the prompt any run
+sent recoverable afterwards -- a pure function of barwise version,
+surface, provider and model, which `barwise prompt artifact` computes
+offline. Put the flag on a production command and an unreviewed prompt
+can do real modelling work while the recorded `promptHash` resolves to
+nothing. Trying a candidate against a live model is `barwise prompt
+run`, which is what that lane is for. This table is hand-maintained and therefore the
 same kind of claim that went stale before -- it previously asserted
 parity that did not hold, for two years' worth of readers, because
 nothing checked it (`docs/unwired-capability-audit-2026-08-20.md`).

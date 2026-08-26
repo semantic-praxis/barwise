@@ -27,6 +27,7 @@
  */
 import type { LlmClient, PromptArtifact } from "@barwise/llm";
 import {
+  assertArtifactSurface,
   buildResponseSchema,
   buildSystemPrompt,
   buildUserMessage,
@@ -334,11 +335,11 @@ export async function runSuite(
   }
 
   const artifact = options?.artifact;
-  if (artifact !== undefined && artifact.surface !== "extraction") {
-    throw new Error(
-      `Prompt artifact surface "${artifact.surface}" cannot drive transcript extraction.`,
-    );
-  }
+  // The runner receives an artifact its caller already resolved -- over
+  // a wider candidate set than production sees -- so it cannot call
+  // `selectArtifact`. It needs the identical check, though, and carried
+  // a byte-identical copy of this message until the guard was exported.
+  if (artifact !== undefined) assertArtifactSurface(artifact, "extraction");
   const selected = options?.split;
   const suiteCases = selected === undefined
     ? suite.cases

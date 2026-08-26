@@ -268,3 +268,54 @@ describe("barwise llm-usage", () => {
     expect(stderr).toContain("Error:");
   });
 });
+
+describe("llm-usage prompt provenance", () => {
+  // Whether a window of calls is comparable at all: two hashes for one
+  // model means the window spans a prompt change, and a mean across it
+  // is a mean over two different things
+  // (docs/specs/artifact-resolution-parity.spec.md, workstream 2).
+  const withHashes = (hashes: readonly string[]) =>
+    hashes.map((h, i) => ({
+      startedAt: `t${i}`,
+      provider: "anthropic",
+      model: "claude-haiku-4-5",
+      modelUsed: "claude-haiku-4-5",
+      ok: true,
+      promptHash: h,
+    }));
+
+  it("names the distinct hashes when there are few", async () => {
+    const log = writeLog(withHashes(["aaaaaaaaaaaa", "aaaaaaaaaaaa", "bbbbbbbbbbbb"]));
+    const { stdout } = await usage(["--log", log]);
+
+    expect(stdout).toContain("aaaaaaaaaaaa, bbbbbbbbbbbb");
+  });
+
+  it("counts them instead once the list stops being readable", async () => {
+    const log = writeLog(
+      withHashes(["aaaaaaaaaaaa", "bbbbbbbbbbbb", "cccccccccccc", "dddddddddddd"]),
+    );
+    const { stdout } = await usage(["--log", log]);
+
+    expect(stdout).toContain("4 distinct");
+  });
+
+  it("reports them under the model in JSON, deduplicated and sorted", async () => {
+    const log = writeLog(withHashes(["bbbbbbbbbbbb", "aaaaaaaaaaaa", "bbbbbbbbbbbb"]));
+    const [model] = await models(["--log", log]);
+
+    expect(model!["promptHashes"]).toEqual(["aaaaaaaaaaaa", "bbbbbbbbbbbb"]);
+  });
+
+  it("says nothing about prompts for rows written before the field existed", async () => {
+    // Absent is not the same as one prompt. Rows from before this
+    // shipped must not collapse into a phantom single hash, which would
+    // read as "these calls are comparable" without evidence.
+    const log = writeLog(CALLS);
+    const { stdout } = await usage(["--log", log]);
+    const [model] = await models(["--log", log]);
+
+    expect(stdout).not.toContain("prompt   ");
+    expect(model).not.toHaveProperty("promptHashes");
+  });
+});

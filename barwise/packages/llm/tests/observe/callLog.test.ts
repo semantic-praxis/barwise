@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import type { CompletionRequest, LlmClient } from "../../src/LlmClient.js";
 import type { LlmCallRecord } from "../../src/observe/callLog.js";
 import { withCallLog } from "../../src/observe/callLog.js";
+import { hashPrompt } from "../../src/prompt/promptHash.js";
 
 const FIXED = "2026-08-21T00:00:00.000Z";
 
@@ -52,6 +53,7 @@ describe("withCallLog", () => {
       completionTokens: 340,
       latencyMs: 812,
       ok: true,
+      promptHash: hashPrompt("SECRET-SYSTEM-PROMPT"),
     });
   });
 
@@ -140,6 +142,58 @@ describe("withCallLog", () => {
       provider: "anthropic",
       model: "claude-haiku-4-5",
       ok: true,
+      promptHash: hashPrompt("SECRET-SYSTEM-PROMPT"),
     });
+  });
+});
+
+describe("withCallLog prompt provenance", () => {
+  it("records the hash of the system prompt that was sent", async () => {
+    const s = sink();
+    await withCallLog(client(), s, { now: () => FIXED }).complete(request);
+
+    expect(s.entries[0]!.promptHash).toBe(hashPrompt("SECRET-SYSTEM-PROMPT"));
+  });
+
+  it("records it on a failed call too", async () => {
+    // A failed call sent a prompt. A log that carried the hash only on
+    // success could not answer "which prompt was I sending when the
+    // rate limiting started", which is when the question gets asked.
+    const s = sink();
+    const failing = client({ complete: () => Promise.reject(new Error("overloaded")) });
+
+    await expect(withCallLog(failing, s, { now: () => FIXED }).complete(request))
+      .rejects.toThrow("overloaded");
+    expect(s.entries[0]!.ok).toBe(false);
+    expect(s.entries[0]!.promptHash).toBe(hashPrompt("SECRET-SYSTEM-PROMPT"));
+  });
+
+  it("hashes the system prompt and not the user message", async () => {
+    // The content rule applied rather than bent: the system prompt is
+    // authored in this repository, the user message is the transcript a
+    // client handed us. Two requests differing only in user message must
+    // hash identically -- a hash that moved with the transcript would be
+    // deriving a record from client material.
+    const s = sink();
+    const wrapped = withCallLog(client(), s, { now: () => FIXED });
+
+    await wrapped.complete(request);
+    await wrapped.complete({ ...request, userMessage: "A COMPLETELY DIFFERENT TRANSCRIPT" });
+
+    expect(s.entries[0]!.promptHash).toBe(s.entries[1]!.promptHash);
+    expect(JSON.stringify(s.entries)).not.toContain("DIFFERENT TRANSCRIPT");
+  });
+
+  it("moves when the system prompt moves", async () => {
+    // The other half: a hash that never moved would be inert, and the
+    // whole point is that editing a variant without bumping its version
+    // is visible.
+    const s = sink();
+    const wrapped = withCallLog(client(), s, { now: () => FIXED });
+
+    await wrapped.complete(request);
+    await wrapped.complete({ ...request, systemPrompt: "SECRET-SYSTEM-PROMPT, edited" });
+
+    expect(s.entries[0]!.promptHash).not.toBe(s.entries[1]!.promptHash);
   });
 });

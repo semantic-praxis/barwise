@@ -1,5 +1,5 @@
 /**
- * barwise prompt eval|score|schema|history
+ * barwise prompt eval|score|schema|artifact|run|history
  *
  * Prompt evaluation for the LLM surfaces
  * (docs/specs/prompt-optimization-harness.spec.md). `eval` sweeps the
@@ -8,19 +8,27 @@
  * point); `schema` prints the structured-output JSON Schema the Python
  * lane must reuse; `history` shows the checked-in score record.
  */
-import type { ProviderName } from "@barwise/llm";
+import type { PromptArtifact, PromptSurface, ProviderName } from "@barwise/llm";
 import {
   buildResponseSchema,
   buildReviewResponseSchema,
+  buildReviewSystemPrompt,
+  buildSystemPrompt,
+  builtinArtifacts,
   createLlmClient,
   defaultExtractionArtifact,
   defaultReviewArtifact,
+  processTranscript,
+  PROMPT_SURFACES,
   resolveArtifact,
+  reviewModel,
+  withCallLog,
 } from "@barwise/llm";
 import type { RunProgress, SuiteReport } from "@barwise/promptlab";
 import {
   appendRunHistory,
   defaultSuitePath,
+  hashPrompt,
   historyPathFor,
   IncompleteRunError,
   loadSuite,
@@ -31,10 +39,14 @@ import {
   toHistoryEntry,
 } from "@barwise/promptlab";
 import type { Command } from "commander";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, extname, join, resolve } from "node:path";
+import { callLogSink } from "../workspace/callLogSink.js";
+import { loadModel, readFile } from "../workspace/io.js";
 import { artifactCandidates } from "../workspace/promptArtifacts.js";
 import { describeProvenance, resolveProvenance } from "../workspace/provenance.js";
+import { renderReview } from "./review.js";
 
 interface ProviderOpts {
   provider?: string;
@@ -52,6 +64,7 @@ export function registerPromptCommand(program: Command, version = "0.0.0-dev"): 
   registerScore(promptCmd);
   registerSchema(promptCmd);
   registerArtifact(promptCmd);
+  registerRun(promptCmd);
   registerHistory(promptCmd);
 }
 
@@ -147,13 +160,21 @@ function registerEval(promptCmd: Command, version: string): void {
           }
           // Constructed after the guards, so a typo in a flag costs
           // nothing rather than a client and a sweep.
-          const client = createLlmClient({
+          const bare = createLlmClient({
             provider: opts.provider as ProviderName | undefined,
             apiKey: opts.apiKey,
             model: opts.model,
             baseUrl: opts.baseUrl,
             ...(contextWindow !== undefined ? { contextWindow } : {}),
           });
+          // A sweep is where the log earns most -- dozens of calls that
+          // are worth costing as a unit, which is what the correlation
+          // id is for. This was the third command the call-log spec
+          // marked `modify` and never wired.
+          const sink = callLogSink();
+          const client = sink === undefined
+            ? bare
+            : withCallLog(bare, sink, { correlationId: randomUUID() });
 
           // Resolved from the CLIENT, not from the flags, and therefore
           // only after it exists (barwise-842). `createLlmClient`
@@ -335,12 +356,7 @@ function registerSchema(promptCmd: Command): void {
         // artifact` covers both: a test pinned the refusal of `review`
         // as if it were a requirement, and the refusal outlived the
         // surface gaining a schema (barwise-855).
-        if (opts.surface !== "extraction" && opts.surface !== "review") {
-          throw new Error(
-            `Unknown surface "${opts.surface}". Use "extraction" or "review".`,
-          );
-        }
-        const schema = opts.surface === "review"
+        const schema = parseSurface(opts.surface) === "review"
           ? buildReviewResponseSchema()
           : buildResponseSchema(false);
         process.stdout.write(JSON.stringify(schema, null, 2) + "\n");
@@ -374,12 +390,7 @@ function registerArtifact(promptCmd: Command): void {
           // the one command whose job is "which prompt would this
           // configuration send" unable to answer for the surface that
           // had just started having an answer.
-          if (opts.surface !== "extraction" && opts.surface !== "review") {
-            throw new Error(
-              `Unknown surface "${opts.surface}". Use "extraction" or "review".`,
-            );
-          }
-          const surface = opts.surface;
+          const surface = parseSurface(opts.surface);
           const fallback = surface === "review"
             ? defaultReviewArtifact
             : defaultExtractionArtifact;
@@ -407,6 +418,44 @@ function registerArtifact(promptCmd: Command): void {
             );
           }
 
+          // The version is authored by hand and can be edited without
+          // being bumped; the hash is derived from the bytes and cannot.
+          // Printing both is what lets an operator join a call-log row
+          // back to a prompt they can read
+          // (docs/specs/artifact-resolution-parity.spec.md).
+          process.stderr.write(
+            `Artifact ${resolved.version}@${hashPrompt(render(surface, resolved))}.\n`,
+          );
+
+          // This command's whole job is "which prompt would this target
+          // be sent", and with `--artifacts` it can answer with one no
+          // production run could resolve: production reads
+          // `builtinArtifacts` and nothing else. Saying so is the
+          // difference between a hypothetical and a false claim.
+          //
+          // Which of the two it is gets checked rather than assumed. A
+          // directory entry that is byte-identical to the shipped
+          // artifact of the same version IS what production sends --
+          // pointing at `packages/llm/prompts/`, the very files the
+          // built-ins are generated from, is the ordinary case -- and
+          // claiming otherwise would be the same unchecked assertion
+          // this line exists to remove. The two answers also happen to
+          // make `regen:builtins` drift visible at the point of use.
+          if (opts.artifacts !== undefined && !builtinArtifacts.includes(resolved)) {
+            const target = `${opts.provider ?? "any provider"}/${opts.model ?? "any model"}`;
+            const shipped = builtinArtifacts.find(
+              (a) => a.surface === surface && a.version === resolved.version,
+            );
+            process.stderr.write(
+              shipped !== undefined && render(surface, shipped) === render(surface, resolved)
+                ? `Loaded from ${opts.artifacts}, and byte-identical to the shipped`
+                  + ` ${resolved.version}: a production run on ${target} sends this.\n`
+                : `Loaded from ${opts.artifacts} and NOT shipped: a production run on`
+                  + ` ${target} would not send it.`
+                  + ` Promote it with npm run regen:builtins.\n`,
+            );
+          }
+
           if (opts.format === "json") {
             process.stdout.write(JSON.stringify(resolved, null, 2) + "\n");
           } else {
@@ -419,6 +468,50 @@ function registerArtifact(promptCmd: Command): void {
         }
       },
     );
+}
+
+/**
+ * Render an artifact the way its surface will send it.
+ *
+ * Extraction is rendered without the alternatives section, matching
+ * what `runSuite` hashes into the score history -- so a hash printed
+ * here compares directly against a recorded one. An extraction run made
+ * with `--alternatives` renders a longer prompt and hashes differently;
+ * that is a second rendering of the same artifact, not a mismatch.
+ *
+ * The branch is not observable today and is kept deliberately: with
+ * `includeAlternatives` false, `buildSystemPrompt` and
+ * `buildReviewSystemPrompt` both reduce to instructions plus rendered
+ * demos, so they agree byte for byte on every artifact. No test can
+ * catch swapping one for the other, which is exactly why the branch
+ * should not be "simplified" to a single call -- the day extraction
+ * grows another suffix, review would silently start carrying it.
+ */
+function render(surface: "extraction" | "review", artifact: PromptArtifact): string {
+  return surface === "review"
+    ? buildReviewSystemPrompt(artifact)
+    : buildSystemPrompt(false, artifact);
+}
+
+/**
+ * Validate a `--surface` value against the declared surfaces.
+ *
+ * Derived from `PROMPT_SURFACES` rather than written out, so a surface
+ * added to the union is accepted here without anyone remembering to
+ * edit three commands. That is the barwise-855 defect designed out:
+ * `prompt artifact` and `prompt schema` refused `--surface review` for
+ * as long as review had been artifact-driven, because the guards named
+ * their surfaces by hand and tests pinned the refusal as intent.
+ */
+function parseSurface(value: string): PromptSurface {
+  if ((PROMPT_SURFACES as readonly string[]).includes(value)) {
+    return value as PromptSurface;
+  }
+  const quoted = PROMPT_SURFACES.map((s) => `"${s}"`);
+  const known = quoted.length <= 2
+    ? quoted.join(" or ")
+    : `${quoted.slice(0, -1).join(", ")} or ${quoted.at(-1)}`;
+  throw new Error(`Unknown surface "${value}". Use ${known}.`);
 }
 
 /** `barwise prompt history` */
@@ -722,4 +815,108 @@ function renderResolution(report: SuiteReport): string[] {
 function fail(err: unknown): void {
   process.stderr.write(`Error: ${(err as Error).message}\n`);
   process.exitCode = 1;
+}
+
+/**
+ * `barwise prompt run`
+ *
+ * Send a candidate artifact once and print what came back
+ * (docs/specs/artifact-resolution-parity.spec.md, workstream 3).
+ *
+ * This is the answer to barwise-855 item 2, and deliberately not the
+ * one it asked for. That issue proposed `--artifacts` on `barwise
+ * review`, on the ground that there is otherwise no way to try a review
+ * variant without editing `packages/llm/prompts/` and rebuilding. The
+ * need is real; putting the flag on the production command is not the
+ * way to meet it. Production resolving over `builtinArtifacts` alone is
+ * what makes the prompt any run sent recoverable afterwards -- a pure
+ * function of version, surface, provider and model, which `prompt
+ * artifact` computes offline. A directory override on `review` or
+ * `import transcript` would let an unreviewed prompt do real modelling
+ * work and make the recorded hash resolve to nothing.
+ *
+ * So the override stays in the lane whose job is candidates. `prompt
+ * artifact` says what would be sent, `prompt run` sends it once, and
+ * `prompt eval` scores it over the suite. The middle one exists because
+ * the review metric refuses to grade prose by design, so the only way
+ * to judge a review prompt's advice is to read it.
+ */
+function registerRun(promptCmd: Command): void {
+  promptCmd
+    .command("run")
+    .description("Send a prompt artifact once and print the answer (candidates included)")
+    .argument("<file>", "Transcript for extraction, or .orm.yaml for review")
+    .option("--surface <surface>", "Prompt surface (extraction or review)", "extraction")
+    .option("--artifacts <dir>", "Also consider .prompt.yaml variants in this directory")
+    .option(
+      "--provider <provider>",
+      "LLM provider (anthropic, openai, ollama). Auto-detects from env vars if omitted.",
+    )
+    .option("--model <model>", "Model override for the LLM provider")
+    .option("--api-key <key>", "API key (falls back to env vars)")
+    .option("--base-url <url>", "Ollama server URL (only for ollama provider)")
+    .action(
+      async (
+        file: string,
+        opts: ProviderOpts & { surface: string; artifacts?: string; },
+      ) => {
+        try {
+          const surface = parseSurface(opts.surface);
+
+          const bare = createLlmClient({
+            provider: opts.provider as ProviderName | undefined,
+            apiKey: opts.apiKey,
+            model: opts.model,
+            baseUrl: opts.baseUrl,
+          });
+          const sink = callLogSink();
+          const client = sink === undefined
+            ? bare
+            : withCallLog(bare, sink, { correlationId: randomUUID() });
+
+          // Resolved from the client for the same reason `eval` is
+          // (barwise-842): `createLlmClient` detects the provider from
+          // the environment and each provider applies its own default
+          // model, so keying on the flags would silently send the
+          // default whenever one was omitted.
+          const artifact = resolveArtifact(artifactCandidates(opts.artifacts), {
+            surface,
+            ...(client.provider !== undefined ? { provider: client.provider } : {}),
+            ...(client.model !== undefined ? { model: client.model } : {}),
+          }) ?? (surface === "review" ? defaultReviewArtifact : defaultExtractionArtifact);
+
+          // Named before the call, not after: this command exists to
+          // judge one prompt, and an operator who cannot tell which one
+          // ran has spent a call for nothing.
+          process.stderr.write(
+            `Sending ${surface} artifact ${artifact.version}`
+              + `@${hashPrompt(render(surface, artifact))}`
+              + ` (${client.provider}/${client.model ?? "default model"}).\n`,
+          );
+
+          if (surface === "review") {
+            const result = await reviewModel(loadModel(file), client, { artifact });
+            process.stdout.write(renderReview(result));
+            return;
+          }
+
+          const transcript = readFile(file);
+          if (!transcript.trim()) {
+            throw new Error("Transcript file is empty.");
+          }
+          const result = await processTranscript(transcript, client, {
+            modelName: basename(file, extname(file)),
+            artifact,
+          });
+          // The raw payload, because that is what an extraction prompt
+          // author is judging: the scorer grades this JSON, and
+          // serializing to YAML first would hide the shape questions --
+          // a missing uniqueness block, a frequency `min: 0` -- that the
+          // prompt is being changed to fix.
+          process.stdout.write((result.rawResponse ?? "") + "\n");
+        } catch (err) {
+          fail(err);
+        }
+      },
+    );
 }

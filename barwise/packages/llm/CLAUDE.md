@@ -181,15 +181,32 @@ npx tsc --noEmit            # type-check only
   extraction that cost a paid call must not be lost to an unwritable
   log. The sink and the clock are supplied by the caller, like the
   history writer's date and build provenance.
-- **Both LLM surfaces resolve their prompt the same way.**
-  `processTranscript` and `reviewModel` each take an optional
-  `artifact`, and when none is given they query `builtinArtifacts` with
-  their own surface plus the client's provider and model, falling back
-  to `defaultExtractionArtifact` / `defaultReviewArtifact`. A golden
+- **Both LLM surfaces resolve their prompt through one function.**
+  `selectArtifact(surface, client, options?.artifact)` in
+  `src/prompt/selectArtifact.ts` owns the whole answer: the candidate
+  set (`builtinArtifacts`, and nothing else), the surface guard, and
+  the surface-to-default table. `processTranscript` and `reviewModel`
+  each call it once and hold no resolution logic of their own. A golden
   test per surface pins the default's rendered bytes, so wiring a
-  surface up is a no-op until a variant for it is authored. An artifact
-  whose `surface` does not match the call is rejected before the LLM
-  call rather than rendered.
+  surface up is a no-op until a variant for it is authored.
+
+  Do not re-answer any part of it at a call site. It was answered
+  separately in three places, with the surface-to-default mapping
+  spread across three files and restated here in prose, and the cost
+  was change amplification: `PromptSurface` is shaped to grow, and a
+  third surface meant editing every copy. barwise-850 is what that
+  costs when it goes wrong -- two commands, one question, two answers,
+  unnoticed for months, because falling back to the default is
+  indistinguishable from choosing it.
+
+  `resolveArtifact` remains the pure matcher over a caller-supplied
+  list, and the `select` / `resolve` split in the names is
+  load-bearing: production asks the narrow question over the shipped
+  set, while `barwise prompt eval --artifacts` asks a wider one over
+  candidates that are not shipped, and a reader can tell which from the
+  call site. `promptlab`'s `runSuite` receives an already-resolved
+  artifact and so uses the exported `assertArtifactSurface` rather than
+  a fourth copy of the guard.
 - **A review suggestion is validated, not cast.** `parseReviewResponse`
   drops any suggestion whose `category` or `severity` falls outside the
   enums the response schema declares, and any that is missing
@@ -202,6 +219,30 @@ npx tsc --noEmit            # type-check only
   `prompts/*.prompt.yaml` by `npm run regen:builtins` and committed;
   a drift test guards it. The published package ships `dist` only, so
   runtime loading is not an option.
+
+  **What may bypass that promotion path, and what may not.** Nothing on
+  a production path may: `selectArtifact` reads `builtinArtifacts` and
+  has no directory override, so `barwise import transcript`, `barwise
+  review`, the MCP tools and the VS Code commands can only ever send an
+  artifact that went through `regen:builtins`, the drift test and
+  review. The dev lane may, and that is where the seam belongs --
+  `barwise prompt eval --artifacts`, `prompt artifact --artifacts` and
+  `prompt run --artifacts` all resolve over `artifactCandidates(dir)`,
+  which is the built-ins plus a directory. `processTranscript` and
+  `reviewModel` still accept an explicit `artifact`, so an embedder can
+  pass one; what does not exist is a CLI flag that makes a production
+  command do it by accident.
+
+  This is what keeps a recorded prompt identifiable. `withCallLog`
+  records `hashPrompt` of the system prompt and deliberately not an
+  `artifactVersion`, because with production narrow the version is
+  recoverable: render every shipped artifact and match the hash. Two
+  renderings per extraction artifact, since `--alternatives` appends a
+  section and hashes differently -- a small search, not an ambiguity.
+  `barwise prompt artifact` prints `version@hash` for exactly this
+  join. Widen the override to a production surface and that recovery
+  stops working, which is why the decision is recorded in the root
+  `CLAUDE.md` capability matrix rather than left to taste.
 - The VS Code extension also provides a `CopilotLlmClient` that
   implements this interface via the GitHub Copilot chat API -- that
   implementation lives in `packages/vscode/`, not here.

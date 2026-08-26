@@ -19,6 +19,7 @@
  */
 
 import type { CompletionRequest, CompletionResponse, LlmClient } from "../LlmClient.js";
+import { hashPrompt } from "../prompt/promptHash.js";
 
 export interface LlmCallRecord {
   /** Caller-supplied, because this package reads no clock. */
@@ -40,6 +41,26 @@ export interface LlmCallRecord {
   readonly errorKind?: string;
   /** Groups the calls of one operation -- an eval sweep, say. */
   readonly correlationId?: string;
+  /**
+   * Fingerprint of the system prompt this call sent
+   * (docs/specs/artifact-resolution-parity.spec.md, workstream 2).
+   *
+   * The system prompt only, never the user message. That is the rule
+   * about content applied rather than bent: the system prompt is
+   * authored in this repository, and the user message is the
+   * transcript or model a client handed us. A digest is not readable
+   * text, but hashing client material would still be recording it,
+   * and the line is worth keeping where nobody has to argue about it.
+   *
+   * `artifactVersion` is deliberately absent. It is a hand-maintained
+   * string that can be edited without being bumped; this is derived
+   * from the bytes and cannot. With production resolving over
+   * `builtinArtifacts` alone, the version is recoverable anyway --
+   * `barwise prompt artifact` renders the shipped set offline and
+   * prints each one's hash, so a row here joins back to a readable
+   * prompt without this package storing a claim it cannot check.
+   */
+  readonly promptHash?: string;
 }
 
 export interface CallLogSink {
@@ -85,6 +106,10 @@ export function withCallLog(
     model: client.model,
     async complete(request: CompletionRequest): Promise<CompletionResponse> {
       const startedAt = now();
+      // Computed once, and used on both paths: a failed call sent a
+      // prompt too, and "which prompt was I sending when the retries
+      // started" is a question a log of successes cannot answer.
+      const promptHash = hashPrompt(request.systemPrompt);
       try {
         const response = await client.complete(request);
         emit({
@@ -100,6 +125,7 @@ export function withCallLog(
             : {}),
           ...(response.latencyMs !== undefined ? { latencyMs: response.latencyMs } : {}),
           ok: true,
+          promptHash,
           ...correlation,
         });
         return response;
@@ -112,6 +138,7 @@ export function withCallLog(
           model: client.model,
           ok: false,
           errorKind: classifyError(err),
+          promptHash,
           ...correlation,
         });
         throw err;

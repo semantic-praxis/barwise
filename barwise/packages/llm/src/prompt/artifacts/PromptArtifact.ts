@@ -7,7 +7,28 @@
  * files loaded with `loadArtifact` and selected with `resolveArtifact`.
  */
 
-export type PromptSurface = "extraction" | "review";
+/**
+ * Every prompt surface, declared once.
+ *
+ * A list rather than a bare union because the union's members are a
+ * capability, not a data vocabulary: each one needs wiring at several
+ * layers, and the CLI commands that take a `--surface` flag validate a
+ * *string* against it. Hand-written literals in those guards is how
+ * barwise-855 happened -- `prompt artifact` and `prompt schema` went on
+ * refusing `--surface review` long after `reviewModel` was
+ * artifact-driven, with tests pinning the refusal as a requirement.
+ *
+ * Deriving both the type and the guards from this array means adding a
+ * surface makes the commands accept it without anyone remembering to,
+ * which is the failure defined out of existence rather than tested for.
+ * The same shape as `REVIEW_CATEGORIES` in `review/reviewModel.ts`, for
+ * the same reason. `loadArtifact` validates against this too -- it kept
+ * its own copy, typed `readonly PromptSurface[]`, which catches a
+ * REMOVED member and silently lags on an added one.
+ */
+export const PROMPT_SURFACES = ["extraction", "review"] as const;
+
+export type PromptSurface = (typeof PROMPT_SURFACES)[number];
 
 /** A few-shot demonstration rendered inline into the system prompt. */
 export interface PromptDemo {
