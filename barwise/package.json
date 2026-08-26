@@ -19,6 +19,7 @@
     "purity": "node scripts/check-core-purity.mjs",
     "filesize": "node scripts/check-file-size.mjs",
     "check:beads": "bash scripts/check-beads.sh",
+    "bd": "node scripts/beads-crud.mjs",
     "audit": "node scripts/audit-gate.mjs",
     "dup": "jscpd",
     "oxlint": "oxlint packages/*/src/",
