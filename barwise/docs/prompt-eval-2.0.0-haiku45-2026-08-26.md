@@ -72,35 +72,84 @@ What this run does establish: nothing here supports authoring three new
 long transcripts on error-bar grounds. Re-measure dev dispersion after
 workstream 2 lands, then choose.
 
-## barwise-852 reproduced, and separated its two modes cleanly
+## barwise-852 is a rubric bug: the case discriminates on a synonym
 
 `university-enrollment`: `ok=2/5`, `quality=1.000 +/- 0.000`. When it
 survives it scores **exactly 1.000 with zero spread**; when it does not,
 0.167, 0.154, 0.160 with an identical failure list all three times --
 three `requires_element` and two `forbids_population` checks on
-`CourseOffering`, failing as one block.
+`CourseOffering`, failing as one block. It accounts for 89% of the
+suite's noise; without it the train resolvable gap falls from 0.086 to
+roughly 0.03, and the other six cases average 0.957.
 
-That is not a hard case executed inconsistently. It is a coin flip on a
-single modelling decision, executed perfectly either way. It accounts
-for 89% of the suite's noise; without it the train resolvable gap falls
-from 0.086 to roughly 0.03, and the other six cases average 0.957.
+Reading the two retained payloads settles what that block is. It is not
+a modelling failure and not a hard case. **The collapsed run models the
+offering correctly and is failed for naming it `Offering`.**
 
-`collapseFloor: 0.3` is doing exactly what it was specified to do here
--- the two modes are reported apart, and the quality mean is untouched
-by the collapses. It does not need re-fitting on this evidence.
+| Rubric check                                                 | What the collapsed run has                                              |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| `requires_element` entity `CourseOffering`                   | `Offering`, entity, `reference_mode: offering_id`                       |
+| `factTypeBetween [Student, CourseOffering]`                  | `Student enrolls in Offering`                                           |
+| `factTypeBetween [CourseOffering, Semester]`                 | `Offering is in Semester`                                               |
+| `forbids_population CourseOffering is of Course` (IUC)       | `Offering is of Course`, IUC on the Offering role, mandatory            |
+| `forbids_population Instructor teaches CourseOffering` (IUC) | `Offering is taught by Instructor`, IUC on the Offering role, mandatory |
 
-Still open, and the saved payloads are what settle it: whether the
-transcript underdetermines `CourseOffering` (an authoring bug -- fix the
-transcript) or whether it is genuinely hard (a real signal -- keep the
-case and raise `repeat`). The diff to read is what a collapsed run
-builds instead: a direct `Student enrolls in Course` with the semester
-hung off it would mean the transcript never forces the offering to be a
-thing.
+Nothing structural is missing. `normalizeForMatch` folds case and strips
+separators, so `Course Offering` and `course_offering` already resolve --
+but it cannot match a head noun to a compound, and should not, since
+that same rule would match `Course` to `CourseOffering`. The candidate
+recorded no alias, so the resolution has nothing to work with.
 
-Second instance of the same shape, in train: `conference-reviews`,
-sd=0.158, three of five samples missing `Reviewer reviews Paper` and
-failing its `requires_element` and `forbids_population` together. Worth
-looking at once university-enrollment is settled.
+**The transcript licenses the name it punishes.** The Registrar says
+"course offering" three times and bare "offering" nine, including the
+line the model cited for its reference mode: "Offerings get an offering
+ID." The rubric demands the minority spelling, so the extraction that
+followed the transcript's dominant vocabulary is the one that fails.
+
+The clinching evidence that this case is not measuring modelling: the
+run that scored **1.000** diverges from the reference on grades -- it
+objectifies `Enrollment` and hangs `Enrollment has Grade` off it, where
+the reference has the ternary `Student receives LetterGrade for
+CourseOffering`. The **0.154** run has that ternary, with uniqueness on
+`[Student, Offering]`, matching "a student gets at most one grade per
+offering". The rubric declares no grade check, so a real structural
+difference is invisible while a synonym costs 0.85.
+
+`collapseFloor: 0.3` still did exactly what it was specified to do --
+the two modes are reported apart and the quality mean is untouched -- so
+the floor needs no re-fitting. What needs fixing is the rubric.
+
+### What to do about it
+
+Not a transcript rewrite. People shorten terms mid-conversation; that is
+what makes the transcript realistic, and normalizing the vocabulary
+would hide the defect rather than repair it.
+
+The fix belongs where the mismatch is, in what a case is allowed to
+declare: **let a rubric name the terms the domain licenses**, as
+`entity: [CourseOffering, Offering]` and the same for
+`forbids_population`'s `factType`. That is "explicit over implicit"
+applied to the case author, who can see that the transcript offers two
+words for one concept. It widens `ElementQuery` in `@barwise/learn` and
+its parser.
+
+A second change is worth making on its own merits and is not a
+substitute: **have the extraction record the transcript's own terms as
+aliases.** `getObjectTypeByNameOrAlias` already consults candidate
+aliases, so an `Offering` carrying the alias `course offering` would
+pass all five checks today. Capturing the domain's vocabulary is ORM's
+job. But it is a behavioural ask of the model rather than a guarantee,
+so the metric cannot rest on it.
+
+Until one of those lands, this case's 0.460 SD is measuring word choice,
+and every mean that includes it inherits that.
+
+### The same check is owed to conference-reviews
+
+`conference-reviews`, sd=0.158, three of five samples missing
+`Reviewer reviews Paper` and failing its `requires_element` and
+`forbids_population` together -- the identical shape. Its retained
+payloads should be read before assuming it is a different problem.
 
 ## Operational notes
 
@@ -129,8 +178,10 @@ looking at once university-enrollment is settled.
    `incident-response` at 0.960, on conformance corrections and
    validation warnings rather than any failed check.
 
-2. Read the two `university-enrollment` payload modes and settle
-   barwise-852 before touching the case.
+2. barwise-852 is settled: the case discriminates on a synonym. File
+   the rubric-alternatives change against `@barwise/learn`, and read the
+   `conference-reviews` payloads for the same defect. Do not re-fit
+   `collapseFloor` and do not rewrite the transcript.
 3. Re-measure dev dispersion after step 1, then decide the case count.
 4. The sonnet arms stay unrun. They answer the variant-versus-default
    comparison, which nothing above is waiting on.
