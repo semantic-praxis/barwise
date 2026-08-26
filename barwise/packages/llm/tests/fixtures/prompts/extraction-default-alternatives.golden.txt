@@ -41,10 +41,12 @@ Analyze the transcript carefully and extract:
    - If stakeholders use alternative names or synonyms for this concept, list them in the aliases array (e.g., aliases: ["Client"] when the primary name is "Customer")
    - Include source references (line numbers and verbatim excerpts)
 
-2. **Populations**: Capture example data mentioned in the transcript. When stakeholders give concrete examples like "Customer Alice placed Order 123" or "Status can be scheduled, completed, or cancelled", record these as sample fact instances. For each population:
+2. **Populations**: Capture example data mentioned in the transcript. When stakeholders give a concrete, complete example fact like "Customer Alice placed Order 123", record it as a sample fact instance. For each population:
    - Identify the fact type being exemplified
    - List the role player names and their example values
    - Include source references
+   - Every instance MUST supply a value for EVERY role of the fact type. If the transcript gives example values for only some roles (e.g. a list of department names with no paired identifier values), do NOT emit a population for it -- a partial instance makes the model invalid.
+   - An enumerated list of allowed values ("Status can be scheduled, completed, or cancelled") is a value constraint, not a population. Record it with value_constraint and do not emit a population for it.
    - Only capture examples explicitly mentioned in the transcript -- do not invent sample data
    - Examples serve two purposes: (1) validation -- they can be checked against constraints to verify the model is correct, (2) documentation -- they make abstract fact types concrete for stakeholders and developers
 
@@ -95,7 +97,7 @@ Analyze the transcript carefully and extract:
    - For binary many-to-one relationships, the uniqueness goes on the "many" side. "Customers can place multiple orders" but "each Order belongs to one Customer" means uniqueness on the Order role, not the Customer role.
    - For **subset** and **equality** constraints that span two fact types, use the "fact_type" field for one side and "superset_fact_type" for the other side. List role players in "roles" for the first fact type and "superset_roles" for the second. Both role arrays must have the same length (matching arity).
    - For **ring** constraints on self-referencing fact types (where the same entity plays both roles), specify ring_type as one of: irreflexive, asymmetric, antisymmetric, intransitive, acyclic, symmetric, transitive, purely_reflexive. The roles array must contain exactly 2 entries (both the same player name).
-   - For **frequency** constraints, specify min and max (max can be the string "unbounded"). The roles array must contain exactly 1 entry.
+   - For **frequency** constraints, specify min and max (max can be the string "unbounded"). The roles array must contain exactly 1 entry: the player whose occurrences are counted -- the entity the rule is "per". Side it like uniqueness: the constraint sits on the side the sentence quantifies over. "Each Shipment sits in at most two Warehouses" bounds how many storage facts a single Shipment appears in, so use roles: ["Shipment"], NOT ["Warehouse"] -- even though the bound is a count of warehouses. Putting the frequency on the counted-thing's role states the opposite rule.
    - Assess confidence: "high" if explicitly stated, "medium" if strongly implied, "low" if inferred from general domain knowledge
    - Include the source references that justify the inference
 

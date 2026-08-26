@@ -48,7 +48,9 @@ describe("runSuite", () => {
     const report = await runSuite(suite, client, TRAIN);
     expect(report.cases.map((c) => c.caseId)).toEqual(trainCases.map((c) => c.evalCase.id));
     expect(report.repeat).toBe(1);
-    expect(report.artifactVersion).toBe("1.0.0");
+    // The default extraction artifact's current version (it flows from
+    // @barwise/llm's defaultExtractionArtifact when no artifact is given).
+    expect(report.artifactVersion).toBe("1.1.0");
     for (const c of report.cases) {
       expect(c.runs).toHaveLength(1);
       expect(c.runs[0]!.score?.rubricPassed).toBe(c.runs[0]!.score?.rubricTotal);

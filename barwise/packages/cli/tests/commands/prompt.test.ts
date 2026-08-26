@@ -247,7 +247,7 @@ describe("barwise prompt artifact", () => {
     const extraction = await runCli(["prompt", "artifact"]);
     const review = await runCli(["prompt", "artifact", "--surface", "review"]);
 
-    expect(extraction.stderr).toMatch(/Artifact 1\.0\.0@[0-9a-f]{12}\./);
+    expect(extraction.stderr).toMatch(/Artifact 1\.1\.0@[0-9a-f]{12}\./);
     expect(review.stderr).toMatch(/Artifact 1\.0\.0@[0-9a-f]{12}\./);
 
     // Two surfaces whose default instructions differ, so two different
