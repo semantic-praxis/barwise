@@ -535,24 +535,34 @@ method for re-running this sweep is carried in
 
 ## Follow-up index
 
-`bd` is unavailable in this container; these are the issue-shaped
-items, for filing when it is back. Ordered by the audit's ranking, not
+Filed as bd issues (hand-authored into `.beads/issues.jsonl` in
+canonical form, validated by `npm run check:beads -- --strict`; `bd`
+itself is unavailable in this container, so a bd-equipped session
+picks them up on its next sync). Ordered by the audit's ranking, not
 by effort.
 
-1. Fix the depcruise subpath blindness; correct the two graph copies
-   (A1). Everything else's verification story depends on it.
-2. Reconcile the extraction default with the variants, or declare the
-   divergence (B1). Live behavioral bug.
-3. One SQL-type mapping; delete `_mapSqlType` (B2). Live bug.
-4. Share the dbt walk skip-list; stop mining `target/` (B3). Live bug.
-5. One `matchesConstraintType` (B4).
-6. Derive format lists/help/enums from the registry; add `extension`
-   to `FormatDescriptor`; register or un-reference `list_formats`;
-   decide the VS Code export-command bypass (B5, B6).
-7. Seed the parity manifest with C1-C11; add the examples/output
-   drift test and collapse its regenerators (A2); guard the union
-   restatements (D) behind `assertNever`/derivation.
-8. Docs: dedupe `AGENTS.md`, re-date or rewrite `ARCHITECTURE.md`,
-   regenerate the aggregator dependency tables, fix
-   `promptlab/CLAUDE.md`'s `history.jsonl` claim, complete or trim
-   `docs/MCP.md` and `docs/CLI.md` (B8).
+1. **barwise-862** -- fix the depcruise subpath blindness; correct
+   the two graph copies (A1). Everything else's verification story
+   depends on it.
+2. **barwise-863** -- reconcile the extraction default with the
+   variants, or declare the divergence (B1). Live behavioral bug.
+3. **barwise-864** -- share the dbt walk skip-list; stop mining
+   `target/` (B3). Live bug.
+4. **barwise-865** -- one SQL-type mapping; delete `_mapSqlType`
+   (B2). Live bug.
+5. **barwise-866** -- one `matchesConstraintType` (B4).
+6. **barwise-867** -- derive format lists/help/enums from the
+   registry; add `extension` to `FormatDescriptor`; register or
+   un-reference `list_formats`; decide the VS Code export-command
+   bypass (B5, B6, D's list restatements).
+7. **barwise-868..871** -- the drift-guards spec's workstreams 2-5:
+   parity manifest + `check:parity` seeded with C1-C11 (868);
+   `assertNever` and the union guards (869); one regenerator and a
+   real drift test for `examples/output/` (870, A2); the
+   `audit:duplication` script and baseline ratchet (871).
+8. **barwise-872** -- the convention line and spec-writer gate item
+   (spec workstream 6).
+9. **barwise-873** -- docs: dedupe `AGENTS.md`, re-date or rewrite
+   `ARCHITECTURE.md`, regenerate the aggregator dependency tables,
+   fix `promptlab/CLAUDE.md`'s `history.jsonl` claim, complete or
+   trim `docs/MCP.md` and `docs/CLI.md` (B8).

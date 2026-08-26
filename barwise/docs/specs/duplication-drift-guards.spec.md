@@ -5,9 +5,12 @@ Created: 2026-08-26
 Last-updated: 2026-08-26
 Tracking: `docs/logic-duplication-audit-2026-08-26.md` (all classes);
 extends the remedy of `docs/specs/artifact-resolution-parity.spec.md`
-(implemented, PR #347) from one instance to the class. No new bd
-issues filed -- `bd` is unavailable in this container; the audit's
-Follow-up index is the issue list.
+(implemented, PR #347) from one instance to the class. Issues:
+barwise-862 (W1), barwise-868 (W2), barwise-869 (W3), barwise-870
+(W4), barwise-871 (W5), barwise-872 (W6); the audit's diverged-copy
+findings are barwise-863..867 and 873. Hand-authored into
+`.beads/issues.jsonl` (canonical form, `check:beads --strict` clean);
+`bd` itself is unavailable in this container.
 
 ## Principle
 
