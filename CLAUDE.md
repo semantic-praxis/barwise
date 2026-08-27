@@ -275,6 +275,16 @@ skill (`.claude/skills/release/`).
   by JavaScript or Node core (e.g. use `node:crypto.randomUUID()` not
   `uuid`). High-quality libraries that solve real problems (yaml, ajv)
   are fine.
+- A copy that must agree with other code is never guarded by a
+  comment: share it, derive it from the authority, register the pair
+  in `barwise/parity.manifest.json` (checked by `npm run
+  check:parity`), or give it a drift test -- in the same commit that
+  creates the copy. `npm run audit:duplication -- --check` ratchets
+  new candidates against `barwise/audit-baseline.json`; the
+  `duplication-audit` skill carries the rubric and the full-sweep
+  method. Deliberately parallel code stays (DRY is secondary);
+  unchecked must-agree code does not
+  (`docs/specs/duplication-drift-guards.spec.md`).
 - ESLint config is shared at the repo root (`barwise/eslint.config.mjs`).
 - Turborepo (`barwise/turbo.json`) orchestrates build/test/lint with
   correct dependency ordering.
