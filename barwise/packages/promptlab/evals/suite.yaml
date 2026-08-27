@@ -50,7 +50,22 @@
 # gets no licence on purpose: its spread is a real modelling fork (the
 # associative-entity workaround versus objectification), which is the
 # suite working.
-version: 2.1.0
+#
+# 2.2.0 widens five rubrics with ten checks the barwise-878 reference
+# audit found settled in the transcripts, carried by the references,
+# and guarded by nothing (docs/reference-rubric-audit-2026-08-27.md):
+# order-management +2, university-enrollment +2, clinic-appointments
+# +4, project-staffing +2, and an employee-hierarchy hint corrected to
+# describe what its check actually tests. Every answer key still
+# scores exactly 1.000, so the keys are unchanged as answer keys --
+# but rubric fractions have new denominators, and a run that misses a
+# newly guarded constraint scores lower than the same run did under
+# 2.1.0, so rows either side of this line are not comparable. Two
+# settled mandatories (Employee works in Department, Review has
+# ReviewScore) are deliberately NOT guarded: their players appear in
+# exactly one fact type, and the mandatory counterexample needs an
+# anchor role in another (see the audit's findings).
+version: 2.2.0
 
 # Re-fitted for the rated form, because rating changed what a weight
 # means. A weight is now the cost of a model in which EVERY element

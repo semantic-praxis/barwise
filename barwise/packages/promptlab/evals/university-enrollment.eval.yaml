@@ -29,3 +29,11 @@ checks:
     factType: Instructor teaches CourseOffering
     constraint: internal_uniqueness
     hint: Each offering is taught by exactly one instructor.
+  - kind: forbids_population
+    factType: CourseOffering is in Semester
+    constraint: internal_uniqueness
+    hint: Each offering belongs to exactly one semester.
+  - kind: forbids_population
+    factType: Instructor teaches CourseOffering
+    constraint: mandatory
+    hint: Each offering is taught by some instructor.

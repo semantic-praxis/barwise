@@ -24,3 +24,11 @@ checks:
     factType: Employee is assigned to Project
     constraint: frequency
     hint: Each employee is assigned to between 1 and 3 projects.
+  - kind: forbids_population
+    factType: Employee mentors Employee
+    constraint: internal_uniqueness
+    hint: Each employee has at most one mentor.
+  - kind: forbids_population
+    factType: Employee is assigned to Project
+    constraint: internal_uniqueness
+    hint: No double assignment - an employee is on a project once or not at all.

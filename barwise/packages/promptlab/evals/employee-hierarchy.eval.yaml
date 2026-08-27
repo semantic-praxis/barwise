@@ -16,4 +16,4 @@ checks:
   - kind: forbids_population
     factType: Department has DepartmentName
     constraint: internal_uniqueness
-    hint: No two departments share a name.
+    hint: Each department has at most one department name.
