@@ -12,6 +12,18 @@ import { OpenAILlmClient } from "./openai.js";
 
 export type ProviderName = "anthropic" | "openai" | "ollama";
 
+// Record-typed so the runtime list cannot lag the union; every surface
+// that names the providers (CLI help, MCP enums) derives from this
+// instead of re-listing (barwise-867: seven independent restatements).
+const PROVIDER_MEMBERS: Record<ProviderName, true> = {
+  anthropic: true,
+  openai: true,
+  ollama: true,
+};
+
+/** Every ProviderName member, in declaration order. */
+export const PROVIDER_NAMES = Object.keys(PROVIDER_MEMBERS) as readonly ProviderName[];
+
 export interface ProviderOptions {
   /** Explicit provider name. If omitted, auto-detects from env vars. */
   readonly provider?: ProviderName;

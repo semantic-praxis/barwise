@@ -1,4 +1,5 @@
 import { getImporter, OrmYamlSerializer } from "@barwise/core";
+import { SQL_DIALECTS } from "@barwise/core/sql";
 import type { Command } from "commander";
 import { statSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
@@ -14,7 +15,7 @@ export function addSqlSubcommand(importCmd: Command): void {
     .option("--name <name>", "Model name (defaults to filename/dirname)")
     .option(
       "--dialect <dialect>",
-      "SQL dialect (ansi, snowflake, bigquery, postgres, mysql, redshift, databricks)",
+      `SQL dialect (${SQL_DIALECTS.join(", ")})`,
     )
     .action(
       async (

@@ -11,6 +11,7 @@ import { renderDiagramSvg } from "@barwise/diagram-ui/server";
 import type { Command } from "commander";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { resolveDomainModels } from "../workspace/domainModels.js";
 import { isProjectFile, loadModel, writeOutput } from "../workspace/io.js";
 import { loadProject } from "../workspace/projectLoader.js";
 
@@ -65,29 +66,24 @@ async function diagramDomain(
   annotate: boolean,
   output?: string,
 ): Promise<void> {
-  const { project, problems } = loadProject(file);
-  for (const problem of problems) {
-    process.stderr.write(`Warning: ${problem}\n`);
-  }
-
-  const domain = project.getDomain(context);
-  if (!domain) {
-    const available = project.domains.map((d) => d.context).join(", ");
-    process.stderr.write(
-      `Error: project has no domain "${context}". Available: ${available}.\n`,
-    );
-    process.exitCode = 1;
-    return;
-  }
-  if (!domain.model) {
-    process.stderr.write(
-      `Error: domain "${context}" could not be loaded; see warnings above.\n`,
-    );
+  // The unknown-domain guard lives in resolveDomainModels, shared with
+  // the other domain-taking commands: this file predated it and kept a
+  // third copy whose empty-project fallback had already drifted
+  // (barwise-867; audit finding B7).
+  let model;
+  try {
+    const { resolved, problems } = resolveDomainModels(file, context);
+    for (const problem of problems) {
+      process.stderr.write(`Warning: ${problem}\n`);
+    }
+    model = resolved[0]!.model;
+  } catch (err) {
+    process.stderr.write(`Error: ${err instanceof Error ? err.message : String(err)}\n`);
     process.exitCode = 1;
     return;
   }
 
-  const result = await generateDiagram(domain.model, diagramOptions(domain.model, annotate));
+  const result = await generateDiagram(model, diagramOptions(model, annotate));
   writeOutput(renderDiagramSvg(result.layout), output);
 }
 

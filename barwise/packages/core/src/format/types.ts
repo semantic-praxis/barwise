@@ -28,6 +28,15 @@ export interface FormatDescriptor {
   /** Human-readable description of the format. */
   readonly description: string;
 
+  /**
+   * File extension (without the dot) for exported artifacts, e.g.
+   * "sql" for DDL. Declared here so every surface writes the same
+   * extension: three surfaces previously answered this independently
+   * (`.ddl` vs `.sql` vs hardcoded per-command) because the registry
+   * had nothing to consult (barwise-867).
+   */
+  readonly extension?: string;
+
   /** Import capability, if the format supports importing. */
   readonly importer?: ImportFormat;
 

@@ -258,9 +258,12 @@ describe("barwise export (project)", () => {
       outputDir,
     ]);
     expect(result.exitCode).toBe(0);
-    expect(existsSync(join(outputDir, "crm.ddl"))).toBe(true);
-    expect(existsSync(join(outputDir, "billing.ddl"))).toBe(true);
-    expect(readFileSync(join(outputDir, "crm.ddl"), "utf-8")).toContain("CREATE TABLE");
+    // .sql, not .ddl: the extension comes from the format registry's
+    // declared extension, the same answer MCP's spill files use
+    // (barwise-867) -- previously the format NAME was the extension.
+    expect(existsSync(join(outputDir, "crm.sql"))).toBe(true);
+    expect(existsSync(join(outputDir, "billing.sql"))).toBe(true);
+    expect(readFileSync(join(outputDir, "crm.sql"), "utf-8")).toContain("CREATE TABLE");
 
     rmSync(outputDir, { recursive: true });
   });

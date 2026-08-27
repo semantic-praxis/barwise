@@ -22,6 +22,7 @@ import { SqlImportFormat } from "./sql/SqlImportFormat.js";
 export const ddlFormat: FormatDescriptor = {
   name: "ddl",
   description: "SQL DDL (CREATE TABLE statements)",
+  extension: "sql",
   importer: new DdlImportFormat(),
   exporter: new DdlExportFormat(),
 };
@@ -30,6 +31,7 @@ export const ddlFormat: FormatDescriptor = {
 export const openApiFormat: FormatDescriptor = {
   name: "openapi",
   description: "OpenAPI 3.0 specification",
+  extension: "json",
   importer: new OpenApiImportFormat(),
   exporter: new OpenApiExportFormat(),
 };
@@ -38,6 +40,7 @@ export const openApiFormat: FormatDescriptor = {
 export const avroFormat: FormatDescriptor = {
   name: "avro",
   description: "Apache Avro schema definitions (.avsc)",
+  extension: "avsc",
   exporter: new AvroExportFormat(),
 };
 
@@ -52,6 +55,7 @@ export const sqlFormat: FormatDescriptor = {
 export const normaFormat: FormatDescriptor = {
   name: "norma",
   description: "NORMA .orm XML files",
+  extension: "orm",
   importer: new NormaImportFormat(),
   exporter: new NormaExportFormat(),
 };

@@ -2,7 +2,7 @@
  * export_model tool: exports an ORM model to a specified format.
  */
 
-import { getExporter } from "@barwise/core";
+import { getExporter, listExporters } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -38,7 +38,10 @@ export function registerExportModelTool(server: McpServer): void {
         format: z
           .string()
           .describe(
-            "Export format name (e.g., 'ddl', 'openapi'). Use list_formats to see available formats.",
+            // Derived from the registry (populated above); an earlier
+            // version pointed at a list_formats tool that was never
+            // registered (barwise-867).
+            `Export format name. Available: ${listExporters().map((f) => f.name).join(", ")}`,
           ),
         outputPath: z
           .string()
@@ -79,18 +82,13 @@ export function registerExportModelTool(server: McpServer): void {
   );
 }
 
-/** Map an export format to a sensible spill-file extension. */
+/**
+ * Spill-file extension for an export format, from the registry's
+ * declared extension -- the one answer every surface uses
+ * (barwise-867; three surfaces previously answered independently).
+ */
 function extensionForFormat(format: string): string {
-  switch (format.toLowerCase()) {
-    case "ddl":
-    case "sql":
-      return "sql";
-    case "openapi":
-    case "avro":
-      return "json";
-    default:
-      return "txt";
-  }
+  return listExporters().find((f) => f.name === format)?.extension ?? "txt";
 }
 
 export function executeExportModel(
@@ -104,7 +102,9 @@ export function executeExportModel(
   const exporter = getExporter(format);
   if (!exporter) {
     return jsonError(
-      `Unknown export format: "${format}". Use list_formats to see available formats.`,
+      `Unknown export format: "${format}". Available formats: ${
+        listExporters().map((f) => f.name).join(", ")
+      }`,
     );
   }
 

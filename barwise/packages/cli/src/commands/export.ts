@@ -9,6 +9,7 @@
 import type { ExportFormatAdapter } from "@barwise/core";
 import { getExporter, listExporters } from "@barwise/core";
 import { hashModel, type ManifestExport, updateManifest } from "@barwise/core/lineage";
+import { SQL_DIALECTS } from "@barwise/core/sql";
 import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
 import type { Command } from "commander";
@@ -46,9 +47,9 @@ export function registerExportCommand(program: Command): void {
     .option("--domain <context>", "For a project, export only this one domain")
     .option(
       "--dialect <name>",
-      "Target SQL dialect for DDL export (ansi, postgres, mysql, snowflake, "
-        + "bigquery, redshift, databricks); routes each constraint to a native "
-        + "clause, an informational clause, or a constraint-spec comment",
+      `Target SQL dialect for DDL export (${SQL_DIALECTS.join(", ")}); `
+        + "routes each constraint to a native clause, an informational "
+        + "clause, or a constraint-spec comment",
     )
     .action(async (source: string, opts: ExportOptions) => {
       try {
@@ -162,7 +163,10 @@ function exportProject(source: string, exporter: ExportFormatAdapter, opts: Expo
         written.push(p);
       }
     } else {
-      const p = join(opts.output, `${context ?? "domain"}.${opts.format}`);
+      // Extension from the registry, not the format name: three surfaces
+      // previously answered this independently (barwise-867).
+      const ext = listExporters().find((f) => f.name === opts.format)?.extension ?? opts.format;
+      const p = join(opts.output, `${context ?? "domain"}.${ext}`);
       writeFileSync(p, result.text, "utf-8");
       written.push(p);
     }

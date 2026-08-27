@@ -1,6 +1,12 @@
 import { annotateOrmYaml } from "@barwise/core/annotation";
 import { diffModels, mergeAndValidate } from "@barwise/core/diff";
-import { buildReasoningTrail, createLlmClient, processTranscript, withCallLog } from "@barwise/llm";
+import {
+  buildReasoningTrail,
+  createLlmClient,
+  processTranscript,
+  PROVIDER_NAMES,
+  withCallLog,
+} from "@barwise/llm";
 import type { ProviderName } from "@barwise/llm";
 import type { Command } from "commander";
 import { randomUUID } from "node:crypto";
@@ -18,7 +24,7 @@ export function addTranscriptSubcommand(importCmd: Command): void {
     .option("--output <file>", "Write .orm.yaml to file instead of stdout")
     .option(
       "--provider <provider>",
-      "LLM provider (anthropic, openai, ollama). Auto-detects from env vars if omitted.",
+      `LLM provider (${PROVIDER_NAMES.join(", ")}). Auto-detects from env vars if omitted.`,
     )
     .option("--model <model>", "Model override for the LLM provider")
     .option("--api-key <key>", "API key (falls back to env vars)")

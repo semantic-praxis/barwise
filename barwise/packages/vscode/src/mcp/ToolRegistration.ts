@@ -107,7 +107,10 @@ interface DescribeDomainInput {
 
 interface ImportModelInput {
   source: string;
-  format: "ddl" | "openapi" | "norma" | "dbt" | "sql" | "typescript" | "java" | "kotlin";
+  // A plain string, validated by the format registry inside
+  // executeImportModel -- not a re-listed union (barwise-867). The
+  // manifest's languageModelTools enum is the user-facing constraint.
+  format: string;
   modelName?: string;
   dialect?: string;
 }

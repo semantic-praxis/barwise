@@ -107,13 +107,13 @@
       "detail": "\"Open an .orm.yaml file before exporting.\" in packages/vscode/src/commands/ExportAvroCommand.ts, packages/vscode/src/commands/ExportDbtCommand.ts, packages/vscode/src/commands/ExportDdlCommand.ts"
     },
     "literal:6a377717a8ee": {
-      "status": "tracked:barwise-867",
-      "note": "provider list / provider option restated; derive from an exported runtime list",
+      "status": "accepted-benign",
+      "note": "shared option wording only -- the provider LIST it once carried is now derived from PROVIDER_NAMES (barwise-867); remaining repetition is help-text phrasing, not a decision",
       "detail": "\"LLM model override (e.g. 'gpt-4o', 'claude-sonnet-4-5-20250929')\" in packages/mcp/src/tools/import.ts, packages/mcp/src/tools/review.ts"
     },
     "literal:6f8d60c49e53": {
-      "status": "tracked:barwise-867",
-      "note": "provider list / provider option restated; derive from an exported runtime list",
+      "status": "accepted-benign",
+      "note": "shared option wording only -- the provider LIST it once carried is now derived from PROVIDER_NAMES (barwise-867); remaining repetition is help-text phrasing, not a decision",
       "detail": "\"LLM provider. Auto-detects from env vars if omitted.\" in packages/mcp/src/tools/import.ts, packages/mcp/src/tools/review.ts"
     },
     "literal:73a47b4be4f5": {
@@ -190,11 +190,6 @@
       "status": "accepted-benign",
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"Path to incoming .orm.yaml file\" in packages/cli/src/commands/diff.ts, packages/cli/src/commands/merge.ts"
-    },
-    "literal:ca2144e15735": {
-      "status": "tracked:barwise-867",
-      "note": "provider list / provider option restated; derive from an exported runtime list",
-      "detail": "\"LLM provider (anthropic, openai, ollama). Auto-detects from env vars i...\" in packages/cli/src/commands/import/batch.ts, packages/cli/src/commands/import/transcript.ts, packages/cli/src/commands/prompt.ts, packages/cli/src/commands/review.ts"
     },
     "literal:ddd09e146c3f": {
       "status": "accepted-benign",

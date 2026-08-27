@@ -2,6 +2,7 @@
 export { detectStatementType, parseSqlFile, parseSqlStatement } from "./SqlCascadeParser.js";
 export { extractSqlPatterns, splitSqlStatements } from "./SqlPatternExtractor.js";
 export { mapSqlTypeToConceptual } from "./typeMapping.js";
+export { SQL_DIALECTS } from "./types.js";
 export type {
   CalciteParseRequest,
   CalciteParseResponse,

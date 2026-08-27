@@ -1,5 +1,5 @@
 import { annotateOrmYaml } from "@barwise/core/annotation";
-import { createLlmClient, processTranscript, withCallLog } from "@barwise/llm";
+import { createLlmClient, processTranscript, PROVIDER_NAMES, withCallLog } from "@barwise/llm";
 import type { ProviderName } from "@barwise/llm";
 import type { Command } from "commander";
 import { randomUUID } from "node:crypto";
@@ -22,7 +22,7 @@ export function addBatchSubcommand(importCmd: Command): void {
     )
     .option(
       "--provider <provider>",
-      "LLM provider (anthropic, openai, ollama). Auto-detects from env vars if omitted.",
+      `LLM provider (${PROVIDER_NAMES.join(", ")}). Auto-detects from env vars if omitted.`,
     )
     .option("--api-key <key>", "API key (falls back to env vars)")
     .option(
