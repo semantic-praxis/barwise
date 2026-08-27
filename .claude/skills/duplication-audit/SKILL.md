@@ -101,16 +101,29 @@ and a follow-up index.
 
 The sweep splits into deterministic **detection** (emitting
 candidates) and human **classification** (assigning verdicts), and
-only the second is this skill's job. Detection belongs to
-`npm run audit:duplication`
-(`docs/specs/duplication-drift-guards.spec.md`, workstream 5): run it
-and classify its candidate report against the rubric. Until that
-script lands, the five passes below are the manual detection
-procedure -- and they remain the statement of what the script must
-cover. Passes 1 and the shape-hunt half of 5 are inherently
-judgment-loaded (comparing wirings, recognizing semantic clones);
-even with the script, expect to read code there, seeded by its
-candidates.
+only the second is this skill's job. Detection is one command:
+
+```sh
+npm run audit:duplication              # the candidate report
+npm run audit:duplication -- --check   # diff against audit-baseline.json (CI runs this)
+```
+
+Its crisp detectors (cross-file duplicate literals, core-union
+restatement sites, parity-claim prose in standing docs, generated
+files and their guard-test presence) are deterministic -- same tree,
+same bytes -- and every candidate carries a verdict in
+`audit-baseline.json`: `accepted-benign`, or `tracked:<issue>`. The
+`--check` mode fails on a new unclassified candidate and on a stale
+entry for a resolved finding, so the tracked rows always enumerate
+the open detectable findings. Registered byte-identical pairs live
+one layer up in `parity.manifest.json` (`npm run check:parity`).
+
+A full sweep still needs the judgment passes the script cannot run:
+pass 1 (cross-surface wiring comparison) and the semantic-clone
+shape hunts of pass 5 mean reading code, seeded by the script's
+candidates; run `npx jscpd --min-tokens 60` by hand for token-level
+clones (deliberately not a repo dependency). The pass descriptions
+below remain the statement of what a full sweep covers.
 
 1. **Cross-surface wiring.** For each capability the CLAUDE.md matrix
    puts on 2+ surfaces, compare the CLI command, MCP tool, and VS

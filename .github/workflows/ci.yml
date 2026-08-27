@@ -113,6 +113,13 @@ jobs:
       - run: npm run check:parity
         if: steps.changes.outputs.docs_only != 'true'
 
+      # The duplication ratchet: every candidate the deterministic
+      # detectors surface carries a verdict in audit-baseline.json, and
+      # the check fails on a new unclassified candidate AND on a stale
+      # entry for a resolved finding -- so the baseline's tracked rows
+      # always enumerate the open detectable findings (barwise-871).
+      - run: npm run audit:duplication -- --check
+
       - run: npm run purity
         if: steps.changes.outputs.docs_only != 'true'
 
