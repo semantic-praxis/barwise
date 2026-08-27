@@ -17,13 +17,8 @@
  * here) can improve naming and add definitions.
  */
 
-import {
-  type ConceptualDataTypeName,
-  type ImportFormat,
-  type ImportOptions,
-  type ImportResult,
-  OrmModel,
-} from "@barwise/core";
+import { type ImportFormat, type ImportOptions, type ImportResult, OrmModel } from "@barwise/core";
+import { mapSqlTypeToConceptual } from "@barwise/core/sql";
 
 /**
  * A parsed CREATE TABLE statement.
@@ -393,7 +388,9 @@ export class DdlImportFormat implements ImportFormat {
   ): void {
     // Create value type
     const valueTypeName = toPascalCase(column.name);
-    const conceptualType = this.mapSqlTypeToConceptual(column.dataType);
+    // "other" is DDL import's explicit unknown-type policy; the shared
+    // mapping leaves that decision to each caller (barwise-865).
+    const conceptualType = mapSqlTypeToConceptual(column.dataType) ?? "other";
 
     let valueType = model.getObjectTypeByName(valueTypeName);
     if (!valueType) {
@@ -477,54 +474,6 @@ export class DdlImportFormat implements ImportFormat {
     return base === referencedEntityName.toLowerCase()
       ? "references"
       : toCamelCase(base);
-  }
-
-  /**
-   * Map SQL data types to conceptual ORM data types.
-   */
-  private mapSqlTypeToConceptual(sqlType: string): ConceptualDataTypeName {
-    const normalized = sqlType.toUpperCase();
-
-    if (
-      /^(VARCHAR|CHAR|TEXT|STRING|NVARCHAR|CHARACTER)/.test(normalized)
-    ) {
-      return "text";
-    }
-    if (/^(INT|INTEGER|BIGINT|SMALLINT|TINYINT)/.test(normalized)) {
-      return "integer";
-    }
-    if (/^(DECIMAL|NUMERIC|NUMBER)/.test(normalized)) {
-      return "decimal";
-    }
-    if (/^(REAL|FLOAT|DOUBLE)/.test(normalized)) {
-      return "float";
-    }
-    if (/^(BOOL|BOOLEAN)/.test(normalized)) {
-      return "boolean";
-    }
-    if (/^DATE$/.test(normalized)) {
-      return "date";
-    }
-    if (/^TIME$/.test(normalized)) {
-      return "time";
-    }
-    if (/^(DATETIME|TIMESTAMP)/.test(normalized)) {
-      return "datetime";
-    }
-    if (/^(SERIAL|AUTOINCREMENT|IDENTITY)/.test(normalized)) {
-      return "auto_counter";
-    }
-    if (/^(BLOB|BINARY|BYTEA)/.test(normalized)) {
-      return "binary";
-    }
-    if (normalized.startsWith("UUID")) {
-      return "uuid";
-    }
-    if (normalized.startsWith("MONEY")) {
-      return "money";
-    }
-
-    return "other";
   }
 }
 

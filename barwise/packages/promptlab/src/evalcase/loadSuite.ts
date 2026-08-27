@@ -13,13 +13,20 @@ import type {
   SuiteWeights,
 } from "./types.js";
 
-/** Checks `@barwise/learn` evaluates against the parsed model. */
-const GYM_CHECK_KINDS = [
-  "must_validate",
-  "requires_verbalization",
-  "forbids_population",
-  "requires_element",
-] as const;
+/**
+ * Checks `@barwise/learn` evaluates against the parsed model.
+ * Record-typed over the imported GymCheck union so a fifth check kind
+ * added in learn is a compile error here instead of promptlab
+ * silently rejecting every suite case that uses it (barwise-869; this
+ * was a third, cross-package copy of the list).
+ */
+const GYM_CHECK_KIND_MEMBERS: Record<GymCheck["kind"], true> = {
+  must_validate: true,
+  requires_verbalization: true,
+  forbids_population: true,
+  requires_element: true,
+};
+const GYM_CHECK_KINDS = Object.keys(GYM_CHECK_KIND_MEMBERS) as readonly GymCheck["kind"][];
 
 /** Checks promptlab evaluates against the extraction payload. */
 const PROMPT_CHECK_KINDS = ["requires_ambiguity"] as const;

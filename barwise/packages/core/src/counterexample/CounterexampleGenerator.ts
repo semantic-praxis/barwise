@@ -28,6 +28,7 @@ import type { FactType } from "../model/FactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
+import { assertNever } from "../util/assertNever.js";
 import {
   kwSeg,
   textSeg,
@@ -241,7 +242,7 @@ function forRing(
       instances = [pair(a, b), pair(b, c), pair(a, c)];
       break;
     default:
-      return undefined;
+      assertNever(rc.ringType);
   }
 
   const reason = `a ${rc.ringType.replace(/_/g, " ")} ring violation among `

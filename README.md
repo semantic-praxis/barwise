@@ -1,8 +1,8 @@
 # barwise
 
-Object-role modeling for VS Code. Transform business concepts into precise, fact-oriented schemas that everyone can understand.
+Object-role modeling for data engineers and architects. Transform business concepts into precise, fact-oriented schemas that everyone can understand.
 
-Barwise is an [ORM 2](https://en.wikipedia.org/wiki/Object-role_modeling) modeling tool built for data engineers and architects. It ships as a VS Code extension backed by a platform-independent core library, so all model logic is testable without launching an editor.
+Barwise is an [ORM 2](https://en.wikipedia.org/wiki/Object-role_modeling) modeling toolkit. It ships as a VS Code extension, a `barwise` CLI, and an MCP server, all backed by the same platform-independent `@barwise/core` library, so all model logic is testable without launching an editor.
 
 ## Learning ORM
 
@@ -27,7 +27,7 @@ npm install
 npm run prepare
 ```
 
-The repository is an npm workspace. `npm install` at the monorepo root handles all four packages (`core`, `llm`, `diagram`, `vscode`).
+The repository is an npm workspace. `npm install` at the monorepo root (`barwise/`) handles every workspace package.
 
 `npm run prepare` is a separate step because `.npmrc` sets `ignore-scripts=true`, which blocks install-time scripts from dependencies -- and, unavoidably, our own `prepare` hook along with them. It installs the git hooks (husky); skip it and commits bypass the formatting gate. See `docs/specs/supply-chain-hardening.spec.md`.
 
@@ -37,12 +37,7 @@ The repository is an npm workspace. `npm install` at the monorepo root handles a
 npm run build
 ```
 
-This runs `turbo run build`, which compiles the packages in dependency order:
-
-1. `@barwise/core` -- metamodel, validation, verbalization, diff/merge
-2. `@barwise/llm` -- LLM-powered transcript extraction
-3. `@barwise/diagram` -- ORM diagram layout and SVG rendering
-4. `packages/vscode` -- VS Code extension (esbuild bundle)
+This runs `turbo run build`, which compiles every workspace package in dependency order -- `@barwise/core` first (it has no internal dependencies), the VS Code extension's esbuild bundle last. The full package list and dependency graph live in [`barwise/CLAUDE.md`](barwise/CLAUDE.md).
 
 ### 3. Run the tests
 
@@ -89,10 +84,10 @@ cd packages/vscode
 npx @vscode/vsce package --no-dependencies
 ```
 
-This produces a `barwise-vscode-0.1.0.vsix` file. Install it in VS Code:
+This produces a `barwise-vscode-<version>.vsix` file. Install it in VS Code:
 
 ```sh
-code --install-extension barwise-vscode-0.1.0.vsix
+code --install-extension barwise-vscode-<version>.vsix
 ```
 
 ## Configuration
@@ -108,27 +103,38 @@ After installing, open **Settings** and search for `barwise`. The key settings a
 
 ## Quick start
 
-1. **Create a project:** run the command **ORM: New Project** from the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`).
-2. **Import a transcript:** run **ORM: Import Transcript**, pick a `.md` or `.txt` file containing a business conversation, and name the model. The LLM extracts object types, fact types, and constraints into a `.orm.yaml` file. Try one of the example transcripts in `examples/transcripts/` to get started.
+1. **Create a project:** run the command **Barwise: New Project** from the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`).
+2. **Import a transcript:** run **Barwise: Import...** and choose **From Transcript**, pick a `.md` or `.txt` file containing a business conversation, and name the model. The LLM extracts object types, fact types, and constraints into a `.orm.yaml` file. Try one of the example transcripts in `barwise/examples/transcripts/` to get started. The same picker also imports from dbt projects and TypeScript/Java/Kotlin code.
 3. **Review changes:** if the `.orm.yaml` already exists, the import shows a fact-by-fact review dialog. Each added, modified, or removed element gets its own checkbox -- additions and modifications are pre-selected, removals require explicit opt-in.
-4. **Validate:** run **ORM: Validate Model** to check structural rules and constraint consistency.
-5. **Visualize:** run **ORM: Show Diagram** to see the ORM diagram.
-6. **Verbalize:** run **ORM: Verbalize Model** to generate natural-language readings of all fact types and constraints.
+4. **Validate:** run **Barwise: Validate Model** to check structural rules and constraint consistency.
+5. **Visualize:** run **Barwise: Show Diagram** to see the ORM diagram.
+6. **Verbalize:** run **Barwise: Verbalize Model** to generate natural-language readings of all fact types and constraints.
+
+The same capabilities are available from the terminal via the `barwise` CLI (see [`barwise/docs/CLI.md`](barwise/docs/CLI.md)) and to MCP clients via the MCP server (see [`barwise/docs/MCP.md`](barwise/docs/MCP.md)).
 
 ## Project structure
 
 ```
 barwise/
   examples/
-    transcripts/                 -- sample transcripts for ORM: Import Transcript
+    transcripts/                       -- sample transcripts for transcript import
   packages/
-    core/       @barwise/core     -- metamodel, validation, verbalization, diff/merge
-    llm/        @barwise/llm      -- LLM transcript extraction
-    diagram/    @barwise/diagram  -- diagram layout and SVG rendering
-    vscode/     barwise-vscode    -- VS Code extension (language server + commands)
+    core/          @barwise/core          -- metamodel, validation, verbalization, mapping, diff/merge
+    diagram/       @barwise/diagram       -- diagram layout
+    diagram-ui/    @barwise/diagram-ui    -- React diagram renderer (interactive + headless SVG)
+    llm/           @barwise/llm           -- LLM transcript extraction and model review
+    code-analysis/ @barwise/code-analysis -- TypeScript/Java/Kotlin code importers
+    dbt/           @barwise/dbt           -- dbt project importer/exporter
+    formats/       @barwise/formats       -- DDL/OpenAPI/Avro/NORMA/SQL interop formats
+    learn/         @barwise/learn         -- modeling gym and tutorial renderer
+    promptlab/     @barwise/promptlab     -- deterministic prompt evaluation
+    cli/           @barwise/cli           -- the barwise command-line tool
+    mcp/           @barwise/mcp           -- MCP server (tools, resources, prompts)
+    vscode/        barwise-vscode         -- VS Code extension (language server + commands)
   docs/
-    ARCHITECTURE.md              -- full system design and phasing plan
-  CLAUDE.md                      -- conventions and development commands
+    ARCHITECTURE.md                    -- historical design record (see CLAUDE.md for current state)
+    CLI.md, MCP.md                     -- command and tool references
+  CLAUDE.md                          -- conventions, dependency graph, development commands
 ```
 
 ## Static analysis and coverage
@@ -145,13 +151,7 @@ npm run lint
 cd packages/core && npx vitest run --coverage
 ```
 
-Current coverage thresholds:
-
-| Package   | Statements | Branches | Functions | Lines |
-|-----------|------------|----------|-----------|-------|
-| core      | 90%        | 84%      | 90%       | 90%   |
-| llm       | 78%        | 82%      | 100%      | 78%   |
-| diagram   | 94%        | 80%      | 100%      | 94%   |
+Each package declares its own thresholds in its `vitest.config.ts`; CI enforces them via `npm run test:coverage`.
 
 ## Commands reference
 

@@ -2,6 +2,7 @@
  * Focus-specific describers: build a DomainDescription for the full
  * model, a single entity, a single fact type, or a constraint type.
  */
+import { matchesConstraintType } from "../model/constraintKeyword.js";
 import type { FactType } from "../model/FactType.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
@@ -255,57 +256,4 @@ export function isConstraintTypeKeyword(keyword: string): boolean {
     "exclusive-or",
   ];
   return types.includes(keyword);
-}
-
-/**
- * Check if a verbalization type matches a constraint type keyword.
- */
-function matchesConstraintType(
-  verbalizationType: string | undefined,
-  keyword: string,
-): boolean {
-  if (!verbalizationType) return false;
-  const normalized = verbalizationType.toLowerCase();
-  const keywordNormalized = keyword.toLowerCase();
-
-  // Direct match.
-  if (normalized === keywordNormalized) return true;
-
-  // Handle variations.
-  if (keywordNormalized === "uniqueness" && normalized.includes("uniqueness")) {
-    return true;
-  }
-  if (keywordNormalized === "mandatory" && normalized.includes("mandatory")) {
-    return true;
-  }
-  if (keywordNormalized === "value" && normalized.includes("value")) {
-    return true;
-  }
-  if (keywordNormalized === "frequency" && normalized.includes("frequency")) {
-    return true;
-  }
-  if (keywordNormalized === "exclusion" && normalized.includes("exclusion")) {
-    return true;
-  }
-  if (keywordNormalized === "subset" && normalized.includes("subset")) {
-    return true;
-  }
-  if (keywordNormalized === "equality" && normalized.includes("equality")) {
-    return true;
-  }
-  if (keywordNormalized === "ring" && normalized.includes("ring")) return true;
-  if (
-    keywordNormalized === "disjunctive"
-    && normalized.includes("disjunctive")
-  ) {
-    return true;
-  }
-  if (
-    keywordNormalized === "exclusive-or"
-    && normalized.includes("exclusive")
-  ) {
-    return true;
-  }
-
-  return false;
 }

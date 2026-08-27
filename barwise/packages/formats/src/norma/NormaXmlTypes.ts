@@ -10,6 +10,8 @@
  */
 
 /** Root document of a parsed NORMA .orm file. */
+import type { RingType } from "@barwise/core";
+
 export interface NormaDocument {
   readonly modelId: string;
   readonly modelName: string;
@@ -426,15 +428,12 @@ export interface NormaJoinPath {
   readonly projections: readonly NormaJoinProjection[];
 }
 
-export type NormaRingType =
-  | "irreflexive"
-  | "asymmetric"
-  | "antisymmetric"
-  | "intransitive"
-  | "acyclic"
-  | "symmetric"
-  | "transitive"
-  | "purely_reflexive";
+/**
+ * NORMA's ring vocabulary is core's: aliased rather than re-listed so
+ * the two cannot drift (barwise-869; this was an independent
+ * eight-member union).
+ */
+export type NormaRingType = RingType;
 
 export interface NormaRingConstraint {
   readonly type: "ring";

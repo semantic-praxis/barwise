@@ -35,15 +35,22 @@ full splitting workflow.
 `output/` holds models extracted from the sample transcripts together
 with their verbalizations and diagnostics, as committed comparison
 artifacts: regenerating them across barwise versions shows how
-verbalization and validation evolve. Each output file is stamped with
-the barwise version that produced it, so version-to-version diffs are
-explicit.
+verbalization and validation evolve, with git history carrying the
+version-to-version diffs.
 
-Regenerate them from the models in `output/` with:
+The `.verbalizations.txt` and `.diagnostics.txt` files are pure
+derivations of their `.orm.yaml` siblings, guarded by a drift test
+(`packages/core/tests/integration/exampleOutputDrift.test.ts`) that
+shares its derivation with the regenerator. Refresh them with:
 
 ```sh
-npm run build && npm run regen:examples
+npm run regen:examples
 ```
+
+The `.orm.yaml` models themselves come from the recorded pipeline
+fixtures; refresh those with `UPDATE_GOLDEN=1` on
+`packages/llm/tests/Pipeline.integration.test.ts`, then rerun
+`npm run regen:examples`.
 
 ## Walkthrough
 

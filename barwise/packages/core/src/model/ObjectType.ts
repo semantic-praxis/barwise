@@ -59,6 +59,32 @@ export type ConceptualDataTypeName =
   | "uuid"
   | "other";
 
+// Record-typed for the same reason as RING_TYPE_MEMBERS in
+// Constraint.ts: completeness is compile-checked, so the runtime list
+// every consumer derives from (LLM response schema, output
+// validation) cannot silently lag the union (barwise-869).
+const CONCEPTUAL_DATA_TYPE_MEMBERS: Record<ConceptualDataTypeName, true> = {
+  text: true,
+  integer: true,
+  decimal: true,
+  money: true,
+  float: true,
+  boolean: true,
+  date: true,
+  time: true,
+  datetime: true,
+  timestamp: true,
+  auto_counter: true,
+  binary: true,
+  uuid: true,
+  other: true,
+};
+
+/** Every ConceptualDataTypeName member, in declaration order. */
+export const CONCEPTUAL_DATA_TYPE_NAMES = Object.keys(
+  CONCEPTUAL_DATA_TYPE_MEMBERS,
+) as readonly ConceptualDataTypeName[];
+
 /**
  * A conceptual data type definition on a value type.
  *

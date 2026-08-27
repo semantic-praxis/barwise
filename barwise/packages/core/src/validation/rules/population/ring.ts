@@ -1,5 +1,6 @@
 import { isRing } from "../../../model/Constraint.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
+import { assertNever } from "../../../util/assertNever.js";
 import type { Diagnostic, DiagnosticSeverity } from "../../Diagnostic.js";
 import { severityForModality } from "./shared.js";
 
@@ -200,6 +201,8 @@ export function checkRingViolations(model: OrmModel): Diagnostic[] {
             }
           }
           break;
+        default:
+          assertNever(rc.ringType);
       }
     }
   }

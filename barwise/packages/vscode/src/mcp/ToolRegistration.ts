@@ -34,6 +34,7 @@ import {
   executeSchema,
   executeValidate,
   executeVerbalize,
+  formatReview,
   resolveSource,
   type SourceInput,
 } from "@barwise/mcp";
@@ -106,7 +107,10 @@ interface DescribeDomainInput {
 
 interface ImportModelInput {
   source: string;
-  format: "ddl" | "openapi" | "norma" | "dbt" | "sql" | "typescript" | "java" | "kotlin";
+  // A plain string, validated by the format registry inside
+  // executeImportModel -- not a re-listed union (barwise-867). The
+  // manifest's languageModelTools enum is the user-facing constraint.
+  format: string;
   modelName?: string;
   dialect?: string;
 }
@@ -247,39 +251,8 @@ async function runReviewModel(
   const model = resolveSource(source);
   const result = await reviewModel(model, client, { focus: input.focus });
 
-  const lines: string[] = [];
-  lines.push("# Model Review");
-  lines.push("");
-  lines.push(`**Summary**: ${result.summary}`);
-  lines.push("");
-
-  if (result.suggestions.length === 0) {
-    lines.push("No suggestions. The model looks good!");
-  } else {
-    lines.push(`## Suggestions (${result.suggestions.length})`);
-    lines.push("");
-
-    const byCategory = new Map<string, typeof result.suggestions>();
-    for (const suggestion of result.suggestions) {
-      const existing = byCategory.get(suggestion.category) || [];
-      byCategory.set(suggestion.category, [...existing, suggestion]);
-    }
-
-    for (const [category, suggestions] of byCategory.entries()) {
-      lines.push(`### ${category.charAt(0).toUpperCase() + category.slice(1)}`);
-      lines.push("");
-      for (const s of suggestions) {
-        const severity = s.severity.toUpperCase();
-        const element = s.element ? ` (${s.element})` : "";
-        lines.push(`**${severity}${element}**: ${s.description}`);
-        lines.push(`*Rationale*: ${s.rationale}`);
-        lines.push("");
-      }
-    }
-  }
-
   return new vscode.LanguageModelToolResult([
-    new vscode.LanguageModelTextPart(lines.join("\n")),
+    new vscode.LanguageModelTextPart(formatReview(result)),
   ]);
 }
 

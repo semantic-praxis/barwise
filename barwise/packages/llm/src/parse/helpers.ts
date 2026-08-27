@@ -3,42 +3,24 @@
  */
 
 import {
+  CONCEPTUAL_DATA_TYPE_NAMES,
   type ConceptualDataTypeName,
   type DataTypeDef,
   type FactType,
   OrmModel,
-  type RingType,
+  RING_TYPES,
 } from "@barwise/core";
 
-/** Valid ConceptualDataTypeName values for validation of LLM output. */
-export const VALID_DATA_TYPE_NAMES: ReadonlySet<string> = new Set<ConceptualDataTypeName>([
-  "text",
-  "integer",
-  "decimal",
-  "money",
-  "float",
-  "boolean",
-  "date",
-  "time",
-  "datetime",
-  "timestamp",
-  "auto_counter",
-  "binary",
-  "uuid",
-  "other",
-]);
+/**
+ * Valid values for validation of LLM output, derived from core's
+ * completeness-checked member lists rather than re-listed -- a bare
+ * literal array typed `Set<ConceptualDataTypeName>` proves each entry
+ * valid but silently lags when the union grows (barwise-869).
+ */
+export const VALID_DATA_TYPE_NAMES: ReadonlySet<string> = new Set(CONCEPTUAL_DATA_TYPE_NAMES);
 
-/** Valid RingType values for validation of LLM output. */
-export const VALID_RING_TYPES: ReadonlySet<string> = new Set<RingType>([
-  "irreflexive",
-  "asymmetric",
-  "antisymmetric",
-  "intransitive",
-  "acyclic",
-  "symmetric",
-  "transitive",
-  "purely_reflexive",
-]);
+/** Valid RingType values for validation of LLM output; see above. */
+export const VALID_RING_TYPES: ReadonlySet<string> = new Set(RING_TYPES);
 
 /**
  * Resolve role identifiers from constraint role hints.

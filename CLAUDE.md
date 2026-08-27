@@ -93,9 +93,11 @@ what follows is only the vocabulary, anchored to this codebase.
 
 ## Essential Context
 
-Read `barwise/docs/ARCHITECTURE.md` before making any changes. It
-contains the full system design, metamodel specification, and phasing
-plan.
+Read `barwise/docs/ARCHITECTURE.md` for the original system design,
+metamodel specification, and phasing plan -- it is a historical design
+record now (its repository-shape sections predate the 12-package
+monorepo; its own header says what changed). The current structure
+lives in this file and the per-package CLAUDE.md files below.
 
 ## Package-Specific Instructions
 
@@ -111,7 +113,7 @@ working in a package:
 - `barwise/packages/dbt/CLAUDE.md` -- dbt connector package; registers the dbt importer/exporter into the `FormatDescriptor` registry (owns its fs + subprocess I/O)
 - `barwise/packages/formats/CLAUDE.md` -- standard interop connector package; registers the DDL/OpenAPI/Avro/NORMA/SQL descriptors into the `FormatDescriptor` registry
 - `barwise/packages/promptlab/CLAUDE.md` -- deterministic prompt evaluation: eval suite, scorer, runner, score history for the LLM surfaces
-- `barwise/packages/cli/CLAUDE.md` -- CLI tool (validate, verbalize, schema, export, diagram, diff, import, gym, prompt)
+- `barwise/packages/cli/CLAUDE.md` -- CLI tool (the full command surface is the capability matrix below plus `barwise --help`; docs/CLI.md documents every command)
 - `barwise/packages/mcp/CLAUDE.md` -- MCP server (tools, resources, prompts)
 - `barwise/packages/vscode/CLAUDE.md` -- VS Code extension integration
 - `barwise/optimizer/CLAUDE.md` -- the DSPy optimization lane (Python,
@@ -275,6 +277,16 @@ skill (`.claude/skills/release/`).
   by JavaScript or Node core (e.g. use `node:crypto.randomUUID()` not
   `uuid`). High-quality libraries that solve real problems (yaml, ajv)
   are fine.
+- A copy that must agree with other code is never guarded by a
+  comment: share it, derive it from the authority, register the pair
+  in `barwise/parity.manifest.json` (checked by `npm run
+  check:parity`), or give it a drift test -- in the same commit that
+  creates the copy. `npm run audit:duplication -- --check` ratchets
+  new candidates against `barwise/audit-baseline.json`; the
+  `duplication-audit` skill carries the rubric and the full-sweep
+  method. Deliberately parallel code stays (DRY is secondary);
+  unchecked must-agree code does not
+  (`docs/specs/duplication-drift-guards.spec.md`).
 - ESLint config is shared at the repo root (`barwise/eslint.config.mjs`).
 - Turborepo (`barwise/turbo.json`) orchestrates build/test/lint with
   correct dependency ordering.

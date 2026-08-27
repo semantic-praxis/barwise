@@ -20,6 +20,7 @@ import {
   defaultReviewArtifact,
   processTranscript,
   PROMPT_SURFACES,
+  PROVIDER_NAMES,
   resolveArtifact,
   reviewModel,
   withCallLog,
@@ -80,7 +81,7 @@ function registerEval(promptCmd: Command, version: string): void {
     .option("--suite <manifest>", "Suite manifest (defaults to the packaged suite)")
     .option(
       "--provider <provider>",
-      "LLM provider (anthropic, openai, ollama). Auto-detects from env vars if omitted.",
+      `LLM provider (${PROVIDER_NAMES.join(", ")}). Auto-detects from env vars if omitted.`,
     )
     .option("--model <model>", "Model override for the LLM provider")
     .option("--api-key <key>", "API key (falls back to env vars)")
@@ -850,7 +851,7 @@ function registerRun(promptCmd: Command): void {
     .option("--artifacts <dir>", "Also consider .prompt.yaml variants in this directory")
     .option(
       "--provider <provider>",
-      "LLM provider (anthropic, openai, ollama). Auto-detects from env vars if omitted.",
+      `LLM provider (${PROVIDER_NAMES.join(", ")}). Auto-detects from env vars if omitted.`,
     )
     .option("--model <model>", "Model override for the LLM provider")
     .option("--api-key <key>", "API key (falls back to env vars)")

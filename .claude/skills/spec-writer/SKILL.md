@@ -170,6 +170,13 @@ reverse.
   which file, from which workstream?
 - **Header block is current** -- `Status`, `Created`, `Last-updated`
   (bumped if this push revises an existing spec), `Tracking`.
+- **Parity check**: if the design introduces a copy that must agree
+  with other code -- a parallel implementation, a re-listed union, a
+  derived file, a table restating code facts -- the spec names its
+  check (a shared owner, a derivation, a `parity.manifest.json`
+  entry, or a drift test) in the same workstream that introduces it.
+  A "must match" comment is not a check
+  (`docs/specs/duplication-drift-guards.spec.md`).
 - **REPO_REVIEW link**: reference the finding the spec resolves, and
   update its checkbox/status line when the spec lands.
 

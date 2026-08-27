@@ -3,7 +3,8 @@
  */
 
 import { registerCodeFormats } from "@barwise/code-analysis";
-import { getImporter, OrmYamlSerializer } from "@barwise/core";
+import { getImporter, listImporters, OrmYamlSerializer } from "@barwise/core";
+import { SQL_DIALECTS } from "@barwise/core/sql";
 import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -40,7 +41,10 @@ export function registerImportModelTool(server: McpServer): void {
               + "For sql: file path, directory path, or inline content.",
           ),
         format: z
-          .enum(["ddl", "openapi", "norma", "dbt", "sql", "typescript", "java", "kotlin"])
+          // Derived from the registry (populated above) so a newly
+          // registered importer is accepted without editing this enum
+          // (barwise-867).
+          .enum(listImporters().map((f) => f.name) as [string, ...string[]])
           .describe(
             "Format of the source: 'ddl' for SQL DDL, 'openapi' for OpenAPI 3.x specs, "
               + "'norma' for NORMA .orm XML files, "
@@ -53,7 +57,7 @@ export function registerImportModelTool(server: McpServer): void {
           .optional()
           .describe("Name for the resulting ORM model (defaults to format-specific)"),
         dialect: z
-          .enum(["ansi", "snowflake", "bigquery", "postgres", "mysql", "redshift", "databricks"])
+          .enum(SQL_DIALECTS as unknown as [string, ...string[]])
           .optional()
           .describe("SQL dialect (for sql format). Auto-detected if omitted."),
       },
@@ -66,7 +70,9 @@ export function registerImportModelTool(server: McpServer): void {
 
 export async function executeImportModel(
   source: string,
-  format: "ddl" | "openapi" | "norma" | "dbt" | "sql" | "typescript" | "java" | "kotlin",
+  // Validated against the registry below, not a re-listed union: the
+  // registry is the one owner of which importers exist (barwise-867).
+  format: string,
   modelName?: string,
   dialect?: string,
 ): Promise<{ content: Array<{ type: "text"; text: string; }>; }> {
@@ -77,8 +83,9 @@ export async function executeImportModel(
       content: [
         {
           type: "text" as const,
-          text:
-            `Error: Unknown import format "${format}". Supported formats: ddl, openapi, norma, dbt, sql, typescript, java, kotlin`,
+          text: `Error: Unknown import format "${format}". Supported formats: ${
+            listImporters().map((f) => f.name).join(", ")
+          }`,
         },
       ],
     };

@@ -15,19 +15,25 @@ import {
   type ProficiencyLevel,
 } from "./types.js";
 
-const CONSTRAINT_KINDS: readonly ConstraintKind[] = [
-  "internal_uniqueness",
-  "mandatory",
-  "value",
-  "frequency",
-  "ring",
-];
-const CHECK_KINDS = [
-  "must_validate",
-  "requires_verbalization",
-  "forbids_population",
-  "requires_element",
-] as const;
+// Record-typed so the parser's accepted-value lists cannot lag the
+// unions in types.ts: a bare `readonly ConstraintKind[]` checks
+// membership but not completeness, and the old CHECK_KINDS had no
+// type link at all (barwise-869).
+const CONSTRAINT_KIND_MEMBERS: Record<ConstraintKind, true> = {
+  internal_uniqueness: true,
+  mandatory: true,
+  value: true,
+  frequency: true,
+  ring: true,
+};
+const CONSTRAINT_KINDS = Object.keys(CONSTRAINT_KIND_MEMBERS) as readonly ConstraintKind[];
+const CHECK_KIND_MEMBERS: Record<GymCheck["kind"], true> = {
+  must_validate: true,
+  requires_verbalization: true,
+  forbids_population: true,
+  requires_element: true,
+};
+const CHECK_KINDS = Object.keys(CHECK_KIND_MEMBERS) as readonly GymCheck["kind"][];
 
 /** Thrown when a `.gym.yaml` document is structurally invalid. */
 export class ExerciseParseError extends Error {

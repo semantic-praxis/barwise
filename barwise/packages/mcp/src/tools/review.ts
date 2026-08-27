@@ -83,7 +83,14 @@ export async function executeReview(
 }
 
 /** Render one model's review result as Markdown. */
-function formatReview(result: Awaited<ReturnType<typeof reviewModel>>): string {
+/**
+ * Render a ReviewResult as the markdown both chat surfaces show. The
+ * VS Code extension consumes this too -- it needs a different LLM
+ * client than executeReview builds, but the rendering is one
+ * decision, and it previously held a byte-identical private copy
+ * (barwise-868; audit finding C6).
+ */
+export function formatReview(result: Awaited<ReturnType<typeof reviewModel>>): string {
   const lines: string[] = [];
   lines.push("# Model Review");
   lines.push("");

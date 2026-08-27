@@ -16,6 +16,8 @@
     "knip": "knip",
     "depcruise": "depcruise packages --config .dependency-cruiser.cjs",
     "check:depcruise-gate": "node scripts/check-depcruise-gate.mjs",
+    "check:parity": "node scripts/check-parity.mjs",
+    "audit:duplication": "node scripts/audit-duplication.mjs",
     "purity": "node scripts/check-core-purity.mjs",
     "filesize": "node scripts/check-file-size.mjs",
     "check:beads": "bash scripts/check-beads.sh",

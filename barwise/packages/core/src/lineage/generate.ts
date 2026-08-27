@@ -3,6 +3,7 @@
  */
 
 import type { RelationalSchema } from "../mapping/RelationalSchema.js";
+import type { Constraint } from "../model/Constraint.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { LineageEntry, SourceReference } from "./types.js";
 
@@ -258,10 +259,29 @@ export function generateModelLineage(
 }
 
 /**
+ * Constraint kinds that deliberately take the generic label below
+ * rather than a dedicated one. Typed over the exact complement of the
+ * labeled cases so a new Constraint member forces a choice here or in
+ * the switch -- previously the parameter was widened to plain string
+ * and five kinds fell to the generic label with nothing recording
+ * whether that was intended (barwise-869).
+ */
+const GENERIC_LABELED: Record<
+  "value_comparison" | "cardinality" | "join_subset" | "join_equality" | "join_exclusion",
+  true
+> = {
+  value_comparison: true,
+  cardinality: true,
+  join_subset: true,
+  join_equality: true,
+  join_exclusion: true,
+};
+
+/**
  * Helper to generate a readable name for a constraint.
  */
 function getConstraintName(
-  constraint: { type: string; id?: string; },
+  constraint: { type: Constraint["type"]; id?: string; },
   factType: { name: string; },
 ): string {
   switch (constraint.type) {
@@ -287,7 +307,12 @@ function getConstraintName(
       return `Subset`;
     case "equality":
       return `Equality`;
-    default:
+    default: {
+      // Narrowed to exactly the declared generic-labeled kinds; a new
+      // member missing from GENERIC_LABELED fails to compile.
+      const declared: true = GENERIC_LABELED[constraint.type];
+      void declared;
       return `Constraint: ${factType.name}`;
+    }
   }
 }

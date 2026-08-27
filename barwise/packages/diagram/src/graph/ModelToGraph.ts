@@ -12,6 +12,38 @@ import type {
   SubtypeEdge,
 } from "./GraphTypes.js";
 
+/**
+ * Constraint kinds deliberately not drawn as dedicated constraint
+ * nodes, each with the reason. A new Constraint member must be added
+ * either to the drawn cases in the constraint-node switch or here --
+ * the switch's default indexes this record over the exact complement
+ * of the drawn kinds, so leaving it out of both is a compile error.
+ */
+const NOT_DRAWN: Record<
+  | "internal_uniqueness"
+  | "mandatory"
+  | "value_constraint"
+  | "frequency"
+  | "ring"
+  | "value_comparison"
+  | "cardinality"
+  | "join_subset"
+  | "join_equality"
+  | "join_exclusion",
+  string
+> = {
+  internal_uniqueness: "Phase 1: rendered inline as a uniqueness bar on the fact type",
+  mandatory: "Phase 1: rendered inline as a mandatory dot on the role connector",
+  value_constraint: "Phase 1: rendered inline on the object type",
+  frequency: "rendered inline on the role box",
+  ring: "rendered inline on the fact type node",
+  value_comparison: "not drawn: no ORM 2 glyph wired yet; verbalization carries it",
+  cardinality: "not drawn: no ORM 2 glyph wired yet; verbalization carries it",
+  join_subset: "not drawn: join-path glyphs are not wired yet; verbalization carries it",
+  join_equality: "not drawn: join-path glyphs are not wired yet; verbalization carries it",
+  join_exclusion: "not drawn: join-path glyphs are not wired yet; verbalization carries it",
+};
+
 /** Map core RingType values to short diagram labels. */
 const RING_TYPE_LABELS: Record<RingType, RingTypeLabel> = {
   irreflexive: "ir",
@@ -303,8 +335,16 @@ export function modelToGraph(
         case "equality":
           addConstraintNode("equality", c.roleIds1, c.roleIds2);
           break;
-          // frequency and ring are handled inline on role boxes / fact type nodes.
-          // internal_uniqueness, mandatory, and value_constraint are Phase 1.
+        default: {
+          // Narrowed to exactly the kinds declared not-drawn below; a
+          // new Constraint member missing from both the cases above
+          // and NOT_DRAWN fails to compile instead of silently not
+          // rendering (barwise-869: the join/comparison/cardinality
+          // kinds were undrawn with nothing recording the intent).
+          const reason: string = NOT_DRAWN[c.type];
+          void reason;
+          break;
+        }
       }
     }
   }

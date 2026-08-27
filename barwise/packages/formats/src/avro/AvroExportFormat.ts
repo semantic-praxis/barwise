@@ -186,7 +186,9 @@ function injectDocAnnotations(
 /**
  * Convert a snake_case name to PascalCase.
  *
- * Must match the toPascalCase in avro.ts so record names align.
+ * Registered in parity.manifest.json ("pascal-case-avro") with the
+ * copy in core's avro renderer: record names must align, and
+ * check:parity fails when the copies differ.
  */
 function toPascalCase(name: string): string {
   return name

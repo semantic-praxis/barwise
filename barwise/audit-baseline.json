@@ -1,0 +1,260 @@
+{
+  "$comment": "Classification baseline for scripts/audit-duplication.mjs --check (barwise-871). Every detected candidate carries a verdict: accepted-benign (repetition that is not one decision, or a checked/guarded copy) or tracked:<issue> (an open, detectable finding). --check fails on a candidate missing here AND on an entry no longer detected, so the tracked entries always enumerate exactly the open detectable findings, and resolving one forces removing its row and closing its issue. Rubric and method: .claude/skills/duplication-audit/.",
+  "candidates": {
+    "generated:45f4fbb82790": {
+      "status": "accepted-benign",
+      "note": "generated artifact with a drift test (builtins.test.ts)",
+      "detail": "packages/llm/src/prompt/artifacts/builtins.generated.ts (guard test mentioning it: yes)"
+    },
+    "literal:04dabcc31485": {
+      "status": "tracked:barwise-875",
+      "note": "extraction tool-prompt fragment duplicated across providers; move to @barwise/llm",
+      "detail": "\"Extract a structured ORM model from the transcript analysis.\" in packages/llm/src/providers/anthropic.ts, packages/vscode/src/llm/CopilotLlmClient.ts"
+    },
+    "literal:060b891ada89": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Output as JSON instead of human-readable text\" in packages/cli/src/commands/describe.ts, packages/cli/src/commands/query.ts"
+    },
+    "literal:0f47c7c3ae64": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Ensure GitHub Copilot is installed and signed in.\" in packages/vscode/src/commands/ImportTranscriptCommand.ts, packages/vscode/src/llm/CopilotLlmClient.ts"
+    },
+    "literal:1077ef6afbb5": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Project name must be a non-empty string.\" in packages/core/src/model/OrmProject.ts, packages/core/src/project/scaffoldProject.ts"
+    },
+    "literal:1569174ca48b": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Error: Source file is empty.\\n\" in packages/cli/src/commands/import/model.ts, packages/cli/src/commands/import/norma.ts"
+    },
+    "literal:16077163cccc": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"vscode-languageserver-textdocument\" in packages/vscode/src/server/CompletionProvider.ts, packages/vscode/src/server/DiagnosticsProvider.ts, packages/vscode/src/server/HoverProvider.ts, packages/vscode/src/server/OrmLanguageServer.ts"
+    },
+    "literal:1733ce1456df": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Path to .orm.yaml or .orm-project.yaml file\" in packages/cli/src/commands/describe.ts, packages/cli/src/commands/diagram.ts, packages/cli/src/commands/export.ts, packages/cli/src/commands/query.ts, packages/cli/src/commands/validate.ts, packages/cli/src/commands/verbalize.ts"
+    },
+    "literal:1da02d15746d": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Kotlin project (annotations, sealed classes, validations)\" in packages/code-analysis/src/formats/KotlinImportFormat.ts, packages/code-analysis/src/formats/registration.ts"
+    },
+    "literal:1e84528eae54": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"TypeScript project (types, validations, state machines)\" in packages/code-analysis/src/formats/TypeScriptImportFormat.ts, packages/code-analysis/src/formats/registration.ts"
+    },
+    "literal:28f70480a12c": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"File path to .orm.yaml, .orm-project.yaml, or inline YAML content\" in packages/mcp/src/tools/describeDomain.ts, packages/mcp/src/tools/exportModel.ts, packages/mcp/src/tools/queryModel.ts, packages/mcp/src/tools/review.ts, packages/mcp/src/tools/validate.ts, packages/mcp/src/tools/verbalize.ts"
+    },
+    "literal:37a6fdb45c78": {
+      "status": "accepted-benign",
+      "note": "one diagnostic family deliberately emitted by two population rule files",
+      "detail": "\"population/equality-violation\" in packages/core/src/validation/rules/population/setComparison.ts, packages/core/src/validation/rules/population/spanning.ts"
+    },
+    "literal:3a530b0bebb7": {
+      "status": "accepted-benign",
+      "note": "one diagnostic family deliberately emitted by two population rule files",
+      "detail": "\"population/exclusion-violation\" in packages/core/src/validation/rules/population/setComparison.ts, packages/core/src/validation/rules/population/spanning.ts"
+    },
+    "literal:3c8ee4ddb504": {
+      "status": "tracked:barwise-875",
+      "note": "part of the duplicated analyze extractModel pair (audit C8)",
+      "detail": "\"no deterministic import format detected for this repository \" in packages/cli/src/commands/analyze.ts, packages/mcp/src/tools/analyze.ts"
+    },
+    "literal:4352dacc84a1": {
+      "status": "tracked:barwise-875",
+      "note": "part of the duplicated analyze extractModel pair (audit C8)",
+      "detail": "\"Model name for the extracted domain\" in packages/cli/src/commands/analyze.ts, packages/mcp/src/tools/analyze.ts"
+    },
+    "literal:49c3feeca8f4": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"SQL DDL (CREATE TABLE statements)\" in packages/formats/src/ddl/DdlExportFormat.ts, packages/formats/src/registration.ts"
+    },
+    "literal:4a313791a27a": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Model override for the LLM provider\" in packages/cli/src/commands/import/transcript.ts, packages/cli/src/commands/prompt.ts, packages/cli/src/commands/review.ts"
+    },
+    "literal:51068e131699": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"population/exclusive-or-violation\" in packages/core/src/validation/rules/population/setComparison.ts, packages/core/src/validation/rules/population/spanning.ts"
+    },
+    "literal:560138396b48": {
+      "status": "accepted-benign",
+      "note": "the documented deliberate cli/mcp workspace mirror (mcp/src/workspace/resolve.ts header); cli/commands/diagram.ts's third unshared copy is tracked under the same audit finding",
+      "detail": "\". Available: ${available || \" in packages/cli/src/workspace/domainModels.ts, packages/mcp/src/workspace/resolve.ts"
+    },
+    "literal:5e8c47fe1a0d": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Write .orm.yaml to file instead of stdout\" in packages/cli/src/commands/import/code.ts, packages/cli/src/commands/import/dbt.ts, packages/cli/src/commands/import/model.ts, packages/cli/src/commands/import/norma.ts, packages/cli/src/commands/import/sql.ts, packages/cli/src/commands/import/transcript.ts"
+    },
+    "literal:64e47a4126f6": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Open an .orm.yaml file before exporting.\" in packages/vscode/src/commands/ExportAvroCommand.ts, packages/vscode/src/commands/ExportDbtCommand.ts, packages/vscode/src/commands/ExportDdlCommand.ts"
+    },
+    "literal:6a377717a8ee": {
+      "status": "accepted-benign",
+      "note": "shared option wording only -- the provider LIST it once carried is now derived from PROVIDER_NAMES (barwise-867); remaining repetition is help-text phrasing, not a decision",
+      "detail": "\"LLM model override (e.g. 'gpt-4o', 'claude-sonnet-4-5-20250929')\" in packages/mcp/src/tools/import.ts, packages/mcp/src/tools/review.ts"
+    },
+    "literal:6f8d60c49e53": {
+      "status": "accepted-benign",
+      "note": "shared option wording only -- the provider LIST it once carried is now derived from PROVIDER_NAMES (barwise-867); remaining repetition is help-text phrasing, not a decision",
+      "detail": "\"LLM provider. Auto-detects from env vars if omitted.\" in packages/mcp/src/tools/import.ts, packages/mcp/src/tools/review.ts"
+    },
+    "literal:73a47b4be4f5": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"No dbt_project.yml found in the selected directory. \" in packages/vscode/src/commands/ExportDbtCommand.ts, packages/vscode/src/commands/ImportDbtCommand.ts"
+    },
+    "literal:76a0f5be3194": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Java project (annotations, types, validations)\" in packages/code-analysis/src/formats/JavaImportFormat.ts, packages/code-analysis/src/formats/registration.ts"
+    },
+    "literal:7c9ed77763f0": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"API key (falls back to env vars)\" in packages/cli/src/commands/import/batch.ts, packages/cli/src/commands/import/transcript.ts, packages/cli/src/commands/prompt.ts, packages/cli/src/commands/review.ts"
+    },
+    "literal:821bd1da5aa9": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Active file is not an .orm.yaml file.\" in packages/vscode/src/commands/ValidateModelCommand.ts, packages/vscode/src/commands/VerbalizeCommand.ts"
+    },
+    "literal:849b484270a7": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"File path or inline YAML for the base model\" in packages/mcp/src/tools/diff.ts, packages/mcp/src/tools/merge.ts"
+    },
+    "literal:8f95b7c3b80b": {
+      "status": "tracked:barwise-875",
+      "note": "counterexample renderer twin between cli and mcp (audit C12)",
+      "detail": "\"Counterexamples (what the constraints rule out):\" in packages/cli/src/workspace/format.ts, packages/mcp/src/tools/verbalize.ts"
+    },
+    "literal:930fc90869d0": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Name for the imported Barwise model\" in packages/vscode/src/commands/ImportCodeCommand.ts, packages/vscode/src/commands/ImportDbtCommand.ts"
+    },
+    "literal:95f7bf50feb3": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Model name (defaults to filename)\" in packages/cli/src/commands/import/model.ts, packages/cli/src/commands/import/norma.ts, packages/cli/src/commands/import/transcript.ts"
+    },
+    "literal:9a5095ddebd1": {
+      "status": "tracked:barwise-875",
+      "note": "part of the duplicated analyze extractModel pair (audit C8)",
+      "detail": "\"Branch, tag, or commit to analyze\" in packages/cli/src/commands/analyze.ts, packages/mcp/src/tools/analyze.ts"
+    },
+    "literal:9cf1e480a40f": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\" produces `# TODO(barwise):`, \" in packages/core/src/annotation/ExportAnnotationCollector.ts, packages/core/src/annotation/helpers.ts"
+    },
+    "literal:a3312c7106f0": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Please select a valid dbt project root.\" in packages/vscode/src/commands/ExportDbtCommand.ts, packages/vscode/src/commands/ImportDbtCommand.ts"
+    },
+    "literal:a627e0caaaf9": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Skip TODO/NOTE annotations in output\" in packages/cli/src/commands/import/batch.ts, packages/cli/src/commands/import/transcript.ts"
+    },
+    "literal:ae564b4b9a78": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Output format (text or json)\" in packages/cli/src/commands/analyze.ts, packages/cli/src/commands/diff.ts, packages/cli/src/commands/gym.ts, packages/cli/src/commands/lineage.ts, packages/cli/src/commands/llmUsage.ts, packages/cli/src/commands/prompt.ts, packages/cli/src/commands/review.ts, packages/cli/src/commands/validate.ts, packages/cli/src/commands/verbalize.ts"
+    },
+    "literal:b45e4fc13e0b": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Apache Avro schema definitions (.avsc)\" in packages/formats/src/avro/AvroExportFormat.ts, packages/formats/src/registration.ts"
+    },
+    "literal:bf5e6f822f5a": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Path to incoming .orm.yaml file\" in packages/cli/src/commands/diff.ts, packages/cli/src/commands/merge.ts"
+    },
+    "literal:ddd09e146c3f": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"No Person is a parent of that same Person.\" in packages/core/src/model/Constraint.ts, packages/core/src/validation/rules/population/ring.ts"
+    },
+    "literal:ed82f35862b1": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Ollama server URL (only for ollama provider)\" in packages/cli/src/commands/import/batch.ts, packages/cli/src/commands/import/transcript.ts, packages/cli/src/commands/prompt.ts, packages/cli/src/commands/review.ts"
+    },
+    "literal:f050ba536362": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"Model name (defaults to directory name)\" in packages/cli/src/commands/import/code.ts, packages/cli/src/commands/import/dbt.ts"
+    },
+    "literal:f0532f0fe1f6": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"File path or inline YAML for the incoming model\" in packages/mcp/src/tools/diff.ts, packages/mcp/src/tools/merge.ts"
+    },
+    "literal:f356330501a4": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
+      "detail": "\"File path to .orm.yaml or inline YAML content\" in packages/mcp/src/tools/diagram.ts, packages/mcp/src/tools/schema.ts"
+    },
+    "prose:3ab05c3cbd94": {
+      "status": "accepted-benign",
+      "note": "the capability matrix's own honesty note; the matrix is re-audited by convention",
+      "detail": "../CLAUDE.md: run`, which is what that lane is for. This table is hand-maintained and therefore the"
+    },
+    "prose:5236a3a26169": {
+      "status": "accepted-benign",
+      "note": "descriptive: explains why the hand-maintained value is distrusted, not a live mirror",
+      "detail": "packages/promptlab/CLAUDE.md: `version:` being bumped -- which `artifactVersion`, a hand-maintained"
+    },
+    "union:0b572648a186": {
+      "status": "accepted-benign",
+      "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
+      "detail": "SqlDialect restated as record in packages/formats/src/sql/SqlglotBridge.ts"
+    },
+    "union:142510fe570f": {
+      "status": "accepted-benign",
+      "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
+      "detail": "SqlDialect restated as record in packages/dbt/src/sql/SqlglotBridge.ts"
+    },
+    "union:2cff6a8d7af5": {
+      "status": "accepted-benign",
+      "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
+      "detail": "ConceptualDataTypeName restated as record in packages/formats/src/norma/NormaXmlWriter.ts"
+    },
+    "union:46780e616ca9": {
+      "status": "accepted-benign",
+      "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
+      "detail": "SqlDialect restated as record in packages/formats/src/ddl/dialectCapabilities.ts"
+    },
+    "union:68fdcce7dcbf": {
+      "status": "accepted-benign",
+      "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
+      "detail": "RingType restated as record in packages/diagram/src/graph/ModelToGraph.ts"
+    },
+    "union:806852fbaa93": {
+      "status": "accepted-benign",
+      "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
+      "detail": "ConceptualDataTypeName restated as set in packages/llm/src/parse/helpers.ts"
+    }
+  }
+}

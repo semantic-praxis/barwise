@@ -19,7 +19,7 @@
  */
 
 import type { ProviderName, ReviewResult, ReviewSuggestion } from "@barwise/llm";
-import { createLlmClient, reviewModel, withCallLog } from "@barwise/llm";
+import { createLlmClient, PROVIDER_NAMES, reviewModel, withCallLog } from "@barwise/llm";
 import type { Command } from "commander";
 import { randomUUID } from "node:crypto";
 import { callLogSink } from "../workspace/callLogSink.js";
@@ -33,7 +33,7 @@ export function registerReviewCommand(program: Command): void {
     .option("--focus <name>", "Review only this entity or fact type")
     .option(
       "--provider <provider>",
-      "LLM provider (anthropic, openai, ollama). Auto-detects from env vars if omitted.",
+      `LLM provider (${PROVIDER_NAMES.join(", ")}). Auto-detects from env vars if omitted.`,
     )
     .option("--model <model>", "Model override for the LLM provider")
     .option("--api-key <key>", "API key (falls back to env vars)")

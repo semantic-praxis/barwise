@@ -1138,5 +1138,16 @@ function normalizeRingType(raw: string): NormaRingType {
     transitive: "transitive",
     purelyreflexive: "purely_reflexive",
   };
-  return map[lower] ?? "irreflexive";
+  const ringType = map[lower];
+  if (ringType === undefined) {
+    // Reject rather than coerce: silently rewriting an unrecognized
+    // ring type to "irreflexive" changed the model's semantics with
+    // nothing reporting it (barwise-869). The import format wraps
+    // this into a NormaImportError.
+    throw new Error(
+      `Unrecognized ring constraint type "${raw}" in NORMA document`
+        + ` (expected one of: ${Object.keys(map).join(", ")}).`,
+    );
+  }
+  return ringType;
 }

@@ -17,6 +17,21 @@ export type SqlDialect =
   | "redshift"
   | "databricks";
 
+// Record-typed so the runtime list cannot lag the union; CLI help and
+// MCP enums derive from this instead of re-listing (barwise-867).
+const SQL_DIALECT_MEMBERS: Record<SqlDialect, true> = {
+  ansi: true,
+  snowflake: true,
+  bigquery: true,
+  postgres: true,
+  mysql: true,
+  redshift: true,
+  databricks: true,
+};
+
+/** Every SqlDialect member, in declaration order. */
+export const SQL_DIALECTS = Object.keys(SQL_DIALECT_MEMBERS) as readonly SqlDialect[];
+
 /**
  * Which cascade level produced a parse result.
  *

@@ -101,7 +101,7 @@ export type { OpenAIClientOptions } from "./providers/openai.js";
 
 // Provider factory
 export { createLlmClient, detectProvider } from "./providers/factory.js";
-export type { ProviderName, ProviderOptions } from "./providers/factory.js";
+export { PROVIDER_NAMES, type ProviderName, type ProviderOptions } from "./providers/factory.js";
 
 // Review
 export { buildReviewResponseSchema, reviewModel } from "./review/reviewModel.js";

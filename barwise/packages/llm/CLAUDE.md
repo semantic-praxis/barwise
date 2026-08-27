@@ -29,11 +29,20 @@ same pattern.
 src/
   ExtractionTypes.ts      Types for extraction responses (ExtractedObjectType, InferredConstraint, etc.)
   LlmClient.ts            Abstract LLM client interface (LlmClient, CompletionRequest, CompletionResponse)
-  ExtractionPrompt.ts     System prompt construction and response schema
+  ExtractionPrompt.ts     Thin facade re-exporting the prompt/ modules
+  ExtractionConformance.ts Structural cleanup so parsed constraints pass validation
   DraftModelParser.ts     Converts extraction response into an OrmModel with provenance tracking
   TranscriptProcessor.ts  Pipeline orchestrator: transcript -> LLM -> draft model
-  providers/
-    anthropic.ts          Anthropic Claude implementation of LlmClient
+  ModelContext.ts         Existing-model context for incremental extraction
+  ReasoningTrail.ts       Extraction reasoning capture
+  budget.ts               Output-token budget derived from transcript length
+  parse/                  Response parsing (object types, fact types, constraints, ...)
+  prompt/                 Prompt artifacts (builtins.generated.ts, selectArtifact,
+                          systemPrompt, reviewPrompt, responseSchema, promptHash)
+  providers/              LlmClient implementations: anthropic, openai, ollama
+                          (+ factory.ts createLlmClient, stopReason.ts)
+  observe/                Call/extraction/validation telemetry records
+  review/                 reviewModel (LLM semantic review)
   index.ts                Public API
 ```
 
@@ -266,7 +275,10 @@ npx tsc --noEmit            # type-check only
 
 ## Dependencies
 
-| Direction  | Package          | What is used                                                                  |
-| ---------- | ---------------- | ----------------------------------------------------------------------------- |
-| Upstream   | `@barwise/core`  | `OrmModel`, `ObjectType`, `FactType`, `Role`, constraint types, serialization |
-| Downstream | `barwise-vscode` | `processTranscript`, `AnthropicLlmClient`, extraction types                   |
+| Direction  | Package              | What is used                                                                  |
+| ---------- | -------------------- | ----------------------------------------------------------------------------- |
+| Upstream   | `@barwise/core`      | `OrmModel`, `ObjectType`, `FactType`, `Role`, constraint types, serialization |
+| Downstream | `@barwise/cli`       | `processTranscript`, `reviewModel`, `createLlmClient`, artifact resolution    |
+| Downstream | `@barwise/mcp`       | `processTranscript`, `reviewModel`, `createLlmClient`                         |
+| Downstream | `@barwise/promptlab` | `LlmClient`, artifacts, conformance, parsing for the eval runner              |
+| Downstream | `barwise-vscode`     | `processTranscript`, `reviewModel`, `AnthropicLlmClient`, extraction types    |

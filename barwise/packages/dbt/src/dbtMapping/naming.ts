@@ -2,50 +2,17 @@
  * Pure name and data-type inference helpers for dbt-to-ORM mapping.
  */
 
-import type { ConceptualDataTypeName, DataTypeDef } from "@barwise/core";
+import type { DataTypeDef } from "@barwise/core";
+import { mapSqlTypeToConceptual } from "@barwise/core/sql";
 
 // ---------------------------------------------------------------------------
 // Data type resolution
 // ---------------------------------------------------------------------------
 
-const SQL_TYPE_MAP: Record<string, ConceptualDataTypeName> = {
-  text: "text",
-  varchar: "text",
-  "character varying": "text",
-  string: "text",
-  int: "integer",
-  integer: "integer",
-  bigint: "integer",
-  smallint: "integer",
-  number: "decimal",
-  numeric: "decimal",
-  decimal: "decimal",
-  float: "float",
-  double: "float",
-  "double precision": "float",
-  real: "float",
-  boolean: "boolean",
-  bool: "boolean",
-  date: "date",
-  time: "time",
-  datetime: "datetime",
-  timestamp: "timestamp",
-  "timestamp_ntz": "timestamp",
-  "timestamp_ltz": "timestamp",
-  "timestamp_tz": "timestamp",
-  "timestamp without time zone": "timestamp",
-  "timestamp with time zone": "timestamp",
-  binary: "binary",
-  varbinary: "binary",
-  bytes: "binary",
-  uuid: "uuid",
-};
-
 export function resolveDataType(rawType: string | undefined): DataTypeDef | undefined {
   if (!rawType) return undefined;
 
-  const normalized = rawType.toLowerCase().replace(/\(.*\)/, "").trim();
-  const conceptual = SQL_TYPE_MAP[normalized];
+  const conceptual = mapSqlTypeToConceptual(rawType);
 
   if (!conceptual) return undefined;
 

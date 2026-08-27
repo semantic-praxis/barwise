@@ -1,4 +1,4 @@
-import { getImporter, OrmYamlSerializer } from "@barwise/core";
+import { getImporter, listImporters, OrmYamlSerializer } from "@barwise/core";
 import type { Command } from "commander";
 import { basename, extname } from "node:path";
 import { readFile, writeOutput } from "../../workspace/io.js";
@@ -9,7 +9,12 @@ export function addModelSubcommand(importCmd: Command): void {
     .command("model")
     .description("Import ORM model from a text-based format")
     .argument("<source>", "Path to source file")
-    .requiredOption("--format <format>", "Format: ddl, openapi, norma")
+    .requiredOption(
+      "--format <format>",
+      // Derived from the registry: the CLI advertised 3 of 8+
+      // registered importers and the error text lied (barwise-867).
+      `Format: one of ${listImporters().map((f) => f.name).join(", ")}`,
+    )
     .option("--output <file>", "Write .orm.yaml to file instead of stdout")
     .option("--name <name>", "Model name (defaults to filename)")
     .action(
@@ -32,7 +37,9 @@ export function addModelSubcommand(importCmd: Command): void {
           const format = getImporter(opts.format);
           if (!format) {
             process.stderr.write(
-              `Error: Unknown format "${opts.format}". Available: ddl, openapi, norma\n`,
+              `Error: Unknown format "${opts.format}". Available: ${
+                listImporters().map((f) => f.name).join(", ")
+              }\n`,
             );
             process.exitCode = 1;
             return;

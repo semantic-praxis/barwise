@@ -1,14 +1,15 @@
 # @barwise/cli
 
 Command-line tool for ORM 2 modeling. Wraps the platform-independent
-packages (`@barwise/core`, `@barwise/diagram`, `@barwise/llm`) into a
-`barwise` CLI binary.
+packages into a `barwise` CLI binary; the authoritative list of
+internal dependencies is the root CLAUDE.md dependency graph (and
+this package's `package.json`).
 
 ## Dependency Rule
 
-This package depends on `@barwise/core`, `@barwise/diagram`,
-`@barwise/llm`, `@barwise/promptlab`, and `commander`. It has ZERO
-dependencies on VS Code.
+This package may depend on any internal package except
+`barwise-vscode` and `@barwise/mcp`; `commander` is the only
+substantial external. It has ZERO dependencies on VS Code.
 
 ## Package Layout
 
@@ -19,6 +20,7 @@ src/
   commands/
     validate.ts         barwise validate <file>
     verbalize.ts        barwise verbalize <file>
+    describe.ts         barwise describe <file>
     schema.ts           barwise schema <file>
     export.ts           barwise export <file> --format <name>
     diagram.ts          barwise diagram <file>
@@ -27,8 +29,13 @@ src/
     review.ts           barwise review <file> (LLM semantic review; always exits 0)
     gym.ts              barwise gym list|show|check (modeling gym; miss-card
                         emission + session log at $XDG_STATE_HOME/barwise/)
+    history.ts          barwise history (model history from git)
+    project.ts          barwise project init|split (project-level operations)
     import.ts           barwise import (orchestrator over import/)
     import/             one module per import subcommand + shared helpers
+    analyze.ts          barwise analyze (repo-wide code analysis)
+    lineage.ts          barwise lineage status|impact|show
+    query.ts            barwise query <file> <query>
     prompt.ts           barwise prompt eval|score|schema|artifact|run|history
                         (prompt evaluation over @barwise/promptlab)
     llmUsage.ts         barwise llm-usage (report over the call log)
@@ -171,8 +178,14 @@ npx tsc --noEmit            # type-check only
 
 ## Dependencies
 
-| Direction | Package            | What is used                                                   |
-| --------- | ------------------ | -------------------------------------------------------------- |
-| Upstream  | `@barwise/core`    | Model, validation, verbalization, mapping, diff, serialization |
-| Upstream  | `@barwise/diagram` | `generateDiagram` for SVG output                               |
-| Upstream  | `@barwise/llm`     | `processTranscript`, `createLlmClient`, provider factory       |
+| Direction | Package                  | What is used                                                       |
+| --------- | ------------------------ | ------------------------------------------------------------------ |
+| Upstream  | `@barwise/core`          | Model, validation, verbalization, mapping, diff, query, describe   |
+| Upstream  | `@barwise/diagram`       | Diagram layout for SVG output                                      |
+| Upstream  | `@barwise/diagram-ui`    | Headless SVG rendering of the positioned graph                     |
+| Upstream  | `@barwise/llm`           | `processTranscript`, `reviewModel`, `createLlmClient`, providers   |
+| Upstream  | `@barwise/code-analysis` | `registerCodeFormats` for TypeScript/Java/Kotlin import            |
+| Upstream  | `@barwise/dbt`           | `registerDbtFormats` for dbt import/export                         |
+| Upstream  | `@barwise/formats`       | `registerStandardFormats` (DDL/OpenAPI/Avro/NORMA/SQL descriptors) |
+| Upstream  | `@barwise/learn`         | Modeling gym (exercise catalog, evaluator, miss cards)             |
+| Upstream  | `@barwise/promptlab`     | Eval suite, scorer, runner, score history for `barwise prompt`     |

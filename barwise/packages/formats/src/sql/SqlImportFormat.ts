@@ -9,13 +9,7 @@
  * via explicit flags, file-level hints, or syntax probing.
  */
 
-import {
-  type ConceptualDataTypeName,
-  type ImportFormat,
-  type ImportOptions,
-  type ImportResult,
-  OrmModel,
-} from "@barwise/core";
+import { type ImportFormat, type ImportOptions, type ImportResult, OrmModel } from "@barwise/core";
 import { parseSqlFile, type SqlDialect, type SqlPatternContext } from "@barwise/core/sql";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -91,25 +85,6 @@ function findSqlFiles(dir: string): string[] {
   }
 
   return results;
-}
-
-/**
- * Map SQL data types to conceptual ORM data types.
- */
-function _mapSqlType(sqlType: string): ConceptualDataTypeName {
-  const normalized = sqlType.toUpperCase();
-
-  if (/^(VARCHAR|CHAR|TEXT|STRING|NVARCHAR)/.test(normalized)) return "text";
-  if (/^(INT|INTEGER|BIGINT|SMALLINT|TINYINT)/.test(normalized)) return "integer";
-  if (/^(DECIMAL|NUMERIC|NUMBER)/.test(normalized)) return "decimal";
-  if (/^(REAL|FLOAT|DOUBLE)/.test(normalized)) return "float";
-  if (/^(BOOL|BOOLEAN)/.test(normalized)) return "boolean";
-  if (/^DATE$/.test(normalized)) return "date";
-  if (/^TIME$/.test(normalized)) return "time";
-  if (/^(DATETIME|TIMESTAMP)/.test(normalized)) return "datetime";
-  if (/^(BLOB|BINARY|BYTEA)/.test(normalized)) return "binary";
-  if (normalized.startsWith("UUID")) return "uuid";
-  return "other";
 }
 
 /**
