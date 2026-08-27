@@ -101,9 +101,10 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
   rubric-tested suite-wide, and no set-comparison constraint is -- or
   can be, until `forbids_population` grows a kind for them. A suite
   mean therefore says nothing about whether a prompt extracts the
-  uncovered types, however green it runs. The inventory, the
-  two-instances-per-common-type target, and the closing workstreams
-  are `docs/specs/constraint-extraction-coverage.spec.md`; update that
+  uncovered types, however green it runs. The policy is
+  `docs/adr/0002-constraint-coverage-policy.md`; the living inventory
+  and closing workstreams are
+  `docs/specs/constraint-extraction-coverage.spec.md` -- update that
   spec in the same commit that adds a type's first or second tested
   instance.
 - **`requires_ambiguity` needs its budget.** The check alone is won by
