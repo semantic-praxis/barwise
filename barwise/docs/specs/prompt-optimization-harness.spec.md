@@ -3,10 +3,14 @@
 Status: Accepted (merged in PR #289). Workstreams 1 (artifact seam),
 2 (promptlab: eval suite, scorer, runner, CLI) and **3 (the DSPy
 `optimizer/` project, 2026-08-23 -- see
-`docs/specs/dspy-optimizer.spec.md`)** implemented. Workstreams 4-6
-open.
+`docs/specs/dspy-optimizer.spec.md`)** implemented. Workstream 5 is
+grounded with its first slice landed (2026-08-24: the review artifact
+seam and response validation -- see
+`docs/specs/review-surface-evals.spec.md`, whose workstreams 2-4 carry
+the rest). Workstreams 4 and 6 open; 4's committed baseline is now
+workstream 4 of `docs/specs/eval-split-stratification.spec.md`.
 Created: 2026-08-08
-Last-updated: 2026-08-23
+Last-updated: 2026-08-27
 
 > **Correction (2026-08-09).** Workstream 1 shipped the artifact seam
 > but not its production wiring, and two claims in this spec were
