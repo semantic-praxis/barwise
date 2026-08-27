@@ -37,3 +37,8 @@ checks:
     factType: Instructor teaches CourseOffering
     constraint: mandatory
     hint: Each offering is taught by some instructor.
+  - kind: forbids_population
+    factType: Student receives LetterGrade for CourseOffering
+    constraint: internal_uniqueness
+    hint: A student gets at most one grade per offering - as the ternary or
+      as an objectified enrollment carrying the grade; both shapes pass.

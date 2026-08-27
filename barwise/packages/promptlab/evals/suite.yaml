@@ -71,7 +71,14 @@
 # instance could witness its supertype's existence
 # (docs/specs/mandatory-existence-witness.spec.md, barwise-880). One
 # rubric grows by one check; the answer keys still score 1.000.
-version: 2.3.0
+#
+# 2.4.0 adds the one check the audit's finding F6 had to leave off:
+# university-enrollment's settled grade rule, addable now that
+# forbids_population sees through objectification
+# (docs/specs/objectified-correspondence.spec.md, barwise-881). The
+# ternary and the objectified-Enrollment shapes both pass; the answer
+# keys still score 1.000.
+version: 2.4.0
 
 # Re-fitted for the rated form, because rating changed what a weight
 # means. A weight is now the cost of a model in which EVERY element

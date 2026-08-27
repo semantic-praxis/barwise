@@ -59,7 +59,7 @@ describe("the university-enrollment licence", () => {
     // licence were ignored and matching had become fuzzy, this payload
     // would score 1.000 here too. Only must_validate survives -- the
     // recorded 0.154 collapse's shape, over the rubric as it stands
-    // (eight checks since suite 2.2.0).
+    // (the rubric as versioned in suite.yaml).
     const score = scoreExtraction(synonymPayload(), unlicensed(), suite.weights);
     expect(score.rubricPassed).toBe(1);
     expect(score.score).toBeCloseTo(1 / score.rubricTotal, 10);
