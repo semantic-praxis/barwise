@@ -36,9 +36,29 @@ export function severityForModality(
  * Treating extracted samples as complete is what reported a mandatory
  * violation for every entity a transcript merely mentioned in passing
  * (docs/specs/sample-populations.spec.md).
+ *
+ * A value is credited to the role's player AND to every supertype
+ * reachable through identification-sharing subtype links: "every
+ * Employee is also a Person" is definitional in ORM, and a subtype
+ * whose `providesIdentification` is true names its instances in the
+ * supertype's value space, so a Manager recorded managing a department
+ * exists as an Employee too. A link with an independent identifier
+ * breaks the chain -- the value spaces differ, so the credit would
+ * assert an identity nothing established. Witnessing flows up only:
+ * whether an Employee value is also a Manager is not decidable from a
+ * population and is not attempted
+ * (docs/specs/mandatory-existence-witness.spec.md).
  */
 export function buildObjectUniverse(model: OrmModel): Map<string, Set<string>> {
   const universe = new Map<string, Set<string>>();
+  const credit = (typeId: string, value: string): void => {
+    let values = universe.get(typeId);
+    if (!values) {
+      values = new Set();
+      universe.set(typeId, values);
+    }
+    values.add(value);
+  };
   for (const pop of model.populations) {
     if (pop.sample) continue;
     const ft = model.getFactType(pop.factTypeId);
@@ -47,16 +67,37 @@ export function buildObjectUniverse(model: OrmModel): Map<string, Set<string>> {
       for (const role of ft.roles) {
         const value = inst.roleValues[role.id];
         if (value === undefined) continue;
-        let values = universe.get(role.playerId);
-        if (!values) {
-          values = new Set();
-          universe.set(role.playerId, values);
+        for (const typeId of identificationSharingAncestry(model, role.playerId)) {
+          credit(typeId, value);
         }
-        values.add(value);
       }
     }
   }
   return universe;
+}
+
+/**
+ * The player itself plus every supertype reachable through
+ * `providesIdentification` subtype links, cycle-guarded. Shared by the
+ * universe above and the counterexample generator's anchor search --
+ * two answers to "who does this value witness" would be the drift this
+ * function exists to prevent.
+ */
+export function identificationSharingAncestry(
+  model: OrmModel,
+  playerId: string,
+): readonly string[] {
+  const seen = new Set<string>([playerId]);
+  const chain = [playerId];
+  for (let i = 0; i < chain.length; i++) {
+    for (const sf of model.subtypeFacts) {
+      if (sf.subtypeId !== chain[i] || !sf.providesIdentification) continue;
+      if (seen.has(sf.supertypeId)) continue;
+      seen.add(sf.supertypeId);
+      chain.push(sf.supertypeId);
+    }
+  }
+  return chain;
 }
 /** The set of values appearing in a given role across all populations. */
 export function valuesPlayedInRole(model: OrmModel, roleId: string): Set<string> {

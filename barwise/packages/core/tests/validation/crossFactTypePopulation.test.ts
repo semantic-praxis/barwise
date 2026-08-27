@@ -128,3 +128,73 @@ describe("cross-fact-type population validation: disjunctive mandatory", () => {
     ).toBe(false);
   });
 });
+
+/**
+ * Subtype existence witnessing
+ * (docs/specs/mandatory-existence-witness.spec.md): a value recorded in
+ * a subtype's role exists as the supertype too, when the subtype shares
+ * the supertype's identification scheme.
+ */
+function subtypeWitnessModel(providesIdentification: boolean): OrmModel {
+  const model = new OrmModel({ name: "M" });
+  const employee = model.addObjectType({
+    name: "Employee",
+    kind: "entity",
+    referenceMode: "employee_id",
+  });
+  // The entity constructor requires a reference mode either way; what
+  // decides whether the value spaces are shared is the subtype fact's
+  // providesIdentification flag, not the mode's presence.
+  const manager = model.addObjectType({
+    name: "Manager",
+    kind: "entity",
+    referenceMode: "manager_id",
+  });
+  const department = model.addObjectType({
+    name: "Department",
+    kind: "entity",
+    referenceMode: "department_code",
+  });
+  model.addSubtypeFact({
+    subtypeId: manager.id,
+    supertypeId: employee.id,
+    providesIdentification,
+  });
+  const managesFt = model.addFactType({
+    name: "Manager manages Department",
+    roles: [
+      { name: "manages", playerId: manager.id, id: "m1" },
+      { name: "is managed by", playerId: department.id, id: "m2" },
+    ],
+    readings: ["{0} manages {1}"],
+  });
+  model.addFactType({
+    name: "Employee works in Department",
+    roles: [
+      { name: "works in", playerId: employee.id, id: "w1" },
+      { name: "has", playerId: department.id, id: "w2" },
+    ],
+    readings: ["{0} works in {1}"],
+    constraints: [{ type: "mandatory", roleId: "w1" }],
+  });
+  // Manager E1 exists -- only through the Manager role.
+  model.addPopulation({ factTypeId: managesFt.id }).addInstance({
+    roleValues: { m1: "E1", m2: "D1" },
+  });
+  return model;
+}
+
+describe("subtype instances witness supertype existence", () => {
+  it("flags a Manager who works in no department, through the Employee mandatory", () => {
+    const diags = populationValidationRules(subtypeWitnessModel(true));
+    expect(diags.some((d) => d.ruleId === "population/mandatory-violation")).toBe(true);
+  });
+
+  it("does not conduct across a subtype link with an independent identifier", () => {
+    // providesIdentification: false means Manager and Employee values
+    // live in different spaces; crediting "E1" to Employee would assert
+    // an identity nothing established.
+    const diags = populationValidationRules(subtypeWitnessModel(false));
+    expect(diags.some((d) => d.ruleId === "population/mandatory-violation")).toBe(false);
+  });
+});
