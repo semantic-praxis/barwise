@@ -1,8 +1,10 @@
 # Licensed names: stop grading which of a domain's own words the model picked
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Accepted; workstreams 1 and 2 implemented (see Implementation
+notes). Workstream 3 stays provisional: measure alias compliance
+against the now-honest metric before editing the prompt.
 Created: 2026-08-26
-Last-updated: 2026-08-26
+Last-updated: 2026-08-27
 Tracking: barwise-852. Evidence:
 `docs/prompt-eval-2.0.0-haiku45-2026-08-26.md`. Sibling:
 `docs/specs/eval-split-stratification.spec.md`, whose workstream 3 is
@@ -263,25 +265,22 @@ gave it.
   surfaces consume `evaluateCandidate`'s report, not its inputs.
 - Suite manifest moves to 2.1.0 in workstream 2.
 
-## Open decisions (for review)
+## Decisions (resolved 2026-08-27, as recommended)
 
 - **Whether workstream 3 is a hand-edited variant or an optimizer run.**
-  A hand edit is one line and one paid re-measure; routing it through
-  the DSPy lane costs a compilation but produces a variant selected
-  against the metric rather than against a hunch. Recommend the hand
-  edit first, purely to price the gap -- if compliance is already high
-  once the metric is honest, there is nothing to optimize.
+  RESOLVED: the hand edit first, purely to price the gap -- if
+  compliance is already high once the metric is honest, there is
+  nothing to optimize. Still provisional; nothing has been measured yet.
 
-- **Whether the licence is symmetric or directional.** Symmetric (a set
-  of interchangeable words) is simpler to author and to reason about;
-  directional (rubric name accepts these alternatives) is narrower and
-  cannot accidentally make two rubric names collide. Recommend
-  symmetric, with the loader rejecting a word that appears in two sets.
+- **Whether the licence is symmetric or directional.** RESOLVED:
+  symmetric, with the parser rejecting a word that appears in two sets
+  -- compared normalized, the same way resolution compares, so
+  `Course Offering` and `CourseOffering` cannot be licensed apart.
 
-- **Whether gym exercises get the field too.** They share the type, so
-  they get it for free; the question is whether to say so in the gym's
-  authoring guidance. Recommend yes -- a learner naming a concept with
-  the brief's other word has the same complaint.
+- **Whether gym exercises get the field too.** RESOLVED: yes. They
+  share `GymExercise`, so the field arrived with the type; the gym's
+  CLAUDE.md now says so, and the exercise JSON schema carries the
+  block for editor autocomplete.
 
 ## Risks and testing
 
@@ -307,3 +306,41 @@ gave it.
 - No substring, stemming, or edit-distance matching. Synonymy is
   declared, never inferred -- that is the whole point of the design.
 - No transcript edits.
+
+## Implementation notes
+
+### Workstreams 1 and 2 (2026-08-27)
+
+Shipped as specified, with one deviation and one substitution worth
+recording.
+
+- **One parser, not two.** The brief's inventory had `parseExercise`
+  and promptlab's loader each learning the block. `parseVocabulary` is
+  instead exported from `@barwise/learn` and called by both -- the
+  validation rules (two-word minimum, one set per word, normalized
+  collision detection) are exactly the kind of must-agree copy the
+  duplication-drift-guards spec exists to prevent, and learn already
+  sits below promptlab in the graph.
+
+- **The acceptance payload is reconstructed, not replayed.** The 0.154
+  payload the brief names was retained by `keepDiagnosticPayloads` in
+  the operator's local run and is not checked in. The test builds its
+  equivalent by renaming `CourseOffering` to `Offering` across the
+  recorded answer key -- the eval writeup established that this one
+  word is the entire difference -- and asserts both directions: 1.000
+  with the licence declared, exactly 1/6 (only `must_validate`) with it
+  stripped. The rename is whole-payload on purpose: the token appears
+  in constraint role hints too, and renaming only some turns a
+  vocabulary difference into a structural one (two orphaned
+  constraints, two `invalid_role_player` corrections), which is a
+  different payload than the one the collapse recorded.
+
+- The append-only pin and the `Course`-versus-`CourseOffering` negative
+  both live in `learn/tests/nameLicence.test.ts`; the suite bumped to
+  2.1.0; the seven answer-key pins in `scoreExtraction.test.ts` are
+  byte-identical to before, as required.
+
+The offline re-score of the operator's retained payloads
+(`barwise prompt score --case university-enrollment --extraction
+<file>`) remains worth doing as confirmation, but the reconstruction
+answers the acceptance criterion without it.

@@ -4,6 +4,7 @@
  * Pure -- no I/O -- so it is testable without the filesystem and reusable
  * by any loader.
  */
+import { normalizeForMatch } from "../evaluate/nameResolution.js";
 import {
   type CheckGuidance,
   type ConstraintKind,
@@ -11,6 +12,7 @@ import {
   type GymCheck,
   type GymExercise,
   type GymTransition,
+  type NameLicence,
   PROFICIENCY_LEVELS,
   type ProficiencyLevel,
 } from "./types.js";
@@ -113,6 +115,50 @@ function parseElementQuery(v: unknown, where: string): ElementQuery {
   );
 }
 
+/**
+ * The optional `vocabulary` block: licence sets of names that denote
+ * one concept each (docs/specs/eval-name-licensing.spec.md).
+ *
+ * A set needs at least two words -- one word licenses nothing -- and a
+ * word may appear in only one set (compared normalized, the same way
+ * resolution compares), because sets are symmetric: a shared word would
+ * make two rubric names collide through the licence. Exported because
+ * promptlab's eval-case loader accepts the identical block; one parser
+ * keeps the two formats from drifting.
+ */
+export function parseVocabulary(v: unknown, where: string): NameLicence | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (!Array.isArray(v) || v.length === 0) {
+    throw new ExerciseParseError(
+      `${where}: "vocabulary" must be a non-empty list of name sets when declared`,
+    );
+  }
+  const seen = new Map<string, string>();
+  const licence = v.map((set, i) => {
+    if (
+      !Array.isArray(set) || set.length < 2
+      || set.some((w) => typeof w !== "string" || w.length === 0)
+    ) {
+      throw new ExerciseParseError(
+        `${where}: "vocabulary[${i}]" must list at least two non-empty name strings`,
+      );
+    }
+    for (const word of set as string[]) {
+      const key = normalizeForMatch(word);
+      const clash = seen.get(key);
+      if (clash !== undefined) {
+        throw new ExerciseParseError(
+          `${where}: "vocabulary" licenses "${word}" twice (already declared as "${clash}") `
+            + `-- a word may appear in only one set`,
+        );
+      }
+      seen.set(key, word);
+    }
+    return set as readonly string[];
+  });
+  return licence;
+}
+
 function parseCheck(v: unknown, i: number): GymCheck {
   const where = `checks[${i}]`;
   if (!isRecord(v)) throw new ExerciseParseError(`${where} must be an object`);
@@ -183,6 +229,7 @@ export function parseExercise(data: unknown): GymExercise {
     reading: optStr(data, "reading", "exercise"),
     starter: optStr(data, "starter", "exercise"),
     reference: optStr(data, "reference", "exercise"),
+    vocabulary: parseVocabulary(data["vocabulary"], "exercise"),
     checks: rawChecks.map(parseCheck),
   };
 }

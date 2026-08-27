@@ -86,6 +86,16 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
   order. A payload check never reaches `evaluateCandidate` -- it takes
   an `OrmModel` and has no vocabulary for the payload -- which is why
   the family lives here and not in `learn`.
+- **A case can license names.** An optional `vocabulary` block declares
+  sets of words that denote one concept, and both check families
+  resolve through it, so an extraction that picked the transcript's
+  other word for a concept is not scored as if it missed the concept
+  (docs/specs/eval-name-licensing.spec.md; suite 2.1.0's only change).
+  The block is parsed by learn's exported `parseVocabulary` -- one
+  parser for the gym and eval formats -- and it only ever rescues a
+  comparison that would otherwise fail. Declare it only when the
+  transcript itself uses both words: `conference-reviews` gets none
+  because its spread is a real modelling fork, not vocabulary.
 - **`requires_ambiguity` needs its budget.** The check alone is won by
   an extraction that flags everything, so a case that declares one
   should declare an `ambiguityBudget`, and the suite an

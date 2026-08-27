@@ -6,7 +6,7 @@ export {
   listExercises,
 } from "./exercise/catalog.js";
 export { type LoadedExercise, loadExercise } from "./exercise/loadExercise.js";
-export { ExerciseParseError, parseExercise } from "./exercise/parseExercise.js";
+export { ExerciseParseError, parseExercise, parseVocabulary } from "./exercise/parseExercise.js";
 export {
   type CheckGuidance,
   type ConstraintKind,
@@ -14,6 +14,7 @@ export {
   type GymCheck,
   type GymExercise,
   type GymTransition,
+  type NameLicence,
   PROFICIENCY_LEVELS,
   type ProficiencyLevel,
 } from "./exercise/types.js";

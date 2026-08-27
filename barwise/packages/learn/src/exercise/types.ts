@@ -56,6 +56,22 @@ export type ElementQuery =
   | { readonly factTypeBetween: readonly [string, string]; };
 
 /**
+ * Licensed names: each entry lists words the exercise declares to
+ * denote one concept, so a candidate naming it with any of them
+ * resolves against a rubric or reference name using another
+ * (docs/specs/eval-name-licensing.spec.md).
+ *
+ * Sets are symmetric, and synonymy is declared, never inferred -- no
+ * substring or edit-distance matching, so "Course" stays distinct from
+ * "CourseOffering" unless a set says otherwise. The parser rejects a
+ * word appearing in two sets, which is what keeps two rubric names
+ * from colliding through a shared licence. Resolution is append-only:
+ * a licence can only rescue a comparison that would otherwise have
+ * failed, never redirect one that succeeded.
+ */
+export type NameLicence = readonly (readonly string[])[];
+
+/**
  * Learner-facing guidance a check may carry (learning-design C6):
  *
  * - `hint` -- a nudge toward the fix, shown on failure (and on a miss
@@ -121,5 +137,12 @@ export interface GymExercise {
   readonly starter?: string;
   /** Path (relative to the exercise file) to one valid answer. Backs `forbids_population`. */
   readonly reference?: string;
+  /**
+   * Optional licensed names. A learner (or an extraction) naming a
+   * concept with the brief's other word for it has the same complaint
+   * as an eval candidate: the rubric should grade the model, not which
+   * of the domain's own words it picked.
+   */
+  readonly vocabulary?: NameLicence;
   readonly checks: readonly GymCheck[];
 }

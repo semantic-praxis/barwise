@@ -9,7 +9,7 @@
  * so reweighting is a data change recorded in git.
  */
 import type { OrmModel } from "@barwise/core";
-import type { GymCheck } from "@barwise/learn";
+import type { GymCheck, NameLicence } from "@barwise/learn";
 
 /**
  * Penalty sizes applied by the scorer, declared in the suite manifest.
@@ -89,6 +89,16 @@ export interface EvalCase {
    * unaffected.
    */
   readonly ambiguityBudget?: number;
+  /**
+   * Optional licensed names (docs/specs/eval-name-licensing.spec.md):
+   * each entry lists words the case declares to denote one concept, so
+   * an extraction naming it with any of them resolves against a rubric
+   * or reference name using another. Both check families consult it --
+   * `requires_element` when resolving a named object type, and
+   * `forbids_population` when corresponding fact types by player names
+   * -- and it only ever rescues a comparison that would otherwise fail.
+   */
+  readonly vocabulary?: NameLicence;
   readonly checks: readonly (GymCheck | PromptCheck)[];
 }
 

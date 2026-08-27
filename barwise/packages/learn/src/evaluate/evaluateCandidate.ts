@@ -26,7 +26,7 @@ export function evaluateCandidate(
       case "requires_verbalization":
         return requiresVerbalization(candidate, check.sentence, check.hint);
       case "requires_element":
-        return requiresElement(candidate, check.element, check.hint);
+        return requiresElement(candidate, check.element, check.hint, exercise.vocabulary);
       case "forbids_population":
         return forbidsPopulation(
           candidate,
@@ -34,6 +34,7 @@ export function evaluateCandidate(
           check.factType,
           check.constraint,
           check.hint,
+          exercise.vocabulary,
         );
     }
   });

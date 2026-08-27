@@ -1,5 +1,5 @@
 import type { OrmModel } from "@barwise/core";
-import type { ElementQuery } from "../../exercise/types.js";
+import type { ElementQuery, NameLicence } from "../../exercise/types.js";
 import type { CheckResult } from "../GymReport.js";
 import { getObjectTypeByNameOrAlias } from "../nameResolution.js";
 
@@ -7,9 +7,14 @@ import { getObjectTypeByNameOrAlias } from "../nameResolution.js";
  * Is there a fact type in the model with a role played by an object type
  * named (or aliased) `a` and a (distinct) role played by one named `b`?
  */
-function hasFactTypeBetween(model: OrmModel, a: string, b: string): boolean {
-  const otA = getObjectTypeByNameOrAlias(model, a);
-  const otB = getObjectTypeByNameOrAlias(model, b);
+function hasFactTypeBetween(
+  model: OrmModel,
+  a: string,
+  b: string,
+  licence?: NameLicence,
+): boolean {
+  const otA = getObjectTypeByNameOrAlias(model, a, licence);
+  const otB = getObjectTypeByNameOrAlias(model, b, licence);
   if (!otA || !otB) return false;
 
   return model.factTypes.some((ft) => {
@@ -27,9 +32,10 @@ export function requiresElement(
   candidate: OrmModel,
   element: ElementQuery,
   hint?: string,
+  licence?: NameLicence,
 ): CheckResult {
   if ("entity" in element) {
-    const found = getObjectTypeByNameOrAlias(candidate, element.entity) !== undefined;
+    const found = getObjectTypeByNameOrAlias(candidate, element.entity, licence) !== undefined;
     return {
       kind: "requires_element",
       passed: found,
@@ -41,7 +47,7 @@ export function requiresElement(
   }
 
   const [a, b] = element.factTypeBetween;
-  const found = hasFactTypeBetween(candidate, a, b);
+  const found = hasFactTypeBetween(candidate, a, b, licence);
   return {
     kind: "requires_element",
     passed: found,

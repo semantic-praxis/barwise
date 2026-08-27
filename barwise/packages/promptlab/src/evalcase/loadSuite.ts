@@ -1,5 +1,6 @@
 import { OrmYamlSerializer } from "@barwise/core";
 import type { GymCheck } from "@barwise/learn";
+import { parseVocabulary } from "@barwise/learn";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -124,6 +125,12 @@ export function loadEvalCase(filePath: string): LoadedEvalCase {
 
   const checks = validateChecks(doc["checks"], absPath);
 
+  // Same block, same rules, one parser: learn owns the licence format
+  // (docs/specs/eval-name-licensing.spec.md), and the evaluator this
+  // loader feeds is learn's, so a second validator here would be a
+  // must-agree copy waiting to drift.
+  const vocabulary = parseVocabulary(doc["vocabulary"], absPath);
+
   const caseDir = dirname(absPath);
   const transcript = readFileSync(resolve(caseDir, transcriptPath), "utf8");
 
@@ -148,6 +155,7 @@ export function loadEvalCase(filePath: string): LoadedEvalCase {
     transcript: transcriptPath,
     ...(referencePath !== undefined ? { reference: referencePath } : {}),
     ...(ambiguityBudget !== undefined ? { ambiguityBudget } : {}),
+    ...(vocabulary !== undefined ? { vocabulary } : {}),
     checks,
   };
   return {
