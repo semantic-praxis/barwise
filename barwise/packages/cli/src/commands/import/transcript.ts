@@ -3,8 +3,11 @@ import { diffModels, mergeAndValidate } from "@barwise/core/diff";
 import {
   buildReasoningTrail,
   createLlmClient,
+  MAX_SAMPLES,
+  MIN_SAMPLES,
   processTranscript,
   PROVIDER_NAMES,
+  sampleTranscript,
   withCallLog,
 } from "@barwise/llm";
 import type { ProviderName } from "@barwise/llm";
@@ -42,6 +45,12 @@ export function addTranscriptSubcommand(importCmd: Command): void {
       "--trail",
       "Write a <model>.trail.json reasoning-trail sidecar (requires --output)",
     )
+    .option(
+      "--samples <n>",
+      `Extract n times (${MIN_SAMPLES}-${MAX_SAMPLES}) and report run-to-run disagreement `
+        + `as ambiguities; the emitted model is the sample that agrees most with the others. `
+        + `Multiplies LLM cost by n.`,
+    )
     .action(
       async (
         file: string,
@@ -55,12 +64,22 @@ export function addTranscriptSubcommand(importCmd: Command): void {
           annotate: boolean;
           alternatives?: boolean;
           trail?: boolean;
+          samples?: string;
         },
       ) => {
         try {
           const transcript = readFile(file);
           if (!transcript.trim()) {
             process.stderr.write("Error: Transcript file is empty.\n");
+            process.exitCode = 1;
+            return;
+          }
+
+          const samples = opts.samples === undefined ? 1 : Number(opts.samples);
+          if (!Number.isInteger(samples) || samples < 1 || samples > MAX_SAMPLES) {
+            process.stderr.write(
+              `Error: --samples must be an integer between ${MIN_SAMPLES} and ${MAX_SAMPLES}.\n`,
+            );
             process.exitCode = 1;
             return;
           }
@@ -84,13 +103,24 @@ export function addTranscriptSubcommand(importCmd: Command): void {
 
           const modelName = opts.name ?? basename(file, extname(file));
 
-          process.stderr.write("Extracting ORM model from transcript...\n");
+          process.stderr.write(
+            samples > 1
+              ? `Extracting ORM model from transcript (${samples} samples)...\n`
+              : "Extracting ORM model from transcript...\n",
+          );
 
-          const result = await processTranscript(transcript, client, {
+          const processorOptions = {
             modelName,
             alternatives: opts.alternatives,
             ...(sink !== undefined ? { observer: sink, correlationId } : {}),
-          });
+          };
+          // --samples 1 is the plain import, byte-identical to omitting
+          // the flag: one call, no agreement machinery.
+          const sampled = samples > 1
+            ? await sampleTranscript(transcript, client, { ...processorOptions, samples })
+            : undefined;
+          const result = sampled
+            ?? await processTranscript(transcript, client, processorOptions);
 
           // If --output targets an existing file, do a non-interactive merge.
           let finalModel = result.model;
@@ -187,6 +217,14 @@ export function addTranscriptSubcommand(importCmd: Command): void {
           if (result.ambiguities.length > 0) {
             process.stderr.write(
               `${result.ambiguities.length} ambiguity(ies) detected.\n`,
+            );
+          }
+          if (sampled) {
+            const ok = sampled.samples.filter((o) => o.status === "ok").length;
+            const n = sampled.agreement.disagreements.length;
+            process.stderr.write(
+              `Agreement over ${ok} sample(s): ${sampled.agreement.stable} stable element(s), `
+                + `${n} disagreement(s)${n > 0 ? " (reported above as ambiguities)" : ""}.\n`,
             );
           }
           const altSection = formatAlternativeFramings(result.alternatives);

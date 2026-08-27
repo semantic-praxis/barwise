@@ -1,6 +1,7 @@
 # Multi-sample transcript import: run-to-run disagreement becomes declared ambiguity
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Implemented (all three workstreams, one PR; see
+Implementation notes)
 Created: 2026-08-27
 Last-updated: 2026-08-27
 Tracking: barwise-877. Motivated by the run-to-run dispersion the eval
@@ -233,21 +234,20 @@ implementation time.
 - Suite, scorer, and history formats are untouched -- this feature
   never produces a score.
 
-## Open decisions (for review)
+## Decisions (resolved 2026-08-27, as recommended)
 
-- **Bounds and default for n.** Recommend [2, 5] and no default-on:
-  each sample is a full extraction call, and prompt caching makes
-  samples after the first cheaper on input tokens but not on output.
-  A cap above 5 buys little agreement information for linear cost.
-- **Sequential or concurrent calls.** Recommend sequential: the first
-  call writes the prompt-cache entry the rest read, retry/backoff
-  stays the client's existing behavior, and import is interactive but
-  not latency-critical. Concurrency can come later without API change.
-- **Structured disagreements on the result.** The `Ambiguity` shape is
-  `description` plus `source_references`, which renders everywhere
-  today. Recommend emitting disagreements as plain ambiguities plus
-  the structured `SampleAgreement` on the result object for
-  programmatic callers, rather than widening `Ambiguity` itself.
+- **Bounds and default for n.** RESOLVED: [2, 5] (`MIN_SAMPLES`,
+  `MAX_SAMPLES`, exported so both surfaces cite one source) and no
+  default-on. Each sample is a full extraction call; prompt caching
+  makes later samples cheaper on input tokens but not output.
+- **Sequential or concurrent calls.** RESOLVED: sequential -- the
+  first call writes the prompt-cache entry the rest read, and retry
+  stays the client's behavior. Concurrency can come later without API
+  change.
+- **Structured disagreements on the result.** RESOLVED: disagreements
+  render as plain `Ambiguity` entries appended to the medoid's list,
+  and the structured `SampleAgreement` rides the result object for
+  programmatic callers. `Ambiguity` itself is unwidened.
 
 ## Risks and testing
 
@@ -274,3 +274,34 @@ implementation time.
   schema.
 - No default multi-sample behavior on any surface.
 - No revise loop; that remains harness workstream 6's question.
+
+## Implementation notes
+
+All three workstreams landed in one PR rather than three -- the
+designated branch serializes PRs, and each workstream had its own
+offline tests, so splitting bought review granularity at three
+round-trips' cost. Deviations from the brief, all small:
+
+- The modules live at `llm/src/` root (`sampleAgreement.ts`,
+  `sampleTranscript.ts`) beside `TranscriptProcessor.ts`; the sketch's
+  `src/pipeline/` directory does not exist in the package and one
+  entry did not justify creating it.
+- `SampleDisagreement` grew a third kind, "naming", carrying the
+  diff's synonym candidates ("Offering also appears named
+  CourseOffering") -- the run-to-run vocabulary instability the
+  eval-name-licensing work rescues on the grading side surfaces here
+  as production evidence, which is the feedback loop the licence
+  spec's workstream 3 wants.
+- One surviving sample degrades to single-sample behavior with a
+  warning naming the failed draws, per Scope; zero survivors rethrow
+  the last failure, exactly what a single-sample import does today.
+- The CLI validates `--samples` before building a client, so a bad
+  count fails without touching provider configuration; `--samples 1`
+  is accepted as the plain import rather than rejected, since "one
+  sample" is not an error, just not the feature.
+
+The determinism, medoid tie-break, failure-exclusion, and
+bounds-rejection pins are `llm/tests/SampleAgreement.test.ts`; the CLI
+flag validation is pinned in `cli/tests/commands/import.test.ts`. The
+capability matrix carries the row (CLI yes, MCP yes, VS Code a
+deliberate gap).

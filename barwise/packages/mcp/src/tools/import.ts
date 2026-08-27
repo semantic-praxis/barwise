@@ -5,7 +5,14 @@
 import { OrmYamlSerializer } from "@barwise/core";
 import { annotateOrmYaml } from "@barwise/core/annotation";
 import type { ModelDiffResult } from "@barwise/core/diff";
-import { buildExistingModelContext, createLlmClient, processTranscript } from "@barwise/llm";
+import {
+  buildExistingModelContext,
+  createLlmClient,
+  MAX_SAMPLES,
+  MIN_SAMPLES,
+  processTranscript,
+  sampleTranscript,
+} from "@barwise/llm";
 import type { CandidateFraming, ProviderName } from "@barwise/llm";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -55,9 +62,21 @@ export function registerImportTool(server: McpServer): void {
               + "highest-impact structural fork, with a diff against the "
               + "primary model.",
           ),
+        samples: z
+          .number()
+          .int()
+          .min(MIN_SAMPLES)
+          .max(MAX_SAMPLES)
+          .optional()
+          .describe(
+            `Extract this many times (${MIN_SAMPLES}-${MAX_SAMPLES}) and report `
+              + "run-to-run disagreement as ambiguities; the returned model is the "
+              + "sample agreeing most with the others. Multiplies LLM cost. "
+              + "Omit for a single extraction.",
+          ),
       },
     },
-    async ({ transcript, modelName, base, provider, model, alternatives }) => {
+    async ({ transcript, modelName, base, provider, model, alternatives, samples }) => {
       return executeImport(
         transcript,
         modelName,
@@ -65,6 +84,7 @@ export function registerImportTool(server: McpServer): void {
         model,
         base,
         alternatives,
+        samples,
       );
     },
   );
@@ -77,6 +97,7 @@ export async function executeImport(
   model?: string,
   base?: string,
   alternatives?: boolean,
+  samples?: number,
 ): Promise<{ content: Array<{ type: "text"; text: string; }>; }> {
   const text = readSource(transcript);
 
@@ -97,11 +118,13 @@ export async function executeImport(
     }
   }
 
-  const result = await processTranscript(text, client, {
-    modelName,
-    existingModelContext,
-    alternatives,
-  });
+  const processorOptions = { modelName, existingModelContext, alternatives };
+  // Omitted samples is the plain single-shot import, unchanged; the
+  // agreement's disagreements arrive inside result.ambiguities and are
+  // rendered by the annotator like any other ambiguity.
+  const result = samples !== undefined
+    ? await sampleTranscript(text, client, { ...processorOptions, samples })
+    : await processTranscript(text, client, processorOptions);
 
   const yaml = serializer.serialize(result.model);
   const annotated = annotateOrmYaml(yaml, result);

@@ -100,10 +100,155 @@ function roleCorrespondence(
 }
 
 /**
+ * A correspondence found by expanding objectifying players
+ * (docs/specs/objectified-correspondence.spec.md): plain candidate
+ * roles map one-to-one to reference roles; each objectifying candidate
+ * role absorbs the group of reference roles matching its objectified
+ * fact type's players.
+ */
+interface ExpandedCorrespondence {
+  readonly candFt: FactType;
+  /** Reference role id -> candidate role id, for the plain roles. */
+  readonly roleMap: ReadonlyMap<string, string>;
+  /** Objectifying candidate role id -> absorbed reference role ids,
+   *  in reference role order (the fold's join order). */
+  readonly folds: ReadonlyMap<string, readonly string[]>;
+}
+
+/**
+ * Second correspondence tier, tried only when the flat multiset finds
+ * nothing: expand each candidate role whose player objectifies a fact
+ * type into that fact type's player names (one level -- an objectified
+ * player inside the expansion fails the attempt rather than recursing).
+ * "Student receives LetterGrade for CourseOffering" then corresponds to
+ * an objectified Enrollment carrying the grade, which is the same
+ * conceptual content in ORM's own terms. Expansion is driven only by
+ * declared ObjectifiedFactType links -- the licence spec's
+ * declared-never-inferred rule, applied to shape.
+ */
+function expandedCorrespondence(
+  refFt: FactType,
+  refModel: OrmModel,
+  candidate: OrmModel,
+  licence?: NameLicence,
+): ExpandedCorrespondence | null {
+  const refNames = playerNames(refFt, refModel);
+  if (refNames.some((n) => n === undefined)) return null;
+  const refVocabulary = new Set(refNames.filter((n): n is string => n !== undefined));
+  const byObjectType = new Map(
+    candidate.objectifiedFactTypes.map((o) => [o.objectTypeId, o.factTypeId]),
+  );
+
+  for (const ft of candidate.factTypes) {
+    const attempt = tryExpandedMatch(
+      ft,
+      refFt,
+      refModel,
+      candidate,
+      refVocabulary,
+      byObjectType,
+      licence,
+    );
+    if (attempt) return attempt;
+  }
+  return null;
+}
+
+function tryExpandedMatch(
+  candFt: FactType,
+  refFt: FactType,
+  refModel: OrmModel,
+  candidate: OrmModel,
+  refVocabulary: ReadonlySet<string>,
+  byObjectType: ReadonlyMap<string, string>,
+  licence?: NameLicence,
+): ExpandedCorrespondence | null {
+  // Classify each candidate role: plain (one reference-vocabulary
+  // name) or objectifying (the objectified fact type's names, in that
+  // fact type's role order).
+  const plain: { role: Role; name: string; }[] = [];
+  const objectifying: { role: Role; names: string[]; }[] = [];
+  for (const role of candFt.roles) {
+    const ot = candidate.getObjectType(role.playerId);
+    if (!ot) return null;
+    const baseId = byObjectType.get(role.playerId);
+    const base = baseId !== undefined && baseId !== candFt.id
+      ? candidate.getFactType(baseId)
+      : undefined;
+    if (base) {
+      const names: string[] = [];
+      for (const br of base.roles) {
+        const player = candidate.getObjectType(br.playerId);
+        // One level only: a nested objectifying player fails the
+        // attempt instead of recursing.
+        if (!player || byObjectType.has(br.playerId)) return null;
+        names.push(nameInVocabulary(player, refVocabulary, licence));
+      }
+      objectifying.push({ role, names });
+    } else {
+      plain.push({ role, name: nameInVocabulary(ot, refVocabulary, licence) });
+    }
+  }
+  // The flat tier already answered the no-objectification case, and
+  // answered it first on purpose: expansion only rescues.
+  if (objectifying.length === 0) return null;
+
+  const expanded = [...plain.map((p) => p.name), ...objectifying.flatMap((o) => o.names)];
+  if (!sameMultiset(expanded, playerNames(refFt, refModel))) return null;
+
+  // Consume reference roles greedily in declared order -- the same
+  // position-disambiguates-repeats semantics as the flat tier's zip.
+  const unconsumed = refFt.roles.map((r) => ({
+    role: r,
+    name: refModel.getObjectType(r.playerId)?.name,
+  }));
+  const take = (name: string): Role | null => {
+    const i = unconsumed.findIndex((e) => e.name === name);
+    if (i < 0) return null;
+    return unconsumed.splice(i, 1)[0]!.role;
+  };
+
+  const roleMap = new Map<string, string>();
+  for (const p of plain) {
+    const ref = take(p.name);
+    if (!ref) return null;
+    roleMap.set(ref.id, p.role.id);
+  }
+  const folds = new Map<string, readonly string[]>();
+  for (const o of objectifying) {
+    const absorbed: Role[] = [];
+    for (const name of o.names) {
+      const ref = take(name);
+      if (!ref) return null;
+      absorbed.push(ref);
+    }
+    // Join order is reference role order, not the objectified fact
+    // type's, so the synthetic value is a pure function of the
+    // reference instance alone.
+    const ordered = absorbed
+      .sort((a, b) => refFt.roles.indexOf(a) - refFt.roles.indexOf(b))
+      .map((r) => r.id);
+    folds.set(o.role.id, ordered);
+  }
+  return { candFt, roleMap, folds };
+}
+
+/**
+ * Separator for folded synthetic values. Only equality matters -- the
+ * candidate's constraints compare the value to itself across instances
+ * -- so the sole requirement is that equal reference tuples fold to
+ * equal strings and the seam is visible to a human reading a report.
+ */
+const FOLD_SEPARATOR = " & ";
+
+/**
  * Re-express a reference forbidden population as a `PopulationConfig`
  * against the candidate, or return null if no corresponding fact type or
  * role correspondence exists (which means the candidate has not modeled
- * the relationship the constraint would guard).
+ * the relationship the constraint would guard). Flat correspondence is
+ * tried first and is byte-identical to the pre-expansion behavior; the
+ * objectification tier only ever rescues a mapping that would otherwise
+ * have failed.
  */
 export function mapForbiddenPopulation(
   forbidden: Population,
@@ -114,20 +259,42 @@ export function mapForbiddenPopulation(
   const refFt = refModel.getFactType(forbidden.factTypeId);
   if (!refFt) return null;
 
-  const candFt = correspondingFactType(playerNames(refFt, refModel), candidate, licence);
-  if (!candFt) return null;
-
-  const roleMap = roleCorrespondence(refFt, refModel, candFt, candidate, licence);
-  if (!roleMap) return null;
+  let candFt = correspondingFactType(playerNames(refFt, refModel), candidate, licence);
+  let roleMap: ReadonlyMap<string, string> | null = null;
+  let folds: ReadonlyMap<string, readonly string[]> = new Map();
+  if (candFt) {
+    roleMap = roleCorrespondence(refFt, refModel, candFt, candidate, licence);
+    if (!roleMap) return null;
+  } else {
+    const exp = expandedCorrespondence(refFt, refModel, candidate, licence);
+    if (!exp) return null;
+    candFt = exp.candFt;
+    roleMap = exp.roleMap;
+    folds = exp.folds;
+  }
 
   const instances: { roleValues: Record<string, string>; }[] = [];
   for (const inst of forbidden.instances) {
     const roleValues: Record<string, string> = {};
     for (const [refRoleId, value] of Object.entries(inst.roleValues)) {
       const candRoleId = roleMap.get(refRoleId);
-      if (candRoleId === undefined) return null;
-      roleValues[candRoleId] = value;
+      if (candRoleId !== undefined) roleValues[candRoleId] = value;
     }
+    for (const [candRoleId, refRoleIds] of folds) {
+      const parts: string[] = [];
+      for (const refRoleId of refRoleIds) {
+        const value = inst.roleValues[refRoleId];
+        if (value === undefined) return null;
+        parts.push(value);
+      }
+      roleValues[candRoleId] = parts.join(FOLD_SEPARATOR);
+    }
+    // Every reference value must have landed somewhere: a value that
+    // corresponds to nothing means the correspondence was partial.
+    const mapped = Object.keys(inst.roleValues).filter(
+      (id) => roleMap!.has(id) || [...folds.values()].some((ids) => ids.includes(id)),
+    );
+    if (mapped.length !== Object.keys(inst.roleValues).length) return null;
     instances.push({ roleValues });
   }
 
