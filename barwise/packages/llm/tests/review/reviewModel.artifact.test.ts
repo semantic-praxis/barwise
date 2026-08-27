@@ -19,7 +19,27 @@ import { reviewModel } from "../../src/review/reviewModel.js";
 // Hoisted so the mock factory -- which vitest lifts above the imports
 // -- and the assertions below read the same two artifacts rather than
 // two copies that can drift.
-const { haikuReviewVariant, haikuExtractionVariant } = vi.hoisted(() => ({
+const { haikuReviewVariant, haikuExtractionVariant, mockDefaults } = vi.hoisted(() => ({
+  /**
+   * Matchless defaults, one per surface: systemPrompt.ts and
+   * reviewPrompt.ts read their default from the registry at module
+   * load and throw when a surface has none, so the mocked registry
+   * must carry them too.
+   */
+  mockDefaults: [
+    {
+      surface: "review",
+      version: "mock-review-default",
+      instructions: "Mock default review instructions.",
+      demos: [],
+    },
+    {
+      surface: "extraction",
+      version: "mock-extraction-default",
+      instructions: "Mock default extraction instructions.",
+      demos: [],
+    },
+  ] as PromptArtifact[],
   haikuReviewVariant: {
     surface: "review",
     version: "review-haiku-1",
@@ -38,7 +58,7 @@ const { haikuReviewVariant, haikuExtractionVariant } = vi.hoisted(() => ({
 }));
 
 vi.mock("../../src/prompt/artifacts/builtins.generated.js", () => ({
-  builtinArtifacts: [haikuReviewVariant, haikuExtractionVariant],
+  builtinArtifacts: [haikuReviewVariant, haikuExtractionVariant, ...mockDefaults],
 }));
 
 function capturingClient(

@@ -27,11 +27,18 @@ describe("builtinArtifacts", () => {
     expect(builtinArtifacts.length).toBeGreaterThan(0);
   });
 
-  it("declares a match block on every variant", () => {
-    // A variant with no match block would apply to nothing --
-    // resolveArtifact filters those out, so it would be dead weight.
-    for (const a of builtinArtifacts) {
-      expect(a.match, a.version).toBeDefined();
+  it("carries exactly one matchless default per surface; everything else declares a match", () => {
+    // A matchless artifact is invisible to resolveArtifact: the one
+    // per surface is that surface's default, reachable only through
+    // selectArtifact's explicit fallback. A second matchless artifact
+    // on a surface would be dead weight; zero would leave the surface
+    // with no default and fail the module-load guard in
+    // systemPrompt.ts / reviewPrompt.ts.
+    for (const surface of ["extraction", "review"] as const) {
+      const defaults = builtinArtifacts.filter(
+        (a) => a.surface === surface && a.match === undefined,
+      );
+      expect(defaults, surface).toHaveLength(1);
     }
   });
 

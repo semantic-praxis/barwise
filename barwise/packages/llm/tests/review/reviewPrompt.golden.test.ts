@@ -67,12 +67,18 @@ describe("buildReviewSystemPrompt golden output", () => {
 });
 
 describe("the wired seam is a no-op until a review artifact exists", () => {
-  it("ships no review artifact yet", () => {
+  it("ships no review variant yet", () => {
     // The premise of the test below, and of the spec's claim that
     // wiring the resolver changes nothing for any of the three
     // surfaces. When a review variant is authored this assertion is
-    // the one that must be revisited deliberately.
-    expect(builtinArtifacts.filter((a) => a.surface === "review")).toEqual([]);
+    // the one that must be revisited deliberately. The matchless
+    // default artifact is excluded: it ships in the registry as the
+    // surface's default (extraction-default-parity.spec.md) and is
+    // invisible to resolveArtifact, so it cannot make the seam a
+    // non-no-op.
+    expect(
+      builtinArtifacts.filter((a) => a.surface === "review" && a.match !== undefined),
+    ).toEqual([]);
   });
 
   it("sends the golden prompt for a client that resolves an extraction variant", async () => {

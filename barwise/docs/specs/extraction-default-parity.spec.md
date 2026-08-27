@@ -1,7 +1,6 @@
 # Re-home the default prompts to YAML, then bring the extraction default up to the rules its variants carry
 
-Status: Draft for review (design only -- implementation follows per
-workstream)
+Status: Implemented
 Created: 2026-08-26
 Last-updated: 2026-08-26
 Tracking: barwise-863; `docs/logic-duplication-audit-2026-08-26.md`
@@ -97,24 +96,25 @@ Out of scope, deferred and named:
 
 ## Inventory
 
-| Area                                               | Current state                                         | Verdict                                      |
-| -------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------- |
-| `llm/prompts/extraction.default.prompt.yaml`       | Does not exist                                        | new (W1)                                     |
-| `llm/prompts/review.default.prompt.yaml`           | Does not exist                                        | new (W1)                                     |
-| `llm/src/prompt/systemPrompt.ts`                   | Holds `EXTRACTION_INSTRUCTIONS` + the default literal | modify (W1)                                  |
-| `llm/src/prompt/reviewPrompt.ts`                   | Holds the review default literal                      | modify (W1)                                  |
-| `llm/src/prompt/artifacts/builtins.generated.ts`   | Two variants                                          | regenerated (W1)                             |
-| `llm/tests/prompt/artifacts/builtins.test.ts`      | Pins artifact count and reach                         | modify count only (W1); reach case untouched |
-| `llm/tests/prompt/systemPrompt.golden.test.ts`     | Pins default bytes against frozen fixture             | untouched (W1); fixture updated (W2)         |
-| `llm/tests/review/reviewPrompt.golden.test.ts`     | Pins review default bytes                             | untouched                                    |
-| `scripts/regen-builtin-artifacts.mjs`              | Globs `prompts/*.prompt.yaml` via the loader          | untouched                                    |
-| `llm/src/TranscriptProcessor.ts`, `selectArtifact` | Consume `defaultExtractionArtifact` by name           | untouched                                    |
+| Area                                               | Current state                                         | Verdict                                            |
+| -------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------- |
+| `llm/prompts/extraction.default.prompt.yaml`       | Does not exist                                        | new (W1)                                           |
+| `llm/prompts/review.default.prompt.yaml`           | Does not exist                                        | new (W1)                                           |
+| `llm/src/prompt/systemPrompt.ts`                   | Holds `EXTRACTION_INSTRUCTIONS` + the default literal | modify (W1)                                        |
+| `llm/src/prompt/reviewPrompt.ts`                   | Holds the review default literal                      | modify (W1)                                        |
+| `llm/src/prompt/artifacts/builtins.generated.ts`   | Two variants                                          | regenerated (W1)                                   |
+| `llm/tests/prompt/artifacts/builtins.test.ts`      | Pins artifact count and reach                         | modify match-block case (W1); reach case untouched |
+| `llm/tests/prompt/systemPrompt.golden.test.ts`     | Pins default bytes against frozen fixture             | untouched (W1); fixture updated (W2)               |
+| `llm/tests/review/reviewPrompt.golden.test.ts`     | Pins review default bytes                             | untouched                                          |
+| `scripts/regen-builtin-artifacts.mjs`              | Globs `prompts/*.prompt.yaml` via the loader          | untouched                                          |
+| `llm/src/TranscriptProcessor.ts`, `selectArtifact` | Consume `defaultExtractionArtifact` by name           | untouched                                          |
 
-The count assertion in `builtins.test.ts` moves from 2 to 4; the reach
-case ("a client on `claude-haiku-4-5` gets the haiku45 variant through
-`processTranscript`") must pass unmodified -- if it needs an edit, the
-re-homing changed resolution and the change reached further than
-intended.
+The reach case in `builtins.test.ts` ("a client on `claude-haiku-4-5`
+gets the haiku45 variant through `processTranscript`") must pass
+unmodified -- if it needs an edit, the re-homing changed resolution and
+the change reached further than intended. (See Implementation notes:
+the count assertion self-adjusts; the test needing a deliberate
+rewrite was the match-block one.)
 
 ## Workstreams (each independently shippable)
 
@@ -194,3 +194,34 @@ shall be unchanged.
   carry.
 - No change to demos, provenance blocks, or the review artifact's
   text.
+
+## Implementation notes (2026-08-26, both workstreams)
+
+Grounding during implementation corrected four Inventory-level
+predictions; the design held unchanged:
+
+- **The count assertion needed no edit** -- it compares against
+  `fromDisk.length`, so it self-adjusts. The Inventory's "moves from 2
+  to 4" was wrong about the mechanism, right about the count.
+- **A different `builtins.test.ts` case needed a deliberate rewrite**:
+  "declares a match block on every variant" pinned "matchless = dead
+  weight", which this design retires. It now asserts exactly one
+  matchless default per surface and a match block on everything else.
+- **Two review-side tests pinned the pre-YAML state**:
+  `reviewPrompt.golden.test.ts`'s "ships no review artifact yet" (the
+  assertion-audit "yet" tell) became "ships no review _variant_ yet",
+  and `reviewModel.artifact.test.ts`'s mocked registry needed matchless
+  defaults added, because both prompt modules now read their default
+  from the registry at module load and throw when a surface has none.
+- **The enumerated-list rule forced the Populations intro along with
+  it**: the old intro cited "Status can be scheduled, completed, or
+  cancelled" as an example to record _as a population_, which the new
+  rule contradicts. The variants' intro rewording (byte-identical in
+  both) came with the rule; the W2 golden diff is those two population
+  bullets, the intro sentence, and the frequency extension -- nothing
+  else.
+
+`ALTERNATIVES_SECTION` stays a TS constant in `systemPrompt.ts`: it is
+a render-time suffix applied to whichever artifact renders, not part
+of any artifact, which is also why a recorded `promptHash` resolves
+against two renderings per artifact.

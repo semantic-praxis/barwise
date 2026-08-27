@@ -2,9 +2,12 @@
  * Prompt artifacts: versioned, per-provider prompt definitions for the
  * LLM surfaces (see docs/specs/prompt-optimization-harness.spec.md).
  *
- * The default artifact for each surface lives in code so the packaged
- * bundle needs no runtime file loading; variants are `.prompt.yaml`
- * files loaded with `loadArtifact` and selected with `resolveArtifact`.
+ * Every artifact -- each surface's matchless default and every
+ * variant -- is a `.prompt.yaml` file compiled into
+ * `builtins.generated.ts`, so the packaged bundle needs no runtime
+ * file loading. Variants are selected with `resolveArtifact`; the
+ * defaults are invisible to it and reached only through
+ * `selectArtifact`'s fallback (extraction-default-parity.spec.md).
  */
 
 /**
