@@ -31,6 +31,16 @@
     },
     "starter": { "type": "string", "description": "Path (relative to this file) to a partial starter .orm.yaml." },
     "reference": { "type": "string", "description": "Path (relative to this file) to one valid answer; backs forbids_population checks." },
+    "vocabulary": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Licensed names: each entry lists words that denote one concept, so a candidate naming it with any of them resolves against a rubric or reference name using another. A word may appear in only one set.",
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "items": { "type": "string", "minLength": 1 }
+      }
+    },
     "checks": {
       "type": "array",
       "minItems": 1,

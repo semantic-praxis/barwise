@@ -10,7 +10,7 @@ import {
   ValidationEngine,
 } from "@barwise/core";
 import { generateCounterexampleForConstraint } from "@barwise/core/counterexample";
-import type { ConstraintKind } from "../../exercise/types.js";
+import type { ConstraintKind, NameLicence } from "../../exercise/types.js";
 import type { CheckResult } from "../GymReport.js";
 import { mapForbiddenPopulation } from "../populationMapping.js";
 
@@ -64,6 +64,7 @@ export function forbidsPopulation(
   factTypeName: string,
   constraintKind: ConstraintKind,
   hint?: string,
+  licence?: NameLicence,
 ): CheckResult {
   if (!reference) {
     return fail(`This check needs a reference model, but the exercise declares none.`);
@@ -91,7 +92,7 @@ export function forbidsPopulation(
 
   const configs: PopulationConfig[] = [];
   for (const pop of counterexample.forbidden) {
-    const mapped = mapForbiddenPopulation(pop, reference, candidate);
+    const mapped = mapForbiddenPopulation(pop, reference, candidate, licence);
     if (!mapped) {
       return fail(
         `Your model does not yet carry the relationship this rule guards `

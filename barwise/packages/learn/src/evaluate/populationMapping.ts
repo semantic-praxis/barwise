@@ -10,6 +10,7 @@
  * player name -- and, where a player is repeated (a ring), by position.
  */
 import type { FactType, OrmModel, Population, PopulationConfig, Role } from "@barwise/core";
+import type { NameLicence } from "../exercise/types.js";
 import { nameInVocabulary } from "./nameResolution.js";
 
 /** The object-type name each role plays, in role order (undefined if unresolved). */
@@ -26,10 +27,11 @@ function candidatePlayerNames(
   ft: FactType,
   model: OrmModel,
   vocabulary: ReadonlySet<string>,
+  licence?: NameLicence,
 ): (string | undefined)[] {
   return ft.roles.map((r) => {
     const ot = model.getObjectType(r.playerId);
-    return ot ? nameInVocabulary(ot, vocabulary) : undefined;
+    return ot ? nameInVocabulary(ot, vocabulary, licence) : undefined;
   });
 }
 
@@ -46,11 +48,12 @@ function sameMultiset(a: (string | undefined)[], b: (string | undefined)[]): boo
 function correspondingFactType(
   refNames: (string | undefined)[],
   candidate: OrmModel,
+  licence?: NameLicence,
 ): FactType | undefined {
   if (refNames.some((n) => n === undefined)) return undefined;
   const vocabulary = new Set(refNames.filter((n): n is string => n !== undefined));
   return candidate.factTypes.find((ft) =>
-    sameMultiset(candidatePlayerNames(ft, candidate, vocabulary), refNames)
+    sameMultiset(candidatePlayerNames(ft, candidate, vocabulary, licence), refNames)
   );
 }
 
@@ -65,6 +68,7 @@ function roleCorrespondence(
   refModel: OrmModel,
   candFt: FactType,
   candModel: OrmModel,
+  licence?: NameLicence,
 ): Map<string, string> | null {
   const refVocabulary = new Set(
     playerNames(refFt, refModel).filter((n): n is string => n !== undefined),
@@ -74,7 +78,7 @@ function roleCorrespondence(
     for (const r of ft.roles) {
       const ot = model.getObjectType(r.playerId);
       if (!ot) return groups; // caller handles mismatch below
-      const name = canonical ? nameInVocabulary(ot, refVocabulary) : ot.name;
+      const name = canonical ? nameInVocabulary(ot, refVocabulary, licence) : ot.name;
       const list = groups.get(name) ?? [];
       list.push(r);
       groups.set(name, list);
@@ -105,14 +109,15 @@ export function mapForbiddenPopulation(
   forbidden: Population,
   refModel: OrmModel,
   candidate: OrmModel,
+  licence?: NameLicence,
 ): PopulationConfig | null {
   const refFt = refModel.getFactType(forbidden.factTypeId);
   if (!refFt) return null;
 
-  const candFt = correspondingFactType(playerNames(refFt, refModel), candidate);
+  const candFt = correspondingFactType(playerNames(refFt, refModel), candidate, licence);
   if (!candFt) return null;
 
-  const roleMap = roleCorrespondence(refFt, refModel, candFt, candidate);
+  const roleMap = roleCorrespondence(refFt, refModel, candFt, candidate, licence);
   if (!roleMap) return null;
 
   const instances: { roleValues: Record<string, string>; }[] = [];

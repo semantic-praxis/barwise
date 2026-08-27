@@ -23,7 +23,7 @@ describe("loadSuite on the packaged seed suite", () => {
   // shared CI runner, so the package sets a 30s testTimeout.
   it("loads the manifest with weights and ten cases in declared order", () => {
     const suite = loadSuite(defaultSuitePath());
-    expect(suite.version).toBe("2.0.0");
+    expect(suite.version).toBe("2.1.0");
     // Re-fitted for suite 2.0.0, where a weight is the cost of a model
     // in which every element carries that kind of defect rather than
     // the cost of one occurrence

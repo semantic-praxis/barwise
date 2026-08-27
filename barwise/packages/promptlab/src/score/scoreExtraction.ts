@@ -239,6 +239,9 @@ function asExercise(
     transition: { from: "naive", to: "naive" },
     exitPerformance: "n/a (prompt eval)",
     brief: "n/a (prompt eval)",
+    ...(loadedCase.evalCase.vocabulary !== undefined
+      ? { vocabulary: loadedCase.evalCase.vocabulary }
+      : {}),
     checks,
   };
 }

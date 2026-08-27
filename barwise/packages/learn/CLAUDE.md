@@ -71,6 +71,16 @@ tests/            Vitest; tests/helpers/ModelBuilder.ts (copied from @barwise/co
 - **Reference models double as exercise answer keys.** A well-formed
   exercise's reference model should pass its own rubric (there is a test
   for the seed exercise asserting exactly this).
+- **Names can be licensed, never fuzzy-matched.** An exercise may
+  declare `vocabulary` sets -- names that denote one concept -- and
+  both `requires_element` and `forbids_population` resolve through
+  them, so a learner naming a concept with the brief's other word is
+  not marked down for it (docs/specs/eval-name-licensing.spec.md).
+  Resolution stays append-only (an exact match always wins) and
+  synonymy is declared, never inferred: no substring or edit-distance
+  matching, so "Course" never matches "CourseOffering" unless a set
+  says so. A word may appear in only one set; `parseVocabulary` is
+  exported and promptlab's eval-case loader reuses it.
 - **Exercises declare a transition, not a difficulty.** The C1 front
   matter (`transition: {from, to}` on the proficiency scale plus
   `exitPerformance`) replaced the old three-value `difficulty` enum;
