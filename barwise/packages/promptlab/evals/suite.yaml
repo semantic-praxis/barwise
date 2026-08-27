@@ -65,7 +65,13 @@
 # ReviewScore) are deliberately NOT guarded: their players appear in
 # exactly one fact type, and the mandatory counterexample needs an
 # anchor role in another (see the audit's findings).
-version: 2.2.0
+#
+# 2.3.0 restores the one check 2.2.0 had to withdraw: the settled
+# Employee-works-in-Department mandatory, underivable until a subtype
+# instance could witness its supertype's existence
+# (docs/specs/mandatory-existence-witness.spec.md, barwise-880). One
+# rubric grows by one check; the answer keys still score 1.000.
+version: 2.3.0
 
 # Re-fitted for the rated form, because rating changed what a weight
 # means. A weight is now the cost of a model in which EVERY element

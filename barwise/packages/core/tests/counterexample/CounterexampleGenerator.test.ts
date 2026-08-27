@@ -622,3 +622,72 @@ describe("model-wide round-trip completeness", () => {
     }
   });
 });
+
+describe("descendant anchors for mandatory counterexamples", () => {
+  /** Employee's only other appearance is through its subtype Manager. */
+  function hierarchy(providesIdentification: boolean): OrmModel {
+    return new ModelBuilder()
+      .withEntityType("Employee")
+      .withEntityType("Manager")
+      .withEntityType("Department")
+      .withSubtypeFact("Manager", "Employee", { providesIdentification })
+      .withBinaryFactType("Manager manages Department", {
+        role1: { player: "Manager", name: "manages" },
+        role2: { player: "Department", name: "is managed by" },
+      })
+      .withBinaryFactType("Employee works in Department", {
+        role1: { player: "Employee", name: "works in" },
+        role2: { player: "Department", name: "has" },
+        mandatory: "role1",
+      })
+      .build();
+  }
+
+  function mandatoryCe(model: OrmModel): Counterexample | undefined {
+    const ft = model.getFactTypeByName("Employee works in Department")!;
+    const mc = ft.constraints.find((c) => c.type === "mandatory")!;
+    return generateCounterexampleForConstraint(mc, ft, model);
+  }
+
+  it("anchors in an identification-sharing subtype's role", () => {
+    // Before the widening this was the audit's withdrawn check: no role
+    // is played by Employee exactly, so the mandatory had no witness
+    // (docs/specs/mandatory-existence-witness.spec.md).
+    const model = hierarchy(true);
+    const ce = mandatoryCe(model);
+    expect(ce).toBeDefined();
+    expect(ce!.forbidden[0]!.factTypeId)
+      .toBe(model.getFactTypeByName("Manager manages Department")!.id);
+  });
+
+  it("does not anchor across an independent-identifier subtype link", () => {
+    expect(mandatoryCe(hierarchy(false))).toBeUndefined();
+  });
+
+  it("still prefers an exact-player anchor when one exists", () => {
+    const model = new ModelBuilder()
+      .withEntityType("Employee")
+      .withEntityType("Manager")
+      .withEntityType("Department")
+      .withValueType("EmployeeId")
+      .withSubtypeFact("Manager", "Employee", { providesIdentification: true })
+      .withBinaryFactType("Manager manages Department", {
+        role1: { player: "Manager", name: "manages" },
+        role2: { player: "Department", name: "is managed by" },
+      })
+      .withBinaryFactType("Employee has EmployeeId", {
+        role1: { player: "Employee", name: "has" },
+        role2: { player: "EmployeeId", name: "identifies" },
+      })
+      .withBinaryFactType("Employee works in Department", {
+        role1: { player: "Employee", name: "works in" },
+        role2: { player: "Department", name: "has" },
+        mandatory: "role1",
+      })
+      .build();
+    const ce = mandatoryCe(model);
+    expect(ce).toBeDefined();
+    expect(ce!.forbidden[0]!.factTypeId)
+      .toBe(model.getFactTypeByName("Employee has EmployeeId")!.id);
+  });
+});

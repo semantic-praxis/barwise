@@ -17,3 +17,7 @@ checks:
     factType: Department has DepartmentName
     constraint: internal_uniqueness
     hint: Each department has at most one department name.
+  - kind: forbids_population
+    factType: Employee works in Department
+    constraint: mandatory
+    hint: Nobody is unassigned - every employee works in some department.

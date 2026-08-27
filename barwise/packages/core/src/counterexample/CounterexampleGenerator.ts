@@ -29,6 +29,7 @@ import type { OrmModel } from "../model/OrmModel.js";
 import { Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
 import { assertNever } from "../util/assertNever.js";
+import { identificationSharingAncestry } from "../validation/rules/population/shared.js";
 import {
   kwSeg,
   textSeg,
@@ -476,20 +477,35 @@ interface AnchorRole {
   readonly role: Role;
 }
 
-/** Find a role played by the type, excluding the given role ids. */
+/**
+ * Find a role that can witness an instance of the type, excluding the
+ * given role ids: a role played by the type itself, or -- failing that
+ * -- by an identification-sharing descendant, since a Manager recorded
+ * anywhere exists as an Employee under the same identifier
+ * (docs/specs/mandatory-existence-witness.spec.md). Exact-player
+ * anchors win when both exist: the counterexample then reads in the
+ * constrained type's own vocabulary, and the preference keeps output
+ * stable for every model the widening does not concern.
+ */
 function findAnchorRole(
   model: OrmModel,
   playerId: string,
   excludeRoleIds: ReadonlySet<string>,
 ): AnchorRole | undefined {
+  let descendant: AnchorRole | undefined;
   for (const ft of model.factTypes) {
     for (const role of ft.roles) {
-      if (role.playerId === playerId && !excludeRoleIds.has(role.id)) {
-        return { ft, role };
+      if (excludeRoleIds.has(role.id)) continue;
+      if (role.playerId === playerId) return { ft, role };
+      if (
+        descendant === undefined
+        && identificationSharingAncestry(model, role.playerId).includes(playerId)
+      ) {
+        descendant = { ft, role };
       }
     }
   }
-  return undefined;
+  return descendant;
 }
 
 /** Find the fact type and role for a role id. */
