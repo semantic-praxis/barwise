@@ -20,3 +20,11 @@ checks:
     factType: Customer places Order
     constraint: mandatory
     hint: Every order must be placed by some customer.
+  - kind: forbids_population
+    factType: Order has OrderStatus
+    constraint: mandatory
+    hint: Every order must have a status.
+  - kind: forbids_population
+    factType: Customer has Name
+    constraint: mandatory
+    hint: Every customer has a name.
