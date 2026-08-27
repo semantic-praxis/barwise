@@ -8,6 +8,7 @@
  */
 
 import { type Constraint, isInternalUniqueness, isMandatoryRole } from "../model/Constraint.js";
+import { matchesConstraintType } from "../model/constraintKeyword.js";
 import type { FactType } from "../model/FactType.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
@@ -151,9 +152,7 @@ class QueryContext {
   }
 
   listConstraints(constraintType?: string): QueryResult {
-    const keyword = constraintType !== undefined
-      ? normalizeConstraintKeyword(constraintType)
-      : undefined;
+    const keyword = constraintType;
     const constraints: ConstraintRef[] = [];
     for (const ft of this.model.factTypes) {
       ft.constraints.forEach((c, i) => {
@@ -487,19 +486,4 @@ function byName<T extends { name: string; }>(a: T, b: T): number {
 
 function notFoundEntity(name: string): QueryResult {
   return { kind: "not-found", message: `No entity named "${name}".` };
-}
-
-/** Normalize a user-supplied constraint keyword (lowercase, hyphen/space to underscore). */
-function normalizeConstraintKeyword(keyword: string): string {
-  return keyword.toLowerCase().replace(/[\s-]+/g, "_");
-}
-
-/**
- * Match a constraint type against a normalized keyword. The keyword
- * matches if it equals the type or is a substring of it, so "uniqueness"
- * matches both "internal_uniqueness" and "external_uniqueness".
- */
-function matchesConstraintType(constraintType: string, normalizedKeyword: string): boolean {
-  return constraintType === normalizedKeyword
-    || constraintType.includes(normalizedKeyword);
 }
