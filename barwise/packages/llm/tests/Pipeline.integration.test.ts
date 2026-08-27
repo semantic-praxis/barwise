@@ -171,10 +171,14 @@ describe("Full pipeline integration", () => {
           model.objectTypes.length + model.factTypes.length,
         );
 
-        // Refresh the committed examples/output artifacts only on
+        // Refresh the committed examples/output MODELS only on
         // request: every run mints fresh element ids, so an
         // unconditional write dirtied the tracked files on every full
         // test run. Regenerate intentionally with UPDATE_GOLDEN=1.
+        // The derived .verbalizations.txt / .diagnostics.txt siblings
+        // are NOT written here: core's exampleOutputDrift.test.ts is
+        // their one writer and drift guard (barwise-870) -- after
+        // refreshing models, run `npm run regen:examples`.
         if (process.env["UPDATE_GOLDEN"] !== "1") return;
         mkdirSync(outputDir, { recursive: true });
         const slug = example.name.toLowerCase().replace(/\s+/g, "-");
@@ -183,23 +187,6 @@ describe("Full pipeline integration", () => {
         writeFileSync(
           resolve(outputDir, `${slug}.orm.yaml`),
           serializer.serialize(model),
-        );
-
-        const verbalizer = new Verbalizer();
-        const verbalizations = verbalizer.verbalizeModel(model);
-        const verbText = verbalizations.map((v) => v.text).join("\n");
-        writeFileSync(resolve(outputDir, `${slug}.verbalizations.txt`), verbText);
-
-        const engine = new ValidationEngine();
-        const diagnostics = engine.validate(model);
-        const diagText = diagnostics.length > 0
-          ? diagnostics
-            .map((d) => `[${d.severity}] ${d.ruleId}: ${d.message}`)
-            .join("\n")
-          : "No diagnostics.";
-        writeFileSync(
-          resolve(outputDir, `${slug}.diagnostics.txt`),
-          diagText,
         );
       });
     });
