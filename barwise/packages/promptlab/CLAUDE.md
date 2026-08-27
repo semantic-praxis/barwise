@@ -96,6 +96,16 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
   comparison that would otherwise fail. Declare it only when the
   transcript itself uses both words: `conference-reviews` gets none
   because its spread is a real modelling fork, not vocabulary.
+- **A score vouches only for what some rubric tests.** Constraint-type
+  coverage is thin and tiered: one ring instance (acyclic) is
+  rubric-tested suite-wide, and no set-comparison constraint is -- or
+  can be, until `forbids_population` grows a kind for them. A suite
+  mean therefore says nothing about whether a prompt extracts the
+  uncovered types, however green it runs. The inventory, the
+  two-instances-per-common-type target, and the closing workstreams
+  are `docs/specs/constraint-extraction-coverage.spec.md`; update that
+  spec in the same commit that adds a type's first or second tested
+  instance.
 - **`requires_ambiguity` needs its budget.** The check alone is won by
   an extraction that flags everything, so a case that declares one
   should declare an `ambiguityBudget`, and the suite an

@@ -167,6 +167,15 @@ npx tsc --noEmit            # type-check only
   `parse/helpers.ts` does -- role name first, case-insensitively, then
   player name, each match consuming a role. Resolving differently is the
   same bug one level down.
+- **Instructed is not validated.** The prompt instructs, the schema
+  carries, and the parser maps every ring type and set-comparison
+  constraint -- but the eval suite exercises almost none of them, so an
+  extracted constraint of an uncovered type is an unreviewed
+  suggestion: schema-valid, population-checked for consistency, and
+  unmeasured for whether it reflects the transcript. Which types are
+  covered, the trust statement, and the plan for closing the gap live
+  in `docs/specs/constraint-extraction-coverage.spec.md` -- consult it
+  before building anything that relies on ring or subset extraction.
 - **Observability records identities, never content, and never lives on
   the result type.** `observe/` holds two records: `callLog.ts` for what
   a call cost, `extractionLog.ts` for what the pipeline changed
