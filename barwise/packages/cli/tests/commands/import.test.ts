@@ -141,3 +141,27 @@ describe("barwise import transcript", () => {
     expect(result.exitCode).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// --samples validation (docs/specs/multi-sample-import.spec.md)
+// ---------------------------------------------------------------------------
+
+describe("import transcript --samples", () => {
+  it("rejects a count outside the bounds before touching any provider", async () => {
+    mkdirSync(tmpDir, { recursive: true });
+    const transcript = join(tmpDir, "t.md");
+    writeFileSync(transcript, "Facilitator: hello.\n");
+    const result = await runCli(["import", "transcript", transcript, "--samples", "7"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("--samples must be an integer between 2 and 5");
+  });
+
+  it("rejects a non-integer count", async () => {
+    mkdirSync(tmpDir, { recursive: true });
+    const transcript = join(tmpDir, "t.md");
+    writeFileSync(transcript, "Facilitator: hello.\n");
+    const result = await runCli(["import", "transcript", transcript, "--samples", "2.5"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("--samples must be an integer");
+  });
+});

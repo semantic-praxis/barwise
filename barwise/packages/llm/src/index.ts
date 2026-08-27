@@ -91,6 +91,11 @@ export { buildExistingModelContext } from "./ModelContext.js";
 export { parseExtractionFromJson, processTranscript } from "./TranscriptProcessor.js";
 export type { ProcessorOptions } from "./TranscriptProcessor.js";
 
+export { computeSampleAgreement } from "./sampleAgreement.js";
+export type { SampleAgreement, SampleDisagreement } from "./sampleAgreement.js";
+export { MAX_SAMPLES, MIN_SAMPLES, sampleTranscript } from "./sampleTranscript.js";
+export type { SampledDraftResult, SampleOutcome } from "./sampleTranscript.js";
+
 // Providers
 export { AnthropicLlmClient } from "./providers/anthropic.js";
 export type { AnthropicClientOptions } from "./providers/anthropic.js";
