@@ -1,7 +1,9 @@
 # barwise-vscode
 
 VS Code extension that wires the platform-independent packages
-(`@barwise/core`, `@barwise/diagram`, `@barwise/llm`, `@barwise/mcp`) into the editor.
+(`@barwise/core`, `@barwise/diagram`, `@barwise/diagram-ui`,
+`@barwise/llm`, `@barwise/code-analysis`, `@barwise/dbt`,
+`@barwise/formats`, `@barwise/mcp`) into the editor.
 This package is the thin integration layer -- business logic lives in
 the core packages.
 
@@ -28,12 +30,23 @@ src/
     DiagnosticsProvider.ts    Maps validation diagnostics to LSP
     HoverProvider.ts          Hover info for object type references
   commands/
-    NewProjectCommand.ts      orm.newProject -- scaffold a new .orm.yaml
-    ValidateModelCommand.ts   orm.validateModel -- full validation
-    VerbalizeCommand.ts       orm.verbalize -- generate verbalization report
-    ShowDiagramCommand.ts     orm.showDiagram -- open diagram webview panel
-    ImportTranscriptCommand.ts orm.importTranscript -- LLM transcript extraction
-    ImportCodeCommand.ts      orm.import -- TypeScript/Java/Kotlin code analysis
+    NewProjectCommand.ts      barwise.newProject -- scaffold a new .orm.yaml
+    ValidateModelCommand.ts   barwise.validateModel -- full validation
+    VerbalizeCommand.ts       barwise.verbalize -- generate verbalization report
+    ShowDiagramCommand.ts     barwise.showDiagram -- open diagram webview panel
+    ImportCommand.ts          barwise.import -- quick-pick router over the importers below
+    ImportTranscriptCommand.ts  LLM transcript extraction (via barwise.import)
+    ImportDbtCommand.ts         dbt project import (via barwise.import)
+    ImportCodeCommand.ts        TypeScript/Java/Kotlin code analysis (via barwise.import)
+    ExportCommand.ts          barwise.export -- quick-pick router over the exporters below
+    ExportDbtCommand.ts         dbt project export (via barwise.export)
+    ExportDdlCommand.ts         DDL export (via barwise.export)
+    ExportAvroCommand.ts        Avro schema export (via barwise.export)
+    AnalyzeRepositoryCommand.ts barwise.analyzeRepository -- repo-wide code analysis
+                              Diagram-side commands (barwise.highlightInDiagram,
+                              copyElementName, addToView, createView, loadView) are
+                              registered in client/extension.ts; the authoritative
+                              user-facing list is contributes.commands in package.json
   diagram/
     DiagramPanel.ts           Webview host; thin adapter over @barwise/diagram DiagramSession
     protocol.ts               Webview message types (envelopes over the diagram contract)
@@ -126,8 +139,11 @@ Test fixtures live in `tests/fixtures/` (`.orm.yaml` files).
 | --------- | ------------------------------ | ---------------------------------------------------------------------------------- |
 | Upstream  | `@barwise/code-analysis`       | `registerCodeFormats`, `getImporter` for TypeScript/Java/Kotlin code import        |
 | Upstream  | `@barwise/core`                | Model types, validation, verbalization, serialization, mapping                     |
-| Upstream  | `@barwise/diagram`             | `generateDiagram` for webview SVG rendering                                        |
-| Upstream  | `@barwise/llm`                 | `processTranscript`, `LlmClient` interface, extraction types                       |
+| Upstream  | `@barwise/dbt`                 | `registerDbtFormats` for dbt project import/export                                 |
+| Upstream  | `@barwise/diagram`             | Diagram layout/session for the webview                                             |
+| Upstream  | `@barwise/diagram-ui`          | React diagram renderer used by the webview app                                     |
+| Upstream  | `@barwise/formats`             | `registerStandardFormats` for DDL/OpenAPI/Avro/NORMA/SQL interop                   |
+| Upstream  | `@barwise/llm`                 | `processTranscript`, `reviewModel`, `LlmClient` interface, extraction types        |
 | Upstream  | `@barwise/mcp`                 | `createServer` for MCP stdio server; `execute*` functions for Language Model Tools |
 | External  | `vscode`                       | Editor API (provided at runtime, not bundled)                                      |
 | External  | `vscode-languageserver/client` | LSP protocol implementation                                                        |

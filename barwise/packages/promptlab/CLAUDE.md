@@ -33,8 +33,11 @@ src/
   index.ts     Public API barrel
 
 evals/         The packaged seed suite: suite.yaml (weights + declared
-               case list), *.eval.yaml, *.transcript.md,
-               *.reference.orm.yaml, history.jsonl (checked-in record)
+               case list), *.eval.yaml, *.transcript.md, and
+               *.reference.orm.yaml for the train split. history.jsonl
+               appears here only after a recorded eval run; none is
+               checked in (docs/local-eval-runbook.md states the same,
+               and this file used to contradict it -- barwise-873)
 tests/         Vitest; fixtures/responses/ holds the recorded payloads
                that double as the suite's answer keys
 ```

@@ -8,9 +8,11 @@ per-tool integration work.
 
 ## Dependency Rule
 
-This package depends on `@barwise/core`, `@barwise/diagram`,
-`@barwise/llm`, the MCP SDK, and `zod`. It has ZERO dependencies on
-VS Code.
+This package may depend on any internal package except
+`barwise-vscode`, `@barwise/cli`, and `@barwise/promptlab`; the MCP
+SDK and `zod` are the externals. It has ZERO dependencies on VS Code.
+The authoritative internal list is the root CLAUDE.md dependency
+graph (and this package's `package.json`).
 
 ## Package Layout
 
@@ -25,13 +27,20 @@ src/
     index.ts            Tool registration barrel
     validate.ts         validate_model tool
     verbalize.ts        verbalize_model tool
+    describeDomain.ts   describe_domain tool
     schema.ts           generate_schema tool
     diff.ts             diff_models tool
     diagram.ts          generate_diagram tool
+    exportModel.ts      export_model tool
+    importModel.ts      import_model tool (registry-backed formats)
     analyze.ts          analyze_repository tool (clone, profile, extract)
     gym.ts              gym_list / gym_check tools (modeling gym)
     import.ts           import_transcript tool
     merge.ts            merge_models tool
+    review.ts           review_model tool (exports formatReview, shared with vscode)
+    queryModel.ts       query_model tool
+    lineageStatus.ts    lineage_status tool
+    impactAnalysis.ts   impact_analysis tool
   resources/
     index.ts            Resource registration barrel
     ormSchema.ts        orm-schema://json-schema resource
@@ -68,8 +77,13 @@ npx tsc --noEmit            # type-check only
 
 ## Dependencies
 
-| Direction | Package            | What is used                                                          |
-| --------- | ------------------ | --------------------------------------------------------------------- |
-| Upstream  | `@barwise/core`    | Model, validation, verbalization, mapping, diff, merge, serialization |
-| Upstream  | `@barwise/diagram` | `generateDiagram` for SVG output                                      |
-| Upstream  | `@barwise/llm`     | `processTranscript`, `createLlmClient`, provider factory              |
+| Direction | Package                  | What is used                                                           |
+| --------- | ------------------------ | ---------------------------------------------------------------------- |
+| Upstream  | `@barwise/core`          | Model, validation, verbalization, mapping, diff, merge, query, lineage |
+| Upstream  | `@barwise/diagram`       | Diagram layout for SVG output                                          |
+| Upstream  | `@barwise/diagram-ui`    | Headless SVG rendering of the positioned graph                         |
+| Upstream  | `@barwise/llm`           | `processTranscript`, `reviewModel`, `createLlmClient`, providers       |
+| Upstream  | `@barwise/code-analysis` | `registerCodeFormats`; repo analysis for analyze_repository            |
+| Upstream  | `@barwise/dbt`           | `registerDbtFormats` for dbt import/export                             |
+| Upstream  | `@barwise/formats`       | `registerStandardFormats` (DDL/OpenAPI/Avro/NORMA/SQL descriptors)     |
+| Upstream  | `@barwise/learn`         | Modeling gym (exercise catalog, evaluator) for gym_list / gym_check    |

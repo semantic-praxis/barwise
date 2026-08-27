@@ -456,6 +456,26 @@ auto-detection.
 
 ---
 
+### import_model
+
+Import an ORM model from a structured format via deterministic parsing
+(no LLM). Produces a draft `.orm.yaml` for review.
+
+| Parameter   | Type                                                                                            | Required | Description                                                                                                                                                                                                                                                       |
+| ----------- | ----------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `source`    | string                                                                                          | yes      | File path (preferred) or inline content. Text formats (`ddl`, `openapi`, `norma`, `sql`) accept a file path or raw content; directory formats (`dbt`, `typescript`, `java`, `kotlin`) take a project directory path. `sql` also accepts a directory of SQL files. |
+| `format`    | `"ddl"`, `"openapi"`, `"norma"`, `"dbt"`, `"sql"`, `"typescript"`, `"java"`, or `"kotlin"`      | yes      | Format of the source                                                                                                                                                                                                                                              |
+| `modelName` | string                                                                                          | no       | Name for the resulting model. Defaults to a format-specific name.                                                                                                                                                                                                 |
+| `dialect`   | `"ansi"`, `"snowflake"`, `"bigquery"`, `"postgres"`, `"mysql"`, `"redshift"`, or `"databricks"` | no       | SQL dialect (for the `sql` format). Auto-detected if omitted.                                                                                                                                                                                                     |
+
+**Returns** draft `.orm.yaml` content, followed by any import warnings
+as `#` comments and an `# Import confidence:` note. Prefer file paths
+over inline content for large inputs (especially NORMA `.orm` XML).
+For dbt projects, the tool reads `DBT_TARGET_TYPE` / `DBT_ADAPTER` from
+the environment for dialect detection.
+
+---
+
 ### merge_models
 
 Merge an incoming ORM model into a base model. Accepts all additions
@@ -481,6 +501,54 @@ and modifications, rejects removals (non-interactive merge strategy).
 The `yaml` field contains the merged model. If `valid` is false, the
 `diagnostics` array lists structural errors that should be resolved
 before saving.
+
+---
+
+### export_model
+
+Export an ORM model to a registered format (DDL, OpenAPI, Avro, SQL,
+NORMA, dbt).
+
+| Parameter    | Type             | Required | Description                                                                                                                                                                                                                               |
+| ------------ | ---------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `source`     | string \| object | yes      | File path to `.orm.yaml`, `.orm-project.yaml`, or inline YAML; or a `{ path, content }` object (e.g. an unsaved buffer)                                                                                                                   |
+| `format`     | string           | yes      | Export format name (e.g. `"ddl"`, `"openapi"`)                                                                                                                                                                                            |
+| `domain`     | string           | no       | For a project source, the one domain context to export                                                                                                                                                                                    |
+| `outputPath` | string           | no       | Destination file for the exported artifact. Large artifacts are always written to a file; this chooses where.                                                                                                                             |
+| `options`    | object           | no       | `annotate` (include TODO/NOTE annotations, default true), `includeExamples` (default true), `strict` (refuse to export a model with validation errors, default false), plus format-specific options (e.g. `title`, `version` for OpenAPI) |
+
+**Returns** the exported artifact as text (a combined view for
+multi-file formats). Output larger than the inline limit (8 KB by
+default) is spilled to a file -- `outputPath` if given, otherwise
+`.barwise/mcp-cache/` next to the model -- and the tool returns the
+file path plus a short preview. A single call produces one artifact,
+so exporting a multi-domain project requires `domain`; without it the
+tool returns an error listing the available domains.
+
+---
+
+### describe_domain
+
+Query the formal domain model for entity definitions, constraints,
+relationships, and business rules -- a structured summary to consult
+before generating schemas, API code, or data models.
+
+| Parameter            | Type             | Required | Description                                                                                                                                                                                |
+| -------------------- | ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `source`             | string \| object | yes      | File path to `.orm.yaml`, `.orm-project.yaml`, or inline YAML; or a `{ path, content }` object (e.g. an unsaved buffer)                                                                    |
+| `domain`             | string           | no       | For a project source, describe only this one domain context                                                                                                                                |
+| `focus`              | string           | no       | Entity name, fact type name, or constraint type keyword (e.g. `"Patient"`, `"mandatory"`). Omit for a full summary.                                                                        |
+| `includePopulations` | boolean          | no       | Include population (example) data in the description (default: true)                                                                                                                       |
+| `filePath`           | string           | no       | Path to a generated artifact (e.g. a DDL file). Resolves through the lineage manifest back to the source model and focuses on the elements that produced the artifact. Overrides `source`. |
+
+**Returns** JSON with a `summary` plus `entities`, `factTypes`, and
+`constraints` arrays (and `populations` when included, sample instances
+capped at 3). Each array is capped at 25 entries; when capped, the
+result carries a `truncation` map and a note -- follow up with
+`query_model` for the full enumeration. A project source without
+`domain` returns `{ domains: [...] }` with one block per domain. With
+`filePath`, the result adds a `lineage` block (artifact, format,
+exported-at, source elements).
 
 ---
 
@@ -543,6 +611,118 @@ against a missing element returns a `not-found` result; a malformed
 query string returns an `error` field instead.
 
 ---
+
+### lineage_status
+
+Check staleness of exported artifacts by comparing the current model
+against the lineage manifest.
+
+| Parameter | Type             | Required | Description                                                                                                      |
+| --------- | ---------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| `source`  | string \| object | yes      | File path to the `.orm.yaml` file (needed to find the project directory and model); inline YAML is also accepted |
+
+**Returns** JSON staleness report: which exported artifacts are stale
+(out of date with the model) versus fresh (up to date). The manifest is
+looked up next to the model file when `source` is a path; for inline
+YAML it falls back to the server's working directory.
+
+---
+
+### impact_analysis
+
+Analyze the impact of changing a model element: which exported
+artifacts depend on it.
+
+| Parameter   | Type             | Required | Description                                                              |
+| ----------- | ---------------- | -------- | ------------------------------------------------------------------------ |
+| `source`    | string \| object | yes      | File path to the `.orm.yaml` file (needed to find the project directory) |
+| `elementId` | string           | yes      | ID of the model element to analyze (entity, fact type, constraint, etc.) |
+
+**Returns** JSON impact report listing the exported artifacts recorded
+in the lineage manifest that depend on the element. As with
+`lineage_status`, the manifest is located next to the model file when
+`source` is a path.
+
+---
+
+### review_model
+
+Use an LLM to review an ORM model for semantic quality. Distinct from
+`validate_model` (which checks structural rules) -- review gives
+subjective modeling advice on naming, completeness, normalization,
+constraints, and definitions.
+
+| Parameter  | Type                                     | Required | Description                                                                                                             |
+| ---------- | ---------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `source`   | string \| object                         | yes      | File path to `.orm.yaml`, `.orm-project.yaml`, or inline YAML; or a `{ path, content }` object (e.g. an unsaved buffer) |
+| `domain`   | string                                   | no       | For a project source, review only this one domain context                                                               |
+| `focus`    | string                                   | no       | Focus on a specific entity or fact type name. Omit for a full review.                                                   |
+| `provider` | `"anthropic"`, `"openai"`, or `"ollama"` | no       | LLM provider. Auto-detects from env vars if omitted.                                                                    |
+| `model`    | string                                   | no       | LLM model override (e.g. `"gpt-4o"`)                                                                                    |
+
+**Returns** a Markdown review: a summary plus suggestions grouped by
+category, each with severity, affected element, description, and
+rationale. Requires an LLM provider configured via environment
+variables (see Setup). A project source without `domain` reviews every
+domain, one `== <context> ==` section per domain.
+
+---
+
+### gym_list
+
+List the modeling-gym exercise catalog.
+
+Takes no parameters.
+
+**Returns** JSON: an array of exercises, each with `id`, `title`, the
+proficiency `transition` the exercise serves, its `exitPerformance`,
+the `brief`, suggested `reading`, and the number of rubric `checks`.
+Use the `id` with `gym_check`.
+
+---
+
+### gym_check
+
+Evaluate a candidate ORM model against a gym exercise's rubric of
+semantic checks.
+
+| Parameter  | Type             | Required | Description                                                    |
+| ---------- | ---------------- | -------- | -------------------------------------------------------------- |
+| `exercise` | string           | yes      | Exercise id (see `gym_list`)                                   |
+| `source`   | string \| object | yes      | File path to the candidate `.orm.yaml`, or inline YAML content |
+
+**Returns** JSON: the structured evaluation report and, when checks
+fail, a `missCardFile` field with the miss-card deck content (Anki
+tab-separated import, `ORM 2::Misses` subdeck) for the calling agent
+to save or relay -- the server itself performs no writes. Large
+reports spill to a file with an inline preview.
+
+---
+
+### analyze_repository
+
+Clone, profile, and extract business rules from a code repository via
+the deterministic code importers.
+
+| Parameter     | Type    | Required | Description                                                          |
+| ------------- | ------- | -------- | -------------------------------------------------------------------- |
+| `repo`        | string  | yes      | GitHub org/repo (e.g. `"MyOrg/Foo"`) or a local path                 |
+| `ref`         | string  | no       | Branch, tag, or commit to analyze                                    |
+| `domain`      | string  | no       | Model name for the extracted domain. Defaults to the repo reference. |
+| `profileOnly` | boolean | no       | Only profile the repository, do not extract a model                  |
+| `confirm`     | boolean | no       | Confirm cloning a not-yet-cloned remote repository                   |
+
+**Returns** JSON with a `profile` (language, framework, build system,
+detected import format, domain paths, source file count, summary) and,
+unless `profileOnly`, the extracted `.orm.yaml` in `model` alongside
+`objectTypes` and `factTypes` counts. Cloning is a side effect: a
+remote repo not yet in the local store returns
+`requiresConfirmation: true` without cloning -- present that to the
+user and call again with `confirm: true`. Local paths and
+already-cloned repos (which are pulled) proceed directly. If no
+deterministic import format is detected, extraction fails with a hint
+to use `import_transcript` instead. Large output spills to a file with
+an inline preview.
 
 ## Resources
 

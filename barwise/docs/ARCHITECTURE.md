@@ -1,6 +1,15 @@
 # Architecture: ORM Modeler for VS Code
 
-**Status:** Draft
+**Status:** Historical design record (February 2026). This is the
+original system design and phasing plan, kept as the rationale for the
+metamodel and the layering. Its repository-shape sections predate the
+12-package monorepo: the repo is `barwise/`, not `orm-modeler/`; NORMA
+import/export shipped (`@barwise/formats`) despite the non-goal below;
+dbt, the MCP server, and the CLI are in-repo packages, not separate
+repositories; and the dependency gate is `.dependency-cruiser.cjs`,
+not per-package tsconfig checks. For current structure, read the root
+`CLAUDE.md` and each package's `CLAUDE.md` (barwise-873).
+
 **Last Updated:** February 2026
 
 ---
