@@ -3,8 +3,15 @@
 The keyed runs. `barwise prompt eval` is the one command in the
 repository that cannot run in CI or in an ephemeral session container:
 it needs a provider key, and the runs it makes cost money. This is the
-procedure for making them count, written against suite **2.0.0** and the
+procedure for making them count, written against suite **2.4.0** and the
 open workstreams of `docs/specs/eval-split-stratification.spec.md`.
+
+**Suite 2.1.0 through 2.4.0 landed between the last keyed run and now**
+(the licence, thirteen audit-and-machinery checks, all train-side), so
+no mean from the 2026-08-26 run is comparable to what these commands
+will print today: the train rubrics have new denominators, and
+runs that miss a newly guarded constraint score lower than the same
+runs did then. Dev rubrics are untouched, which matters below.
 
 Every command below was executed verbatim with no key in the
 environment, from `barwise/`. They parse, they print the artifact they
@@ -23,8 +30,12 @@ waiting on a keyed run:
   `subscription-billing` and `incident-response` have no recorded
   payload, therefore no generated reference, therefore no
   `forbids_population` check. Train grades constraint semantics and dev
-  grades element recall, so the two halves are not one measurement. The
-  fix starts with a payload, which is what a keyed dev run produces.
+  grades element recall, so the two halves are not one measurement.
+  **The payloads for this already exist**: the 2026-08-26 run saved six
+  dev payloads (`docs/prompt-eval-2.0.0-haiku45-2026-08-26.md`), every
+  dev sample passed its rubric, and the dev rubrics have not changed
+  since -- so closing barwise-845 needs no new calls unless those saved
+  files were lost. A fresh keyed dev run is the fallback, not the plan.
 - **barwise-846** (workstreams 3 and 4): re-split, then re-baseline both
   splits at `repeat >= 5` for the default artifact and both committed
   variants, and write the first committed history rows.
@@ -255,21 +266,23 @@ Two more things about recording:
   mean rather than scored zero. The request id is the only handle the
   provider will accept afterwards.
 - `COLLAPSE` on a sample -- below the manifest's `collapseFloor` of 0.3.
-  Expected on `university-enrollment` (barwise-852): it is bimodal on
-  whether the model invents `CourseOffering`, five of six checks flip
-  together, and it manufactured 88% of the suite's resolvable difference
-  in the first 2.0.0 baseline. Read its saved payloads before concluding
-  anything about the case -- an authoring bug and a genuinely hard case
-  call for opposite responses.
+  Under 2.0.0 this was expected on `university-enrollment`, which was
+  bimodal on a synonym (barwise-852). That is FIXED: since 2.1.0 the
+  case licenses `CourseOffering`/`Offering`, so a collapse there -- or
+  anywhere -- is now signal, not a known artifact. Read the saved
+  payloads before concluding anything: an authoring bug and a genuinely
+  hard case call for opposite responses.
 
 ## After the dev runs: close barwise-845
 
-The dev payloads are the point of that half. For each of the three
-cases, take the highest-scoring saved run, install it under the name the
-regenerator expects, and generate the reference:
+The dev payloads are the point of that half -- whether they come from
+the 2026-08-26 run's saved files or a fresh one. For each of the three
+cases, take the highest-scoring saved run (`barwise prompt score
+--case <id> --extraction <file>` ranks them offline), install it under
+the name the regenerator expects, and generate the reference:
 
 ```sh
-cp /tmp/eval-payloads/sonnet5-3-dev/vendor-onboarding-runN.json \
+cp /tmp/eval-payloads/haiku45-2-dev/vendor-onboarding-runN.json \
    packages/promptlab/tests/fixtures/responses/vendor-onboarding.json
 # ... likewise subscription-billing and incident-response
 npm run regen:references          # from barwise/, after npm run build
@@ -279,7 +292,16 @@ The script names the cases it skipped, which is the fastest answer to
 "which cases still lack a reference". Then add `reference:` to each of
 the three case files, add `forbids_population` checks where the
 transcript settles a constraint and a `requires_ambiguity` check to
-`incident-response`, and re-run the promptlab tests:
+`incident-response`, and re-run the promptlab tests. Two additions the
+audit round bolted onto this step
+(`docs/specs/constraint-extraction-coverage.spec.md`, workstream 1):
+verbalize each new reference and read it against its transcript before
+pinning (the train pass caught an answer key asserting a constraint
+the transcript never settles), and add the ring `forbids_population`
+check for "Incident is duplicate of Incident" -- `incident-response`
+settles irreflexive explicitly, and if the best payload MISSED that
+ring, record the miss as prompt-headroom evidence rather than picking
+a payload for carrying it:
 
 ```sh
 (cd packages/promptlab && npx vitest run)
@@ -296,6 +318,7 @@ weaken the check to make the fixture pass.
 shadow directory above works and is verified, but it is a workaround for
 a missing flag, and an operator who does not know the trick will compare
 the default against a variant by changing the model -- confounding the
-two things the comparison exists to separate. Worth an
-`--artifact-version <version|default>` flag on both `prompt eval` and
-`prompt artifact`.
+two things the comparison exists to separate. Filed as barwise-882:
+an `--artifact-version <version|default>` flag on both `prompt eval`
+and `prompt artifact`, wanted before the workstream 4 re-baseline runs
+the default arm on both models.
