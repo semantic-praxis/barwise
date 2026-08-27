@@ -37,7 +37,20 @@
 # every score after it, which is exactly what a major bump is for. The
 # splits and the ten cases are untouched here; stratifying them is
 # barwise-846.
-version: 2.0.0
+#
+# 2.1.0 changes one case and no weight, floor or split:
+# university-enrollment declares `CourseOffering` and `Offering` as one
+# concept (docs/specs/eval-name-licensing.spec.md). On the recorded
+# 2.0.0 baseline that case scored 0.154 on three of five samples for
+# naming the entity with the transcript's dominant word -- nothing the
+# rubric asks about was missing -- and that one block manufactured 89%
+# of the suite's noise. A score that was 0.154 becomes 1.000, so rows
+# either side of this line are not comparable, the same reasoning that
+# bumped 1.3.0 for a conformance check's removal. conference-reviews
+# gets no licence on purpose: its spread is a real modelling fork (the
+# associative-entity workaround versus objectification), which is the
+# suite working.
+version: 2.1.0
 
 # Re-fitted for the rated form, because rating changed what a weight
 # means. A weight is now the cost of a model in which EVERY element

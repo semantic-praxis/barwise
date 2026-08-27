@@ -1,6 +1,15 @@
 id: university-enrollment
 transcript: university-enrollment.transcript.md
 reference: university-enrollment.reference.orm.yaml
+# The Registrar says bare "offering" nine times and "course offering"
+# three, including the identification line ("Offerings get an offering
+# ID"), so both words are the domain's own and the prompt's pick-the-
+# most-common-term rule argues for the shorter one. Without this
+# licence the rubric charged 0.85 for that choice while a real
+# structural divergence (how grades attach) stayed invisible
+# (docs/specs/eval-name-licensing.spec.md, suite 2.1.0).
+vocabulary:
+  - [CourseOffering, Offering]
 checks:
   - kind: must_validate
   - kind: requires_element
