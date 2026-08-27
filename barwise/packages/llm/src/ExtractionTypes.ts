@@ -77,6 +77,31 @@ export type InferredConstraintType =
   | "ring"
   | "frequency";
 
+// Record-typed so INFERRED_CONSTRAINT_TYPES cannot lag the union: the
+// response schema's enum and the conformance-correspondence sweep both
+// derive from this list, and a bare `readonly InferredConstraintType[]`
+// annotation would let a twelfth member stay silently absent from both
+// (barwise-869; the correspondence test existed precisely to catch a
+// new type with no conformance rule, and its own list was unguarded).
+const INFERRED_CONSTRAINT_TYPE_MEMBERS: Record<InferredConstraintType, true> = {
+  internal_uniqueness: true,
+  mandatory: true,
+  value_constraint: true,
+  external_uniqueness: true,
+  disjunctive_mandatory: true,
+  exclusion: true,
+  exclusive_or: true,
+  subset: true,
+  equality: true,
+  ring: true,
+  frequency: true,
+};
+
+/** Every InferredConstraintType member, in declaration order. */
+export const INFERRED_CONSTRAINT_TYPES = Object.keys(
+  INFERRED_CONSTRAINT_TYPE_MEMBERS,
+) as readonly InferredConstraintType[];
+
 export interface InferredConstraint {
   readonly type: InferredConstraintType;
   /** The name of the fact type this constraint applies to. */

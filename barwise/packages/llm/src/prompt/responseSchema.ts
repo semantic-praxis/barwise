@@ -1,3 +1,5 @@
+import { CONCEPTUAL_DATA_TYPE_NAMES, RING_TYPES } from "@barwise/core";
+import { INFERRED_CONSTRAINT_TYPES } from "../ExtractionTypes.js";
 /**
  * The JSON Schema that constrains the LLM's structured extraction output.
  */
@@ -35,22 +37,7 @@ export function buildResponseSchema(
               properties: {
                 name: {
                   type: "string",
-                  enum: [
-                    "text",
-                    "integer",
-                    "decimal",
-                    "money",
-                    "float",
-                    "boolean",
-                    "date",
-                    "time",
-                    "datetime",
-                    "timestamp",
-                    "auto_counter",
-                    "binary",
-                    "uuid",
-                    "other",
-                  ],
+                  enum: [...CONCEPTUAL_DATA_TYPE_NAMES],
                 },
                 length: { type: "number" },
                 scale: { type: "number" },
@@ -126,19 +113,7 @@ export function buildResponseSchema(
           properties: {
             type: {
               type: "string",
-              enum: [
-                "internal_uniqueness",
-                "mandatory",
-                "value_constraint",
-                "external_uniqueness",
-                "disjunctive_mandatory",
-                "exclusion",
-                "exclusive_or",
-                "subset",
-                "equality",
-                "ring",
-                "frequency",
-              ],
+              enum: [...INFERRED_CONSTRAINT_TYPES],
             },
             fact_type: { type: "string" },
             roles: { type: "array", items: { type: "string" } },
@@ -151,16 +126,7 @@ export function buildResponseSchema(
             values: { type: "array", items: { type: "string" } },
             ring_type: {
               type: "string",
-              enum: [
-                "irreflexive",
-                "asymmetric",
-                "antisymmetric",
-                "intransitive",
-                "acyclic",
-                "symmetric",
-                "transitive",
-                "purely_reflexive",
-              ],
+              enum: [...RING_TYPES],
             },
             min: { type: "number" },
             max: {

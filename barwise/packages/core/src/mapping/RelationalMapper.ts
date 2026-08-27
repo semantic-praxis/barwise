@@ -611,8 +611,6 @@ function conceptualTypeToSql(dataType: DataTypeDef | undefined): string {
       return "UUID";
     case "other":
       return "TEXT";
-    default:
-      return "TEXT";
   }
 }
 

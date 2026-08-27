@@ -20,10 +20,11 @@ import { ValidationEngine } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { parseDraftModel } from "../src/DraftModelParser.js";
 import { enforceConformance } from "../src/ExtractionConformance.js";
-import type {
-  ExtractionResponse,
-  InferredConstraint,
-  InferredConstraintType,
+import {
+  type ExtractionResponse,
+  INFERRED_CONSTRAINT_TYPES,
+  type InferredConstraint,
+  type InferredConstraintType,
 } from "../src/ExtractionTypes.js";
 
 const REF = [{ lines: [1, 2] as [number, number], excerpt: "test" }];
@@ -398,19 +399,7 @@ describe("the vocabulary is covered", () => {
     // stale in the capability matrix. A new type added to
     // `InferredConstraintType` with no malformed shape here would
     // otherwise be silently unswept.
-    const ALL: readonly InferredConstraintType[] = [
-      "internal_uniqueness",
-      "mandatory",
-      "value_constraint",
-      "external_uniqueness",
-      "disjunctive_mandatory",
-      "exclusion",
-      "exclusive_or",
-      "subset",
-      "equality",
-      "ring",
-      "frequency",
-    ];
+    const ALL = INFERRED_CONSTRAINT_TYPES;
     const swept = new Set(MALFORMED.map(([, c]) => c.type));
 
     expect([...ALL].filter((t) => !swept.has(t))).toEqual([]);

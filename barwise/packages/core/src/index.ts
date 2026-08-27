@@ -32,6 +32,7 @@ export {
   type JoinOperand,
   type JoinSubsetConstraint,
   type MandatoryRoleConstraint,
+  RING_TYPES,
   type RingConstraint,
   type RingType,
   type RolePath,
@@ -65,6 +66,7 @@ export {
 } from "./model/ObjectifiedFactType.js";
 export {
   type CardinalityRange,
+  CONCEPTUAL_DATA_TYPE_NAMES,
   type ConceptualDataTypeName,
   type DataTypeDef,
   ObjectType,
@@ -92,6 +94,7 @@ export { expandReading, type ReadingOrder, validateReadingTemplate } from "./mod
 export { Role, type RoleConfig } from "./model/Role.js";
 export { SemanticConflict, type SemanticConflictConfig } from "./model/SemanticConflict.js";
 export { SubtypeFact, type SubtypeFactConfig } from "./model/SubtypeFact.js";
+export { assertNever } from "./util/assertNever.js";
 
 // Serialization
 export {

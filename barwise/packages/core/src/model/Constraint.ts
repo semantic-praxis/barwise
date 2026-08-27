@@ -199,6 +199,24 @@ export type RingType =
   | "transitive"
   | "purely_reflexive";
 
+// Typed as Record<RingType, true> so the derived array below cannot
+// lag the union: adding a member without listing it here is a compile
+// error, unlike a bare literal array, whose `readonly RingType[]`
+// annotation checks membership but never completeness (barwise-869).
+const RING_TYPE_MEMBERS: Record<RingType, true> = {
+  irreflexive: true,
+  asymmetric: true,
+  antisymmetric: true,
+  intransitive: true,
+  acyclic: true,
+  symmetric: true,
+  transitive: true,
+  purely_reflexive: true,
+};
+
+/** Every RingType member, in declaration order. */
+export const RING_TYPES = Object.keys(RING_TYPE_MEMBERS) as readonly RingType[];
+
 /**
  * Ring constraint.
  *
