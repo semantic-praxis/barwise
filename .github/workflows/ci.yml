@@ -107,6 +107,12 @@ jobs:
       - run: npm run check:depcruise-gate
         if: steps.changes.outputs.docs_only != 'true'
 
+      # Declared must-agree copies (parity.manifest.json) stay
+      # byte-identical; editing one copy without its partners fails
+      # here instead of drifting silently (barwise-868).
+      - run: npm run check:parity
+        if: steps.changes.outputs.docs_only != 'true'
+
       - run: npm run purity
         if: steps.changes.outputs.docs_only != 'true'
 
