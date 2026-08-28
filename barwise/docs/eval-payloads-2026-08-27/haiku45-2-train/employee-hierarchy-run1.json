@@ -1,0 +1,251 @@
+{
+  "object_types": [
+    {
+      "name": "Person",
+      "kind": "entity",
+      "reference_mode": "person_id",
+      "definition": "An individual tracked in the system, identified by a unique person ID. All persons in the system, including employees and managers, are instances of Person.",
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "We track persons generally -- anyone in the system is a person with a person ID."
+        }
+      ]
+    },
+    {
+      "name": "PersonId",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 20 },
+      "definition": "The unique identifier assigned to each Person.",
+      "source_references": [{ "lines": [3, 3], "excerpt": "a person with a person ID" }]
+    },
+    {
+      "name": "Employee",
+      "kind": "entity",
+      "reference_mode": "person_id",
+      "definition": "A person employed by the organization. Every employee is also a person, identified through their person ID.",
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "Employees are persons; every employee is also a person, identified the same way."
+        }
+      ]
+    },
+    {
+      "name": "Manager",
+      "kind": "entity",
+      "reference_mode": "person_id",
+      "definition": "An employee with extra responsibilities. Every manager is an employee, and through that, a person.",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "A manager is an employee with extra responsibilities. Every manager is an employee, and through that, a person."
+        }
+      ]
+    },
+    {
+      "name": "Department",
+      "kind": "entity",
+      "reference_mode": "department_code",
+      "definition": "An organizational unit with employees. Each department has a unique department code and a unique department name.",
+      "source_references": [{ "lines": [11, 11], "excerpt": "Every employee works in exactly one department." }]
+    },
+    {
+      "name": "DepartmentCode",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 20 },
+      "definition": "The unique identifier assigned to each Department.",
+      "source_references": [{ "lines": [19, 19], "excerpt": "Each department has a department code." }]
+    },
+    {
+      "name": "DepartmentName",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 100 },
+      "definition": "The name of a department, such as 'Payroll' or 'Field Operations'. Department names are unique.",
+      "source_references": [
+        {
+          "lines": [19, 19],
+          "excerpt": "Departments also each have a department name, like \"Payroll\" or \"Field Operations\", and no two share a name."
+        }
+      ]
+    }
+  ],
+  "fact_types": [
+    {
+      "name": "Person has PersonId",
+      "roles": [{ "player": "Person", "role_name": "has" }, { "player": "PersonId", "role_name": "identifies" }],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [{ "lines": [3, 3], "excerpt": "a person with a person ID" }]
+    },
+    {
+      "name": "Employee works in Department",
+      "roles": [{ "player": "Employee", "role_name": "works in" }, { "player": "Department", "role_name": "employs" }],
+      "readings": ["{0} works in {1}", "{1} employs {0}"],
+      "source_references": [{ "lines": [11, 11], "excerpt": "Every employee works in exactly one department." }]
+    },
+    {
+      "name": "Manager manages Department",
+      "roles": [
+        { "player": "Manager", "role_name": "manages" },
+        { "player": "Department", "role_name": "is managed by" }
+      ],
+      "readings": ["{0} manages {1}", "{1} is managed by {0}"],
+      "source_references": [{ "lines": [15, 15], "excerpt": "A manager manages at most one department." }]
+    },
+    {
+      "name": "Department has DepartmentCode",
+      "roles": [
+        { "player": "Department", "role_name": "has" },
+        { "player": "DepartmentCode", "role_name": "identifies" }
+      ],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [{ "lines": [19, 19], "excerpt": "Each department has a department code." }]
+    },
+    {
+      "name": "Department has DepartmentName",
+      "roles": [
+        { "player": "Department", "role_name": "has" },
+        { "player": "DepartmentName", "role_name": "is the name of" }
+      ],
+      "readings": ["{0} has {1}", "{1} is the name of {0}"],
+      "source_references": [{ "lines": [19, 19], "excerpt": "Departments also each have a department name" }]
+    }
+  ],
+  "subtypes": [
+    {
+      "subtype": "Employee",
+      "supertype": "Person",
+      "provides_identification": true,
+      "description": "Every employee is a person. Employees are identified through the same person ID as their supertype.",
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "Employees are persons; every employee is also a person, identified the same way."
+        }
+      ]
+    },
+    {
+      "subtype": "Manager",
+      "supertype": "Employee",
+      "provides_identification": true,
+      "description": "A manager is an employee with extra responsibilities. Managers are identified through the same person ID as their supertype.",
+      "source_references": [{ "lines": [7, 7], "excerpt": "Every manager is an employee, and through that, a person." }]
+    }
+  ],
+  "inferred_constraints": [
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Person has PersonId",
+      "roles": ["Person"],
+      "is_preferred": true,
+      "description": "Each Person has at most one PersonId.",
+      "confidence": "high",
+      "source_references": [{ "lines": [3, 3], "excerpt": "a person with a person ID" }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Person has PersonId",
+      "roles": ["PersonId"],
+      "description": "Each PersonId identifies at most one Person.",
+      "confidence": "high",
+      "source_references": [{ "lines": [3, 3], "excerpt": "a person with a person ID" }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Person has PersonId",
+      "roles": ["Person"],
+      "description": "Every Person has a PersonId.",
+      "confidence": "high",
+      "source_references": [{ "lines": [3, 3], "excerpt": "a person with a person ID" }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Employee works in Department",
+      "roles": ["Employee"],
+      "description": "Each Employee works in at most one Department.",
+      "confidence": "high",
+      "source_references": [{ "lines": [11, 11], "excerpt": "Every employee works in exactly one department." }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Employee works in Department",
+      "roles": ["Employee"],
+      "description": "Every Employee works in some Department.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [11, 11], "excerpt": "Every employee works in exactly one department. ... nobody is unassigned." }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Manager manages Department",
+      "roles": ["Manager"],
+      "description": "Each Manager manages at most one Department.",
+      "confidence": "high",
+      "source_references": [{ "lines": [15, 15], "excerpt": "A manager manages at most one department." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Department has DepartmentCode",
+      "roles": ["Department"],
+      "is_preferred": true,
+      "description": "Each Department has at most one DepartmentCode.",
+      "confidence": "high",
+      "source_references": [{ "lines": [19, 19], "excerpt": "Each department has a department code." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Department has DepartmentCode",
+      "roles": ["DepartmentCode"],
+      "description": "Each DepartmentCode identifies at most one Department.",
+      "confidence": "high",
+      "source_references": [{ "lines": [19, 19], "excerpt": "Each department has a department code." }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Department has DepartmentCode",
+      "roles": ["Department"],
+      "description": "Every Department has a DepartmentCode.",
+      "confidence": "high",
+      "source_references": [{ "lines": [19, 19], "excerpt": "Each department has a department code." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Department has DepartmentName",
+      "roles": ["DepartmentName"],
+      "description": "Each DepartmentName identifies at most one Department.",
+      "confidence": "high",
+      "source_references": [{ "lines": [19, 19], "excerpt": "no two share a name" }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Department has DepartmentName",
+      "roles": ["Department"],
+      "description": "Every Department has a DepartmentName.",
+      "confidence": "high",
+      "source_references": [{ "lines": [19, 19], "excerpt": "Departments also each have a department name" }]
+    }
+  ],
+  "objectified_fact_types": [],
+  "populations": [],
+  "ambiguities": [
+    {
+      "description": "Department management direction and mandatory participation unclear. The transcript states 'A manager manages at most one department' and 'Some managers are between assignments and manage none.' This leaves ambiguous whether every department must have a manager. Is the 'is managed by' role on Department mandatory (every department must have a manager), or optional (a department can exist without a manager)? The forward direction states managers can manage zero or one department, but the reverse direction is not explicitly addressed.",
+      "source_references": [
+        {
+          "lines": [15, 15],
+          "excerpt": "A manager manages at most one department. Some managers are between assignments and manage none."
+        }
+      ]
+    },
+    {
+      "description": "Many-to-many possibility for 'Employee works in Department'. While the transcript states 'Every employee works in exactly one department' and 'nobody is in two departments at once', it is not explicitly clear whether a department can have only one employee, or whether departments employ many. The wording implies departments have many employees, but this should be confirmed. Is 'employs' on Department optional or mandatory? Can a department have zero employees?",
+      "source_references": [
+        {
+          "lines": [11, 11],
+          "excerpt": "Every employee works in exactly one department. Departments have many employees, but nobody is in two departments at once, and nobody is unassigned."
+        }
+      ]
+    }
+  ]
+}

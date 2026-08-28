@@ -1,0 +1,958 @@
+{
+  "object_types": [
+    {
+      "name": "Account",
+      "kind": "entity",
+      "reference_mode": "account_number",
+      "definition": "A customer account in the system, identified by an account number. Every account has a unique 6-digit sequential identifier that is never reused; if an account closes and the same company returns, they receive a new account number.",
+      "source_references": [
+        {
+          "lines": [17, 21],
+          "excerpt": "An account. Every account has an account number...Six digits, sequential, never reused. If an account closes and the same company comes back, they get a new number and we treat them as a new customer for reporting."
+        }
+      ]
+    },
+    {
+      "name": "AccountNumber",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 10 },
+      "definition": "The unique 6-digit sequential identifier for an account.",
+      "source_references": [
+        { "lines": [17, 21], "excerpt": "Every account has an account number...Six digits, sequential, never reused." }
+      ]
+    },
+    {
+      "name": "Subscription",
+      "kind": "entity",
+      "reference_mode": "subscription_id",
+      "definition": "The agreement that an account pays a specified amount on a specified billing cycle for a specified product. Identified by a subscription ID prefixed with SUB.",
+      "source_references": [
+        {
+          "lines": [33, 37],
+          "excerpt": "A subscription is the agreement that this account pays us this amount on this cycle for this thing. It's got a subscription ID...Unique. Generated, prefixed with SUB."
+        }
+      ]
+    },
+    {
+      "name": "SubscriptionID",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 20 },
+      "definition": "The unique identifier for a subscription, prefixed with SUB.",
+      "source_references": [
+        { "lines": [33, 37], "excerpt": "It's got a subscription ID...Unique. Generated, prefixed with SUB." }
+      ]
+    },
+    {
+      "name": "Product",
+      "kind": "entity",
+      "reference_mode": "product_code",
+      "definition": "A product offered by the company. Currently three products exist: CORE, ANALYTICS, and CONNECT.",
+      "source_references": [
+        {
+          "lines": [67, 69],
+          "excerpt": "And products -- how are they identified?...Product code. We have three: CORE, ANALYTICS, and CONNECT."
+        }
+      ]
+    },
+    {
+      "name": "ProductCode",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 20 },
+      "value_constraint": { "values": ["CORE", "ANALYTICS", "CONNECT"] },
+      "definition": "The unique identifier for a product. Currently restricted to CORE, ANALYTICS, or CONNECT.",
+      "source_references": [
+        { "lines": [69, 69], "excerpt": "Product code. We have three: CORE, ANALYTICS, and CONNECT." }
+      ]
+    },
+    {
+      "name": "PricePlan",
+      "kind": "entity",
+      "reference_mode": "plan_code",
+      "definition": "The billing artefact that specifies the price and billing frequency. Identified by plan code (e.g., CORE-MO-49, CORE-AN-490). Each price plan entitles exactly one feature bundle.",
+      "source_references": [
+        {
+          "lines": [77, 77],
+          "excerpt": "The price plan. It's got a plan code, it says what the customer pays and how often. CORE-MO-49, CORE-AN-490, that kind of thing."
+        }
+      ],
+      "aliases": ["billing plan"]
+    },
+    {
+      "name": "PlanCode",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 20 },
+      "definition": "The unique identifier for a price plan, such as CORE-MO-49 or CORE-AN-490.",
+      "source_references": [
+        {
+          "lines": [77, 77],
+          "excerpt": "The price plan. It's got a plan code, it says what the customer pays and how often. CORE-MO-49, CORE-AN-490, that kind of thing."
+        }
+      ]
+    },
+    {
+      "name": "FeatureBundle",
+      "kind": "entity",
+      "reference_mode": "bundle_name",
+      "definition": "The feature set or tier that a customer receives. Identified by name. Examples include Starter, Professional, and Enterprise. Each bundle specifies how many seats, whether API access is included, whether SSO is included, etc.",
+      "source_references": [
+        {
+          "lines": [83, 83],
+          "excerpt": "When I say plan I mean what the customer gets. Starter, Professional, Enterprise. It's the feature bundle -- how many seats, whether they get the API, whether they get SSO."
+        },
+        {
+          "lines": [191, 195],
+          "excerpt": "Name. Starter, Professional, Enterprise. There's no code, which annoys me...Yes. There's exactly one Professional."
+        }
+      ]
+    },
+    {
+      "name": "BundleName",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 100 },
+      "definition": "The unique name identifier for a feature bundle.",
+      "source_references": [
+        {
+          "lines": [191, 195],
+          "excerpt": "Name. Starter, Professional, Enterprise...Yes. There's exactly one Professional."
+        }
+      ]
+    },
+    {
+      "name": "PlanChange",
+      "kind": "entity",
+      "reference_mode": "change_id",
+      "definition": "A record of a subscription plan change, capturing the subscription, the new price plan, the effective date, the date it was requested, and who requested it. Allows subscription plan history to be tracked.",
+      "source_references": [
+        {
+          "lines": [207, 215],
+          "excerpt": "A change is a record. We don't overwrite the plan on the subscription, we write a plan change with an effective date...It's got a change ID. It has to, because we need to know who made it and when it takes effect, and those are different dates...It records the subscription, the new price plan, the effective date, and who requested it."
+        }
+      ]
+    },
+    {
+      "name": "ChangeID",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 20 },
+      "definition": "The unique identifier for a plan change.",
+      "source_references": [{ "lines": [211, 211], "excerpt": "It's got a change ID." }]
+    },
+    {
+      "name": "StartDate",
+      "kind": "value",
+      "data_type": { "name": "date" },
+      "definition": "The date on which a subscription begins. This field is mandatory for every subscription.",
+      "source_references": [
+        {
+          "lines": [103, 103],
+          "excerpt": "Start date is always there. You can't create a subscription without one, the form won't submit."
+        }
+      ]
+    },
+    {
+      "name": "EndDate",
+      "kind": "value",
+      "data_type": { "name": "date" },
+      "definition": "The date on which a subscription ends. This field is optional; open-ended subscriptions have no end date.",
+      "source_references": [
+        {
+          "lines": [95, 99],
+          "excerpt": "End date, sometimes...An open-ended subscription has no end date. Most of them are open-ended -- they run until cancelled. A fixed-term one has an end date agreed up front, that's usually an enterprise deal."
+        }
+      ]
+    },
+    {
+      "name": "BillingPeriod",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 20 },
+      "value_constraint": { "values": ["monthly", "annual"] },
+      "definition": "The frequency at which a subscription is billed. Must be exactly monthly or annual.",
+      "source_references": [
+        {
+          "lines": [107, 119],
+          "excerpt": "Billing period -- what are the values?...Monthly or annual...Every subscription has exactly one billing period."
+        }
+      ]
+    },
+    {
+      "name": "SubscriptionStatus",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 20 },
+      "value_constraint": { "values": ["trialing", "active", "past due", "cancelled"] },
+      "definition": "The current status of a subscription. Must be exactly one of: trialing, active, past due, or cancelled.",
+      "source_references": [
+        { "lines": [123, 127], "excerpt": "Status?...Trialing, active, past due, cancelled...Exactly one, yes." }
+      ]
+    },
+    {
+      "name": "EffectiveDate",
+      "kind": "value",
+      "data_type": { "name": "date" },
+      "definition": "The date on which a plan change becomes effective. May differ from the request date.",
+      "source_references": [
+        {
+          "lines": [211, 211],
+          "excerpt": "we need to know who made it and when it takes effect, and those are different dates. Someone can make a change on the third that takes effect on the first of next month."
+        }
+      ]
+    },
+    {
+      "name": "Requester",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 200 },
+      "definition": "The person or system that requested a plan change.",
+      "source_references": [
+        {
+          "lines": [215, 215],
+          "excerpt": "It records the subscription, the new price plan, the effective date, and who requested it."
+        }
+      ]
+    }
+  ],
+  "fact_types": [
+    {
+      "name": "Account has AccountNumber",
+      "roles": [{ "player": "Account", "role_name": "has" }, { "player": "AccountNumber", "role_name": "identifies" }],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [
+        {
+          "lines": [17, 21],
+          "excerpt": "An account. Every account has an account number...Six digits, sequential, never reused."
+        }
+      ]
+    },
+    {
+      "name": "Subscription has SubscriptionID",
+      "roles": [
+        { "player": "Subscription", "role_name": "has" },
+        { "player": "SubscriptionID", "role_name": "identifies" }
+      ],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [
+        { "lines": [33, 37], "excerpt": "It's got a subscription ID...Unique. Generated, prefixed with SUB." }
+      ]
+    },
+    {
+      "name": "Product has ProductCode",
+      "roles": [{ "player": "Product", "role_name": "has" }, { "player": "ProductCode", "role_name": "identifies" }],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [
+        {
+          "lines": [67, 69],
+          "excerpt": "And products -- how are they identified?...Product code. We have three: CORE, ANALYTICS, and CONNECT."
+        }
+      ]
+    },
+    {
+      "name": "PricePlan has PlanCode",
+      "roles": [{ "player": "PricePlan", "role_name": "has" }, { "player": "PlanCode", "role_name": "identifies" }],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [
+        {
+          "lines": [77, 77],
+          "excerpt": "The price plan. It's got a plan code, it says what the customer pays and how often. CORE-MO-49, CORE-AN-490, that kind of thing."
+        }
+      ]
+    },
+    {
+      "name": "FeatureBundle has BundleName",
+      "roles": [
+        { "player": "FeatureBundle", "role_name": "has" },
+        { "player": "BundleName", "role_name": "identifies" }
+      ],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [
+        {
+          "lines": [191, 195],
+          "excerpt": "Name. Starter, Professional, Enterprise...Yes. There's exactly one Professional."
+        }
+      ]
+    },
+    {
+      "name": "PlanChange has ChangeID",
+      "roles": [{ "player": "PlanChange", "role_name": "has" }, { "player": "ChangeID", "role_name": "identifies" }],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [{ "lines": [211, 211], "excerpt": "It's got a change ID." }]
+    },
+    {
+      "name": "Subscription belongs to Account",
+      "roles": [{ "player": "Subscription", "role_name": "belongs to" }, { "player": "Account", "role_name": "has" }],
+      "readings": ["{0} belongs to {1}", "{1} has {0}"],
+      "source_references": [
+        { "lines": [13, 13], "excerpt": "A customer signs up, they pick a plan, we create a subscription" },
+        { "lines": [33, 33], "excerpt": "A subscription is the agreement that this account pays us" }
+      ]
+    },
+    {
+      "name": "Subscription is for Product",
+      "roles": [{ "player": "Subscription", "role_name": "is for" }, { "player": "Product", "role_name": "has" }],
+      "readings": ["{0} is for {1}", "{1} has {0}"],
+      "source_references": [
+        {
+          "lines": [49, 49],
+          "excerpt": "an account can have a subscription to each of them at once. So it's one active subscription per account per product."
+        }
+      ]
+    },
+    {
+      "name": "Subscription uses PricePlan",
+      "roles": [
+        { "player": "Subscription", "role_name": "uses" },
+        { "player": "PricePlan", "role_name": "is used by" }
+      ],
+      "readings": ["{0} uses {1}", "{1} is used by {0}"],
+      "source_references": [
+        {
+          "lines": [271, 271],
+          "excerpt": "No, Sam, it does have a current plan field. The changes are the history, but there's a denormalised current plan on the record."
+        }
+      ]
+    },
+    {
+      "name": "Subscription has StartDate",
+      "roles": [{ "player": "Subscription", "role_name": "has" }, { "player": "StartDate", "role_name": "is of" }],
+      "readings": ["{0} has {1}", "{1} is of {0}"],
+      "source_references": [
+        {
+          "lines": [95, 103],
+          "excerpt": "Start date. End date, sometimes...Start date is always there. You can't create a subscription without one, the form won't submit."
+        }
+      ]
+    },
+    {
+      "name": "Subscription has EndDate",
+      "roles": [{ "player": "Subscription", "role_name": "has" }, { "player": "EndDate", "role_name": "is of" }],
+      "readings": ["{0} has {1}", "{1} is of {0}"],
+      "source_references": [
+        {
+          "lines": [95, 99],
+          "excerpt": "End date, sometimes...An open-ended subscription has no end date. Most of them are open-ended -- they run until cancelled."
+        }
+      ]
+    },
+    {
+      "name": "Subscription has BillingPeriod",
+      "roles": [{ "player": "Subscription", "role_name": "has" }, { "player": "BillingPeriod", "role_name": "is of" }],
+      "readings": ["{0} has {1}", "{1} is of {0}"],
+      "source_references": [
+        {
+          "lines": [105, 119],
+          "excerpt": "Billing period -- what are the values?...Monthly or annual...Every subscription has exactly one billing period."
+        }
+      ]
+    },
+    {
+      "name": "Subscription has SubscriptionStatus",
+      "roles": [
+        { "player": "Subscription", "role_name": "has" },
+        { "player": "SubscriptionStatus", "role_name": "is of" }
+      ],
+      "readings": ["{0} has {1}", "{1} is of {0}"],
+      "source_references": [
+        { "lines": [121, 127], "excerpt": "Status?...Trialing, active, past due, cancelled...Exactly one, yes." }
+      ]
+    },
+    {
+      "name": "PricePlan entitles FeatureBundle",
+      "roles": [
+        { "player": "PricePlan", "role_name": "entitles" },
+        { "player": "FeatureBundle", "role_name": "is entitled by" }
+      ],
+      "readings": ["{0} entitles {1}", "{1} is entitled by {0}"],
+      "source_references": [
+        {
+          "lines": [173, 183],
+          "excerpt": "They're related. Every price plan gives you exactly one feature bundle. CORE-MO-49 and CORE-AN-490 both give you Professional...A price plan that doesn't entitle you to anything would be a donation."
+        }
+      ]
+    },
+    {
+      "name": "PlanChange is for Subscription",
+      "roles": [{ "player": "PlanChange", "role_name": "is for" }, { "player": "Subscription", "role_name": "has" }],
+      "readings": ["{0} is for {1}", "{1} has {0}"],
+      "source_references": [
+        {
+          "lines": [213, 215],
+          "excerpt": "And a plan change belongs to exactly one subscription?...One change, one subscription. It records the subscription, the new price plan, the effective date, and who requested it."
+        }
+      ]
+    },
+    {
+      "name": "PlanChange specifies PricePlan",
+      "roles": [
+        { "player": "PlanChange", "role_name": "specifies" },
+        { "player": "PricePlan", "role_name": "is specified by" }
+      ],
+      "readings": ["{0} specifies {1}", "{1} is specified by {0}"],
+      "source_references": [
+        {
+          "lines": [215, 215],
+          "excerpt": "It records the subscription, the new price plan, the effective date, and who requested it."
+        }
+      ]
+    },
+    {
+      "name": "PlanChange has EffectiveDate",
+      "roles": [{ "player": "PlanChange", "role_name": "has" }, { "player": "EffectiveDate", "role_name": "is of" }],
+      "readings": ["{0} has {1}", "{1} is of {0}"],
+      "source_references": [
+        {
+          "lines": [207, 215],
+          "excerpt": "we write a plan change with an effective date...It records the subscription, the new price plan, the effective date, and who requested it."
+        }
+      ]
+    },
+    {
+      "name": "PlanChange has Requester",
+      "roles": [{ "player": "PlanChange", "role_name": "has" }, { "player": "Requester", "role_name": "requested" }],
+      "readings": ["{0} has {1}", "{1} requested {0}"],
+      "source_references": [
+        {
+          "lines": [211, 215],
+          "excerpt": "we need to know who made it and when it takes effect...It records the subscription, the new price plan, the effective date, and who requested it."
+        }
+      ]
+    }
+  ],
+  "inferred_constraints": [
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Account has AccountNumber",
+      "roles": ["Account"],
+      "description": "Each Account has at most one AccountNumber.",
+      "confidence": "high",
+      "is_preferred": true,
+      "source_references": [
+        { "lines": [17, 21], "excerpt": "Every account has an account number...Six digits, sequential, never reused." }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Account has AccountNumber",
+      "roles": ["AccountNumber"],
+      "description": "Each AccountNumber identifies at most one Account.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [17, 21], "excerpt": "Every account has an account number...Six digits, sequential, never reused." }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Account has AccountNumber",
+      "roles": ["Account"],
+      "description": "Every Account has an AccountNumber.",
+      "confidence": "high",
+      "source_references": [{ "lines": [17, 17], "excerpt": "Every account has an account number." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Subscription has SubscriptionID",
+      "roles": ["Subscription"],
+      "description": "Each Subscription has at most one SubscriptionID.",
+      "confidence": "high",
+      "is_preferred": true,
+      "source_references": [
+        { "lines": [33, 37], "excerpt": "It's got a subscription ID...Unique. Generated, prefixed with SUB." }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Subscription has SubscriptionID",
+      "roles": ["SubscriptionID"],
+      "description": "Each SubscriptionID identifies at most one Subscription.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [33, 37], "excerpt": "It's got a subscription ID...Unique. Generated, prefixed with SUB." }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Subscription has SubscriptionID",
+      "roles": ["Subscription"],
+      "description": "Every Subscription has a SubscriptionID.",
+      "confidence": "high",
+      "source_references": [{ "lines": [33, 33], "excerpt": "It's got a subscription ID." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Product has ProductCode",
+      "roles": ["Product"],
+      "description": "Each Product has at most one ProductCode.",
+      "confidence": "high",
+      "is_preferred": true,
+      "source_references": [
+        { "lines": [67, 69], "excerpt": "Product code. We have three: CORE, ANALYTICS, and CONNECT." }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Product has ProductCode",
+      "roles": ["ProductCode"],
+      "description": "Each ProductCode identifies at most one Product.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [67, 69], "excerpt": "Product code. We have three: CORE, ANALYTICS, and CONNECT." }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Product has ProductCode",
+      "roles": ["Product"],
+      "description": "Every Product has a ProductCode.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [67, 69], "excerpt": "Product code. We have three: CORE, ANALYTICS, and CONNECT." }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "PricePlan has PlanCode",
+      "roles": ["PricePlan"],
+      "description": "Each PricePlan has at most one PlanCode.",
+      "confidence": "high",
+      "is_preferred": true,
+      "source_references": [
+        {
+          "lines": [77, 77],
+          "excerpt": "The price plan. It's got a plan code, it says what the customer pays and how often. CORE-MO-49, CORE-AN-490, that kind of thing."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "PricePlan has PlanCode",
+      "roles": ["PlanCode"],
+      "description": "Each PlanCode identifies at most one PricePlan.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [77, 77],
+          "excerpt": "The price plan. It's got a plan code, it says what the customer pays and how often. CORE-MO-49, CORE-AN-490, that kind of thing."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "PricePlan has PlanCode",
+      "roles": ["PricePlan"],
+      "description": "Every PricePlan has a PlanCode.",
+      "confidence": "high",
+      "source_references": [{ "lines": [77, 77], "excerpt": "The price plan. It's got a plan code" }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "FeatureBundle has BundleName",
+      "roles": ["FeatureBundle"],
+      "description": "Each FeatureBundle has at most one BundleName.",
+      "confidence": "high",
+      "is_preferred": true,
+      "source_references": [
+        { "lines": [193, 195], "excerpt": "Is the name unique?...Yes. There's exactly one Professional." }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "FeatureBundle has BundleName",
+      "roles": ["BundleName"],
+      "description": "Each BundleName identifies at most one FeatureBundle.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [193, 195], "excerpt": "Is the name unique?...Yes. There's exactly one Professional." }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "FeatureBundle has BundleName",
+      "roles": ["FeatureBundle"],
+      "description": "Every FeatureBundle has a BundleName.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [191, 195],
+          "excerpt": "Name. Starter, Professional, Enterprise...Yes. There's exactly one Professional."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "PlanChange has ChangeID",
+      "roles": ["PlanChange"],
+      "description": "Each PlanChange has at most one ChangeID.",
+      "confidence": "high",
+      "is_preferred": true,
+      "source_references": [{ "lines": [211, 211], "excerpt": "It's got a change ID." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "PlanChange has ChangeID",
+      "roles": ["ChangeID"],
+      "description": "Each ChangeID identifies at most one PlanChange.",
+      "confidence": "high",
+      "source_references": [{ "lines": [211, 211], "excerpt": "It's got a change ID." }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "PlanChange has ChangeID",
+      "roles": ["PlanChange"],
+      "description": "Every PlanChange has a ChangeID.",
+      "confidence": "high",
+      "source_references": [{ "lines": [211, 211], "excerpt": "It's got a change ID." }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Subscription belongs to Account",
+      "roles": ["Subscription"],
+      "description": "Every Subscription belongs to exactly one Account.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [13, 13], "excerpt": "A customer signs up, they pick a plan, we create a subscription" }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Subscription belongs to Account",
+      "roles": ["Subscription"],
+      "description": "Each Subscription belongs to exactly one Account (cannot belong to multiple accounts).",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [33, 33], "excerpt": "A subscription is the agreement that this account pays us" }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Subscription is for Product",
+      "roles": ["Subscription"],
+      "description": "Every Subscription is for exactly one Product.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [33, 33],
+          "excerpt": "A subscription is the agreement that this account pays us this amount on this cycle for this thing."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Subscription is for Product",
+      "roles": ["Subscription"],
+      "description": "Each Subscription is for exactly one Product (cannot be for multiple products).",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [49, 49],
+          "excerpt": "an account can have a subscription to each of them at once. So it's one active subscription per account per product."
+        }
+      ]
+    },
+    {
+      "type": "exclusive_or",
+      "fact_type": "Subscription is for Product",
+      "roles": ["Account", "Product"],
+      "description": "Each Account can have at most one active Subscription per Product. The combination of Account and Product uniquely identifies a Subscription.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [49, 65],
+          "excerpt": "An account can have a subscription to each of them at once. So it's one active subscription per account per product...One active subscription per account per product, enforced at the database level."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Subscription uses PricePlan",
+      "roles": ["Subscription"],
+      "description": "Every Subscription uses exactly one current PricePlan.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [271, 271],
+          "excerpt": "No, Sam, it does have a current plan field. The changes are the history, but there's a denormalised current plan on the record."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Subscription uses PricePlan",
+      "roles": ["Subscription"],
+      "description": "Each Subscription uses exactly one PricePlan (cannot use multiple price plans concurrently).",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [115, 115],
+          "excerpt": "You cannot bill someone monthly and annually for the same subscription, that's just billing them twice."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Subscription has StartDate",
+      "roles": ["Subscription"],
+      "description": "Every Subscription has a StartDate.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [103, 103],
+          "excerpt": "Start date is always there. You can't create a subscription without one, the form won't submit."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Subscription has StartDate",
+      "roles": ["Subscription"],
+      "description": "Each Subscription has at most one StartDate.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [103, 103],
+          "excerpt": "Start date is always there. You can't create a subscription without one, the form won't submit."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Subscription has EndDate",
+      "roles": ["Subscription"],
+      "description": "Each Subscription has at most one EndDate.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [95, 99], "excerpt": "End date, sometimes...An open-ended subscription has no end date." }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Subscription has BillingPeriod",
+      "roles": ["Subscription"],
+      "description": "Every Subscription has exactly one BillingPeriod.",
+      "confidence": "high",
+      "source_references": [{ "lines": [119, 119], "excerpt": "Every subscription has exactly one billing period." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Subscription has BillingPeriod",
+      "roles": ["Subscription"],
+      "description": "Each Subscription has at most one BillingPeriod.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [113, 115],
+          "excerpt": "Can a subscription be both?...No. It's one or the other. You cannot bill someone monthly and annually for the same subscription, that's just billing them twice."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Subscription has SubscriptionStatus",
+      "roles": ["Subscription"],
+      "description": "Every Subscription has exactly one SubscriptionStatus.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [125, 127], "excerpt": "Every subscription in exactly one?...Exactly one, yes." }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Subscription has SubscriptionStatus",
+      "roles": ["Subscription"],
+      "description": "Each Subscription has at most one SubscriptionStatus at any moment.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [125, 127], "excerpt": "Every subscription in exactly one?...Exactly one, yes." }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "PricePlan entitles FeatureBundle",
+      "roles": ["PricePlan"],
+      "description": "Every PricePlan entitles exactly one FeatureBundle.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [181, 183],
+          "excerpt": "Does every price plan point at exactly one bundle? Never zero, never two?...Exactly one. A price plan that doesn't entitle you to anything would be a donation."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "PricePlan entitles FeatureBundle",
+      "roles": ["PricePlan"],
+      "description": "Each PricePlan entitles exactly one FeatureBundle.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [173, 173], "excerpt": "Every price plan gives you exactly one feature bundle." }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "PlanChange is for Subscription",
+      "roles": ["PlanChange"],
+      "description": "Every PlanChange is for exactly one Subscription.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [213, 215],
+          "excerpt": "And a plan change belongs to exactly one subscription?...One change, one subscription."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "PlanChange is for Subscription",
+      "roles": ["PlanChange"],
+      "description": "Each PlanChange is for exactly one Subscription.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [213, 215],
+          "excerpt": "And a plan change belongs to exactly one subscription?...One change, one subscription."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "PlanChange specifies PricePlan",
+      "roles": ["PlanChange"],
+      "description": "Every PlanChange specifies exactly one new PricePlan.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [215, 215],
+          "excerpt": "It records the subscription, the new price plan, the effective date, and who requested it."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "PlanChange specifies PricePlan",
+      "roles": ["PlanChange"],
+      "description": "Each PlanChange specifies at most one PricePlan.",
+      "confidence": "high",
+      "source_references": [{ "lines": [215, 215], "excerpt": "the new price plan" }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "PlanChange has EffectiveDate",
+      "roles": ["PlanChange"],
+      "description": "Every PlanChange has an EffectiveDate.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [207, 215],
+          "excerpt": "we write a plan change with an effective date...It records the subscription, the new price plan, the effective date, and who requested it."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "PlanChange has EffectiveDate",
+      "roles": ["PlanChange"],
+      "description": "Each PlanChange has at most one EffectiveDate.",
+      "confidence": "high",
+      "source_references": [{ "lines": [207, 215], "excerpt": "we write a plan change with an effective date" }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "PlanChange has Requester",
+      "roles": ["PlanChange"],
+      "description": "Every PlanChange has a Requester (the person or system that made the change request).",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [215, 215],
+          "excerpt": "It records the subscription, the new price plan, the effective date, and who requested it."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "PlanChange has Requester",
+      "roles": ["PlanChange"],
+      "description": "Each PlanChange has at most one Requester.",
+      "confidence": "high",
+      "source_references": [{ "lines": [215, 215], "excerpt": "who requested it" }]
+    }
+  ],
+  "subtypes": [],
+  "objectified_fact_types": [],
+  "populations": [],
+  "ambiguities": [
+    {
+      "description": "Overloaded term 'plan': The transcript uses 'plan' to refer to three distinct concepts. (1) Price plan (Priya's definition): the billing artefact identifying price and frequency, identified by plan code (e.g., CORE-MO-49). (2) Feature bundle (Tom's definition): the feature tier describing seats, API access, SSO, etc., with names like Starter, Professional, Enterprise. (3) Sales deals: the sales team refers to negotiated deals as plans, which may match either of the above or neither. The model currently separates PricePlan and FeatureBundle as distinct entities related by entitlement, which correctly captures the system reality. However, stakeholder communication remains ambiguous. Action: Document the three distinct meanings explicitly in implementation notes and update any product documentation or sales materials accordingly.",
+      "source_references": [
+        {
+          "lines": [75, 92],
+          "excerpt": "Now, plan. You both used the word. Priya, what's a plan?...The price plan...When I say plan I mean what the customer gets. Starter, Professional, Enterprise...So we've got two things both called plan...the sales team calls a third thing a plan, which is the deal they negotiated"
+        }
+      ]
+    },
+    {
+      "description": "Mid-term annual subscription cancellation policy: The current system behavior is clear: cancellation of an annual subscription sets the end date to the paid-through date and access continues with no refund mechanism. However, there is a stated discrepancy between system behavior and communicated policy. Sales and the pricing page appear to imply refunds or credits are available, and the company has made manual goodwill credits in at least four cases last quarter. Tom argues this pattern constitutes an undocumented policy; finance and legal have not formally decided whether this represents the correct business rule. The model captures the current system behavior (cancellation sets end date, access runs to it), but the business policy governing refund eligibility for mid-term annual cancellations remains unresolved. Action: Finance and legal must decide and formalize the refund policy; coordinate with sales and support to communicate a consistent policy to customers.",
+      "source_references": [
+        {
+          "lines": [233, 265],
+          "excerpt": "Mid-term cancellation on annual plans. Someone signs an annual deal in January, pays up front, cancels in April. What happens?...Nothing happens. They've paid for the year, they keep access until December, we don't refund...That's not what the pricing page implies...Those were goodwill and they were signed off individually...Four times in a quarter isn't goodwill, it's a policy nobody's written down...the system rule is clear, and what's unclear is whether the system rule is the business rule...Then I'm parking it explicitly...The model will capture the system behaviour, which is that cancellation sets an end date and access runs to it"
+        }
+      ]
+    },
+    {
+      "description": "Paused subscription status: The system treats 'paused' as a separate boolean flag independent of the four core statuses (trialing, active, past due, cancelled), but paused subscriptions behave like a status in business logic. This causes bugs: querying for active subscriptions returns paused ones as well. It is unclear whether paused should be modeled as a fifth status, as a separate independent boolean (current state), or as a time-bound flag (pause start and end dates). The current model treats paused as external to the subscription status value type, consistent with the current system architecture, but this design issue should be revisited. Action: Decide whether paused should be a distinct status or a separate dimensional attribute; if the latter, model the pause start and end dates.",
+      "source_references": [
+        {
+          "lines": [129, 139],
+          "excerpt": "Tom: There's also paused...Priya: Paused isn't a status, it's a flag...Tom: It behaves like a status...Priya: It behaves like a status but it isn't one, it's a separate boolean, which is exactly why it causes bugs. If you ask the system for active subscriptions you get paused ones too...I'm going to record the four statuses as the status, and note that paused exists separately and overlaps confusingly."
+        }
+      ]
+    },
+    {
+      "description": "Product code cardinality: The product codes are currently fixed at exactly three (CORE, ANALYTICS, CONNECT), and the ProductCode value type is constrained to these values. However, a fourth product is in discovery. The model captures today's state but may need revision once that product is released. Action: Confirm the timeline for the fourth product release and plan a model update accordingly; consider whether to proactively expand the value constraint or wait for confirmation.",
+      "source_references": [
+        {
+          "lines": [69, 73],
+          "excerpt": "Product code. We have three: CORE, ANALYTICS, and CONNECT...Fixed at three?...Fixed today. There's a fourth in discovery, but I'm not going to pretend I know what it is."
+        }
+      ]
+    },
+    {
+      "description": "Composite uniqueness of Account-Product-Subscription relationship: The constraint 'one active subscription per account per product' is modeled as an exclusive_or constraint on the fact type 'Subscription is for Product' using roles [Account, Product]. However, this requires that Account appears in the fact type, which it does not directly—Account is related to Subscription through the separate binary fact 'Subscription belongs to Account'. To properly express the uniqueness of the (Account, Product) combination, an external_uniqueness constraint spanning roles from multiple fact types may be more appropriate: [(Subscription belongs to Account, Account role), (Subscription is for Product, Product role)]. The current model may not fully capture this cross-fact-type uniqueness in formal ORM terms. Action: Clarify whether the exclusive_or constraint as modeled is sufficient, or whether an external_uniqueness constraint is needed.",
+      "source_references": [
+        {
+          "lines": [49, 65],
+          "excerpt": "An account can have a subscription to each of them at once. So it's one active subscription per account per product...One active subscription per account per product, enforced at the database level."
+        }
+      ]
+    },
+    {
+      "description": "Subscription status values and edge cases: The four subscription statuses are trialing, active, past due, and cancelled. It is unclear whether every subscription progresses through all four, whether some are terminal (e.g., cancelled cannot transition to active), or what the valid state transition rules are. The model captures the four allowed values but does not specify mandatory state progression or exclusivity of terminal states. Action: Document state transition rules and confirm whether all combinations of transitions are valid.",
+      "source_references": [
+        { "lines": [123, 127], "excerpt": "Status?...Trialing, active, past due, cancelled...Exactly one, yes." }
+      ]
+    },
+    {
+      "description": "MRR storage and derivation: The statement 'MRR is derived and not stored' is based on the assertion that MRR is calculated from price plan and billing period, and that 'nothing writes it.' However, the transcript also notes that MRR is visible in the reporting layer on the subscription. It is unclear whether MRR is computed at query time, cached/denormalized on the subscription record (but never manually set), or materialized in a separate reporting table. The model treats it as derived and therefore does not include it as a fact-type attribute, which is consistent with the principle that stored data should not duplicate derived values. However, if the implementation caches MRR on the subscription for performance reasons, the model should document this separately. Action: Confirm whether MRR is computed on-the-fly or cached, and if cached, clarify that the cache is always consistent with price and billing period.",
+      "source_references": [
+        {
+          "lines": [151, 169],
+          "excerpt": "Every subscription has an MRR...In the source system, is MRR a field somebody sets, or is it worked out?...It's worked out. It's the plan price normalised to a month...Nobody types an MRR anywhere...It's on the subscription in the reporting layer...but nothing writes it...I'm not going to model it as an attribute of the subscription, then, because it isn't a fact anybody asserts -- it's a calculation over facts we already have."
+        }
+      ]
+    },
+    {
+      "description": "Subscription plan field maintenance after plan changes: The model captures that a subscription has a current plan field that is denormalized (maintained by the change process but not manually set), and that the change history records are the authoritative source. The statement 'if those two ever disagree, the change history wins and the current plan is the bug' establishes that change history is the source of truth. However, there is no explicit constraint preventing divergence (e.g., no trigger guarantee), so this is a known data quality risk. The model captures the intended invariant but not the technical safeguards. Action: Ensure that the change process includes validation logic to keep current plan synchronized with the latest change record's effective date, and implement monitoring alerts for divergence.",
+      "source_references": [
+        {
+          "lines": [271, 281],
+          "excerpt": "No, Sam, it does have a current plan field. The changes are the history, but there's a denormalised current plan on the record...And if those two ever disagree, the change history wins and the current plan is the bug."
+        }
+      ]
+    },
+    {
+      "description": "PlanChange request date vs. effective date precision: The model captures that a plan change has both a request date (implicit, not modeled as a separate fact type) and an effective date, and that these can differ by weeks. The effective date is modeled as EffectiveDate, but the request date is not explicitly captured. The requester fact type captures who made it but not when the request was made. The transcript notes 'Someone can make a change on the third that takes effect on the first of next month,' implying the request date is significant for audit and billing purposes. Action: Clarify whether the request date should be modeled as a separate fact type 'PlanChange has RequestDate' or whether the change creation timestamp in the audit log is sufficient.",
+      "source_references": [
+        {
+          "lines": [211, 211],
+          "excerpt": "because we need to know who made it and when it takes effect, and those are different dates. Someone can make a change on the third that takes effect on the first of next month."
+        }
+      ]
+    }
+  ]
+}

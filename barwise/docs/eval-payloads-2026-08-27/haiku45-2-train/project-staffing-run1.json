@@ -1,0 +1,302 @@
+{
+  "object_types": [
+    {
+      "name": "Employee",
+      "kind": "entity",
+      "definition": "A person employed by the consultancy who can be assigned to projects and may mentor or be mentored by other employees.",
+      "reference_mode": "employee_number",
+      "source_references": [
+        {
+          "lines": [3, 7],
+          "excerpt": "We staff employees onto projects. Every employee is assigned to at least one project... Employees have an employee number."
+        }
+      ]
+    },
+    {
+      "name": "Project",
+      "kind": "entity",
+      "definition": "A business engagement identified by a project code, to which employees are assigned.",
+      "reference_mode": "project_code",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Projects have a project code, and each project also has exactly one project name."
+        }
+      ]
+    },
+    {
+      "name": "EmployeeNumber",
+      "kind": "value",
+      "definition": "The unique identifier assigned to an employee.",
+      "data_type": { "name": "text", "length": 15 },
+      "source_references": [{ "lines": [7, 7], "excerpt": "Employees have an employee number." }]
+    },
+    {
+      "name": "ProjectCode",
+      "kind": "value",
+      "definition": "The unique identifier assigned to a project.",
+      "data_type": { "name": "text", "length": 15 },
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Projects have a project code, and each project also has exactly one project name."
+        }
+      ]
+    },
+    {
+      "name": "ProjectName",
+      "kind": "value",
+      "definition": "The name of a project. Each project has exactly one project name.",
+      "data_type": { "name": "text", "length": 200 },
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Projects have a project code, and each project also has exactly one project name."
+        }
+      ]
+    }
+  ],
+  "fact_types": [
+    {
+      "name": "Employee has EmployeeNumber",
+      "roles": [
+        { "player": "Employee", "role_name": "has" },
+        { "player": "EmployeeNumber", "role_name": "identifies" }
+      ],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [{ "lines": [7, 7], "excerpt": "Employees have an employee number." }]
+    },
+    {
+      "name": "Project has ProjectCode",
+      "roles": [{ "player": "Project", "role_name": "has" }, { "player": "ProjectCode", "role_name": "identifies" }],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Projects have a project code, and each project also has exactly one project name."
+        }
+      ]
+    },
+    {
+      "name": "Project has ProjectName",
+      "roles": [{ "player": "Project", "role_name": "has" }, { "player": "ProjectName", "role_name": "is of" }],
+      "readings": ["{0} has {1}", "{1} is of {0}"],
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Projects have a project code, and each project also has exactly one project name."
+        }
+      ]
+    },
+    {
+      "name": "Employee is assigned to Project",
+      "roles": [
+        { "player": "Employee", "role_name": "is assigned to" },
+        { "player": "Project", "role_name": "has assigned" }
+      ],
+      "readings": ["{0} is assigned to {1}", "{1} has assigned {0}"],
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "We staff employees onto projects. Every employee is assigned to at least one project, and never more than three at a time."
+        }
+      ]
+    },
+    {
+      "name": "Employee mentors Employee",
+      "roles": [
+        { "player": "Employee", "role_name": "mentors" },
+        { "player": "Employee", "role_name": "is mentored by" }
+      ],
+      "readings": ["{0} mentors {1}", "{1} is mentored by {0}"],
+      "source_references": [
+        {
+          "lines": [11, 11],
+          "excerpt": "Yes -- employees mentor other employees. Each employee has at most one mentor, who is also an employee."
+        }
+      ]
+    }
+  ],
+  "subtypes": [],
+  "objectified_fact_types": [],
+  "inferred_constraints": [
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Employee has EmployeeNumber",
+      "roles": ["Employee"],
+      "description": "Each Employee has at most one EmployeeNumber.",
+      "is_preferred": true,
+      "confidence": "high",
+      "source_references": [{ "lines": [7, 7], "excerpt": "Employees have an employee number." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Employee has EmployeeNumber",
+      "roles": ["EmployeeNumber"],
+      "description": "Each EmployeeNumber identifies at most one Employee.",
+      "confidence": "high",
+      "source_references": [{ "lines": [7, 7], "excerpt": "Employees have an employee number." }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Employee has EmployeeNumber",
+      "roles": ["Employee"],
+      "description": "Every Employee has an EmployeeNumber.",
+      "confidence": "high",
+      "source_references": [{ "lines": [7, 7], "excerpt": "Employees have an employee number." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Project has ProjectCode",
+      "roles": ["Project"],
+      "description": "Each Project has at most one ProjectCode.",
+      "is_preferred": true,
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Projects have a project code, and each project also has exactly one project name."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Project has ProjectCode",
+      "roles": ["ProjectCode"],
+      "description": "Each ProjectCode identifies at most one Project.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Projects have a project code, and each project also has exactly one project name."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Project has ProjectCode",
+      "roles": ["Project"],
+      "description": "Every Project has a ProjectCode.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Projects have a project code, and each project also has exactly one project name."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Project has ProjectName",
+      "roles": ["Project"],
+      "description": "Each Project has at most one ProjectName.",
+      "is_preferred": false,
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Projects have a project code, and each project also has exactly one project name."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Project has ProjectName",
+      "roles": ["Project"],
+      "description": "Every Project has a ProjectName.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Projects have a project code, and each project also has exactly one project name."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Employee is assigned to Project",
+      "roles": ["Employee"],
+      "description": "Every Employee is assigned to at least one Project.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "Every employee is assigned to at least one project, and never more than three at a time."
+        }
+      ]
+    },
+    {
+      "type": "frequency",
+      "fact_type": "Employee is assigned to Project",
+      "roles": ["Employee"],
+      "description": "Each Employee is assigned to between 1 and 3 Projects.",
+      "min": 1,
+      "max": 3,
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "Every employee is assigned to at least one project, and never more than three at a time."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Employee is assigned to Project",
+      "roles": ["Employee", "Project"],
+      "description": "An Employee is either on a Project or not; there is no double assignment. Each Employee-Project pair occurs at most once.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [21, 23],
+          "excerpt": "Can an employee be put on the same project twice?... No. An employee is either on a project or not; there is no double assignment."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Employee mentors Employee",
+      "roles": ["Employee"],
+      "description": "Each Employee (as mentee) has at most one mentor.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [11, 11], "excerpt": "Each employee has at most one mentor, who is also an employee." }
+      ]
+    },
+    {
+      "type": "ring",
+      "fact_type": "Employee mentors Employee",
+      "roles": ["Employee", "Employee"],
+      "ring_type": "irreflexive",
+      "description": "No Employee can mentor themselves.",
+      "confidence": "high",
+      "source_references": [{ "lines": [13, 15], "excerpt": "Can someone be their own mentor?... No, never." }]
+    },
+    {
+      "type": "ring",
+      "fact_type": "Employee mentors Employee",
+      "roles": ["Employee", "Employee"],
+      "ring_type": "acyclic",
+      "description": "Mentoring relationships form a directed acyclic graph; no cycles allowed. If Alice mentors Bob, then Bob cannot mentor Alice (directly or indirectly through a chain).",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [13, 15],
+          "excerpt": "And you cannot have loops either -- if Alice mentors Bob, then Bob cannot mentor Alice, not even indirectly through a chain. Mentoring always flows one way."
+        }
+      ]
+    }
+  ],
+  "populations": [],
+  "ambiguities": [
+    {
+      "description": "ProjectName uniqueness is unclear. The transcript states 'each project also has exactly one project name', which establishes that each project has exactly one project name (mandatory and single-valued). However, it does not explicitly state whether multiple projects can share the same project name. Should ProjectName be unique across all projects, or can different projects have the same name?",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Projects have a project code, and each project also has exactly one project name."
+        }
+      ]
+    }
+  ]
+}

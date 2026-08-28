@@ -1,0 +1,621 @@
+{
+  "object_types": [
+    {
+      "name": "Patient",
+      "kind": "entity",
+      "definition": "A person who books appointments at the clinic",
+      "reference_mode": "patient_id",
+      "source_references": [
+        {
+          "lines": [3, 11],
+          "excerpt": "Patients book appointments. Every appointment is booked by exactly one patient, and a patient can have many appointments... Patients have a patient ID -- it's on their card."
+        }
+      ]
+    },
+    {
+      "name": "PatientId",
+      "kind": "value",
+      "definition": "The unique identifier for a patient, recorded on their card",
+      "data_type": { "name": "text", "length": 20 },
+      "source_references": [{ "lines": [11, 11], "excerpt": "Patients have a patient ID -- it's on their card." }]
+    },
+    {
+      "name": "Doctor",
+      "kind": "entity",
+      "definition": "A medical professional who sees patients in appointments",
+      "reference_mode": "license_number",
+      "source_references": [
+        {
+          "lines": [7, 11],
+          "excerpt": "Each appointment is with exactly one doctor. Doctors see many patients across their appointments... Doctors have a license number."
+        }
+      ]
+    },
+    {
+      "name": "LicenseNumber",
+      "kind": "value",
+      "definition": "The unique medical license number that identifies a doctor",
+      "data_type": { "name": "text", "length": 20 },
+      "source_references": [{ "lines": [11, 11], "excerpt": "Doctors have a license number." }]
+    },
+    {
+      "name": "Appointment",
+      "kind": "entity",
+      "definition": "A scheduled meeting between a patient and a doctor at the clinic",
+      "reference_mode": "appointment_number",
+      "source_references": [
+        {
+          "lines": [3, 11],
+          "excerpt": "Every appointment is booked by exactly one patient... Appointments get an appointment number when they're created."
+        }
+      ]
+    },
+    {
+      "name": "AppointmentNumber",
+      "kind": "value",
+      "definition": "The unique identifier assigned to an appointment when it is created",
+      "data_type": { "name": "auto_counter" },
+      "source_references": [
+        { "lines": [11, 11], "excerpt": "Appointments get an appointment number when they're created." }
+      ]
+    },
+    {
+      "name": "ExamRoom",
+      "kind": "entity",
+      "definition": "A room at the clinic used for patient examinations",
+      "reference_mode": "room_number",
+      "source_references": [{ "lines": [11, 11], "excerpt": "Exam rooms have a room number." }]
+    },
+    {
+      "name": "RoomNumber",
+      "kind": "value",
+      "definition": "The unique identifier for an exam room",
+      "data_type": { "name": "text", "length": 10 },
+      "source_references": [{ "lines": [11, 11], "excerpt": "Exam rooms have a room number." }]
+    },
+    {
+      "name": "Specialty",
+      "kind": "value",
+      "definition": "A medical specialty such as cardiology or general practice",
+      "data_type": { "name": "text", "length": 100 },
+      "source_references": [
+        { "lines": [15, 15], "excerpt": "Every doctor has exactly one specialty, like cardiology or general practice." }
+      ]
+    },
+    {
+      "name": "AppointmentDate",
+      "kind": "value",
+      "definition": "The calendar date on which an appointment is scheduled",
+      "data_type": { "name": "date" },
+      "source_references": [
+        {
+          "lines": [19, 19],
+          "excerpt": "Every appointment is on a date and at a time slot -- we book in fixed slots like 09:00 or 09:30."
+        }
+      ]
+    },
+    {
+      "name": "TimeSlot",
+      "kind": "value",
+      "definition": "A fixed time slot for appointments, such as 09:00 or 09:30",
+      "data_type": { "name": "time" },
+      "source_references": [
+        {
+          "lines": [19, 19],
+          "excerpt": "Every appointment is on a date and at a time slot -- we book in fixed slots like 09:00 or 09:30."
+        }
+      ]
+    },
+    {
+      "name": "AppointmentStatus",
+      "kind": "value",
+      "definition": "The current status of an appointment",
+      "data_type": { "name": "text", "length": 20 },
+      "value_constraint": { "values": ["scheduled", "checked-in", "completed", "cancelled"] },
+      "source_references": [
+        {
+          "lines": [19, 23],
+          "excerpt": "Every appointment also has a status. The status is one of: scheduled, checked-in, completed, or cancelled. Never. An appointment always has exactly one status from that list."
+        }
+      ]
+    },
+    {
+      "name": "VisitReason",
+      "kind": "value",
+      "definition": "The reason a patient gives when booking an appointment",
+      "data_type": { "name": "text", "length": 500 },
+      "source_references": [
+        { "lines": [27, 27], "excerpt": "An appointment can have a visit reason the patient gives when booking" }
+      ]
+    },
+    {
+      "name": "FollowUpNote",
+      "kind": "value",
+      "definition": "A note attached by the doctor after a visit",
+      "data_type": { "name": "text", "length": 500 },
+      "source_references": [{ "lines": [27, 27], "excerpt": "after the visit the doctor can attach a follow-up note" }]
+    }
+  ],
+  "fact_types": [
+    {
+      "name": "Patient has PatientId",
+      "roles": [{ "player": "Patient", "role_name": "has" }, { "player": "PatientId", "role_name": "identifies" }],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [{ "lines": [11, 11], "excerpt": "Patients have a patient ID -- it's on their card." }]
+    },
+    {
+      "name": "Doctor has LicenseNumber",
+      "roles": [{ "player": "Doctor", "role_name": "has" }, { "player": "LicenseNumber", "role_name": "identifies" }],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [{ "lines": [11, 11], "excerpt": "Doctors have a license number." }]
+    },
+    {
+      "name": "Appointment has AppointmentNumber",
+      "roles": [
+        { "player": "Appointment", "role_name": "has" },
+        { "player": "AppointmentNumber", "role_name": "identifies" }
+      ],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [
+        { "lines": [11, 11], "excerpt": "Appointments get an appointment number when they're created." }
+      ]
+    },
+    {
+      "name": "ExamRoom has RoomNumber",
+      "roles": [{ "player": "ExamRoom", "role_name": "has" }, { "player": "RoomNumber", "role_name": "identifies" }],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [{ "lines": [11, 11], "excerpt": "Exam rooms have a room number." }]
+    },
+    {
+      "name": "Patient books Appointment",
+      "roles": [
+        { "player": "Patient", "role_name": "books" },
+        { "player": "Appointment", "role_name": "is booked by" }
+      ],
+      "readings": ["{0} books {1}", "{1} is booked by {0}"],
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "Patients book appointments. Every appointment is booked by exactly one patient, and a patient can have many appointments."
+        }
+      ]
+    },
+    {
+      "name": "Doctor conducts Appointment",
+      "roles": [
+        { "player": "Doctor", "role_name": "conducts" },
+        { "player": "Appointment", "role_name": "is conducted by" }
+      ],
+      "readings": ["{0} conducts {1}", "{1} is conducted by {0}"],
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Each appointment is with exactly one doctor. Doctors see many patients across their appointments."
+        }
+      ]
+    },
+    {
+      "name": "Doctor has Specialty",
+      "roles": [
+        { "player": "Doctor", "role_name": "has" },
+        { "player": "Specialty", "role_name": "is the specialty of" }
+      ],
+      "readings": ["{0} has {1}", "{1} is the specialty of {0}"],
+      "source_references": [
+        { "lines": [15, 15], "excerpt": "Every doctor has exactly one specialty, like cardiology or general practice." }
+      ]
+    },
+    {
+      "name": "Appointment is on AppointmentDate",
+      "roles": [
+        { "player": "Appointment", "role_name": "is on" },
+        { "player": "AppointmentDate", "role_name": "is the date of" }
+      ],
+      "readings": ["{0} is on {1}", "{1} is the date of {0}"],
+      "source_references": [
+        {
+          "lines": [19, 19],
+          "excerpt": "Every appointment is on a date and at a time slot -- we book in fixed slots like 09:00 or 09:30."
+        }
+      ]
+    },
+    {
+      "name": "Appointment is at TimeSlot",
+      "roles": [
+        { "player": "Appointment", "role_name": "is at" },
+        { "player": "TimeSlot", "role_name": "is the time slot of" }
+      ],
+      "readings": ["{0} is at {1}", "{1} is the time slot of {0}"],
+      "source_references": [
+        {
+          "lines": [19, 19],
+          "excerpt": "Every appointment is on a date and at a time slot -- we book in fixed slots like 09:00 or 09:30."
+        }
+      ]
+    },
+    {
+      "name": "Appointment has AppointmentStatus",
+      "roles": [
+        { "player": "Appointment", "role_name": "has" },
+        { "player": "AppointmentStatus", "role_name": "is the status of" }
+      ],
+      "readings": ["{0} has {1}", "{1} is the status of {0}"],
+      "source_references": [
+        {
+          "lines": [19, 23],
+          "excerpt": "Every appointment also has a status. The status is one of: scheduled, checked-in, completed, or cancelled. Never. An appointment always has exactly one status from that list."
+        }
+      ]
+    },
+    {
+      "name": "Appointment has VisitReason",
+      "roles": [
+        { "player": "Appointment", "role_name": "has" },
+        { "player": "VisitReason", "role_name": "is the visit reason for" }
+      ],
+      "readings": ["{0} has {1}", "{1} is the visit reason for {0}"],
+      "source_references": [
+        { "lines": [27, 27], "excerpt": "An appointment can have a visit reason the patient gives when booking" }
+      ]
+    },
+    {
+      "name": "Appointment has FollowUpNote",
+      "roles": [
+        { "player": "Appointment", "role_name": "has" },
+        { "player": "FollowUpNote", "role_name": "is the follow-up note for" }
+      ],
+      "readings": ["{0} has {1}", "{1} is the follow-up note for {0}"],
+      "source_references": [
+        {
+          "lines": [27, 27],
+          "excerpt": "after the visit the doctor can attach a follow-up note. At most one follow-up note per appointment."
+        }
+      ]
+    },
+    {
+      "name": "Patient has primary Doctor",
+      "roles": [
+        { "player": "Patient", "role_name": "has as primary doctor" },
+        { "player": "Doctor", "role_name": "is the primary doctor of" }
+      ],
+      "readings": ["{0} has {1} as primary doctor", "{1} is the primary doctor of {0}"],
+      "source_references": [
+        {
+          "lines": [31, 31],
+          "excerpt": "Yes, every patient has exactly one primary doctor. That's separate from who they happen to see in a given appointment."
+        }
+      ]
+    }
+  ],
+  "inferred_constraints": [
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Patient has PatientId",
+      "roles": ["Patient"],
+      "description": "Each patient has at most one patient ID",
+      "is_preferred": true,
+      "confidence": "high",
+      "source_references": [{ "lines": [11, 11], "excerpt": "Patients have a patient ID -- it's on their card." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Patient has PatientId",
+      "roles": ["PatientId"],
+      "description": "Each patient ID identifies at most one patient",
+      "is_preferred": false,
+      "confidence": "high",
+      "source_references": [{ "lines": [11, 11], "excerpt": "Patients have a patient ID -- it's on their card." }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Patient has PatientId",
+      "roles": ["Patient"],
+      "description": "Every patient has a patient ID",
+      "confidence": "high",
+      "source_references": [{ "lines": [11, 11], "excerpt": "Patients have a patient ID -- it's on their card." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Doctor has LicenseNumber",
+      "roles": ["Doctor"],
+      "description": "Each doctor has at most one license number",
+      "is_preferred": true,
+      "confidence": "high",
+      "source_references": [{ "lines": [11, 11], "excerpt": "Doctors have a license number." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Doctor has LicenseNumber",
+      "roles": ["LicenseNumber"],
+      "description": "Each license number identifies at most one doctor",
+      "is_preferred": false,
+      "confidence": "high",
+      "source_references": [{ "lines": [11, 11], "excerpt": "Doctors have a license number." }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Doctor has LicenseNumber",
+      "roles": ["Doctor"],
+      "description": "Every doctor has a license number",
+      "confidence": "high",
+      "source_references": [{ "lines": [11, 11], "excerpt": "Doctors have a license number." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Appointment has AppointmentNumber",
+      "roles": ["Appointment"],
+      "description": "Each appointment has at most one appointment number",
+      "is_preferred": true,
+      "confidence": "high",
+      "source_references": [
+        { "lines": [11, 11], "excerpt": "Appointments get an appointment number when they're created." }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Appointment has AppointmentNumber",
+      "roles": ["AppointmentNumber"],
+      "description": "Each appointment number identifies at most one appointment",
+      "is_preferred": false,
+      "confidence": "high",
+      "source_references": [
+        { "lines": [11, 11], "excerpt": "Appointments get an appointment number when they're created." }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Appointment has AppointmentNumber",
+      "roles": ["Appointment"],
+      "description": "Every appointment has an appointment number",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [11, 11], "excerpt": "Appointments get an appointment number when they're created." }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "ExamRoom has RoomNumber",
+      "roles": ["ExamRoom"],
+      "description": "Each exam room has at most one room number",
+      "is_preferred": true,
+      "confidence": "high",
+      "source_references": [{ "lines": [11, 11], "excerpt": "Exam rooms have a room number." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "ExamRoom has RoomNumber",
+      "roles": ["RoomNumber"],
+      "description": "Each room number identifies at most one exam room",
+      "is_preferred": false,
+      "confidence": "high",
+      "source_references": [{ "lines": [11, 11], "excerpt": "Exam rooms have a room number." }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "ExamRoom has RoomNumber",
+      "roles": ["ExamRoom"],
+      "description": "Every exam room has a room number",
+      "confidence": "high",
+      "source_references": [{ "lines": [11, 11], "excerpt": "Exam rooms have a room number." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Patient books Appointment",
+      "roles": ["Appointment"],
+      "description": "Each appointment is booked by at most one patient",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "Every appointment is booked by exactly one patient, and a patient can have many appointments."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Patient books Appointment",
+      "roles": ["Appointment"],
+      "description": "Every appointment is booked by exactly one patient",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [3, 3],
+          "excerpt": "Every appointment is booked by exactly one patient, and a patient can have many appointments."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Doctor conducts Appointment",
+      "roles": ["Appointment"],
+      "description": "Each appointment is conducted by at most one doctor",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Each appointment is with exactly one doctor. Doctors see many patients across their appointments."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Doctor conducts Appointment",
+      "roles": ["Appointment"],
+      "description": "Every appointment is conducted by exactly one doctor",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [7, 7],
+          "excerpt": "Each appointment is with exactly one doctor. Doctors see many patients across their appointments."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Doctor has Specialty",
+      "roles": ["Doctor"],
+      "description": "Each doctor has at most one specialty",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [15, 15], "excerpt": "Every doctor has exactly one specialty, like cardiology or general practice." }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Doctor has Specialty",
+      "roles": ["Doctor"],
+      "description": "Every doctor has exactly one specialty",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [15, 15], "excerpt": "Every doctor has exactly one specialty, like cardiology or general practice." }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Appointment is on AppointmentDate",
+      "roles": ["Appointment"],
+      "description": "Each appointment is on at most one date",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [19, 19],
+          "excerpt": "Every appointment is on a date and at a time slot -- we book in fixed slots like 09:00 or 09:30."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Appointment is on AppointmentDate",
+      "roles": ["Appointment"],
+      "description": "Every appointment is on exactly one date",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [19, 19],
+          "excerpt": "Every appointment is on a date and at a time slot -- we book in fixed slots like 09:00 or 09:30."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Appointment is at TimeSlot",
+      "roles": ["Appointment"],
+      "description": "Each appointment is at at most one time slot",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [19, 19],
+          "excerpt": "Every appointment is on a date and at a time slot -- we book in fixed slots like 09:00 or 09:30."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Appointment is at TimeSlot",
+      "roles": ["Appointment"],
+      "description": "Every appointment is at exactly one time slot",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [19, 19],
+          "excerpt": "Every appointment is on a date and at a time slot -- we book in fixed slots like 09:00 or 09:30."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Appointment has AppointmentStatus",
+      "roles": ["Appointment"],
+      "description": "Each appointment has at most one status",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [23, 23], "excerpt": "An appointment always has exactly one status from that list." }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Appointment has AppointmentStatus",
+      "roles": ["Appointment"],
+      "description": "Every appointment has exactly one status",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [19, 23],
+          "excerpt": "Every appointment also has a status. The status is one of: scheduled, checked-in, completed, or cancelled. Never. An appointment always has exactly one status from that list."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Appointment has VisitReason",
+      "roles": ["Appointment"],
+      "description": "Each appointment has at most one visit reason",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [27, 27], "excerpt": "An appointment can have a visit reason the patient gives when booking" }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Appointment has FollowUpNote",
+      "roles": ["Appointment"],
+      "description": "Each appointment has at most one follow-up note",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [27, 27],
+          "excerpt": "after the visit the doctor can attach a follow-up note. At most one follow-up note per appointment."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Patient has primary Doctor",
+      "roles": ["Patient"],
+      "description": "Each patient has at most one primary doctor",
+      "confidence": "high",
+      "source_references": [{ "lines": [31, 31], "excerpt": "Yes, every patient has exactly one primary doctor." }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Patient has primary Doctor",
+      "roles": ["Patient"],
+      "description": "Every patient has exactly one primary doctor",
+      "confidence": "high",
+      "source_references": [{ "lines": [31, 31], "excerpt": "Yes, every patient has exactly one primary doctor." }]
+    }
+  ],
+  "subtypes": [],
+  "objectified_fact_types": [],
+  "populations": [],
+  "ambiguities": [
+    {
+      "description": "Exam room usage is unspecified. The transcript introduces ExamRoom as an entity type with a room number identifier, but does not describe any relationship between appointments and exam rooms. Are appointments assigned to specific exam rooms? Is this an optional assignment, or is every appointment in a specific room? This needs clarification to determine if a fact type 'Appointment is in ExamRoom' should be added.",
+      "source_references": [{ "lines": [11, 11], "excerpt": "Exam rooms have a room number." }]
+    },
+    {
+      "description": "Visit reason cardinality on value constraint. The transcript states 'An appointment can have a visit reason' (line 27), indicating visit reason is optional. However, it does not specify whether a given visit reason text can be reused across multiple appointments (many-to-many) or if each visit reason instance is unique to an appointment. Is 'VisitReason' meant to be an enumerated list of standard reasons, or free-form text provided by the patient? This affects whether VisitReason should have a value constraint with predefined choices.",
+      "source_references": [
+        { "lines": [27, 27], "excerpt": "An appointment can have a visit reason the patient gives when booking" }
+      ]
+    },
+    {
+      "description": "Follow-up note reusability. Similar to visit reason, the transcript does not clarify whether a follow-up note can be attached to multiple appointments. The phrase 'the doctor can attach a follow-up note' (line 27) followed by 'At most one follow-up note per appointment' (line 27) implies one note per appointment, but does not clarify if multiple appointments can share the same note text or if each is independent.",
+      "source_references": [
+        {
+          "lines": [27, 27],
+          "excerpt": "after the visit the doctor can attach a follow-up note. At most one follow-up note per appointment."
+        }
+      ]
+    },
+    {
+      "description": "Appointment date-time uniqueness. The transcript specifies that appointments have both a date and a time slot, but does not state whether the combination of date and time slot is unique per doctor, per exam room, or globally across all appointments. Can two doctors each have an appointment at 09:00 on the same day? Can the same doctor have appointments in the same time slot on different dates? These constraints need clarification.",
+      "source_references": [
+        {
+          "lines": [19, 19],
+          "excerpt": "Every appointment is on a date and at a time slot -- we book in fixed slots like 09:00 or 09:30."
+        }
+      ]
+    }
+  ]
+}

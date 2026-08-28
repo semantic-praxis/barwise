@@ -1,0 +1,779 @@
+{
+  "object_types": [
+    {
+      "name": "Incident",
+      "kind": "entity",
+      "reference_mode": "incident_number",
+      "definition": "A record of a service outage or problem requiring operational response, created when an alert fires or a customer reports an issue.",
+      "source_references": [
+        {
+          "lines": [13, 13],
+          "excerpt": "Okay. Something breaks. We find out about it, one way or another. Somebody declares an incident, somebody runs it, we fix it, we write it up."
+        },
+        { "lines": [39, 39], "excerpt": "Incident number. INC-, then a sequence." }
+      ]
+    },
+    {
+      "name": "IncidentNumber",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 20 },
+      "definition": "Unique identifier for an incident, formatted as INC- followed by a sequence number.",
+      "source_references": [
+        { "lines": [39, 39], "excerpt": "Incident number. INC-, then a sequence." },
+        {
+          "lines": [41, 43],
+          "excerpt": "Unique, never reused? Unique. And we never delete incidents, which becomes relevant later."
+        }
+      ]
+    },
+    {
+      "name": "Alert",
+      "kind": "entity",
+      "reference_mode": "alert_id",
+      "definition": "A notification from the monitoring platform or a manually-created record indicating a potential service issue.",
+      "source_references": [
+        { "lines": [17, 17], "excerpt": "Monitoring fires an alert, or a customer tells us." },
+        {
+          "lines": [29, 29],
+          "excerpt": "If an engineer spots something, they raise it, and raising it creates an alert record. It's a manual alert but it's still an alert."
+        }
+      ]
+    },
+    {
+      "name": "AlertId",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 50 },
+      "definition": "Unique identifier for an alert, sourced from the monitoring platform.",
+      "source_references": [{ "lines": [47, 47], "excerpt": "Alert ID. Comes from the monitoring platform." }]
+    },
+    {
+      "name": "Ticket",
+      "kind": "entity",
+      "reference_mode": "ticket_number",
+      "definition": "A customer support ticket, created when a customer reports an issue to the support system.",
+      "source_references": [
+        {
+          "lines": [21, 21],
+          "excerpt": "Or both, which is the common one -- the alert fires and support gets three tickets in the same two minutes."
+        },
+        {
+          "lines": [49, 49],
+          "excerpt": "And a ticket has a ticket number. Different system, different format, always has."
+        }
+      ]
+    },
+    {
+      "name": "TicketNumber",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 20 },
+      "definition": "Unique identifier for a support ticket, in a different format than incident numbers.",
+      "source_references": [
+        {
+          "lines": [49, 49],
+          "excerpt": "And a ticket has a ticket number. Different system, different format, always has."
+        }
+      ]
+    },
+    {
+      "name": "IncidentSeverity",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 10 },
+      "definition": "Classification of an incident's technical impact and blast radius, ranging from SEV1 (complete outage) to SEV4 (minor or cosmetic issue).",
+      "value_constraint": { "values": ["SEV1", "SEV2", "SEV3", "SEV4"] },
+      "source_references": [
+        {
+          "lines": [53, 53],
+          "excerpt": "SEV1 through SEV4. It's about blast radius and technical impact. SEV1 is everything's down for everyone. SEV4 is degraded, cosmetic, one region, nobody's really suffering."
+        }
+      ]
+    },
+    {
+      "name": "IncidentPriority",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 10 },
+      "definition": "Classification of an incident's business urgency, based on customer impact and SLA considerations, ranging from P1 (highest) to P4 (lowest).",
+      "value_constraint": { "values": ["P1", "P2", "P3", "P4"] },
+      "source_references": [
+        {
+          "lines": [55, 59],
+          "excerpt": "And priority is P1 through P4. Which is completely different, and this is the single biggest source of miscommunication in the company. Priority is about customer urgency. Who's affected, what they've promised their own customers, whether we're breaching an SLA."
+        }
+      ]
+    },
+    {
+      "name": "IncidentState",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 20 },
+      "definition": "Current operational state of an incident in its lifecycle.",
+      "value_constraint": { "values": ["triage", "declared", "mitigated", "resolved", "closed"] },
+      "source_references": [
+        { "lines": [117, 117], "excerpt": "Triage, declared, mitigated, resolved, closed." },
+        { "lines": [121, 121], "excerpt": "Exactly one at a time." }
+      ]
+    },
+    {
+      "name": "Person",
+      "kind": "entity",
+      "reference_mode": "person_id",
+      "definition": "An individual who may serve as an incident commander.",
+      "source_references": [
+        {
+          "lines": [101, 101],
+          "excerpt": "The incident commander. One person, named, and it's a role for the duration, not a job title."
+        }
+      ]
+    },
+    {
+      "name": "PersonId",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 50 },
+      "definition": "Unique identifier for a person.",
+      "source_references": [
+        {
+          "lines": [101, 101],
+          "excerpt": "The incident commander. One person, named, and it's a role for the duration, not a job title."
+        }
+      ]
+    },
+    {
+      "name": "Team",
+      "kind": "entity",
+      "reference_mode": "team_id",
+      "definition": "A team responsible for owning and maintaining a service.",
+      "source_references": [{ "lines": [143, 143], "excerpt": "A team. Services are owned by teams. People move." }]
+    },
+    {
+      "name": "TeamId",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 50 },
+      "definition": "Unique identifier for a team.",
+      "source_references": [{ "lines": [143, 143], "excerpt": "A team. Services are owned by teams. People move." }]
+    },
+    {
+      "name": "Service",
+      "kind": "entity",
+      "reference_mode": "service_name",
+      "definition": "A software service or system component that may be affected by incidents.",
+      "source_references": [
+        {
+          "lines": [145, 147],
+          "excerpt": "And an incident affects a service? One or more. Usually one, sometimes several when it's an infrastructure thing."
+        },
+        { "lines": [151, 151], "excerpt": "Service name. They're unique, we enforce it in the catalogue." }
+      ]
+    },
+    {
+      "name": "ServiceName",
+      "kind": "value",
+      "data_type": { "name": "text", "length": 100 },
+      "definition": "Unique name identifying a service, enforced in the service catalogue.",
+      "source_references": [
+        { "lines": [151, 151], "excerpt": "Service name. They're unique, we enforce it in the catalogue." }
+      ]
+    }
+  ],
+  "fact_types": [
+    {
+      "name": "Incident has IncidentNumber",
+      "roles": [
+        { "player": "Incident", "role_name": "has" },
+        { "player": "IncidentNumber", "role_name": "identifies" }
+      ],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [{ "lines": [39, 39], "excerpt": "Incident number. INC-, then a sequence." }]
+    },
+    {
+      "name": "Alert has AlertId",
+      "roles": [{ "player": "Alert", "role_name": "has" }, { "player": "AlertId", "role_name": "identifies" }],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [{ "lines": [47, 47], "excerpt": "Alert ID. Comes from the monitoring platform." }]
+    },
+    {
+      "name": "Ticket has TicketNumber",
+      "roles": [{ "player": "Ticket", "role_name": "has" }, { "player": "TicketNumber", "role_name": "identifies" }],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [
+        {
+          "lines": [49, 49],
+          "excerpt": "And a ticket has a ticket number. Different system, different format, always has."
+        }
+      ]
+    },
+    {
+      "name": "Person has PersonId",
+      "roles": [{ "player": "Person", "role_name": "has" }, { "player": "PersonId", "role_name": "identifies" }],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [
+        {
+          "lines": [101, 101],
+          "excerpt": "The incident commander. One person, named, and it's a role for the duration, not a job title."
+        }
+      ]
+    },
+    {
+      "name": "Team has TeamId",
+      "roles": [{ "player": "Team", "role_name": "has" }, { "player": "TeamId", "role_name": "identifies" }],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [{ "lines": [143, 143], "excerpt": "A team. Services are owned by teams. People move." }]
+    },
+    {
+      "name": "Service has ServiceName",
+      "roles": [{ "player": "Service", "role_name": "has" }, { "player": "ServiceName", "role_name": "identifies" }],
+      "readings": ["{0} has {1}", "{1} identifies {0}"],
+      "source_references": [
+        { "lines": [151, 151], "excerpt": "Service name. They're unique, we enforce it in the catalogue." }
+      ]
+    },
+    {
+      "name": "Incident originates from Alert or Ticket",
+      "roles": [
+        { "player": "Incident", "role_name": "originates from" },
+        { "player": "Alert", "role_name": "triggers" },
+        { "player": "Ticket", "role_name": "reports" }
+      ],
+      "readings": ["{0} originates from {1} or {2}"],
+      "source_references": [
+        {
+          "lines": [29, 29],
+          "excerpt": "There's no path to an incident that doesn't have either an alert or a customer report behind it. The form requires you to link at least one."
+        },
+        { "lines": [31, 33], "excerpt": "Never neither. The declare form won't let you." }
+      ]
+    },
+    {
+      "name": "Incident has IncidentSeverity",
+      "roles": [
+        { "player": "Incident", "role_name": "has" },
+        { "player": "IncidentSeverity", "role_name": "characterizes" }
+      ],
+      "readings": ["{0} has {1}", "{1} characterizes {0}"],
+      "source_references": [
+        {
+          "lines": [83, 83],
+          "excerpt": "Every declared incident has a severity. That's mandatory, you can't declare without one."
+        }
+      ]
+    },
+    {
+      "name": "Incident has IncidentPriority",
+      "roles": [
+        { "player": "Incident", "role_name": "has" },
+        { "player": "IncidentPriority", "role_name": "indicates" }
+      ],
+      "readings": ["{0} has {1}", "{1} indicates {0}"],
+      "source_references": [
+        { "lines": [85, 85], "excerpt": "Priority too. Support sets it, and it's on every incident." }
+      ]
+    },
+    {
+      "name": "Incident has IncidentState",
+      "roles": [
+        { "player": "Incident", "role_name": "is in" },
+        { "player": "IncidentState", "role_name": "describes" }
+      ],
+      "readings": ["{0} is in {1}", "{1} describes {0}"],
+      "source_references": [
+        { "lines": [117, 121], "excerpt": "Triage, declared, mitigated, resolved, closed. Exactly one at a time." }
+      ]
+    },
+    {
+      "name": "Incident is commanded by Person",
+      "roles": [
+        { "player": "Incident", "role_name": "is commanded by" },
+        { "player": "Person", "role_name": "commands" }
+      ],
+      "readings": ["{0} is commanded by {1}", "{1} commands {0}"],
+      "source_references": [
+        { "lines": [113, 113], "excerpt": "Declared incidents have exactly one commander. Triage incidents have none." }
+      ]
+    },
+    {
+      "name": "Incident affects Service",
+      "roles": [
+        { "player": "Incident", "role_name": "affects" },
+        { "player": "Service", "role_name": "is affected by" }
+      ],
+      "readings": ["{0} affects {1}", "{1} is affected by {0}"],
+      "source_references": [
+        {
+          "lines": [145, 147],
+          "excerpt": "And an incident affects a service? One or more. Usually one, sometimes several when it's an infrastructure thing."
+        }
+      ]
+    },
+    {
+      "name": "Service is owned by Team",
+      "roles": [{ "player": "Service", "role_name": "is owned by" }, { "player": "Team", "role_name": "owns" }],
+      "readings": ["{0} is owned by {1}", "{1} owns {0}"],
+      "source_references": [
+        { "lines": [143, 143], "excerpt": "A team. Services are owned by teams. People move." },
+        { "lines": [145, 145], "excerpt": "And an incident affects a service?" },
+        { "lines": [151, 151], "excerpt": "Service name. They're unique, we enforce it in the catalogue." }
+      ]
+    },
+    {
+      "name": "Incident is duplicate of Incident",
+      "roles": [
+        { "player": "Incident", "role_name": "is a duplicate of" },
+        { "player": "Incident", "role_name": "is the primary of" }
+      ],
+      "readings": ["{0} is a duplicate of {1}", "{1} is the primary of {0}"],
+      "source_references": [
+        {
+          "lines": [173, 177],
+          "excerpt": "You link them. One is the primary and the others get marked as duplicates of it. A duplicate relationship between two incidents. Right. Incident B is a duplicate of incident A."
+        }
+      ]
+    }
+  ],
+  "inferred_constraints": [
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Incident has IncidentNumber",
+      "roles": ["Incident"],
+      "description": "Each incident has at most one incident number.",
+      "confidence": "high",
+      "is_preferred": true,
+      "source_references": [{ "lines": [39, 39], "excerpt": "Incident number. INC-, then a sequence." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Incident has IncidentNumber",
+      "roles": ["IncidentNumber"],
+      "description": "Each incident number identifies at most one incident.",
+      "confidence": "high",
+      "source_references": [{ "lines": [41, 43], "excerpt": "Unique, never reused?" }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Incident has IncidentNumber",
+      "roles": ["Incident"],
+      "description": "Every incident has an incident number.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [37, 39], "excerpt": "How is an incident identified? Incident number. INC-, then a sequence." }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Alert has AlertId",
+      "roles": ["Alert"],
+      "description": "Each alert has at most one alert ID.",
+      "confidence": "high",
+      "is_preferred": true,
+      "source_references": [{ "lines": [47, 47], "excerpt": "Alert ID. Comes from the monitoring platform." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Alert has AlertId",
+      "roles": ["AlertId"],
+      "description": "Each alert ID identifies at most one alert.",
+      "confidence": "high",
+      "source_references": [{ "lines": [47, 47], "excerpt": "Alert ID. Comes from the monitoring platform." }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Alert has AlertId",
+      "roles": ["Alert"],
+      "description": "Every alert has an alert ID.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [45, 47],
+          "excerpt": "And an alert -- identified how? Alert ID. Comes from the monitoring platform."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Ticket has TicketNumber",
+      "roles": ["Ticket"],
+      "description": "Each ticket has at most one ticket number.",
+      "confidence": "high",
+      "is_preferred": true,
+      "source_references": [
+        {
+          "lines": [49, 49],
+          "excerpt": "And a ticket has a ticket number. Different system, different format, always has."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Ticket has TicketNumber",
+      "roles": ["TicketNumber"],
+      "description": "Each ticket number identifies at most one ticket.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [49, 49],
+          "excerpt": "And a ticket has a ticket number. Different system, different format, always has."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Ticket has TicketNumber",
+      "roles": ["Ticket"],
+      "description": "Every ticket has a ticket number.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [49, 49],
+          "excerpt": "And a ticket has a ticket number. Different system, different format, always has."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Person has PersonId",
+      "roles": ["Person"],
+      "description": "Each person has at most one person ID.",
+      "confidence": "medium",
+      "is_preferred": true,
+      "source_references": [
+        {
+          "lines": [101, 101],
+          "excerpt": "The incident commander. One person, named, and it's a role for the duration, not a job title."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Person has PersonId",
+      "roles": ["PersonId"],
+      "description": "Each person ID identifies at most one person.",
+      "confidence": "medium",
+      "source_references": [
+        {
+          "lines": [101, 101],
+          "excerpt": "The incident commander. One person, named, and it's a role for the duration, not a job title."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Person has PersonId",
+      "roles": ["Person"],
+      "description": "Every person has a person ID.",
+      "confidence": "medium",
+      "source_references": [
+        {
+          "lines": [101, 101],
+          "excerpt": "The incident commander. One person, named, and it's a role for the duration, not a job title."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Team has TeamId",
+      "roles": ["Team"],
+      "description": "Each team has at most one team ID.",
+      "confidence": "medium",
+      "is_preferred": true,
+      "source_references": [{ "lines": [143, 143], "excerpt": "A team. Services are owned by teams. People move." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Team has TeamId",
+      "roles": ["TeamId"],
+      "description": "Each team ID identifies at most one team.",
+      "confidence": "medium",
+      "source_references": [{ "lines": [143, 143], "excerpt": "A team. Services are owned by teams. People move." }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Team has TeamId",
+      "roles": ["Team"],
+      "description": "Every team has a team ID.",
+      "confidence": "medium",
+      "source_references": [{ "lines": [143, 143], "excerpt": "A team. Services are owned by teams. People move." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Service has ServiceName",
+      "roles": ["Service"],
+      "description": "Each service has at most one service name.",
+      "confidence": "high",
+      "is_preferred": true,
+      "source_references": [
+        { "lines": [151, 151], "excerpt": "Service name. They're unique, we enforce it in the catalogue." }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Service has ServiceName",
+      "roles": ["ServiceName"],
+      "description": "Each service name identifies at most one service.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [151, 151], "excerpt": "Service name. They're unique, we enforce it in the catalogue." }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Service has ServiceName",
+      "roles": ["Service"],
+      "description": "Every service has a service name.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [151, 151], "excerpt": "Service name. They're unique, we enforce it in the catalogue." }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Incident has IncidentSeverity",
+      "roles": ["Incident"],
+      "description": "Each incident has at most one severity.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [83, 83],
+          "excerpt": "Every declared incident has a severity. That's mandatory, you can't declare without one."
+        },
+        { "lines": [87, 87], "excerpt": "Both mandatory, both single-valued, drawn from their own four values." }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Incident has IncidentSeverity",
+      "roles": ["Incident"],
+      "description": "Every declared incident has exactly one severity.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [83, 83],
+          "excerpt": "Every declared incident has a severity. That's mandatory, you can't declare without one."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Incident has IncidentPriority",
+      "roles": ["Incident"],
+      "description": "Each incident has at most one priority.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [85, 85], "excerpt": "Priority too. Support sets it, and it's on every incident." },
+        { "lines": [87, 87], "excerpt": "Both mandatory, both single-valued, drawn from their own four values." }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Incident has IncidentPriority",
+      "roles": ["Incident"],
+      "description": "Every incident has exactly one priority.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [85, 85], "excerpt": "Priority too. Support sets it, and it's on every incident." }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Incident has IncidentState",
+      "roles": ["Incident"],
+      "description": "Each incident is in at most one state.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [119, 121], "excerpt": "Five, and an incident is in exactly one? Exactly one at a time." }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Incident has IncidentState",
+      "roles": ["Incident"],
+      "description": "Every incident is in exactly one state.",
+      "confidence": "high",
+      "source_references": [
+        { "lines": [119, 121], "excerpt": "Five, and an incident is in exactly one? Exactly one at a time." }
+      ]
+    },
+    {
+      "type": "disjunctive_mandatory",
+      "fact_type": "Incident originates from Alert or Ticket",
+      "roles": ["Alert", "Ticket"],
+      "description": "Every incident originates from at least one of: an alert or a customer ticket (or both).",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [29, 33],
+          "excerpt": "There's no path to an incident that doesn't have either an alert or a customer report behind it. The form requires you to link at least one. Never neither. The declare form won't let you."
+        }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Incident is commanded by Person",
+      "roles": ["Incident"],
+      "description": "Each declared incident is commanded by at most one person.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [113, 113],
+          "excerpt": "Declared incidents have exactly one commander. Triage incidents have none."
+        },
+        {
+          "lines": [257, 257],
+          "excerpt": "It has exactly one severity from SEV1 to SEV4 and exactly one priority from P1 to P4, and those are independent."
+        }
+      ]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Incident is commanded by Person",
+      "roles": ["Incident"],
+      "description": "Every declared incident (not in triage) has an incident commander.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [113, 113],
+          "excerpt": "Declared incidents have exactly one commander. Triage incidents have none."
+        },
+        { "lines": [265, 265], "excerpt": "Declared incidents have exactly one commander; triage incidents have none." }
+      ]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Service is owned by Team",
+      "roles": ["Service"],
+      "description": "Each service is owned by at most one team.",
+      "confidence": "high",
+      "source_references": [{ "lines": [143, 143], "excerpt": "A team. Services are owned by teams. People move." }]
+    },
+    {
+      "type": "mandatory",
+      "fact_type": "Service is owned by Team",
+      "roles": ["Service"],
+      "description": "Every service is owned by exactly one team.",
+      "confidence": "high",
+      "source_references": [{ "lines": [143, 143], "excerpt": "A team. Services are owned by teams. People move." }]
+    },
+    {
+      "type": "internal_uniqueness",
+      "fact_type": "Incident is duplicate of Incident",
+      "roles": ["Incident"],
+      "description": "Each incident is a duplicate of at most one other incident.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [207, 209],
+          "excerpt": "Can an incident be a duplicate of more than one other? No. One primary. It doesn't mean anything to be a duplicate of two different incidents."
+        }
+      ]
+    },
+    {
+      "type": "ring",
+      "ring_type": "irreflexive",
+      "fact_type": "Incident is duplicate of Incident",
+      "roles": ["Incident", "Incident"],
+      "description": "An incident cannot be a duplicate of itself.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [179, 191],
+          "excerpt": "Can an incident be a duplicate of itself? ...That's a strange question. No, obviously not. Then it's worth stating. An incident cannot be a duplicate of itself."
+        }
+      ]
+    },
+    {
+      "type": "ring",
+      "ring_type": "acyclic",
+      "fact_type": "Incident is duplicate of Incident",
+      "roles": ["Incident", "Incident"],
+      "description": "Duplicate relationships must form a directed acyclic graph; no chains allowed. A primary incident should not be a duplicate of any other incident.",
+      "confidence": "high",
+      "source_references": [
+        {
+          "lines": [195, 205],
+          "excerpt": "Can a chain form? B duplicates A, C duplicates B? It shouldn't. The intent is that everything points at the primary directly. But nothing stops you making a chain and I've seen two-deep ones. Is a chain wrong, or just untidy? It's wrong. If C duplicates B and B duplicates A, then C should point at A. When we roll up incident counts we only follow one hop, so a chain undercounts."
+        }
+      ]
+    }
+  ],
+  "subtypes": [],
+  "objectified_fact_types": [],
+  "populations": [],
+  "ambiguities": [
+    {
+      "description": "Incident commander is mandatory only for declared incidents, not for triage incidents. The model captures this distinction with a mandatory constraint on the fact type, but the constraint applies conditionally based on incident state. The current formulation may be unclear to implementers about when the constraint applies. Should the constraint be qualified with a state condition, or should there be a separate modeling approach (e.g., objectifying declarations)?",
+      "source_references": [
+        {
+          "lines": [109, 113],
+          "excerpt": "An incident starts in triage. In triage there's no commander, that's the point of triage: someone's looking at whether this is even real. A commander is assigned when it's declared. If it turns out to be nothing, it gets closed from triage having never had one. Declared incidents have exactly one commander. Triage incidents have none."
+        }
+      ]
+    },
+    {
+      "description": "The 'Incident originates from Alert or Ticket' fact type is modeled as ternary with a disjunctive mandatory constraint, but typical usage may be binary (linking incidents to alerts) or binary (linking incidents to tickets) independently. Are these truly three distinct roles (incident, alert-role, ticket-role) all in one relationship, or should they be two separate binary fact types with a combined disjunctive mandatory spanning them?",
+      "source_references": [
+        {
+          "lines": [29, 29],
+          "excerpt": "There's no path to an incident that doesn't have either an alert or a customer report behind it. The form requires you to link at least one."
+        }
+      ]
+    },
+    {
+      "description": "Severity and priority are stated to be independent (lines 65-81), but the model does not capture any exclusion or independence constraint. Should an explicit constraint be added to formalize their independence, or is the independence already implicit from the absence of a linking fact type?",
+      "source_references": [
+        {
+          "lines": [63, 81],
+          "excerpt": "Are they correlated at all? A P1 is always a SEV1. That is not true. It's not true in practice either, and it's the assumption that gets us in trouble. The point stands either way -- they're independent."
+        }
+      ]
+    },
+    {
+      "description": "The transcript mentions that severity can change during an incident (lines 93-97: 'Constantly. Severity gets revised as we understand the blast radius.'). The model captures only the current severity, not historical changes. Should the model include a temporal dimension or an event log for severity changes, or is the 'timeline' mentioned sufficient as a separate concept outside this ORM model?",
+      "source_references": [
+        {
+          "lines": [91, 97],
+          "excerpt": "Can either change during the incident? Constantly. Severity gets revised as we understand the blast radius. That's normal and expected. Is the history of that kept? In the timeline, as events. The incident record carries the current severity."
+        }
+      ]
+    },
+    {
+      "description": "The IncidentState value type lists five states (triage, declared, mitigated, resolved, closed), but one stakeholder mentions 'monitoring' as something people treat as a state (lines 123-129). The facilitator decided not to model it because it is not in the system dropdown, but this distinction between informal usage and formal state may create confusion. Should a note be added to clarify that 'monitoring' is not a formal state?",
+      "source_references": [
+        {
+          "lines": [123, 131],
+          "excerpt": "There's also 'monitoring,' which sits between mitigated and resolved. That's not a state, that's a thing people write in the channel. People treat it as a state. People treat lots of things as states. It's not in the dropdown. If it's not in the system I'm not modelling it. Five states."
+        }
+      ]
+    },
+    {
+      "description": "The concept of 'service owner' (the team that owns the service) versus 'incident commander' (the person running this incident) is clarified as distinct, but both are sometimes referred to as 'owner' in casual speech (lines 135-139). The model captures both but does not formally distinguish the two 'owner' roles. The ambiguity is acknowledged in the transcript but left unresolved in the model; clarification in documentation may be needed.",
+      "source_references": [
+        {
+          "lines": [135, 139],
+          "excerpt": "Nadia, you said commander is a role, not a job title. Is there a different sense of owner? There is, and it's the second collision. The service owner is the team that owns the broken thing. Is a service owner a team or a person? And in a channel, 'who owns this?' means either. It's genuinely ambiguous every single time."
+        }
+      ]
+    },
+    {
+      "description": "An incident that is later determined to be caused by customer misconfiguration raises a question about whether it should be reclassified or excluded from reliability metrics. The transcript explicitly parks this decision for later (lines 243-253), and the model does not include any concept of cause classification or incident type. Should the model be extended in the future to capture cause classification when that decision is made, or is it appropriate to keep the model as-is pending a decision from Ravi?",
+      "source_references": [
+        {
+          "lines": [243, 253],
+          "excerpt": "Is there a decision here today? No, and it's above all three of us. That's a decision about what we report to the board, and Ravi owns that. Parking it explicitly, then. Whether an incident later found to be caused by customer misconfiguration should be reclassified, excluded from reliability metrics, or left as-is, is undecided. The model today captures the five states and does not include any concept of a cause classification, because there isn't one to capture."
+        }
+      ]
+    },
+    {
+      "description": "The duplicate relationship has acyclic and irreflexive ring constraints, intended to keep all duplicates pointing directly at a primary incident. However, the facilitator notes this is 'not enforced today' (line 205). Should the model include constraints that reflect what is actually enforced, or what should be enforced? The current choice (to model the intended rule) is documented, but enforcement gap remains a risk.",
+      "source_references": [
+        {
+          "lines": [195, 205],
+          "excerpt": "Can a chain form? B duplicates A, C duplicates B? It shouldn't. The intent is that everything points at the primary directly. But nothing stops you making a chain and I've seen two-deep ones. That's the rule as intended. It's not enforced."
+        }
+      ]
+    },
+    {
+      "description": "The reference modes for Person and Team are inferred as 'person_id' and 'team_id', but the transcript does not explicitly state how persons or teams are identified in the system. Are there existing employee IDs, team codes, or other identifiers? Without explicit confirmation, the choice of reference mode is uncertain and may not match actual system identifiers.",
+      "source_references": [
+        {
+          "lines": [101, 101],
+          "excerpt": "The incident commander. One person, named, and it's a role for the duration, not a job title."
+        }
+      ]
+    }
+  ]
+}
