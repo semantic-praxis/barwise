@@ -1,0 +1,29 @@
+Using the default prompt artifact.
+[ 1/3] vendor-onboarding      run 1/5  0.875  79.3s  13303/41640 out  0 cached
+[ 1/3] vendor-onboarding      run 2/5  0.855  87.9s  14171/41640 out  11781 cached
+[ 1/3] vendor-onboarding      run 3/5  0.845  72.5s  11786/41640 out  11781 cached
+[ 1/3] vendor-onboarding      run 4/5  0.840  92.1s  13208/41640 out  11781 cached
+[ 1/3] vendor-onboarding      run 5/5  0.836  81.1s  13420/41640 out  11781 cached
+[ 2/3] subscription-billing   run 1/5  0.922  79.2s  13673/35255 out  6029 cached
+[ 2/3] subscription-billing   run 2/5  0.972  81.4s  13550/35255 out  11003 cached
+[ 2/3] subscription-billing   run 3/5  0.571  22.9s  3127/35255 out  11003 cached
+[ 2/3] subscription-billing   run 4/5  0.950  85.2s  14404/35255 out  11003 cached
+[ 2/3] subscription-billing   run 5/5  0.961  76.3s  13539/35255 out  11003 cached
+[ 3/3] incident-response      run 1/5  0.907  73.5s  12168/31700 out  6029 cached
+[ 3/3] incident-response      run 2/5  0.893  68.5s  11938/31700 out  10631 cached
+[ 3/3] incident-response      run 3/5  0.953  68.2s  11108/31700 out  10631 cached
+[ 3/3] incident-response      run 4/5  0.893  76.1s  12665/31700 out  10631 cached
+[ 3/3] incident-response      run 5/5  0.927  84.5s  13893/31700 out  10631 cached
+vendor-onboarding  mean=0.850  worst=0.836  sd=0.015  ok=5/5  quality=0.850+/-0.015  [corrections=6.8 warnings=8.4 excessAmbiguity=1.6]
+subscription-billing  mean=0.875  worst=0.571  sd=0.171  ok=5/5  quality=0.875+/-0.171  [corrections=3.4 warnings=1.8]
+  requires_element: The model has no fact type connecting "Account" and "Subscription".
+  requires_element: The model has no fact type connecting "Subscription" and "Product".
+  requires_ambiguity: No ambiguities were reported; expected one matching "cancel".
+incident-response  mean=0.915  worst=0.893  sd=0.026  ok=5/5  quality=0.915+/-0.026  [corrections=7.2 warnings=2.8]
+suite 2.0.0  artifact=1.0.0@0eced4cda015  mean=0.880 +/- 0.051 (95%)  worst=0.571  (repeat=5)
+  warnings: completeness/fact-type-without-constraints x40, completeness/fact-type-without-uniqueness x21, constraint/external-uniqueness-all-local x4
+  fixed:    duplicate_value_constraint_population x36, missing_identifier_population x35, incomplete_instance x7, arity_mismatch x6, duplicate_constraint x3
+  cache: 145718 read, 21357 written
+  gaps below 0.072 are not resolvable against a comparable run
+  97% of that noise is subscription-billing alone
+Wrote 6 payload(s) to /Users/gschenz/repos/barwise/barwise/eval-runs/20260824-1903/payloads-default-dev.
