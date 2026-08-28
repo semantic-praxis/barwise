@@ -17,13 +17,13 @@ function tmpSuiteDir(): string {
 
 describe("loadSuite on the packaged seed suite", () => {
   // The only test that loads the whole packaged suite in its body: ten
-  // transcripts read from disk and seven reference models deserialized
+  // transcripts read from disk and ten reference models deserialized
   // through OrmYamlSerializer. That runs in well under a second locally
   // and an order of magnitude slower under coverage instrumentation on a
   // shared CI runner, so the package sets a 30s testTimeout.
   it("loads the manifest with weights and ten cases in declared order", () => {
     const suite = loadSuite(defaultSuitePath());
-    expect(suite.version).toBe("2.4.0");
+    expect(suite.version).toBe("2.5.0");
     // Re-fitted for suite 2.0.0, where a weight is the cost of a model
     // in which every element carries that kind of defect rather than
     // the cost of one occurrence
@@ -62,15 +62,16 @@ describe("loadSuite on the packaged seed suite", () => {
     expect(train).toHaveLength(7);
   });
 
-  it("gives every train case a reference model, and no dev case one", () => {
-    // References are generated from a recorded payload, and the dev
-    // cases have never run against a provider -- so they ship with
-    // reference-free rubrics and gain population checks later. Pinned
-    // so that stays a deliberate state rather than a forgotten one.
+  it("gives every case a reference model", () => {
+    // Until suite 2.5.0 the dev cases shipped reference-free -- they
+    // had never run against a provider, so there was no payload to
+    // generate one from. The 2026-08-27 sweep closed that
+    // (barwise-845): every case now carries a generated reference and
+    // population checks. Pinned so a case added later without one is a
+    // decision, not an oversight.
     const suite = loadSuite(defaultSuitePath());
     for (const c of suite.cases) {
-      if (c.split === "train") expect(c.reference, c.evalCase.id).toBeDefined();
-      else expect(c.reference, c.evalCase.id).toBeUndefined();
+      expect(c.reference, c.evalCase.id).toBeDefined();
     }
   });
 });

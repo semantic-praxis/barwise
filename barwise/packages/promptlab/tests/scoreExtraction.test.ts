@@ -25,8 +25,8 @@ function caseFor(caseId: string) {
 }
 
 describe("scoreExtraction over the seed suite", () => {
-  // Every answer key scores exactly 1.000 as of barwise-839. It did not
-  // before: the seven ran 0.94-0.98, and all fourteen of the
+  // Every train answer key scores exactly 1.000 as of barwise-839. It
+  // did not before: the seven ran 0.94-0.98, and all fourteen of the
   // corrections between them were `orphaned_reference_mode` -- a check
   // that mirrored no validator rule and charged 0.02 for what ORM
   // reference-mode notation is for. Removing it left these payloads
@@ -35,17 +35,27 @@ describe("scoreExtraction over the seed suite", () => {
   // A 1.000 row is a stronger pin than a 0.94 one, because there is now
   // exactly one way to be right and any regression moves the number.
   //
-  // These seven rows cannot detect a wrong denominator, and it is worth
+  // The 1.000 rows cannot detect a wrong denominator, and it is worth
   // saying so where a reader will look for the guarantee. Suite 2.0.0
   // rates every penalty by element count, but a payload that produces
   // no occurrences scores 1.000 under any denominator -- including a
   // multiplied one. The arithmetic is asserted in "size-rated
   // penalties" below, on hand-built payloads that do produce
-  // occurrences (docs/specs/eval-split-stratification.spec.md).
+  // occurrences (docs/specs/eval-split-stratification.spec.md); the
+  // two sub-1.000 dev rows below now also exercise the real division.
   //
-  // `elements` is pinned here anyway, because it is what those seven
+  // `elements` is pinned here anyway, because it is what those
   // divisions would have been measured against and a payload edited
   // without noticing should show up as a diff.
+  //
+  // The three dev keys (suite 2.5.0, barwise-845) pin below 1.000 on
+  // purpose: each is the best payload of the recorded 2026-08-27
+  // haiku45-2 sweep, and two carry conformance corrections that are
+  // defects of the recorded extraction, not of any rubric. Editing a
+  // recorded payload to make it clean would forge the record;
+  // re-running until a clean one appears would be payload-shopping.
+  // The full-rubric pass is the invariant; the exact sub-1.000 score
+  // is the pin.
   const expected = [
     { caseId: "order-management", score: 1, corrections: 0, elements: 10 },
     { caseId: "university-enrollment", score: 1, corrections: 0, elements: 21 },
@@ -54,6 +64,15 @@ describe("scoreExtraction over the seed suite", () => {
     { caseId: "project-staffing", score: 1, corrections: 0, elements: 6 },
     { caseId: "conference-reviews", score: 1, corrections: 0, elements: 6 },
     { caseId: "freight-corrections", score: 1, corrections: 0, elements: 6 },
+    { caseId: "vendor-onboarding", score: 1, corrections: 0, elements: 33 },
+    // 1 - 0.2 * (1/36): one arity_mismatch correction.
+    { caseId: "subscription-billing", score: 179 / 180, corrections: 1, elements: 36 },
+    // 1 - 0.2 * (1/30) - 0.4 * (2/30): one arity_mismatch -- the
+    // payload's cross-fact-type encoding of the alert-or-ticket
+    // disjunctive mandatory, which the schema's one-fact_type
+    // constraint shape cannot carry -- and two completeness warnings
+    // on the origin fact types it left unconstrained as a result.
+    { caseId: "incident-response", score: 29 / 30, corrections: 1, elements: 30 },
   ];
 
   it.each(expected)(
@@ -268,12 +287,14 @@ describe("scoreExtraction with both check families", () => {
  *
  * Suite 2.0.0 divides each rule's occurrence count by the scored
  * model's element count before applying the weight
- * (docs/specs/eval-split-stratification.spec.md). The seven answer keys
- * cannot check that: they produce no occurrences, so they score 1.000
- * under any denominator, and a scorer that multiplied by element count
- * instead of dividing would pass every one of them. These payloads are
- * hand-built to produce a known number of occurrences at a known
- * element count, so the division is pinned.
+ * (docs/specs/eval-split-stratification.spec.md). The 1.000 answer
+ * keys cannot check that: they produce no occurrences, so they score
+ * 1.000 under any denominator, and a scorer that multiplied by element
+ * count instead of dividing would pass every one of them. These
+ * payloads are hand-built to produce a known number of occurrences at
+ * a known element count, so the division is pinned against arithmetic
+ * the reader can redo (the two sub-1.000 dev keys pin it again on
+ * recorded payloads).
  *
  * Mutation check for anyone touching the fold: change `rated` to
  * multiply instead of divide and every assertion in this block must

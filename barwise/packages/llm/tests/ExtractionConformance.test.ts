@@ -398,6 +398,52 @@ describe("ExtractionConformance", () => {
       expect(corrections).toHaveLength(1);
       expect(corrections[0]!.category).toBe("duplicate_constraint");
     });
+
+    it("keeps ring constraints that differ only in ring type", () => {
+      // Irreflexive and acyclic on the same role pair are independent
+      // assertions and the validator accepts both. A recorded
+      // incident-response payload carried exactly this pair and the
+      // acyclic one was silently dropped as a duplicate because the
+      // key ignored ring_type.
+      const ring = (ringType: string, description: string) => ({
+        type: "ring" as const,
+        fact_type: "Incident is duplicate of Incident",
+        roles: ["Incident", "Incident"],
+        description,
+        confidence: "high" as const,
+        ring_type: ringType,
+        source_references: REF,
+      });
+      const input = makeResponse({
+        object_types: [
+          { name: "Incident", kind: "entity", source_references: REF },
+        ],
+        fact_types: [
+          {
+            name: "Incident is duplicate of Incident",
+            roles: [
+              { player: "Incident", role_name: "duplicate" },
+              { player: "Incident", role_name: "primary" },
+            ],
+            readings: ["{0} is duplicate of {1}"],
+            source_references: REF,
+          },
+        ],
+        inferred_constraints: [
+          ring("irreflexive", "An Incident cannot duplicate itself"),
+          ring("acyclic", "Duplicate links cannot form a cycle"),
+          ring("acyclic", "Restated: no duplicate cycles"),
+        ],
+      });
+
+      const { response, corrections } = enforceConformance(input);
+      expect(response.inferred_constraints.map((c) => c.ring_type)).toEqual([
+        "irreflexive",
+        "acyclic",
+      ]);
+      expect(corrections).toHaveLength(1);
+      expect(corrections[0]!.category).toBe("duplicate_constraint");
+    });
   });
 
   describe("reference modes", () => {

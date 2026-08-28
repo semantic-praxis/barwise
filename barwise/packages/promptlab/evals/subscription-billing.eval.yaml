@@ -3,9 +3,17 @@
 # active subscription per account per product. Getting that right means
 # a fact type spanning account and product rather than a binary.
 #
-# No reference model, so no forbids_population -- see vendor-onboarding.
+# Reference generated from the best 2026-08-27 haiku45-2 dev payload
+# (suite 2.5.0; barwise-845). That payload models account and product
+# as binaries off Subscription, so the composite Halloway rule itself
+# is not in the reference and cannot be population-checked -- and even
+# a spanning shape would need the external-uniqueness kind
+# forbids_population does not support. The requires_element pair below
+# stays the only probe; the composite rule is recorded prompt headroom
+# (docs/specs/constraint-extraction-coverage.spec.md).
 id: subscription-billing
 transcript: subscription-billing.transcript.md
+reference: subscription-billing.reference.orm.yaml
 ambiguityBudget: 10
 checks:
   - kind: must_validate
@@ -29,3 +37,30 @@ checks:
   - kind: requires_ambiguity
     matches: [cancel]
     hint: The room parked what happens commercially when an annual subscription is cancelled mid-term.
+  - kind: forbids_population
+    factType: Subscription has BillingPeriod
+    constraint: internal_uniqueness
+    hint: One billing period - monthly and annual on the same subscription
+      is billing them twice.
+  - kind: forbids_population
+    factType: Subscription has BillingPeriod
+    constraint: mandatory
+    hint: Never neither - every subscription has exactly one billing period.
+  - kind: forbids_population
+    factType: PricePlan entitles FeatureBundle
+    constraint: internal_uniqueness
+    hint: Every price plan entitles exactly one bundle - never two.
+  - kind: forbids_population
+    factType: PricePlan entitles FeatureBundle
+    constraint: mandatory
+    hint: Never zero - a price plan that entitles nothing would be a donation.
+  - kind: forbids_population
+    factType: Subscription has StartDate
+    constraint: mandatory
+    hint: Start date is always there - the form will not submit without one.
+      End date stays optional; do not mirror this check onto it.
+  - kind: forbids_population
+    factType: PlanChange is for Subscription
+    constraint: internal_uniqueness
+    hint: One change, one subscription - the change history is per
+      subscription.

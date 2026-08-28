@@ -1,0 +1,425 @@
+orm_version: "1.1"
+model:
+  name: vendor-onboarding
+  object_types:
+    - id: 00000000-0000-7001-ad34-3b424950575e
+      name: Vendor
+      kind: entity
+      reference_mode: vendor_number
+      definition: A supplier of goods or services to the organization, identified by a unique vendor number assigned at record creation.
+    - id: 00000000-0000-7002-8c53-5a61686f767d
+      name: VendorNumber
+      kind: value
+      definition: The unique identifier assigned to a vendor record at creation.
+      data_type:
+        name: text
+        length: 20
+    - id: 00000000-0000-7003-ab72-7980878e959c
+      name: LegalName
+      kind: value
+      definition: The registered legal business name of a vendor.
+      data_type:
+        name: text
+        length: 200
+    - id: 00000000-0000-7004-8a91-989fa6adb4bb
+      name: TaxID
+      kind: value
+      definition: The tax identifier of a vendor, which is not guaranteed to be unique due to parent-subsidiary structures and duplicate records.
+      data_type:
+        name: text
+        length: 20
+    - id: 00000000-0000-7005-a9b0-b7bec5ccd3da
+      name: VendorStatus
+      kind: value
+      definition: "The operational status of a vendor: draft (not yet approved), active (approved and transactable), or suspended (temporarily inactive)."
+      value_constraint:
+        values:
+          - draft
+          - active
+          - suspended
+      data_type:
+        name: text
+        length: 20
+    - id: 00000000-0000-7006-88cf-d6dde4ebf2f9
+      name: SpendTier
+      kind: value
+      definition: A classification of vendor based on annual spending level. Bronze (default), silver, or gold.
+      value_constraint:
+        values:
+          - bronze
+          - silver
+          - gold
+      data_type:
+        name: text
+        length: 20
+    - id: 00000000-0000-7007-a7ee-f5fc030a1118
+      name: RiskTier
+      kind: value
+      definition: "A classification of vendor based on compliance risk: low, medium, or high. Assigned by the risk review process."
+      value_constraint:
+        values:
+          - low
+          - medium
+          - high
+      data_type:
+        name: text
+        length: 20
+    - id: 00000000-0000-7008-860d-141b22293037
+      name: VendorAddress
+      kind: value
+      definition: A mailing or operational address associated with a vendor.
+      data_type:
+        name: text
+        length: 300
+    - id: 00000000-0000-7009-a52c-333a41484f56
+      name: ContactName
+      kind: value
+      definition: The name of a contact person associated with a vendor in a specific region.
+      data_type:
+        name: text
+        length: 100
+    - id: 00000000-0000-700a-844b-525960676e75
+      name: ContactEmail
+      kind: value
+      definition: The email address of a vendor contact.
+      data_type:
+        name: text
+        length: 100
+    - id: 00000000-0000-700b-a36a-71787f868d94
+      name: ContactPhone
+      kind: value
+      definition: The phone number of a vendor contact.
+      data_type:
+        name: text
+        length: 20
+    - id: 00000000-0000-700c-8289-90979ea5acb3
+      name: Region
+      kind: entity
+      reference_mode: region_code
+      definition: "A geographic region served by vendors: EMEA, APAC, NA, or LATAM."
+    - id: 00000000-0000-700d-a1a8-afb6bdc4cbd2
+      name: RegionCode
+      kind: value
+      definition: The code identifying a geographic region.
+      value_constraint:
+        values:
+          - EMEA
+          - APAC
+          - NA
+          - LATAM
+      data_type:
+        name: text
+        length: 10
+    - id: 00000000-0000-700e-80c7-ced5dce3eaf1
+      name: RiskReview
+      kind: entity
+      reference_mode: review_id
+      definition: A compliance risk assessment of a vendor, completed and signed off before the vendor can be activated.
+    - id: 00000000-0000-700f-9fe6-edf4fb020910
+      name: ReviewID
+      kind: value
+      definition: The unique identifier for a risk review record.
+      data_type:
+        name: text
+        length: 20
+    - id: 00000000-0000-7010-be05-0c131a21282f
+      name: PurchaseOrder
+      kind: entity
+      reference_mode: po_number
+      definition: A request to purchase goods or services from a vendor, identified by a unique PO number.
+    - id: 00000000-0000-7011-9d24-2b323940474e
+      name: PONumber
+      kind: value
+      definition: The unique identifier for a purchase order.
+      data_type:
+        name: text
+        length: 20
+    - id: 00000000-0000-7012-bc43-4a51585f666d
+      name: Amount
+      kind: value
+      definition: The monetary value of a purchase order.
+      data_type:
+        name: money
+    - id: 00000000-0000-7013-9b62-6970777e858c
+      name: RaisedDate
+      kind: value
+      definition: The date on which a purchase order was created.
+      data_type:
+        name: date
+  fact_types:
+    - id: 00000000-0000-7014-ba81-888f969da4ab
+      name: Vendor has VendorNumber
+      roles:
+        - id: 00000000-0000-7015-99a0-a7aeb5bcc3ca
+          player: 00000000-0000-7001-ad34-3b424950575e
+          role_name: has
+        - id: 00000000-0000-7016-b8bf-c6cdd4dbe2e9
+          player: 00000000-0000-7002-8c53-5a61686f767d
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7015-99a0-a7aeb5bcc3ca
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7016-b8bf-c6cdd4dbe2e9
+        - type: mandatory
+          role: 00000000-0000-7015-99a0-a7aeb5bcc3ca
+    - id: 00000000-0000-7017-97de-e5ecf3fa0108
+      name: Vendor has LegalName
+      roles:
+        - id: 00000000-0000-7018-b6fd-040b12192027
+          player: 00000000-0000-7001-ad34-3b424950575e
+          role_name: has
+        - id: 00000000-0000-7019-951c-232a31383f46
+          player: 00000000-0000-7003-ab72-7980878e959c
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7018-b6fd-040b12192027
+        - type: mandatory
+          role: 00000000-0000-7018-b6fd-040b12192027
+    - id: 00000000-0000-701a-b43b-424950575e65
+      name: Vendor has TaxID
+      roles:
+        - id: 00000000-0000-701b-935a-61686f767d84
+          player: 00000000-0000-7001-ad34-3b424950575e
+          role_name: has
+        - id: 00000000-0000-701c-b279-80878e959ca3
+          player: 00000000-0000-7004-8a91-989fa6adb4bb
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-701b-935a-61686f767d84
+        - type: mandatory
+          role: 00000000-0000-701b-935a-61686f767d84
+    - id: 00000000-0000-701d-9198-9fa6adb4bbc2
+      name: Vendor has VendorStatus
+      roles:
+        - id: 00000000-0000-701e-b0b7-bec5ccd3dae1
+          player: 00000000-0000-7001-ad34-3b424950575e
+          role_name: has
+        - id: 00000000-0000-701f-8fd6-dde4ebf2f900
+          player: 00000000-0000-7005-a9b0-b7bec5ccd3da
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-701e-b0b7-bec5ccd3dae1
+        - type: mandatory
+          role: 00000000-0000-701e-b0b7-bec5ccd3dae1
+    - id: 00000000-0000-7020-aef5-fc030a11181f
+      name: Vendor has SpendTier
+      roles:
+        - id: 00000000-0000-7021-8d14-1b222930373e
+          player: 00000000-0000-7001-ad34-3b424950575e
+          role_name: has
+        - id: 00000000-0000-7022-ac33-3a41484f565d
+          player: 00000000-0000-7006-88cf-d6dde4ebf2f9
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7021-8d14-1b222930373e
+        - type: mandatory
+          role: 00000000-0000-7021-8d14-1b222930373e
+    - id: 00000000-0000-7023-8b52-5960676e757c
+      name: Vendor has RiskTier
+      roles:
+        - id: 00000000-0000-7024-aa71-787f868d949b
+          player: 00000000-0000-7001-ad34-3b424950575e
+          role_name: has
+        - id: 00000000-0000-7025-8990-979ea5acb3ba
+          player: 00000000-0000-7007-a7ee-f5fc030a1118
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7024-aa71-787f868d949b
+    - id: 00000000-0000-7026-a8af-b6bdc4cbd2d9
+      name: Region has RegionCode
+      roles:
+        - id: 00000000-0000-7027-87ce-d5dce3eaf1f8
+          player: 00000000-0000-700c-8289-90979ea5acb3
+          role_name: has
+        - id: 00000000-0000-7028-a6ed-f4fb02091017
+          player: 00000000-0000-700d-a1a8-afb6bdc4cbd2
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7027-87ce-d5dce3eaf1f8
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7028-a6ed-f4fb02091017
+        - type: mandatory
+          role: 00000000-0000-7027-87ce-d5dce3eaf1f8
+    - id: 00000000-0000-7029-850c-131a21282f36
+      name: Vendor operates in Region with Contact
+      roles:
+        - id: 00000000-0000-702a-a42b-323940474e55
+          player: 00000000-0000-7001-ad34-3b424950575e
+          role_name: operates in
+        - id: 00000000-0000-702b-834a-51585f666d74
+          player: 00000000-0000-700c-8289-90979ea5acb3
+          role_name: has vendor
+        - id: 00000000-0000-702c-a269-70777e858c93
+          player: 00000000-0000-7009-a52c-333a41484f56
+          role_name: is primary contact
+        - id: 00000000-0000-702d-8188-8f969da4abb2
+          player: 00000000-0000-700a-844b-525960676e75
+          role_name: email
+        - id: 00000000-0000-702e-a0a7-aeb5bcc3cad1
+          player: 00000000-0000-700b-a36a-71787f868d94
+          role_name: phone
+      readings:
+        - "{0} in {1} has primary contact {2}, email {3}, phone {4}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-702a-a42b-323940474e55
+            - 00000000-0000-702b-834a-51585f666d74
+    - id: 00000000-0000-702f-bfc6-cdd4dbe2e9f0
+      name: RiskReview has ReviewID
+      roles:
+        - id: 00000000-0000-7030-9ee5-ecf3fa01080f
+          player: 00000000-0000-700e-80c7-ced5dce3eaf1
+          role_name: has
+        - id: 00000000-0000-7031-bd04-0b121920272e
+          player: 00000000-0000-700f-9fe6-edf4fb020910
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7030-9ee5-ecf3fa01080f
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7031-bd04-0b121920272e
+        - type: mandatory
+          role: 00000000-0000-7030-9ee5-ecf3fa01080f
+    - id: 00000000-0000-7032-9c23-2a31383f464d
+      name: RiskReview is for Vendor
+      roles:
+        - id: 00000000-0000-7033-bb42-4950575e656c
+          player: 00000000-0000-700e-80c7-ced5dce3eaf1
+          role_name: is for
+        - id: 00000000-0000-7034-9a61-686f767d848b
+          player: 00000000-0000-7001-ad34-3b424950575e
+          role_name: has
+      readings:
+        - "{0} is for {1}"
+        - "{1} has {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7033-bb42-4950575e656c
+    - id: 00000000-0000-7035-b980-878e959ca3aa
+      name: PurchaseOrder has PONumber
+      roles:
+        - id: 00000000-0000-7036-989f-a6adb4bbc2c9
+          player: 00000000-0000-7010-be05-0c131a21282f
+          role_name: has
+        - id: 00000000-0000-7037-b7be-c5ccd3dae1e8
+          player: 00000000-0000-7011-9d24-2b323940474e
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7036-989f-a6adb4bbc2c9
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7037-b7be-c5ccd3dae1e8
+        - type: mandatory
+          role: 00000000-0000-7036-989f-a6adb4bbc2c9
+    - id: 00000000-0000-7038-96dd-e4ebf2f90007
+      name: PurchaseOrder is raised against Vendor
+      roles:
+        - id: 00000000-0000-7039-b5fc-030a11181f26
+          player: 00000000-0000-7010-be05-0c131a21282f
+          role_name: is raised against
+        - id: 00000000-0000-703a-941b-222930373e45
+          player: 00000000-0000-7001-ad34-3b424950575e
+          role_name: has
+      readings:
+        - "{0} is raised against {1}"
+        - "{1} has {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7039-b5fc-030a11181f26
+        - type: mandatory
+          role: 00000000-0000-7039-b5fc-030a11181f26
+        - type: subset
+          subset_roles:
+            - 00000000-0000-703a-941b-222930373e45
+          superset_roles:
+            - 00000000-0000-701e-b0b7-bec5ccd3dae1
+    - id: 00000000-0000-703b-b33a-41484f565d64
+      name: PurchaseOrder has Amount
+      roles:
+        - id: 00000000-0000-703c-9259-60676e757c83
+          player: 00000000-0000-7010-be05-0c131a21282f
+          role_name: has
+        - id: 00000000-0000-703d-b178-7f868d949ba2
+          player: 00000000-0000-7012-bc43-4a51585f666d
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-703c-9259-60676e757c83
+        - type: mandatory
+          role: 00000000-0000-703c-9259-60676e757c83
+    - id: 00000000-0000-703e-9097-9ea5acb3bac1
+      name: PurchaseOrder has RaisedDate
+      roles:
+        - id: 00000000-0000-703f-afb6-bdc4cbd2d9e0
+          player: 00000000-0000-7010-be05-0c131a21282f
+          role_name: has
+        - id: 00000000-0000-7040-8ed5-dce3eaf1f8ff
+          player: 00000000-0000-7013-9b62-6970777e858c
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-703f-afb6-bdc4cbd2d9e0
+        - type: mandatory
+          role: 00000000-0000-703f-afb6-bdc4cbd2d9e0

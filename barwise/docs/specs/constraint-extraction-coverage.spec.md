@@ -3,7 +3,8 @@
 Status: Accepted (companion to ADR 0002, which holds the policy; this
 file holds the state that changes as coverage closes)
 Created: 2026-08-27
-Last-updated: 2026-08-27
+Last-updated: 2026-08-28 (workstream 1 done: the irreflexive check is
+live at suite 2.5.0)
 Tracking: barwise-878 (the reference audit; the inventory below is its
 first pass); barwise-845 (the irreflexive instance arrives with the
 dev references); barwise-846 (the authoring budget rides split-spec
@@ -28,12 +29,25 @@ nobody is obliged to update is the stale capability matrix again.
 Swept: ten transcripts, seven references, seven recorded payloads, one
 gym exercise.
 
-| Type                                                                                   | Settled in a transcript | In a reference | Rubric-tested | Verdict                                       |
-| -------------------------------------------------------------------------------------- | ----------------------- | -------------- | ------------- | --------------------------------------------- |
-| ring: acyclic                                                                          | project-staffing        | yes            | yes           | the one wired instance; needs a second domain |
-| ring: irreflexive                                                                      | incident-response       | no (dev, none) | no            | arrives with barwise-845; check the payload   |
-| ring: asymmetric, antisymmetric, intransitive, symmetric, transitive, purely_reflexive | none                    | none           | no            | zero evidence anywhere                        |
-| subset, equality, exclusion (set-comparison)                                           | none                    | none           | cannot be     | zero evidence AND no check kind (see below)   |
+| Type                                                                                   | Settled in a transcript             | In a reference | Rubric-tested          | Verdict                                                                              |
+| -------------------------------------------------------------------------------------- | ----------------------------------- | -------------- | ---------------------- | ------------------------------------------------------------------------------------ |
+| ring: acyclic                                                                          | project-staffing, incident-response | yes (both)     | one (project-staffing) | second reference instance landed with 2.5.0; untested there (see below)              |
+| ring: irreflexive                                                                      | incident-response                   | yes            | yes (2.5.0)            | first instance live; needs a second domain                                           |
+| ring: asymmetric, antisymmetric, intransitive, symmetric, transitive, purely_reflexive | none                                | none           | no                     | zero evidence anywhere                                                               |
+| subset, equality, exclusion (set-comparison)                                           | subset: vendor-onboarding (weakly)  | subset: yes    | cannot be              | no check kind (see below); the vendor reference carries a redundant PO-vendor subset |
+
+The incident-response reference carries acyclic as well as irreflexive
+on "Incident is duplicate of Incident" (the sweep payload extracted
+both; a conformance bug that dropped same-role rings as duplicates was
+fixed in the same change). Only the irreflexive one is rubric-tested
+there: `forbids_population` takes the first constraint of the named
+kind, and the transcript settles irreflexive harder ("stated") than
+acyclic ("the rule as intended. It's not enforced"). The
+vendor-onboarding subset is the payload's approximation of "POs only
+against active vendors" -- it asserts something true but redundant
+(every vendor has a status anyway), and set-comparison has no check
+kind, so it sits in the reference untested, which is what the ADR's
+trust statement says to expect.
 
 The machinery envelope exceeds the evidence envelope, worth noting on
 purpose: `generateCounterexampleForConstraint` derives counterexamples
@@ -47,13 +61,13 @@ existed. Closing subset coverage needs data and a check capability;
 
 ## Workstreams (each rides work already tracked)
 
-### 1. The irreflexive instance (with barwise-845)
+### 1. The irreflexive instance (with barwise-845) -- DONE, suite 2.5.0
 
-When the incident-response reference is pinned, add the ring
-`forbids_population` check for "Incident is duplicate of Incident".
-If the recorded payload missed the settled ring, record that as
-prompt-headroom evidence rather than picking a payload that happens to
-carry it -- the miss is a finding.
+The incident-response reference is pinned and the ring
+`forbids_population` check is live. The contingency (payload missed
+the ring) did not arise: the best recorded payload carried the
+irreflexive ring at high confidence, sourced to the transcript's
+settling lines, so the check has a genuine answer key.
 
 ### 2. The common-tier authoring budget (with split-spec workstream 3)
 

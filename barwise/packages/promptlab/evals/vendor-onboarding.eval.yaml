@@ -4,11 +4,15 @@
 # one completed risk review" before correcting himself to "a vendor
 # accumulates reviews; at most one is current".
 #
-# No reference model, so no forbids_population: references are generated
-# from a recorded payload, and this case has never run against a
-# provider (eval-metric-readiness spec, workstream 2).
+# Reference generated from the best 2026-08-27 haiku45-2 dev payload
+# (suite 2.5.0; barwise-845). Two settled rules the payload does NOT
+# carry, so no check can test them yet: the review-side mandatory on
+# "RiskReview is for Vendor" ("one review, one vendor"), and any
+# current-review construct ("at most one is current") -- both are
+# prompt headroom, not rubric gaps to paper over.
 id: vendor-onboarding
 transcript: vendor-onboarding.transcript.md
+reference: vendor-onboarding.reference.orm.yaml
 ambiguityBudget: 10
 checks:
   - kind: must_validate
@@ -30,3 +34,28 @@ checks:
   - kind: requires_ambiguity
     matches: [suspend]
     hint: The room parked what happens to in-flight purchase orders when a vendor is suspended.
+  - kind: forbids_population
+    factType: Vendor has VendorNumber
+    constraint: internal_uniqueness
+    hint: Vendor number is the identifier - unique, and settled over the
+      tax-ID decoy the room withdrew.
+  - kind: forbids_population
+    factType: Vendor has VendorStatus
+    constraint: mandatory
+    hint: A vendor is never in no status - it defaults to draft the moment
+      the record is created.
+  - kind: forbids_population
+    factType: Vendor operates in Region with Contact
+    constraint: internal_uniqueness
+    hint: The Meridian rule - at most one primary contact per vendor per
+      region; the system rejects the second.
+  - kind: forbids_population
+    factType: PurchaseOrder is raised against Vendor
+    constraint: internal_uniqueness
+    hint: A PO is raised against exactly one vendor - no PO split across
+      suppliers.
+  - kind: forbids_population
+    factType: PurchaseOrder is raised against Vendor
+    constraint: mandatory
+    hint: No orphan POs - the form will not let you create one without a
+      vendor.
