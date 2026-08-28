@@ -125,6 +125,15 @@ serial calls of wall clock to roughly its slowest case's chain.
 Payloads now land as each case finishes rather than at the end of the
 sweep (barwise-888), so a crash keeps what was already paid for.
 
+**Stamp the payload and log directories per round**
+(`/tmp/eval-payloads/$(date +%Y%m%d-%H%M)/<arm>`, likewise
+`/tmp/eval-logs/`). Payload filenames are `<case>-run<N>.json`, so
+reusing a directory across rounds overwrites by run index and mixes
+rounds silently -- the 2026-08-28 verification had to re-score every
+file to tell which round it came from. Pushed into the repo, they
+live under the same stamp: `eval-payloads/<stamp>/<arm>/`, beside
+`eval-runs/<stamp>/`.
+
 ```sh
 # The two shipped variants
 npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \
