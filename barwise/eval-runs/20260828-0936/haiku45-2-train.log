@@ -1,0 +1,58 @@
+Using artifact version haiku45-2 (anthropic/claude-haiku-4-5).
+[ 1/7] order-management       run 1/5  1.000  39.1s  5003/16384 out  6720 cached
+[ 5/7] project-staffing       run 1/5  1.000  26.4s  3363/16384 out  6720 cached
+[ 4/7] employee-hierarchy     run 1/5  1.000  26.5s  3529/16384 out  6720 cached
+[ 6/7] conference-reviews     run 1/5  0.857  29.4s  3822/16384 out  6720 cached
+[ 7/7] freight-corrections    run 1/5  0.933  30.9s  3925/16384 out  6720 cached
+[ 1/7] order-management       run 2/5  1.000  40.3s  5208/16384 out  7598 cached
+[ 5/7] project-staffing       run 2/5  1.000  27.9s  3531/16384 out  7507 cached
+[ 4/7] employee-hierarchy     run 2/5  1.000  29.1s  3775/16384 out  7437 cached
+[ 6/7] conference-reviews     run 2/5  0.857  28.1s  3673/16384 out  7461 cached
+[ 3/7] clinic-appointments    run 1/5  1.000  58.8s  7951/16384 out  6720 cached
+[ 7/7] freight-corrections    run 2/5  0.733  38.5s  4980/16384 out  7490 cached
+[ 2/7] university-enrollment  run 1/5  0.882  70.3s  9415/16384 out  6720 cached
+[ 1/7] order-management       run 3/5  1.000  36.9s  4807/16384 out  7598 cached
+[ 5/7] project-staffing       run 3/5  1.000  28.8s  3678/16384 out  7507 cached
+[ 6/7] conference-reviews     run 3/5  0.857  26.0s  3346/16384 out  7461 cached
+[ 4/7] employee-hierarchy     run 3/5  1.000  28.4s  3616/16384 out  7437 cached
+[ 7/7] freight-corrections    run 3/5  0.933  28.5s  3698/16384 out  7490 cached
+[ 5/7] project-staffing       run 4/5  1.000  28.4s  3580/16384 out  7507 cached
+[ 1/7] order-management       run 4/5  1.000  35.2s  4585/16384 out  7598 cached
+[ 4/7] employee-hierarchy     run 4/5  1.000  28.6s  3672/16384 out  7437 cached
+[ 3/7] clinic-appointments    run 2/5  1.000  55.8s  7539/16384 out  7605 cached
+[ 6/7] conference-reviews     run 4/5  0.684  32.3s  4171/16384 out  7461 cached
+[ 7/7] freight-corrections    run 4/5  0.933  31.2s  3957/16384 out  7490 cached
+[ 2/7] university-enrollment  run 2/5  0.889  62.6s  8440/16384 out  7616 cached
+[ 5/7] project-staffing       run 5/5  0.980  29.7s  3644/16384 out  7507 cached
+[ 4/7] employee-hierarchy     run 5/5  1.000  29.7s  3838/16384 out  7437 cached
+[ 1/7] order-management       run 5/5  1.000  35.7s  4550/16384 out  7598 cached
+[ 6/7] conference-reviews     run 5/5  0.986  39.3s  5017/16384 out  7461 cached
+[ 7/7] freight-corrections    run 5/5  0.933  31.6s  3799/16384 out  7490 cached
+[ 3/7] clinic-appointments    run 3/5  1.000  56.9s  7492/16384 out  7605 cached
+[ 2/7] university-enrollment  run 3/5  0.981  67.8s  8994/16384 out  7616 cached
+[ 3/7] clinic-appointments    run 4/5  1.000  56.1s  7511/16384 out  7605 cached
+[ 2/7] university-enrollment  run 4/5  0.989  76.4s  10242/16384 out  7616 cached
+[ 3/7] clinic-appointments    run 5/5  0.985  56.9s  7768/16384 out  7605 cached
+[ 2/7] university-enrollment  run 5/5  0.983  70.7s  9648/16384 out  7616 cached
+order-management  mean=1.000  worst=1.000  sd=0.000  ok=5/5  quality=1.000+/-0.000
+university-enrollment  mean=0.945  worst=0.882  sd=0.054  ok=5/5  quality=0.945+/-0.054  [corrections=0.6 warnings=0.6]
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Instructor teaches CourseOffering"), so it cannot rule out: Rules out: a CourseOffering that exists but never plays "Instructor teaches CourseOffering" -- e.g. CourseOffering#1 appears in Student enrolls in CourseOffering but not in Instructor teaches CourseOffering
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Instructor teaches CourseOffering"), so it cannot rule out: Rules out: a CourseOffering that exists but never plays "Instructor teaches CourseOffering" -- e.g. CourseOffering#1 appears in Student enrolls in CourseOffering but not in Instructor teaches CourseOffering
+clinic-appointments  mean=0.997  worst=0.985  sd=0.007  ok=5/5  quality=0.997+/-0.007  [warnings=0.2]
+employee-hierarchy  mean=1.000  worst=1.000  sd=0.000  ok=5/5  quality=1.000+/-0.000
+project-staffing  mean=0.996  worst=0.980  sd=0.009  ok=5/5  quality=0.996+/-0.009  [corrections=0.2]
+conference-reviews  mean=0.848  worst=0.684  sd=0.108  ok=5/5  quality=0.848+/-0.108  [corrections=0.2 warnings=0.2]
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Reviewer reviews Paper"), so it cannot rule out: Rules out: two facts of Reviewer reviews Paper that agree on Reviewer, Paper -- e.g. {Reviewer=Reviewer#1, Paper=Paper#1}; {Reviewer=Reviewer#1, Paper=Paper#1}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Reviewer reviews Paper"), so it cannot rule out: Rules out: two facts of Reviewer reviews Paper that agree on Reviewer, Paper -- e.g. {Reviewer=Reviewer#1, Paper=Paper#1}; {Reviewer=Reviewer#1, Paper=Paper#1}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Reviewer reviews Paper"), so it cannot rule out: Rules out: two facts of Reviewer reviews Paper that agree on Reviewer, Paper -- e.g. {Reviewer=Reviewer#1, Paper=Paper#1}; {Reviewer=Reviewer#1, Paper=Paper#1}
+  requires_element: The model has no fact type connecting "Reviewer" and "Paper".
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Reviewer reviews Paper"), so it cannot rule out: Rules out: two facts of Reviewer reviews Paper that agree on Reviewer, Paper -- e.g. {Reviewer=Reviewer#1, Paper=Paper#1}; {Reviewer=Reviewer#1, Paper=Paper#1}
+freight-corrections  mean=0.893  worst=0.733  sd=0.089  ok=5/5  quality=0.893+/-0.089  [corrections=2 warnings=1.2]
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Shipment contains Product in Quantity"), so it cannot rule out: Rules out: two facts of Shipment contains Product in Quantity that agree on Shipment, Product -- e.g. {Shipment=Shipment#1, Product=Product#1, Quantity=Quantity#1}; {Shipment=Shipment#1, Product=Product#1, Quantity=Quantity#2}
+suite 2.5.0  artifact=haiku45-2@3edda4eff7e5  mean=0.954 +/- 0.019 (95%)  worst=0.684  (repeat=5)
+  warnings: completeness/fact-type-without-uniqueness x5, completeness/fact-type-without-constraints x4, constraint/external-uniqueness-all-local x2
+  fixed:    missing_identifier_population x8, arity_mismatch x3, duplicate_constraint x2, invalid_role_player x2
+  cache: 257896 read, 5674 written
+  gaps below 0.027 are not resolvable against a comparable run
+  51% of that noise is conference-reviews alone
+Wrote 12 payload(s) to /tmp/eval-payloads/haiku45-2-train.
