@@ -14,6 +14,14 @@ id: vendor-onboarding
 transcript: vendor-onboarding.transcript.md
 reference: vendor-onboarding.reference.orm.yaml
 ambiguityBudget: 10
+vocabulary:
+  # Mei names the concept "phone number" ("Name, email, phone
+  # number."), which the reference shortened to ContactPhone and the
+  # recorded haiku payloads render in full. Without the licence the
+  # entity-fold tier (suite 2.6.0, barwise-890) cannot evidence the
+  # phone attribute against the Contact entity, and the Meridian check
+  # fails a shape that carries the exact rule.
+  - [ContactPhone, ContactPhoneNumber]
 checks:
   - kind: must_validate
   - kind: requires_element
@@ -32,7 +40,11 @@ checks:
       factTypeBetween: [Vendor, RiskReview]
     hint: A vendor accumulates reviews over time; at most one is current.
   - kind: requires_ambiguity
-    matches: [suspend]
+    # The stem, not the verb: sonnet reported the parked item as "the
+    # suspension question" and failed lexically -- "suspension" does not
+    # contain the substring "suspend" (suspen-d vs suspen-s). "suspen"
+    # matches suspend, suspended and suspension alike (barwise-892).
+    matches: [suspen]
     hint: The room parked what happens to in-flight purchase orders when a vendor is suspended.
   - kind: forbids_population
     factType: Vendor has VendorNumber

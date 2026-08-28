@@ -1,7 +1,9 @@
 # Wider-shape correspondence: projection and entity-fold tiers for forbids_population
 
-Status: Draft for review (design only -- implementation follows on
-approval, with the 2.6.0 suite bump)
+Status: Implemented at suite 2.6.0 (2026-08-28; both tiers, the
+carrier diagnostics, the riders, and the offline re-read appended to
+the baseline doc). The open decisions resolved as recommended: 891
+rounds at 3 decimals; the entity-fold requires no reference mode.
 Created: 2026-08-28
 Last-updated: 2026-08-28
 Tracking: barwise-890 (the tiers), barwise-891 and barwise-892 (riders

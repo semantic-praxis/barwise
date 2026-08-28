@@ -113,3 +113,74 @@ stands unchanged.
 3. WS4 prompt iteration on the unblinded numbers (freight regression
    first), and the barwise-846 WS3 transcripts per
    `docs/specs/eval-difficulty-calibration.spec.md`.
+
+## Appendix, same day: the 2.6.0 offline re-read
+
+Suite 2.6.0 landed (`docs/specs/wider-shape-correspondence.spec.md`)
+and the committed payloads were re-scored against it -- the free,
+zero-call re-read item 2 promised. Two results, one of them about the
+record itself.
+
+### The record first: seven payload files are stale
+
+The audit that makes the deltas trustworthy also caught a flaw. A
+fresh file re-scored with the new tiers disabled must reproduce its
+arm log's recorded score exactly (for non-vendor cases, whose rubrics
+2.6.0 did not touch); seven files in the two `haiku45-*` directories
+do not, at gaps far beyond rounding. They are leftovers of the
+discarded 2.4.0 attempts in the reused `/tmp` directories -- the same
+overwrite hazard the false-alarm investigation hit -- and are named in
+`eval-payloads/20260828-0936/README.md`; nothing below reads them.
+Every other file reproduces its logged score exactly. Two earlier
+claims must be re-graded accordingly: the incident Severity+Priority
+drop rested partly on a stale file (the 2026-08-27 sighting stands,
+this round's does not), and no committed conference payload actually
+records the 0.833 middle mode -- best/worst retention never kept one,
+which is barwise-891's argument made by its own absence.
+
+### The genuine deltas (fresh files only, live 2.5.0 -> offline 2.6.0)
+
+| Arm                  | Payload                    | 2.5.0 | 2.6.0 | delta  |
+| -------------------- | -------------------------- | ----- | ----- | ------ |
+| sonnet5-train        | clinic-appointments-run1   | 0.467 | 0.967 | +0.500 |
+| default-sonnet-train | clinic-appointments-run1   | 0.500 | 1.000 | +0.500 |
+| sonnet5-dev          | vendor-onboarding-run2     | 0.735 | 0.917 | +0.182 |
+| haiku45-dev          | vendor-onboarding-run3     | 0.889 | 1.000 | +0.111 |
+| haiku45-train        | university-enrollment-run1 | 0.882 | 0.993 | +0.111 |
+| sonnet5-train        | university-enrollment-run3 | 0.889 | 1.000 | +0.111 |
+| default-sonnet-train | university-enrollment-run2 | 0.889 | 1.000 | +0.111 |
+| haiku45-dev          | vendor-onboarding-run1     | 0.869 | 0.960 | +0.091 |
+| haiku45-dev          | vendor-onboarding-run2     | 0.909 | 1.000 | +0.091 |
+| sonnet5-dev          | vendor-onboarding-run3     | 0.833 | 0.924 | +0.091 |
+| default-haiku-dev    | vendor-onboarding-run3     | 0.819 | 0.910 | +0.091 |
+| default-sonnet-dev   | vendor-onboarding-run2     | 0.627 | 0.718 | +0.091 |
+| default-sonnet-dev   | vendor-onboarding-run4     | 0.820 | 0.911 | +0.091 |
+| default-sonnet-dev   | subscription-billing-run3  | 0.669 | 0.746 | +0.077 |
+| sonnet5-dev          | subscription-billing-run3  | 0.624 | 0.700 | +0.076 |
+| default-haiku-dev    | vendor-onboarding-run4     | 0.816 | 0.879 | +0.063 |
+
+Every delta is a rise (the tiers are rescue-only, and the audit is
+what backs that word with data); every remaining fresh file is
+unchanged to three decimals.
+
+### What the re-read settles, and what it cannot
+
+- **The clinic diagnosis was exact.** Both prompts' worst sonnet
+  clinic runs gain +0.500: two direct projections and three anchor
+  propagations, all rescued by one shape correspondence. The 0.467
+  "collapse-adjacent" minimum was measurement.
+- **The vendor distortion was ~0.09 per arm as estimated**, and it
+  reached every arm, both models, both prompts.
+- **A finding the baseline missed: university was 890-distorted too.**
+  The "Instructor teaches" misses called a case property in headroom
+  item 3 were sonnet (and once haiku) carrying the fact type wider;
+  those payloads now score 0.993-1.000. Item 3 shrinks from "case
+  property worth a payload read" to "haiku-only, and rarer".
+- **Arm means cannot be recomputed offline.** Saved payloads are the
+  per-case extremes, not the samples, so the table above bounds the
+  distortion without yielding new means. Directionally: both sonnet
+  arms gain on the same cases by similar amounts, so verdict 1's
+  "sonnet5-3 shows no resolvable value over the default" likely
+  survives, while verdict 2's cross-model gap shrinks materially. The
+  true 2.6.0 baseline is the next keyed run, and it should precede any
+  WS4 prompt iteration.

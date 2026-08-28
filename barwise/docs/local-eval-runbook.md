@@ -3,15 +3,17 @@
 The keyed runs. `barwise prompt eval` is the one command in the
 repository that cannot run in CI or in an ephemeral session container:
 it needs a provider key, and the runs it makes cost money. This is the
-procedure for making them count, written against suite **2.5.0** and the
+procedure for making them count, written against suite **2.6.0** and the
 open workstreams of `docs/specs/eval-split-stratification.spec.md`.
 
-**Suite 2.5.0 changed the DEV rubrics** (references, fifteen
-population checks, an ambiguity budget -- the barwise-845 close, from
-the 2026-08-27 haiku45-2 sweep's saved payloads), on top of the
-2.1.0-2.4.0 train-side widening. No mean from any earlier keyed run,
-the 2026-08-27 sweep included, is comparable to what these commands
-print today, on either split.
+**Suite 2.6.0 taught the evaluator wider shapes** (the projection and
+entity-fold correspondence tiers, the vendor phone licence and
+"suspen" stem -- the barwise-890 round, verified against the
+2026-08-28 payloads), after **2.5.0 changed the DEV rubrics**
+(references, fifteen population checks, an ambiguity budget -- the
+barwise-845 close). No mean from any earlier keyed run, the recorded
+2026-08-28 eight-arm baseline included, is comparable to what these
+commands print today, on either split.
 
 Every command below was executed verbatim with no key in the
 environment, from `barwise/`. They parse, they print the artifact they
@@ -211,7 +213,8 @@ Why each flag is there:
   sweep is running. Without it a rate-limited run and a hung one look
   identical for as long as the backoff lasts, and a rubric no extraction
   can pass is invisible until the bill.
-- `--save-payloads` -- keeps each case's best and worst scored sample
+- `--save-payloads` -- keeps one sample per distinct score mode per
+  case (equal after rounding to the three printed decimals; barwise-891)
   plus every unscorable one. A separate directory per arm and split,
   because the files are named `<caseId>-run<N>.json` and would otherwise
   collide.

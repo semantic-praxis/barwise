@@ -12,7 +12,11 @@ import {
 import { generateCounterexampleForConstraint } from "@barwise/core/counterexample";
 import type { ConstraintKind, NameLicence } from "../../exercise/types.js";
 import type { CheckResult } from "../GymReport.js";
-import { mapForbiddenPopulation } from "../populationMapping.js";
+import {
+  entityFoldMappings,
+  mapForbiddenPopulation,
+  projectionMappings,
+} from "../populationMapping.js";
 
 const GUARDS: Record<ConstraintKind, (c: Constraint) => boolean> = {
   internal_uniqueness: isInternalUniqueness,
@@ -90,26 +94,75 @@ export function forbidsPopulation(
     );
   }
 
-  const configs: PopulationConfig[] = [];
+  // Map each forbidden population. The flat and expansion tiers give
+  // at most one mapping; when they find none, the projection tier may
+  // offer several wider carriers, each tried in turn -- the check
+  // passes on the first attempt whose injection the candidate rejects
+  // (docs/specs/wider-shape-correspondence.spec.md).
+  const options: PopulationConfig[][] = [];
+  const carriersTried: string[] = [];
   for (const pop of counterexample.forbidden) {
     const mapped = mapForbiddenPopulation(pop, reference, candidate, licence);
-    if (!mapped) {
-      return fail(
-        `Your model does not yet carry the relationship this rule guards `
-          + `(no fact type matching "${factTypeName}"), so it cannot rule out: ${counterexample.text}`,
-        hint,
-      );
+    if (mapped) {
+      options.push([mapped]);
+      continue;
     }
-    configs.push(mapped);
+    const projected = projectionMappings(pop, reference, candidate, licence);
+    if (projected.length > 0) {
+      options.push(projected.map((p) => p.config));
+      for (const p of projected) {
+        if (!carriersTried.includes(p.candFt.name)) carriersTried.push(p.candFt.name);
+      }
+      continue;
+    }
+    const folded = entityFoldMappings(pop, reference, candidate, licence);
+    if (folded.length > 0) {
+      options.push(folded.map((f) => f.config));
+      continue;
+    }
+    return fail(
+      `Your model does not yet carry the relationship this rule guards `
+        + `(no fact type matching "${factTypeName}"), so it cannot rule out: ${counterexample.text}`,
+      hint,
+    );
   }
 
-  if (candidateRejects(candidate, configs)) {
-    return {
-      kind: "forbids_population",
-      passed: true,
-      message: `Your model correctly rules out: ${counterexample.text}`,
-    };
+  for (const configs of combinations(options)) {
+    if (candidateRejects(candidate, configs)) {
+      return {
+        kind: "forbids_population",
+        passed: true,
+        message: `Your model correctly rules out: ${counterexample.text}`,
+      };
+    }
   }
 
+  if (carriersTried.length > 0) {
+    const named = carriersTried.map((n) => `"${n}"`).join(" or ");
+    return fail(
+      `Your model still allows what it should forbid: ${counterexample.text} `
+        + `(possibly carried in the wider fact type ${named}, whose constraints `
+        + `do not forbid this population)`,
+      hint,
+    );
+  }
   return fail(`Your model still allows what it should forbid: ${counterexample.text}`, hint);
+}
+
+/**
+ * Every way of picking one config per population, first list varying
+ * slowest. Almost always a single one-element list -- only a population
+ * that mapped through the projection tier contributes alternatives.
+ */
+function* combinations(options: PopulationConfig[][]): Generator<PopulationConfig[]> {
+  if (options.length === 0) {
+    yield [];
+    return;
+  }
+  const [head, ...rest] = options;
+  for (const config of head!) {
+    for (const tail of combinations(rest)) {
+      yield [config, ...tail];
+    }
+  }
 }

@@ -101,7 +101,29 @@
 # dev split is no longer untuned-against in the weak sense that its
 # rubrics were authored from a haiku sweep's payloads -- the CASES are
 # still held out of prompt iteration, which is the sense that matters.
-version: 2.5.0
+#
+# 2.6.0 is the barwise-890 round
+# (docs/specs/wider-shape-correspondence.spec.md): scores loosen where
+# the shapes were blind. Three changes, each of which alone would bump:
+# - forbids_population gains the projection and entity-fold
+#   correspondence tiers, so a candidate carrying a settled rule in a
+#   WIDER fact type than the reference's -- sonnet's clinic 5-ary, the
+#   Contact-as-entity vendor ternary every recorded run produced -- now
+#   scores as carrying it. The 2026-08-28 baseline measured the
+#   blindness at ~0.1 of every arm's vendor mean and ~0.3 of sonnet's
+#   affected clinic runs, so scores rise for affected extractions and
+#   rows either side of this line are incomparable.
+# - vendor-onboarding licenses ContactPhone/ContactPhoneNumber (the
+#   transcript's phrase is "phone number") and its requires_ambiguity
+#   token becomes the stem "suspen": sonnet reported the parked item
+#   as "the suspension question" and failed on the missing letter d
+#   (barwise-892).
+# - Riding the same round, outside this file: payload retention keeps
+#   one payload per distinct score mode instead of only the extremes
+#   (barwise-891). No score changes; the diagnostic record does.
+# The answer keys still pin their 2.5.0 scores exactly -- the tiers are
+# rescue-only, and a key that moved would be a finding, not a drift.
+version: 2.6.0
 
 # Re-fitted for the rated form, because rating changed what a weight
 # means. A weight is now the cost of a model in which EVERY element

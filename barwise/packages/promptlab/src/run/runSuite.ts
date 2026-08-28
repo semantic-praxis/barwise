@@ -680,27 +680,32 @@ function tallyByRule(
 }
 
 /**
- * Drop every payload except the ones worth reading: the case's best and
- * worst scored samples, and any run that could not be scored at all.
+ * Drop every payload except the ones worth reading: one per distinct
+ * score mode -- scores equal after rounding to three decimals, the
+ * precision every report prints -- plus any run that could not be
+ * scored at all.
  *
- * Pruning here rather than at capture time because which run is worst
- * is not knowable until the rest have run. The alternative -- a fixed
- * threshold -- was tried and missed the case it was built for: a run
- * scoring 0.327 against a 0.30 floor is not a collapse and is exactly
- * what needs explaining when its sibling scored 0.950.
+ * Pruning here rather than at capture time because which runs are
+ * worth reading is not knowable until the rest have run. A fixed
+ * threshold was tried first and missed the case it was built for: a
+ * run scoring 0.327 against a 0.30 floor is not a collapse and is
+ * exactly what needs explaining when its sibling scored 0.950. Best
+ * and worst only came next (they are modes, so they still survive)
+ * and lost the middle of every trimodal case: conference's recorded
+ * 0.592 / 0.833 / 1.000 spread kept two payloads and dropped the one
+ * that distinguished the two failure modes (barwise-891).
  */
-function keepDiagnosticPayloads(runs: readonly CaseRun[]): CaseRun[] {
-  const scored = runs
-    .map((run, index) => ({ run, index }))
-    .filter((r) => r.run.score !== undefined && r.run.error === undefined);
-
+export function keepDiagnosticPayloads(runs: readonly CaseRun[]): CaseRun[] {
   const keep = new Set<number>();
-  if (scored.length > 0) {
-    const by = (pick: (a: number, b: number) => boolean) =>
-      scored.reduce((best, r) => pick(r.run.score!.score, best.run.score!.score) ? r : best);
-    keep.add(by((a, b) => a < b).index);
-    keep.add(by((a, b) => a > b).index);
-  }
+  const modes = new Set<string>();
+  runs.forEach((run, index) => {
+    if (run.score === undefined || run.error !== undefined) return;
+    const mode = run.score.score.toFixed(3);
+    if (!modes.has(mode)) {
+      modes.add(mode);
+      keep.add(index);
+    }
+  });
   // An unscorable run keeps its payload regardless: it has no score to
   // rank, and the payload is the only account of why it failed.
   runs.forEach((run, index) => {
