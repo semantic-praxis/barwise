@@ -1,0 +1,68 @@
+Using artifact version 1.1.0 (forced by --artifact-version; client is anthropic/claude-sonnet-5).
+[ 1/7] order-management       run 1/5  0.975  33.5s  4872/16384 out  8710 cached
+[ 5/7] project-staffing       run 1/5  1.000  26.5s  3539/16384 out  8710 cached
+[ 6/7] conference-reviews     run 1/5  1.000  30.1s  4336/16384 out  8710 cached
+[ 7/7] freight-corrections    run 1/5  0.933  31.7s  4498/16384 out  8710 cached
+[ 4/7] employee-hierarchy     run 1/5  0.805  32.2s  4779/16384 out  8710 cached
+[ 1/7] order-management       run 2/5  1.000  35.9s  5163/16384 out  9530 cached
+[ 3/7] clinic-appointments    run 1/5  0.500  53.1s  7966/16384 out  8710 cached
+[ 5/7] project-staffing       run 2/5  0.940  29.0s  4203/16384 out  9425 cached
+[ 4/7] employee-hierarchy     run 2/5  1.000  27.8s  3961/16384 out  9317 cached
+[ 2/7] university-enrollment  run 1/5  0.994  60.2s  9265/16384 out  8710 cached
+[ 6/7] conference-reviews     run 2/5  1.000  31.2s  4423/16384 out  9357 cached
+[ 7/7] freight-corrections    run 2/5  0.933  30.9s  4581/16384 out  9400 cached
+[ 1/7] order-management       run 3/5  1.000  35.3s  4991/16384 out  9530 cached
+[ 5/7] project-staffing       run 3/5  1.000  30.5s  4482/16384 out  9425 cached
+[ 6/7] conference-reviews     run 3/5  1.000  29.9s  4235/16384 out  9357 cached
+[ 4/7] employee-hierarchy     run 3/5  1.000  33.0s  4882/16384 out  9317 cached
+[ 7/7] freight-corrections    run 3/5  0.933  31.5s  4576/16384 out  9400 cached
+[ 1/7] order-management       run 4/5  1.000  34.8s  5130/16384 out  9530 cached
+[ 3/7] clinic-appointments    run 2/5  0.500  53.8s  8272/16384 out  9577 cached
+[ 5/7] project-staffing       run 4/5  0.940  26.7s  3812/16384 out  9425 cached
+[ 2/7] university-enrollment  run 2/5  0.889  55.4s  8687/16384 out  9538 cached
+[ 6/7] conference-reviews     run 4/5  1.000  31.6s  4482/16384 out  9357 cached
+[ 7/7] freight-corrections    run 4/5  0.933  28.9s  4217/16384 out  9400 cached
+[ 4/7] employee-hierarchy     run 4/5  1.000  31.6s  4587/16384 out  9317 cached
+[ 5/7] project-staffing       run 5/5  1.000  27.7s  3979/16384 out  9425 cached
+[ 1/7] order-management       run 5/5  1.000  38.7s  5881/16384 out  9530 cached
+[ 6/7] conference-reviews     run 5/5  1.000  29.8s  4272/16384 out  9357 cached
+[ 7/7] freight-corrections    run 5/5  0.933  31.2s  4490/16384 out  9400 cached
+[ 3/7] clinic-appointments    run 3/5  0.500  48.8s  7456/16384 out  9577 cached
+[ 4/7] employee-hierarchy     run 5/5  1.000  31.7s  4719/16384 out  9317 cached
+[ 2/7] university-enrollment  run 3/5  0.923  54.9s  8465/16384 out  9538 cached
+[ 3/7] clinic-appointments    run 4/5  1.000  50.2s  7693/16384 out  9577 cached
+[ 2/7] university-enrollment  run 4/5  0.987  57.4s  8979/16384 out  9538 cached
+[ 3/7] clinic-appointments    run 5/5  1.000  55.2s  8423/16384 out  9577 cached
+[ 2/7] university-enrollment  run 5/5  0.889  56.7s  8866/16384 out  9538 cached
+order-management  mean=0.995  worst=0.975  sd=0.011  ok=5/5  quality=0.995+/-0.011  [warnings=0.2]
+university-enrollment  mean=0.936  worst=0.889  sd=0.051  ok=5/5  quality=0.936+/-0.051  [corrections=0.2 warnings=1.4]
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Instructor teaches CourseOffering"), so it cannot rule out: Rules out: a CourseOffering that exists but never plays "Instructor teaches CourseOffering" -- e.g. CourseOffering#1 appears in Student enrolls in CourseOffering but not in Instructor teaches CourseOffering
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Instructor teaches CourseOffering"), so it cannot rule out: Rules out: a CourseOffering that exists but never plays "Instructor teaches CourseOffering" -- e.g. CourseOffering#1 appears in Student enrolls in CourseOffering but not in Instructor teaches CourseOffering
+clinic-appointments  mean=0.700  worst=0.500  sd=0.274  ok=5/5  quality=0.700+/-0.274
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Patient books Appointment"), so it cannot rule out: Rules out: two facts of Patient books Appointment that agree on Appointment -- e.g. {Patient=Patient#1, Appointment=Appointment#1}; {Patient=Patient#2, Appointment=Appointment#1}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Appointment has AppointmentStatus"), so it cannot rule out: Rules out: a Appointment that exists but never plays "Appointment has AppointmentStatus" -- e.g. Appointment#1 appears in Patient books Appointment but not in Appointment has AppointmentStatus
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Appointment is with Doctor"), so it cannot rule out: Rules out: two facts of Appointment is with Doctor that agree on Appointment -- e.g. {Appointment=Appointment#1, Doctor=Doctor#1}; {Appointment=Appointment#1, Doctor=Doctor#2}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Doctor has Specialty"), so it cannot rule out: Rules out: a Doctor that exists but never plays "Doctor has Specialty" -- e.g. Doctor#1 appears in Appointment is with Doctor but not in Doctor has Specialty
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Patient has primary Doctor"), so it cannot rule out: Rules out: a Patient that exists but never plays "Patient has primary Doctor" -- e.g. Patient#1 appears in Patient books Appointment but not in Patient has primary Doctor
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Patient books Appointment"), so it cannot rule out: Rules out: two facts of Patient books Appointment that agree on Appointment -- e.g. {Patient=Patient#1, Appointment=Appointment#1}; {Patient=Patient#2, Appointment=Appointment#1}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Appointment has AppointmentStatus"), so it cannot rule out: Rules out: a Appointment that exists but never plays "Appointment has AppointmentStatus" -- e.g. Appointment#1 appears in Patient books Appointment but not in Appointment has AppointmentStatus
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Appointment is with Doctor"), so it cannot rule out: Rules out: two facts of Appointment is with Doctor that agree on Appointment -- e.g. {Appointment=Appointment#1, Doctor=Doctor#1}; {Appointment=Appointment#1, Doctor=Doctor#2}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Doctor has Specialty"), so it cannot rule out: Rules out: a Doctor that exists but never plays "Doctor has Specialty" -- e.g. Doctor#1 appears in Appointment is with Doctor but not in Doctor has Specialty
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Patient has primary Doctor"), so it cannot rule out: Rules out: a Patient that exists but never plays "Patient has primary Doctor" -- e.g. Patient#1 appears in Patient books Appointment but not in Patient has primary Doctor
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Patient books Appointment"), so it cannot rule out: Rules out: two facts of Patient books Appointment that agree on Appointment -- e.g. {Patient=Patient#1, Appointment=Appointment#1}; {Patient=Patient#2, Appointment=Appointment#1}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Appointment has AppointmentStatus"), so it cannot rule out: Rules out: a Appointment that exists but never plays "Appointment has AppointmentStatus" -- e.g. Appointment#1 appears in Patient books Appointment but not in Appointment has AppointmentStatus
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Appointment is with Doctor"), so it cannot rule out: Rules out: two facts of Appointment is with Doctor that agree on Appointment -- e.g. {Appointment=Appointment#1, Doctor=Doctor#1}; {Appointment=Appointment#1, Doctor=Doctor#2}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Doctor has Specialty"), so it cannot rule out: Rules out: a Doctor that exists but never plays "Doctor has Specialty" -- e.g. Doctor#1 appears in Appointment is with Doctor but not in Doctor has Specialty
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Patient has primary Doctor"), so it cannot rule out: Rules out: a Patient that exists but never plays "Patient has primary Doctor" -- e.g. Patient#1 appears in Patient books Appointment but not in Patient has primary Doctor
+employee-hierarchy  mean=0.961  worst=0.805  sd=0.087  ok=5/5  quality=0.961+/-0.087  [corrections=0.4]
+  forbids_population: Your model still allows what it should forbid: Rules out: a Employee that exists but never plays "Employee works in Department" -- e.g. Employee#1 appears in Manager manages Department but not in Employee works in Department
+project-staffing  mean=0.976  worst=0.940  sd=0.033  ok=5/5  quality=0.976+/-0.033  [corrections=0.4 warnings=0.4]
+conference-reviews  mean=1.000  worst=1.000  sd=0.000  ok=5/5  quality=1.000+/-0.000
+freight-corrections  mean=0.933  worst=0.933  sd=0.000  ok=5/5  quality=0.933+/-0.000  [corrections=2 warnings=1]
+suite 2.5.0  artifact=1.1.0@08b024dc2a29  mean=0.929 +/- 0.037 (95%)  worst=0.500  (repeat=5)
+  warnings: completeness/fact-type-without-uniqueness x12, completeness/fact-type-without-constraints x3
+  fixed:    missing_identifier_population x12, invalid_role_player x2, empty_population x1
+  cache: 325546 read, 5174 written
+  gaps below 0.052 are not resolvable against a comparable run
+  87% of that noise is clinic-appointments alone
+Wrote 12 payload(s) to /tmp/eval-payloads/default-sonnet-train.

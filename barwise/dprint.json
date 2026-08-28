@@ -25,7 +25,9 @@
     "**/*.orm-project.yaml",
     "**/package-lock.json",
     "**/schemas/**",
-    "test-plan/**"
+    "test-plan/**",
+    "eval-payloads/**",
+    "eval-runs/**"
   ],
   "plugins": [
     "./node_modules/@dprint/typescript/plugin.wasm",

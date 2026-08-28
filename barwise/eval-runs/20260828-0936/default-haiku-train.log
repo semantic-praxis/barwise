@@ -1,0 +1,53 @@
+Using artifact version 1.1.0 (forced by --artifact-version; client is anthropic/claude-haiku-4-5).
+[ 1/7] order-management       run 1/5  0.950  22.6s  4509/16384 out  0 cached
+[ 7/7] freight-corrections    run 1/5  0.917  17.6s  3624/16384 out  6232 cached
+[ 4/7] employee-hierarchy     run 1/5  1.000  18.1s  3594/16384 out  6232 cached
+[ 5/7] project-staffing       run 1/5  0.920  18.5s  3662/16384 out  6232 cached
+[ 6/7] conference-reviews     run 1/5  1.000  22.2s  4480/16384 out  6232 cached
+[ 1/7] order-management       run 2/5  0.950  23.7s  4911/16384 out  7110 cached
+[ 5/7] project-staffing       run 2/5  1.000  16.2s  3256/16384 out  7019 cached
+[ 3/7] clinic-appointments    run 1/5  0.969  35.3s  7550/16384 out  6232 cached
+[ 2/7] university-enrollment  run 1/5  0.923  36.1s  7971/16384 out  6232 cached
+[ 4/7] employee-hierarchy     run 2/5  1.000  18.3s  3751/16384 out  6949 cached
+[ 7/7] freight-corrections    run 2/5  0.967  19.3s  3974/16384 out  7002 cached
+[ 6/7] conference-reviews     run 2/5  0.857  21.1s  4050/16384 out  6973 cached
+[ 1/7] order-management       run 3/5  0.975  23.9s  4836/16384 out  7110 cached
+[ 5/7] project-staffing       run 3/5  0.920  17.5s  3540/16384 out  7019 cached
+[ 7/7] freight-corrections    run 3/5  0.933  17.8s  3760/16384 out  7002 cached
+[ 4/7] employee-hierarchy     run 3/5  0.950  18.4s  3682/16384 out  6949 cached
+[ 6/7] conference-reviews     run 3/5  0.969  20.2s  4084/16384 out  6973 cached
+[ 5/7] project-staffing       run 4/5  0.960  16.0s  3281/16384 out  7019 cached
+[ 3/7] clinic-appointments    run 2/5  0.985  34.7s  7589/16384 out  7117 cached
+[ 1/7] order-management       run 4/5  0.938  24.1s  4940/16384 out  7110 cached
+[ 4/7] employee-hierarchy     run 4/5  0.983  17.1s  3563/16384 out  6949 cached
+[ 2/7] university-enrollment  run 2/5  0.923  36.1s  8320/16384 out  7128 cached
+[ 7/7] freight-corrections    run 4/5  0.950  20.0s  3930/16384 out  7002 cached
+[ 6/7] conference-reviews     run 4/5  0.684  21.0s  4254/16384 out  6973 cached
+[ 5/7] project-staffing       run 5/5  0.920  17.7s  3497/16384 out  7019 cached
+[ 4/7] employee-hierarchy     run 5/5  1.000  17.1s  3486/16384 out  6949 cached
+[ 7/7] freight-corrections    run 5/5  0.933  17.4s  3690/16384 out  7002 cached
+[ 1/7] order-management       run 5/5  0.950  21.7s  4529/16384 out  7110 cached
+[ 3/7] clinic-appointments    run 3/5  0.969  32.9s  7499/16384 out  7117 cached
+[ 6/7] conference-reviews     run 5/5  0.969  18.9s  3812/16384 out  6973 cached
+[ 2/7] university-enrollment  run 3/5  0.981  39.9s  8927/16384 out  7128 cached
+[ 3/7] clinic-appointments    run 4/5  0.985  33.9s  7723/16384 out  7117 cached
+[ 2/7] university-enrollment  run 4/5  0.987  36.9s  8503/16384 out  7128 cached
+[ 3/7] clinic-appointments    run 5/5  0.985  33.1s  7516/16384 out  7117 cached
+[ 2/7] university-enrollment  run 5/5  0.923  42.3s  8905/16384 out  7128 cached
+order-management  mean=0.953  worst=0.938  sd=0.014  ok=5/5  quality=0.953+/-0.014  [corrections=0.2 warnings=1.8]
+university-enrollment  mean=0.947  worst=0.923  sd=0.034  ok=5/5  quality=0.947+/-0.034  [corrections=0.2 warnings=4]
+clinic-appointments  mean=0.979  worst=0.969  sd=0.009  ok=5/5  quality=0.979+/-0.009  [warnings=1.4]
+employee-hierarchy  mean=0.987  worst=0.950  sd=0.022  ok=5/5  quality=0.987+/-0.022  [corrections=0.4 warnings=0.2]
+project-staffing  mean=0.944  worst=0.920  sd=0.036  ok=5/5  quality=0.944+/-0.036  [warnings=1.4]
+conference-reviews  mean=0.896  worst=0.684  sd=0.131  ok=5/5  quality=0.896+/-0.131  [warnings=0.6]
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Reviewer reviews Paper"), so it cannot rule out: Rules out: two facts of Reviewer reviews Paper that agree on Reviewer, Paper -- e.g. {Reviewer=Reviewer#1, Paper=Paper#1}; {Reviewer=Reviewer#1, Paper=Paper#1}
+  requires_element: The model has no fact type connecting "Reviewer" and "Paper".
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Reviewer reviews Paper"), so it cannot rule out: Rules out: two facts of Reviewer reviews Paper that agree on Reviewer, Paper -- e.g. {Reviewer=Reviewer#1, Paper=Paper#1}; {Reviewer=Reviewer#1, Paper=Paper#1}
+freight-corrections  mean=0.940  worst=0.917  sd=0.019  ok=5/5  quality=0.940+/-0.019  [corrections=1.6 warnings=1]
+suite 2.5.0  artifact=1.1.0@08b024dc2a29  mean=0.949 +/- 0.018 (95%)  worst=0.684  (repeat=5)
+  warnings: completeness/fact-type-without-uniqueness x32, completeness/fact-type-without-constraints x14, constraint/external-uniqueness-all-local x4, constraint/spanning-all-roles x2
+  fixed:    missing_identifier_population x6, arity_mismatch x4, invalid_bounds x1, misplaced_is_preferred x1
+  cache: 234584 read, 11906 written
+  gaps below 0.025 are not resolvable against a comparable run
+  83% of that noise is conference-reviews alone
+Wrote 14 payload(s) to /tmp/eval-payloads/default-haiku-train.

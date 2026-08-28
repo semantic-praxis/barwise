@@ -1,0 +1,25 @@
+Using artifact version haiku45-2.
+[ 1/3] vendor-onboarding      run 1/5  0.940  99.6s  11942/41640 out  6720 cached
+[ 1/3] vendor-onboarding      run 2/5  1.000  123.1s  14073/41640 out  12472 cached
+[ 1/3] vendor-onboarding      run 3/5  1.000  117.0s  13576/41640 out  12472 cached
+[ 1/3] vendor-onboarding      run 4/5  1.000  149.5s  15914/41640 out  12472 cached
+[ 1/3] vendor-onboarding      run 5/5  0.980  90.1s  10473/41640 out  12472 cached
+[ 2/3] subscription-billing   run 1/5  0.929  120.9s  13675/35255 out  6720 cached
+[ 2/3] subscription-billing   run 2/5  0.967  119.7s  13733/35255 out  11694 cached
+[ 2/3] subscription-billing   run 3/5  0.988  104.1s  12188/35255 out  11694 cached
+[ 2/3] subscription-billing   run 4/5  0.989  104.4s  12487/35255 out  11694 cached
+[ 2/3] subscription-billing   run 5/5  0.989  114.0s  13162/35255 out  11694 cached
+[ 3/3] incident-response      run 1/5  0.960  104.9s  11830/31700 out  6720 cached
+[ 3/3] incident-response      run 2/5  0.960  106.6s  12228/31700 out  11322 cached
+[ 3/3] incident-response      run 3/5  0.933  110.9s  12238/31700 out  11322 cached
+[ 3/3] incident-response      run 4/5  0.967  93.1s  10742/31700 out  11322 cached
+[ 3/3] incident-response      run 5/5  0.964  98.1s  10856/31700 out  11322 cached
+vendor-onboarding  mean=0.984  worst=0.940  sd=0.026  ok=5/5  quality=0.984+/-0.026  [warnings=0.8 excessAmbiguity=0.4]
+subscription-billing  mean=0.972  worst=0.929  sd=0.026  ok=5/5  quality=0.972+/-0.026  [corrections=0.4 warnings=1.2 excessAmbiguity=0.6]
+incident-response  mean=0.957  worst=0.933  sd=0.013  ok=5/5  quality=0.957+/-0.013  [corrections=2 warnings=2.2]
+suite 2.0.0  artifact=haiku45-2@3edda4eff7e5  mean=0.971 +/- 0.011 (95%)  worst=0.929  (repeat=5)
+  warnings: completeness/fact-type-without-constraints x14, constraint/external-uniqueness-all-local x4, completeness/fact-type-without-uniqueness x3
+  fixed:    arity_mismatch x8, duplicate_constraint x4
+  cache: 162112 read, 15328 written
+  gaps below 0.016 are not resolvable against a comparable run
+Wrote 6 payload(s) to /Users/gschenz/repos/barwise/barwise/eval-runs/20260824-1903/payloads-haiku45-dev.

@@ -1,0 +1,73 @@
+Using artifact version haiku45-2.
+[ 1/7] order-management       run 1/5  1.000  35.9s  4617/16384 out  0 cached
+[ 1/7] order-management       run 2/5  1.000  39.4s  5046/16384 out  7598 cached
+[ 1/7] order-management       run 3/5  1.000  40.1s  5013/16384 out  7598 cached
+[ 1/7] order-management       run 4/5  0.988  39.6s  5059/16384 out  7598 cached
+[ 1/7] order-management       run 5/5  1.000  35.6s  4751/16384 out  7598 cached
+[ 2/7] university-enrollment  run 1/5  0.147  63.9s  8716/16384 out  6720 cached  COLLAPSE
+[ 2/7] university-enrollment  run 2/5  0.154  65.0s  8684/16384 out  7616 cached  COLLAPSE
+[ 2/7] university-enrollment  run 3/5  0.154  66.0s  8915/16384 out  7616 cached  COLLAPSE
+[ 2/7] university-enrollment  run 4/5  1.000  61.1s  8373/16384 out  7616 cached
+[ 2/7] university-enrollment  run 5/5  0.154  63.2s  8597/16384 out  7616 cached  COLLAPSE
+[ 3/7] clinic-appointments    run 1/5  1.000  60.6s  8155/16384 out  6720 cached
+[ 3/7] clinic-appointments    run 2/5  0.985  55.3s  7300/16384 out  7605 cached
+[ 3/7] clinic-appointments    run 3/5  1.000  55.2s  7464/16384 out  7605 cached
+[ 3/7] clinic-appointments    run 4/5  0.985  54.1s  7289/16384 out  7605 cached
+[ 3/7] clinic-appointments    run 5/5  0.985  58.2s  7839/16384 out  7605 cached
+[ 4/7] employee-hierarchy     run 1/5  1.000  29.5s  3700/16384 out  6720 cached
+[ 4/7] employee-hierarchy     run 2/5  1.000  26.9s  3497/16384 out  7437 cached
+[ 4/7] employee-hierarchy     run 3/5  1.000  29.7s  3822/16384 out  7437 cached
+[ 4/7] employee-hierarchy     run 4/5  1.000  28.3s  3583/16384 out  7437 cached
+[ 4/7] employee-hierarchy     run 5/5  1.000  26.3s  3365/16384 out  7437 cached
+[ 5/7] project-staffing       run 1/5  0.980  27.0s  3464/16384 out  6720 cached
+[ 5/7] project-staffing       run 2/5  0.920  27.0s  3426/16384 out  7507 cached
+[ 5/7] project-staffing       run 3/5  0.980  27.4s  3475/16384 out  7507 cached
+[ 5/7] project-staffing       run 4/5  0.980  28.2s  3527/16384 out  7507 cached
+[ 5/7] project-staffing       run 5/5  0.980  27.6s  3508/16384 out  7507 cached
+[ 6/7] conference-reviews     run 1/5  1.000  32.9s  4180/16384 out  6720 cached
+[ 6/7] conference-reviews     run 2/5  0.857  30.9s  3929/16384 out  7461 cached
+[ 6/7] conference-reviews     run 3/5  0.857  26.6s  3406/16384 out  7461 cached
+[ 6/7] conference-reviews     run 4/5  1.000  34.3s  4332/16384 out  7461 cached
+[ 6/7] conference-reviews     run 5/5  0.857  28.1s  3501/16384 out  7461 cached
+[ 7/7] freight-corrections    run 1/5  0.933  33.0s  4036/16384 out  6720 cached
+[ 7/7] freight-corrections    run 2/5  0.933  29.7s  3781/16384 out  7490 cached
+[ 7/7] freight-corrections    run 3/5  0.933  30.4s  3956/16384 out  7490 cached
+[ 7/7] freight-corrections    run 4/5  0.917  29.4s  3774/16384 out  7490 cached
+[ 7/7] freight-corrections    run 5/5  0.933  32.4s  4132/16384 out  7490 cached
+order-management  mean=0.997  worst=0.988  sd=0.006  ok=5/5  quality=0.997+/-0.006  [corrections=0.2]
+university-enrollment  mean=0.322  worst=0.147  sd=0.379  ok=1/5  quality=1.000  [corrections=0.2 warnings=0.8]
+  requires_element: The model has no object type named "CourseOffering".
+  requires_element: The model has no fact type connecting "Student" and "CourseOffering".
+  requires_element: The model has no fact type connecting "CourseOffering" and "Semester".
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "CourseOffering is of Course"), so it cannot rule out: Rules out: two facts of CourseOffering is of Course that agree on CourseOffering -- e.g. {CourseOffering=CourseOffering#1, Course=Course#1}; {CourseOffering=CourseOffering#1, Course=Course#2}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Instructor teaches CourseOffering"), so it cannot rule out: Rules out: two facts of Instructor teaches CourseOffering that agree on CourseOffering -- e.g. {Instructor=Instructor#1, CourseOffering=CourseOffering#1}; {Instructor=Instructor#2, CourseOffering=CourseOffering#1}
+  requires_element: The model has no object type named "CourseOffering".
+  requires_element: The model has no fact type connecting "Student" and "CourseOffering".
+  requires_element: The model has no fact type connecting "CourseOffering" and "Semester".
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "CourseOffering is of Course"), so it cannot rule out: Rules out: two facts of CourseOffering is of Course that agree on CourseOffering -- e.g. {CourseOffering=CourseOffering#1, Course=Course#1}; {CourseOffering=CourseOffering#1, Course=Course#2}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Instructor teaches CourseOffering"), so it cannot rule out: Rules out: two facts of Instructor teaches CourseOffering that agree on CourseOffering -- e.g. {Instructor=Instructor#1, CourseOffering=CourseOffering#1}; {Instructor=Instructor#2, CourseOffering=CourseOffering#1}
+  requires_element: The model has no object type named "CourseOffering".
+  requires_element: The model has no fact type connecting "Student" and "CourseOffering".
+  requires_element: The model has no fact type connecting "CourseOffering" and "Semester".
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "CourseOffering is of Course"), so it cannot rule out: Rules out: two facts of CourseOffering is of Course that agree on CourseOffering -- e.g. {CourseOffering=CourseOffering#1, Course=Course#1}; {CourseOffering=CourseOffering#1, Course=Course#2}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Instructor teaches CourseOffering"), so it cannot rule out: Rules out: two facts of Instructor teaches CourseOffering that agree on CourseOffering -- e.g. {Instructor=Instructor#1, CourseOffering=CourseOffering#1}; {Instructor=Instructor#2, CourseOffering=CourseOffering#1}
+  requires_element: The model has no object type named "CourseOffering".
+  requires_element: The model has no fact type connecting "Student" and "CourseOffering".
+  requires_element: The model has no fact type connecting "CourseOffering" and "Semester".
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "CourseOffering is of Course"), so it cannot rule out: Rules out: two facts of CourseOffering is of Course that agree on CourseOffering -- e.g. {CourseOffering=CourseOffering#1, Course=Course#1}; {CourseOffering=CourseOffering#1, Course=Course#2}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Instructor teaches CourseOffering"), so it cannot rule out: Rules out: two facts of Instructor teaches CourseOffering that agree on CourseOffering -- e.g. {Instructor=Instructor#1, CourseOffering=CourseOffering#1}; {Instructor=Instructor#2, CourseOffering=CourseOffering#1}
+clinic-appointments  mean=0.991  worst=0.985  sd=0.008  ok=5/5  quality=0.991+/-0.008  [warnings=0.6]
+employee-hierarchy  mean=1.000  worst=1.000  sd=0.000  ok=5/5  quality=1.000+/-0.000
+project-staffing  mean=0.968  worst=0.920  sd=0.027  ok=5/5  quality=0.968+/-0.027  [corrections=1.2 warnings=0.2]
+conference-reviews  mean=0.914  worst=0.857  sd=0.078  ok=5/5  quality=0.914+/-0.078
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Reviewer reviews Paper"), so it cannot rule out: Rules out: two facts of Reviewer reviews Paper that agree on Reviewer, Paper -- e.g. {Reviewer=Reviewer#1, Paper=Paper#1}; {Reviewer=Reviewer#1, Paper=Paper#1}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Reviewer reviews Paper"), so it cannot rule out: Rules out: two facts of Reviewer reviews Paper that agree on Reviewer, Paper -- e.g. {Reviewer=Reviewer#1, Paper=Paper#1}; {Reviewer=Reviewer#1, Paper=Paper#1}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Reviewer reviews Paper"), so it cannot rule out: Rules out: two facts of Reviewer reviews Paper that agree on Reviewer, Paper -- e.g. {Reviewer=Reviewer#1, Paper=Paper#1}; {Reviewer=Reviewer#1, Paper=Paper#1}
+freight-corrections  mean=0.930  worst=0.917  sd=0.007  ok=5/5  quality=0.930+/-0.007  [corrections=2.2 warnings=1]
+suite 2.0.0  artifact=haiku45-2@3edda4eff7e5  mean=0.875 +/- 0.049 (95%)  worst=0.147  (repeat=5)
+  warnings: completeness/fact-type-without-uniqueness x7, completeness/fact-type-without-constraints x6
+  fixed:    missing_identifier_population x10, duplicate_constraint x5, arity_mismatch x3, invalid_role_player x1
+  cache: 251176 read, 12394 written
+  gaps below 0.069 are not resolvable against a comparable run
+  95% of that noise is university-enrollment alone
+Wrote 13 payload(s) to /Users/gschenz/repos/barwise/barwise/eval-runs/20260824-1903/payloads-haiku45-train.

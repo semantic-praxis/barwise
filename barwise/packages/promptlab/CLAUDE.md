@@ -33,11 +33,13 @@ src/
   index.ts     Public API barrel
 
 evals/         The packaged seed suite: suite.yaml (weights + declared
-               case list), *.eval.yaml, *.transcript.md, and
-               *.reference.orm.yaml for the train split. history.jsonl
-               appears here only after a recorded eval run; none is
-               checked in (docs/local-eval-runbook.md states the same,
-               and this file used to contradict it -- barwise-873)
+               case list), *.eval.yaml, *.transcript.md, a
+               *.reference.orm.yaml per case, and history.jsonl -- the
+               committed record of recorded eval runs, first rows from
+               the 2026-08-28 re-baseline
+               (docs/prompt-baseline-2.5.0-2026-08-28.md). Tests that
+               copy evals/ carry those rows, so history assertions are
+               deltas against the baseline, never absolute counts
 tests/         Vitest; fixtures/responses/ holds the recorded payloads
                that double as the suite's answer keys
 ```

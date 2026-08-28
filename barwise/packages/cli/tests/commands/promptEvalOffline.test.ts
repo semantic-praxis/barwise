@@ -418,14 +418,25 @@ describe("barwise prompt eval, against a loopback provider", () => {
     expect(readdirSync(out).length).toBeGreaterThan(0);
   });
 
+  // Since the 2026-08-28 re-baseline, the packaged suite ships with
+  // COMMITTED history rows (846 workstream 4), and the temp copy these
+  // tests run against carries them. Both tests therefore assert the
+  // DELTA against that baseline, not an absolute count -- asserting
+  // emptiness was a limitation pin on the pre-baseline state.
+  const historyRows = (): string[] => {
+    if (!existsSync(historyPath())) return [];
+    return readFileSync(historyPath(), "utf8").trim().split("\n").filter((l) => l.length > 0);
+  };
+
   it("appends one history row carrying provider, model, split and build", async () => {
     await serve(fixtureAnswerer(EVALS, FIXTURES, TRAIN));
+    const before = historyRows();
 
     await runCli(evalArgs(["--split", "train"]));
 
-    const rows = readFileSync(historyPath(), "utf8").trim().split("\n");
-    expect(rows).toHaveLength(1);
-    const row = JSON.parse(rows[0]!) as Record<string, unknown>;
+    const rows = historyRows();
+    expect(rows).toHaveLength(before.length + 1);
+    const row = JSON.parse(rows[rows.length - 1]!) as Record<string, unknown>;
     expect(row).toMatchObject({ provider: "ollama", model: "fake-local", split: "train" });
     expect(row["build"]).toBeDefined();
     expect(row["mean"]).toBeCloseTo(ANSWER_KEY_MEAN, 10);
@@ -433,9 +444,10 @@ describe("barwise prompt eval, against a loopback provider", () => {
 
   it("writes no history row when told not to", async () => {
     await serve(fixtureAnswerer(EVALS, FIXTURES, TRAIN));
+    const before = historyRows();
 
     await runCli(evalArgs(["--split", "train", "--no-history"]));
 
-    expect(existsSync(historyPath())).toBe(false);
+    expect(historyRows()).toEqual(before);
   });
 });

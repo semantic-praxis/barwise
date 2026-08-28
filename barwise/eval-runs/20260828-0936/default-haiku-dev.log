@@ -1,0 +1,41 @@
+Using artifact version 1.1.0 (forced by --artifact-version; client is anthropic/claude-haiku-4-5).
+[ 1/3] vendor-onboarding      run 1/5  0.569  69.0s  10736/41640 out  11984 cached
+[ 3/3] incident-response      run 1/5  0.933  60.9s  10392/31700 out  6232 cached
+[ 2/3] subscription-billing   run 1/5  0.989  71.1s  12422/35255 out  6232 cached
+[ 1/3] vendor-onboarding      run 2/5  0.805  71.3s  11955/41640 out  11984 cached
+[ 3/3] incident-response      run 2/5  0.953  59.5s  10346/31700 out  10834 cached
+[ 1/3] vendor-onboarding      run 3/5  0.819  61.3s  10965/41640 out  11984 cached
+[ 2/3] subscription-billing   run 2/5  0.816  75.3s  12182/35255 out  11206 cached
+[ 3/3] incident-response      run 3/5  0.953  53.7s  9742/31700 out  10834 cached
+[ 1/3] vendor-onboarding      run 4/5  0.816  73.6s  11789/41640 out  11984 cached
+[ 2/3] subscription-billing   run 3/5  0.989  72.6s  12660/35255 out  11206 cached
+[ 3/3] incident-response      run 4/5  0.947  58.8s  9961/31700 out  10834 cached
+[ 1/3] vendor-onboarding      run 5/5  0.570  79.3s  12650/41640 out  11984 cached
+[ 2/3] subscription-billing   run 4/5  0.708  75.9s  13251/35255 out  11206 cached
+[ 3/3] incident-response      run 5/5  0.933  71.2s  11792/31700 out  10834 cached
+[ 2/3] subscription-billing   run 5/5  0.721  86.7s  14220/35255 out  11206 cached
+vendor-onboarding  mean=0.716  worst=0.569  sd=0.134  ok=5/5  quality=0.716+/-0.134  [corrections=2.2 warnings=8.8 excessAmbiguity=0.8]
+  forbids_population: Your model still allows what it should forbid: Rules out: a Vendor that exists but never plays "Vendor has VendorStatus" -- e.g. Vendor#1 appears in Vendor has VendorNumber but not in Vendor has VendorStatus
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Vendor operates in Region with Contact"), so it cannot rule out: Rules out: two facts of Vendor operates in Region with Contact that agree on Vendor, Region -- e.g. {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#1, ContactEmail=ContactEmail#1, ContactPhone=ContactPhone#1}; {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#2, ContactEmail=ContactEmail#2, ContactPhone=ContactPhone#2}
+  forbids_population: Your model still allows what it should forbid: Rules out: a PurchaseOrder that exists but never plays "PurchaseOrder is raised against Vendor" -- e.g. PurchaseOrder#1 appears in PurchaseOrder has PONumber but not in PurchaseOrder is raised against Vendor
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Vendor operates in Region with Contact"), so it cannot rule out: Rules out: two facts of Vendor operates in Region with Contact that agree on Vendor, Region -- e.g. {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#1, ContactEmail=ContactEmail#1, ContactPhone=ContactPhone#1}; {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#2, ContactEmail=ContactEmail#2, ContactPhone=ContactPhone#2}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Vendor operates in Region with Contact"), so it cannot rule out: Rules out: two facts of Vendor operates in Region with Contact that agree on Vendor, Region -- e.g. {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#1, ContactEmail=ContactEmail#1, ContactPhone=ContactPhone#1}; {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#2, ContactEmail=ContactEmail#2, ContactPhone=ContactPhone#2}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Vendor operates in Region with Contact"), so it cannot rule out: Rules out: two facts of Vendor operates in Region with Contact that agree on Vendor, Region -- e.g. {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#1, ContactEmail=ContactEmail#1, ContactPhone=ContactPhone#1}; {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#2, ContactEmail=ContactEmail#2, ContactPhone=ContactPhone#2}
+  forbids_population: Your model still allows what it should forbid: Rules out: a Vendor that exists but never plays "Vendor has VendorStatus" -- e.g. Vendor#1 appears in Vendor has VendorNumber but not in Vendor has VendorStatus
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Vendor operates in Region with Contact"), so it cannot rule out: Rules out: two facts of Vendor operates in Region with Contact that agree on Vendor, Region -- e.g. {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#1, ContactEmail=ContactEmail#1, ContactPhone=ContactPhone#1}; {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#2, ContactEmail=ContactEmail#2, ContactPhone=ContactPhone#2}
+  forbids_population: Your model still allows what it should forbid: Rules out: a PurchaseOrder that exists but never plays "PurchaseOrder is raised against Vendor" -- e.g. PurchaseOrder#1 appears in PurchaseOrder has PONumber but not in PurchaseOrder is raised against Vendor
+subscription-billing  mean=0.845  worst=0.708  sd=0.138  ok=5/5  quality=0.845+/-0.138  [corrections=2 warnings=3.6 excessAmbiguity=0.6]
+  forbids_population: Your model still allows what it should forbid: Rules out: a Subscription that exists but never plays "Subscription has BillingPeriod" -- e.g. Subscription#1 appears in Subscription has SubscriptionID but not in Subscription has BillingPeriod
+  forbids_population: Your model still allows what it should forbid: Rules out: a PricePlan that exists but never plays "PricePlan entitles FeatureBundle" -- e.g. PricePlan#1 appears in PricePlan has PlanCode but not in PricePlan entitles FeatureBundle
+  forbids_population: Your model still allows what it should forbid: Rules out: a Subscription that exists but never plays "Subscription has StartDate" -- e.g. Subscription#1 appears in Subscription has SubscriptionID but not in Subscription has StartDate
+  forbids_population: Your model still allows what it should forbid: Rules out: a Subscription that exists but never plays "Subscription has BillingPeriod" -- e.g. Subscription#1 appears in Subscription has SubscriptionID but not in Subscription has BillingPeriod
+  forbids_population: Your model still allows what it should forbid: Rules out: a PricePlan that exists but never plays "PricePlan entitles FeatureBundle" -- e.g. PricePlan#1 appears in PricePlan has PlanCode but not in PricePlan entitles FeatureBundle
+  forbids_population: Your model still allows what it should forbid: Rules out: a Subscription that exists but never plays "Subscription has StartDate" -- e.g. Subscription#1 appears in Subscription has SubscriptionID but not in Subscription has StartDate
+incident-response  mean=0.944  worst=0.933  sd=0.010  ok=5/5  quality=0.944+/-0.010  [corrections=1.2 warnings=3 excessAmbiguity=0.4]
+suite 2.5.0  artifact=1.1.0@08b024dc2a29  mean=0.835 +/- 0.056 (95%)  worst=0.569  (repeat=5)
+  warnings: completeness/fact-type-without-constraints x48, completeness/fact-type-without-uniqueness x16, structural/binary-missing-inverse-reading x8, constraint/external-uniqueness-all-local x5
+  fixed:    missing_identifier_population x13, arity_mismatch x11, invalid_bounds x2, duplicate_value_constraint_population x1
+  cache: 160544 read, 9576 written
+  gaps below 0.080 are not resolvable against a comparable run
+  51% of that noise is subscription-billing alone
+Wrote 6 payload(s) to /tmp/eval-payloads/default-haiku-dev.

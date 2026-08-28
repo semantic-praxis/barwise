@@ -1,0 +1,42 @@
+Using artifact version sonnet5-3 (anthropic/claude-sonnet-5).
+[ 1/3] vendor-onboarding      run 1/5  0.737  82.7s  11807/41640 out  8916 cached
+[ 3/3] incident-response      run 1/5  0.933  66.9s  9616/31700 out  8916 cached
+[ 2/3] subscription-billing   run 1/5  0.923  74.1s  10399/35255 out  8916 cached
+[ 1/3] vendor-onboarding      run 2/5  0.735  82.7s  11923/41640 out  16083 cached
+[ 3/3] incident-response      run 2/5  0.867  71.6s  10081/31700 out  14512 cached
+[ 2/3] subscription-billing   run 2/5  0.989  82.7s  12188/35255 out  14942 cached
+[ 1/3] vendor-onboarding      run 3/5  0.833  84.9s  12293/41640 out  16083 cached
+[ 3/3] incident-response      run 3/5  0.947  74.1s  10400/31700 out  14512 cached
+[ 2/3] subscription-billing   run 3/5  0.624  77.8s  11181/35255 out  14942 cached
+[ 1/3] vendor-onboarding      run 4/5  0.826  75.1s  10523/41640 out  16083 cached
+[ 3/3] incident-response      run 4/5  0.953  69.5s  10007/31700 out  14512 cached
+[ 2/3] subscription-billing   run 4/5  0.731  87.5s  12500/35255 out  14942 cached
+[ 1/3] vendor-onboarding      run 5/5  0.828  83.8s  12156/41640 out  16083 cached
+[ 3/3] incident-response      run 5/5  0.953  65.9s  9179/31700 out  14512 cached
+[ 2/3] subscription-billing   run 5/5  0.923  74.7s  10521/35255 out  14942 cached
+vendor-onboarding  mean=0.792  worst=0.735  sd=0.051  ok=5/5  quality=0.792+/-0.051  [corrections=1.2 warnings=6.8]
+  requires_ambiguity: None of the 9 reported ambiguities match "suspend".
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Vendor operates in Region with Contact"), so it cannot rule out: Rules out: two facts of Vendor operates in Region with Contact that agree on Vendor, Region -- e.g. {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#1, ContactEmail=ContactEmail#1, ContactPhone=ContactPhone#1}; {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#2, ContactEmail=ContactEmail#2, ContactPhone=ContactPhone#2}
+  requires_ambiguity: None of the 9 reported ambiguities match "suspend".
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Vendor operates in Region with Contact"), so it cannot rule out: Rules out: two facts of Vendor operates in Region with Contact that agree on Vendor, Region -- e.g. {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#1, ContactEmail=ContactEmail#1, ContactPhone=ContactPhone#1}; {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#2, ContactEmail=ContactEmail#2, ContactPhone=ContactPhone#2}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Vendor operates in Region with Contact"), so it cannot rule out: Rules out: two facts of Vendor operates in Region with Contact that agree on Vendor, Region -- e.g. {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#1, ContactEmail=ContactEmail#1, ContactPhone=ContactPhone#1}; {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#2, ContactEmail=ContactEmail#2, ContactPhone=ContactPhone#2}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Vendor operates in Region with Contact"), so it cannot rule out: Rules out: two facts of Vendor operates in Region with Contact that agree on Vendor, Region -- e.g. {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#1, ContactEmail=ContactEmail#1, ContactPhone=ContactPhone#1}; {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#2, ContactEmail=ContactEmail#2, ContactPhone=ContactPhone#2}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Vendor operates in Region with Contact"), so it cannot rule out: Rules out: two facts of Vendor operates in Region with Contact that agree on Vendor, Region -- e.g. {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#1, ContactEmail=ContactEmail#1, ContactPhone=ContactPhone#1}; {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#2, ContactEmail=ContactEmail#2, ContactPhone=ContactPhone#2}
+subscription-billing  mean=0.838  worst=0.624  sd=0.154  ok=5/5  quality=0.838+/-0.154  [corrections=2 warnings=1]
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "PlanChange is for Subscription"), so it cannot rule out: Rules out: two facts of PlanChange is for Subscription that agree on PlanChange -- e.g. {PlanChange=PlanChange#1, Subscription=Subscription#1}; {PlanChange=PlanChange#1, Subscription=Subscription#2}
+  forbids_population: Your model still allows what it should forbid: Rules out: a Subscription that exists but never plays "Subscription has BillingPeriod" -- e.g. Subscription#1 appears in Subscription has SubscriptionID but not in Subscription has BillingPeriod
+  forbids_population: Your model still allows what it should forbid: Rules out: a PricePlan that exists but never plays "PricePlan entitles FeatureBundle" -- e.g. PricePlan#1 appears in PricePlan has PlanCode but not in PricePlan entitles FeatureBundle
+  forbids_population: Your model still allows what it should forbid: Rules out: a Subscription that exists but never plays "Subscription has StartDate" -- e.g. Subscription#1 appears in Subscription has SubscriptionID but not in Subscription has StartDate
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "PlanChange is for Subscription"), so it cannot rule out: Rules out: two facts of PlanChange is for Subscription that agree on PlanChange -- e.g. {PlanChange=PlanChange#1, Subscription=Subscription#1}; {PlanChange=PlanChange#1, Subscription=Subscription#2}
+  forbids_population: Your model still allows what it should forbid: Rules out: a Subscription that exists but never plays "Subscription has BillingPeriod" -- e.g. Subscription#1 appears in Subscription has SubscriptionID but not in Subscription has BillingPeriod
+  forbids_population: Your model still allows what it should forbid: Rules out: a PricePlan that exists but never plays "PricePlan entitles FeatureBundle" -- e.g. PricePlan#1 appears in PricePlan has PlanCode but not in PricePlan entitles FeatureBundle
+  forbids_population: Your model still allows what it should forbid: Rules out: a Subscription that exists but never plays "Subscription has StartDate" -- e.g. Subscription#1 appears in Subscription has SubscriptionID but not in Subscription has StartDate
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "PlanChange is for Subscription"), so it cannot rule out: Rules out: two facts of PlanChange is for Subscription that agree on PlanChange -- e.g. {PlanChange=PlanChange#1, Subscription=Subscription#1}; {PlanChange=PlanChange#1, Subscription=Subscription#2}
+incident-response  mean=0.931  worst=0.867  sd=0.037  ok=5/5  quality=0.931+/-0.037  [corrections=2.8 warnings=3.4]
+suite 2.5.0  artifact=sonnet5-3@8643ad91d140  mean=0.853 +/- 0.049 (95%)  worst=0.624  (repeat=5)
+  warnings: completeness/fact-type-without-constraints x35, completeness/fact-type-without-uniqueness x17, constraint/external-uniqueness-all-local x3, completeness/multiple-preferred-identifiers x1
+  fixed:    misplaced_is_preferred x8, arity_mismatch x6, missing_identifier_population x6, invalid_role_player x5, empty_population x3, duplicate_value_constraint_population x2
+  cache: 208896 read, 18789 written
+  gaps below 0.069 are not resolvable against a comparable run
+  86% of that noise is subscription-billing alone
+Wrote 6 payload(s) to /tmp/eval-payloads/sonnet-5-dev.
