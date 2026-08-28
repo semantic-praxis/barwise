@@ -108,6 +108,14 @@ and says nothing about sonnet5-3, and comparing sonnet5-3 against a
 haiku default moves the model and the prompt at once -- the confound
 the shadow directory exists to remove.
 
+Two preflight checks these blocks assume, both cheap and both already
+paid for once: the first stderr line must name the artifact you meant
+(a variant arm that prints `suite 2.4.0` in its footer ran a stale
+checkout -- pull and `npm run build` first, the bin reads `dist`), and
+for the workstream 4 recording round **drop `--no-history` from every
+arm** -- the flags below carry it because they were written for the
+pre-baseline rounds ("Record or not" below governs).
+
 ```sh
 # The two shipped variants
 npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \

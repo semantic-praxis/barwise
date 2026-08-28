@@ -46,6 +46,18 @@ describe("classifyFailure", () => {
     expect(classifyFailure(new Error("connect ECONNRESET"))).toBe("transient");
   });
 
+  it("retries undici's bare mid-stream drop, which carries no status at all", () => {
+    // The 2026-08-28 dev arm lost 6 of 15 calls to exactly this
+    // message, unretried, one case keeping 1 of its 5 samples.
+    expect(classifyFailure(new TypeError("terminated"))).toBe("transient");
+    expect(classifyFailure(new Error("other side closed"))).toBe("transient");
+    expect(classifyFailure(new TypeError("fetch failed"))).toBe("transient");
+  });
+
+  it("keeps auth wording terminal even when it says terminated", () => {
+    expect(classifyFailure(new Error("api key terminated"))).toBe("terminal");
+  });
+
   it("recognizes the auth failure that produced the junk history rows", () => {
     const err = new Error(
       "Could not resolve authentication method. Expected either apiKey or authToken to be set.",

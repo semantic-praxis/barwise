@@ -79,6 +79,16 @@ const TRANSIENT_PATTERNS = [
   /\bETIMEDOUT\b/,
   /\bEAI_AGAIN\b/,
   /\bsocket hang up\b/i,
+  // undici's mid-stream connection drop is the bare message
+  // "terminated" (and its cause, "other side closed"): no status, no
+  // code, nothing the sets above see. Measured cost of missing it: 6
+  // of 15 calls on a 2026-08-28 dev arm died unretried on ~2-minute
+  // streaming responses, one case losing 4 of its 5 samples. The
+  // terminal patterns still win first, so "account terminated" wording
+  // from an auth failure would stay terminal.
+  /\bterminated\b/i,
+  /\bother side closed\b/i,
+  /\bfetch failed\b/i,
 ];
 
 /**
