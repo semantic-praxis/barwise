@@ -21,10 +21,11 @@ inferred.
 
 ## What is actually outstanding
 
-`packages/promptlab/evals/history.jsonl` **does not exist**. No run has
-ever been recorded here; every recorded score lives in operators' local
-files and in the dated notes under `docs/`. Two spec workstreams are
-waiting on a keyed run:
+`packages/promptlab/evals/history.jsonl` carries its first committed
+rows: the 2026-08-28 eight-arm re-baseline
+(docs/prompt-baseline-2.5.0-2026-08-28.md). Recorded runs append to
+it; `barwise prompt history` reads it back. Where the workstreams
+stand:
 
 - **barwise-845 -- CLOSED at suite 2.5.0.** The three dev cases carry
   references generated from the 2026-08-27 sweep's best payloads, plus
