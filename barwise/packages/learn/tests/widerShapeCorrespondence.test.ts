@@ -279,3 +279,140 @@ describe("projection-tier forbids_population", () => {
     expect(clinicCheck(clinicReference()).passed).toBe(true);
   });
 });
+
+/**
+ * Entity-fold tier: the observed vendor shape. The reference flattens
+ * a contact's name, email and phone into value roles of one 5-ary; an
+ * equally correct candidate models Contact as an entity with its own
+ * attribute binaries and carries the reference's uniqueness on a
+ * ternary. The fold is evidenced by those binaries -- a candidate whose
+ * absorbed names attach to a different entity does not fold.
+ */
+describe("entity-fold-tier forbids_population", () => {
+  /** Reference: the flat 5-ary with the Meridian rule over (Vendor, Region). */
+  function vendorReference(): OrmModel {
+    const model = new OrmModel({ name: "ref" });
+    const vendor = model.addObjectType({
+      name: "Vendor",
+      kind: "entity",
+      referenceMode: "vendor_id",
+    });
+    const region = model.addObjectType({
+      name: "Region",
+      kind: "entity",
+      referenceMode: "region_code",
+    });
+    const name = model.addObjectType({ name: "ContactName", kind: "value" });
+    const email = model.addObjectType({ name: "ContactEmail", kind: "value" });
+    const phone = model.addObjectType({ name: "ContactPhone", kind: "value" });
+    model.addFactType({
+      name: "Vendor operates in Region with contact",
+      roles: [
+        { name: "operates in", playerId: vendor.id, id: "rV" },
+        { name: "hosts", playerId: region.id, id: "rR" },
+        { name: "is reached via", playerId: name.id, id: "rN" },
+        { name: "is reached at", playerId: email.id, id: "rE" },
+        { name: "is called on", playerId: phone.id, id: "rP" },
+      ],
+      readings: ["{0} operates in {1} with {2}, {3}, {4}"],
+      constraints: [{ type: "internal_uniqueness", roleIds: ["rV", "rR"] }],
+    });
+    return model;
+  }
+
+  /**
+   * Candidate: the Contact-as-entity ternary both models produced in
+   * 20/20 recorded runs. `attachPhoneTo` moves the phone binary off
+   * Contact to break the fold's evidence in the negative test.
+   */
+  function contactCandidate(
+    options: { withRule: boolean; attachPhoneTo?: "Contact" | "Elsewhere"; },
+  ): OrmModel {
+    const model = new OrmModel({ name: "cand" });
+    const vendor = model.addObjectType({
+      name: "Vendor",
+      kind: "entity",
+      referenceMode: "vendor_id",
+    });
+    const region = model.addObjectType({
+      name: "Region",
+      kind: "entity",
+      referenceMode: "region_code",
+    });
+    const contact = model.addObjectType({
+      name: "Contact",
+      kind: "entity",
+      referenceMode: "contact_id",
+    });
+    const name = model.addObjectType({ name: "ContactName", kind: "value" });
+    const email = model.addObjectType({ name: "ContactEmail", kind: "value" });
+    const phone = model.addObjectType({ name: "ContactPhone", kind: "value" });
+    model.addFactType({
+      name: "Vendor operates in Region with Contact",
+      roles: [
+        { name: "operates in", playerId: vendor.id, id: "cV" },
+        { name: "hosts", playerId: region.id, id: "cR" },
+        { name: "is fronted by", playerId: contact.id, id: "cC" },
+      ],
+      readings: ["{0} operates in {1} with {2}"],
+      constraints: options.withRule
+        ? [{ type: "internal_uniqueness", roleIds: ["cV", "cR"] }]
+        : [],
+    });
+    const binary = (ftName: string, entityId: string, valueId: string, ids: [string, string]) =>
+      model.addFactType({
+        name: ftName,
+        roles: [
+          { name: "has", playerId: entityId, id: ids[0] },
+          { name: "is of", playerId: valueId, id: ids[1] },
+        ],
+        readings: ["{0} has {1}"],
+      });
+    binary("Contact has ContactName", contact.id, name.id, ["nC", "nN"]);
+    binary("Contact has ContactEmail", contact.id, email.id, ["eC", "eE"]);
+    if (options.attachPhoneTo === "Elsewhere") {
+      const desk = model.addObjectType({
+        name: "Desk",
+        kind: "entity",
+        referenceMode: "desk_id",
+      });
+      binary("Desk has ContactPhone", desk.id, phone.id, ["pD", "pP"]);
+    } else {
+      binary("Contact has ContactPhone", contact.id, phone.id, ["pC", "pP"]);
+    }
+    return model;
+  }
+
+  const vendorCheck = (candidate: OrmModel) =>
+    forbidsPopulation(
+      candidate,
+      vendorReference(),
+      "Vendor operates in Region with contact",
+      "internal_uniqueness",
+    );
+
+  it("passes the Contact ternary that carries the Meridian rule", () => {
+    // The two injected instances agree on (Vendor, Region) and fold
+    // their differing contact details into two distinct synthetic
+    // Contact values; the ternary's uniqueness over (Vendor, Region)
+    // rejects the pair -- the rule is carried, other shape.
+    expect(vendorCheck(contactCandidate({ withRule: true })).passed).toBe(true);
+  });
+
+  it("fails the same ternary without the rule, with the still-allows message", () => {
+    const result = vendorCheck(contactCandidate({ withRule: false }));
+    expect(result.passed).toBe(false);
+    expect(result.message).toContain("still allows");
+  });
+
+  it("does not fold when an absorbed name attaches to a different entity", () => {
+    // ContactPhone hangs off Desk, not Contact: the candidate itself
+    // never declares the phone as Contact's, so the fold has no
+    // structural evidence and the shape stays unmapped.
+    const result = vendorCheck(
+      contactCandidate({ withRule: true, attachPhoneTo: "Elsewhere" }),
+    );
+    expect(result.passed).toBe(false);
+    expect(result.message).toContain("does not yet carry");
+  });
+});

@@ -12,7 +12,11 @@ import {
 import { generateCounterexampleForConstraint } from "@barwise/core/counterexample";
 import type { ConstraintKind, NameLicence } from "../../exercise/types.js";
 import type { CheckResult } from "../GymReport.js";
-import { mapForbiddenPopulation, projectionMappings } from "../populationMapping.js";
+import {
+  entityFoldMappings,
+  mapForbiddenPopulation,
+  projectionMappings,
+} from "../populationMapping.js";
 
 const GUARDS: Record<ConstraintKind, (c: Constraint) => boolean> = {
   internal_uniqueness: isInternalUniqueness,
@@ -109,6 +113,11 @@ export function forbidsPopulation(
       for (const p of projected) {
         if (!carriersTried.includes(p.candFt.name)) carriersTried.push(p.candFt.name);
       }
+      continue;
+    }
+    const folded = entityFoldMappings(pop, reference, candidate, licence);
+    if (folded.length > 0) {
+      options.push(folded.map((f) => f.config));
       continue;
     }
     return fail(

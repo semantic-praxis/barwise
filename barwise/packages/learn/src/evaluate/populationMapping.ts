@@ -380,6 +380,161 @@ function projectOnto(
 }
 
 /**
+ * Fourth correspondence tier, tried by the check only when projection
+ * also finds no carrier: the ENTITY-FOLD. A candidate fact type
+ * matches the reference's players except that two or more reference
+ * VALUE roles are replaced by one entity role -- the "Vendor operates
+ * in Region with Contact" shape, where the reference flattens
+ * Contact's name, email and phone into value roles. The fold is
+ * evidenced by the candidate's own declarations: every absorbed
+ * reference name must be the value player of a candidate binary whose
+ * other player is the folding entity. Absorbed values join into one
+ * synthetic value in reference role order, under the objectification
+ * fold's separator and determinism rules -- so equal reference tuples
+ * fold equal and the per-instance distinctness the vacuity guard needs
+ * falls out of the reference values themselves.
+ */
+export function entityFoldMappings(
+  forbidden: Population,
+  refModel: OrmModel,
+  candidate: OrmModel,
+  licence?: NameLicence,
+): WiderMapping[] {
+  const refFt = refModel.getFactType(forbidden.factTypeId);
+  if (!refFt) return [];
+  const refNames = playerNames(refFt, refModel);
+  if (refNames.some((n) => n === undefined)) return [];
+  const vocabulary = new Set(refNames.filter((n): n is string => n !== undefined));
+
+  const mappings: WiderMapping[] = [];
+  const carriers = [...candidate.factTypes]
+    .sort((a, b) => a.roles.length - b.roles.length); // stable sort: model order within an arity
+  for (const candFt of carriers) {
+    const config = foldOnto(forbidden, refFt, refModel, candFt, candidate, vocabulary, licence);
+    if (config) mappings.push({ candFt, config });
+  }
+  return mappings;
+}
+
+/**
+ * Is `valueName` the value player of a candidate binary whose other
+ * player is the entity `entityId`? This is the fold's declaration:
+ * the candidate itself says the absorbed value belongs to the entity.
+ */
+function attributeBinaryExists(
+  candidate: OrmModel,
+  entityId: string,
+  valueName: string,
+  vocabulary: ReadonlySet<string>,
+  licence?: NameLicence,
+): boolean {
+  return candidate.factTypes.some((ft) => {
+    if (ft.roles.length !== 2) return false;
+    const [a, b] = ft.roles;
+    for (const [entityRole, valueRole] of [[a!, b!], [b!, a!]] as const) {
+      if (entityRole.playerId !== entityId) continue;
+      const player = candidate.getObjectType(valueRole.playerId);
+      if (
+        player && player.kind === "value"
+        && nameInVocabulary(player, vocabulary, licence) === valueName
+      ) {
+        return true;
+      }
+    }
+    return false;
+  });
+}
+
+function foldOnto(
+  forbidden: Population,
+  refFt: FactType,
+  refModel: OrmModel,
+  candFt: FactType,
+  candidate: OrmModel,
+  vocabulary: ReadonlySet<string>,
+  licence?: NameLicence,
+): PopulationConfig | null {
+  // Group both sides by player name, as every tier does. The candidate
+  // must show exactly one role of a name outside the reference (the
+  // fold entity) and be missing two or more reference value roles;
+  // everything else zips flat.
+  const refGroups = new Map<string, { role: Role; kind: string | undefined; }[]>();
+  for (const r of refFt.roles) {
+    const ot = refModel.getObjectType(r.playerId);
+    if (!ot) return null;
+    const list = refGroups.get(ot.name) ?? [];
+    list.push({ role: r, kind: ot.kind });
+    refGroups.set(ot.name, list);
+  }
+  const candGroups = new Map<string, Role[]>();
+  for (const r of candFt.roles) {
+    const ot = candidate.getObjectType(r.playerId);
+    if (!ot) return null;
+    const name = nameInVocabulary(ot, vocabulary, licence);
+    const list = candGroups.get(name) ?? [];
+    list.push(r);
+    candGroups.set(name, list);
+  }
+
+  // The one extra candidate role: the folding entity.
+  let foldRole: Role | undefined;
+  for (const [name, roles] of candGroups) {
+    if (refGroups.has(name)) continue;
+    if (foldRole !== undefined || roles.length !== 1) return null;
+    foldRole = roles[0];
+  }
+  if (!foldRole) return null;
+  const foldEntity = candidate.getObjectType(foldRole.playerId);
+  if (!foldEntity || foldEntity.kind !== "entity") return null;
+
+  // Shared roles zip; the reference roles beyond each shared count are
+  // absorbed, and each must be a value role the candidate evidences
+  // with an attribute binary against the fold entity.
+  const roleMap = new Map<string, string>();
+  const absorbed: Role[] = [];
+  for (const [name, refRoles] of refGroups) {
+    const candRoles = candGroups.get(name) ?? [];
+    if (candRoles.length > refRoles.length) return null;
+    refRoles.slice(0, candRoles.length)
+      .forEach((rr, i) => roleMap.set(rr.role.id, candRoles[i]!.id));
+    for (const entry of refRoles.slice(candRoles.length)) {
+      if (entry.kind !== "value") return null;
+      if (!attributeBinaryExists(candidate, foldRole.playerId, name, vocabulary, licence)) {
+        return null;
+      }
+      absorbed.push(entry.role);
+    }
+  }
+  if (absorbed.length < 2) return null;
+  // Join order is reference role order, the objectification fold's rule.
+  absorbed.sort((a, b) => refFt.roles.indexOf(a) - refFt.roles.indexOf(b));
+
+  const instances: { roleValues: Record<string, string>; }[] = [];
+  for (const inst of forbidden.instances) {
+    const roleValues: Record<string, string> = {};
+    for (const [refRoleId, value] of Object.entries(inst.roleValues)) {
+      const candRoleId = roleMap.get(refRoleId);
+      if (candRoleId !== undefined) roleValues[candRoleId] = value;
+    }
+    const parts: string[] = [];
+    for (const role of absorbed) {
+      const value = inst.roleValues[role.id];
+      if (value === undefined) return null;
+      parts.push(value);
+    }
+    roleValues[foldRole.id] = parts.join(FOLD_SEPARATOR);
+    // Every reference value must have landed somewhere -- the flat
+    // tier's completeness rule.
+    const landed = Object.keys(inst.roleValues).filter(
+      (id) => roleMap.has(id) || absorbed.some((r) => r.id === id),
+    );
+    if (landed.length !== Object.keys(inst.roleValues).length) return null;
+    instances.push({ roleValues });
+  }
+  return { factTypeId: candFt.id, instances };
+}
+
+/**
  * Re-express a reference forbidden population as a `PopulationConfig`
  * against the candidate, or return null if no corresponding fact type or
  * role correspondence exists (which means the candidate has not modeled

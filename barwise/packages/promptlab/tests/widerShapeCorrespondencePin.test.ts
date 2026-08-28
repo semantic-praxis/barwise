@@ -54,4 +54,27 @@ describe("wider-shape correspondence on the recorded baseline payloads", () => {
     expect(result.elementCount).toBe(24);
     expect(result.score).toBeCloseTo(29 / 30, 10);
   });
+
+  it("haiku's Contact-as-entity vendor shape passes the Meridian check", () => {
+    // The recorded payload carries the exact uniqueness over (Vendor,
+    // Region), sourced to the transcript's settling lines, on a ternary
+    // that folds the reference's three contact value roles into a
+    // Contact entity evidenced by its own attribute binaries. At 2.5.0
+    // it scored as "does not carry the relationship"; the entity-fold
+    // tier plus the ContactPhone/ContactPhoneNumber licence (both words
+    // are the transcript's "phone number") map it.
+    const payload = readFileSync(
+      join(payloadsDir, "haiku45-dev/vendor-onboarding-run1.json"),
+      "utf8",
+    );
+    const result = scoreExtraction(payload, caseFor("vendor-onboarding"), suite.weights);
+
+    expect(result.rubricPassed).toBe(result.rubricTotal);
+    // The remaining gap to 1.000 is the payload's own ambiguity excess
+    // (12 reported against the case's budget of 10), untouched by any
+    // correspondence tier.
+    expect(result.ambiguitiesReported).toBe(12);
+    expect(result.ambiguityExcess).toBe(2);
+    expect(result.score).toBeCloseTo(0.96, 10);
+  });
 });
