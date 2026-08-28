@@ -578,8 +578,13 @@ barwise prompt history --format json
   scores. Options: `--suite <manifest>`, `--provider`, `--model`,
   `--api-key`, `--base-url`, `--artifacts <dir>`,
   `--artifact-version <version|default>`, `--repeat <n>`
-  (default: 1), `--split <train|dev>`, `--max-tokens <n>`,
-  `--save-payloads <dir>`, `--context-window <n>` (ollama only),
+  (default: 1), `--concurrency <n>` (default: 1 -- cases run as
+  parallel chains, repeats within a case stay serial, and the run's
+  first call completes alone to warm the prompt cache),
+  `--split <train|dev>`, `--max-tokens <n>`,
+  `--save-payloads <dir>` (written as each case finishes, so a crash
+  late in a sweep keeps the earlier cases' payloads),
+  `--context-window <n>` (ollama only),
   `--format <text|json>`, `--verbose`, `--no-history`,
   `--force-history`.
 - `score` -- score one saved extraction payload against an eval case
