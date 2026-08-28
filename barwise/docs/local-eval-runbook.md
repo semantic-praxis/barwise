@@ -125,49 +125,56 @@ serial calls of wall clock to roughly its slowest case's chain.
 Payloads now land as each case finishes rather than at the end of the
 sweep (barwise-888), so a crash keeps what was already paid for.
 
-**Stamp the payload and log directories per round**
-(`/tmp/eval-payloads/$(date +%Y%m%d-%H%M)/<arm>`, likewise
-`/tmp/eval-logs/`). Payload filenames are `<case>-run<N>.json`, so
-reusing a directory across rounds overwrites by run index and mixes
-rounds silently -- the 2026-08-28 verification had to re-score every
-file to tell which round it came from. Pushed into the repo, they
-live under the same stamp: `eval-payloads/<stamp>/<arm>/`, beside
-`eval-runs/<stamp>/`.
+**Save payloads and logs straight into the repo's dated record**, not
+`/tmp`: `eval-payloads/<stamp>/<arm>/` and `eval-runs/<stamp>/`, one
+stamp per round. Three problems disappear at once: payload filenames
+are `<case>-run<N>.json`, so a reused directory overwrites by run
+index and mixes rounds silently (the 2026-08-28 verification had to
+re-score every file to tell which round it came from); `/tmp` does not
+survive a reboot, and a sweep's payloads are paid-for evidence; and
+the transfer-to-repo step stops existing -- what the run wrote is what
+gets committed. Both directories are dprint-excluded, so raw payload
+bytes commit as the model emitted them.
 
 ```sh
+STAMP=$(date +%Y%m%d-%H%M)
+mkdir -p eval-runs/$STAMP
+
 # The two shipped variants
 npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \
   --split dev   --repeat 5 --verbose --no-history \
-  --save-payloads /tmp/eval-payloads/haiku45-2-dev   2>&1 | tee /tmp/eval-logs/haiku45-2-dev.log
+  --save-payloads eval-payloads/$STAMP/haiku45-2-dev   2>&1 | tee eval-runs/$STAMP/haiku45-2-dev.log
 npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \
   --split train --repeat 5 --verbose --no-history \
-  --save-payloads /tmp/eval-payloads/haiku45-2-train 2>&1 | tee /tmp/eval-logs/haiku45-2-train.log
+  --save-payloads eval-payloads/$STAMP/haiku45-2-train 2>&1 | tee eval-runs/$STAMP/haiku45-2-train.log
 
 npx barwise prompt eval --provider anthropic --model claude-sonnet-5 \
   --split dev   --repeat 5 --verbose --no-history \
-  --save-payloads /tmp/eval-payloads/sonnet5-3-dev   2>&1 | tee /tmp/eval-logs/sonnet5-3-dev.log
+  --save-payloads eval-payloads/$STAMP/sonnet5-3-dev   2>&1 | tee eval-runs/$STAMP/sonnet5-3-dev.log
 npx barwise prompt eval --provider anthropic --model claude-sonnet-5 \
   --split train --repeat 5 --verbose --no-history \
-  --save-payloads /tmp/eval-payloads/sonnet5-3-train 2>&1 | tee /tmp/eval-logs/sonnet5-3-train.log
+  --save-payloads eval-payloads/$STAMP/sonnet5-3-train 2>&1 | tee eval-runs/$STAMP/sonnet5-3-train.log
 
 # The default artifact, one control per model
 npx barwise prompt eval --artifact-version default \
   --provider anthropic --model claude-haiku-4-5 \
   --split dev   --repeat 5 --verbose --no-history \
-  --save-payloads /tmp/eval-payloads/default-haiku-dev    2>&1 | tee /tmp/eval-logs/default-haiku-dev.log
+  --save-payloads eval-payloads/$STAMP/default-haiku-dev    2>&1 | tee eval-runs/$STAMP/default-haiku-dev.log
 npx barwise prompt eval --artifact-version default \
   --provider anthropic --model claude-haiku-4-5 \
   --split train --repeat 5 --verbose --no-history \
-  --save-payloads /tmp/eval-payloads/default-haiku-train  2>&1 | tee /tmp/eval-logs/default-haiku-train.log
+  --save-payloads eval-payloads/$STAMP/default-haiku-train  2>&1 | tee eval-runs/$STAMP/default-haiku-train.log
 
 npx barwise prompt eval --artifact-version default \
   --provider anthropic --model claude-sonnet-5 \
   --split dev   --repeat 5 --verbose --no-history \
-  --save-payloads /tmp/eval-payloads/default-sonnet-dev   2>&1 | tee /tmp/eval-logs/default-sonnet-dev.log
+  --save-payloads eval-payloads/$STAMP/default-sonnet-dev   2>&1 | tee eval-runs/$STAMP/default-sonnet-dev.log
 npx barwise prompt eval --artifact-version default \
   --provider anthropic --model claude-sonnet-5 \
   --split train --repeat 5 --verbose --no-history \
-  --save-payloads /tmp/eval-payloads/default-sonnet-train 2>&1 | tee /tmp/eval-logs/default-sonnet-train.log
+  --save-payloads eval-payloads/$STAMP/default-sonnet-train 2>&1 | tee eval-runs/$STAMP/default-sonnet-train.log
+
+git add eval-payloads/$STAMP eval-runs/$STAMP && git commit -m "log: eval round $STAMP"
 ```
 
 **Run the two haiku arms first, and stop there.** Every arm run before
@@ -241,8 +248,8 @@ runbook. barwise-846 re-splits the suite, and its own timing note says
 the re-split is nearly free while no committed rows exist and gets
 monotonically more expensive the moment the first ones land. These runs
 are the grounding evidence for _how many cases_ the new split needs;
-they are not the baseline that split will be measured against. Keep them
-in `/tmp/eval-logs/` and in a dated `docs/` note, not in
+they are not the baseline that split will be measured against. Keep
+them in `eval-runs/<stamp>/` and in a dated `docs/` note, not in
 `evals/history.jsonl`.
 
 Drop `--no-history` for the workstream 4 sweep -- after the payloads,
@@ -292,7 +299,7 @@ ranks them offline), install it under the name the regenerator
 expects, and generate the reference:
 
 ```sh
-cp /tmp/eval-payloads/haiku45-2-dev/vendor-onboarding-runN.json \
+cp eval-payloads/<stamp>/haiku45-2-dev/vendor-onboarding-runN.json \
    packages/promptlab/tests/fixtures/responses/vendor-onboarding.json
 # ... likewise subscription-billing and incident-response
 npm run regen:references          # from barwise/, after npm run build
