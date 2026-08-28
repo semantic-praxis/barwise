@@ -138,55 +138,63 @@ as each case finishes rather than at the end of the sweep
 before the pool opens (barwise-889 will add a stderr line for it).
 
 **Save payloads and logs straight into the repo's dated record**, not
-`/tmp`: `eval-payloads/<stamp>/<arm>/` and `eval-runs/<stamp>/`, one
-stamp per round. Three problems disappear at once: payload filenames
-are `<case>-run<N>.json`, so a reused directory overwrites by run
-index and mixes rounds silently (the 2026-08-28 verification had to
-re-score every file to tell which round it came from); `/tmp` does not
-survive a reboot, and a sweep's payloads are paid-for evidence; and
-the transfer-to-repo step stops existing -- what the run wrote is what
-gets committed. Both directories are dprint-excluded, so raw payload
-bytes commit as the model emitted them.
+`/tmp`: one tree per round, `eval-payloads/<stamp>/`, holding each
+arm's payload directory and its log as siblings (`<arm>/` and
+`<arm>.log`). Three problems disappear at once: payload filenames are
+`<case>-run<N>.json`, so a reused directory overwrites by run index
+and mixes rounds silently (the 2026-08-28 verification had to re-score
+every file to tell which round it came from); `/tmp` does not survive
+a reboot, and a sweep's payloads are paid-for evidence; and the
+transfer-to-repo step stops existing -- what the run wrote is what
+gets committed. The log sits beside the payloads it is the manifest
+of, under the same name, because the 2026-08-28 round split them into
+`eval-runs/` under names that drifted from the arm directories'
+(`haiku45-2-dev.log` beside `haiku45-dev/`), and the audit needed a
+hand-written mapping to join a log to its own arm. That round's logs
+stay where they landed. The tree is dprint-excluded, so raw payload
+bytes commit as the model emitted them. The one `mkdir` is for `tee`,
+which does not create directories; `--save-payloads` creates the arm
+directories itself.
 
 ```sh
 STAMP=$(date +%Y%m%d-%H%M)
-mkdir -p eval-runs/$STAMP
+mkdir -p eval-payloads/$STAMP
 
 # The two shipped variants
 npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \
   --split dev   --repeat 5 --concurrency 3 --verbose \
-  --save-payloads eval-payloads/$STAMP/haiku45-2-dev   2>&1 | tee eval-runs/$STAMP/haiku45-2-dev.log
+  --save-payloads eval-payloads/$STAMP/haiku45-2-dev   2>&1 | tee eval-payloads/$STAMP/haiku45-2-dev.log
 npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \
   --split train --repeat 5 --concurrency 7 --verbose \
-  --save-payloads eval-payloads/$STAMP/haiku45-2-train 2>&1 | tee eval-runs/$STAMP/haiku45-2-train.log
+  --save-payloads eval-payloads/$STAMP/haiku45-2-train 2>&1 | tee eval-payloads/$STAMP/haiku45-2-train.log
 
 npx barwise prompt eval --provider anthropic --model claude-sonnet-5 \
   --split dev   --repeat 5 --concurrency 3 --verbose \
-  --save-payloads eval-payloads/$STAMP/sonnet5-3-dev   2>&1 | tee eval-runs/$STAMP/sonnet5-3-dev.log
+  --save-payloads eval-payloads/$STAMP/sonnet5-3-dev   2>&1 | tee eval-payloads/$STAMP/sonnet5-3-dev.log
 npx barwise prompt eval --provider anthropic --model claude-sonnet-5 \
   --split train --repeat 5 --concurrency 7 --verbose \
-  --save-payloads eval-payloads/$STAMP/sonnet5-3-train 2>&1 | tee eval-runs/$STAMP/sonnet5-3-train.log
+  --save-payloads eval-payloads/$STAMP/sonnet5-3-train 2>&1 | tee eval-payloads/$STAMP/sonnet5-3-train.log
 
 # The default artifact, one control per model
 npx barwise prompt eval --artifact-version default \
   --provider anthropic --model claude-haiku-4-5 \
   --split dev   --repeat 5 --concurrency 3 --verbose \
-  --save-payloads eval-payloads/$STAMP/default-haiku-dev    2>&1 | tee eval-runs/$STAMP/default-haiku-dev.log
+  --save-payloads eval-payloads/$STAMP/default-haiku-dev    2>&1 | tee eval-payloads/$STAMP/default-haiku-dev.log
 npx barwise prompt eval --artifact-version default \
   --provider anthropic --model claude-haiku-4-5 \
   --split train --repeat 5 --concurrency 7 --verbose \
-  --save-payloads eval-payloads/$STAMP/default-haiku-train  2>&1 | tee eval-runs/$STAMP/default-haiku-train.log
+  --save-payloads eval-payloads/$STAMP/default-haiku-train  2>&1 | tee eval-payloads/$STAMP/default-haiku-train.log
 
 npx barwise prompt eval --artifact-version default \
   --provider anthropic --model claude-sonnet-5 \
   --split dev   --repeat 5 --concurrency 3 --verbose \
-  --save-payloads eval-payloads/$STAMP/default-sonnet-dev   2>&1 | tee eval-runs/$STAMP/default-sonnet-dev.log
+  --save-payloads eval-payloads/$STAMP/default-sonnet-dev   2>&1 | tee eval-payloads/$STAMP/default-sonnet-dev.log
 npx barwise prompt eval --artifact-version default \
   --provider anthropic --model claude-sonnet-5 \
   --split train --repeat 5 --concurrency 7 --verbose \
-  --save-payloads eval-payloads/$STAMP/default-sonnet-train 2>&1 | tee eval-runs/$STAMP/default-sonnet-train.log
+  --save-payloads eval-payloads/$STAMP/default-sonnet-train 2>&1 | tee eval-payloads/$STAMP/default-sonnet-train.log
 
-git add eval-payloads/$STAMP eval-runs/$STAMP && git commit -m "log: eval round $STAMP"
+git add eval-payloads/$STAMP && git commit -m "log: eval round $STAMP"
 ```
 
 **For the 2.6.0 re-baseline, all eight arms are the round** -- the
