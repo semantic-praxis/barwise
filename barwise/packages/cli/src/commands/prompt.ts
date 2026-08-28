@@ -25,7 +25,7 @@ import {
   reviewModel,
   withCallLog,
 } from "@barwise/llm";
-import type { RunProgress, SuiteReport } from "@barwise/promptlab";
+import type { CaseSummary, RunProgress, SuiteReport } from "@barwise/promptlab";
 import {
   appendRunHistory,
   defaultSuitePath,
@@ -95,6 +95,13 @@ function registerEval(promptCmd: Command, version: string): void {
     )
     .option("--repeat <n>", "Samples per case", "1")
     .option(
+      "--concurrency <n>",
+      "Run up to n cases at once (repeats within a case stay serial, and the"
+        + " run's first call completes alone to warm the prompt cache). 2-4 is"
+        + " safe on typical provider tiers; retries absorb rate limits.",
+      "1",
+    )
+    .option(
       "--split <split>",
       "Run only one half of the suite (train or dev). Omitted runs every case.",
     )
@@ -130,6 +137,7 @@ function registerEval(promptCmd: Command, version: string): void {
           artifacts?: string;
           artifactVersion?: string;
           repeat: string;
+          concurrency: string;
           split?: string;
           maxTokens?: string;
           contextWindow?: string;
@@ -165,6 +173,12 @@ function registerEval(promptCmd: Command, version: string): void {
                 `--context-window must be a positive integer, got "${opts.contextWindow}".`,
               );
             }
+          }
+          const concurrency = Number(opts.concurrency);
+          if (!Number.isInteger(concurrency) || concurrency < 1) {
+            throw new Error(
+              `--concurrency must be a positive integer, got "${opts.concurrency}".`,
+            );
           }
           // Validated with the other flags, before a client exists: a
           // typo'd version must not cost a sweep. `undefined` means
@@ -225,13 +239,29 @@ function registerEval(promptCmd: Command, version: string): void {
           // Progress goes to stderr so `--format json` stays a clean
           // pipe. A sweep is dozens of sequential calls; without this a
           // rate-limited run and a hung one look the same from outside.
+          // Payloads land as each case finishes, not when the sweep
+          // does: every call is paid for the moment it returns, and a
+          // crash in the last case must not lose the evidence of the
+          // first six (barwise-888).
+          const payloadDir = opts.savePayloads !== undefined
+            ? resolve(opts.savePayloads)
+            : undefined;
+          let payloadsWritten = 0;
           const report = await runSuite(suite, client, {
             ...(artifact !== undefined ? { artifact } : {}),
             ...(opts.split !== undefined ? { split: opts.split as "train" | "dev" } : {}),
             ...(maxTokens !== undefined ? { maxTokens } : {}),
             repeat: Number(opts.repeat),
+            concurrency,
             ...(opts.verbose === true
               ? { onProgress: (e: RunProgress) => process.stderr.write(renderProgress(e)) }
+              : {}),
+            ...(payloadDir !== undefined
+              ? {
+                onCaseComplete: (summary: CaseSummary) => {
+                  payloadsWritten += writeCasePayloads(summary, payloadDir, payloadsWritten);
+                },
+              }
               : {}),
           });
 
@@ -289,12 +319,11 @@ function registerEval(promptCmd: Command, version: string): void {
           // Written before the history decision: a collapse is the run
           // most worth keeping and the least likely to be recorded,
           // since an incomplete sweep is refused.
-          if (opts.savePayloads !== undefined) {
-            const written = savePayloads(report, resolve(opts.savePayloads));
+          if (payloadDir !== undefined) {
             process.stderr.write(
-              written === 0
+              payloadsWritten === 0
                 ? `No collapsed or unscorable runs, so no payloads were written.\n`
-                : `Wrote ${written} payload(s) to ${resolve(opts.savePayloads)}.\n`,
+                : `Wrote ${payloadsWritten} payload(s) to ${payloadDir}.\n`,
             );
           }
 
@@ -678,16 +707,25 @@ function renderPenalties(c: SuiteReport["cases"][number]): string {
  * clutter. A collapse that happens one run in five is exactly the event
  * that cannot be reasoned about from its score.
  */
-function savePayloads(report: SuiteReport, dir: string): number {
+/**
+ * Write one finished case's retained payloads, called from
+ * `onCaseComplete` so a crash later in the sweep cannot lose them. The
+ * directory is created lazily on the first write of the run
+ * (`writtenSoFar` says whether that happened), preserving the old
+ * behavior of leaving no empty directory behind a clean sweep.
+ */
+function writeCasePayloads(
+  c: CaseSummary,
+  dir: string,
+  writtenSoFar: number,
+): number {
   let written = 0;
-  for (const c of report.cases) {
-    c.runs.forEach((run, index) => {
-      if (run.payload === undefined) return;
-      if (written === 0) mkdirSync(dir, { recursive: true });
-      writeFileSync(join(dir, `${c.caseId}-run${index + 1}.json`), run.payload);
-      written++;
-    });
-  }
+  c.runs.forEach((run, index) => {
+    if (run.payload === undefined) return;
+    if (writtenSoFar + written === 0) mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, `${c.caseId}-run${index + 1}.json`), run.payload);
+    written++;
+  });
   return written;
 }
 

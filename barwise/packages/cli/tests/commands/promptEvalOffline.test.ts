@@ -280,6 +280,40 @@ describe("barwise prompt eval, against a loopback provider", () => {
     expect(system).not.toContain("UNMISTAKABLE-VARIANT-MARKER");
   });
 
+  it("runs the sweep at --concurrency 3 and reports the same answer keys", async () => {
+    // The whole concurrent path against a real server: chains overlap
+    // on the wire, and the report must come back in manifest order
+    // with the same means the serial sweep pins above.
+    await serve(fixtureAnswerer(EVALS, FIXTURES, TRAIN));
+
+    const { stdout, exitCode } = await runCli(
+      evalArgs(["--split", "train", "--no-history", "--concurrency", "3", "--format", "json"]),
+    );
+
+    expect(exitCode).toBe(0);
+    const report = JSON.parse(stdout) as {
+      mean: number;
+      complete: boolean;
+      cases: Array<{ caseId: string; }>;
+    };
+    expect(report.complete).toBe(true);
+    expect(report.cases.map((c) => c.caseId)).toEqual([...TRAIN]);
+    expect(report.mean).toBeCloseTo(ANSWER_KEY_MEAN, 10);
+    expect(fake!.requests).toHaveLength(TRAIN.length);
+  });
+
+  it("rejects a nonsense --concurrency before spending a call", async () => {
+    await serve(fixtureAnswerer(EVALS, FIXTURES, TRAIN));
+
+    const { stderr, exitCode } = await runCli(
+      evalArgs(["--split", "train", "--no-history", "--concurrency", "0"]),
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("--concurrency must be a positive integer");
+    expect(fake!.requests).toHaveLength(0);
+  });
+
   it("rejects an unknown --artifact-version before spending a call", async () => {
     await serve(fixtureAnswerer(EVALS, FIXTURES, TRAIN));
 

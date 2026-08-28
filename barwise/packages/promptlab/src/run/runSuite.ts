@@ -40,6 +40,7 @@ import type { CaseScore } from "../score/scoreExtraction.js";
 import { scoreExtraction } from "../score/scoreExtraction.js";
 import type { Dispersion } from "../stats/dispersion.js";
 import { dispersionOf, sampleSd, splitAtFloor } from "../stats/dispersion.js";
+import { boundedAll, deferred } from "./pool.js";
 import type { FailureKind, RetryOptions } from "./retry.js";
 import { describeProviderError, withRetry } from "./retry.js";
 
@@ -129,6 +130,23 @@ export interface RunSuiteOptions {
    * got.
    */
   readonly onProgress?: (event: RunProgress) => void;
+  /**
+   * How many case chains run at once (default 1, the serial sweep).
+   * Repeats within a case always stay serial -- a case's first call
+   * writes the user-message cache entry its other repeats read -- and
+   * the run's very first call completes alone before any other chain
+   * starts, so the shared system-prompt entry is written exactly once
+   * (docs/specs/eval-run-concurrency.spec.md).
+   */
+  readonly concurrency?: number;
+  /**
+   * Called as each case finishes, with its completed summary. This is
+   * the durable point for anything derived from a case -- the payload
+   * pruning has already run, so a caller persisting payloads here
+   * loses at most the in-flight case on a crash, not the whole sweep
+   * (barwise-888).
+   */
+  readonly onCaseComplete?: (summary: CaseSummary) => void;
 }
 
 /** One LLM call's outcome. */
@@ -475,12 +493,19 @@ export async function runSuite(
     }
   };
 
-  const cases: CaseSummary[] = [];
-  for (const loadedCase of suiteCases) {
+  // One chain per case: the repeat loop, its progress events, the
+  // summary assembly, and the completion callback. Repeats stay serial
+  // inside the chain on purpose -- the case's first call writes the
+  // user-message cache entry the rest read.
+  const runCase = async (
+    loadedCase: EvalSuite["cases"][number],
+    caseIndex: number,
+    afterFirstRun?: () => void,
+  ): Promise<CaseSummary> => {
     const runs: CaseRun[] = [];
-    const caseIndex = suiteCases.indexOf(loadedCase) + 1;
     for (let i = 0; i < repeat; i++) {
       const run = await runOnce(loadedCase, i + 1);
+      if (i === 0) afterFirstRun?.();
       runs.push(run);
       const score = run.score?.score;
       report?.({
@@ -523,7 +548,7 @@ export async function runSuite(
       ? mean(atFloor.quality)
       : undefined;
     const qualitySd = atFloor ? sampleSd(atFloor.quality) : undefined;
-    cases.push({
+    const summary: CaseSummary = {
       caseId: loadedCase.evalCase.id,
       runs: keepDiagnosticPayloads(runs),
       mean: scores.length > 0 ? mean(scores) : 0,
@@ -535,8 +560,23 @@ export async function runSuite(
       ...(atFloor !== undefined ? { collapses: atFloor.collapses } : {}),
       ...(qualityMean !== undefined ? { qualityMean } : {}),
       ...(qualitySd !== undefined ? { qualitySd } : {}),
-    });
-  }
+    };
+    options?.onCaseComplete?.(summary);
+    return summary;
+  };
+
+  const concurrency = options?.concurrency ?? 1;
+  // The run's very first call settles alone -- it writes the shared
+  // system-prompt cache entry -- then the remaining chains fan out up
+  // to the bound. Failure opens the gate too: the write-premium
+  // question is answered either way, and a dead provider should fail
+  // the sweep fast rather than serially.
+  const gate = deferred<void>();
+  const tasks = suiteCases.map((loadedCase, i) => async (): Promise<CaseSummary> => {
+    if (i > 0) await gate.promise;
+    return runCase(loadedCase, i + 1, i === 0 ? () => gate.resolve() : undefined);
+  });
+  const cases = await boundedAll(tasks, concurrency);
 
   const scored = cases.filter((c) => c.samples > 0);
   const failures = cases.reduce((sum, c) => sum + c.failures, 0);

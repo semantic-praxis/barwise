@@ -306,3 +306,103 @@ describe("runSuite", () => {
     expect(first.mean).toBeGreaterThan(0);
   });
 });
+
+const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+const ticks = async (n: number) => {
+  for (let i = 0; i < n; i++) await tick();
+};
+
+/**
+ * The fixture client with every call's completion held behind a
+ * deferred, so the scheduler's ordering claims are asserted instead of
+ * raced: the test decides exactly when each call finishes.
+ */
+function gatedFixtureClient() {
+  const releases: Array<() => void> = [];
+  const started: string[] = [];
+  return {
+    releases,
+    started,
+    provider: "test",
+    model: undefined,
+    complete: (request: CompletionRequest) => {
+      const match = suite.cases.find((c) =>
+        request.userMessage.includes(c.transcript.split("\n")[0]!)
+      );
+      if (!match) return Promise.reject(new Error("no fixture for request"));
+      started.push(match.evalCase.id);
+      const payload = readFileSync(join(fixturesDir, `${match.evalCase.id}.json`), "utf8");
+      return new Promise<{ content: string; }>((resolve) => {
+        releases.push(() => resolve({ content: payload }));
+      });
+    },
+  };
+}
+
+describe("runSuite concurrency (docs/specs/eval-run-concurrency.spec.md)", () => {
+  it("holds every other chain until the run's first call settles", async () => {
+    const client = gatedFixtureClient();
+    const pending = runSuite(suite, client, { ...TRAIN, concurrency: 3 });
+
+    // The first call warms the shared system-prompt cache entry;
+    // nothing else may start until it settles, however many workers
+    // are waiting.
+    await ticks(5);
+    expect(client.started).toHaveLength(1);
+
+    // Releasing it opens the gate: up to the bound start (the first
+    // chain is done at repeat 1, so three fresh chains fit).
+    client.releases[0]!();
+    await ticks(5);
+    expect(client.started.length).toBe(4);
+
+    while (client.started.length < 7) {
+      client.releases.splice(0).forEach((r) => r());
+      await ticks(5);
+    }
+    while (client.releases.length > 0) {
+      client.releases.splice(0).forEach((r) => r());
+      await ticks(5);
+    }
+    const report = await pending;
+    expect(report.complete).toBe(true);
+  });
+
+  it("orders the report by manifest, not by completion", async () => {
+    const client = gatedFixtureClient();
+    const pending = runSuite(suite, client, { ...TRAIN, concurrency: 7 });
+    await ticks(3);
+    client.releases[0]!();
+    await ticks(3);
+    // Finish the remaining chains in reverse arrival order.
+    while (client.started.length < 7) await tick();
+    for (const release of [...client.releases.splice(0)].reverse()) release();
+    const report = await pending;
+    expect(report.cases.map((c) => c.caseId)).toEqual(
+      trainCases.map((c) => c.evalCase.id),
+    );
+    expect(report.mean).toBeCloseTo(1, 10);
+  });
+
+  it("fires onCaseComplete once per case, after that case's pruning", async () => {
+    const completed: string[] = [];
+    const report = await runSuite(suite, fixtureClient(), {
+      ...TRAIN,
+      onCaseComplete: (summary) => {
+        completed.push(summary.caseId);
+        // The summary handed out is the finished article: scored,
+        // pruned, the same object the report will carry.
+        expect(summary.samples).toBe(1);
+      },
+    });
+    expect(completed).toEqual(report.cases.map((c) => c.caseId));
+  });
+
+  it("rejects a non-positive concurrency before any call", async () => {
+    const client = fixtureClient();
+    await expect(runSuite(suite, client, { ...TRAIN, concurrency: 0 })).rejects.toThrow(
+      /positive integer/,
+    );
+    expect(client.requests).toHaveLength(0);
+  });
+});

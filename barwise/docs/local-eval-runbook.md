@@ -108,6 +108,22 @@ and says nothing about sonnet5-3, and comparing sonnet5-3 against a
 haiku default moves the model and the prompt at once -- the confound
 the shadow directory exists to remove.
 
+Two preflight checks these blocks assume, both cheap and both already
+paid for once: the first stderr line must name the artifact you meant
+(a variant arm that prints `suite 2.4.0` in its footer ran a stale
+checkout -- pull and `npm run build` first, the bin reads `dist`), and
+for the workstream 4 recording round **drop `--no-history` from every
+arm** -- the flags below carry it because they were written for the
+pre-baseline rounds ("Record or not" below governs).
+
+Add `--concurrency 3` to any arm to run case chains in parallel
+(barwise-887): repeats within a case stay serial and the run's first
+call still completes alone, so the cache economics are unchanged --
+watch the footer's cache line to confirm. A train arm drops from ~35
+serial calls of wall clock to roughly its slowest case's chain.
+Payloads now land as each case finishes rather than at the end of the
+sweep (barwise-888), so a crash keeps what was already paid for.
+
 ```sh
 # The two shipped variants
 npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \
