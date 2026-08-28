@@ -56,11 +56,11 @@
   },
   "lint-staged": {
     "*.ts": [
-      "dprint fmt --",
+      "dprint fmt --allow-no-files --",
       "eslint --fix",
       "oxlint"
     ],
-    "*.{json,md}": "dprint fmt --"
+    "*.{json,md}": "dprint fmt --allow-no-files --"
   },
   "packageManager": "npm@10.0.0",
   "engines": {
