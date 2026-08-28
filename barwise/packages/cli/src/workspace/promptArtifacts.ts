@@ -21,8 +21,13 @@
  * `resolveArtifact` compares specificity and knows nothing of order, so
  * the claim was never true.
  */
-import type { PromptArtifact } from "@barwise/llm";
-import { builtinArtifacts, loadArtifactsFromDir } from "@barwise/llm";
+import type { PromptArtifact, PromptSurface } from "@barwise/llm";
+import {
+  builtinArtifacts,
+  defaultExtractionArtifact,
+  defaultReviewArtifact,
+  loadArtifactsFromDir,
+} from "@barwise/llm";
 import { resolve } from "node:path";
 
 /**
@@ -39,4 +44,39 @@ export function artifactCandidates(dir?: string): PromptArtifact[] {
   const local = dir ? loadArtifactsFromDir(resolve(dir)) : [];
   const overridden = new Set(local.map((a) => a.version));
   return [...builtinArtifacts.filter((a) => !overridden.has(a.version)), ...local];
+}
+
+/**
+ * Pick an artifact by name instead of by provider/model match: the
+ * `--artifact-version` selector (barwise-882). `"default"` names the
+ * surface's default artifact -- the arm that was previously reachable
+ * only by shadowing every builtin with match-less copies, which
+ * confounded default-versus-variant with model-versus-model for any
+ * operator who did not know the trick. An unknown version throws
+ * BEFORE a client exists, naming what would have matched, because a
+ * typo that reaches a provider costs a sweep.
+ *
+ * Shared by `eval` and `artifact` so the two commands cannot answer
+ * the same question differently -- the barwise-850/851 lesson.
+ */
+export function artifactByVersion(
+  candidates: readonly PromptArtifact[],
+  surface: PromptSurface,
+  version: string,
+): PromptArtifact {
+  if (version === "default") {
+    return surface === "review" ? defaultReviewArtifact : defaultExtractionArtifact;
+  }
+  const matches = candidates.filter((a) => a.surface === surface && a.version === version);
+  if (matches.length === 1) return matches[0]!;
+  const available = candidates
+    .filter((a) => a.surface === surface)
+    .map((a) => a.version)
+    .sort();
+  throw new Error(
+    matches.length === 0
+      ? `No ${surface} artifact has version "${version}".`
+        + ` Available: default, ${available.join(", ")}.`
+      : `Version "${version}" is ambiguous: ${matches.length} ${surface} artifacts carry it.`,
+  );
 }

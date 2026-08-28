@@ -240,6 +240,61 @@ describe("barwise prompt eval, against a loopback provider", () => {
     expect(system).toContain("RESOLVED-FROM-THE-CLIENT");
   });
 
+  it("sends the default when --artifact-version says so, even where a variant matches", async () => {
+    // barwise-882. The default arm was previously reachable only by
+    // shadowing every builtin with match-less copies; an operator who
+    // did not know the trick would compare default against variant by
+    // changing the MODEL, confounding the two things the comparison
+    // exists to separate. The variant here matches the client, so only
+    // the flag can explain the default going out on the wire.
+    const artifactsDir = join(tmp, "artifacts-forced-default");
+    mkdirSync(artifactsDir);
+    writeFileSync(
+      join(artifactsDir, "extraction.fake.prompt.yaml"),
+      [
+        "surface: extraction",
+        "version: would-have-matched-1",
+        "match:",
+        "  provider: ollama",
+        "instructions: |-",
+        "  UNMISTAKABLE-VARIANT-MARKER",
+        "  Extract an ORM model from the transcript.",
+        "",
+      ].join("\n"),
+    );
+    await serve(fixtureAnswerer(EVALS, FIXTURES, TRAIN));
+
+    const { stderr } = await runCli(evalArgs([
+      "--split",
+      "train",
+      "--no-history",
+      "--artifacts",
+      artifactsDir,
+      "--artifact-version",
+      "default",
+    ]));
+
+    expect(stderr).toContain("forced by --artifact-version");
+    const first = fake!.requests[0] as { messages: Array<{ role: string; content: string; }>; };
+    const system = first.messages.find((m) => m.role === "system")!.content;
+    expect(system).not.toContain("UNMISTAKABLE-VARIANT-MARKER");
+  });
+
+  it("rejects an unknown --artifact-version before spending a call", async () => {
+    await serve(fixtureAnswerer(EVALS, FIXTURES, TRAIN));
+
+    const { stderr, exitCode } = await runCli(
+      evalArgs(["--split", "train", "--no-history", "--artifact-version", "bogus"]),
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain('No extraction artifact has version "bogus"');
+    // What WOULD have worked is in the message, so the retry needs no
+    // second failed run to find a spelling.
+    expect(stderr).toContain("haiku45-2");
+    expect(fake!.requests).toHaveLength(0);
+  });
+
   it("excludes a failed run from the mean rather than scoring it zero", async () => {
     // Zeroing a call that never returned a payload would record a
     // provider outage as a prompt regression. Only a mixed run can tell

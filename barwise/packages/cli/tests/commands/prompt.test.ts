@@ -161,6 +161,56 @@ describe("barwise prompt artifact", () => {
     expect((JSON.parse(stdout) as { version: string; }).version).toBe("haiku45-2");
   });
 
+  it("prints the version --artifact-version names, ignoring a matching target", async () => {
+    // barwise-882: the flags name a target a variant matches, and the
+    // forced version must still win -- that is the whole point of a
+    // selector that holds the model fixed while pinning the prompt.
+    const { stdout, stderr } = await runCli([
+      "prompt",
+      "artifact",
+      "--provider",
+      "anthropic",
+      "--model",
+      "claude-haiku-4-5",
+      "--artifact-version",
+      "default",
+      "--format",
+      "json",
+    ]);
+
+    expect((JSON.parse(stdout) as { version: string; }).version).not.toBe("haiku45-2");
+    expect(stderr).toContain("forced by --artifact-version");
+  });
+
+  it("rejects an unknown --artifact-version, naming what exists", async () => {
+    const { stderr, exitCode } = await runCli([
+      "prompt",
+      "artifact",
+      "--artifact-version",
+      "bogus",
+    ]);
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain('No extraction artifact has version "bogus"');
+    expect(stderr).toContain("haiku45-2");
+  });
+
+  it("scopes --artifact-version to the surface, like every other resolution", async () => {
+    // An extraction version asked for under --surface review is a
+    // mistake to name, not a prompt to print.
+    const { stderr, exitCode } = await runCli([
+      "prompt",
+      "artifact",
+      "--surface",
+      "review",
+      "--artifact-version",
+      "haiku45-2",
+    ]);
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain('No review artifact has version "haiku45-2"');
+  });
+
   it("shows the barwise-842 trap rather than requiring a paid run to find it", async () => {
     // Artifact resolution here keys on the (provider, model) pair, so
     // omitting --provider falls back to the default. `prompt eval` no

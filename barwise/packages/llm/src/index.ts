@@ -91,6 +91,10 @@ export { buildExistingModelContext } from "./ModelContext.js";
 export { parseExtractionFromJson, processTranscript } from "./TranscriptProcessor.js";
 export type { ProcessorOptions } from "./TranscriptProcessor.js";
 
+// The pure fold is public although no shipped surface calls it
+// directly: `SampledDraftResult.agreement` makes the TYPES public
+// regardless, and the value export is the deterministic seam that
+// lets an embedder fold already-drawn samples without a live client.
 export { computeSampleAgreement } from "./sampleAgreement.js";
 export type { SampleAgreement, SampleDisagreement } from "./sampleAgreement.js";
 export { MAX_SAMPLES, MIN_SAMPLES, sampleTranscript } from "./sampleTranscript.js";

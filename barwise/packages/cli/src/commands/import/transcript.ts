@@ -78,7 +78,8 @@ export function addTranscriptSubcommand(importCmd: Command): void {
           const samples = opts.samples === undefined ? 1 : Number(opts.samples);
           if (!Number.isInteger(samples) || samples < 1 || samples > MAX_SAMPLES) {
             process.stderr.write(
-              `Error: --samples must be an integer between ${MIN_SAMPLES} and ${MAX_SAMPLES}.\n`,
+              `Error: --samples must be an integer between ${MIN_SAMPLES} and ${MAX_SAMPLES}`
+                + ` (or 1, the plain single-shot import).\n`,
             );
             process.exitCode = 1;
             return;

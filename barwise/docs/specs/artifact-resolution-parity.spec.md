@@ -1,8 +1,10 @@
 # Resolve the prompt in one place, record which one ran, and keep the candidate override in the eval lane
 
-Status: Implemented (all three workstreams; see Implementation notes)
+Status: Implemented (all three workstreams; see Implementation notes.
+Extended 2026-08-28 with the `--artifact-version` selector, barwise-882
+-- see the dated section at the end)
 Created: 2026-08-26
-Last-updated: 2026-08-26
+Last-updated: 2026-08-28
 Tracking: barwise-855, item 2 -- this spec answers it differently than
 it was filed, so the issue needs editing rather than implementing (item
 1 has already shipped; see "What grounding corrected"). Precedent:
@@ -604,3 +606,43 @@ and the Open decisions stand as resolved. The `selectArtifact` seam in
 particular came through unchanged, and the audit's structural fix
 strengthened it -- which is the outcome an Inventory row promising "one
 place to encode the decision" was predicting.
+
+## Extension (2026-08-28): the `--artifact-version` selector (barwise-882)
+
+The runbook's "Gap worth closing", closed. `prompt eval` had no way to
+say "this model, the default prompt": with the builtins always in the
+candidate set, forcing the default while holding the model fixed
+required shadowing every builtin with match-less copies -- and an
+operator who did not know the trick would compare default against
+variant by changing the model, confounding exactly what the comparison
+exists to separate. Wanted before the split-spec workstream 4
+re-baseline, which runs the default arm on both models.
+
+Design, as implemented:
+
+- `--artifact-version <version|default>` on `prompt eval` and
+  `prompt artifact` only. `run` keeps its existing answer (`--artifacts`
+  plus matching names a candidate already); the production commands
+  stay out per Open decision 1 -- the selector picks WITHIN the
+  candidate set and does not widen the bypass boundary.
+- `"default"` names the surface's default artifact; any other value
+  must be the exact `version` of a candidate for the surface
+  (builtins plus `--artifacts`). Unknown versions fail before a client
+  exists, listing what would have worked -- a typo must not cost a
+  sweep.
+- Selection lives in one function, `artifactByVersion` in the CLI's
+  `workspace/promptArtifacts.ts`, beside `artifactCandidates`: the
+  seam two commands answered differently once (barwise-850/851)
+  gets no second chance to.
+- Both commands say on stderr when a version was forced, because a
+  forced artifact claims nothing about what production would resolve
+  -- the same honesty rule as the fallback notice.
+- History rows need no new field: the report already records
+  `artifactVersion` from the artifact actually sent, and a forced
+  default records the default's own version string.
+
+Covered by five tests: eval sends the default on the wire when forced
+past a matching variant, eval rejects an unknown version with zero
+requests spent, artifact ignores a matching target when forced,
+artifact names the available versions on a miss, and the selector is
+surface-scoped.
