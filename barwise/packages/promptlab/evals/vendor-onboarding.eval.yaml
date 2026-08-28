@@ -40,7 +40,11 @@ checks:
       factTypeBetween: [Vendor, RiskReview]
     hint: A vendor accumulates reviews over time; at most one is current.
   - kind: requires_ambiguity
-    matches: [suspend]
+    # The stem, not the verb: sonnet reported the parked item as "the
+    # suspension question" and failed lexically -- "suspension" does not
+    # contain the substring "suspend" (suspen-d vs suspen-s). "suspen"
+    # matches suspend, suspended and suspension alike (barwise-892).
+    matches: [suspen]
     hint: The room parked what happens to in-flight purchase orders when a vendor is suspended.
   - kind: forbids_population
     factType: Vendor has VendorNumber
