@@ -35,12 +35,18 @@ stand:
   ambiguity budget, so both halves now grade constraint semantics. The
   "After the dev runs" section below records how it was done and stays
   as the procedure for the next reference refresh (barwise-879).
-- **barwise-846** (workstreams 3 and 4): re-split, then re-baseline both
-  splits at `repeat >= 5` for the default artifact and both committed
-  variants, and write the first committed history rows.
+- **The 2.6.0 re-baseline is the next keyed round.** The 2026-08-28
+  rows were measured at 2.5.0, whose evaluator was blind to wider
+  shapes (barwise-890); the offline re-read bounded the distortion but
+  cannot recompute means. Until the eight arms are re-run at 2.6.0,
+  the sonnet5-3-versus-default verdict stays provisional, and WS4
+  prompt iteration waits on it.
+- **barwise-846** (workstreams 3 and 4): author the new transcripts
+  (per `docs/specs/eval-difficulty-calibration.spec.md`), re-split,
+  then re-baseline both splits again on the new split.
 
-Their order matters for what you pass to `--no-history`. See
-"Record or not" below.
+Recording is the default now that committed rows exist. See "Record or
+not" below for the one case that still wants `--no-history`.
 
 ## Preflight, all free
 
@@ -70,7 +76,7 @@ npx barwise prompt artifact --provider anthropic --model claude-sonnet-5 >/dev/n
 
 Observed: `claude-haiku-4-5` resolves **haiku45-2**, `claude-sonnet-5`
 resolves **sonnet5-3**, and anything else (`claude-sonnet-4-5-20250929`,
-`claude-opus-5`) falls back to the default **1.0.0** with a stderr line
+`claude-opus-5`) falls back to the default **1.1.0** with a stderr line
 saying so.
 
 **`--artifacts packages/llm/prompts` is no longer how you select a
@@ -84,7 +90,7 @@ from now merely de-duplicates back to the same answer. Use
 ## The arms
 
 Three prompts are worth measuring, on both splits, at `repeat 5`:
-haiku45-2, sonnet5-3, and the default 1.0.0 as the baseline both variants
+haiku45-2, sonnet5-3, and the default 1.1.0 as the baseline both variants
 are supposed to beat.
 
 The third one used to need a shadow-directory trick; since barwise-882
@@ -111,21 +117,25 @@ and says nothing about sonnet5-3, and comparing sonnet5-3 against a
 haiku default moves the model and the prompt at once -- the confound
 the shadow directory exists to remove.
 
-Two preflight checks these blocks assume, both cheap and both already
-paid for once: the first stderr line must name the artifact you meant
-(a variant arm that prints `suite 2.4.0` in its footer ran a stale
-checkout -- pull and `npm run build` first, the bin reads `dist`), and
-for the workstream 4 recording round **drop `--no-history` from every
-arm** -- the flags below carry it because they were written for the
-pre-baseline rounds ("Record or not" below governs).
+Two checks these blocks assume, both cheap and both already paid for
+once: the run's footer must name the current suite version (an arm
+whose footer says an older one ran a stale checkout -- pull and
+`npm run build` first, the bin reads `dist`), and the blocks now
+RECORD by default -- add `--no-history` yourself only for a throwaway
+experiment ("Record or not" below governs; copying a block verbatim
+into a recording round with the flag still on is how one arm of the
+2026-08-28 baseline had to be re-run).
 
-Add `--concurrency 3` to any arm to run case chains in parallel
-(barwise-887): repeats within a case stay serial and the run's first
-call still completes alone, so the cache economics are unchanged --
-watch the footer's cache line to confirm. A train arm drops from ~35
-serial calls of wall clock to roughly its slowest case's chain.
-Payloads now land as each case finishes rather than at the end of the
-sweep (barwise-888), so a crash keeps what was already paid for.
+The blocks carry `--concurrency` 3 (dev) and 7 (train), the values the
+recorded baseline used: case chains run in parallel (barwise-887),
+repeats within a case stay serial, and the run's first call still
+completes alone, so the cache economics are unchanged -- watch the
+footer's cache line to confirm. A train arm drops from ~35 serial
+calls of wall clock to roughly its slowest case's chain. Payloads land
+as each case finishes rather than at the end of the sweep
+(barwise-888), so a crash keeps what was already paid for. Expect
+~2 minutes of silence at the start: the warm-up call completes alone
+before the pool opens (barwise-889 will add a stderr line for it).
 
 **Save payloads and logs straight into the repo's dated record**, not
 `/tmp`: `eval-payloads/<stamp>/<arm>/` and `eval-runs/<stamp>/`, one
@@ -144,59 +154,49 @@ mkdir -p eval-runs/$STAMP
 
 # The two shipped variants
 npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \
-  --split dev   --repeat 5 --verbose --no-history \
+  --split dev   --repeat 5 --concurrency 3 --verbose \
   --save-payloads eval-payloads/$STAMP/haiku45-2-dev   2>&1 | tee eval-runs/$STAMP/haiku45-2-dev.log
 npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \
-  --split train --repeat 5 --verbose --no-history \
+  --split train --repeat 5 --concurrency 7 --verbose \
   --save-payloads eval-payloads/$STAMP/haiku45-2-train 2>&1 | tee eval-runs/$STAMP/haiku45-2-train.log
 
 npx barwise prompt eval --provider anthropic --model claude-sonnet-5 \
-  --split dev   --repeat 5 --verbose --no-history \
+  --split dev   --repeat 5 --concurrency 3 --verbose \
   --save-payloads eval-payloads/$STAMP/sonnet5-3-dev   2>&1 | tee eval-runs/$STAMP/sonnet5-3-dev.log
 npx barwise prompt eval --provider anthropic --model claude-sonnet-5 \
-  --split train --repeat 5 --verbose --no-history \
+  --split train --repeat 5 --concurrency 7 --verbose \
   --save-payloads eval-payloads/$STAMP/sonnet5-3-train 2>&1 | tee eval-runs/$STAMP/sonnet5-3-train.log
 
 # The default artifact, one control per model
 npx barwise prompt eval --artifact-version default \
   --provider anthropic --model claude-haiku-4-5 \
-  --split dev   --repeat 5 --verbose --no-history \
+  --split dev   --repeat 5 --concurrency 3 --verbose \
   --save-payloads eval-payloads/$STAMP/default-haiku-dev    2>&1 | tee eval-runs/$STAMP/default-haiku-dev.log
 npx barwise prompt eval --artifact-version default \
   --provider anthropic --model claude-haiku-4-5 \
-  --split train --repeat 5 --verbose --no-history \
+  --split train --repeat 5 --concurrency 7 --verbose \
   --save-payloads eval-payloads/$STAMP/default-haiku-train  2>&1 | tee eval-runs/$STAMP/default-haiku-train.log
 
 npx barwise prompt eval --artifact-version default \
   --provider anthropic --model claude-sonnet-5 \
-  --split dev   --repeat 5 --verbose --no-history \
+  --split dev   --repeat 5 --concurrency 3 --verbose \
   --save-payloads eval-payloads/$STAMP/default-sonnet-dev   2>&1 | tee eval-runs/$STAMP/default-sonnet-dev.log
 npx barwise prompt eval --artifact-version default \
   --provider anthropic --model claude-sonnet-5 \
-  --split train --repeat 5 --verbose --no-history \
+  --split train --repeat 5 --concurrency 7 --verbose \
   --save-payloads eval-payloads/$STAMP/default-sonnet-train 2>&1 | tee eval-runs/$STAMP/default-sonnet-train.log
 
 git add eval-payloads/$STAMP eval-runs/$STAMP && git commit -m "log: eval round $STAMP"
 ```
 
-**Run the two haiku arms first, and stop there.** Every arm run before
-the re-split is re-run at workstream 4 on the new split, so the only
-runs worth making today are the ones that settle something before it:
-the dispersion that decides how many long transcripts barwise-846
-workstream 3 should author (the 845 dev payloads were the other
-reason, satisfied by the 2026-08-27 sweep). That is satisfiable on
-haiku, and haiku is the noisier of the two models -- a dev error bar
-that is tight there is tight on sonnet, which is the conservative
-direction for a decision about adding cases.
+**For the 2.6.0 re-baseline, all eight arms are the round** -- the
+question it answers (does either variant beat the default on its own
+model, measured by an evaluator that sees wider shapes) needs every
+cell. If you must stage, the two sonnet arms settle the most: the
+sonnet5-3 verdict is the one the 2.5.0 baseline left provisional,
+while the haiku verdict was resolvable even under the old blindness.
 
-What the sonnet arms buy is the variant-versus-default comparison for
-sonnet5-3, and no pending decision turns on it. One thing would change
-that: if haiku's best dev sample does not pass its case's full rubric,
-it cannot serve as an answer key, and the sonnet **dev** arm (15 calls)
-is then worth running for better payloads. Not the train arm, which
-buys nothing at that point.
-
-Within a stage, run dev before train: it is the cheap half by call
+Within an arm pair, run dev before train: it is the cheap half by call
 count, and stopping after it still leaves the payloads behind.
 
 Why each flag is there:
@@ -246,18 +246,18 @@ directory above uses.
 
 ## Record or not
 
-`--no-history` above is deliberate, and it is the one judgment in this
-runbook. barwise-846 re-splits the suite, and its own timing note says
-the re-split is nearly free while no committed rows exist and gets
-monotonically more expensive the moment the first ones land. These runs
-are the grounding evidence for _how many cases_ the new split needs;
-they are not the baseline that split will be measured against. Keep
-them in `eval-runs/<stamp>/` and in a dated `docs/` note, not in
-`evals/history.jsonl`.
+Recording is the default: the blocks above append to
+`evals/history.jsonl`, which carries the committed 2026-08-28 rows,
+and `barwise prompt history` reads it back. A row's `suiteVersion` is
+what keeps rows either side of a bump from being compared, so
+recording at a new suite version needs no ceremony beyond a clean
+tree.
 
-Drop `--no-history` for the workstream 4 sweep -- after the payloads,
-the references and the re-split have landed. That is when a row is worth
-committing, and `barwise prompt history` is how you read the file back.
+Add `--no-history` yourself for the one case that still wants it: a
+throwaway experiment -- an unshipped `--artifacts` candidate, a
+repeat-1 smoke test, a run you already know you will discard. A row
+that records such a run pollutes the permanent record with a mean
+nobody will act on.
 
 Two more things about recording:
 
