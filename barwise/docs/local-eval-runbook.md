@@ -84,30 +84,15 @@ Three prompts are worth measuring, on both splits, at `repeat 5`:
 haiku45-2, sonnet5-3, and the default 1.0.0 as the baseline both variants
 are supposed to beat.
 
-The third one has a wrinkle. There is no `--artifact-version` or
-`--no-artifacts` flag, so with the builtins always in play the default
-is reachable only by naming a model that matches no variant -- which
-changes the model and the prompt at once, and answers a different
-question. To hold the model fixed and force the default, shadow the
-builtins with match-less copies at the same versions (a directory entry
-sharing a builtin's version replaces it; an artifact with no `match`
-block is never applicable, so resolution falls through to the default):
-
-```sh
-mkdir -p /tmp/default-only
-python3 - <<'EOF'
-import re, glob, os
-for f in sorted(glob.glob("packages/llm/prompts/*.prompt.yaml")):
-    t = open(f).read()
-    open(os.path.join("/tmp/default-only", os.path.basename(f)), "w").write(
-        re.sub(r"^match:\n(?:  .*\n)+", "", t, count=1, flags=re.M)
-    )
-EOF
-```
-
-Confirmed: with `--artifacts /tmp/default-only`, both
-`--model claude-haiku-4-5` and `--model claude-sonnet-5` print
-`Using the default prompt artifact (... matches no variant).`
+The third one used to need a shadow-directory trick; since barwise-882
+it is a flag. `--artifact-version default` forces the default prompt
+while the model stays whatever `--model` says, and the run's first
+stderr line confirms it:
+`Using artifact version 1.1.0 (forced by --artifact-version; ...)`.
+The same flag pins a named variant (`--artifact-version haiku45-2`),
+which is how a variant is measured on the OTHER model when the
+cross-model question comes up. An unknown version fails before any
+call, listing what exists.
 
 ## The runs
 
@@ -140,20 +125,20 @@ npx barwise prompt eval --provider anthropic --model claude-sonnet-5 \
   --save-payloads /tmp/eval-payloads/sonnet5-3-train 2>&1 | tee /tmp/eval-logs/sonnet5-3-train.log
 
 # The default artifact, one control per model
-npx barwise prompt eval --artifacts /tmp/default-only \
+npx barwise prompt eval --artifact-version default \
   --provider anthropic --model claude-haiku-4-5 \
   --split dev   --repeat 5 --verbose --no-history \
   --save-payloads /tmp/eval-payloads/default-haiku-dev    2>&1 | tee /tmp/eval-logs/default-haiku-dev.log
-npx barwise prompt eval --artifacts /tmp/default-only \
+npx barwise prompt eval --artifact-version default \
   --provider anthropic --model claude-haiku-4-5 \
   --split train --repeat 5 --verbose --no-history \
   --save-payloads /tmp/eval-payloads/default-haiku-train  2>&1 | tee /tmp/eval-logs/default-haiku-train.log
 
-npx barwise prompt eval --artifacts /tmp/default-only \
+npx barwise prompt eval --artifact-version default \
   --provider anthropic --model claude-sonnet-5 \
   --split dev   --repeat 5 --verbose --no-history \
   --save-payloads /tmp/eval-payloads/default-sonnet-dev   2>&1 | tee /tmp/eval-logs/default-sonnet-dev.log
-npx barwise prompt eval --artifacts /tmp/default-only \
+npx barwise prompt eval --artifact-version default \
   --provider anthropic --model claude-sonnet-5 \
   --split train --repeat 5 --verbose --no-history \
   --save-payloads /tmp/eval-payloads/default-sonnet-train 2>&1 | tee /tmp/eval-logs/default-sonnet-train.log
@@ -314,13 +299,10 @@ score: two of the 2.5.0 dev keys pin below 1.000 because the recorded
 extraction itself carries a conformance defect, and the pinned score
 in `tests/scoreExtraction.test.ts` names it rather than hiding it.)
 
-## Gap worth closing
+## Gap closed (barwise-882)
 
-`prompt eval` has no way to say "this model, the default prompt". The
-shadow directory above works and is verified, but it is a workaround for
-a missing flag, and an operator who does not know the trick will compare
-the default against a variant by changing the model -- confounding the
-two things the comparison exists to separate. Filed as barwise-882:
-an `--artifact-version <version|default>` flag on both `prompt eval`
-and `prompt artifact`, wanted before the workstream 4 re-baseline runs
-the default arm on both models.
+`prompt eval` and `prompt artifact` now take
+`--artifact-version <version|default>`, which is what "The arms" above
+uses for the default control. The shadow-directory recipe this section
+used to carry is gone; if you are reading an old checkout that lacks
+the flag, the git history of this file has it.

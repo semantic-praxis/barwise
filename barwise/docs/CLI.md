@@ -576,7 +576,8 @@ barwise prompt history --format json
 
 - `eval` -- run the eval suite against a live provider and record the
   scores. Options: `--suite <manifest>`, `--provider`, `--model`,
-  `--api-key`, `--base-url`, `--artifacts <dir>`, `--repeat <n>`
+  `--api-key`, `--base-url`, `--artifacts <dir>`,
+  `--artifact-version <version|default>`, `--repeat <n>`
   (default: 1), `--split <train|dev>`, `--max-tokens <n>`,
   `--save-payloads <dir>`, `--context-window <n>` (ollama only),
   `--format <text|json>`, `--verbose`, `--no-history`,
@@ -589,10 +590,12 @@ barwise prompt history --format json
   Options: `--surface <extraction|review>` (default: extraction).
 - `artifact` -- print the prompt artifact a given target would actually
   resolve, offline, no API key needed. Options: `--surface`,
-  `--provider`, `--model`, `--artifacts <dir>`, `--format
-  <text|json>`. It says on stderr whether a variant matched or the
-  default fell through, and prints the version and prompt hash so a
-  call-log row can be joined back to a readable prompt.
+  `--provider`, `--model`, `--artifacts <dir>`,
+  `--artifact-version <version|default>`, `--format
+  <text|json>`. It says on stderr whether a variant matched, the
+  default fell through, or a version was forced, and prints the
+  version and prompt hash so a call-log row can be joined back to a
+  readable prompt.
 - `run` -- send a prompt artifact once against a live model and print
   the raw answer, unshipped candidates included. Options: `--surface`,
   `--artifacts <dir>`, `--provider`, `--model`, `--api-key`,
@@ -608,6 +611,14 @@ not and must not. Production resolves over the built-in artifacts
 alone, which is what keeps every recorded `promptHash` recoverable --
 trying a candidate against a live model is what `prompt run` is for
 (see `docs/specs/artifact-resolution-parity.spec.md`).
+
+`--artifact-version` (on `eval` and `artifact`) selects within that
+candidate set by name instead of by provider/model match, and
+`default` names the surface's default prompt -- so a
+default-versus-variant comparison can hold the model fixed, which
+previously required shadowing the builtins with match-less copies
+(barwise-882). An unknown version fails before any call, naming the
+versions that exist.
 
 ### llm-usage
 

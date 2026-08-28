@@ -45,7 +45,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 import { callLogSink } from "../workspace/callLogSink.js";
 import { loadModel, readFile } from "../workspace/io.js";
-import { artifactCandidates } from "../workspace/promptArtifacts.js";
+import { artifactByVersion, artifactCandidates } from "../workspace/promptArtifacts.js";
 import { describeProvenance, resolveProvenance } from "../workspace/provenance.js";
 import { renderReview } from "./review.js";
 
@@ -87,6 +87,12 @@ function registerEval(promptCmd: Command, version: string): void {
     .option("--api-key <key>", "API key (falls back to env vars)")
     .option("--base-url <url>", "Ollama server URL (only for ollama provider)")
     .option("--artifacts <dir>", "Load .prompt.yaml variants from this directory")
+    .option(
+      "--artifact-version <version>",
+      "Send this artifact instead of resolving one from the client's provider"
+        + ' and model. "default" forces the default prompt, so a default-vs-variant'
+        + " comparison can hold the model fixed.",
+    )
     .option("--repeat <n>", "Samples per case", "1")
     .option(
       "--split <split>",
@@ -122,6 +128,7 @@ function registerEval(promptCmd: Command, version: string): void {
         opts: ProviderOpts & {
           suite?: string;
           artifacts?: string;
+          artifactVersion?: string;
           repeat: string;
           split?: string;
           maxTokens?: string;
@@ -159,6 +166,16 @@ function registerEval(promptCmd: Command, version: string): void {
               );
             }
           }
+          // Validated with the other flags, before a client exists: a
+          // typo'd version must not cost a sweep. `undefined` means
+          // resolve from the client below, which cannot happen yet.
+          const forced = opts.artifactVersion !== undefined
+            ? artifactByVersion(
+              artifactCandidates(opts.artifacts),
+              "extraction",
+              opts.artifactVersion,
+            )
+            : undefined;
           // Constructed after the guards, so a typo in a flag costs
           // nothing rather than a client and a sweep.
           const bare = createLlmClient({
@@ -185,13 +202,20 @@ function registerEval(promptCmd: Command, version: string): void {
           // reason `LlmClient` carries them. Keying on the flags instead
           // meant omitting `--provider` produced a working client and an
           // unmatched query, and the run silently measured the default.
-          const artifact = resolveArtifact(artifactCandidates(opts.artifacts), {
+          const artifact = forced ?? resolveArtifact(artifactCandidates(opts.artifacts), {
             surface: "extraction",
             ...(client.provider !== undefined ? { provider: client.provider } : {}),
             ...(client.model !== undefined ? { model: client.model } : {}),
           });
+          // A forced version says so: a log reader must be able to tell
+          // "the operator pinned this" from "this matched the client",
+          // because only the second claims anything about production.
           process.stderr.write(
-            artifact
+            forced
+              ? `Using artifact version ${forced.version}`
+                + ` (forced by --artifact-version;`
+                + ` client is ${client.provider}/${client.model ?? "default model"}).\n`
+              : artifact
               ? `Using artifact version ${artifact.version}`
                 + ` (${client.provider}/${client.model ?? "default model"}).\n`
               : `Using the default prompt artifact`
@@ -376,6 +400,11 @@ function registerArtifact(promptCmd: Command): void {
     .option("--provider <provider>", "Provider to resolve for (anthropic, openai, ollama)")
     .option("--model <model>", "Model to resolve for")
     .option("--artifacts <dir>", "Also consider .prompt.yaml variants in this directory")
+    .option(
+      "--artifact-version <version>",
+      "Print this artifact instead of resolving one from --provider/--model."
+        + ' "default" names the surface\'s default prompt.',
+    )
     .option("--format <format>", "Output format (text or json)", "text")
     .action(
       (opts: {
@@ -383,6 +412,7 @@ function registerArtifact(promptCmd: Command): void {
         provider?: string;
         model?: string;
         artifacts?: string;
+        artifactVersion?: string;
         format: string;
       }) => {
         try {
@@ -399,19 +429,28 @@ function registerArtifact(promptCmd: Command): void {
           // Keyed on the flags on purpose, unlike `eval`: this command
           // answers a hypothetical -- what would THIS configuration be
           // sent -- and building a client to ask would demand a key for
-          // a question that needs none.
-          const matched = resolveArtifact(artifactCandidates(opts.artifacts), {
+          // a question that needs none. `--artifact-version` asks a
+          // different hypothetical (what does THIS artifact say) and
+          // skips matching entirely.
+          const forced = opts.artifactVersion !== undefined
+            ? artifactByVersion(artifactCandidates(opts.artifacts), surface, opts.artifactVersion)
+            : undefined;
+          const matched = forced ?? resolveArtifact(artifactCandidates(opts.artifacts), {
             surface,
             ...(opts.provider !== undefined ? { provider: opts.provider } : {}),
             ...(opts.model !== undefined ? { model: opts.model } : {}),
           });
           const resolved = matched ?? fallback;
 
-          // Say which of the two answers this is. Printing the default's
+          // Say which of the answers this is. Printing the default's
           // text and a matched variant's text identically is the same
           // silence `eval` carried: an operator reading a prompt has no
           // way to tell "this is your variant" from "nothing matched".
-          if (matched === undefined) {
+          if (forced !== undefined) {
+            process.stderr.write(
+              `Version forced by --artifact-version; no provider/model matching was done.\n`,
+            );
+          } else if (matched === undefined) {
             process.stderr.write(
               `No ${surface} variant matches`
                 + ` ${opts.provider ?? "any provider"}/${opts.model ?? "any model"};`
