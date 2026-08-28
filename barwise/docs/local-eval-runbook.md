@@ -3,15 +3,15 @@
 The keyed runs. `barwise prompt eval` is the one command in the
 repository that cannot run in CI or in an ephemeral session container:
 it needs a provider key, and the runs it makes cost money. This is the
-procedure for making them count, written against suite **2.4.0** and the
+procedure for making them count, written against suite **2.5.0** and the
 open workstreams of `docs/specs/eval-split-stratification.spec.md`.
 
-**Suite 2.1.0 through 2.4.0 landed between the last keyed run and now**
-(the licence, thirteen audit-and-machinery checks, all train-side), so
-no mean from the 2026-08-26 run is comparable to what these commands
-will print today: the train rubrics have new denominators, and
-runs that miss a newly guarded constraint score lower than the same
-runs did then. Dev rubrics are untouched, which matters below.
+**Suite 2.5.0 changed the DEV rubrics** (references, fifteen
+population checks, an ambiguity budget -- the barwise-845 close, from
+the 2026-08-27 haiku45-2 sweep's saved payloads), on top of the
+2.1.0-2.4.0 train-side widening. No mean from any earlier keyed run,
+the 2026-08-27 sweep included, is comparable to what these commands
+print today, on either split.
 
 Every command below was executed verbatim with no key in the
 environment, from `barwise/`. They parse, they print the artifact they
@@ -26,16 +26,12 @@ ever been recorded here; every recorded score lives in operators' local
 files and in the dated notes under `docs/`. Two spec workstreams are
 waiting on a keyed run:
 
-- **barwise-845** (workstream 2): `vendor-onboarding`,
-  `subscription-billing` and `incident-response` have no recorded
-  payload, therefore no generated reference, therefore no
-  `forbids_population` check. Train grades constraint semantics and dev
-  grades element recall, so the two halves are not one measurement.
-  **The payloads for this already exist**: the 2026-08-26 run saved six
-  dev payloads (`docs/prompt-eval-2.0.0-haiku45-2026-08-26.md`), every
-  dev sample passed its rubric, and the dev rubrics have not changed
-  since -- so closing barwise-845 needs no new calls unless those saved
-  files were lost. A fresh keyed dev run is the fallback, not the plan.
+- **barwise-845 -- CLOSED at suite 2.5.0.** The three dev cases carry
+  references generated from the 2026-08-27 sweep's best payloads, plus
+  fifteen `forbids_population` checks and incident-response's
+  ambiguity budget, so both halves now grade constraint semantics. The
+  "After the dev runs" section below records how it was done and stays
+  as the procedure for the next reference refresh (barwise-879).
 - **barwise-846** (workstreams 3 and 4): re-split, then re-baseline both
   splits at `repeat >= 5` for the default artifact and both committed
   variants, and write the first committed history rows.
@@ -166,11 +162,12 @@ npx barwise prompt eval --artifacts /tmp/default-only \
 **Run the two haiku arms first, and stop there.** Every arm run before
 the re-split is re-run at workstream 4 on the new split, so the only
 runs worth making today are the ones that settle something before it:
-the dev payloads barwise-845 needs, and the dispersion that decides how
-many long transcripts barwise-846 workstream 3 should author. Both are
-satisfiable on haiku, and haiku is the noisier of the two models -- a
-dev error bar that is tight there is tight on sonnet, which is the
-conservative direction for a decision about adding cases.
+the dispersion that decides how many long transcripts barwise-846
+workstream 3 should author (the 845 dev payloads were the other
+reason, satisfied by the 2026-08-27 sweep). That is satisfiable on
+haiku, and haiku is the noisier of the two models -- a dev error bar
+that is tight there is tight on sonnet, which is the conservative
+direction for a decision about adding cases.
 
 What the sonnet arms buy is the variant-versus-default comparison for
 sonnet5-3, and no pending decision turns on it. One thing would change
@@ -273,13 +270,15 @@ Two more things about recording:
   payloads before concluding anything: an authoring bug and a genuinely
   hard case call for opposite responses.
 
-## After the dev runs: close barwise-845
+## After a dev run: refresh the dev references
 
-The dev payloads are the point of that half -- whether they come from
-the 2026-08-26 run's saved files or a fresh one. For each of the three
-cases, take the highest-scoring saved run (`barwise prompt score
---case <id> --extraction <file>` ranks them offline), install it under
-the name the regenerator expects, and generate the reference:
+This is how barwise-845 was closed at suite 2.5.0, from the
+2026-08-27 sweep's saved payloads; it stays as the procedure for the
+next reference refresh (barwise-879), which is the same moves with
+better payloads. For each of the three cases, take the highest-scoring
+saved run (`barwise prompt score --case <id> --extraction <file>`
+ranks them offline), install it under the name the regenerator
+expects, and generate the reference:
 
 ```sh
 cp /tmp/eval-payloads/haiku45-2-dev/vendor-onboarding-runN.json \
@@ -308,9 +307,12 @@ a payload for carrying it:
 ```
 
 The answer-key invariant is what you are checking: a recorded payload
-must pass its case's full rubric. If the best sonnet5-3 sample does not,
-that is a finding about the rubric or the transcript -- do not quietly
-weaken the check to make the fixture pass.
+must pass its case's full rubric. If the best sample does not, that is
+a finding about the rubric or the transcript -- do not quietly weaken
+the check to make the fixture pass. (Full-rubric pass, not a 1.000
+score: two of the 2.5.0 dev keys pin below 1.000 because the recorded
+extraction itself carries a conformance defect, and the pinned score
+in `tests/scoreExtraction.test.ts` names it rather than hiding it.)
 
 ## Gap worth closing
 

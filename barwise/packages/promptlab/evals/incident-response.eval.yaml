@@ -5,9 +5,19 @@
 # explicitly refuting "a P1 is always a SEV1". An extraction that
 # collapses them into one concept fails the last two checks.
 #
-# No reference model, so no forbids_population -- see vendor-onboarding.
+# Reference generated from the best 2026-08-27 haiku45-2 dev payload
+# (suite 2.5.0; barwise-845). The disjunctive alert-or-ticket mandatory
+# is not in that payload (the extraction schema's mandatory is
+# single-fact-type), so the firm rule the case was written around still
+# has no population check -- recorded as prompt headroom. The payload
+# DOES carry the irreflexive ring on the duplicate relationship, with
+# the November self-link story as its source, so the suite's first
+# irreflexive check gets a real answer key
+# (docs/specs/constraint-extraction-coverage.spec.md).
 id: incident-response
 transcript: incident-response.transcript.md
+reference: incident-response.reference.orm.yaml
+ambiguityBudget: 10
 checks:
   - kind: must_validate
   - kind: requires_element
@@ -28,3 +38,26 @@ checks:
     element:
       entity: Priority
     hint: Priority is customer urgency. "A P1 is always a SEV1" was refuted in the room.
+  - kind: forbids_population
+    factType: Incident is duplicate of Incident
+    constraint: ring
+    hint: An incident cannot be a duplicate of itself - the November
+      bulk-linking script did exactly that and a dashboard divided by zero.
+  - kind: forbids_population
+    factType: Incident is duplicate of Incident
+    constraint: internal_uniqueness
+    hint: One primary - being a duplicate of two different incidents does
+      not mean anything.
+  - kind: forbids_population
+    factType: Incident has Severity
+    constraint: mandatory
+    hint: Severity is mandatory - you cannot declare without one.
+  - kind: forbids_population
+    factType: Service is owned by Team
+    constraint: internal_uniqueness
+    hint: A service is owned by exactly one team - a standing assignment,
+      independent of any incident.
+  - kind: requires_ambiguity
+    matches: [classification]
+    hint: The room parked whether customer-caused incidents get a cause
+      classification - that decision went to Ravi.

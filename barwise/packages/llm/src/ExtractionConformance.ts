@@ -716,7 +716,14 @@ function expectedArityDescription(type: InferredConstraint["type"]): string {
 
 function constraintKey(ic: InferredConstraint): string {
   const sortedRoles = [...ic.roles].sort().join(",");
-  return `${ic.type}|${ic.fact_type}|${sortedRoles}`;
+  // Ring constraints with different ring types are independent
+  // assertions on the same role pair -- irreflexive and acyclic on one
+  // fact type both hold and the validator accepts both. Without the
+  // ring type in the key, the second was silently dropped as a
+  // duplicate (found on a recorded incident-response payload carrying
+  // exactly that pair).
+  const ring = ic.type === "ring" ? `|${ic.ring_type ?? ""}` : "";
+  return `${ic.type}|${ic.fact_type}|${sortedRoles}${ring}`;
 }
 
 // ---------------------------------------------------------------------------

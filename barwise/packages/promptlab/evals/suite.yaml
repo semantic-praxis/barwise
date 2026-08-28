@@ -78,7 +78,30 @@
 # (docs/specs/objectified-correspondence.spec.md, barwise-881). The
 # ternary and the objectified-Enrollment shapes both pass; the answer
 # keys still score 1.000.
-version: 2.4.0
+#
+# 2.5.0 is the barwise-845 closing round, from the 2026-08-27 haiku45-2
+# sweep. Three changes, each of which alone would bump:
+# - The three dev cases gain references (generated from each case's
+#   best saved dev payload) and fifteen forbids_population checks plus
+#   incident-response's requires_ambiguity and budget, so dev rubrics
+#   now guard settled constraints instead of only element presence.
+#   incident-response's ring check is the suite's first irreflexive
+#   instance (docs/adr/0002-constraint-coverage-policy.md).
+# - university-enrollment licenses LetterGrade/Grade: the 2.4.0 grade
+#   check failed all five sweep runs over the player's name while every
+#   run carried the correct ternary and spanning uniqueness. The check
+#   was measuring vocabulary, which is the 2.1.0 lesson again.
+# - Conformance no longer drops a ring constraint as a duplicate of one
+#   with a different ring type (found on the incident-response payload:
+#   its sourced acyclic ring was silently discarded next to the
+#   irreflexive one). Fewer corrections means marginally higher scores
+#   for affected extractions, the 1.3.0 reasoning.
+# Unlike every bump since 2.1.0, this one touches the DEV half:
+# dev/train means either side of this line are incomparable, and the
+# dev split is no longer untuned-against in the weak sense that its
+# rubrics were authored from a haiku sweep's payloads -- the CASES are
+# still held out of prompt iteration, which is the sense that matters.
+version: 2.5.0
 
 # Re-fitted for the rated form, because rating changed what a weight
 # means. A weight is now the cost of a model in which EVERY element

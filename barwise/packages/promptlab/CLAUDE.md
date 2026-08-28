@@ -97,9 +97,10 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
   transcript itself uses both words: `conference-reviews` gets none
   because its spread is a real modelling fork, not vocabulary.
 - **A score vouches only for what some rubric tests.** Constraint-type
-  coverage is thin and tiered: one ring instance (acyclic) is
-  rubric-tested suite-wide, and no set-comparison constraint is -- or
-  can be, until `forbids_population` grows a kind for them. A suite
+  coverage is thin and tiered: two ring instances (acyclic on
+  project-staffing, irreflexive on incident-response) are rubric-tested
+  suite-wide, and no set-comparison constraint is -- or can be, until
+  `forbids_population` grows a kind for them. A suite
   mean therefore says nothing about whether a prompt extracts the
   uncovered types, however green it runs. The policy is
   `docs/adr/0002-constraint-coverage-policy.md`; the living inventory

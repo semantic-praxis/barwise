@@ -10,6 +10,14 @@ reference: university-enrollment.reference.orm.yaml
 # (docs/specs/eval-name-licensing.spec.md, suite 2.1.0).
 vocabulary:
   - [CourseOffering, Offering]
+  # The Registrar says bare "grade" three times and "letter grade" once
+  # ("The grade is one of A, B, C, D, or F"), so both are the domain's
+  # words for the one concept. Without this licence the 2.4.0 grade
+  # check failed all five haiku45-2 runs of the 2026-08-27 sweep as "no
+  # fact type matching" when every one of them carried the correct
+  # ternary with the correct spanning uniqueness -- only the player was
+  # named Grade, not LetterGrade (suite 2.5.0).
+  - [LetterGrade, Grade]
 checks:
   - kind: must_validate
   - kind: requires_element

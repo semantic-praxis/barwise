@@ -1,0 +1,479 @@
+orm_version: "1.1"
+model:
+  name: subscription-billing
+  object_types:
+    - id: 00000000-0000-7001-ad34-3b424950575e
+      name: Account
+      kind: entity
+      reference_mode: account_number
+      definition: A customer account in the system, identified by an account number. Every account has a unique 6-digit sequential identifier that is never reused; if an account closes and the same company returns, they receive a new account number.
+    - id: 00000000-0000-7002-8c53-5a61686f767d
+      name: AccountNumber
+      kind: value
+      definition: The unique 6-digit sequential identifier for an account.
+      data_type:
+        name: text
+        length: 10
+    - id: 00000000-0000-7003-ab72-7980878e959c
+      name: Subscription
+      kind: entity
+      reference_mode: subscription_id
+      definition: The agreement that an account pays a specified amount on a specified billing cycle for a specified product. Identified by a subscription ID prefixed with SUB.
+    - id: 00000000-0000-7004-8a91-989fa6adb4bb
+      name: SubscriptionID
+      kind: value
+      definition: The unique identifier for a subscription, prefixed with SUB.
+      data_type:
+        name: text
+        length: 20
+    - id: 00000000-0000-7005-a9b0-b7bec5ccd3da
+      name: Product
+      kind: entity
+      reference_mode: product_code
+      definition: "A product offered by the company. Currently three products exist: CORE, ANALYTICS, and CONNECT."
+    - id: 00000000-0000-7006-88cf-d6dde4ebf2f9
+      name: ProductCode
+      kind: value
+      definition: The unique identifier for a product. Currently restricted to CORE, ANALYTICS, or CONNECT.
+      value_constraint:
+        values:
+          - CORE
+          - ANALYTICS
+          - CONNECT
+      data_type:
+        name: text
+        length: 20
+    - id: 00000000-0000-7007-a7ee-f5fc030a1118
+      name: PricePlan
+      kind: entity
+      reference_mode: plan_code
+      definition: The billing artefact that specifies the price and billing frequency. Identified by plan code (e.g., CORE-MO-49, CORE-AN-490). Each price plan entitles exactly one feature bundle.
+      aliases:
+        - billing plan
+    - id: 00000000-0000-7008-860d-141b22293037
+      name: PlanCode
+      kind: value
+      definition: The unique identifier for a price plan, such as CORE-MO-49 or CORE-AN-490.
+      data_type:
+        name: text
+        length: 20
+    - id: 00000000-0000-7009-a52c-333a41484f56
+      name: FeatureBundle
+      kind: entity
+      reference_mode: bundle_name
+      definition: The feature set or tier that a customer receives. Identified by name. Examples include Starter, Professional, and Enterprise. Each bundle specifies how many seats, whether API access is included, whether SSO is included, etc.
+    - id: 00000000-0000-700a-844b-525960676e75
+      name: BundleName
+      kind: value
+      definition: The unique name identifier for a feature bundle.
+      data_type:
+        name: text
+        length: 100
+    - id: 00000000-0000-700b-a36a-71787f868d94
+      name: PlanChange
+      kind: entity
+      reference_mode: change_id
+      definition: A record of a subscription plan change, capturing the subscription, the new price plan, the effective date, the date it was requested, and who requested it. Allows subscription plan history to be tracked.
+    - id: 00000000-0000-700c-8289-90979ea5acb3
+      name: ChangeID
+      kind: value
+      definition: The unique identifier for a plan change.
+      data_type:
+        name: text
+        length: 20
+    - id: 00000000-0000-700d-a1a8-afb6bdc4cbd2
+      name: StartDate
+      kind: value
+      definition: The date on which a subscription begins. This field is mandatory for every subscription.
+      data_type:
+        name: date
+    - id: 00000000-0000-700e-80c7-ced5dce3eaf1
+      name: EndDate
+      kind: value
+      definition: The date on which a subscription ends. This field is optional; open-ended subscriptions have no end date.
+      data_type:
+        name: date
+    - id: 00000000-0000-700f-9fe6-edf4fb020910
+      name: BillingPeriod
+      kind: value
+      definition: The frequency at which a subscription is billed. Must be exactly monthly or annual.
+      value_constraint:
+        values:
+          - monthly
+          - annual
+      data_type:
+        name: text
+        length: 20
+    - id: 00000000-0000-7010-be05-0c131a21282f
+      name: SubscriptionStatus
+      kind: value
+      definition: "The current status of a subscription. Must be exactly one of: trialing, active, past due, or cancelled."
+      value_constraint:
+        values:
+          - trialing
+          - active
+          - past due
+          - cancelled
+      data_type:
+        name: text
+        length: 20
+    - id: 00000000-0000-7011-9d24-2b323940474e
+      name: EffectiveDate
+      kind: value
+      definition: The date on which a plan change becomes effective. May differ from the request date.
+      data_type:
+        name: date
+    - id: 00000000-0000-7012-bc43-4a51585f666d
+      name: Requester
+      kind: value
+      definition: The person or system that requested a plan change.
+      data_type:
+        name: text
+        length: 200
+  fact_types:
+    - id: 00000000-0000-7013-9b62-6970777e858c
+      name: Account has AccountNumber
+      roles:
+        - id: 00000000-0000-7014-ba81-888f969da4ab
+          player: 00000000-0000-7001-ad34-3b424950575e
+          role_name: has
+        - id: 00000000-0000-7015-99a0-a7aeb5bcc3ca
+          player: 00000000-0000-7002-8c53-5a61686f767d
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7014-ba81-888f969da4ab
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7015-99a0-a7aeb5bcc3ca
+        - type: mandatory
+          role: 00000000-0000-7014-ba81-888f969da4ab
+    - id: 00000000-0000-7016-b8bf-c6cdd4dbe2e9
+      name: Subscription has SubscriptionID
+      roles:
+        - id: 00000000-0000-7017-97de-e5ecf3fa0108
+          player: 00000000-0000-7003-ab72-7980878e959c
+          role_name: has
+        - id: 00000000-0000-7018-b6fd-040b12192027
+          player: 00000000-0000-7004-8a91-989fa6adb4bb
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7017-97de-e5ecf3fa0108
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7018-b6fd-040b12192027
+        - type: mandatory
+          role: 00000000-0000-7017-97de-e5ecf3fa0108
+    - id: 00000000-0000-7019-951c-232a31383f46
+      name: Product has ProductCode
+      roles:
+        - id: 00000000-0000-701a-b43b-424950575e65
+          player: 00000000-0000-7005-a9b0-b7bec5ccd3da
+          role_name: has
+        - id: 00000000-0000-701b-935a-61686f767d84
+          player: 00000000-0000-7006-88cf-d6dde4ebf2f9
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-701a-b43b-424950575e65
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-701b-935a-61686f767d84
+        - type: mandatory
+          role: 00000000-0000-701a-b43b-424950575e65
+    - id: 00000000-0000-701c-b279-80878e959ca3
+      name: PricePlan has PlanCode
+      roles:
+        - id: 00000000-0000-701d-9198-9fa6adb4bbc2
+          player: 00000000-0000-7007-a7ee-f5fc030a1118
+          role_name: has
+        - id: 00000000-0000-701e-b0b7-bec5ccd3dae1
+          player: 00000000-0000-7008-860d-141b22293037
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-701d-9198-9fa6adb4bbc2
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-701e-b0b7-bec5ccd3dae1
+        - type: mandatory
+          role: 00000000-0000-701d-9198-9fa6adb4bbc2
+    - id: 00000000-0000-701f-8fd6-dde4ebf2f900
+      name: FeatureBundle has BundleName
+      roles:
+        - id: 00000000-0000-7020-aef5-fc030a11181f
+          player: 00000000-0000-7009-a52c-333a41484f56
+          role_name: has
+        - id: 00000000-0000-7021-8d14-1b222930373e
+          player: 00000000-0000-700a-844b-525960676e75
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7020-aef5-fc030a11181f
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7021-8d14-1b222930373e
+        - type: mandatory
+          role: 00000000-0000-7020-aef5-fc030a11181f
+    - id: 00000000-0000-7022-ac33-3a41484f565d
+      name: PlanChange has ChangeID
+      roles:
+        - id: 00000000-0000-7023-8b52-5960676e757c
+          player: 00000000-0000-700b-a36a-71787f868d94
+          role_name: has
+        - id: 00000000-0000-7024-aa71-787f868d949b
+          player: 00000000-0000-700c-8289-90979ea5acb3
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7023-8b52-5960676e757c
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7024-aa71-787f868d949b
+        - type: mandatory
+          role: 00000000-0000-7023-8b52-5960676e757c
+    - id: 00000000-0000-7025-8990-979ea5acb3ba
+      name: Subscription belongs to Account
+      roles:
+        - id: 00000000-0000-7026-a8af-b6bdc4cbd2d9
+          player: 00000000-0000-7003-ab72-7980878e959c
+          role_name: belongs to
+        - id: 00000000-0000-7027-87ce-d5dce3eaf1f8
+          player: 00000000-0000-7001-ad34-3b424950575e
+          role_name: has
+      readings:
+        - "{0} belongs to {1}"
+        - "{1} has {0}"
+      constraints:
+        - type: mandatory
+          role: 00000000-0000-7026-a8af-b6bdc4cbd2d9
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7026-a8af-b6bdc4cbd2d9
+    - id: 00000000-0000-7028-a6ed-f4fb02091017
+      name: Subscription is for Product
+      roles:
+        - id: 00000000-0000-7029-850c-131a21282f36
+          player: 00000000-0000-7003-ab72-7980878e959c
+          role_name: is for
+        - id: 00000000-0000-702a-a42b-323940474e55
+          player: 00000000-0000-7005-a9b0-b7bec5ccd3da
+          role_name: has
+      readings:
+        - "{0} is for {1}"
+        - "{1} has {0}"
+      constraints:
+        - type: mandatory
+          role: 00000000-0000-7029-850c-131a21282f36
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7029-850c-131a21282f36
+    - id: 00000000-0000-702b-834a-51585f666d74
+      name: Subscription uses PricePlan
+      roles:
+        - id: 00000000-0000-702c-a269-70777e858c93
+          player: 00000000-0000-7003-ab72-7980878e959c
+          role_name: uses
+        - id: 00000000-0000-702d-8188-8f969da4abb2
+          player: 00000000-0000-7007-a7ee-f5fc030a1118
+          role_name: is used by
+      readings:
+        - "{0} uses {1}"
+        - "{1} is used by {0}"
+      constraints:
+        - type: mandatory
+          role: 00000000-0000-702c-a269-70777e858c93
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-702c-a269-70777e858c93
+    - id: 00000000-0000-702e-a0a7-aeb5bcc3cad1
+      name: Subscription has StartDate
+      roles:
+        - id: 00000000-0000-702f-bfc6-cdd4dbe2e9f0
+          player: 00000000-0000-7003-ab72-7980878e959c
+          role_name: has
+        - id: 00000000-0000-7030-9ee5-ecf3fa01080f
+          player: 00000000-0000-700d-a1a8-afb6bdc4cbd2
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: mandatory
+          role: 00000000-0000-702f-bfc6-cdd4dbe2e9f0
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-702f-bfc6-cdd4dbe2e9f0
+    - id: 00000000-0000-7031-bd04-0b121920272e
+      name: Subscription has EndDate
+      roles:
+        - id: 00000000-0000-7032-9c23-2a31383f464d
+          player: 00000000-0000-7003-ab72-7980878e959c
+          role_name: has
+        - id: 00000000-0000-7033-bb42-4950575e656c
+          player: 00000000-0000-700e-80c7-ced5dce3eaf1
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7032-9c23-2a31383f464d
+    - id: 00000000-0000-7034-9a61-686f767d848b
+      name: Subscription has BillingPeriod
+      roles:
+        - id: 00000000-0000-7035-b980-878e959ca3aa
+          player: 00000000-0000-7003-ab72-7980878e959c
+          role_name: has
+        - id: 00000000-0000-7036-989f-a6adb4bbc2c9
+          player: 00000000-0000-700f-9fe6-edf4fb020910
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: mandatory
+          role: 00000000-0000-7035-b980-878e959ca3aa
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7035-b980-878e959ca3aa
+    - id: 00000000-0000-7037-b7be-c5ccd3dae1e8
+      name: Subscription has SubscriptionStatus
+      roles:
+        - id: 00000000-0000-7038-96dd-e4ebf2f90007
+          player: 00000000-0000-7003-ab72-7980878e959c
+          role_name: has
+        - id: 00000000-0000-7039-b5fc-030a11181f26
+          player: 00000000-0000-7010-be05-0c131a21282f
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: mandatory
+          role: 00000000-0000-7038-96dd-e4ebf2f90007
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7038-96dd-e4ebf2f90007
+    - id: 00000000-0000-703a-941b-222930373e45
+      name: PricePlan entitles FeatureBundle
+      roles:
+        - id: 00000000-0000-703b-b33a-41484f565d64
+          player: 00000000-0000-7007-a7ee-f5fc030a1118
+          role_name: entitles
+        - id: 00000000-0000-703c-9259-60676e757c83
+          player: 00000000-0000-7009-a52c-333a41484f56
+          role_name: is entitled by
+      readings:
+        - "{0} entitles {1}"
+        - "{1} is entitled by {0}"
+      constraints:
+        - type: mandatory
+          role: 00000000-0000-703b-b33a-41484f565d64
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-703b-b33a-41484f565d64
+    - id: 00000000-0000-703d-b178-7f868d949ba2
+      name: PlanChange is for Subscription
+      roles:
+        - id: 00000000-0000-703e-9097-9ea5acb3bac1
+          player: 00000000-0000-700b-a36a-71787f868d94
+          role_name: is for
+        - id: 00000000-0000-703f-afb6-bdc4cbd2d9e0
+          player: 00000000-0000-7003-ab72-7980878e959c
+          role_name: has
+      readings:
+        - "{0} is for {1}"
+        - "{1} has {0}"
+      constraints:
+        - type: mandatory
+          role: 00000000-0000-703e-9097-9ea5acb3bac1
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-703e-9097-9ea5acb3bac1
+    - id: 00000000-0000-7040-8ed5-dce3eaf1f8ff
+      name: PlanChange specifies PricePlan
+      roles:
+        - id: 00000000-0000-7041-adf4-fb020910171e
+          player: 00000000-0000-700b-a36a-71787f868d94
+          role_name: specifies
+        - id: 00000000-0000-7042-8c13-1a21282f363d
+          player: 00000000-0000-7007-a7ee-f5fc030a1118
+          role_name: is specified by
+      readings:
+        - "{0} specifies {1}"
+        - "{1} is specified by {0}"
+      constraints:
+        - type: mandatory
+          role: 00000000-0000-7041-adf4-fb020910171e
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7041-adf4-fb020910171e
+    - id: 00000000-0000-7043-ab32-3940474e555c
+      name: PlanChange has EffectiveDate
+      roles:
+        - id: 00000000-0000-7044-8a51-585f666d747b
+          player: 00000000-0000-700b-a36a-71787f868d94
+          role_name: has
+        - id: 00000000-0000-7045-a970-777e858c939a
+          player: 00000000-0000-7011-9d24-2b323940474e
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: mandatory
+          role: 00000000-0000-7044-8a51-585f666d747b
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7044-8a51-585f666d747b
+    - id: 00000000-0000-7046-888f-969da4abb2b9
+      name: PlanChange has Requester
+      roles:
+        - id: 00000000-0000-7047-a7ae-b5bcc3cad1d8
+          player: 00000000-0000-700b-a36a-71787f868d94
+          role_name: has
+        - id: 00000000-0000-7048-86cd-d4dbe2e9f0f7
+          player: 00000000-0000-7012-bc43-4a51585f666d
+          role_name: requested
+      readings:
+        - "{0} has {1}"
+        - "{1} requested {0}"
+      constraints:
+        - type: mandatory
+          role: 00000000-0000-7047-a7ae-b5bcc3cad1d8
+        - type: internal_uniqueness
+          roles:
+            - 00000000-0000-7047-a7ae-b5bcc3cad1d8

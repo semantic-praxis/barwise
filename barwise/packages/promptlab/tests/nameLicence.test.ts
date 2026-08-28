@@ -43,7 +43,10 @@ function unlicensed(): LoadedEvalCase {
 
 describe("the university-enrollment licence", () => {
   it("is declared on the shipped case", () => {
-    expect(loadedCase.evalCase.vocabulary).toEqual([["CourseOffering", "Offering"]]);
+    expect(loadedCase.evalCase.vocabulary).toEqual([
+      ["CourseOffering", "Offering"],
+      ["LetterGrade", "Grade"],
+    ]);
   });
 
   it("scores the synonym payload's full rubric", () => {

@@ -40,9 +40,9 @@ function payloadFor(id: string): string {
 describe("CaseScore.errorsByRule", () => {
   it("is empty rather than absent when a payload validates clean", () => {
     // The answer keys are the evidence that warning and error cost is
-    // addressable rather than a floor: all seven score full rubric with
-    // neither. A reader must not have to tell "none" from "not
-    // measured".
+    // addressable rather than a floor: every one scores full rubric
+    // and none carries a validation error. A reader must not have to
+    // tell "none" from "not measured".
     const score = scoreExtraction(
       payloadFor("order-management"),
       caseNamed("order-management"),
