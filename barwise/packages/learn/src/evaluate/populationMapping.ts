@@ -242,6 +242,144 @@ function tryExpandedMatch(
 const FOLD_SEPARATOR = " & ";
 
 /**
+ * A wider-carrier mapping (docs/specs/wider-shape-correspondence.spec.md):
+ * the candidate fact type a population was re-expressed into, plus the
+ * config to inject. The carrier is exposed so the check can name it in
+ * a failure message when no attempt is rejected.
+ */
+export interface WiderMapping {
+  readonly candFt: FactType;
+  readonly config: PopulationConfig;
+}
+
+/**
+ * Does `cand` strictly contain `ref` as a multiset? (Every reference
+ * name at least as often, and at least one extra role.)
+ */
+function strictlyContains(
+  cand: (string | undefined)[],
+  ref: (string | undefined)[],
+): boolean {
+  if (cand.length <= ref.length) return false;
+  const counts = new Map<string | undefined, number>();
+  for (const n of cand) counts.set(n, (counts.get(n) ?? 0) + 1);
+  for (const n of ref) {
+    const c = counts.get(n) ?? 0;
+    if (c === 0) return false;
+    counts.set(n, c - 1);
+  }
+  return true;
+}
+
+/**
+ * Third correspondence tier, tried by the check only when
+ * `mapForbiddenPopulation` returns null: PROJECT the reference
+ * population into a candidate fact type whose player multiset strictly
+ * contains the reference's. Shared roles map by the flat tier's
+ * group-and-zip rule; every extra candidate role gets a fresh value,
+ * distinct per injected instance and role. The distinctness is what
+ * keeps the injection non-vacuous: two byte-identical tuples would
+ * violate EVERY uniqueness constraint, so a candidate whose only
+ * uniqueness spans all roles -- the shape that does NOT carry the
+ * reference rule -- would falsely reject them too. With distinct
+ * extras, a uniqueness over only the shared roles rejects the
+ * injection (rule carried) and one spanning an extra role does not
+ * (rule not carried).
+ *
+ * Several candidate fact types can contain the reference's players, so
+ * every carrier's mapping is returned, ordered by ascending arity
+ * (fewest extra roles first -- the least speculative reading) then
+ * model order. The check passes on the first injection the candidate
+ * rejects: each attempt asks the same question of a different declared
+ * carrier, and "some declared carrier forbids this population" is the
+ * check's semantic intent.
+ */
+export function projectionMappings(
+  forbidden: Population,
+  refModel: OrmModel,
+  candidate: OrmModel,
+  licence?: NameLicence,
+): WiderMapping[] {
+  const refFt = refModel.getFactType(forbidden.factTypeId);
+  if (!refFt) return [];
+  const refNames = playerNames(refFt, refModel);
+  if (refNames.some((n) => n === undefined)) return [];
+  const vocabulary = new Set(refNames.filter((n): n is string => n !== undefined));
+
+  const carriers = candidate.factTypes
+    .filter((ft) =>
+      strictlyContains(candidatePlayerNames(ft, candidate, vocabulary, licence), refNames)
+    )
+    .sort((a, b) => a.roles.length - b.roles.length); // stable sort: model order within an arity
+
+  const mappings: WiderMapping[] = [];
+  for (const candFt of carriers) {
+    const config = projectOnto(forbidden, refFt, refModel, candFt, candidate, vocabulary, licence);
+    if (config) mappings.push({ candFt, config });
+  }
+  return mappings;
+}
+
+function projectOnto(
+  forbidden: Population,
+  refFt: FactType,
+  refModel: OrmModel,
+  candFt: FactType,
+  candidate: OrmModel,
+  vocabulary: ReadonlySet<string>,
+  licence?: NameLicence,
+): PopulationConfig | null {
+  // Group both sides by player name, as the flat tier does; here the
+  // candidate group may be larger. Its first ref-count roles map (the
+  // same position-disambiguates-repeats semantics as the flat zip) and
+  // the remainder are extra, as is every role of a non-reference name.
+  const refGroups = new Map<string, Role[]>();
+  for (const r of refFt.roles) {
+    const name = refModel.getObjectType(r.playerId)?.name;
+    if (name === undefined) return null;
+    const list = refGroups.get(name) ?? [];
+    list.push(r);
+    refGroups.set(name, list);
+  }
+  const candGroups = new Map<string | undefined, Role[]>();
+  for (const r of candFt.roles) {
+    const ot = candidate.getObjectType(r.playerId);
+    const name = ot ? nameInVocabulary(ot, vocabulary, licence) : undefined;
+    const list = candGroups.get(name) ?? [];
+    list.push(r);
+    candGroups.set(name, list);
+  }
+
+  const roleMap = new Map<string, string>();
+  const extraRoles: Role[] = [];
+  for (const [name, refRoles] of refGroups) {
+    const candRoles = candGroups.get(name);
+    if (!candRoles || candRoles.length < refRoles.length) return null;
+    refRoles.forEach((rr, i) => roleMap.set(rr.id, candRoles[i]!.id));
+    extraRoles.push(...candRoles.slice(refRoles.length));
+  }
+  for (const [name, roles] of candGroups) {
+    if (name === undefined || !refGroups.has(name)) extraRoles.push(...roles);
+  }
+
+  let fresh = 0;
+  const instances: { roleValues: Record<string, string>; }[] = [];
+  for (const inst of forbidden.instances) {
+    const roleValues: Record<string, string> = {};
+    for (const [refRoleId, value] of Object.entries(inst.roleValues)) {
+      const candRoleId = roleMap.get(refRoleId);
+      // A value that corresponds to nothing means the correspondence
+      // was partial -- same completeness rule as the flat tier.
+      if (candRoleId === undefined) return null;
+      roleValues[candRoleId] = value;
+    }
+    for (const role of extraRoles) roleValues[role.id] = `fresh-${++fresh}`;
+    instances.push({ roleValues });
+  }
+  return { factTypeId: candFt.id, instances };
+}
+
+/**
  * Re-express a reference forbidden population as a `PopulationConfig`
  * against the candidate, or return null if no corresponding fact type or
  * role correspondence exists (which means the candidate has not modeled
