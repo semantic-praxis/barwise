@@ -223,7 +223,14 @@ through. `BARWISE_CLI` overrides what gets run.
 
 ## Testing
 
-- Framework: pytest. Everything runs offline.
+- Framework: pytest, **always through `uv run`**. A bare
+  `python3 -m pytest` reports `No module named pytest` because the deps
+  live in the uv-managed venv, not in the ambient interpreter -- and that
+  error reads exactly like "this machine cannot run the suite", which is
+  how it was once written into a commit message as a fact. `uv sync
+  --extra dev` then `uv run pytest -q` is the whole story, and
+  `../compile-runner.sh` does both as preflight.
+- Everything runs offline.
 - **Run it before you spend money, because nothing else will.** This
   lane is outside Turborepo and CI by design, so a red test here is
   reported by no one. The loader round trip below sat red from the day
