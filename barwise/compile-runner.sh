@@ -38,7 +38,20 @@ fi
 # A candidate's provenance names a commit, so a dirty tree would record a
 # revision that never produced it.
 if [ -n "$(git status --porcelain)" ]; then
-  echo "working tree is dirty -- commit or stash first (the candidate records the commit)" >&2
+  echo "working tree is dirty -- the candidate's provenance records a commit," >&2
+  echo "so it must be a commit that produced this tree. Offenders:" >&2
+  git status --porcelain >&2
+  # package-lock.json is the usual one and the usual answer is NOT to
+  # commit it: `npm install` rewrites it where `npm ci` (what CI and this
+  # script use) never does, so a lock diff with no package.json change is
+  # churn, and committing it pins whatever the local npm happened to
+  # resolve.
+  if git status --porcelain -- package-lock.json | grep -q .; then
+    echo >&2
+    echo "package-lock.json is dirty. If package.json is unchanged this is" >&2
+    echo "npm install churn, not a real change -- discard it rather than" >&2
+    echo "commit it:  git restore package-lock.json" >&2
+  fi
   exit 1
 fi
 
