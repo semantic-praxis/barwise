@@ -761,11 +761,11 @@
     "@barwise/formats": "1.7.0",
     "@barwise/llm": "1.7.0",
     "@barwise/mcp": "1.7.0",
-    "@modelcontextprotocol/sdk": "^1.27.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@vscode/chat-extension-utils": "^0.0.0-alpha.5",
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1",
-    "vscode-languageserver-textdocument": "^1.0.12",
+    "vscode-languageserver-textdocument": "^1.0.14",
     "yaml": "^2.8.2"
   },
   "devDependencies": {
