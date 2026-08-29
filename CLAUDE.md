@@ -289,6 +289,18 @@ skill (`.claude/skills/release/`).
   method. Deliberately parallel code stays (DRY is secondary);
   unchecked must-agree code does not
   (`docs/specs/duplication-drift-guards.spec.md`).
+- A finding is not closed by a document. The same rule the
+  must-agree copies follow -- share it, derive it, register it, or
+  drift-test it, in the same commit -- applies to anything an audit
+  turns up: land a check that fails when it regresses, or a baseline
+  row that has to be removed when it is fixed. `npm run audit:rubric
+  -- --check` ratchets the eval rubric's discriminating checks against
+  `barwise/rubric-baseline.json` the way `audit:duplication` ratchets
+  the copies; both fail on a new unclassified finding AND on a stale
+  entry, so the baselines always enumerate exactly what is open. A
+  sweep run by hand runs once, and the next edit reintroduces what it
+  found. The `assertion-audit` skill carries the three mutation passes
+  and the method rules.
 - ESLint config is shared at the repo root (`barwise/eslint.config.mjs`).
 - Turborepo (`barwise/turbo.json`) orchestrates build/test/lint with
   correct dependency ordering.

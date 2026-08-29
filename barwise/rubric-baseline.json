@@ -1,0 +1,179 @@
+{
+  "$comment": "Rubric checks with no reachable failure path, from scripts/audit-rubric.mjs (npm run audit:rubric -- --check; CI runs it). A check that passes on an answer key with the thing it asks about removed banks a guaranteed point instead of measuring. Every entry carries a verdict: tracked:<issue> for an open finding, or accepted-benign with the reason. --check fails on a check missing here AND on an entry that now discriminates, so fixing one forces its row out and the file always enumerates exactly the open findings. Method: docs/prompt-optimization-log.md.",
+  "checks": {
+    "order-management::must_validate::bf1f8ae6beaf": {
+      "case": "order-management",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "order-management::forbids_population::d687861f9c43": {
+      "case": "order-management",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of Customer places Order that agree on Order -- e.g. {Customer=Cust",
+      "verdict": "tracked:barwise-894"
+    },
+    "university-enrollment::must_validate::bf1f8ae6beaf": {
+      "case": "university-enrollment",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "university-enrollment::forbids_population::7843cbe5c020": {
+      "case": "university-enrollment",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of CourseOffering is of Course that agree on CourseOffering -- e.g.",
+      "verdict": "tracked:barwise-894"
+    },
+    "university-enrollment::forbids_population::f3cb01b137f0": {
+      "case": "university-enrollment",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of Instructor teaches CourseOffering that agree on CourseOffering -",
+      "verdict": "tracked:barwise-894"
+    },
+    "university-enrollment::forbids_population::29aff8f74ed9": {
+      "case": "university-enrollment",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of CourseOffering is in Semester that agree on CourseOffering -- e.",
+      "verdict": "tracked:barwise-894"
+    },
+    "university-enrollment::forbids_population::91f356d9940f": {
+      "case": "university-enrollment",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of Student receives LetterGrade for CourseOffering that agree on St",
+      "verdict": "tracked:barwise-894"
+    },
+    "clinic-appointments::must_validate::bf1f8ae6beaf": {
+      "case": "clinic-appointments",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "clinic-appointments::forbids_population::f4649f7364e5": {
+      "case": "clinic-appointments",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of Patient books Appointment that agree on Appointment -- e.g. {Pat",
+      "verdict": "tracked:barwise-894"
+    },
+    "clinic-appointments::forbids_population::74c19f6e8fb0": {
+      "case": "clinic-appointments",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of Appointment is with Doctor that agree on Appointment -- e.g. {Ap",
+      "verdict": "tracked:barwise-894"
+    },
+    "clinic-appointments::forbids_population::ca653abc24ea": {
+      "case": "clinic-appointments",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of Appointment has FollowUpNote that agree on Appointment -- e.g. {",
+      "verdict": "tracked:barwise-894"
+    },
+    "employee-hierarchy::must_validate::bf1f8ae6beaf": {
+      "case": "employee-hierarchy",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "project-staffing::must_validate::bf1f8ae6beaf": {
+      "case": "project-staffing",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "project-staffing::forbids_population::411adc9ed2ed": {
+      "case": "project-staffing",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of Employee mentors Employee that agree on Employee -- e.g. {Employ",
+      "verdict": "tracked:barwise-894"
+    },
+    "conference-reviews::must_validate::bf1f8ae6beaf": {
+      "case": "conference-reviews",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "freight-corrections::must_validate::bf1f8ae6beaf": {
+      "case": "freight-corrections",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "vendor-onboarding::must_validate::bf1f8ae6beaf": {
+      "case": "vendor-onboarding",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "vendor-onboarding::forbids_population::2bac21eba322": {
+      "case": "vendor-onboarding",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of Vendor has VendorNumber that agree on Vendor -- e.g. {Vendor=Ven",
+      "verdict": "tracked:barwise-894"
+    },
+    "vendor-onboarding::forbids_population::e278102921c9": {
+      "case": "vendor-onboarding",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of Vendor operates in Region with Contact that agree on Vendor, Reg",
+      "verdict": "tracked:barwise-894"
+    },
+    "vendor-onboarding::forbids_population::1afba07958c0": {
+      "case": "vendor-onboarding",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of PurchaseOrder is raised against Vendor that agree on PurchaseOrd",
+      "verdict": "tracked:barwise-894"
+    },
+    "subscription-billing::must_validate::bf1f8ae6beaf": {
+      "case": "subscription-billing",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "subscription-billing::requires_ambiguity::14d8973636e4": {
+      "case": "subscription-billing",
+      "kind": "requires_ambiguity",
+      "message": "An ambiguity matching \"cancel\" was reported: \"Mid-term annual subscription cancellation policy: The current system behav",
+      "verdict": "tracked:barwise-901"
+    },
+    "subscription-billing::forbids_population::cbb7e0edb4f4": {
+      "case": "subscription-billing",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of Subscription has BillingPeriod that agree on Subscription -- e.g",
+      "verdict": "tracked:barwise-894"
+    },
+    "subscription-billing::forbids_population::4747f10d951e": {
+      "case": "subscription-billing",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of PricePlan entitles FeatureBundle that agree on PricePlan -- e.g.",
+      "verdict": "tracked:barwise-894"
+    },
+    "subscription-billing::forbids_population::2554ea470072": {
+      "case": "subscription-billing",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of PlanChange is for Subscription that agree on PlanChange -- e.g. ",
+      "verdict": "tracked:barwise-894"
+    },
+    "incident-response::must_validate::bf1f8ae6beaf": {
+      "case": "incident-response",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "incident-response::forbids_population::df667dfa2a90": {
+      "case": "incident-response",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: a irreflexive ring violation among Incident instances -- e.g. {Incident=Incid",
+      "verdict": "tracked:barwise-894"
+    },
+    "incident-response::forbids_population::325455f9ea0f": {
+      "case": "incident-response",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of Incident is duplicate of Incident that agree on Incident -- e.g.",
+      "verdict": "tracked:barwise-894"
+    },
+    "incident-response::forbids_population::b333b6800619": {
+      "case": "incident-response",
+      "kind": "forbids_population",
+      "message": "Your model correctly rules out: Rules out: two facts of Service is owned by Team that agree on Service -- e.g. {Service=",
+      "verdict": "tracked:barwise-894"
+    }
+  }
+}

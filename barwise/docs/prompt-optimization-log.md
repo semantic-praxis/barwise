@@ -215,6 +215,48 @@ as it should. Second time in one audit that the first reading was
 wrong and a control caught it. **Check the mutation actually mutated
 something before believing what it shows.**
 
+## 2026-08-29, later: making the audit permanent (barwise-903)
+
+The audit above was about to be left as a throwaway script with a note
+in this log saying nothing re-runs it. That note would have been the
+whole guard -- and the project already has a rule about this exact
+shape, for must-agree copies: never a comment, always a check. A
+finding is the same. It is now
+`npm run audit:rubric -- --check`, ratcheted against
+`rubric-baseline.json` and run in CI after build.
+
+The script is **stricter than the hand audit**: it calls
+`forbids_population` 25/43 where the hand pass said 27, because it
+keys on each check's own declared `ConstraintKind` rather than on the
+uniqueness-subject subset, and so also catches mandatory-subject
+checks whose class deletion does not fail them. Two more findings for
+no extra work, which is the argument for the script over the sweep --
+the hand pass was not merely unrepeatable, it was less accurate.
+
+Ratchet semantics are copied from `audit-duplication.mjs` on purpose:
+`--check` fails on a non-discriminating check missing from the
+baseline **and** on a baseline entry that now discriminates, so fixing
+barwise-894, -901 or -902 forces its rows out rather than leaving them
+to rot. Both directions were mutation-verified including exit codes --
+a guard that prints an error and exits 0 is the defect class this
+whole audit is about.
+
+Its limit is in the script header: discrimination is existential, so
+it catches a check that cannot fail, never one that fails for the
+wrong reason. barwise-894 is visible only because its checks survive
+whole-class deletion.
+
+### The pattern this session kept repeating
+
+Three times, the same shape: fix the smoke test but not the rot that
+hid it (barwise-900); audit one check kind but not the other three;
+run the audit but leave it unrepeatable. Each was caught by a person
+asking, not by the work. The generalisable part is not "look harder"
+-- it is that **the deliverable of an audit is a ratchet, not a
+document**, which is now a rule in CLAUDE.md and a third pass in the
+`assertion-audit` skill, so the next audit starts from here instead of
+from scratch.
+
 ## Open
 
 - The DSPy loop is **not closed**: no instruction-rewriting run
@@ -229,6 +271,6 @@ something before believing what it shows.**
   vacuous passes), barwise-901 (one false pass), barwise-902
   (`must_validate` unreachable). `requires_element` is the only kind
   that came through clean.
-- Nothing re-runs this audit. It was a throwaway script, so the next
-  rubric change can reintroduce exactly what it just found and no test
-  would notice.
+- ~~Nothing re-runs this audit.~~ Closed by barwise-903: it is
+  `npm run audit:rubric -- --check`, ratcheted against
+  `rubric-baseline.json` and gated in CI. See below.

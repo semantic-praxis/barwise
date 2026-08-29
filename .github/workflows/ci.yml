@@ -129,6 +129,16 @@ jobs:
       - run: npm run build
         if: steps.changes.outputs.docs_only != 'true'
 
+      # The rubric ratchet: every eval check that survives the mutation
+      # its own kind is about carries a verdict in rubric-baseline.json,
+      # and the check fails on a newly non-discriminating check AND on a
+      # stale entry for a fixed one. A check that cannot fail banks a
+      # guaranteed point instead of measuring, which is barwise-894,
+      # -901 and -902 (barwise-903). Runs after build: it scores through
+      # the built promptlab, so it carries the same docs-only guard.
+      - run: npm run audit:rubric -- --check
+        if: steps.changes.outputs.docs_only != 'true'
+
       - run: npm run --workspace=@barwise/mcp bundle
         if: steps.changes.outputs.docs_only != 'true'
 
