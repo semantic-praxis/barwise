@@ -35,7 +35,7 @@
     "@barwise/learn": "1.7.0",
     "@barwise/llm": "1.7.0",
     "@barwise/promptlab": "1.7.0",
-    "commander": "^13.0.0"
+    "commander": "^15.0.0"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",

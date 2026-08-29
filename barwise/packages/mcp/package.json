@@ -52,7 +52,7 @@
     "@barwise/formats": "1.7.0",
     "@barwise/learn": "1.7.0",
     "@barwise/llm": "1.7.0",
-    "@modelcontextprotocol/sdk": "^1.27.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "zod": "^3.25.0"
   },
   "devDependencies": {
