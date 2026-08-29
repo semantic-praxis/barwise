@@ -1,0 +1,51 @@
+Using artifact version 1.1.0 (forced by --artifact-version; client is anthropic/claude-haiku-4-5).
+[ 1/7] order-management       run 1/5  1.000  38.2s  4873/16384 out  6232 cached
+[ 5/7] project-staffing       run 1/5  0.920  25.8s  3296/16384 out  6232 cached
+[ 4/7] employee-hierarchy     run 1/5  0.983  29.3s  3773/16384 out  6232 cached
+[ 7/7] freight-corrections    run 1/5  0.917  29.7s  3769/16384 out  6232 cached
+[ 6/7] conference-reviews     run 1/5  1.000  30.2s  3814/16384 out  6232 cached
+[ 1/7] order-management       run 2/5  1.000  38.4s  4801/16384 out  7110 cached
+[ 5/7] project-staffing       run 2/5  1.000  28.5s  3641/16384 out  7019 cached
+[ 3/7] clinic-appointments    run 1/5  0.985  56.6s  7539/16384 out  6232 cached
+[ 6/7] conference-reviews     run 2/5  1.000  27.3s  3583/16384 out  6973 cached
+[ 4/7] employee-hierarchy     run 2/5  1.000  28.8s  3699/16384 out  6949 cached
+[ 2/7] university-enrollment  run 1/5  0.923  59.8s  8178/16384 out  6232 cached
+[ 7/7] freight-corrections    run 2/5  0.933  31.6s  4043/16384 out  7002 cached
+[ 1/7] order-management       run 3/5  1.000  36.8s  4741/16384 out  7110 cached
+[ 5/7] project-staffing       run 3/5  0.920  27.3s  3460/16384 out  7019 cached
+[ 4/7] employee-hierarchy     run 3/5  0.967  30.2s  3828/16384 out  6949 cached
+[ 7/7] freight-corrections    run 3/5  0.917  30.4s  3900/16384 out  7002 cached
+[ 6/7] conference-reviews     run 3/5  1.000  35.1s  4477/16384 out  6973 cached
+[ 5/7] project-staffing       run 4/5  0.920  28.0s  3535/16384 out  7019 cached
+[ 3/7] clinic-appointments    run 2/5  0.969  55.7s  7389/16384 out  7117 cached
+[ 1/7] order-management       run 4/5  0.950  37.4s  4642/16384 out  7110 cached
+[ 4/7] employee-hierarchy     run 4/5  1.000  27.6s  3547/16384 out  6949 cached
+[ 6/7] conference-reviews     run 4/5  1.000  29.3s  3701/16384 out  6973 cached
+[ 7/7] freight-corrections    run 4/5  0.933  32.1s  4160/16384 out  7002 cached
+[ 2/7] university-enrollment  run 2/5  0.939  67.7s  8993/16384 out  7128 cached
+[ 5/7] project-staffing       run 5/5  1.000  28.7s  3583/16384 out  7019 cached
+[ 4/7] employee-hierarchy     run 5/5  1.000  28.5s  3687/16384 out  6949 cached
+[ 1/7] order-management       run 5/5  0.950  35.8s  4613/16384 out  7110 cached
+[ 6/7] conference-reviews     run 5/5  0.954  30.1s  3838/16384 out  6973 cached
+[ 7/7] freight-corrections    run 5/5  0.917  31.8s  4041/16384 out  7002 cached
+[ 3/7] clinic-appointments    run 3/5  0.957  56.5s  7483/16384 out  7117 cached
+[ 2/7] university-enrollment  run 3/5  0.923  60.8s  8260/16384 out  7128 cached
+[ 3/7] clinic-appointments    run 4/5  0.969  54.8s  7349/16384 out  7117 cached
+[ 2/7] university-enrollment  run 4/5  0.933  63.8s  8389/16384 out  7128 cached
+[ 3/7] clinic-appointments    run 5/5  0.963  58.2s  7669/16384 out  7117 cached
+[ 2/7] university-enrollment  run 5/5  0.923  61.4s  8245/16384 out  7128 cached
+order-management  mean=0.980  worst=0.950  sd=0.027  ok=5/5  quality=0.980+/-0.027  [warnings=0.8]
+university-enrollment  mean=0.928  worst=0.923  sd=0.008  ok=5/5  quality=0.928+/-0.008  [warnings=5.6]
+clinic-appointments  mean=0.969  worst=0.957  sd=0.011  ok=5/5  quality=0.969+/-0.011  [corrections=1.2 warnings=1.4]
+employee-hierarchy  mean=0.990  worst=0.967  sd=0.015  ok=5/5  quality=0.990+/-0.015  [corrections=0.6]
+project-staffing  mean=0.952  worst=0.920  sd=0.044  ok=5/5  quality=0.952+/-0.044  [warnings=1.2]
+conference-reviews  mean=0.991  worst=0.954  sd=0.021  ok=5/5  quality=0.991+/-0.021  [corrections=0.2 warnings=0.2]
+freight-corrections  mean=0.923  worst=0.917  sd=0.009  ok=5/5  quality=0.923+/-0.009  [corrections=2.6 warnings=1]
+suite 2.6.0  artifact=1.1.0@08b024dc2a29  mean=0.962 +/- 0.007 (95%)  worst=0.917  (repeat=5)
+  warnings: completeness/fact-type-without-uniqueness x38, completeness/fact-type-without-constraints x9, constraint/external-uniqueness-all-local x3, constraint/spanning-all-roles x1
+  fixed:    missing_identifier_population x10, duplicate_constraint x5, arity_mismatch x4, invalid_bounds x2, misplaced_is_preferred x2
+  cache: 240816 read, 5674 written
+  gaps below 0.011 are not resolvable against a comparable run
+  54% of that noise is project-staffing alone
+Wrote 18 payload(s) to /Users/gschenz/repos/barwise/barwise/eval-payloads/20260828-1647/default-haiku-train.
+NOTE: recording against a modified working tree (1.7.0 (d529a5f-dirty)). The commit alone will not reproduce this run.

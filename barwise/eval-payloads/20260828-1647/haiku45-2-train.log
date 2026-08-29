@@ -1,0 +1,53 @@
+Using artifact version haiku45-2 (anthropic/claude-haiku-4-5).
+[ 1/7] order-management       run 1/5  1.000  40.5s  5203/16384 out  0 cached
+[ 5/7] project-staffing       run 1/5  1.000  27.0s  3398/16384 out  6720 cached
+[ 4/7] employee-hierarchy     run 1/5  1.000  28.8s  3698/16384 out  6720 cached
+[ 7/7] freight-corrections    run 1/5  0.917  32.7s  4147/16384 out  6720 cached
+[ 6/7] conference-reviews     run 1/5  0.684  32.8s  4243/16384 out  6720 cached
+[ 1/7] order-management       run 2/5  1.000  37.8s  4836/16384 out  7598 cached
+[ 4/7] employee-hierarchy     run 2/5  1.000  27.8s  3567/16384 out  7437 cached
+[ 3/7] clinic-appointments    run 1/5  1.000  59.3s  7965/16384 out  6720 cached
+[ 7/7] freight-corrections    run 2/5  0.917  28.1s  3668/16384 out  7490 cached
+[ 6/7] conference-reviews     run 2/5  1.000  28.2s  3604/16384 out  7461 cached
+[ 5/7] project-staffing       run 2/5  1.000  39.9s  3513/16384 out  7507 cached
+[ 2/7] university-enrollment  run 1/5  0.987  67.5s  9096/16384 out  6720 cached
+[ 1/7] order-management       run 3/5  0.975  39.7s  5004/16384 out  7598 cached
+[ 4/7] employee-hierarchy     run 3/5  1.000  28.7s  3736/16384 out  7437 cached
+[ 7/7] freight-corrections    run 3/5  0.917  29.7s  3801/16384 out  7490 cached
+[ 5/7] project-staffing       run 3/5  0.940  27.0s  3445/16384 out  7507 cached
+[ 6/7] conference-reviews     run 3/5  1.000  34.1s  4174/16384 out  7461 cached
+[ 4/7] employee-hierarchy     run 4/5  1.000  26.3s  3389/16384 out  7437 cached
+[ 1/7] order-management       run 4/5  0.988  38.2s  4947/16384 out  7598 cached
+[ 3/7] clinic-appointments    run 2/5  1.000  56.8s  7704/16384 out  7605 cached
+[ 7/7] freight-corrections    run 4/5  0.938  30.6s  3967/16384 out  7490 cached
+[ 5/7] project-staffing       run 4/5  0.940  28.5s  3656/16384 out  7507 cached
+[ 6/7] conference-reviews     run 4/5  1.000  31.6s  4027/16384 out  7461 cached
+[ 2/7] university-enrollment  run 2/5  0.994  63.0s  8538/16384 out  7616 cached
+[ 4/7] employee-hierarchy     run 5/5  1.000  28.6s  3747/16384 out  7437 cached
+[ 5/7] project-staffing       run 5/5  1.000  25.6s  3327/16384 out  7507 cached
+[ 1/7] order-management       run 5/5  1.000  35.3s  4524/16384 out  7598 cached
+[ 7/7] freight-corrections    run 5/5  0.917  33.1s  4194/16384 out  7490 cached
+[ 6/7] conference-reviews     run 5/5  1.000  32.4s  4095/16384 out  7461 cached
+[ 3/7] clinic-appointments    run 3/5  1.000  56.6s  7627/16384 out  7605 cached
+[ 2/7] university-enrollment  run 3/5  0.987  61.5s  8455/16384 out  7616 cached
+[ 3/7] clinic-appointments    run 4/5  0.985  50.9s  6712/16384 out  7605 cached
+[ 2/7] university-enrollment  run 4/5  1.000  69.3s  9270/16384 out  7616 cached
+[ 3/7] clinic-appointments    run 5/5  1.000  57.9s  7829/16384 out  7605 cached
+[ 2/7] university-enrollment  run 5/5  0.981  71.4s  9416/16384 out  7616 cached
+order-management  mean=0.993  worst=0.975  sd=0.011  ok=5/5  quality=0.993+/-0.011  [corrections=0.2 warnings=0.2]
+university-enrollment  mean=0.990  worst=0.981  sd=0.007  ok=5/5  quality=0.990+/-0.007  [corrections=0.4 warnings=0.6]
+clinic-appointments  mean=0.997  worst=0.985  sd=0.007  ok=5/5  quality=0.997+/-0.007  [warnings=0.2]
+employee-hierarchy  mean=1.000  worst=1.000  sd=0.000  ok=5/5  quality=1.000+/-0.000
+project-staffing  mean=0.976  worst=0.940  sd=0.033  ok=5/5  quality=0.976+/-0.033  [corrections=0.4 warnings=0.4]
+conference-reviews  mean=0.937  worst=0.684  sd=0.142  ok=5/5  quality=0.937+/-0.142  [warnings=0.2]
+  requires_element: The model has no fact type connecting "Reviewer" and "Paper".
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Reviewer reviews Paper"), so it cannot rule out: Rules out: two facts of Reviewer reviews Paper that agree on Reviewer, Paper -- e.g. {Reviewer=Reviewer#1, Paper=Paper#1}; {Reviewer=Reviewer#1, Paper=Paper#1}
+freight-corrections  mean=0.921  worst=0.917  sd=0.010  ok=5/5  quality=0.921+/-0.010  [corrections=2.4 warnings=1.2]
+suite 2.6.0  artifact=haiku45-2@3edda4eff7e5  mean=0.973 +/- 0.018 (95%)  worst=0.684  (repeat=5)
+  warnings: completeness/fact-type-without-uniqueness x8, completeness/fact-type-without-constraints x5, constraint/external-uniqueness-all-local x1
+  fixed:    missing_identifier_population x8, arity_mismatch x7, invalid_role_player x2
+  cache: 251176 read, 12394 written
+  gaps below 0.026 are not resolvable against a comparable run
+  93% of that noise is conference-reviews alone
+Wrote 16 payload(s) to /Users/gschenz/repos/barwise/barwise/eval-payloads/20260828-1647/haiku45-2-train.
+NOTE: recording against a modified working tree (1.7.0 (d529a5f-dirty)). The commit alone will not reproduce this run.
