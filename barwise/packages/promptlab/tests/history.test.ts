@@ -80,6 +80,20 @@ describe("history", () => {
     });
   });
 
+  it("carries the thinking budget the caller supplies, and omits it otherwise", () => {
+    // Recorded because a budget changes scores without changing
+    // promptHash, provider or model -- two rows differing only in it
+    // measured different configurations
+    // (docs/specs/thinking-budget-dimension.spec.md).
+    const withBudget = toHistoryEntry(report, "2026-08-29T00:00:00Z", {
+      thinkingBudget: 4096,
+    });
+    expect(withBudget.thinkingBudget).toBe(4096);
+
+    const without = toHistoryEntry(report, "2026-08-29T00:00:00Z");
+    expect("thinkingBudget" in without).toBe(false);
+  });
+
   it("carries the build provenance the caller supplies, and omits it otherwise", () => {
     // Same seam as the date: this package computes the prompt hash from
     // bytes it rendered, and takes everything requiring I/O from the

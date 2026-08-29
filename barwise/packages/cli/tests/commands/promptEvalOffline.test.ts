@@ -314,6 +314,34 @@ describe("barwise prompt eval, against a loopback provider", () => {
     expect(fake!.requests).toHaveLength(0);
   });
 
+  it("rejects a --thinking-budget below the API minimum before spending a call", async () => {
+    await serve(fixtureAnswerer(EVALS, FIXTURES, TRAIN));
+
+    const { stderr, exitCode } = await runCli(
+      evalArgs(["--split", "train", "--no-history", "--thinking-budget", "12"]),
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("--thinking-budget must be an integer of at least 1024");
+    expect(fake!.requests).toHaveLength(0);
+  });
+
+  it("refuses --thinking-budget on a provider without the parameter, before spending", async () => {
+    // The loopback provider is Ollama; the budget is an Anthropic
+    // extended-thinking parameter, and silently ignoring it would
+    // record a run whose flag did nothing
+    // (docs/specs/thinking-budget-dimension.spec.md).
+    await serve(fixtureAnswerer(EVALS, FIXTURES, TRAIN));
+
+    const { stderr, exitCode } = await runCli(
+      evalArgs(["--split", "train", "--no-history", "--thinking-budget", "4096"]),
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("thinkingBudget is an Anthropic extended-thinking parameter");
+    expect(fake!.requests).toHaveLength(0);
+  });
+
   it("rejects an unknown --artifact-version before spending a call", async () => {
     await serve(fixtureAnswerer(EVALS, FIXTURES, TRAIN));
 

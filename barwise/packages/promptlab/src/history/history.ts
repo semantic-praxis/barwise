@@ -46,6 +46,14 @@ export interface HistoryEntry {
   readonly build?: BuildProvenance;
   readonly provider?: string;
   readonly model?: string;
+  /**
+   * Extended-thinking budget the run's calls carried
+   * (docs/specs/thinking-budget-dimension.spec.md). Recorded because
+   * it changes scores without changing promptHash, provider or model;
+   * absent means no thinking parameter was sent, which is what every
+   * row written before the field means.
+   */
+  readonly thinkingBudget?: number;
   readonly repeat: number;
   /**
    * Which half of the suite ran. Absent means all of it, which is what
@@ -150,7 +158,12 @@ export function historyPathFor(manifestPath: string): string {
 export function toHistoryEntry(
   report: SuiteReport,
   date: string,
-  target?: { provider?: string; model?: string; build?: BuildProvenance; },
+  target?: {
+    provider?: string;
+    model?: string;
+    build?: BuildProvenance;
+    thinkingBudget?: number;
+  },
 ): HistoryEntry {
   return {
     date,
@@ -160,6 +173,9 @@ export function toHistoryEntry(
     ...(target?.build !== undefined ? { build: target.build } : {}),
     ...(target?.provider !== undefined ? { provider: target.provider } : {}),
     ...(target?.model !== undefined ? { model: target.model } : {}),
+    ...(target?.thinkingBudget !== undefined
+      ? { thinkingBudget: target.thinkingBudget }
+      : {}),
     repeat: report.repeat,
     ...(report.split !== undefined ? { split: report.split } : {}),
     ...(tokenTotals(report) ?? {}),

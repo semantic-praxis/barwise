@@ -252,6 +252,36 @@ A directory entry sharing a builtin's version replaces it, which is what
 makes "a local edit wins" true, and is the same mechanism the shadow
 directory above uses.
 
+## The thinking dimension
+
+`--thinking-budget <n>` (anthropic only, minimum 1024) sends extended
+thinking on every call and is recorded on the history row -- a budget
+changes scores without changing the prompt hash, so an unrecorded one
+would make two rows indistinguishable
+(docs/specs/thinking-budget-dimension.spec.md). Two facts frame any
+experiment with it: the recorded arms were asymmetric until now --
+no parameter means thinking OFF on Haiku 4.5 and adaptive thinking ON
+on Sonnet 5 -- and the suite is near-saturated for haiku, so a full
+thinking arm would resolve nothing. Probe the reproducible failure
+instead: conference-reviews is haiku's one surviving bimodal
+regression, and its cell in a train leg answers whether thinking
+closes it (`eval` runs whole splits -- 35 calls a leg at haiku prices;
+a `--case` filter for cheaper probes is barwise-898).
+
+```sh
+# Baseline leg exists in the record already; the two thinking legs:
+npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \
+  --split train --repeat 5 --thinking-budget 4096 --verbose --no-history \
+  --save-payloads "eval-payloads/scratch-thinking-4k"
+npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \
+  --split train --repeat 5 --thinking-budget 16384 --verbose --no-history \
+  --save-payloads "eval-payloads/scratch-thinking-16k"
+```
+
+(`--no-history` while these are probes; a real thinking arm records
+like any other and the row carries `thinking=<n>`. Thinking bills as
+output tokens, so a 16k budget adds at most ~8 cents per haiku call.)
+
 ## Record or not
 
 Recording is the default: the blocks above append to

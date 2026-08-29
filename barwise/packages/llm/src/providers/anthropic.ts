@@ -35,6 +35,20 @@ export interface AnthropicClientOptions {
   readonly model?: string;
   /** Maximum tokens for the response. Defaults to 8192. */
   readonly maxTokens?: number;
+  /**
+   * Extended-thinking budget in tokens
+   * (docs/specs/thinking-budget-dimension.spec.md). When set, every
+   * request carries `thinking: {type: "enabled", budget_tokens: N}`
+   * and `max_tokens` is raised by N: on the models this parameter
+   * exists for, thinking spends inside `max_tokens`, and the output
+   * budget prices the ANSWER -- without the raise, a thinking run
+   * would truncate answers the same budget fit without thinking.
+   * Models on adaptive thinking (Sonnet 5 and later) reject
+   * `budget_tokens` with a 400 on the run's first call, before
+   * meaningful spend; the option does not translate to their `effort`
+   * dial by design.
+   */
+  readonly thinkingBudget?: number;
 }
 
 /**
@@ -50,11 +64,30 @@ export class AnthropicLlmClient implements LlmClient {
   private client?: Anthropic;
   private readonly apiKey?: string;
   private readonly maxTokens: number;
+  private readonly thinkingBudget?: number;
 
   constructor(options?: AnthropicClientOptions) {
     this.apiKey = options?.apiKey;
     this.model = options?.model ?? "claude-sonnet-4-5-20250929";
     this.maxTokens = options?.maxTokens ?? 8192;
+    this.thinkingBudget = options?.thinkingBudget;
+  }
+
+  /**
+   * The thinking parameter and the max_tokens it implies. One place,
+   * because the two must move together: budget_tokens must stay under
+   * max_tokens, and the answer's budget must survive the thinking
+   * spend.
+   */
+  private budgetFor(
+    request: CompletionRequest,
+  ): { max_tokens: number; thinking?: { type: "enabled"; budget_tokens: number; }; } {
+    const answerBudget = request.maxTokens ?? this.maxTokens;
+    if (this.thinkingBudget === undefined) return { max_tokens: answerBudget };
+    return {
+      max_tokens: answerBudget + this.thinkingBudget,
+      thinking: { type: "enabled", budget_tokens: this.thinkingBudget },
+    };
   }
 
   /** Load the SDK and construct the underlying client on first use. */
@@ -114,7 +147,7 @@ export class AnthropicLlmClient implements LlmClient {
     const start = Date.now();
     const response = await client.messages.stream({
       model: this.model,
-      max_tokens: request.maxTokens ?? this.maxTokens,
+      ...this.budgetFor(request),
       system: this.systemFor(request),
       messages: this.messagesFor(request),
     }).finalMessage();
@@ -148,7 +181,7 @@ export class AnthropicLlmClient implements LlmClient {
     // `describeAnthropicStop` exists to label.
     const response = await client.messages.stream({
       model: this.model,
-      max_tokens: request.maxTokens ?? this.maxTokens,
+      ...this.budgetFor(request),
       system: this.systemFor(request),
       messages: this.messagesFor(request),
       tools: [

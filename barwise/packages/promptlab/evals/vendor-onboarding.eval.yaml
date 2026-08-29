@@ -15,13 +15,17 @@ transcript: vendor-onboarding.transcript.md
 reference: vendor-onboarding.reference.orm.yaml
 ambiguityBudget: 10
 vocabulary:
-  # Mei names the concept "phone number" ("Name, email, phone
-  # number."), which the reference shortened to ContactPhone and the
-  # recorded haiku payloads render in full. Without the licence the
-  # entity-fold tier (suite 2.6.0, barwise-890) cannot evidence the
-  # phone attribute against the Contact entity, and the Meridian check
-  # fails a shape that carries the exact rule.
-  - [ContactPhone, ContactPhoneNumber]
+  # Mei names the contact's attributes "Name, email, phone number" --
+  # no Contact prefix -- so every recorded rendering of those words is
+  # faithful: the reference shortened to ContactPhone/ContactEmail,
+  # the haiku payloads prefixed in full, and the opus probe dropped
+  # the prefix entirely (EmailAddress, PhoneNumber). Without the
+  # licence the entity-fold tier (barwise-890) cannot evidence the
+  # absorbed attributes against the Contact entity, and the Meridian
+  # check fails shapes that carry the exact rule (barwise-892 at
+  # 2.6.0, barwise-896 at 2.7.0).
+  - [ContactPhone, ContactPhoneNumber, PhoneNumber]
+  - [ContactEmail, EmailAddress]
 checks:
   - kind: must_validate
   - kind: requires_element
