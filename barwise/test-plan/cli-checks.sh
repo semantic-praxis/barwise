@@ -105,9 +105,11 @@ for BIN in "${ROOT}/packages/cli/dist/index.js" "${BUNDLE}" \
   elif [[ -x "${BIN}" ]]; then
     ok "${REL} is executable"
   else
-    # shellcheck disable=SC2012  # BIN is a known literal, not a
+    # shellcheck disable=SC2012,SC2312  # BIN is a known literal, not a
     # glob or user input, and this only decorates a failure message;
-    # stat spells the mode differently on GNU and BSD.
+    # stat spells the mode differently on GNU and BSD. The masked return
+    # is the point too: the check has already failed, and an ls that also
+    # fails should degrade the message, not the run.
     bad "${REL} is executable" "mode $(ls -l "${BIN}" | cut -d' ' -f1); shebang without the bit"
   fi
 done

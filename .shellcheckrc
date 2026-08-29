@@ -1,8 +1,35 @@
-# Style checks this project has opted into.
+# Checks this project has opted into, beyond shellcheck's defaults.
+#
+# --- Correctness ------------------------------------------------------
+#
+# check-extra-masked-returns (SC2312): a command substitution nested
+# inside another command throws its exit status away. This is not
+# hypothetical here -- both runner scripts shipped the guard
+#
+#   if [[ -n "$(git status --porcelain)" ]]; then ... refuse ... fi
+#
+# where a git that FAILS produces empty output, which `-n` reads as a
+# clean tree. The guard whose whole job is to stop a run that records a
+# commit would have waved it through. Both were found by reading and
+# fixed by hand; default shellcheck flags neither, and this option flags
+# both at that exact spelling.
+#
+# check-set-e-suppressed (SC2310/SC2311): `set -e` does not apply inside
+# a function invoked as a condition, so a function that carefully exits
+# non-zero on failure runs to completion and reports success. Costs
+# nothing today -- enabled so it cannot arrive unnoticed.
+#
+# --- Style ------------------------------------------------------------
 #
 # require-variable-braces (SC2250): ${foo} over $foo, always.
 # require-double-brackets (SC2292): [[ ]] over [ ].
 #
-# Both are opt-in in shellcheck and both are taste rather than
-# correctness -- adopted deliberately so the shell scripts read one way.
+# Both are taste rather than correctness -- adopted deliberately so the
+# shell scripts read one way. Deliberately NOT adopted, having been
+# measured against the tracked scripts: check-unassigned-uppercase fires
+# only on the two env vars Claude Code injects into the session hook
+# (false positives, and `set -u` already catches the real case at run
+# time); quote-safe-variables, add-default-case, deprecate-which and
+# avoid-nullary-conditions are further taste with nothing behind them.
+enable=check-extra-masked-returns,check-set-e-suppressed
 enable=require-variable-braces,require-double-brackets

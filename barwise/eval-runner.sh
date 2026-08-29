@@ -52,9 +52,15 @@ run_arm() {
     echo "== ${name}: already complete in this round, skipping"
     return
   fi
+  # Resolved to its own variable rather than inlined into the npx call:
+  # a substitution nested inside another command throws its exit status
+  # away, which is the shape that made the dirty-tree guard above read a
+  # failed `git status` as a clean tree.
+  local concurrency
+  concurrency="$(concurrency_for "${split}")"
   echo "== ${name} (${split} split)"
   npx barwise prompt eval --provider anthropic \
-    --split "${split}" --repeat 5 --concurrency "$(concurrency_for "${split}")" --verbose \
+    --split "${split}" --repeat 5 --concurrency "${concurrency}" --verbose \
     --save-payloads "${ROUND}/${name}" "$@" 2>&1 | tee "${ROUND}/${name}.log"
   touch "${ROUND}/${name}.done"
 }
