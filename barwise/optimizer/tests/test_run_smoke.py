@@ -140,8 +140,19 @@ def test_the_candidate_resolves_through_the_production_loader(compiled):
         env={"PATH": "/usr/bin:/bin:/usr/local/bin", "HOME": "/tmp"},
     )
 
-    assert "Using artifact version dspy-bootstrap-minimal-1." in proc.stderr
-    assert "Using the default prompt artifact." not in proc.stderr
+    # The forced form, verbatim. The old assertion looked for
+    # "...minimal-1." with a trailing period, which the CLI has not
+    # emitted since it started echoing the client it resolved against
+    # (barwise-850) -- so this test had a stale expected string on top
+    # of the ambiguity, and would have kept failing after the flag was
+    # added. Asserting the "forced by" wording also pins the distinction
+    # the CLI draws on purpose: an operator pinned this, it did not
+    # match the client, so it claims nothing about production.
+    assert (
+        "Using artifact version dspy-bootstrap-minimal-1 "
+        "(forced by --artifact-version;" in proc.stderr
+    )
+    assert "Using the default prompt artifact" not in proc.stderr
 
 
 def test_artifacts_alone_is_ambiguous_for_a_candidate(compiled):
