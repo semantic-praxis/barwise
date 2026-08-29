@@ -58,6 +58,26 @@ did, and was scanning 1426 of 1483 tracked files in CI, silently, with
 that fixes one instance of a named class and does not report the sweep
 is incomplete.
 
+## A gate is not verified until you have watched it go red
+
+Before an entry claims a mechanism landed, that mechanism must have been
+seen failing. Three verifications in one session came back green for
+reasons unrelated to what they tested -- a probe written as an
+**untracked** file that the gate could not enumerate; an exit code read
+through `echo | sh hook | tail`, which puts `echo` in `PIPESTATUS[0]`;
+and a `python3 -m pytest` failure concluded as "this container cannot
+run the suite" when the deps were in a uv venv.
+
+So: plant the defect where the gate actually looks (staged or tracked,
+not merely on disk), read the status with nothing in between, and
+establish the red reading BEFORE the green one. `npm run test:scripts`
+does this for the enumerating gates and is the worked example --
+including a test that pins the untracked-probe blind spot itself, so
+nobody re-runs that experiment and believes the result.
+
+An entry reporting a landing you have only seen pass is not a landing
+yet. Say that, or go and break it.
+
 ## What belongs
 
 Process, not code. The bug you fixed is the PR; the reason nothing
