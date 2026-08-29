@@ -111,6 +111,13 @@ jobs:
       # byte-identical; editing one copy without its partners fails
       # here instead of drifting silently (barwise-868).
       - run: npm run check:parity
+
+      # A NUL byte makes git classify a source file as binary: no diff, no
+      # blame, no review, and a patch taken from it loses changes silently.
+      # Four files had reached main writing NUL as a composite-key
+      # delimiter, one of them never diffable in its history. dprint, tsc,
+      # eslint and oxlint all accept NUL, so nothing else catches it.
+      - run: npm run check:no-nul
         if: steps.changes.outputs.docs_only != 'true'
 
       # The duplication ratchet: every candidate the deterministic
