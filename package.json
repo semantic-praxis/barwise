@@ -21,6 +21,7 @@
     "check:no-nul": "npm --prefix barwise run check:no-nul --",
     "check:shell": "npm --prefix barwise run check:shell --",
     "check:root-scripts": "npm --prefix barwise run check:root-scripts --",
+    "test:scripts": "npm --prefix barwise run test:scripts --",
     "audit:duplication": "npm --prefix barwise run audit:duplication --",
     "audit:rubric": "npm --prefix barwise run audit:rubric --",
     "ci:local": "npm --prefix barwise run ci:local --",

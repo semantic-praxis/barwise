@@ -147,6 +147,16 @@ jobs:
       - run: npm run check:root-scripts
         if: steps.changes.outputs.docs_only != 'true'
 
+      # The gates' own tests. Every enumerating gate is proven to report
+      # the same coverage from three different cwds (barwise-905: one of
+      # them silently scanned 1426 of 1483 files under `npm run`), and
+      # every gate here is shown RED on a defect planted where that gate
+      # actually looks -- staged in a throwaway repo, not merely written
+      # to disk (barwise-906: a NUL probe that was never `git add`ed, so
+      # the gate could not see it and reported OK).
+      - run: npm run test:scripts
+        if: steps.changes.outputs.docs_only != 'true'
+
       # The duplication ratchet: every candidate the deterministic
       # detectors surface carries a verdict in audit-baseline.json, and
       # the check fails on a new unclassified candidate AND on a stale
