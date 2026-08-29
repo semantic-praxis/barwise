@@ -14,23 +14,31 @@ set -euo pipefail
 # skips the arms that finished. Minted fresh otherwise, which is what
 # keeps two rounds from overwriting each other by run index.
 STAMP="${STAMP:-$(date '+%Y%m%d-%H%M')}"
-ROUND="eval-payloads/$STAMP"
+ROUND="eval-payloads/${STAMP}"
 
 # Preflight, both free, both paid for once already. A row written off a
 # modified tree names a commit that never produced it, and the `barwise`
 # bin reads `dist`, so an unbuilt checkout measures the previous build
 # while the footer names this suite version.
-if [ -n "$(git status --porcelain)" ]; then
+# Captured separately, not inlined into the test: a failed `git
+# status` produces empty output, which an inline `-n` test reads as
+# a CLEAN tree -- so a broken git would wave through the guard whose
+# whole job is to stop a run that records a commit.
+if ! dirty="$(git status --porcelain)"; then
+  echo "git status failed; refusing to run rather than assume a clean tree" >&2
+  exit 1
+fi
+if [[ -n "${dirty}" ]]; then
   echo "working tree is dirty -- commit or stash first (history rows record the commit)" >&2
   exit 1
 fi
 npm run build >/dev/null
 
-mkdir -p "$ROUND"
+mkdir -p "${ROUND}"
 
 # The recorded concurrency: case chains in parallel, repeats within a
 # case serial, first call alone for the cache write.
-concurrency_for() { if [ "$1" = "dev" ]; then echo 3; else echo 7; fi; }
+concurrency_for() { if [[ "$1" = "dev" ]]; then echo 3; else echo 7; fi; }
 
 # run_arm <name> <split> [extra barwise flags...]
 #
@@ -40,15 +48,15 @@ concurrency_for() { if [ "$1" = "dev" ]; then echo 3; else echo 7; fi; }
 run_arm() {
   local name=$1 split=$2
   shift 2
-  if [ -f "$ROUND/$name.done" ]; then
-    echo "== $name: already complete in this round, skipping"
+  if [[ -f "${ROUND}/${name}.done" ]]; then
+    echo "== ${name}: already complete in this round, skipping"
     return
   fi
-  echo "== $name ($split split)"
+  echo "== ${name} (${split} split)"
   npx barwise prompt eval --provider anthropic \
-    --split "$split" --repeat 5 --concurrency "$(concurrency_for "$split")" --verbose \
-    --save-payloads "$ROUND/$name" "$@" 2>&1 | tee "$ROUND/$name.log"
-  touch "$ROUND/$name.done"
+    --split "${split}" --repeat 5 --concurrency "$(concurrency_for "${split}")" --verbose \
+    --save-payloads "${ROUND}/${name}" "$@" 2>&1 | tee "${ROUND}/${name}.log"
+  touch "${ROUND}/${name}.done"
 }
 
 # --- The round --------------------------------------------------------
@@ -71,14 +79,14 @@ ARMS="${ARMS:-candidate}"
 #
 #   npx barwise prompt artifact --provider anthropic --model claude-sonnet-5 \
 #     --artifacts "$CANDIDATE_DIR" --artifact-version "$CANDIDATE_VERSION"
-if [ "$ARMS" = "candidate" ] || [ "$ARMS" = "both" ]; then
+if [[ "${ARMS}" = "candidate" ]] || [[ "${ARMS}" = "both" ]]; then
   CANDIDATE_DIR="${CANDIDATE_DIR:-../optimizer/out}"
   : "${CANDIDATE_VERSION:?set it to the version field of the exported candidate}"
 
   run_arm candidate-sonnet-dev dev \
-    --model claude-sonnet-5 --artifacts "$CANDIDATE_DIR" --artifact-version "$CANDIDATE_VERSION"
+    --model claude-sonnet-5 --artifacts "${CANDIDATE_DIR}" --artifact-version "${CANDIDATE_VERSION}"
   run_arm candidate-sonnet-train train \
-    --model claude-sonnet-5 --artifacts "$CANDIDATE_DIR" --artifact-version "$CANDIDATE_VERSION"
+    --model claude-sonnet-5 --artifacts "${CANDIDATE_DIR}" --artifact-version "${CANDIDATE_VERSION}"
 
   run_arm default-sonnet-dev dev \
     --model claude-sonnet-5 --artifact-version default
@@ -88,7 +96,7 @@ if [ "$ARMS" = "candidate" ] || [ "$ARMS" = "both" ]; then
   # The candidate prompt travels with the round: it is not a shipped
   # artifact, so its recorded promptHash resolves to nothing unless the
   # bytes that produced it sit in the record beside the scores.
-  cp "$CANDIDATE_DIR"/*.prompt.yaml "$ROUND/" 2>/dev/null || true
+  cp "${CANDIDATE_DIR}"/*.prompt.yaml "${ROUND}/" 2>/dev/null || true
 fi
 
 # The haiku thinking probe. Both legs send the shipped haiku45-2 prompt,
@@ -102,18 +110,18 @@ fi
 #
 # Haiku 4.5 takes a token budget; Sonnet 5 rejects budget_tokens outright
 # (its dial is effort), which is why this probe is haiku-only.
-if [ "$ARMS" = "thinking" ] || [ "$ARMS" = "both" ]; then
+if [[ "${ARMS}" = "thinking" ]] || [[ "${ARMS}" = "both" ]]; then
   THINKING_BUDGET="${THINKING_BUDGET:-8192}"
 
   run_arm haiku-nothinking-train train --model claude-haiku-4-5
   run_arm "haiku-thinking${THINKING_BUDGET}-train" train \
-    --model claude-haiku-4-5 --thinking-budget "$THINKING_BUDGET"
+    --model claude-haiku-4-5 --thinking-budget "${THINKING_BUDGET}"
 fi
 
 # --- The record -------------------------------------------------------
-rm -f "$ROUND"/*.done
+rm -f "${ROUND}"/*.done
 
-git checkout -b "eval-round-$STAMP"
-git add "$ROUND" packages/promptlab/evals/history.jsonl
-git commit -m "log: eval round $STAMP"
-git push -u origin "eval-round-$STAMP"
+git checkout -b "eval-round-${STAMP}"
+git add "${ROUND}" packages/promptlab/evals/history.jsonl
+git commit -m "log: eval round ${STAMP}"
+git push -u origin "eval-round-${STAMP}"

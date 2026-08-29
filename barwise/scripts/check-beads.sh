@@ -19,15 +19,15 @@ beads_check() {
   local strict="${BEADS_STRICT:-0}" f=""
   local a
   for a in "$@"; do
-    case "$a" in
+    case "${a}" in
       --strict) strict=1 ;;
-      *) f="$a" ;;
+      *) f="${a}" ;;
     esac
   done
   f="${f:-$(git rev-parse --show-toplevel 2>/dev/null)/.beads/issues.jsonl}"
-  [ -f "$f" ] || { echo "beads_check: no such file: $f" >&2; return 2; }
+  [[ -f "${f}" ]] || { echo "beads_check: no such file: ${f}" >&2; return 2; }
   command -v python3 >/dev/null 2>&1 || { echo "beads_check: python3 required" >&2; return 2; }
-  BEADS_STRICT="$strict" python3 - "$f" <<'PY'
+  BEADS_STRICT="${strict}" python3 - "${f}" <<'PY'
 import json, os, re, sys
 
 PATH = sys.argv[1]

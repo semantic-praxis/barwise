@@ -1,0 +1,8 @@
+# Style checks this project has opted into.
+#
+# require-variable-braces (SC2250): ${foo} over $foo, always.
+# require-double-brackets (SC2292): [[ ]] over [ ].
+#
+# Both are opt-in in shellcheck and both are taste rather than
+# correctness -- adopted deliberately so the shell scripts read one way.
+enable=require-variable-braces,require-double-brackets

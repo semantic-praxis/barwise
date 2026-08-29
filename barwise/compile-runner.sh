@@ -12,7 +12,7 @@ set -euo pipefail
 # One stamp per compile, so two runs cannot overwrite each other's
 # candidate or report. Override to write into an existing directory.
 STAMP="${STAMP:-$(date '+%Y%m%d-%H%M')}"
-OUT="optimizer/out/$STAMP"
+OUT="optimizer/out/${STAMP}"
 
 # --- Knobs ------------------------------------------------------------
 #
@@ -30,14 +30,22 @@ SEED_FROM="${SEED_FROM:-}"
 
 # --- Preflight, all free ----------------------------------------------
 
-if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
   echo "ANTHROPIC_API_KEY is not exported. Export it; never pass it as a flag." >&2
   exit 1
 fi
 
 # A candidate's provenance names a commit, so a dirty tree would record a
 # revision that never produced it.
-if [ -n "$(git status --porcelain)" ]; then
+# Captured separately, not inlined into the test: a failed `git
+# status` produces empty output, which an inline `-n` test reads as
+# a CLEAN tree -- so a broken git would wave through the guard whose
+# whole job is to stop a run that records a commit.
+if ! dirty="$(git status --porcelain)"; then
+  echo "git status failed; refusing to run rather than assume a clean tree" >&2
+  exit 1
+fi
+if [[ -n "${dirty}" ]]; then
   echo "working tree is dirty -- the candidate's provenance records a commit," >&2
   echo "so it must be a commit that produced this tree. Offenders:" >&2
   git status --porcelain >&2
@@ -75,42 +83,42 @@ echo "== pytest (the only guard this lane has)"
 # compile.py refuses at config time -- but refusing here costs nothing
 # rather than costing the bootstrapping calls already spent.
 PROPOSER_FLAG=()
-if [ "$OPTIMIZER" != "bootstrap" ]; then
-  if [ -z "$PROPOSER" ]; then
-    echo "--optimizer $OPTIMIZER needs a proposer model; set PROPOSER=" >&2
+if [[ "${OPTIMIZER}" != "bootstrap" ]]; then
+  if [[ -z "${PROPOSER}" ]]; then
+    echo "--optimizer ${OPTIMIZER} needs a proposer model; set PROPOSER=" >&2
     exit 1
   fi
-  PROPOSER_FLAG=(--proposer-model "$PROPOSER")
+  PROPOSER_FLAG=(--proposer-model "${PROPOSER}")
 fi
 
 SEED_FLAG=()
-if [ -n "$SEED_FROM" ]; then
-  SEED_FLAG=(--seed-from "$SEED_FROM")
+if [[ -n "${SEED_FROM}" ]]; then
+  SEED_FLAG=(--seed-from "${SEED_FROM}")
 fi
 
-mkdir -p "$OUT"
+mkdir -p "${OUT}"
 
 # --- The compile ------------------------------------------------------
 #
 # stdout carries the run's JSON report; stderr carries the per-call
 # progress (barwise-897), so they are split rather than interleaved --
 # `report.json` stays parseable and `compile.log` stays readable.
-echo "== compile: $OPTIMIZER -> $TARGET, ceiling $MAX_CALLS calls"
-echo "   progress on stderr; report.json and the candidate land in $OUT"
+echo "== compile: ${OPTIMIZER} -> ${TARGET}, ceiling ${MAX_CALLS} calls"
+echo "   progress on stderr; report.json and the candidate land in ${OUT}"
 (
   cd optimizer && uv run python -m barwise_optimizer.compile \
-    --target-model "$TARGET" \
-    --optimizer "$OPTIMIZER" \
-    --max-calls "$MAX_CALLS" \
-    --samples-per-candidate "$SAMPLES" \
-    --out "out/$STAMP" \
+    --target-model "${TARGET}" \
+    --optimizer "${OPTIMIZER}" \
+    --max-calls "${MAX_CALLS}" \
+    --samples-per-candidate "${SAMPLES}" \
+    --out "out/${STAMP}" \
     ${PROPOSER_FLAG[@]+"${PROPOSER_FLAG[@]}"} \
     ${SEED_FLAG[@]+"${SEED_FLAG[@]}"}
-) 2>&1 >"$OUT/report.json" | tee "$OUT/compile.log" >&2
+) 2>&1 >"${OUT}/report.json" | tee "${OUT}/compile.log" >&2
 
 # --- What to read, and what NOT to conclude ---------------------------
 echo
-echo "== done. $OUT holds the candidate, its delta report, and compile.log"
+echo "== done. ${OUT} holds the candidate, its delta report, and compile.log"
 echo
 echo "Read the delta report's THREE arms, and gate on the right one:"
 echo "  shipped    what production sends the target model today"
@@ -130,7 +138,7 @@ echo
 # prose is the copy whose wording nobody owns -- a reword would have made
 # this block silently print nothing, which is the failure mode of every
 # grep over a sentence.
-python3 - "$OUT/report.json" <<'PYEOF' || true
+python3 - "${OUT}/report.json" <<'PYEOF' || true
 import json, sys
 try:
     v = json.load(open(sys.argv[1])).get("verdict")
@@ -150,7 +158,7 @@ print(f"  {v['summary']}")
 PYEOF
 echo
 echo "If it beats shipped, the measurement round is:"
-echo "  CANDIDATE_DIR=../optimizer/out/$STAMP CANDIDATE_VERSION=<version> ARMS=candidate ./eval-runner.sh"
+echo "  CANDIDATE_DIR=../optimizer/out/${STAMP} CANDIDATE_VERSION=<version> ARMS=candidate ./eval-runner.sh"
 echo
 echo "Record the outcome in docs/prompt-optimization-log.md either way."
 echo "A failed compile that goes unrecorded is how the same approach gets"
