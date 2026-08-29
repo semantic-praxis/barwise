@@ -19,6 +19,7 @@
     "check:parity": "node scripts/check-parity.mjs",
     "audit:duplication": "node scripts/audit-duplication.mjs",
     "audit:rubric": "node scripts/audit-rubric.mjs",
+    "ci:local": "node scripts/ci-local.mjs",
     "purity": "node scripts/check-core-purity.mjs",
     "filesize": "node scripts/check-file-size.mjs",
     "check:beads": "bash scripts/check-beads.sh",
