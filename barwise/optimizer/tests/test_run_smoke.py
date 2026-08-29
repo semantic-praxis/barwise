@@ -44,8 +44,16 @@ def repo_root() -> Path:
     raise AssertionError("monorepo not found")
 
 
-@pytest.fixture
-def compiled(tmp_path: Path) -> dict:
+# Module-scoped, and the scope is the point: this fixture runs the WHOLE
+# offline compile, which takes ~30s, and function scope ran it once per
+# test -- five identical compilations for five reads of their output,
+# 152s of a 210s suite. The tests only read what the run produced (files,
+# and subprocesses over the artifacts directory), so one run serves all
+# five. `tmp_path_factory` rather than `tmp_path` because the latter is
+# function-scoped and cannot be requested from a module-scoped fixture.
+@pytest.fixture(scope="module")
+def compiled(tmp_path_factory: pytest.TempPathFactory) -> dict:
+    tmp_path = tmp_path_factory.mktemp("smoke")
     payload = (
         repo_root()
         / "packages/promptlab/tests/fixtures/responses/order-management.json"
