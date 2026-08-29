@@ -113,13 +113,13 @@ taken through it.
 
 The number that should drive the next decision.
 
-| Effort                                              | Calls    | Gaps found                            |
-| --------------------------------------------------- | -------- | ------------------------------------- |
-| Mutation sweep over all ten answer keys             | 0        | 16 instances of barwise-894, measured |
-| Hand-mutating one answer key                        | 0        | 1 (barwise-894, first sighting)       |
-| Reading recorded payloads                           | 0        | 2 (barwise-890, barwise-892)          |
-| Opus probe, `--split dev --repeat 1`                | 3        | 2 (barwise-895, barwise-896)          |
-| The 2.6.0 keyed round, 4 arms x 2 splits x repeat 5 | hundreds | 0                                     |
+| Effort                                              | Calls    | Gaps found                                                    |
+| --------------------------------------------------- | -------- | ------------------------------------------------------------- |
+| Full rubric audit, all 90 checks, all ten keys      | 0        | 16 instances of barwise-894, plus barwise-901 and barwise-902 |
+| Hand-mutating one answer key                        | 0        | 1 (barwise-894, first sighting)                               |
+| Reading recorded payloads                           | 0        | 2 (barwise-890, barwise-892)                                  |
+| Opus probe, `--split dev --repeat 1`                | 3        | 2 (barwise-895, barwise-896)                                  |
+| The 2.6.0 keyed round, 4 arms x 2 splits x repeat 5 | hundreds | 0                                                             |
 
 Zero- and three-call efforts found five defects; the expensive round
 found none. Buy payloads and mutations, not means -- and never buy a
@@ -160,15 +160,60 @@ suite's checks are vacuous" -- wrong, and it would have driven a bad
 decision. The whole-class control is what separated redundancy from
 blindness. **Run the control before reporting the sweep.**
 
-Method control: `requires_element` (0/34), `must_validate` (0/10) and
-`requires_ambiguity` (0/3) show no flips under constraint deletion,
-which is correct -- they do not ask about constraints. The method is
-not producing noise.
-
 The consequence is retroactive rather than prospective: the constraint
 half of every baseline taken to date measured less than it claimed, in
 the suite's most numerous check kind. A 2.7.0 keyed round bought before
 barwise-894 is fixed would inherit the same defect.
+
+### All 90 checks, each vetted with the mutation its own kind is about
+
+The first pass covered `forbids_population` only. Its `0/34`, `0/10`,
+`0/3` for the other kinds was a **method control** -- evidence the
+sweep was not producing noise -- and reading it as vetting would have
+been wrong, because deleting a constraint is not the mutation a check
+about object types is meant to survive. The remaining 47 were then
+swept with their own mutations: delete each object type and fact type
+for `requires_element`, each ambiguity for `requires_ambiguity`, and a
+battery of structural corruptions for `must_validate`.
+
+| Kind                 |  n | Discriminating | Finding                           |
+| -------------------- | -: | -------------- | --------------------------------- |
+| `requires_element`   | 34 | **34**         | clean                             |
+| `forbids_population` | 43 | 27             | barwise-894, 16 vacuous passes    |
+| `requires_ambiguity` |  3 | 2              | barwise-901, one false pass       |
+| `must_validate`      | 10 | **0**          | barwise-902, no reachable failure |
+
+**barwise-901.** `subscription-billing`'s `matches: [cancel]` is about
+the mid-term cancellation policy, but 'cancelled' is a status value the
+transcript uses. Delete the intended ambiguity and the check still
+passes -- on 'Paused subscription status', a boolean-flag ambiguity
+that merely parenthesises the status list. Any competent model mentions
+'cancelled' somewhere, so this is a guaranteed point, not a
+measurement. The mirror image of barwise-892: that was a false miss
+from a token too strict, this is a false pass from one too weak.
+
+**barwise-902.** `must_validate` has no reachable failure path. It
+passed on all 192 recorded payloads across both rounds, with
+`validationErrors` at zero on every one, and on every mutation tried --
+an empty model, a fact type with zero roles, a duplicated object type,
+`{"object_types": "not an array"}`, and `{}`. On `{}` the case scores
+0.125 with rubric 1/8, and the one passing check is `must_validate`:
+the only check a wholly empty extraction passes is the one asserting
+the model is sound. Mechanism: `enforceConformance` repairs upstream,
+so validation is handed nothing to report -- the complement confirms it,
+with corrections firing on 61 of 115 payloads and warnings on 78. Two
+consequences: every rubric fraction carries a constant 1/N of free
+credit, and `validationError: 0.8`, the heaviest weight in the
+manifest, has multiplied zero in 192 payloads.
+
+**A false alarm worth recording.** Mid-audit, rewriting every role's
+player to a nonexistent type appeared to leave the score at a perfect
+1.000 -- which would have meant role declarations were ignored
+entirely. The mutation had set `object_type`; the field is `player`.
+Corrected, the score drops to 0.500 and `requires_element` catches it,
+as it should. Second time in one audit that the first reading was
+wrong and a control caught it. **Check the mutation actually mutated
+something before believing what it shows.**
 
 ## Open
 
@@ -180,3 +225,10 @@ barwise-894 is fixed would inherit the same defect.
   progress, a correct gating command.
 - No keyed round has been measured at suite 2.7.0.
 - barwise-900: nothing catches a red optimizer test.
+- Three rubric defects now open from the audit: barwise-894 (P1, 16
+  vacuous passes), barwise-901 (one false pass), barwise-902
+  (`must_validate` unreachable). `requires_element` is the only kind
+  that came through clean.
+- Nothing re-runs this audit. It was a throwaway script, so the next
+  rubric change can reintroduce exactly what it just found and no test
+  would notice.
