@@ -29,7 +29,6 @@
  * visible here only because its checks pass with their whole
  * constraint class deleted; a subtler wrong-reason pass would not be.
  */
-import { defaultSuitePath, loadSuite, scoreExtraction } from "@barwise/promptlab";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -37,6 +36,18 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(here, "..");
+
+// Dynamic import of the built dist by path, matching regen-references.mjs.
+// A bare specifier would make this root script depend on a workspace
+// package, which knip correctly refuses.
+let promptlab;
+try {
+  promptlab = await import(resolve(ROOT, "packages/promptlab/dist/index.js"));
+} catch {
+  console.error("error: packages/promptlab/dist not found; run 'npm run build' first");
+  process.exit(1);
+}
+const { defaultSuitePath, loadSuite, scoreExtraction } = promptlab;
 const KEYS = resolve(ROOT, "packages/promptlab/tests/fixtures/responses");
 const BASELINE = resolve(ROOT, "rubric-baseline.json");
 
