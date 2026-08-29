@@ -29,7 +29,7 @@
   },
   "dependencies": {
     "@barwise/core": "1.7.0",
-    "elkjs": "^0.9.3"
+    "elkjs": "^0.12.0"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
