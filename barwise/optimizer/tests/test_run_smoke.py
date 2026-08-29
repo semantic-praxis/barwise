@@ -22,6 +22,7 @@ exercised, because a path nothing runs is where the next pair hides.
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -92,6 +93,27 @@ def test_the_run_writes_a_candidate_and_a_report(compiled):
             encoding="utf-8"
         )
     )
+
+
+def test_the_run_writes_its_own_report_json(compiled):
+    """The report is a file the program writes, not a stdout capture.
+
+    It used to exist only because `compile-runner.sh` redirected stdout
+    into it. On a real 40-minute mipro run that file came out EMPTY, so
+    the verdict for 118 paid calls was unreadable and the runner could
+    only print that it could not read it. The redirection is correct in
+    isolation and the failure was never reproduced offline -- which is
+    the argument for this test rather than against it: nothing offline
+    exercised the path at all, so the only place it could fail was in
+    front of an operator who had already spent the money.
+    """
+    report = Path(compiled["dir"]) / "report.json"
+    assert report.is_file(), "run() must write report.json into its out dir"
+    doc = json.loads(report.read_text(encoding="utf-8"))
+    # The verdict is the reason the file exists; a report without it
+    # sends the reader back to grepping the delta report's prose.
+    assert doc["verdict"]["gate"] in {"beats", "ties", "loses", "unmeasurable"}
+    assert doc["artifact"] == compiled["artifact"]
 
 
 def test_the_candidate_is_small_because_the_schema_stays_out_of_it(compiled):

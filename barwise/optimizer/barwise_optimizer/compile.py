@@ -385,7 +385,7 @@ def _run_under_budget(config: RunConfig, out_dir: Path, suite, budget: CallBudge
         saturated=scored > 0 and floored / scored >= SATURATION_SHARE,
     )
 
-    return {
+    result = {
         "artifact": str(artifact_path),
         "shipped": shipped_summary,
         "baseline": baseline_summary,
@@ -394,6 +394,20 @@ def _run_under_budget(config: RunConfig, out_dir: Path, suite, budget: CallBudge
         "budget": budget.summary(),
         "verdict": gate.as_dict(),
     }
+
+    # Written HERE, beside the artifact and the delta report, rather than
+    # left to whoever captures stdout. It was stdout-only, and
+    # `compile-runner.sh` reconstructed report.json with a shell
+    # redirection -- which on a real 40-minute mipro run produced an
+    # EMPTY file, so the run's verdict was unreadable after the calls
+    # were already paid for. The root cause of the empty capture was
+    # never reproduced offline, which is exactly the argument for not
+    # depending on it: the report is this program's output, so this
+    # program writes it, and stdout stays a convenience for pipelines.
+    (out_dir / "report.json").write_text(
+        json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:

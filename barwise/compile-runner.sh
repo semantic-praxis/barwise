@@ -100,11 +100,19 @@ mkdir -p "${OUT}"
 
 # --- The compile ------------------------------------------------------
 #
-# stdout carries the run's JSON report; stderr carries the per-call
-# progress (barwise-897), so they are split rather than interleaved --
-# `report.json` stays parseable and `compile.log` stays readable.
+# EVERYTHING goes to the log. `report.json` is written by compile.py into
+# the same directory, beside the candidate and the delta report -- it is
+# no longer reconstructed here from captured stdout.
+#
+# It used to be. `(...) 2>&1 >report.json | tee compile.log` splits the
+# streams correctly in isolation (verified), and on a real 40-minute
+# mipro run it produced an EMPTY report.json anyway -- so the verdict
+# for 118 paid calls was unreadable, and the runner printed a shrug. The
+# cause was never reproduced offline, and that is the point: a result
+# worth dollars should not depend on a shell capture that can fail in a
+# way nobody can re-create. The program owns its own output file now.
 echo "== compile: ${OPTIMIZER} -> ${TARGET}, ceiling ${MAX_CALLS} calls"
-echo "   progress on stderr; report.json and the candidate land in ${OUT}"
+echo "   progress and report.json both land in ${OUT}"
 (
   cd optimizer && uv run python -m barwise_optimizer.compile \
     --target-model "${TARGET}" \
@@ -114,7 +122,7 @@ echo "   progress on stderr; report.json and the candidate land in ${OUT}"
     --out "out/${STAMP}" \
     ${PROPOSER_FLAG[@]+"${PROPOSER_FLAG[@]}"} \
     ${SEED_FLAG[@]+"${SEED_FLAG[@]}"}
-) 2>&1 >"${OUT}/report.json" | tee "${OUT}/compile.log" >&2
+) 2>&1 | tee "${OUT}/compile.log"
 
 # --- What to read, and what NOT to conclude ---------------------------
 echo
@@ -138,7 +146,16 @@ echo
 # prose is the copy whose wording nobody owns -- a reword would have made
 # this block silently print nothing, which is the failure mode of every
 # grep over a sentence.
-python3 - "${OUT}/report.json" <<'PYEOF' || true
+# No `|| true`. A compile that cannot report its verdict is a failed
+# compile from the operator's side, however well the calls went, and
+# saying so is worth more than continuing politely.
+if [[ ! -s "${OUT}/report.json" ]]; then
+  echo "report.json is missing or empty -- the verdict cannot be read." >&2
+  echo "The run is NOT lost: ${OUT} still holds the candidate and" >&2
+  echo "delta-*.md, which carries the same three arms as prose." >&2
+  exit 1
+fi
+python3 - "${OUT}/report.json" <<'PYEOF'
 import json, sys
 try:
     v = json.load(open(sys.argv[1])).get("verdict")
