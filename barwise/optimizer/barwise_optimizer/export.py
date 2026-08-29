@@ -228,6 +228,7 @@ def _scored(summary: dict) -> int:
 def render_delta_report(
     *,
     candidate_version: str,
+    shipped: dict,
     baseline: dict,
     candidate: dict,
     samples_per_candidate: int,
@@ -240,8 +241,17 @@ def render_delta_report(
     question the mean alone cannot answer and the one most likely to be
     skipped. The rule deltas follow, because they are what survives when
     the margin does not.
+
+    Three arms, not two, and the third is the one the decision turns on
+    (barwise-899). `baseline` is the SEED the optimizer started from --
+    90 words under `--seed-from minimal` -- and a reader takes the word
+    to mean "what we ship". So `shipped` is scored too, on the same dev
+    cases through this same harness: a candidate can beat its seed
+    handily and still lose to production, which is exactly what the
+    2026-08-29 bootstrap run did while reading as a near-tie.
     """
     margin = float(candidate.get("mean", 0.0)) - float(baseline.get("mean", 0.0))
+    shipped_margin = float(candidate.get("mean", 0.0)) - float(shipped.get("mean", 0.0))
 
     # Saturation beats resolvability, and has to be checked first.
     # `scoreExtraction` floors at zero, so runs whose penalties exceed
@@ -263,9 +273,17 @@ def render_delta_report(
     lines.append("")
     lines.append("## Did anything resolve?")
     lines.append("")
-    lines.append(f"- baseline mean: {baseline.get('mean', 0.0):.3f}")
+    lines.append(
+        f"- shipped mean: {shipped.get('mean', 0.0):.3f} "
+        "(what the target model is sent today)"
+    )
+    lines.append(
+        f"- baseline mean: {baseline.get('mean', 0.0):.3f} "
+        "(the seed this run started from)"
+    )
     lines.append(f"- candidate mean: {candidate.get('mean', 0.0):.3f}")
-    lines.append(f"- margin: {margin:+.3f}")
+    lines.append(f"- margin over baseline: {margin:+.3f}")
+    lines.append(f"- margin over shipped: {shipped_margin:+.3f}")
     lines.append(f"- samples per candidate: {samples_per_candidate}")
     if floored:
         lines.append(f"- evaluations floored at zero: {floored} of {total}")
@@ -305,6 +323,39 @@ def render_delta_report(
             "sample count or read the rule deltas below, which are counts "
             "rather than means and do not need a margin to be legible."
         )
+    lines.append("")
+
+    # The gate, stated separately from the margin over the seed: beating
+    # the seed is how the optimizer shows it did something, but only
+    # beating what production sends is a reason to ship anything.
+    if not saturated:
+        if shipped_margin > resolvable:
+            lines.append(
+                f"**It also beats what we ship ({shipped_margin:+.3f}, outside "
+                f"the {resolvable:.3f} noise band).** That is the margin worth "
+                "confirming with a keyed `barwise prompt eval` arm against a "
+                "same-suite-version control."
+            )
+        elif abs(shipped_margin) <= resolvable:
+            lines.append(
+                f"**Against what we ship it is a tie ({shipped_margin:+.3f}, "
+                f"inside the {resolvable:.3f} band).** Improving on the seed is "
+                "not the bar; there is nothing here to gate."
+            )
+        else:
+            lines.append(
+                f"**It loses to what we ship by {abs(shipped_margin):.3f}, "
+                f"outside the {resolvable:.3f} band.** Whatever it did to the "
+                "seed, this candidate is worse than what the target model is "
+                "sent today -- do not spend a keyed arm confirming it."
+            )
+        lines.append("")
+
+    lines.append(
+        "_All three arms are scored through the DSPy harness, so they are "
+        "comparable to each other and NOT to a recorded `barwise prompt eval` "
+        "history row, which renders the prompt production's way._"
+    )
     lines.append("")
     lines.append("## What moved, by name")
     lines.append("")
@@ -358,11 +409,28 @@ def render_delta_report(
     )
     lines.append("")
     lines.append("```sh")
+    # The candidate's own directory, and its version forced. Pointing
+    # `--artifacts` at `packages/llm/prompts` -- which this block did --
+    # widens the set with the directory the SHIPPED builtins are
+    # generated from, so the run resolves a shipped variant on
+    # provider/model match and measures it while the reader believes
+    # they are gating the candidate. That is barwise-850 reproduced in
+    # an instruction. `--artifact-version` is what makes the choice
+    # explicit rather than a race between matching artifacts.
     lines.append(
-        "barwise prompt eval --artifacts packages/llm/prompts "
-        "--provider anthropic --model <target> --split dev --repeat 5"
+        f"barwise prompt eval --artifacts {artifact_path.parent} "
+        f"--artifact-version {candidate_version} \\"
+    )
+    lines.append(
+        "  --provider anthropic --model <target> --split dev --repeat 5"
     )
     lines.append("```")
+    lines.append("")
+    lines.append(
+        "Confirm the resolution first, for free: the same flags on "
+        "`barwise prompt artifact` print the version and hash that would "
+        "be sent."
+    )
     lines.append("")
     return "\n".join(lines)
 

@@ -164,6 +164,7 @@ def test_report_says_plainly_when_a_margin_is_inside_the_noise_band():
     # and it is the step most likely to be skipped.
     body = render_delta_report(
         candidate_version="dspy-1",
+        shipped={"mean": 0.800},
         baseline={"mean": 0.800, "errorsByRule": {}, "warningsByRule": {}},
         candidate={"mean": 0.830, "errorsByRule": {}, "warningsByRule": {}},
         samples_per_candidate=5,
@@ -178,6 +179,7 @@ def test_report_says_plainly_when_a_margin_is_inside_the_noise_band():
 def test_report_calls_a_resolved_margin_resolved():
     body = render_delta_report(
         candidate_version="dspy-1",
+        shipped={"mean": 0.700},
         baseline={"mean": 0.700},
         candidate={"mean": 0.900},
         samples_per_candidate=5,
@@ -191,6 +193,7 @@ def test_report_names_the_rules_that_moved():
     # What survives when the margin does not: counts, not means.
     body = render_delta_report(
         candidate_version="dspy-1",
+        shipped={"mean": 0.6},
         baseline={"mean": 0.6, "warningsByRule": {"completeness/fact-type-without-uniqueness": 18}},
         candidate={"mean": 0.63, "warningsByRule": {"completeness/fact-type-without-uniqueness": 4}},
         samples_per_candidate=5,
@@ -205,6 +208,7 @@ def test_report_names_the_rules_that_moved():
 def test_report_tells_the_reader_its_own_number_is_not_the_accepted_one():
     body = render_delta_report(
         candidate_version="dspy-1",
+        shipped={"mean": 0.7},
         baseline={"mean": 0.7},
         candidate={"mean": 0.9},
         samples_per_candidate=5,
@@ -244,6 +248,7 @@ def test_a_saturated_comparison_refuses_to_call_the_margin_anything():
     # while being nothing of the sort.
     body = render_delta_report(
         candidate_version="dspy-1",
+        shipped={"mean": 0.0},
         baseline={"mean": 0.0, "evaluations": 15, "floored": 10},
         candidate={"mean": 0.001, "evaluations": 15, "floored": 12},
         samples_per_candidate=5,
@@ -262,6 +267,7 @@ def test_saturation_outranks_a_margin_that_would_otherwise_resolve():
     # margin can clear a threshold that no longer means anything.
     body = render_delta_report(
         candidate_version="dspy-1",
+        shipped={"mean": 0.0},
         baseline={"mean": 0.0, "evaluations": 15, "floored": 15},
         candidate={"mean": 0.4, "evaluations": 15, "floored": 8},
         samples_per_candidate=5,
@@ -276,6 +282,7 @@ def test_saturation_outranks_a_margin_that_would_otherwise_resolve():
 def test_an_unsaturated_run_still_reports_normally():
     body = render_delta_report(
         candidate_version="dspy-1",
+        shipped={"mean": 0.70},
         baseline={"mean": 0.70, "evaluations": 15, "floored": 0},
         candidate={"mean": 0.90, "evaluations": 15, "floored": 1},
         samples_per_candidate=5,
@@ -299,6 +306,7 @@ def test_uneven_scored_counts_are_reported_as_rates_not_raw_counts():
     """
     body = render_delta_report(
         candidate_version="dspy-1",
+        shipped={"mean": 0.0},
         baseline={
             "mean": 0.0, "evaluations": 15, "scored": 15,
             "warningsByRule": {"structural/binary-missing-inverse-reading": 160},
@@ -322,6 +330,7 @@ def test_uneven_scored_counts_are_reported_as_rates_not_raw_counts():
 def test_even_scored_counts_keep_the_plain_table():
     body = render_delta_report(
         candidate_version="dspy-1",
+        shipped={"mean": 0.7},
         baseline={
             "mean": 0.7, "evaluations": 15, "scored": 15,
             "warningsByRule": {"completeness/fact-type-without-uniqueness": 18},
@@ -343,6 +352,7 @@ def test_a_summary_without_scored_still_renders():
     # Reports written before `scored` existed must not crash a re-read.
     body = render_delta_report(
         candidate_version="dspy-1",
+        shipped={"mean": 0.7},
         baseline={"mean": 0.7, "evaluations": 15, "warningsByRule": {"a": 3}},
         candidate={"mean": 0.9, "evaluations": 15, "warningsByRule": {"a": 1}},
         samples_per_candidate=5,
@@ -350,3 +360,90 @@ def test_a_summary_without_scored_still_renders():
         artifact_path=Path("out/x.prompt.yaml"),
     )
     assert "raw counts are not comparable" not in body
+
+
+def test_report_says_a_candidate_that_beats_its_seed_still_lost_to_production():
+    # The 2026-08-29 bootstrap run, in miniature: the candidate improves
+    # on the 90-word seed it started from and is far worse than what the
+    # target model is sent today. Reporting only the seed margin made
+    # that read as a near-tie, which is the whole of barwise-899.
+    body = render_delta_report(
+        candidate_version="dspy-1",
+        shipped={"mean": 0.814},
+        baseline={"mean": 0.380},
+        candidate={"mean": 0.500},
+        samples_per_candidate=5,
+        resolvable=0.086,
+        artifact_path=Path("out/x.prompt.yaml"),
+    )
+
+    assert "shipped mean: 0.814" in body
+    assert "margin over shipped: -0.314" in body
+    assert "loses to what we ship" in body
+    # And it must not invite a keyed arm to confirm a loss.
+    assert "do not spend a keyed arm" in body
+
+
+def test_report_calls_a_win_over_the_seed_that_ties_production_a_tie():
+    body = render_delta_report(
+        candidate_version="dspy-1",
+        shipped={"mean": 0.800},
+        baseline={"mean": 0.500},
+        candidate={"mean": 0.810},
+        samples_per_candidate=5,
+        resolvable=0.086,
+        artifact_path=Path("out/x.prompt.yaml"),
+    )
+
+    assert "Against what we ship it is a tie" in body
+    assert "Improving on the seed is not the bar" in body
+
+
+def test_report_promotes_a_candidate_that_clears_production():
+    body = render_delta_report(
+        candidate_version="dspy-1",
+        shipped={"mean": 0.700},
+        baseline={"mean": 0.400},
+        candidate={"mean": 0.900},
+        samples_per_candidate=5,
+        resolvable=0.086,
+        artifact_path=Path("out/x.prompt.yaml"),
+    )
+
+    assert "It also beats what we ship (+0.200" in body
+    assert "keyed `barwise prompt eval` arm" in body
+
+
+def test_report_warns_its_arms_are_not_comparable_to_a_history_row():
+    # Same harness for all three is what makes them comparable to each
+    # other, and is exactly why none is comparable to a recorded row.
+    body = render_delta_report(
+        candidate_version="dspy-1",
+        shipped={"mean": 0.8},
+        baseline={"mean": 0.4},
+        candidate={"mean": 0.5},
+        samples_per_candidate=5,
+        resolvable=0.086,
+        artifact_path=Path("out/x.prompt.yaml"),
+    )
+    assert "NOT to a recorded `barwise prompt eval` history row" in body
+
+
+def test_the_gating_command_names_the_candidate_not_the_shipped_prompts():
+    # The instruction used to read `--artifacts packages/llm/prompts`,
+    # which widens the set with the directory the SHIPPED builtins come
+    # from: the gating run then resolves a shipped variant on
+    # provider/model match and measures it while the reader believes
+    # they are testing the candidate. barwise-850, reproduced in a doc.
+    body = render_delta_report(
+        candidate_version="dspy-mipro-minimal-1",
+        shipped={"mean": 0.7},
+        baseline={"mean": 0.4},
+        candidate={"mean": 0.9},
+        samples_per_candidate=5,
+        resolvable=0.086,
+        artifact_path=Path("out/extraction.dspy-mipro-minimal-1.prompt.yaml"),
+    )
+
+    assert "--artifacts out --artifact-version dspy-mipro-minimal-1" in body
+    assert "--artifacts packages/llm/prompts" not in body

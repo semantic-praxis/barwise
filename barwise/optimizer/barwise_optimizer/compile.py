@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -211,9 +212,18 @@ def seed_instructions(config: RunConfig) -> str:
     prompt earns more penalty than the rubric can offset.
     """
     if config.seed_from == "default":
-        provider, _, model = config.target_model.partition("/")
-        return default_instructions(provider=provider or None, model=model or None)
+        return shipped_instructions(config)
     return SEED_INSTRUCTIONS
+
+
+def shipped_instructions(config: RunConfig) -> str:
+    """What the target model would actually be sent today.
+
+    One reader of the CLI seam, so the seed path and the shipped
+    comparator cannot disagree about which artifact "shipped" means.
+    """
+    provider, _, model = config.target_model.partition("/")
+    return default_instructions(provider=provider or None, model=model or None)
 
 
 def run(config: RunConfig, out_dir: Path) -> dict:
@@ -240,9 +250,38 @@ def run(config: RunConfig, out_dir: Path) -> dict:
         dspy.settings.configure(callbacks=previous_callbacks)
 
 
+class ProgressReporter:
+    """One stderr line per evaluation, naming the phase and the burn.
+
+    A compile is otherwise silent between tqdm ticks ~80s apart at
+    sonnet latency, so a healthy run, a rate-limited one and a hung one
+    are indistinguishable from outside -- and the operator cannot tell
+    whether scores are flat and the run is worth aborting
+    (barwise-897). The eval runner learned this already: `--verbose`
+    exists there for the same reason.
+
+    stderr, not stdout, because `compile` prints its result as JSON and
+    a progress line in that stream would break every reader of it.
+    """
+
+    def __init__(self, budget: CallBudget):
+        self._budget = budget
+        self.phase = "baseline"
+
+    def __call__(self, case_id: str, score: float, outcome: str | None) -> None:
+        detail = f"score={score:.3f}" if outcome is None else f"{outcome} (0.000)"
+        print(
+            f"[{self.phase}] {case_id:<22} {detail}  "
+            f"calls={self._budget.spent}/{self._budget.max_calls}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
 def _run_under_budget(config: RunConfig, out_dir: Path, suite, budget: CallBudget) -> dict:
     baseline_log = MetricLog()
     candidate_log = MetricLog()
+    progress = ProgressReporter(budget)
 
     train = compile_set()
     dev = report_set()
@@ -250,12 +289,42 @@ def _run_under_budget(config: RunConfig, out_dir: Path, suite, budget: CallBudge
     seed = seed_instructions(config)
 
     baseline = ExtractionProgram(seed)
-    evaluate(baseline, dev, make_metric(baseline_log), config.samples_per_candidate)
+    evaluate(baseline, dev, make_metric(baseline_log, progress), config.samples_per_candidate)
 
-    optimizer = build_optimizer(config, make_metric())
+    # The shipped comparator, and the reason it is not optional
+    # (barwise-899). "baseline" here is the SEED program, which for
+    # `--seed-from minimal` is 90 words; a reader takes the word to mean
+    # "what we ship". The 2026-08-29 bootstrap run reported baseline
+    # 0.380 / candidate 0.355 and read as a near-tie, while the shipped
+    # prompt scored 0.814 on these same dev cases -- a candidate that
+    # lost to production by 0.45 looked like noise. So the run scores
+    # what production sends, on the same cases, through the same harness.
+    #
+    # Same harness is the point AND the caveat: DSPy renders these
+    # instructions its own way, so none of the three blocks is
+    # byte-identical to a `barwise prompt eval` row. They are comparable
+    # to each other, which is the comparison the decision needs; they are
+    # not comparable to a recorded history row.
+    #
+    # Skipped only when the seed already IS the shipped prompt, where
+    # `baseline` answers the question and a second sweep buys nothing.
+    shipped_log: MetricLog | None = None
+    if config.seed_from != "default":
+        shipped_log = MetricLog()
+        progress.phase = "shipped"
+        evaluate(
+            ExtractionProgram(shipped_instructions(config)),
+            dev,
+            make_metric(shipped_log, progress),
+            config.samples_per_candidate,
+        )
+
+    progress.phase = "compile"
+    optimizer = build_optimizer(config, make_metric(progress=progress))
     compiled = optimizer.compile(ExtractionProgram(seed), trainset=train, **compile_kwargs(config))
 
-    evaluate(compiled, dev, make_metric(candidate_log), config.samples_per_candidate)
+    progress.phase = "candidate"
+    evaluate(compiled, dev, make_metric(candidate_log, progress), config.samples_per_candidate)
 
     sd = sample_sd(candidate_log.scores)
     resolvable = resolvable_difference(sd, config.samples_per_candidate)
@@ -280,8 +349,16 @@ def _run_under_budget(config: RunConfig, out_dir: Path, suite, budget: CallBudge
         ),
     )
 
+    # When the seed is the shipped prompt, `baseline` already is the
+    # shipped comparator; say so rather than reporting the same sweep
+    # twice or leaving the block out and inviting the 899 misreading.
+    shipped_summary = (
+        shipped_log.summary() if shipped_log is not None else baseline_log.summary()
+    )
+
     report = render_delta_report(
         candidate_version=version,
+        shipped=shipped_summary,
         baseline=baseline_log.summary(),
         candidate=candidate_log.summary(),
         samples_per_candidate=config.samples_per_candidate,
@@ -292,6 +369,7 @@ def _run_under_budget(config: RunConfig, out_dir: Path, suite, budget: CallBudge
 
     return {
         "artifact": str(artifact_path),
+        "shipped": shipped_summary,
         "baseline": baseline_log.summary(),
         "candidate": candidate_log.summary(),
         "resolvable": resolvable,
