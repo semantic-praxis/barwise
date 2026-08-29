@@ -277,6 +277,67 @@ It also refined one of them. That haiku45-2 win is carried entirely by
 unresolved. A one-case win is a different claim from a suite win, and
 nobody had computed the per-case verdicts by hand.
 
+## 2026-08-29, evening: the first real mipro compile, and it lost
+
+**The DSPy loop is closed. The answer is no.** 118 calls, ~40 minutes,
+`mipro` to `claude-sonnet-5` with an opus proposer, seeded `minimal`.
+
+| arm                      | dev mean  | per case            |
+| ------------------------ | --------- | ------------------- |
+| baseline (minimal seed)  | 0.273     | 0.072, 0.115, 0.631 |
+| **shipped (production)** | **0.950** | 0.969, 0.901, 0.981 |
+| candidate (mipro)        | 0.462     | 0.281, 0.460, 0.646 |
+
+**Margin over shipped: -0.488.** Margin over baseline: +0.190 -- and
+that second number is precisely the barwise-899 misreading the shipped
+arm was added to prevent. Reported without it, this run says "candidate
+beats baseline by 0.19" and reads like progress. It is a loss by half
+the scale of the metric.
+
+**MIPRO's own 84.16 is not the same number.** Its trials scored the
+_train_ split and it selected on that: conference-reviews 0.867,
+freight-corrections 0.914, employee-hierarchy 0.850. The same program
+scored 0.462 on held-out dev while production scored 0.950 on those
+same three cases. That gap is what compiling on train and reporting on
+dev exists to expose, and it exposed it: the search overfit five cases.
+
+**What this does not say.** It does not say instruction rewriting
+cannot beat the shipped prompt. It says that ten trials over three
+proposed instructions and six demo sets, selected on five train cases,
+produced something 0.49 worse on held-out cases -- with a hand-written
+4,540-token prompt as the thing to beat. The shipped prompt is the
+output of two rounds of payload forensics; it is a strong baseline, and
+that is the finding worth carrying forward.
+
+### Two instrument defects the run exposed
+
+**The 5 repeats measured nothing, and 30 calls paid for it.** Every arm
+returned byte-identical scores across all five repeats -- baseline
+vendor-onboarding 0.072 five times, shipped 0.969 five times, candidate
+0.281 five times. Whether that is DSPy's request cache or plain
+determinism, the repeats carry no information, and the budget counted
+all fifteen per arm (calls 1-15, 16-30, 104-118). Worse than the waste:
+a spread of zero collapses the variance estimate that `resolvable` is
+computed from, so a near-zero resolvable threshold would make _any_
+margin look decisive. Here the margin is far too large for it to
+matter. On a close run it would have been the whole answer. Filed as
+barwise-908.
+
+**report.json came back empty, so the verdict was unreadable.** It
+existed only because `compile-runner.sh` redirected the compile's
+stdout into it. That redirection is correct in isolation -- verified
+against a probe -- and on this run it produced a zero-byte file anyway,
+after the calls were paid for. The cause was never reproduced offline,
+which is the argument for removing the dependency rather than debugging
+it: `compile.py` now writes `report.json` itself, beside the artifact
+and the delta report, and the runner refuses loudly instead of printing
+`could not read the verdict` and continuing. Guarded by a smoke test
+that was verified red without the write.
+
+Both defects share a shape worth naming: **nothing offline exercised
+the path**, so the only place either could fail was in front of an
+operator who had already spent the money.
+
 ## Open
 
 - The DSPy loop is **not closed**: no instruction-rewriting run
