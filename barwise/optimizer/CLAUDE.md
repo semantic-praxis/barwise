@@ -194,6 +194,12 @@ through. `BARWISE_CLI` overrides what gets run.
 ## Testing
 
 - Framework: pytest. Everything runs offline.
+- **Run it before you spend money, because nothing else will.** This
+  lane is outside Turborepo and CI by design, so a red test here is
+  reported by no one. The loader round trip below sat red from the day
+  the haiku45-2 variant shipped until it was noticed by accident weeks
+  later; the spec's whole guard is the clause "executed by hand"
+  (barwise-900 weighs what should replace it).
 - `DummyLM` drives the program end to end -- signature rendering, the
   call, parsing, the metric -- with no key and no network.
 - The metric tests run the **real** `barwise prompt score` subprocess

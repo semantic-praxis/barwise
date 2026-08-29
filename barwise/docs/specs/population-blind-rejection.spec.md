@@ -1,7 +1,10 @@
 # Population-blind rejection: forbids_population must judge by new errors, not attributed ones
 
-Status: Approved for implementation with suite 2.7.0 (barwise-895; the
-barwise-896 vendor licence rides the same bump)
+Status: Implemented at suite 2.7.0 (2026-08-29, PR #378: the
+before/after error multiset, the barwise-896 vendor licence on the same
+bump, and the free offline re-read appended to the 2.6.0 baseline doc
+-- 11 payloads rise, none falls, 104 unchanged). The blunt-predicate
+half stays open as barwise-894, which this spec scopes out.
 Created: 2026-08-29
 Last-updated: 2026-08-29
 Tracking: barwise-895, barwise-896. Evidence: the opus repeat-1 probe

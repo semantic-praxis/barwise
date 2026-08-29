@@ -1,8 +1,14 @@
 # The thinking budget as a measured experiment dimension
 
-Status: Approved for implementation (no suite bump: the scorer is
-untouched; what changes is what a run can send and what its history
-row records)
+Status: Implemented, all three workstreams (2026-08-29, PR #378: the
+provider option, the `--thinking-budget` flag with pre-spend
+validation, the recorded history field, the runbook block and the
+capability matrix row). No suite bump: the scorer is untouched; what
+changes is what a run can send and what its history row records. The
+first probe of "Sequencing" below is DEFERRED on power, not on the
+dial -- the arithmetic is in the runbook's thinking-dimension section
+and it waits on barwise-898 (`prompt eval --case`) or the 846 WS3
+cases.
 Created: 2026-08-29
 Last-updated: 2026-08-29
 Tracking: the haiku thinking question raised 2026-08-29; builds on
