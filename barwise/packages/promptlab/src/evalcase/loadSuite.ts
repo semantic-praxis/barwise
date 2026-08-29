@@ -276,7 +276,7 @@ function validateChecks(value: unknown, filePath: string): (GymCheck | PromptChe
   if (!Array.isArray(value) || value.length === 0) {
     throw new Error(`${filePath}: "checks" must be a non-empty list.`);
   }
-  return value.map((entry, i) => {
+  const checks = value.map((entry, i) => {
     if (typeof entry !== "object" || entry === null) {
       throw new Error(`${filePath}: checks[${i}] must be a mapping.`);
     }
@@ -323,4 +323,15 @@ function validateChecks(value: unknown, filePath: string): (GymCheck | PromptChe
     }
     return entry as GymCheck | PromptCheck;
   });
+
+  // `must_validate` is outside the rubric fraction, so a case declaring
+  // nothing else has an empty rubric and would divide by zero
+  // (docs/specs/must-validate-outside-the-rubric.spec.md).
+  if (!checks.some((c) => c.kind !== "must_validate")) {
+    throw new Error(
+      `${filePath}: "checks" needs at least one check besides must_validate,`
+        + ` which does not count toward the rubric.`,
+    );
+  }
+  return checks;
 }
