@@ -1,4 +1,6 @@
-cd barwise
+# `|| exit` because every step below assumes this worked; without it a
+# failed cd runs lint-staged and the build against the repo root.
+cd barwise || exit 1
 
 # 0. Validate the beads tracker when it is part of this commit. This guards
 #    the cross-branch clobber (REPO_REVIEW-2026-06-23 F6) even without the bd

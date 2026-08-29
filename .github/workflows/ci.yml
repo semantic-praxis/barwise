@@ -128,6 +128,23 @@ jobs:
       # delimiter, one of them never diffable in its history. dprint, tsc,
       # eslint and oxlint all accept NUL, so nothing else catches it.
       - run: npm run check:no-nul
+
+      # Shell scripts were the one artifact class with no gate: not
+      # dprint, not oxlint, not tsc. Three portability bugs shipped in
+      # compile-runner.sh before it was read adversarially, and shellcheck
+      # catches one of them (SC2144) at error severity for free. Options
+      # are in .shellcheckrc; per-file exceptions are `# shellcheck
+      # disable=` directives carrying a reason.
+      - run: npm run check:shell
+        if: steps.changes.outputs.docs_only != 'true'
+
+      # The repo root's package.json exists only to forward `npm run` into
+      # barwise/, and a forwarder list that disagrees with the real
+      # package.json is worse than none: a stale entry runs nothing, and a
+      # missing one restores the papercut for exactly the newest script.
+      # Generated from barwise/package.json, so this fails on drift in
+      # either direction rather than trusting anyone to remember.
+      - run: npm run check:root-scripts
         if: steps.changes.outputs.docs_only != 'true'
 
       # The duplication ratchet: every candidate the deterministic

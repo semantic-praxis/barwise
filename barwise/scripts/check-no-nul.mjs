@@ -20,9 +20,9 @@
  * `JSON.stringify([a, b])` is the replacement used throughout: printable,
  * and collision-proof in a way a chosen delimiter can only approximate.
  */
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { extname } from "node:path";
+import { extname, resolve } from "node:path";
+import { REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
 
 const TEXT = new Set([
   ".ts",
@@ -43,17 +43,17 @@ const TEXT = new Set([
   ".toml",
 ]);
 
-const tracked = execFileSync("git", ["ls-files", "-z"], {
-  encoding: "utf8",
-  maxBuffer: 64 * 1024 * 1024,
-}).split("\0").filter(Boolean);
+// Anchored, not cwd-relative: this gate scanned 1426 files under `npm
+// run check:no-nul` and 1483 from the repo root, and reported OK both
+// times. The 57 it skipped were every tracked file outside `barwise/`.
+const tracked = trackedFiles();
 
 const offenders = [];
 for (const file of tracked) {
   if (!TEXT.has(extname(file))) continue;
   let buf;
   try {
-    buf = readFileSync(file);
+    buf = readFileSync(resolve(REPO_ROOT, file));
   } catch {
     continue; // deleted in the working tree; not this gate's business
   }

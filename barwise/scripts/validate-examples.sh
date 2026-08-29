@@ -9,11 +9,11 @@
 set -uo pipefail
 shopt -s globstar nullglob
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 CLI="packages/cli/dist/index.js"
-if [[ ! -f "$CLI" ]]; then
-  echo "error: $CLI not found; run 'npm run build' first" >&2
+if [[ ! -f "${CLI}" ]]; then
+  echo "error: ${CLI} not found; run 'npm run build' first" >&2
   exit 1
 fi
 
@@ -33,14 +33,14 @@ fi
 
 status=0
 for f in "${targets[@]}"; do
-  echo "==> validating $f"
-  if ! node "$CLI" validate "$f"; then
+  echo "==> validating ${f}"
+  if ! node "${CLI}" validate "${f}"; then
     status=1
   fi
 done
 
-if [[ $status -ne 0 ]]; then
+if [[ ${status} -ne 0 ]]; then
   echo "" >&2
   echo "error: one or more examples failed validation" >&2
 fi
-exit $status
+exit ${status}
