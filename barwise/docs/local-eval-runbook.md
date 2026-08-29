@@ -137,6 +137,16 @@ as each case finishes rather than at the end of the sweep
 ~2 minutes of silence at the start: the warm-up call completes alone
 before the pool opens (barwise-889 will add a stderr line for it).
 
+**Re-scoring a recorded round is a command, not a script.** After a
+scorer change, `barwise prompt rescore --payloads eval-payloads/<stamp>
+--format json > after.json` scores every payload under the current
+build; pass an earlier result as `--baseline` to see what moved. It
+crosses suite versions on purpose -- that is the question it answers --
+and refuses a diff whose two sides cover different payloads. Comparing
+two recorded rows is `barwise prompt compare --a <i> --b <j>`, which
+prints the resolvability verdicts that used to be done by hand
+(docs/specs/recorded-evidence-commands.spec.md).
+
 **Save payloads and logs straight into the repo's dated record**, not
 `/tmp`: one tree per round, `eval-payloads/<stamp>/`, holding each
 arm's payload directory and its log as siblings (`<arm>/` and

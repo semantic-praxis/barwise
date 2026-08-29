@@ -28,13 +28,17 @@ import {
 import type { CaseSummary, RunProgress, SuiteReport } from "@barwise/promptlab";
 import {
   appendRunHistory,
+  compareRows,
   defaultSuitePath,
+  diffRescores,
   hashPrompt,
   historyPathFor,
   IncompleteRunError,
   loadSuite,
   marginOfError,
+  payloadFileName,
   readHistory,
+  rescoreDirectory,
   runSuite,
   scoreExtraction,
   toHistoryEntry,
@@ -67,6 +71,8 @@ export function registerPromptCommand(program: Command, version = "0.0.0-dev"): 
   registerArtifact(promptCmd);
   registerRun(promptCmd);
   registerHistory(promptCmd);
+  registerRescore(promptCmd);
+  registerCompare(promptCmd);
 }
 
 function suitePath(opts: { suite?: string; }): string {
@@ -756,7 +762,7 @@ function writeCasePayloads(
   c.runs.forEach((run, index) => {
     if (run.payload === undefined) return;
     if (writtenSoFar + written === 0) mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, `${c.caseId}-run${index + 1}.json`), run.payload);
+    writeFileSync(join(dir, payloadFileName(c.caseId, index)), run.payload);
     written++;
   });
   return written;
@@ -1040,4 +1046,174 @@ function registerRun(promptCmd: Command): void {
         }
       },
     );
+}
+
+/** `barwise prompt rescore` */
+function registerRescore(promptCmd: Command): void {
+  promptCmd
+    .command("rescore")
+    .description("Score a recorded round's saved payloads under the current build")
+    .requiredOption("--payloads <dir>", "Directory of saved payloads (searched recursively)")
+    .option("--baseline <file>", "A previous --format json result, to diff against")
+    .option("--suite <manifest>", "Suite manifest (defaults to the packaged suite)")
+    .option("--format <format>", "Output format (text or json)", "text")
+    .action((opts: { payloads: string; baseline?: string; suite?: string; format: string; }) => {
+      try {
+        const suite = loadSuite(suitePath(opts));
+        const result = rescoreDirectory(resolve(opts.payloads), suite);
+
+        if (opts.baseline === undefined) {
+          if (opts.format === "json") {
+            process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+            return;
+          }
+          process.stdout.write(renderRescore(result));
+          return;
+        }
+
+        const before = JSON.parse(readFileSync(resolve(opts.baseline), "utf8")) as typeof result;
+        const diff = diffRescores(before, result);
+        process.stdout.write(
+          opts.format === "json"
+            ? JSON.stringify(diff, null, 2) + "\n"
+            : renderRescoreDiff(diff, result.payloads.length),
+        );
+      } catch (err) {
+        fail(err);
+      }
+    });
+}
+
+function renderRescore(result: ReturnType<typeof rescoreDirectory>): string {
+  const lines = [
+    `Scored ${result.payloads.length} payload(s) under suite ${result.suiteVersion}.`,
+    "",
+  ];
+  const byArm = new Map<string, number[]>();
+  for (const p of result.payloads) {
+    byArm.set(p.arm, [...(byArm.get(p.arm) ?? []), p.score]);
+  }
+  for (const [arm, scores] of [...byArm].sort()) {
+    const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+    lines.push(
+      `  ${arm.padEnd(28)} n=${String(scores.length).padStart(3)}  mean ${mean.toFixed(3)}`,
+    );
+  }
+  lines.push(
+    "",
+    "This is what the round WOULD score under the suite version named above,",
+    "which may differ from the one it was recorded at -- that is the point of",
+    "the command. Save it with --format json and pass it as --baseline to a",
+    "later run to see what a scorer change moved.",
+    "",
+  );
+  return lines.join("\n");
+}
+
+function renderRescoreDiff(
+  diff: ReturnType<typeof diffRescores>,
+  total: number,
+): string {
+  const lines = [
+    `Rescored ${total} payload(s): suite ${diff.beforeVersion} -> ${diff.afterVersion}.`,
+    "",
+    `  unchanged  ${diff.unchanged}`,
+    `  fell       ${diff.fell.length}`,
+    `  rose       ${diff.rose.length}`,
+    "",
+  ];
+  const magnitudes = (rows: typeof diff.fell) => {
+    const mean = rows.reduce((a, r) => a + r.delta, 0) / rows.length;
+    return `mean ${mean.toFixed(3)}, worst ${rows[0]!.delta.toFixed(3)}`;
+  };
+  if (diff.fell.length > 0) {
+    lines.push(`Fell (${magnitudes(diff.fell)}):`);
+    for (const r of diff.fell.slice(0, 10)) {
+      lines.push(
+        `  ${r.delta.toFixed(3).padStart(7)}  ${r.before.toFixed(3)} -> ${
+          r.after.toFixed(3)
+        }  ${r.file}`,
+      );
+    }
+    if (diff.fell.length > 10) lines.push(`  ... and ${diff.fell.length - 10} more`);
+    lines.push("");
+  }
+  if (diff.rose.length > 0) {
+    lines.push(`Rose (${magnitudes(diff.rose)}):`);
+    for (const r of diff.rose.slice(0, 10)) {
+      lines.push(
+        `  ${r.delta.toFixed(3).padStart(7)}  ${r.before.toFixed(3)} -> ${
+          r.after.toFixed(3)
+        }  ${r.file}`,
+      );
+    }
+    if (diff.rose.length > 10) lines.push(`  ... and ${diff.rose.length - 10} more`);
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+/** `barwise prompt compare` */
+function registerCompare(promptCmd: Command): void {
+  promptCmd
+    .command("compare")
+    .description("Compare two recorded history rows, with resolvability verdicts")
+    .requiredOption("--a <index>", "Row index from `prompt history` (1-based)")
+    .requiredOption("--b <index>", "Row index from `prompt history` (1-based)")
+    .option("--suite <manifest>", "Suite manifest (defaults to the packaged suite)")
+    .option("--format <format>", "Output format (text or json)", "text")
+    .action((opts: { a: string; b: string; suite?: string; format: string; }) => {
+      try {
+        const suite = loadSuite(suitePath(opts));
+        const entries = readHistory(historyPathFor(suite.manifestPath));
+        const pick = (raw: string, which: string) => {
+          const n = Number(raw);
+          if (!Number.isInteger(n) || n < 1 || n > entries.length) {
+            throw new Error(
+              `--${which} must be a row index between 1 and ${entries.length}; got "${raw}". `
+                + "Run `barwise prompt history` to see the rows.",
+            );
+          }
+          return entries[n - 1]!;
+        };
+        const a = pick(opts.a, "a");
+        const b = pick(opts.b, "b");
+        const comparison = compareRows(a, b);
+        process.stdout.write(
+          opts.format === "json"
+            ? JSON.stringify(comparison, null, 2) + "\n"
+            : renderComparison(a, b, comparison),
+        );
+      } catch (err) {
+        fail(err);
+      }
+    });
+}
+
+function renderComparison(
+  a: { artifactVersion: string; model?: string; split?: string; },
+  b: { artifactVersion: string; model?: string; split?: string; },
+  c: ReturnType<typeof compareRows>,
+): string {
+  const label = (r: typeof a) => [r.artifactVersion, r.model, r.split].filter(Boolean).join(" / ");
+  const verdict = (v: { delta: number; margin?: number; resolved: boolean; }) => {
+    const d = `${v.delta >= 0 ? "+" : ""}${v.delta.toFixed(3)}`;
+    if (v.margin === undefined) return `${d} (no margin: a row reports no standard error)`;
+    return `${d} against ${v.margin.toFixed(3)} -- ${v.resolved ? "resolved" : "UNRESOLVED"}`;
+  };
+  const lines = [
+    `b minus a, where a = ${label(a)} and b = ${label(b)}.`,
+    "",
+    `  suite  ${verdict(c.suite)}`,
+    "",
+  ];
+  for (const row of c.cases) lines.push(`  ${row.caseId.padEnd(24)} ${verdict(row)}`);
+  if (c.onlyInA.length > 0 || c.onlyInB.length > 0) {
+    lines.push(
+      "",
+      `Not compared -- present in one row only: ${[...c.onlyInA, ...c.onlyInB].join(", ")}.`,
+    );
+  }
+  lines.push("");
+  return lines.join("\n");
 }

@@ -1,6 +1,6 @@
 # Reading recorded evidence: `prompt rescore` and `prompt compare`
 
-Status: Draft for review
+Status: Implemented (all three workstreams, 2026-08-29). Both open decisions resolved as recommended, the spec having merged unamended: `rescore` emits numbers rather than a markdown table, and `compare` takes two history rows only.
 Created: 2026-08-29
 Last-updated: 2026-08-29
 Tracking: barwise-893 (`prompt compare`), and the reification review of
@@ -160,3 +160,27 @@ ordered second because the re-score is the gap with recorded consequences.
    report's arms are: a re-score has no dispersion of its own, so a
    verdict against a row's margin would be computed from one side's
    precision and read as though it came from both.
+
+## Implementation notes
+
+**The command reproduces the appendix it was written for.** Rescoring
+the committed 2026-08-28 round under the pre-894 scorer and diffing
+against the current one prints `unchanged 75, fell 40, rose 0, mean
+-0.131, worst -0.286` -- the 2.8.0 appendix's figures exactly, which
+until now existed only as hand arithmetic. `compare` likewise reproduces
+the 2.6.0 baseline's headline verdict, `+0.086 against 0.062 --
+resolved`.
+
+**And it found something the hand analysis missed.** Per case, that
+haiku45-2 win is carried entirely by `vendor-onboarding` (+0.176,
+resolved); `incident-response` (+0.017) and `subscription-billing`
+(+0.065) are both unresolved. The suite-level verdict is real and it is
+a one-case win, which is a different claim from the one the baseline
+made.
+
+**`--a` and `--b` take row indices, not a selector.** The spec left the
+selector shape open by not specifying it; indices against `prompt
+history` turned out to be enough, and a selector over
+artifact/model/split would need a disambiguation rule for the several
+rows that share all three. If picking rows becomes tedious, that is the
+moment to design the selector, with the tedium as evidence.

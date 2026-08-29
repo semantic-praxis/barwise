@@ -11,9 +11,15 @@ export type {
 } from "./evalcase/types.js";
 
 // Scorer
+export { compareRows } from "./record/compare.js";
+export type { Comparison, Verdict } from "./record/compare.js";
+export { parsePayloadFileName, payloadFileName } from "./record/payloadName.js";
+export { diffRescores, rescoreDirectory } from "./record/rescore.js";
+export type { PayloadDelta, PayloadScore, RescoreDiff, RescoreResult } from "./record/rescore.js";
 export { ambiguityExcess, runPromptChecks } from "./score/promptChecks.js";
 export type { PromptCheckResult } from "./score/promptChecks.js";
 export { scoreExtraction } from "./score/scoreExtraction.js";
+
 export type { CaseScore } from "./score/scoreExtraction.js";
 
 // Dispersion
