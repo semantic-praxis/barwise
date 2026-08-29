@@ -1,6 +1,10 @@
 # Logs
 logs
 *.log
+# The dated eval-round record commits its arm logs beside the payloads
+# (docs/local-eval-runbook.md); without this negation a directory-level
+# git add silently skips them and the round loses its per-sample record.
+!barwise/eval-payloads/**/*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

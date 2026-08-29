@@ -8,13 +8,16 @@ artifact; the next baseline is a new file.
 
 Provenance: suite 2.6.0; artifacts haiku45-2, sonnet5-3, default
 1.1.0. Record in `eval-payloads/20260828-1647/` (committed on branch
-`eval-round-20260828-1647` with the eight history rows); run logs were
-not captured into the commit, so per-sample wall-clock and cache
-detail is absent this round -- everything below derives from the
-history rows and the payloads. The offline audit re-scored all 115
-committed payloads: every one reproduces its recorded per-case worst
-exactly, and per-mode retention (barwise-891) held -- no duplicate
-modes, middle modes present.
+`eval-round-20260828-1647` with the eight history rows, the arm logs
+as siblings of their payload directories, and the `eval-runner.sh`
+that ran them -- the logs initially fell to the root `.gitignore`'s
+`*.log` and needed a force-add; a negation now covers the record).
+The offline audit re-scored all 115 committed payloads against their
+exact per-sample log lines: zero mismatches, and per-mode retention
+(barwise-891) held -- no duplicate modes, middle modes present. Runs
+used `--concurrency` 3 (dev) and 7 (train); every log names its
+artifact, all eight footers say suite 2.6.0, and no failure or
+truncation warning appears anywhere in the round.
 
 ## The eight arms
 
