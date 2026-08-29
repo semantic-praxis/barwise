@@ -120,6 +120,12 @@ function registerEval(promptCmd: Command, version: string): void {
       "Context window in tokens (ollama only). Omitted, one is derived per"
         + " call; set it when the machine cannot afford the derived size.",
     )
+    .option(
+      "--thinking-budget <n>",
+      "Extended-thinking budget in tokens (anthropic only, minimum 1024)."
+        + " Recorded on the history row: a budget changes scores without"
+        + " changing the prompt hash.",
+    )
     .option("--format <format>", "Output format (text or json)", "text")
     .option(
       "--verbose",
@@ -141,6 +147,7 @@ function registerEval(promptCmd: Command, version: string): void {
           split?: string;
           maxTokens?: string;
           contextWindow?: string;
+          thinkingBudget?: string;
           savePayloads?: string;
           format: string;
           verbose?: boolean;
@@ -180,6 +187,7 @@ function registerEval(promptCmd: Command, version: string): void {
               `--concurrency must be a positive integer, got "${opts.concurrency}".`,
             );
           }
+          const thinkingBudget = parseThinkingBudget(opts.thinkingBudget);
           // Validated with the other flags, before a client exists: a
           // typo'd version must not cost a sweep. `undefined` means
           // resolve from the client below, which cannot happen yet.
@@ -198,6 +206,7 @@ function registerEval(promptCmd: Command, version: string): void {
             model: opts.model,
             baseUrl: opts.baseUrl,
             ...(contextWindow !== undefined ? { contextWindow } : {}),
+            ...(thinkingBudget !== undefined ? { thinkingBudget } : {}),
           });
           // A sweep is where the log earns most -- dozens of calls that
           // are worth costing as a unit, which is what the correlation
@@ -343,6 +352,7 @@ function registerEval(promptCmd: Command, version: string): void {
               build,
               ...(opts.provider !== undefined ? { provider: opts.provider } : {}),
               ...(opts.model !== undefined ? { model: opts.model } : {}),
+              ...(thinkingBudget !== undefined ? { thinkingBudget } : {}),
             });
             // Say it while the operator is watching. A row recorded off
             // a modified tree names a commit that never produced it,
@@ -371,6 +381,23 @@ function registerEval(promptCmd: Command, version: string): void {
         }
       },
     );
+}
+
+/**
+ * Parse `--thinking-budget`, before any client exists: a typo must
+ * not cost a sweep. The 1024 floor is the API's own minimum for
+ * `budget_tokens`; passing less fails on the first call after money
+ * is already committed to the run.
+ */
+function parseThinkingBudget(raw: string | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  const budget = Number(raw);
+  if (!Number.isInteger(budget) || budget < 1024) {
+    throw new Error(
+      `--thinking-budget must be an integer of at least 1024 tokens, got "${raw}".`,
+    );
+  }
+  return budget;
 }
 
 /** `barwise prompt score` */
@@ -615,8 +642,14 @@ function registerHistory(promptCmd: Command): void {
           // different prompts, and that is the only place it shows.
           const hash = e.promptHash === undefined ? "" : `@${e.promptHash}`;
           const built = e.build === undefined ? "" : `  ${describeProvenance(e.build)}`;
+          // The thinking budget prints beside the target it modified:
+          // two rows with one artifact, provider and model but
+          // different budgets measured different configurations.
+          const thinking = e.thinkingBudget === undefined
+            ? ""
+            : ` thinking=${e.thinkingBudget}`;
           process.stdout.write(
-            `${e.date}  artifact=${e.artifactVersion}${hash}  ${target}`
+            `${e.date}  artifact=${e.artifactVersion}${hash}  ${target}${thinking}`
               + `  mean=${e.mean.toFixed(3)}${bar}  worst=${
                 e.worst.toFixed(3)
               }  (repeat=${e.repeat})${built}\n`,
@@ -933,19 +966,29 @@ function registerRun(promptCmd: Command): void {
     .option("--model <model>", "Model override for the LLM provider")
     .option("--api-key <key>", "API key (falls back to env vars)")
     .option("--base-url <url>", "Ollama server URL (only for ollama provider)")
+    .option(
+      "--thinking-budget <n>",
+      "Extended-thinking budget in tokens (anthropic only, minimum 1024).",
+    )
     .action(
       async (
         file: string,
-        opts: ProviderOpts & { surface: string; artifacts?: string; },
+        opts: ProviderOpts & {
+          surface: string;
+          artifacts?: string;
+          thinkingBudget?: string;
+        },
       ) => {
         try {
           const surface = parseSurface(opts.surface);
+          const thinkingBudget = parseThinkingBudget(opts.thinkingBudget);
 
           const bare = createLlmClient({
             provider: opts.provider as ProviderName | undefined,
             apiKey: opts.apiKey,
             model: opts.model,
             baseUrl: opts.baseUrl,
+            ...(thinkingBudget !== undefined ? { thinkingBudget } : {}),
           });
           const sink = callLogSink();
           const client = sink === undefined

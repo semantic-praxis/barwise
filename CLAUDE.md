@@ -200,6 +200,7 @@ and update it in the same commit that changes a surface's reach.
 | `llm-usage`                                           | yes | no  | no      | deliberate: reads a local operator log  |
 | prompt-artifact override (`--artifacts`)              | yes | no  | no      | deliberate: candidates are measured, not sent |
 | multi-sample import (`--samples`)                     | yes | yes | no      | deliberate: an editor wants one quick pass    |
+| thinking-budget override (`--thinking-budget`)        | yes | no  | no      | deliberate: an experiment dimension, recorded per history row |
 
 Every remaining gap is marked deliberate, which is the point: an
 unmarked gap is a bug.

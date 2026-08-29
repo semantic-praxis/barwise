@@ -99,3 +99,19 @@ describe("detectProvider", () => {
     expect(detectProvider()).toBe("anthropic");
   });
 });
+
+describe("createLlmClient with a thinking budget", () => {
+  it("passes the budget through to the anthropic provider", () => {
+    const client = createLlmClient({ provider: "anthropic", thinkingBudget: 4096 });
+    expect(client.provider).toBe("anthropic");
+  });
+
+  it("refuses the budget on a provider that has no such parameter", () => {
+    // Refused at construction rather than silently ignored: a recorded
+    // run whose flag did nothing is a measurement that lies.
+    expect(() => createLlmClient({ provider: "ollama", thinkingBudget: 4096 }))
+      .toThrow(/anthropic/i);
+    expect(() => createLlmClient({ provider: "openai", thinkingBudget: 4096 }))
+      .toThrow(/anthropic/i);
+  });
+});

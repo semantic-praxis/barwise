@@ -42,6 +42,14 @@ export interface ProviderOptions {
    * and the output budget. Set it when the machine cannot afford that.
    */
   readonly contextWindow?: number;
+  /**
+   * Extended-thinking budget in tokens. Anthropic only -- the other
+   * providers have no such parameter, and setting it for one is
+   * refused at construction rather than silently ignored: a recorded
+   * run whose flag did nothing is a measurement that lies
+   * (docs/specs/thinking-budget-dimension.spec.md).
+   */
+  readonly thinkingBudget?: number;
 }
 
 /**
@@ -55,11 +63,22 @@ export interface ProviderOptions {
 export function createLlmClient(options?: ProviderOptions): LlmClient {
   const provider = options?.provider ?? detectProvider();
 
+  if (options?.thinkingBudget !== undefined && provider !== "anthropic") {
+    throw new Error(
+      `thinkingBudget is an Anthropic extended-thinking parameter; the resolved `
+        + `provider is "${provider}", which has no equivalent. Drop the option or `
+        + `select the anthropic provider.`,
+    );
+  }
+
   switch (provider) {
     case "anthropic":
       return new AnthropicLlmClient({
         apiKey: options?.apiKey,
         model: options?.model,
+        ...(options?.thinkingBudget !== undefined
+          ? { thinkingBudget: options.thinkingBudget }
+          : {}),
       });
     case "openai":
       return new OpenAILlmClient({

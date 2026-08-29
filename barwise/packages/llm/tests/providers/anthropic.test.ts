@@ -419,3 +419,59 @@ describe("AnthropicLlmClient", () => {
     });
   });
 });
+
+describe("thinking budget (docs/specs/thinking-budget-dimension.spec.md)", () => {
+  beforeEach(() => {
+    mockCreate.mockReset();
+  });
+
+  it("sends the thinking parameter and raises max_tokens by the budget", async () => {
+    // Thinking spends inside max_tokens on the models this parameter
+    // exists for, so the answer's budget must survive the raise: 8192
+    // of answer plus 4096 of thinking.
+    const client = new AnthropicLlmClient({ thinkingBudget: 4096 });
+    mockCreate.mockResolvedValueOnce(textResponse("hi"));
+
+    await client.complete({ systemPrompt: "sys", userMessage: "user" });
+
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        max_tokens: 8192 + 4096,
+        thinking: { type: "enabled", budget_tokens: 4096 },
+      }),
+    );
+  });
+
+  it("applies the budget on the tool path over the per-call answer budget", async () => {
+    const client = new AnthropicLlmClient({ thinkingBudget: 2048 });
+    mockCreate.mockResolvedValueOnce({
+      content: [{ type: "tool_use", input: { ok: true } }],
+      usage: { input_tokens: 10, output_tokens: 5 },
+    });
+
+    await client.complete({
+      systemPrompt: "sys",
+      userMessage: "user",
+      maxTokens: 16000,
+      responseSchema: { type: "object" },
+    });
+
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        max_tokens: 16000 + 2048,
+        thinking: { type: "enabled", budget_tokens: 2048 },
+      }),
+    );
+  });
+
+  it("sends no thinking parameter when no budget is set", async () => {
+    const client = new AnthropicLlmClient();
+    mockCreate.mockResolvedValueOnce(textResponse("hi"));
+
+    await client.complete({ systemPrompt: "sys", userMessage: "user" });
+
+    const body = mockCreate.mock.calls[0]![0] as Record<string, unknown>;
+    expect("thinking" in body).toBe(false);
+    expect(body["max_tokens"]).toBe(8192);
+  });
+});
