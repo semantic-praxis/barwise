@@ -252,6 +252,16 @@ the pre-commit hook with "Property X does not exist on type Y" naming
 something you plainly just added. Run `npm run build` from `barwise/`
 first whenever a change crossed a package boundary.
 
+**The hooks split by cost, not by preference.** Pre-commit is the fast
+path: staged-file linting, a build, and the tests of packages a change
+touches. Pre-push runs `npm run ci:local`, which is the whole CI gate
+list derived from `ci.yml` -- about 30s warm and 2m40s once a source
+file changed, of which `test:coverage` alone is 109s. That belongs at
+the push because a push is what makes CI run, and because the same list
+per commit is a hook people turn off. `git push --no-verify` is the
+escape hatch for work in progress; a red push is the thing it is worth
+30 seconds to avoid.
+
 ## Versioning and Releases
 
 The project uses a single version number across all packages, tracked

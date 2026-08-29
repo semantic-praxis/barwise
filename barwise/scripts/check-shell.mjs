@@ -8,10 +8,26 @@
  * catches one of them (SC2144, at error severity) for free.
  *
  * Options live in `.shellcheckrc` at the repo root, where the two style
- * checks this project opted into are declared. Per-file exceptions are
- * `# shellcheck disable=` directives carrying a reason, so a suppression
- * is reviewable where it applies rather than centralised into a list
- * nobody reads.
+ * checks and the two correctness checks this project opted into are
+ * declared. Per-file exceptions are `# shellcheck disable=` directives
+ * carrying a reason, so a suppression is reviewable where it applies
+ * rather than centralised into a list nobody reads.
+ *
+ * TWO THINGS THIS GETS RIGHT ONLY BECAUSE THEY WERE GOT WRONG FIRST:
+ *
+ * The file list is anchored to the repo root rather than the process
+ * cwd. `git ls-files '*.sh'` resolves its pathspec RELATIVE to cwd, so
+ * this gate linted 7 scripts when run by hand from the repo root and 6
+ * under `npm run check:shell` from `barwise/` -- silently dropping
+ * `.claude/hooks/session-start.sh`, the one script CI never saw. The
+ * count in the OK line is the tell; anchoring is the fix.
+ *
+ * Husky hooks are linted too, as `sh`. They are tracked shell scripts
+ * with no extension and no shebang, so a `*.sh` glob misses them and
+ * shellcheck cannot infer a dialect -- and husky v9 executes them with
+ * `sh`, which makes a bashism a run-time failure in the hook that is
+ * supposed to be catching failures. `.husky/_/` is husky's own generated
+ * shim directory and is gitignored, so it never appears here.
  *
  * `.beads/hooks/` is vendored by the beads tracker and is not ours to
  * lint; it is the only exclusion.
@@ -29,7 +45,15 @@ if (probe.error) {
   process.exit(1);
 }
 
-const tracked = execFileSync("git", ["ls-files", "-z", "*.sh"], {
+const ROOT = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
+
+// Every tracked path, listed from the repo root and partitioned here
+// rather than by pathspec. Two globs (`.husky/*` and `*/.husky/*`) would
+// be needed to reach a husky directory at either depth, and git's
+// wildmatch would then be the thing deciding whether a file lands in the
+// list twice. One listing and one predicate has no such question.
+const all = execFileSync("git", ["ls-files", "-z"], {
+  cwd: ROOT,
   encoding: "utf8",
   maxBuffer: 16 * 1024 * 1024,
 })
@@ -37,20 +61,38 @@ const tracked = execFileSync("git", ["ls-files", "-z", "*.sh"], {
   .filter(Boolean)
   .filter((f) => !f.startsWith(".beads/hooks/"));
 
-if (tracked.length === 0) {
+const scripts = all.filter((f) => f.endsWith(".sh"));
+// A hook, not husky's generated `_/` shims -- those are gitignored, so
+// the exclusion is belt and braces against a repo that commits them.
+const hooks = all.filter((f) => /(^|\/)\.husky\/[^/]+$/.test(f) && !f.includes("/.husky/_/"));
+
+if (scripts.length + hooks.length === 0) {
   console.log("check-shell: no tracked shell scripts.");
   process.exit(0);
 }
 
-const run = spawnSync("shellcheck", ["-f", "gcc", ...tracked], { encoding: "utf8" });
-if (run.stdout) process.stdout.write(run.stdout);
-if (run.stderr) process.stderr.write(run.stderr);
-if (run.status !== 0) {
+let failed = false;
+/** `dialect` is null for files whose shebang answers the question. */
+function check(files, dialect) {
+  if (files.length === 0) return;
+  const args = ["-f", "gcc", ...(dialect ? ["-s", dialect] : []), ...files];
+  const run = spawnSync("shellcheck", args, { cwd: ROOT, encoding: "utf8" });
+  if (run.stdout) process.stdout.write(run.stdout);
+  if (run.stderr) process.stderr.write(run.stderr);
+  if (run.status !== 0) failed = true;
+}
+
+check(scripts, null);
+check(hooks, "sh");
+
+if (failed) {
   console.error(
-    `\ncheck-shell: shellcheck flagged ${tracked.length} script(s) above.\n`
+    "\ncheck-shell: shellcheck flagged the script(s) above.\n"
       + "Fix them, or add a `# shellcheck disable=SCxxxx` directive WITH A REASON\n"
       + "at the narrowest scope that works -- a line, a function, or the file.",
   );
   process.exit(1);
 }
-console.log(`check-shell: ${tracked.length} script(s), no findings. OK`);
+console.log(
+  `check-shell: ${scripts.length} script(s) and ${hooks.length} husky hook(s), no findings. OK`,
+);

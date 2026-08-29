@@ -1,0 +1,41 @@
+# The whole CI gate list, run at the event that actually causes a red
+# build. Two red pushes in one session came from gates that were simply
+# not run -- `fmt:check`, then `knip` -- and a third came from running
+# only the two gates I happened to be thinking about. `ci:local` derives
+# its list from ci.yml, so it cannot drift out of agreement with what
+# will run remotely.
+#
+# Pre-PUSH and not pre-commit, measured rather than assumed: the gate
+# list costs ~30s warm but 2m40s once a source file changes, of which
+# `test:coverage` alone is 109s. Per commit that is a hook people
+# disable, and disabled is worse than absent. Per push it runs once for
+# the whole stack, at the boundary where CI is about to run anyway.
+#
+# Deliberately duplicates some of pre-commit's work (build, tests).
+# Turbo caches what has not changed, and the overlap is the point: the
+# commit hook checks the packages a change touches, this one checks
+# everything CI checks.
+
+# git feeds one line per ref: <local ref> <local sha> <remote ref> <remote sha>.
+# An all-zero local sha is a branch DELETION -- there is nothing to
+# validate, and pruning a merged branch should not cost three minutes.
+pushing=0
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  case "${local_sha}" in
+    *[!0]*) pushing=1 ;;
+  esac
+done
+if [ "${pushing}" -eq 0 ]; then
+  exit 0
+fi
+
+cd barwise || exit 1
+
+echo "pre-push: running the full CI gate list (npm run ci:local)."
+echo "  ~30s warm, ~3min when sources changed."
+if ! npm run ci:local; then
+  echo >&2
+  echo "pre-push: CI would fail on this push (failing gates above)." >&2
+  echo "  Fix them, or push work in progress with:  git push --no-verify" >&2
+  exit 1
+fi
