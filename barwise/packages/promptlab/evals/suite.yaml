@@ -123,7 +123,23 @@
 #   (barwise-891). No score changes; the diagnostic record does.
 # The answer keys still pin their 2.5.0 scores exactly -- the tiers are
 # rescue-only, and a key that moved would be a finding, not a drift.
-version: 2.6.0
+#
+# 2.7.0 removes a false negative the first thorough payloads exposed
+# (docs/specs/population-blind-rejection.spec.md): forbids_population
+# now judges rejection by the errors an injection CAUSED (a
+# before/after multiset) instead of errors attributed to the injected
+# population's id -- an attribution mandatory violations never carry,
+# so a candidate obeying the prompt's instruction to capture example
+# populations lost every mandatory check (barwise-895; 29 payloads of
+# the recorded 2026-08-28 round are affected, concentrated in the
+# sonnet dev cells). Riding the bump, barwise-896 widens the vendor
+# licence: the transcript says "Name, email, phone number", so
+# EmailAddress and PhoneNumber join the ContactEmail/ContactPhone
+# sets the entity-fold evidences against. Scores rise where models
+# were blindly punished; rows either side are incomparable. The
+# answer keys pin unchanged -- all validate clean, so the
+# before-multiset is empty everywhere the old rule looked.
+version: 2.7.0
 
 # Re-fitted for the rated form, because rating changed what a weight
 # means. A weight is now the cost of a model in which EVERY element

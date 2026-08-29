@@ -112,3 +112,46 @@ the sample it should have.
    wait for 813, which is where its dev deficit actually lives.
 4. barwise-846 WS3: the difficulty-calibrated transcripts, then the
    re-split and the next baseline.
+
+## Appendix, 2026-08-29: the 2.7.0 offline re-read
+
+The opus probe exposed barwise-895 -- a candidate's own populations
+blinded every mandatory forbids check
+(docs/specs/population-blind-rejection.spec.md) -- and 29 of this
+round's payloads carry populations. Re-scored at 2.7.0 against their
+live 2.6.0 log lines: 11 payloads rise, none falls, 104 are unchanged.
+
+| Arm                  | Payload                    | 2.6.0 | 2.7.0 | delta  |
+| -------------------- | -------------------------- | ----- | ----- | ------ |
+| default-haiku-dev    | vendor-onboarding-run4     | 0.572 | 0.845 | +0.273 |
+| default-sonnet-dev   | subscription-billing-run3  | 0.741 | 0.972 | +0.231 |
+| sonnet5-3-dev        | subscription-billing-run4  | 0.724 | 0.955 | +0.231 |
+| default-haiku-dev    | subscription-billing-run2  | 0.688 | 0.919 | +0.231 |
+| default-sonnet-dev   | subscription-billing-run2  | 0.733 | 0.964 | +0.231 |
+| default-sonnet-dev   | subscription-billing-run1  | 0.746 | 0.976 | +0.230 |
+| sonnet5-3-dev        | subscription-billing-run3  | 0.721 | 0.951 | +0.230 |
+| default-sonnet-dev   | subscription-billing-run4  | 0.723 | 0.953 | +0.230 |
+| default-sonnet-dev   | subscription-billing-run5  | 0.703 | 0.933 | +0.230 |
+| sonnet5-3-dev        | vendor-onboarding-run3     | 0.726 | 0.908 | +0.182 |
+| default-sonnet-train | university-enrollment-run5 | 0.863 | 0.974 | +0.111 |
+
+What this re-grades:
+
+- **The "sonnet subscription weakness" was mostly measurement.** All
+  five default-sonnet subscription samples rise ~+0.23 -- the arm's
+  0.729 +/- 0.017 cell is ~0.96 under the fixed rule. The declared
+  mandatories were there all along; the payloads' populations hid
+  them from the check. sonnet5-3's subscription cell rises too, except
+  its run-5 true collapse (0.077, zero usable elements), which stands.
+- **barwise-813's evidence base shrinks again.** The conformance
+  tallies (missing_identifier_population and friends) remain real,
+  but the score they appeared to block was substantially these
+  mandatory checks. 813 stays queued on the tallies' own merits, no
+  longer as the largest blocked score.
+- **Both sonnet dev arms rise roughly in parallel** (six default
+  payloads, four variant), so the variant-versus-default verdict is
+  not expected to flip; the cross-model dev gap narrows further. Arm
+  means still cannot be recomputed from mode-representative payloads:
+  the next keyed round measures 2.7.0 properly.
+- The freight, conference, incident and clinic cells are untouched --
+  those diagnoses survive both re-reads.
