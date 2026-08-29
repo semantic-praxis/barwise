@@ -1,0 +1,36 @@
+Using artifact version 1.1.0 (forced by --artifact-version; client is anthropic/claude-haiku-4-5).
+[ 1/3] vendor-onboarding      run 1/5  1.000  110.0s  12623/41640 out  0 cached
+[ 3/3] incident-response      run 1/5  0.927  90.0s  10431/31700 out  6232 cached
+[ 1/3] vendor-onboarding      run 2/5  0.724  94.5s  10819/41640 out  11984 cached
+[ 2/3] subscription-billing   run 1/5  0.978  105.6s  12595/35255 out  6232 cached
+[ 3/3] incident-response      run 2/5  0.913  93.9s  10788/31700 out  10834 cached
+[ 1/3] vendor-onboarding      run 3/5  0.872  105.0s  12066/41640 out  11984 cached
+[ 2/3] subscription-billing   run 2/5  0.688  130.9s  14496/35255 out  11206 cached
+[ 3/3] incident-response      run 3/5  0.947  95.8s  10980/31700 out  10834 cached
+[ 1/3] vendor-onboarding      run 4/5  0.572  108.0s  12533/41640 out  11984 cached
+[ 2/3] subscription-billing   run 3/5  0.892  113.4s  12955/35255 out  11206 cached
+[ 3/3] incident-response      run 4/5  0.953  93.6s  10627/31700 out  10834 cached
+[ 1/3] vendor-onboarding      run 5/5  0.891  103.2s  11789/41640 out  11984 cached
+[ 3/3] incident-response      run 5/5  0.967  103.8s  11841/31700 out  10834 cached
+[ 2/3] subscription-billing   run 4/5  0.978  134.3s  14803/35255 out  11206 cached
+[ 2/3] subscription-billing   run 5/5  0.978  103.8s  12192/35255 out  11206 cached
+vendor-onboarding  mean=0.812  worst=0.572  sd=0.166  ok=5/5  quality=0.812+/-0.166  [corrections=1.8 warnings=6.6 excessAmbiguity=1]
+  requires_ambiguity: None of the 9 reported ambiguities match "suspen".
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Vendor operates in Region with Contact"), so it cannot rule out: Rules out: two facts of Vendor operates in Region with Contact that agree on Vendor, Region -- e.g. {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#1, ContactEmail=ContactEmail#1, ContactPhone=ContactPhone#1}; {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#2, ContactEmail=ContactEmail#2, ContactPhone=ContactPhone#2}
+  forbids_population: Your model still allows what it should forbid: Rules out: a Vendor that exists but never plays "Vendor has VendorStatus" -- e.g. Vendor#1 appears in Vendor has VendorNumber but not in Vendor has VendorStatus
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Vendor operates in Region with Contact"), so it cannot rule out: Rules out: two facts of Vendor operates in Region with Contact that agree on Vendor, Region -- e.g. {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#1, ContactEmail=ContactEmail#1, ContactPhone=ContactPhone#1}; {Vendor=Vendor#1, Region=Region#1, ContactName=ContactName#2, ContactEmail=ContactEmail#2, ContactPhone=ContactPhone#2}
+  forbids_population: Your model still allows what it should forbid: Rules out: a PurchaseOrder that exists but never plays "PurchaseOrder is raised against Vendor" -- e.g. PurchaseOrder#1 appears in PurchaseOrder has PONumber but not in PurchaseOrder is raised against Vendor
+subscription-billing  mean=0.903  worst=0.688  sd=0.126  ok=5/5  quality=0.903+/-0.126  [corrections=1.4 warnings=1.8 excessAmbiguity=0.4]
+  forbids_population: Your model still allows what it should forbid: Rules out: a Subscription that exists but never plays "Subscription has BillingPeriod" -- e.g. Subscription#1 appears in Subscription has SubscriptionID but not in Subscription has BillingPeriod
+  forbids_population: Your model still allows what it should forbid: Rules out: a PricePlan that exists but never plays "PricePlan entitles FeatureBundle" -- e.g. PricePlan#1 appears in PricePlan has PlanCode but not in PricePlan entitles FeatureBundle
+  forbids_population: Your model still allows what it should forbid: Rules out: a Subscription that exists but never plays "Subscription has StartDate" -- e.g. Subscription#1 appears in Subscription has SubscriptionID but not in Subscription has StartDate
+  forbids_population: Your model still allows what it should forbid: Rules out: a PricePlan that exists but never plays "PricePlan entitles FeatureBundle" -- e.g. PricePlan#1 appears in PricePlan has PlanCode but not in PricePlan entitles FeatureBundle
+incident-response  mean=0.941  worst=0.913  sd=0.021  ok=5/5  quality=0.941+/-0.021  [corrections=1.4 warnings=2.8 excessAmbiguity=0.6]
+suite 2.6.0  artifact=1.1.0@08b024dc2a29  mean=0.885 +/- 0.061 (95%)  worst=0.572  (repeat=5)
+  warnings: completeness/fact-type-without-constraints x44, completeness/fact-type-without-uniqueness x7, constraint/external-uniqueness-all-local x5
+  fixed:    arity_mismatch x10, missing_identifier_population x8, invalid_bounds x3, duplicate_value_constraint_population x2
+  cache: 148560 read, 21560 written
+  gaps below 0.087 are not resolvable against a comparable run
+  63% of that noise is vendor-onboarding alone
+Wrote 13 payload(s) to /Users/gschenz/repos/barwise/barwise/eval-payloads/20260828-1647/default-haiku-dev.
+NOTE: recording against a modified working tree (1.7.0 (d529a5f-dirty)). The commit alone will not reproduce this run.

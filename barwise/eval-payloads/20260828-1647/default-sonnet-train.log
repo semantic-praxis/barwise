@@ -1,0 +1,52 @@
+Using artifact version 1.1.0 (forced by --artifact-version; client is anthropic/claude-sonnet-5).
+[ 1/7] order-management       run 1/5  0.975  33.0s  4891/16384 out  8710 cached
+[ 4/7] employee-hierarchy     run 1/5  1.000  23.4s  3478/16384 out  8710 cached
+[ 5/7] project-staffing       run 1/5  0.940  25.9s  3758/16384 out  8710 cached
+[ 6/7] conference-reviews     run 1/5  1.000  29.6s  4320/16384 out  8710 cached
+[ 1/7] order-management       run 2/5  0.975  31.3s  4809/16384 out  9530 cached
+[ 7/7] freight-corrections    run 1/5  0.933  33.6s  5025/16384 out  8710 cached
+[ 4/7] employee-hierarchy     run 2/5  1.000  24.6s  3500/16384 out  9317 cached
+[ 5/7] project-staffing       run 2/5  0.940  25.8s  3679/16384 out  9425 cached
+[ 3/7] clinic-appointments    run 1/5  1.000  51.9s  7861/16384 out  8710 cached
+[ 6/7] conference-reviews     run 2/5  1.000  26.5s  3955/16384 out  9357 cached
+[ 2/7] university-enrollment  run 1/5  0.987  56.2s  8864/16384 out  8710 cached
+[ 7/7] freight-corrections    run 2/5  0.933  29.0s  4506/16384 out  9400 cached
+[ 1/7] order-management       run 3/5  1.000  33.3s  5035/16384 out  9530 cached
+[ 4/7] employee-hierarchy     run 3/5  1.000  24.1s  3624/16384 out  9317 cached
+[ 5/7] project-staffing       run 3/5  1.000  28.1s  4255/16384 out  9425 cached
+[ 6/7] conference-reviews     run 3/5  1.000  32.3s  4783/16384 out  9357 cached
+[ 7/7] freight-corrections    run 3/5  0.933  30.4s  4594/16384 out  9400 cached
+[ 4/7] employee-hierarchy     run 4/5  1.000  24.2s  3554/16384 out  9317 cached
+[ 1/7] order-management       run 4/5  1.000  32.5s  4815/16384 out  9530 cached
+[ 3/7] clinic-appointments    run 2/5  1.000  46.6s  7144/16384 out  9577 cached
+[ 5/7] project-staffing       run 4/5  0.940  24.6s  3606/16384 out  9425 cached
+[ 2/7] university-enrollment  run 2/5  1.000  51.0s  8139/16384 out  9538 cached
+[ 6/7] conference-reviews     run 4/5  1.000  28.2s  4152/16384 out  9357 cached
+[ 4/7] employee-hierarchy     run 5/5  1.000  23.7s  3500/16384 out  9317 cached
+[ 7/7] freight-corrections    run 4/5  0.933  29.9s  4523/16384 out  9400 cached
+[ 1/7] order-management       run 5/5  0.975  32.3s  4794/16384 out  9530 cached
+[ 5/7] project-staffing       run 5/5  0.940  27.6s  4215/16384 out  9425 cached
+[ 6/7] conference-reviews     run 5/5  1.000  28.9s  4318/16384 out  9357 cached
+[ 3/7] clinic-appointments    run 3/5  1.000  48.1s  7445/16384 out  9577 cached
+[ 7/7] freight-corrections    run 5/5  0.933  29.9s  4557/16384 out  9400 cached
+[ 2/7] university-enrollment  run 3/5  0.974  59.4s  9306/16384 out  9538 cached
+[ 3/7] clinic-appointments    run 4/5  1.000  47.9s  7347/16384 out  9577 cached
+[ 2/7] university-enrollment  run 4/5  0.981  55.0s  8680/16384 out  9538 cached
+[ 3/7] clinic-appointments    run 5/5  1.000  50.5s  7841/16384 out  9577 cached
+[ 2/7] university-enrollment  run 5/5  0.863  60.1s  9477/16384 out  9538 cached
+order-management  mean=0.985  worst=0.975  sd=0.014  ok=5/5  quality=0.985+/-0.014  [warnings=0.6]
+university-enrollment  mean=0.961  worst=0.863  sd=0.056  ok=5/5  quality=0.961+/-0.056  [corrections=1 warnings=0.8]
+  forbids_population: Your model still allows what it should forbid: Rules out: a CourseOffering that exists but never plays "Instructor teaches CourseOffering" -- e.g. CourseOffering#1 appears in Student enrolls in CourseOffering but not in Instructor teaches CourseOffering
+clinic-appointments  mean=1.000  worst=1.000  sd=0.000  ok=5/5  quality=1.000+/-0.000
+employee-hierarchy  mean=1.000  worst=1.000  sd=0.000  ok=5/5  quality=1.000+/-0.000
+project-staffing  mean=0.952  worst=0.940  sd=0.027  ok=5/5  quality=0.952+/-0.027  [corrections=0.8 warnings=0.8]
+conference-reviews  mean=1.000  worst=1.000  sd=0.000  ok=5/5  quality=1.000+/-0.000
+freight-corrections  mean=0.933  worst=0.933  sd=0.000  ok=5/5  quality=0.933+/-0.000  [corrections=2 warnings=1]
+suite 2.6.0  artifact=1.1.0@08b024dc2a29  mean=0.976 +/- 0.008 (95%)  worst=0.863  (repeat=5)
+  warnings: completeness/fact-type-without-uniqueness x12, completeness/fact-type-without-constraints x4
+  fixed:    missing_identifier_population x12, invalid_role_player x4, empty_population x2, invalid_bounds x1
+  cache: 325546 read, 5174 written
+  gaps below 0.011 are not resolvable against a comparable run
+  77% of that noise is university-enrollment alone
+Wrote 13 payload(s) to /Users/gschenz/repos/barwise/barwise/eval-payloads/20260828-1647/default-sonnet-train.
+NOTE: recording against a modified working tree (1.7.0 (d529a5f-dirty)). The commit alone will not reproduce this run.

@@ -1,0 +1,50 @@
+Using artifact version sonnet5-3 (anthropic/claude-sonnet-5).
+[ 1/7] order-management       run 1/5  0.975  31.9s  4806/16384 out  8916 cached
+[ 4/7] employee-hierarchy     run 1/5  1.000  22.5s  3327/16384 out  8916 cached
+[ 5/7] project-staffing       run 1/5  0.940  25.4s  3769/16384 out  8916 cached
+[ 6/7] conference-reviews     run 1/5  1.000  28.2s  4168/16384 out  8916 cached
+[ 7/7] freight-corrections    run 1/5  0.933  29.7s  4537/16384 out  8916 cached
+[ 1/7] order-management       run 2/5  0.975  32.5s  4821/16384 out  9736 cached
+[ 4/7] employee-hierarchy     run 2/5  0.967  23.6s  3504/16384 out  9523 cached
+[ 3/7] clinic-appointments    run 1/5  1.000  47.6s  7367/16384 out  8916 cached
+[ 5/7] project-staffing       run 2/5  0.940  26.8s  3867/16384 out  9631 cached
+[ 6/7] conference-reviews     run 2/5  1.000  25.7s  3842/16384 out  9563 cached
+[ 7/7] freight-corrections    run 2/5  0.933  25.5s  3904/16384 out  9606 cached
+[ 2/7] university-enrollment  run 1/5  0.987  55.5s  8746/16384 out  8916 cached
+[ 1/7] order-management       run 3/5  1.000  33.2s  4925/16384 out  9736 cached
+[ 4/7] employee-hierarchy     run 3/5  1.000  24.7s  3661/16384 out  9523 cached
+[ 5/7] project-staffing       run 3/5  1.000  25.4s  3744/16384 out  9631 cached
+[ 6/7] conference-reviews     run 3/5  1.000  24.7s  3663/16384 out  9563 cached
+[ 7/7] freight-corrections    run 3/5  0.933  28.8s  4390/16384 out  9606 cached
+[ 1/7] order-management       run 4/5  0.950  29.4s  4422/16384 out  9736 cached
+[ 4/7] employee-hierarchy     run 4/5  0.943  25.0s  3680/16384 out  9523 cached
+[ 3/7] clinic-appointments    run 2/5  0.983  49.4s  7597/16384 out  9783 cached
+[ 5/7] project-staffing       run 4/5  1.000  26.6s  3944/16384 out  9631 cached
+[ 6/7] conference-reviews     run 4/5  1.000  26.4s  3964/16384 out  9563 cached
+[ 2/7] university-enrollment  run 2/5  0.987  54.7s  8806/16384 out  9744 cached
+[ 7/7] freight-corrections    run 4/5  0.933  27.8s  4178/16384 out  9606 cached
+[ 4/7] employee-hierarchy     run 5/5  1.000  22.6s  3367/16384 out  9523 cached
+[ 1/7] order-management       run 5/5  0.950  30.8s  4604/16384 out  9736 cached
+[ 5/7] project-staffing       run 5/5  0.940  24.8s  3685/16384 out  9631 cached
+[ 6/7] conference-reviews     run 5/5  0.969  27.9s  4046/16384 out  9563 cached
+[ 7/7] freight-corrections    run 5/5  0.967  24.8s  3703/16384 out  9606 cached
+[ 3/7] clinic-appointments    run 3/5  1.000  49.7s  7744/16384 out  9783 cached
+[ 2/7] university-enrollment  run 3/5  1.000  56.3s  8903/16384 out  9744 cached
+[ 3/7] clinic-appointments    run 4/5  1.000  49.7s  7678/16384 out  9783 cached
+[ 2/7] university-enrollment  run 4/5  0.987  54.9s  8601/16384 out  9744 cached
+[ 3/7] clinic-appointments    run 5/5  0.992  53.6s  8272/16384 out  9783 cached
+[ 2/7] university-enrollment  run 5/5  0.987  51.5s  8107/16384 out  9744 cached
+order-management  mean=0.970  worst=0.950  sd=0.021  ok=5/5  quality=0.970+/-0.021  [warnings=1.2]
+university-enrollment  mean=0.990  worst=0.987  sd=0.006  ok=5/5  quality=0.990+/-0.006  [warnings=0.8]
+clinic-appointments  mean=0.995  worst=0.983  sd=0.007  ok=5/5  quality=0.995+/-0.007  [corrections=0.6]
+employee-hierarchy  mean=0.982  worst=0.943  sd=0.026  ok=5/5  quality=0.982+/-0.026  [corrections=0.4 warnings=0.4]
+project-staffing  mean=0.964  worst=0.940  sd=0.033  ok=5/5  quality=0.964+/-0.033  [corrections=0.6 warnings=0.6]
+conference-reviews  mean=0.994  worst=0.969  sd=0.014  ok=5/5  quality=0.994+/-0.014  [warnings=0.2]
+freight-corrections  mean=0.940  worst=0.933  sd=0.015  ok=5/5  quality=0.940+/-0.015  [corrections=1.6 warnings=1]
+suite 2.6.0  artifact=sonnet5-3@8643ad91d140  mean=0.976 +/- 0.007 (95%)  worst=0.933  (repeat=5)
+  warnings: completeness/fact-type-without-uniqueness x13, completeness/fact-type-without-constraints x7, completeness/multiple-preferred-identifiers x1
+  fixed:    missing_identifier_population x8, misplaced_is_preferred x3, invalid_role_player x3, invalid_bounds x2
+  cache: 332756 read, 5174 written
+  gaps below 0.009 are not resolvable against a comparable run
+Wrote 17 payload(s) to /Users/gschenz/repos/barwise/barwise/eval-payloads/20260828-1647/sonnet5-3-train.
+NOTE: recording against a modified working tree (1.7.0 (d529a5f-dirty)). The commit alone will not reproduce this run.
