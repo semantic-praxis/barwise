@@ -44,6 +44,38 @@ function sameMultiset(a: (string | undefined)[], b: (string | undefined)[]): boo
   return sa.every((x, i) => x === sb[i]);
 }
 
+/**
+ * Every candidate fact type that could carry a reference fact type's
+ * rule: the exact-multiset correspondent, plus the wider carriers the
+ * projection tier would accept.
+ *
+ * Exported for mandatory attribution in `forbidsPopulation`, which must
+ * decide whether a `population/mandatory-violation` names the constraint
+ * under test or an unrelated one. It reuses this rather than matching
+ * fact-type names, because correspondence is this module's question and
+ * answering it twice with two mechanisms is how they drift
+ * (docs/specs/attributable-rejection.spec.md).
+ *
+ * The entity-fold tier is deliberately not consulted: a fold absorbs
+ * value roles into an entity, so the reference's mandatory role has no
+ * counterpart role to be mandatory on, and including it would readmit
+ * exactly the vacuous pass this attribution exists to close.
+ */
+export function correspondingFactTypes(
+  refFt: FactType,
+  refModel: OrmModel,
+  candidate: OrmModel,
+  licence?: NameLicence,
+): FactType[] {
+  const refNames = playerNames(refFt, refModel);
+  if (refNames.some((n) => n === undefined)) return [];
+  const vocabulary = new Set(refNames.filter((n): n is string => n !== undefined));
+  return candidate.factTypes.filter((ft) => {
+    const cand = candidatePlayerNames(ft, candidate, vocabulary, licence);
+    return sameMultiset(cand, refNames) || strictlyContains(cand, refNames);
+  });
+}
+
 /** The candidate fact type corresponding to a reference fact type, if any. */
 function correspondingFactType(
   refNames: (string | undefined)[],

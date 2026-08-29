@@ -101,14 +101,22 @@ function mutationsFor(kind, check, key) {
       out.push(m);
     }
   } else if (kind === "forbids_population") {
-    // Delete the whole class of constraint the check names. Deleting
-    // ONE is not enough: it reports redundancy as blindness, which is
-    // the false conclusion the hand audit nearly published (30 checks
-    // looked vacuous under single deletion; 16 are).
+    // Delete constraints of the named kind ON THE NAMED FACT TYPE.
+    //
+    // Two weaker mutations were tried and both mislead. Deleting ONE
+    // constraint reports redundancy as blindness -- 30 of 43 checks
+    // survive it and only 18 are actually blind. Deleting the whole
+    // CLASS is what the first version of this script did, and it cannot
+    // tell a fix that attributes by rule kind from one that also
+    // attributes to the right constraint: under class deletion the
+    // weaker fix scores a perfect 43/43, while this mutation shows it
+    // still passing 12 checks whose named constraint is gone
+    // (docs/specs/attributable-rejection.spec.md). A ratchet that cannot
+    // distinguish the two designs would have certified the weaker one.
     const wire = CONSTRAINT_WIRE[check.constraint] ?? [];
     const m = clone(key);
     m.inferred_constraints = (m.inferred_constraints ?? []).filter(
-      (c) => !wire.includes(c.type),
+      (c) => !(wire.includes(c.type) && c.fact_type === check.factType),
     );
     out.push(m);
   }

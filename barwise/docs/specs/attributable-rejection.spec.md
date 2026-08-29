@@ -1,6 +1,6 @@
 # Attributable rejection: forbids_population must judge by the constraint under test
 
-Status: Approved for implementation with suite 2.8.0 (barwise-894)
+Status: Implemented at suite 2.8.0 (2026-08-29; all three workstreams). Both open decisions resolved as recommended: the 2.6.0 verdicts are superseded, and external uniqueness counts for an internal_uniqueness check.
 Created: 2026-08-29
 Last-updated: 2026-08-29
 Tracking: barwise-894. Evidence: the 2026-08-29 rubric audit
@@ -162,3 +162,46 @@ that is not earned. They land together.
    barwise-896 both fixed. The argument against is that the check names
    `internal_uniqueness` specifically -- if the reviewer prefers strict
    naming, the tiers are the place to say so, not the predicate.
+
+## Implementation notes
+
+**Attribution needed the fact type, not the player.** The spec proposed
+scoping a mandatory rejection to "the carrier fact type the population
+was mapped onto". That carrier is the ANCHOR -- `forMandatory` injects
+into a different fact type from the one the check names -- so it is the
+wrong thing to scope to. Two refinements were measured in turn:
+
+| Attribution                         | Checks still passing with the named constraint deleted |
+| ----------------------------------- | ------------------------------------------------------ |
+| rule kind only                      | 12 of 43, all mandatory                                |
+| rule kind + role player             | 8 of 43                                                |
+| rule kind + corresponding fact type | **0**                                                  |
+
+The player scope failed on a candidate that declares a DIFFERENT
+mandatory on the same object type: the anchor value plays neither role,
+so the unrelated constraint still fires. Scoping to the fact types that
+correspond to the one the check names closes it.
+
+That correspondence reuses `correspondingFactTypes`, added to
+`populationMapping.ts`, rather than matching names locally --
+correspondence is that module's question and answering it twice is the
+drift the spec's own necessity-test rejection was about. It consults the
+flat and projection tiers but deliberately NOT the entity fold: a fold
+absorbs value roles into an entity, so the reference's mandatory role has
+no counterpart role to be mandatory on, and admitting it would readmit
+the vacuous pass.
+
+**A NUL-byte bug found on the way.** The barwise-895 multiset key, merged
+in #378, used literal `\x00` separators, which made
+`forbidsPopulation.ts` a BINARY file to git: `git diff` reported "Binary
+files differ", and a patch taken from it silently lost every change. No
+gate noticed -- dprint, tsc and eslint all accept it. The key is now
+`JSON.stringify([ruleId, elementId, message])`, which is printable and
+cannot collide the way a chosen delimiter can.
+
+**Impact, measured.** 40 of 115 payloads in the recorded round fall, none
+rises, mean -0.131, worst -0.286; all ten answer keys still pass their
+full rubric. The rubric audit goes 25/43 to 43/43 on
+`forbids_population` under the sharpened mutation, and the 18
+`tracked:barwise-894` rows left `rubric-baseline.json` by the ratchet
+rather than by hand.

@@ -155,3 +155,41 @@ What this re-grades:
   the next keyed round measures 2.7.0 properly.
 - The freight, conference, incident and clinic cells are untouched --
   those diagnoses survive both re-reads.
+
+## Appendix, 2026-08-29: superseded at 2.8.0, not recomputed
+
+barwise-894 landed: `forbids_population` now judges by diagnostics
+attributable to the constraint under test rather than by any new
+population error (docs/specs/attributable-rejection.spec.md). Re-scoring
+this round offline shows what the round's constraint half was actually
+worth:
+
+|                    |           |
+| ------------------ | --------- |
+| Payloads unchanged | 75 of 115 |
+| Payloads that fall | 40        |
+| Payloads that rise | **0**     |
+| Mean fall          | -0.131    |
+| Worst fall         | -0.286    |
+
+By case: order-management 10, project-staffing 8, incident-response 7,
+employee-hierarchy 6, conference-reviews 5, subscription-billing 3,
+clinic-appointments 1.
+
+Every movement is downward, which is the signature of removing credit
+that was never earned rather than of changing what good looks like. The
+answer keys are untouched -- all ten still pass their full rubric.
+
+**The arm verdicts above are superseded rather than recomputed.** Two
+reasons, and the second is the load-bearing one. The falls concentrate
+in train cases where both arms already tied, so a recomputation would
+mostly restate ties. And an arm mean rebuilt from retained
+mode-representative payloads is not a measurement of the arm -- this
+document's own 2.7.0 appendix says so -- so recomputing would produce a
+table that reads like a baseline without being one. The next keyed
+round, at 2.8.0, is the baseline that replaces this.
+
+What survives the supersession: the payload-level diagnoses. The
+freight, conference and clinic readings above were about which
+relationships a model captured, not about how a passing check was
+counted.
