@@ -112,10 +112,29 @@ echo "All three ran through the DSPy harness, which renders the prompt its"
 echo "own way -- so they compare to each other and NOT to a recorded"
 echo "\`barwise prompt eval\` row."
 echo
-for report in "$OUT"/delta-*.md; do
-  [ -e "$report" ] || continue
-  grep -iE "^\*\*It (beats|ties|loses)|margin over" "$report" || true
-done
+# The verdict comes from report.json, not from grepping the delta
+# report's prose. Both are rendered from one `verdict.decide`, and the
+# prose is the copy whose wording nobody owns -- a reword would have made
+# this block silently print nothing, which is the failure mode of every
+# grep over a sentence.
+python3 - "$OUT/report.json" <<'PYEOF' || true
+import json, sys
+try:
+    v = json.load(open(sys.argv[1])).get("verdict")
+except Exception as err:
+    print(f"could not read the verdict from report.json: {err}")
+    sys.exit(0)
+if not v:
+    print("report.json carries no verdict (a compile from before it was recorded?)")
+    sys.exit(0)
+print(f"  gate:         {v['gate']}")
+print(f"  vs shipped:   {v['margin_over_shipped']:+.3f}")
+print(f"  vs seed:      {v['margin_over_baseline']:+.3f}")
+print(f"  resolvable:   {v['resolvable']:.3f}")
+print(f"  worth gating: {v['worth_gating']}")
+print()
+print(f"  {v['summary']}")
+PYEOF
 echo
 echo "If it beats shipped, the measurement round is:"
 echo "  CANDIDATE_DIR=../optimizer/out/$STAMP CANDIDATE_VERSION=<version> ARMS=candidate ./eval-runner.sh"

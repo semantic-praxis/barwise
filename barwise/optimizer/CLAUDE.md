@@ -102,6 +102,17 @@ through. `BARWISE_CLI` overrides what gets run.
   and demo payloads run 1,103-3,851 (mean 1,984), so the library
   default is a 3x to 8x prompt paid on every call of every candidate.
   The exporter enforces a token budget and truncates visibly.
+- **The verdict is data, not prose.** `verdict.decide` owns the gate --
+  beats / ties / loses / unmeasurable, plus `worth_gating` -- and both
+  `report.json` and the delta report render that one decision. It used
+  to live only inside the markdown renderer, so acting on it meant
+  reading a paragraph, and `compile-runner.sh` grepped that paragraph
+  until this landed: a reword would have made the runner print nothing
+  and say nothing about it. `unmeasurable` covers the two ways a margin
+  exists arithmetically while meaning nothing -- saturation, and a
+  missing shipped arm under `--seed-from default`, where treating the
+  absent mean as 0.0 would report the candidate beating production by
+  its whole score.
 - **Say whether the win resolved.** At `repeat=5` the suite's
   resolvable difference is about 0.086. The delta report leads with
   whether the margin cleared it and labels a margin inside the band as
