@@ -32,6 +32,12 @@ class MetricLog:
     """
 
     scores: list[float] = field(default_factory=list)
+    # Parallel to `scores`, one entry per evaluation. Kept because the
+    # spread that matters is BETWEEN CASES, not between repeats of one
+    # case, and a flat list of scores cannot tell them apart -- which is
+    # exactly how `resolvable` came to divide a between-case spread by a
+    # repeat count (barwise-908).
+    case_ids: list[str] = field(default_factory=list)
     errors_by_rule: Counter = field(default_factory=Counter)
     warnings_by_rule: Counter = field(default_factory=Counter)
     corrections_by_category: Counter = field(default_factory=Counter)
@@ -40,12 +46,58 @@ class MetricLog:
     floored: int = 0
 
     def record(self, case: CaseScore) -> None:
-        self.scores.append(case.score)
+        self._append(case.case_id, case.score)
         if case.floored:
             self.floored += 1
         self.errors_by_rule.update(case.errors_by_rule)
         self.warnings_by_rule.update(case.warnings_by_rule)
         self.corrections_by_category.update(case.corrections_by_category)
+
+    def record_failure(self, case_id: str, kind: str) -> None:
+        """A run that produced no score: unparseable, or the scorer refused.
+
+        Appended as 0.0, like `record`, so the mean reflects it -- but
+        through the same entry point, because three call sites appending
+        to `scores` by hand is how `scores` and `case_ids` would drift
+        apart, and a drifted pair is silently wrong rather than loud.
+        """
+        if kind == "unparseable":
+            self.unparseable += 1
+        elif kind == "failed":
+            self.failed += 1
+        else:  # pragma: no cover - guards a typo at the call site
+            raise ValueError(f"unknown failure kind: {kind!r}")
+        self._append(case_id, 0.0)
+
+    def _append(self, case_id: str, score: float) -> None:
+        self.scores.append(score)
+        self.case_ids.append(case_id)
+
+    def resolvable(self) -> tuple[float, int]:
+        """This arm's resolvable difference, and the n it was computed over.
+
+        Returned together on purpose. The defect this replaces was not a
+        wrong formula but a wrong PAIRING -- a between-case spread
+        divided by a repeat count (barwise-908) -- and a function that
+        hands back only the figure invites the next caller to supply its
+        own n. Here there is nothing to supply.
+        """
+        means = self.case_means()
+        return resolvable_difference(sample_sd(means), len(means)), len(means)
+
+    def case_means(self) -> list[float]:
+        """One mean per distinct case, in first-seen order.
+
+        The unit an arm's uncertainty should be computed over. Repeats of
+        a single case are not independent observations -- under DSPy's
+        default `cache=True` they are literally the same response read
+        again -- so treating 15 scores from 3 cases as 15 samples claims
+        a precision the run does not have.
+        """
+        totals: dict[str, list[float]] = {}
+        for case_id, score in zip(self.case_ids, self.scores):
+            totals.setdefault(case_id, []).append(score)
+        return [sum(v) / len(v) for v in totals.values()]
 
     @property
     def scored(self) -> int:
@@ -131,16 +183,14 @@ def make_metric(log: MetricLog | None = None, progress=None):
         payload = _extract_payload(prediction)
         if payload is None:
             if log is not None:
-                log.unparseable += 1
-                log.scores.append(0.0)
+                log.record_failure(example.case_id, "unparseable")
             _report(progress, example, 0.0, "no extraction field")
             return 0.0
         try:
             json.loads(payload)
         except json.JSONDecodeError:
             if log is not None:
-                log.unparseable += 1
-                log.scores.append(0.0)
+                log.record_failure(example.case_id, "unparseable")
             _report(progress, example, 0.0, "not JSON")
             return 0.0
 
@@ -151,8 +201,7 @@ def make_metric(log: MetricLog | None = None, progress=None):
             # into a model. Same verdict, counted apart from a malformed
             # string so the report can tell the two failures apart.
             if log is not None:
-                log.failed += 1
-                log.scores.append(0.0)
+                log.record_failure(example.case_id, "failed")
             _report(progress, example, 0.0, "scorer refused")
             return 0.0
 
@@ -171,6 +220,14 @@ def resolvable_difference(sd: float, samples: int) -> float:
     here so a compile run can say whether its winning margin cleared it
     without an operator computing it. Defining that out of existence for
     the caller is the point.
+
+    **`sd` and `samples` must describe the same unit.** They did not
+    once: `sd` was taken over every score (3 cases x 5 repeats) while
+    `samples` was the repeat count, so a between-case spread of 0.154
+    was divided by sqrt(5) and reported 0.191 where the honest figure
+    over case means was 0.292 -- understating the threshold by 35% and
+    calling margins resolvable that were not (barwise-908). Feed it
+    `MetricLog.case_means()` and that list's length.
     """
     if samples < 2:
         return float("inf")
