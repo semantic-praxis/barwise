@@ -349,15 +349,23 @@ describe("scoreExtraction: size-rated penalties", () => {
   }
 
   /**
-   * A rubric of one `must_validate` check, which these payloads pass.
-   * The rubric fraction is then a fixed 1.0 and every movement in the
-   * score is the penalty, which is what this block is measuring.
+   * A rubric these payloads pass in full, so the fraction is a fixed 1.0
+   * and every movement in the score is the penalty -- which is what this
+   * block measures. `must_validate` rides along and contributes nothing:
+   * it is excluded from the fraction (barwise-902), so the
+   * `requires_element` check is the whole denominator.
    */
   function validateOnly(): LoadedEvalCase {
     const base = caseFor("order-management");
     return {
       ...base,
-      evalCase: { ...base.evalCase, checks: [{ kind: "must_validate" }] },
+      evalCase: {
+        ...base.evalCase,
+        checks: [
+          { kind: "must_validate" },
+          { kind: "requires_element", element: { entity: "Customer0" } },
+        ],
+      },
     };
   }
 
@@ -442,6 +450,149 @@ describe("scoreExtraction: size-rated penalties", () => {
     expect(result.elementCount).toBe(0);
     expect(result.conformanceCorrections).toBe(1);
     expect(Number.isFinite(result.score)).toBe(true);
-    expect(result.score).toBe(1);
+    // The penalty charged nothing, asserted as the relationship rather
+    // than as a literal: the score IS the rubric fraction, with the
+    // ruinous weights subtracting zero. The old assertion (`toBe(1)`)
+    // conflated that with a rubric that happened to be all-passing.
+    expect(result.score).toBe(result.rubricPassed / result.rubricTotal);
+  });
+});
+
+describe("must_validate is outside the rubric but still costs when it fails", () => {
+  const weights = {
+    conformanceCorrection: 0.2,
+    validationError: 0.8,
+    validationWarning: 0.4,
+    ambiguityExcess: 0.02,
+  };
+
+  it("scores an empty payload 0, not the 1/N must_validate used to bank", () => {
+    // The finding stated as an assertion. `{}` parses to a model with
+    // nothing in it, so every requires_element check fails -- and the
+    // one check that passed, because an empty model violates nothing,
+    // was must_validate. It scored 0.125 on a rubric of eight.
+    const result = scoreExtraction("{}", caseFor("order-management"), weights);
+    expect(result.score).toBe(0);
+    expect(result.rubricPassed).toBe(0);
+  });
+
+  it("fails, and charges, when a population contradicts its own constraint", () => {
+    // The failure path that 192 recorded payloads never produced, so it
+    // has to be constructed: the model declares each employee works in
+    // at most one department, then puts E1 in two. Conformance leaves it
+    // alone -- it cannot know whether the data or the rule is wrong --
+    // and the validator reports population/uniqueness-violation at error
+    // severity for an alethic constraint.
+    const ot = (name: string, kind: string, extra: object = {}) => ({
+      name,
+      kind,
+      source_references: [],
+      ...extra,
+    });
+    const ft = (name: string, roles: object[], readings: string[]) => ({
+      name,
+      roles,
+      readings,
+      source_references: [],
+    });
+    const uc = (factType: string, roles: string[], description: string, extra: object = {}) => ({
+      type: "internal_uniqueness",
+      fact_type: factType,
+      roles,
+      description,
+      confidence: "high",
+      source_references: [],
+      ...extra,
+    });
+    const inst = (roleValues: Record<string, string>) => ({
+      role_values: roleValues,
+      source_references: [],
+    });
+
+    const payload = JSON.stringify({
+      object_types: [
+        ot("Employee", "entity", { reference_mode: "employee number" }),
+        ot("EmployeeNumber", "value", { data_type: "text" }),
+        ot("Department", "entity", { reference_mode: "code" }),
+        ot("DepartmentCode", "value", { data_type: "text" }),
+      ],
+      fact_types: [
+        ft("EmployeeHasEmployeeNumber", [
+          { player: "Employee", role_name: "employee" },
+          { player: "EmployeeNumber", role_name: "number" },
+        ], ["Employee has EmployeeNumber", "EmployeeNumber is of Employee"]),
+        ft("DepartmentHasDepartmentCode", [
+          { player: "Department", role_name: "department" },
+          { player: "DepartmentCode", role_name: "code" },
+        ], ["Department has DepartmentCode", "DepartmentCode is of Department"]),
+        ft("EmployeeWorksInDepartment", [
+          { player: "Employee", role_name: "worker" },
+          { player: "Department", role_name: "employer" },
+        ], ["Employee works in Department", "Department employs Employee"]),
+      ],
+      subtypes: [],
+      inferred_constraints: [
+        uc("EmployeeHasEmployeeNumber", ["Employee"], "Each employee has one number.", {
+          is_preferred: true,
+        }),
+        uc("DepartmentHasDepartmentCode", ["Department"], "Each department has one code.", {
+          is_preferred: true,
+        }),
+        uc(
+          "EmployeeWorksInDepartment",
+          ["Employee"],
+          "Each employee works in at most one department.",
+        ),
+      ],
+      objectified_fact_types: [],
+      populations: [
+        {
+          fact_type: "EmployeeHasEmployeeNumber",
+          source_references: [],
+          instances: [inst({ employee: "E1", number: "E1" })],
+        },
+        {
+          fact_type: "DepartmentHasDepartmentCode",
+          source_references: [],
+          instances: [
+            inst({ department: "D1", code: "D1" }),
+            inst({ department: "D2", code: "D2" }),
+          ],
+        },
+        {
+          fact_type: "EmployeeWorksInDepartment",
+          source_references: [],
+          instances: [
+            inst({ worker: "E1", employer: "D1" }),
+            inst({ worker: "E1", employer: "D2" }),
+          ],
+        },
+      ],
+      ambiguities: [],
+    });
+
+    const base = caseFor("order-management");
+    const evalCase = {
+      ...base,
+      evalCase: {
+        ...base.evalCase,
+        checks: [
+          { kind: "must_validate" },
+          { kind: "requires_element", element: { entity: "Employee" } },
+        ],
+      },
+    };
+    const result = scoreExtraction(payload, evalCase, weights);
+
+    // The check fails...
+    const validity = result.results.find((r) => r.kind === "must_validate");
+    expect(validity?.passed).toBe(false);
+    expect(result.validationErrors).toBeGreaterThan(0);
+    // ...and it costs, through validationError rather than the rubric:
+    // the one counting check passes, so the fraction is a full 1.0 and
+    // everything below it is the weight doing the work it never could
+    // while the corrector left nothing to price.
+    expect(result.rubricPassed).toBe(result.rubricTotal);
+    expect(result.score).toBeLessThan(1);
   });
 });

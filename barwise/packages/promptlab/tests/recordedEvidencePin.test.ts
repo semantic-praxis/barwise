@@ -30,23 +30,27 @@ import { rescoreDirectory } from "../src/record/rescore.js";
 const ROUND = join(import.meta.dirname, "../../../eval-payloads/20260828-1647");
 const suite = loadSuite(defaultSuitePath());
 
-// Per arm: payload count and mean, under suite 2.8.0.
+// Per arm: payload count and mean, under suite 2.9.0. Every arm fell
+// when must_validate left the rubric (barwise-902), and the SHAPE of
+// the fall is the point: the weakest arm lost most (-0.0144) and the
+// strongest least (-0.0017). A check that always passed was propping
+// up the payloads with the most failures.
 const EXPECTED: readonly (readonly [string, number, number])[] = [
-  ["default-haiku-dev", 13, 0.909751],
-  ["default-haiku-train", 18, 0.871175],
-  ["default-sonnet-dev", 13, 0.853936],
-  ["default-sonnet-train", 13, 0.945557],
-  ["haiku45-2-dev", 11, 0.953795],
-  ["haiku45-2-train", 16, 0.906543],
-  ["sonnet5-3-dev", 14, 0.837878],
-  ["sonnet5-3-train", 17, 0.903907],
+  ["default-haiku-dev", 13, 0.907859],
+  ["default-haiku-train", 18, 0.856735],
+  ["default-sonnet-dev", 13, 0.847562],
+  ["default-sonnet-train", 13, 0.940673],
+  ["haiku45-2-dev", 11, 0.952047],
+  ["haiku45-2-train", 16, 0.895506],
+  ["sonnet5-3-dev", 14, 0.829137],
+  ["sonnet5-3-train", 17, 0.891838],
 ];
 
 describe.skipIf(!existsSync(ROUND))("the committed 2026-08-28 round, rescored", () => {
   const result = rescoreDirectory(ROUND, suite);
 
   it("covers every payload in the round", () => {
-    // 115 is the number the 2.8.0 appendix quotes. A rescore that
+    // 115 is the number the 2.9.0 appendix quotes. A rescore that
     // silently covered fewer would still print a confident total.
     expect(result.payloads).toHaveLength(115);
     expect(result.suiteVersion).toBe(suite.version);

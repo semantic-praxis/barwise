@@ -140,8 +140,23 @@ export function scoreExtraction(
     loadedCase.evalCase.ambiguityBudget,
   );
 
-  const rubricTotal = results.length;
-  const rubricPassed = results.filter((r) => r.passed).length;
+  // `must_validate` runs and is reported, but does not count: conformance
+  // repairs ahead of validation, so it cannot fail on structure and was
+  // banking a guaranteed 1/N -- an empty payload scored 0.125 on it alone.
+  // It stays for the one thing it can still catch, a population that
+  // contradicts its own constraints
+  // (docs/specs/must-validate-outside-the-rubric.spec.md).
+  const scored = results.filter((r) => r.kind !== "must_validate");
+  // The loader refuses such a case, but `scoreExtraction` is exported and
+  // callable directly; a 0/0 here would be a silent NaN score.
+  if (scored.length === 0) {
+    throw new Error(
+      `Case "${loadedCase.evalCase.id}" declares no check that counts:`
+        + ` must_validate is excluded from the rubric.`,
+    );
+  }
+  const rubricTotal = scored.length;
+  const rubricPassed = scored.filter((r) => r.passed).length;
 
   // Penalties are rated by model size, not counted. The rubric half of
   // the score is a fraction bounded to [0, 1] by construction; charging

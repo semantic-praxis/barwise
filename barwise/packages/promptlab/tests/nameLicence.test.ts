@@ -60,12 +60,13 @@ describe("the university-enrollment licence", () => {
   it("mutation check: without the licence the rename collapses the score", () => {
     // Guards the passing direction against a loosened resolver: if the
     // licence were ignored and matching had become fuzzy, this payload
-    // would score 1.000 here too. Only must_validate survives -- the
-    // recorded 0.154 collapse's shape, over the rubric as it stands
-    // (the rubric as versioned in suite.yaml).
+    // would score 1.000 here too. It scores 0 instead: every check that
+    // counts depends on the rename resolving, and must_validate -- the
+    // one thing an unlicensed rename still satisfies -- no longer counts
+    // (barwise-902). The collapse is total now rather than 1/N.
     const score = scoreExtraction(synonymPayload(), unlicensed(), suite.weights);
-    expect(score.rubricPassed).toBe(1);
-    expect(score.score).toBeCloseTo(1 / score.rubricTotal, 10);
+    expect(score.rubricPassed).toBe(0);
+    expect(score.score).toBe(0);
   });
 
   it("leaves the answer key's score untouched", () => {

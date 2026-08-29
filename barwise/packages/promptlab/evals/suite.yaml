@@ -158,7 +158,7 @@
 # and worst -0.286. Rows either side are incomparable. The answer keys
 # pin unchanged -- all ten still pass their full rubric, which is what
 # says this removed vacuous passes rather than real ones.
-version: 2.8.0
+version: 2.9.0
 
 # Re-fitted for the rated form, because rating changed what a weight
 # means. A weight is now the cost of a model in which EVERY element
