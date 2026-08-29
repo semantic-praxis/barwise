@@ -25,6 +25,8 @@ from pathlib import Path
 
 import yaml
 
+from .verdict import decide
+
 #: Chars per token. Crude on purpose -- this is a budget guard, not an
 #: accounting figure, and a tokenizer dependency for a safety margin
 #: would be the trivial dependency the house rules forbid.
@@ -265,6 +267,13 @@ def render_delta_report(
     total = int(baseline.get("evaluations", 0)) + int(candidate.get("evaluations", 0))
     saturated = total > 0 and floored / total >= SATURATION_SHARE
     resolved = (not saturated) and abs(margin) > resolvable
+    gate = decide(
+        shipped_mean=shipped.get("mean") if shipped else None,
+        baseline_mean=baseline.get("mean"),
+        candidate_mean=candidate.get("mean"),
+        resolvable=resolvable,
+        saturated=saturated,
+    )
 
     lines: list[str] = []
     lines.append(f"# Candidate {candidate_version}")
@@ -328,21 +337,26 @@ def render_delta_report(
     # The gate, stated separately from the margin over the seed: beating
     # the seed is how the optimizer shows it did something, but only
     # beating what production sends is a reason to ship anything.
+    #
+    # The DECISION is `verdict.decide`, which `report.json` also carries.
+    # This block renders it; it does not re-derive it. Two copies of a
+    # branch this consequential would be a must-agree pair, and the prose
+    # copy is the one a script would have to grep.
     if not saturated:
-        if shipped_margin > resolvable:
+        if gate.gate == "beats":
             lines.append(
                 f"**It also beats what we ship ({shipped_margin:+.3f}, outside "
                 f"the {resolvable:.3f} noise band).** That is the margin worth "
                 "confirming with a keyed `barwise prompt eval` arm against a "
                 "same-suite-version control."
             )
-        elif abs(shipped_margin) <= resolvable:
+        elif gate.gate == "ties":
             lines.append(
                 f"**Against what we ship it is a tie ({shipped_margin:+.3f}, "
                 f"inside the {resolvable:.3f} band).** Improving on the seed is "
                 "not the bar; there is nothing here to gate."
             )
-        else:
+        elif gate.gate == "loses":
             lines.append(
                 f"**It loses to what we ship by {abs(shipped_margin):.3f}, "
                 f"outside the {resolvable:.3f} band.** Whatever it did to the "

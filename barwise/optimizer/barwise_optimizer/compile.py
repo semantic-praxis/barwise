@@ -31,6 +31,7 @@ import dspy
 from .budget import BudgetExceeded, CallBudget
 from .dataset import compile_set, load_suite, report_set
 from .export import (
+    SATURATION_SHARE,
     Provenance,
     demos_from_program,
     match_for_target,
@@ -40,6 +41,7 @@ from .export import (
 )
 from .barwise_cli import default_instructions
 from .metric import MetricLog, make_metric, resolvable_difference, sample_sd
+from .verdict import decide
 from .program import SEED_INSTRUCTIONS, ExtractionProgram
 
 OPTIMIZERS = ("bootstrap", "mipro", "gepa")
@@ -367,13 +369,30 @@ def _run_under_budget(config: RunConfig, out_dir: Path, suite, budget: CallBudge
     )
     write_delta_report(out_dir / f"delta-{version}.md", report)
 
+    # The verdict travels as DATA, not only as prose in the delta report.
+    # It was already decided deterministically; emitting it only as
+    # English meant anything downstream had to grep a paragraph, which
+    # `compile-runner.sh` did until this landed.
+    candidate_summary = candidate_log.summary()
+    baseline_summary = baseline_log.summary()
+    floored = candidate_summary.get("floored", 0)
+    scored = candidate_summary.get("scored", 0)
+    gate = decide(
+        shipped_mean=shipped_summary.get("mean") if shipped_summary else None,
+        baseline_mean=baseline_summary.get("mean"),
+        candidate_mean=candidate_summary.get("mean"),
+        resolvable=resolvable,
+        saturated=scored > 0 and floored / scored >= SATURATION_SHARE,
+    )
+
     return {
         "artifact": str(artifact_path),
         "shipped": shipped_summary,
-        "baseline": baseline_log.summary(),
-        "candidate": candidate_log.summary(),
+        "baseline": baseline_summary,
+        "candidate": candidate_summary,
         "resolvable": resolvable,
         "budget": budget.summary(),
+        "verdict": gate.as_dict(),
     }
 
 

@@ -2,7 +2,17 @@
 
 DSPy prompt optimization for the extraction surface. **Python, offline,
 dev-time only.** Not an npm workspace member, not a dependency of
-anything, never imported by shipped code, never run in CI.
+anything, never imported by shipped code.
+
+Its tests **do** run in CI, on changes under `optimizer/` or
+`packages/cli/` -- the second because the metric tests shell out to the
+real `barwise prompt score`, so a CLI change can break them without
+touching a Python file. That is new: the lane ran in no CI at all until
+barwise-900, and the guard its spec named -- "executed by hand" -- had
+already failed, with the loader round trip red for weeks before anyone
+noticed. Nothing else about the dependency rule changes; the lane is
+still outside Turborepo and still depends on the workspace only as a
+subprocess.
 
 Design and grounding: `docs/specs/dspy-optimizer.spec.md`.
 Its parent: `docs/specs/prompt-optimization-harness.spec.md` (workstream 3).
@@ -48,6 +58,25 @@ uv run python -m barwise_optimizer.compile \
   --optimizer bootstrap --max-calls 200 --samples-per-candidate 5
 ```
 
+**Prefer `../compile-runner.sh`** for a real run, from `barwise/`. It
+does the four free things first -- key present, tree clean, `dist` built,
+`pytest` green -- stamps the output so two compiles cannot overwrite each
+other, splits the JSON report from the progress stream, and prints which
+arm to gate on. Knobs are environment variables:
+
+```sh
+export ANTHROPIC_API_KEY=...
+./compile-runner.sh                                   # mipro -> sonnet, opus proposer
+OPTIMIZER=bootstrap SEED_FROM=default TARGET=anthropic/claude-haiku-4-5 \
+  ./compile-runner.sh
+```
+
+It refuses rather than guesses, and every refusal is free: no key, a dirty
+tree (the candidate's provenance names a commit), a missing proposer for
+`mipro`/`gepa`. The `pytest` step is there because nothing else catches a
+red test in this lane (barwise-900) and the minute before spending money
+is when hand-running pays.
+
 **Rebuild the CLI after pulling.** The seam runs
 `packages/cli/dist/index.js` -- built output, not sources -- so a branch
 that adds a command still has the previous build on disk until
@@ -83,6 +112,17 @@ through. `BARWISE_CLI` overrides what gets run.
   and demo payloads run 1,103-3,851 (mean 1,984), so the library
   default is a 3x to 8x prompt paid on every call of every candidate.
   The exporter enforces a token budget and truncates visibly.
+- **The verdict is data, not prose.** `verdict.decide` owns the gate --
+  beats / ties / loses / unmeasurable, plus `worth_gating` -- and both
+  `report.json` and the delta report render that one decision. It used
+  to live only inside the markdown renderer, so acting on it meant
+  reading a paragraph, and `compile-runner.sh` grepped that paragraph
+  until this landed: a reword would have made the runner print nothing
+  and say nothing about it. `unmeasurable` covers the two ways a margin
+  exists arithmetically while meaning nothing -- saturation, and a
+  missing shipped arm under `--seed-from default`, where treating the
+  absent mean as 0.0 would report the candidate beating production by
+  its whole score.
 - **Say whether the win resolved.** At `repeat=5` the suite's
   resolvable difference is about 0.086. The delta report leads with
   whether the margin cleared it and labels a margin inside the band as
@@ -193,7 +233,14 @@ through. `BARWISE_CLI` overrides what gets run.
 
 ## Testing
 
-- Framework: pytest. Everything runs offline.
+- Framework: pytest, **always through `uv run`**. A bare
+  `python3 -m pytest` reports `No module named pytest` because the deps
+  live in the uv-managed venv, not in the ambient interpreter -- and that
+  error reads exactly like "this machine cannot run the suite", which is
+  how it was once written into a commit message as a fact. `uv sync
+  --extra dev` then `uv run pytest -q` is the whole story, and
+  `../compile-runner.sh` does both as preflight.
+- Everything runs offline.
 - **Run it before you spend money, because nothing else will.** This
   lane is outside Turborepo and CI by design, so a red test here is
   reported by no one. The loader round trip below sat red from the day

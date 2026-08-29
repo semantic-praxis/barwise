@@ -137,6 +137,13 @@ as each case finishes rather than at the end of the sweep
 ~2 minutes of silence at the start: the warm-up call completes alone
 before the pool opens (barwise-889 will add a stderr line for it).
 
+**A compile is `./compile-runner.sh`, from `barwise/`.** It does the
+free checks before anything bills -- key exported, tree clean, `dist`
+built (the Python lane shells out to it), `pytest` green -- stamps its
+output under `optimizer/out/<stamp>/`, and prints which of the report's
+three arms to gate on. Knobs are environment variables; `OPTIMIZER`,
+`TARGET`, `PROPOSER`, `MAX_CALLS`, `SAMPLES`, `SEED_FROM`.
+
 **Re-scoring a recorded round is a command, not a script.** After a
 scorer change, `barwise prompt rescore --payloads eval-payloads/<stamp>
 --format json > after.json` scores every payload under the current
