@@ -92,7 +92,7 @@ describe("loadSuite validation", () => {
     writeFileSync(join(dir, "t.md"), MINIMAL_TRANSCRIPT);
     writeFileSync(
       join(dir, "a.eval.yaml"),
-      "id: same\ntranscript: t.md\nchecks:\n  - kind: must_validate\n",
+      "id: same\ntranscript: t.md\nchecks:\n  - kind: requires_element\n    element:\n      entity: X\n",
     );
     const manifest = join(dir, "suite.yaml");
     writeFileSync(
@@ -126,7 +126,7 @@ describe("loadSuite validation", () => {
     writeFileSync(join(dir, "t.md"), MINIMAL_TRANSCRIPT);
     writeFileSync(
       join(dir, "a.eval.yaml"),
-      "id: a\ntranscript: t.md\nchecks:\n  - kind: must_validate\n",
+      "id: a\ntranscript: t.md\nchecks:\n  - kind: requires_element\n    element:\n      entity: X\n",
     );
     const manifest = join(dir, "suite.yaml");
     writeFileSync(
@@ -149,7 +149,7 @@ describe("loadSuite validation", () => {
     writeFileSync(join(dir, "t.md"), MINIMAL_TRANSCRIPT);
     writeFileSync(
       join(dir, "a.eval.yaml"),
-      "id: a\ntranscript: t.md\nchecks:\n  - kind: must_validate\n",
+      "id: a\ntranscript: t.md\nchecks:\n  - kind: requires_element\n    element:\n      entity: X\n",
     );
     const manifest = join(dir, "suite.yaml");
     writeFileSync(
@@ -187,6 +187,28 @@ describe("loadEvalCase validation", () => {
     expect(() => loadEvalCase(file)).toThrow(/checks\[0\]\.kind/);
   });
 
+  it("rejects a case whose only check is must_validate", () => {
+    // It does not count toward the rubric, so such a case has an empty
+    // rubric and nothing to score (barwise-902).
+    const dir = tmpSuiteDir();
+    writeFileSync(join(dir, "t.md"), MINIMAL_TRANSCRIPT);
+    const file = join(dir, "case.eval.yaml");
+    writeFileSync(file, "id: c\ntranscript: t.md\nchecks:\n  - kind: must_validate\n");
+    expect(() => loadEvalCase(file)).toThrow(/besides must_validate/);
+  });
+
+  it("accepts must_validate alongside another check", () => {
+    const dir = tmpSuiteDir();
+    writeFileSync(join(dir, "t.md"), MINIMAL_TRANSCRIPT);
+    const file = join(dir, "case.eval.yaml");
+    writeFileSync(
+      file,
+      "id: c\ntranscript: t.md\nchecks:\n  - kind: must_validate\n"
+        + "  - kind: requires_element\n    element:\n      entity: X\n",
+    );
+    expect(loadEvalCase(file).evalCase.checks).toHaveLength(2);
+  });
+
   it("rejects an empty checks list", () => {
     const dir = tmpSuiteDir();
     writeFileSync(join(dir, "t.md"), MINIMAL_TRANSCRIPT);
@@ -216,7 +238,10 @@ describe("loadEvalCase validation", () => {
     const dir = tmpSuiteDir();
     writeFileSync(join(dir, "t.md"), MINIMAL_TRANSCRIPT);
     const file = join(dir, "case.eval.yaml");
-    writeFileSync(file, "id: c\ntranscript: t.md\nchecks:\n  - kind: must_validate\n");
+    writeFileSync(
+      file,
+      "id: c\ntranscript: t.md\nchecks:\n  - kind: requires_element\n    element:\n      entity: X\n",
+    );
     expect(loadEvalCase(file).evalCase.ambiguityBudget).toBeUndefined();
   });
 
@@ -237,7 +262,7 @@ describe("loadEvalCase validation", () => {
     const file = join(dir, "case.eval.yaml");
     writeFileSync(
       file,
-      "id: c\ntranscript: t.md\nambiguityBudget: 1.5\nchecks:\n  - kind: must_validate\n",
+      "id: c\ntranscript: t.md\nambiguityBudget: 1.5\nchecks:\n  - kind: requires_element\n    element:\n      entity: X\n",
     );
     expect(() => loadEvalCase(file)).toThrow(/ambiguityBudget/);
   });

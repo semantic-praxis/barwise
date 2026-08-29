@@ -373,7 +373,7 @@ describe("barwise prompt history", () => {
     writeFileSync(join(dir, "t.md"), "Facilitator: hi.\n");
     writeFileSync(
       join(dir, "case.eval.yaml"),
-      "id: c\ntranscript: t.md\nchecks:\n  - kind: must_validate\n",
+      "id: c\ntranscript: t.md\nchecks:\n  - kind: requires_element\n    element:\n      entity: X\n",
     );
     const manifest = join(dir, "suite.yaml");
     writeFileSync(
@@ -395,7 +395,7 @@ describe("barwise prompt history", () => {
     writeFileSync(join(dir, "t.md"), "Facilitator: hi.\n");
     writeFileSync(
       join(dir, "case.eval.yaml"),
-      "id: c\ntranscript: t.md\nchecks:\n  - kind: must_validate\n",
+      "id: c\ntranscript: t.md\nchecks:\n  - kind: requires_element\n    element:\n      entity: X\n",
     );
     const manifest = join(dir, "suite.yaml");
     writeFileSync(
@@ -435,7 +435,7 @@ describe("barwise prompt history", () => {
     writeFileSync(join(dir, "t.md"), "Facilitator: hi.\n");
     writeFileSync(
       join(dir, "case.eval.yaml"),
-      "id: c\ntranscript: t.md\nchecks:\n  - kind: must_validate\n",
+      "id: c\ntranscript: t.md\nchecks:\n  - kind: requires_element\n    element:\n      entity: X\n",
     );
     const manifest = join(dir, "suite.yaml");
     writeFileSync(
