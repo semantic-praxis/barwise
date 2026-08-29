@@ -2,7 +2,17 @@
 
 DSPy prompt optimization for the extraction surface. **Python, offline,
 dev-time only.** Not an npm workspace member, not a dependency of
-anything, never imported by shipped code, never run in CI.
+anything, never imported by shipped code.
+
+Its tests **do** run in CI, on changes under `optimizer/` or
+`packages/cli/` -- the second because the metric tests shell out to the
+real `barwise prompt score`, so a CLI change can break them without
+touching a Python file. That is new: the lane ran in no CI at all until
+barwise-900, and the guard its spec named -- "executed by hand" -- had
+already failed, with the loader round trip red for weeks before anyone
+noticed. Nothing else about the dependency rule changes; the lane is
+still outside Turborepo and still depends on the workspace only as a
+subprocess.
 
 Design and grounding: `docs/specs/dspy-optimizer.spec.md`.
 Its parent: `docs/specs/prompt-optimization-harness.spec.md` (workstream 3).

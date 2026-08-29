@@ -52,6 +52,16 @@ jobs:
           else
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
           fi
+          # The optimizer lane costs 3.5 minutes and changes rarely, so it
+          # runs only when it is touched -- or when the CLI it shells out
+          # to changes, since its metric tests run the real
+          # `barwise prompt score` and a CLI change can break them without
+          # touching a Python file.
+          if printf '%s\n' "$changed" | grep -qE '^barwise/optimizer/|^barwise/packages/cli/'; then
+            echo "optimizer=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "optimizer=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/setup-node@v7
         with:
@@ -135,6 +145,29 @@ jobs:
 
       - run: npm run build
         if: steps.changes.outputs.docs_only != 'true'
+
+      # The optimizer lane, which until now ran in no CI at all. Its own
+      # spec called the guard "the Python lane has its own pytest run,
+      # executed by hand" -- and a hand-run guard is run when someone
+      # remembers. It did not hold: the loader round trip, the test that
+      # caught the missing `match` block, sat red from the day the
+      # haiku45-2 variant shipped until it was noticed by accident weeks
+      # later (barwise-900).
+      #
+      # After build, because the metric tests shell out to the real
+      # `packages/cli/dist` rather than mocking it. `--frozen` respects
+      # the committed uv.lock rather than re-resolving, which is the same
+      # reason the lock is committed: a compile costs money, so pin what
+      # produced it. uv comes from pip rather than a third-party action --
+      # this workflow uses first-party `actions/*` only, and widening that
+      # is not this change's call.
+      - name: Optimizer lane (Python)
+        if: steps.changes.outputs.optimizer == 'true'
+        working-directory: barwise/optimizer
+        run: |
+          python3 -m pip install --quiet uv
+          uv sync --extra dev --frozen
+          uv run --frozen pytest -q
 
       # The rubric ratchet: every eval check that survives the mutation
       # its own kind is about carries a verdict in rubric-baseline.json,

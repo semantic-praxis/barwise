@@ -304,7 +304,14 @@ would: it answers which prompt a given target resolves.
   and a test asserts an oversized demo set is truncated rather than
   emitted.
 - Gate: the TypeScript gate is unaffected. The Python lane has its own
-  `pytest` run, executed by hand.
+  `pytest` run. ~~Executed by hand.~~ **Superseded (barwise-900):** a
+  hand-run guard is run when someone remembers, and this one did not
+  hold -- the loader round trip sat red from the day the haiku45-2
+  variant shipped until it was noticed by accident weeks later, and a
+  later hand run was mis-invoked (`python3 -m pytest` rather than
+  `uv run pytest`) and its error believed. CI now runs the suite on
+  changes under `optimizer/` or `packages/cli/`, after the build, with
+  `--frozen` against the committed lock.
 
 ## Non-goals
 
