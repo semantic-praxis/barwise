@@ -19,6 +19,7 @@
     "check:parity": "node scripts/check-parity.mjs",
     "check:no-nul": "node scripts/check-no-nul.mjs",
     "check:shell": "node scripts/check-shell.mjs",
+    "check:root-scripts": "node scripts/regen-root-package.mjs --check",
     "audit:duplication": "node scripts/audit-duplication.mjs",
     "audit:rubric": "node scripts/audit-rubric.mjs",
     "ci:local": "node scripts/ci-local.mjs",

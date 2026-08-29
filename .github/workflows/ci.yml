@@ -138,6 +138,15 @@ jobs:
       - run: npm run check:shell
         if: steps.changes.outputs.docs_only != 'true'
 
+      # The repo root's package.json exists only to forward `npm run` into
+      # barwise/, and a forwarder list that disagrees with the real
+      # package.json is worse than none: a stale entry runs nothing, and a
+      # missing one restores the papercut for exactly the newest script.
+      # Generated from barwise/package.json, so this fails on drift in
+      # either direction rather than trusting anyone to remember.
+      - run: npm run check:root-scripts
+        if: steps.changes.outputs.docs_only != 'true'
+
       # The duplication ratchet: every candidate the deterministic
       # detectors surface carries a verdict in audit-baseline.json, and
       # the check fails on a new unclassified candidate AND on a stale
