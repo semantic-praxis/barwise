@@ -311,17 +311,39 @@ that is the finding worth carrying forward.
 
 ### Two instrument defects the run exposed
 
-**The 5 repeats measured nothing, and 30 calls paid for it.** Every arm
-returned byte-identical scores across all five repeats -- baseline
-vendor-onboarding 0.072 five times, shipped 0.969 five times, candidate
-0.281 five times. Whether that is DSPy's request cache or plain
-determinism, the repeats carry no information, and the budget counted
-all fifteen per arm (calls 1-15, 16-30, 104-118). Worse than the waste:
-a spread of zero collapses the variance estimate that `resolvable` is
-computed from, so a near-zero resolvable threshold would make _any_
-margin look decisive. Here the margin is far too large for it to
-matter. On a close run it would have been the whole answer. Filed as
-barwise-908.
+**The 5 repeats measured nothing, and `resolvable` is computed wrong.**
+Every arm returned byte-identical scores across all five repeats --
+baseline vendor-onboarding 0.072 five times, shipped 0.969 five times,
+candidate 0.281 five times. Established rather than guessed: DSPy 3.3.1
+defaults to `cache=True`, and `temperature` is left at `None` (the
+provider default, not 0), so real repeated calls WOULD vary. The repeats
+are cache reads. They consume the `--max-calls` ceiling -- 15 per arm,
+calls 1-15, 16-30, 104-118 -- but no API money.
+
+The second defect is independent of the cache and runs opposite to the
+obvious guess. `sd = sample_sd(candidate_log.scores)` is taken over all
+15 scores, so it is dominated by **between-case** spread (0.154), not
+between-repeat noise (0.000). `resolvable_difference` then divides that
+by `sqrt(samples_per_candidate)` -- by the number of REPEATS. The units
+do not match, and the effect is to treat 15 observations as independent
+when caching leaves only 3:
+
+| computation                                      | resolvable |
+| ------------------------------------------------ | ---------- |
+| as reported: sd over 15 scores / sqrt(5 repeats) | **0.191**  |
+| honest: sd over 3 case means / sqrt(3 cases)     | **0.292**  |
+
+The reported threshold **understates** the honest one by 35%, so it
+calls margins resolvable that are not -- the dangerous direction. It
+does not change this run's verdict (|-0.488| clears both), but a margin
+of 0.25 would have been reported as a resolved win and was not one.
+Filed as barwise-908.
+
+An earlier draft of this entry claimed the zero spread collapsed
+`resolvable` toward zero, making any margin look decisive. That was
+wrong in both magnitude and direction, and is corrected here in place
+rather than quietly removed, because the arithmetic is the whole point
+of the number.
 
 **report.json came back empty, so the verdict was unreadable.** It
 existed only because `compile-runner.sh` redirected the compile's
