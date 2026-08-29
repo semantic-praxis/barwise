@@ -211,6 +211,12 @@ function cmdCreate(flags) {
     created_by: createdBy,
     updated_at: ts,
     ...(flags.design ? { design: flags.design } : {}),
+    // The usage string at the top of this file has advertised --notes on
+    // `create` since it was written; nothing implemented it, so the flag
+    // parsed, the issue wrote, and the notes vanished. Documented and
+    // unimplemented is the worst of the three states.
+    ...(flags.notes ? { notes: flags.notes } : {}),
+    ...(flags.labels ? { labels: splitList(flags.labels) } : {}),
     dependency_count: 0,
     dependent_count: 0,
     comment_count: 0,
@@ -263,6 +269,10 @@ function cmdList(flags) {
   if (flags.priority !== undefined) {
     rows = rows.filter((o) => o.priority === Number(flags.priority));
   }
+  // The query that makes a recurring finding visible: process failures
+  // are filed with `--labels process`, and a session review starts by
+  // reading them back. Without a filter they are 200 rows down.
+  if (flags.label) rows = rows.filter((o) => (o.labels || []).includes(flags.label));
   for (const o of rows) {
     console.log(`${o.id}\t${o.status}\tp${o.priority}\t${o.issue_type}\t${o.title}`);
   }
@@ -280,7 +290,17 @@ const UPDATABLE_FIELDS = {
   "acceptance-criteria": "acceptance_criteria",
   notes: "notes",
   assignee: "assignee",
+  labels: "labels",
 };
+
+/** Fields stored as an array, given on the command line comma-separated. */
+const LIST_FIELDS = new Set(["labels"]);
+
+/** `--labels a,b, c` -> ["a","b","c"]. Empty entries dropped. */
+function splitList(value) {
+  if (value === true) fail("--labels needs a comma-separated value");
+  return String(value).split(",").map((x) => x.trim()).filter(Boolean);
+}
 
 function cmdUpdate(positional, flags) {
   const [id] = positional;
@@ -300,6 +320,7 @@ function cmdUpdate(positional, flags) {
     }
     if (field === "status" && !STATUS.has(value)) fail(`unknown status: ${value}`);
     if (field === "issue_type" && !ITYPE.has(value)) fail(`unknown issue_type: ${value}`);
+    if (LIST_FIELDS.has(field)) value = splitList(value);
     r.obj[field] = value;
     changed = true;
   }
@@ -365,9 +386,61 @@ function cmdDelete(positional, flags) {
   console.log(id);
 }
 
+/**
+ * What each subcommand actually reads. An unlisted flag is REFUSED, not
+ * ignored -- because ignoring it is how this tool has twice reported
+ * success while dropping the caller's data on the floor: once for
+ * `update --append-description` (never a field) and once for `create
+ * --notes` (an update-only field). Both times the write "succeeded",
+ * both times the content was gone, and both times it was caught only by
+ * reading the issue back afterwards. A caller cannot be asked to
+ * remember which fields each verb happens to support; the tool knows,
+ * so the tool says.
+ */
+const ACCEPTED_FLAGS = {
+  create: [
+    "title",
+    "status",
+    "type",
+    "priority",
+    "prefix",
+    "parent",
+    "owner",
+    "created-by",
+    "description",
+    "design",
+    "acceptance-criteria",
+    "notes",
+    "labels",
+    "depends-on",
+  ],
+  show: [],
+  list: ["status", "type", "priority", "label"],
+  // Not just UPDATABLE_FIELDS: cmdUpdate also reads --depends-on and
+  // --created-by, and deriving the list from the field map alone would
+  // have refused them -- turning a silent drop into a hard refusal of
+  // something that worked. The allowlist has to match what the function
+  // reads, not what one table in it happens to hold.
+  update: [...Object.keys(UPDATABLE_FIELDS), "depends-on", "created-by"],
+  close: ["reason"],
+  delete: ["force"],
+};
+
+function rejectUnknownFlags(cmd, flags) {
+  const accepted = ACCEPTED_FLAGS[cmd];
+  if (!accepted) return;
+  const unknown = Object.keys(flags).filter((f) => !accepted.includes(f));
+  if (unknown.length === 0) return;
+  fail(
+    `${cmd}: unknown flag(s) ${unknown.map((f) => `--${f}`).join(", ")}\n`
+      + `  ${cmd} accepts: ${accepted.map((f) => `--${f}`).join(", ") || "(no flags)"}`,
+  );
+}
+
 function main() {
   const [cmd, ...rest] = process.argv.slice(2);
   const { positional, flags } = parseArgs(rest);
+  rejectUnknownFlags(cmd, flags);
   switch (cmd) {
     case "create":
       return cmdCreate(flags);

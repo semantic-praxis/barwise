@@ -24,6 +24,27 @@ The precedents, for calibration:
 
 ## Authoring rules (the prevention)
 
+**0. A gate is not verified until you have watched it go red.** The
+whole skill is about checks that cannot fail; the same trap catches the
+person checking. Three times in one session a probe came back green and
+the green meant nothing:
+
+- the probe was written as an **untracked** file, and the gate
+  enumerates through `git ls-files` -- so it never saw the probe, and
+  printed `OK`;
+- the exit code was read through `echo | sh hook | tail`, which puts
+  `echo` in `PIPESTATUS[0]` -- so the hook's real status was invisible
+  and two readings came back `0`;
+- `python3 -m pytest` failing was concluded as "this container cannot
+  run the suite" and written into a commit message as fact, when the
+  deps lived in the uv venv and `uv run pytest` gave 95 passed.
+
+So: put the defect where the gate actually looks (staged or tracked, not
+merely on disk), read the status with nothing in between, and establish
+the failing reading BEFORE the passing one. A green you did not earn the
+right to trust is worse than no check, because it is reported as
+evidence. Tracked as barwise-906.
+
 **1. Name and word refusal tests by why the input is invalid, never by
 what is currently built.** `it("rejects a surface that is not a
 surface")` survives any capability growth; `it("rejects a surface it

@@ -32,7 +32,8 @@
  * `.beads/hooks/` is vendored by the beads tracker and is not ours to
  * lint; it is the only exclusion.
  */
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { REPO_ROOT as ROOT, trackedFiles } from "./lib/tracked.mjs";
 
 const probe = spawnSync("shellcheck", ["--version"], { encoding: "utf8" });
 if (probe.error) {
@@ -45,21 +46,13 @@ if (probe.error) {
   process.exit(1);
 }
 
-const ROOT = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
-
-// Every tracked path, listed from the repo root and partitioned here
-// rather than by pathspec. Two globs (`.husky/*` and `*/.husky/*`) would
-// be needed to reach a husky directory at either depth, and git's
-// wildmatch would then be the thing deciding whether a file lands in the
-// list twice. One listing and one predicate has no such question.
-const all = execFileSync("git", ["ls-files", "-z"], {
-  cwd: ROOT,
-  encoding: "utf8",
-  maxBuffer: 16 * 1024 * 1024,
-})
-  .split("\0")
-  .filter(Boolean)
-  .filter((f) => !f.startsWith(".beads/hooks/"));
+// One listing, from the shared anchored helper -- see scripts/lib/
+// tracked.mjs for why this is not spelled `git ls-files` here. Partitioned
+// with a predicate rather than by pathspec: two globs (`.husky/*` and
+// `*/.husky/*`) would be needed to reach a husky directory at either
+// depth, and git's wildmatch would then decide whether a file lands in
+// the list twice.
+const all = trackedFiles().filter((f) => !f.startsWith(".beads/hooks/"));
 
 const scripts = all.filter((f) => f.endsWith(".sh"));
 // A hook, not husky's generated `_/` shims -- those are gitignored, so
