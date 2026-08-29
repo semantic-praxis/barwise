@@ -29,11 +29,11 @@
  * visible here only because its checks pass with their whole
  * constraint class deleted; a subtler wrong-reason pass would not be.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { defaultSuitePath, loadSuite, scoreExtraction } from "@barwise/promptlab";
 import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defaultSuitePath, loadSuite, scoreExtraction } from "@barwise/promptlab";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(here, "..");
@@ -130,8 +130,13 @@ function audit() {
       // A check already failing on its own answer key is a different
       // defect, and not one this audit is entitled to call vacuous.
       if (!res.passed) {
-        rows.push({ id: checkId(caseId, res.kind, res.message), caseId,
-          kind: res.kind, message: res.message, status: "fails-on-key" });
+        rows.push({
+          id: checkId(caseId, res.kind, res.message),
+          caseId,
+          kind: res.kind,
+          message: res.message,
+          status: "fails-on-key",
+        });
         continue;
       }
       let discriminates = false;
@@ -143,11 +148,18 @@ function audit() {
           continue;
         }
         if (s.results.length !== checks.length) continue;
-        if (!s.results[i].passed) { discriminates = true; break; }
+        if (!s.results[i].passed) {
+          discriminates = true;
+          break;
+        }
       }
-      rows.push({ id: checkId(caseId, res.kind, res.message), caseId,
-        kind: res.kind, message: res.message,
-        status: discriminates ? "discriminates" : "no-reachable-failure" });
+      rows.push({
+        id: checkId(caseId, res.kind, res.message),
+        caseId,
+        kind: res.kind,
+        message: res.message,
+        status: discriminates ? "discriminates" : "no-reachable-failure",
+      });
     }
   }
   return rows;
@@ -161,8 +173,12 @@ function main() {
   if (mode === "--write-baseline") {
     const entries = {};
     for (const r of open) {
-      entries[r.id] = { case: r.caseId, kind: r.kind,
-        message: r.message.slice(0, 120), verdict: "TODO" };
+      entries[r.id] = {
+        case: r.caseId,
+        kind: r.kind,
+        message: r.message.slice(0, 120),
+        verdict: "TODO",
+      };
     }
     writeFileSync(
       BASELINE,
@@ -179,7 +195,9 @@ function main() {
     if (r.status === "discriminates") byKind[r.kind].ok += 1;
   }
   for (const [k, v] of Object.entries(byKind)) {
-    console.log(`${k.padEnd(20)} ${String(v.ok).padStart(3)}/${String(v.n).padEnd(3)} discriminate`);
+    console.log(
+      `${k.padEnd(20)} ${String(v.ok).padStart(3)}/${String(v.n).padEnd(3)} discriminate`,
+    );
   }
   console.log(`${"TOTAL".padEnd(20)} ${rows.length - open.length}/${rows.length}`);
 

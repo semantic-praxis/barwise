@@ -61,7 +61,11 @@
       "eslint --fix",
       "oxlint"
     ],
-    "*.{json,md}": "dprint fmt --allow-no-files --"
+    "*.{json,md}": "dprint fmt --allow-no-files --",
+    "*.mjs": [
+      "dprint fmt --allow-no-files --",
+      "oxlint"
+    ]
   },
   "packageManager": "npm@10.0.0",
   "engines": {
