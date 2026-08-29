@@ -48,6 +48,25 @@ uv run python -m barwise_optimizer.compile \
   --optimizer bootstrap --max-calls 200 --samples-per-candidate 5
 ```
 
+**Prefer `../compile-runner.sh`** for a real run, from `barwise/`. It
+does the four free things first -- key present, tree clean, `dist` built,
+`pytest` green -- stamps the output so two compiles cannot overwrite each
+other, splits the JSON report from the progress stream, and prints which
+arm to gate on. Knobs are environment variables:
+
+```sh
+export ANTHROPIC_API_KEY=...
+./compile-runner.sh                                   # mipro -> sonnet, opus proposer
+OPTIMIZER=bootstrap SEED_FROM=default TARGET=anthropic/claude-haiku-4-5 \
+  ./compile-runner.sh
+```
+
+It refuses rather than guesses, and every refusal is free: no key, a dirty
+tree (the candidate's provenance names a commit), a missing proposer for
+`mipro`/`gepa`. The `pytest` step is there because nothing else catches a
+red test in this lane (barwise-900) and the minute before spending money
+is when hand-running pays.
+
 **Rebuild the CLI after pulling.** The seam runs
 `packages/cli/dist/index.js` -- built output, not sources -- so a branch
 that adds a command still has the previous build on disk until
