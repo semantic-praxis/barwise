@@ -90,11 +90,44 @@ through. `BARWISE_CLI` overrides what gets run.
   step most likely to be skipped. The **rule tallies** are the more
   useful half: a named rule going from 18 to 4 is a count from the same
   calls, legible where a 0.03 shift in a mean is not.
+- **Three arms, because beating the seed is not the bar.** The run
+  scores what production would send (`shipped`), the seed it started
+  from (`baseline`), and the compiled candidate -- and reports the
+  margin over each. `baseline` is the SEED, which under `--seed-from
+  minimal` is 90 words, and "baseline" is exactly the word a reader
+  takes to mean "what we ship": the 2026-08-29 bootstrap run reported
+  0.380 vs 0.355 and read as a near-tie while the shipped prompt scored
+  0.814 on those same dev cases, so a candidate that lost to production
+  by 0.45 looked like noise (barwise-899). The shipped sweep is skipped
+  only when `--seed-from default` makes the baseline the shipped prompt
+  already. All three go through the DSPy harness, so they compare to
+  each other and **not** to a recorded `barwise prompt eval` row, which
+  renders the prompt production's way -- the report says so in place.
 - **A candidate must declare a `match` block.** `resolveArtifact`
   filters to artifacts that declare one, so a candidate without it
   loads fine and is then silently skipped -- the gating run measures
   the default while reporting on the candidate. `write_candidate`
   requires it and `match_for_target` derives it from `provider/model`.
+- **Gate a candidate with `--artifacts` AND `--artifact-version`.**
+  The match block is derived from the target, so a candidate claims the
+  same provider and model prefix as the shipped variant for that model
+  -- `--artifacts` alone is therefore genuinely ambiguous and the
+  resolver refuses to guess. That refusal is the good outcome; the bad
+  one is the report that used to say `--artifacts packages/llm/prompts`,
+  which widens the set with the directory the shipped builtins come
+  from and measures a shipped variant while the reader believes they are
+  gating the candidate (barwise-850, reproduced in an instruction). The
+  delta report now prints the candidate's own directory and version,
+  and both halves are pinned in `test_run_smoke.py`.
+- **A compile says what it is doing, per call.** `make_metric(log,
+  progress)` reports every evaluation -- case, score, phase
+  (`baseline` / `shipped` / `compile` / `candidate`) and calls spent
+  against the ceiling -- to **stderr**, because the run prints its
+  result as JSON on stdout. Without it a compile is silent between
+  tqdm ticks ~80s apart at sonnet latency, and a healthy run, a
+  rate-limited one and a hung one look identical (barwise-897). Every
+  return path reports, the two zero-scoring ones included: silence on
+  the failure paths is what made the silence dangerous.
 - **`--seed-from` decides which prompt the search starts from, and the
   right answer differs by optimizer.** `minimal` is a 137-token summary
   -- right for `mipro`/`gepa`, which propose replacements, because
@@ -161,6 +194,12 @@ through. `BARWISE_CLI` overrides what gets run.
 ## Testing
 
 - Framework: pytest. Everything runs offline.
+- **Run it before you spend money, because nothing else will.** This
+  lane is outside Turborepo and CI by design, so a red test here is
+  reported by no one. The loader round trip below sat red from the day
+  the haiku45-2 variant shipped until it was noticed by accident weeks
+  later; the spec's whole guard is the clause "executed by hand"
+  (barwise-900 weighs what should replace it).
 - `DummyLM` drives the program end to end -- signature rendering, the
   call, parsing, the metric -- with no key and no network.
 - The metric tests run the **real** `barwise prompt score` subprocess

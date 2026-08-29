@@ -255,6 +255,36 @@
       "status": "accepted-benign",
       "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
       "detail": "ConceptualDataTypeName restated as set in packages/llm/src/parse/helpers.ts"
+    },
+    "literal:fe51e9d5177e": {
+      "status": "accepted-benign",
+      "note": "population rule ids restated in REJECTING_RULES, drift-tested behaviourally (learn/tests/rejectingRulesDrift.test.ts): the test generates each kind's counterexample, injects it, and requires core's emitted rule to be one the map accepts, so a rename in core fails there rather than silently making that kind's checks vacuous again (barwise-894)",
+      "detail": "packages/core/src/validation/rules/population/valueFrequency.ts, packages/learn/src/evaluate/checks/forbidsPopulation.ts"
+    },
+    "literal:187d99670899": {
+      "status": "accepted-benign",
+      "note": "\"population/external-uniqueness-violation\": population rule ids restated in REJECTING_RULES, drift-tested behaviourally (learn/tests/rejectingRulesDrift.test.ts): the test generates each kind's counterexample, injects it, and requires core's emitted rule to be one the map accepts, so a rename in core fails there rather than silently making that kind's checks vacuous again (barwise-894)",
+      "detail": "packages/core/src/validation/rules/population/uniqueness.ts, packages/learn/src/evaluate/checks/forbidsPopulation.ts"
+    },
+    "literal:32b803dd0d4e": {
+      "status": "accepted-benign",
+      "note": "\"population/mandatory-violation\": population rule ids restated in REJECTING_RULES, drift-tested behaviourally (learn/tests/rejectingRulesDrift.test.ts): the test generates each kind's counterexample, injects it, and requires core's emitted rule to be one the map accepts, so a rename in core fails there rather than silently making that kind's checks vacuous again (barwise-894)",
+      "detail": "packages/core/src/validation/rules/population/mandatory.ts, packages/learn/src/evaluate/checks/forbidsPopulation.ts"
+    },
+    "literal:35f3824fa191": {
+      "status": "accepted-benign",
+      "note": "\"population/value-constraint-violation\": population rule ids restated in REJECTING_RULES, drift-tested behaviourally (learn/tests/rejectingRulesDrift.test.ts): the test generates each kind's counterexample, injects it, and requires core's emitted rule to be one the map accepts, so a rename in core fails there rather than silently making that kind's checks vacuous again (barwise-894)",
+      "detail": "packages/core/src/validation/rules/population/valueFrequency.ts, packages/learn/src/evaluate/checks/forbidsPopulation.ts"
+    },
+    "literal:9bbebb629e1f": {
+      "status": "accepted-benign",
+      "note": "\"population/disjunctive-mandatory-violation\": population rule ids restated in REJECTING_RULES, drift-tested behaviourally (learn/tests/rejectingRulesDrift.test.ts): the test generates each kind's counterexample, injects it, and requires core's emitted rule to be one the map accepts, so a rename in core fails there rather than silently making that kind's checks vacuous again (barwise-894)",
+      "detail": "packages/core/src/validation/rules/population/mandatory.ts, packages/learn/src/evaluate/checks/forbidsPopulation.ts"
+    },
+    "literal:b2c090b76301": {
+      "status": "accepted-benign",
+      "note": "\"population/uniqueness-violation\": population rule ids restated in REJECTING_RULES, drift-tested behaviourally (learn/tests/rejectingRulesDrift.test.ts): the test generates each kind's counterexample, injects it, and requires core's emitted rule to be one the map accepts, so a rename in core fails there rather than silently making that kind's checks vacuous again (barwise-894)",
+      "detail": "packages/core/src/validation/rules/population/uniqueness.ts, packages/learn/src/evaluate/checks/forbidsPopulation.ts"
     }
   }
 }

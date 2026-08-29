@@ -1,0 +1,71 @@
+{
+  "$comment": "Rubric checks with no reachable failure path, from scripts/audit-rubric.mjs (npm run audit:rubric -- --check; CI runs it). A check that passes on an answer key with the thing it asks about removed banks a guaranteed point instead of measuring. Every entry carries a verdict: tracked:<issue> for an open finding, or accepted-benign with the reason. --check fails on a check missing here AND on an entry that now discriminates, so fixing one forces its row out and the file always enumerates exactly the open findings. Method: docs/prompt-optimization-log.md.",
+  "checks": {
+    "order-management::must_validate::bf1f8ae6beaf": {
+      "case": "order-management",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "university-enrollment::must_validate::bf1f8ae6beaf": {
+      "case": "university-enrollment",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "clinic-appointments::must_validate::bf1f8ae6beaf": {
+      "case": "clinic-appointments",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "employee-hierarchy::must_validate::bf1f8ae6beaf": {
+      "case": "employee-hierarchy",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "project-staffing::must_validate::bf1f8ae6beaf": {
+      "case": "project-staffing",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "conference-reviews::must_validate::bf1f8ae6beaf": {
+      "case": "conference-reviews",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "freight-corrections::must_validate::bf1f8ae6beaf": {
+      "case": "freight-corrections",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "vendor-onboarding::must_validate::bf1f8ae6beaf": {
+      "case": "vendor-onboarding",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "subscription-billing::must_validate::bf1f8ae6beaf": {
+      "case": "subscription-billing",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    },
+    "subscription-billing::requires_ambiguity::14d8973636e4": {
+      "case": "subscription-billing",
+      "kind": "requires_ambiguity",
+      "message": "An ambiguity matching \"cancel\" was reported: \"Mid-term annual subscription cancellation policy: The current system behav",
+      "verdict": "tracked:barwise-901"
+    },
+    "incident-response::must_validate::bf1f8ae6beaf": {
+      "case": "incident-response",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "tracked:barwise-902"
+    }
+  }
+}

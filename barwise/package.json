@@ -17,7 +17,10 @@
     "depcruise": "depcruise packages --config .dependency-cruiser.cjs",
     "check:depcruise-gate": "node scripts/check-depcruise-gate.mjs",
     "check:parity": "node scripts/check-parity.mjs",
+    "check:no-nul": "node scripts/check-no-nul.mjs",
     "audit:duplication": "node scripts/audit-duplication.mjs",
+    "audit:rubric": "node scripts/audit-rubric.mjs",
+    "ci:local": "node scripts/ci-local.mjs",
     "purity": "node scripts/check-core-purity.mjs",
     "filesize": "node scripts/check-file-size.mjs",
     "check:beads": "bash scripts/check-beads.sh",
@@ -60,7 +63,11 @@
       "eslint --fix",
       "oxlint"
     ],
-    "*.{json,md}": "dprint fmt --allow-no-files --"
+    "*.{json,md}": "dprint fmt --allow-no-files --",
+    "*.mjs": [
+      "dprint fmt --allow-no-files --",
+      "oxlint"
+    ]
   },
   "packageManager": "npm@10.0.0",
   "engines": {

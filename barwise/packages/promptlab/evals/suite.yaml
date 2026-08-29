@@ -139,7 +139,26 @@
 # were blindly punished; rows either side are incomparable. The
 # answer keys pin unchanged -- all validate clean, so the
 # before-multiset is empty everywhere the old rule looked.
-version: 2.7.0
+# 2.8.0: `forbids_population` now judges by diagnostics ATTRIBUTABLE to
+# the constraint under test, where it previously counted any new
+# error-severity population diagnostic. On a constraint-heavy candidate
+# the injection trips some unrelated rule, so a check certified a
+# constraint the model never encoded: 18 of the suite's 43
+# `forbids_population` checks passed with the whole constraint class they
+# name deleted from the answer key, 16 of those uniqueness-subject
+# (barwise-894, docs/specs/attributable-rejection.spec.md). Rejection now
+# requires a rule belonging to the named kind, and for the mandatory
+# family -- whose diagnostics attach to the constraint rather than the
+# injected population, while the counterexample mints fresh players that
+# trip every other mandatory -- a constraint on a fact type corresponding
+# to the one the check names.
+#
+# Scores FALL where credit was banked vacuously: on the recorded
+# 20260828-1647 round, 40 of 115 payloads drop, none rises, mean -0.131
+# and worst -0.286. Rows either side are incomparable. The answer keys
+# pin unchanged -- all ten still pass their full rubric, which is what
+# says this removed vacuous passes rather than real ones.
+version: 2.8.0
 
 # Re-fitted for the rated form, because rating changed what a weight
 # means. A weight is now the cost of a model in which EVERY element

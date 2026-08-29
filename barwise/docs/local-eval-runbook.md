@@ -258,29 +258,39 @@ directory above uses.
 thinking on every call and is recorded on the history row -- a budget
 changes scores without changing the prompt hash, so an unrecorded one
 would make two rows indistinguishable
-(docs/specs/thinking-budget-dimension.spec.md). Two facts frame any
+(docs/specs/thinking-budget-dimension.spec.md). One fact frames any
 experiment with it: the recorded arms were asymmetric until now --
 no parameter means thinking OFF on Haiku 4.5 and adaptive thinking ON
-on Sonnet 5 -- and the suite is near-saturated for haiku, so a full
-thinking arm would resolve nothing. Probe the reproducible failure
-instead: conference-reviews is haiku's one surviving bimodal
-regression, and its cell in a train leg answers whether thinking
-closes it (`eval` runs whole splits -- 35 calls a leg at haiku prices;
-a `--case` filter for cheaper probes is barwise-898).
+on Sonnet 5 -- so haiku's whole record is no-thinking haiku and the
+dial is genuinely untried.
 
-```sh
-# Baseline leg exists in the record already; the two thinking legs:
-npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \
-  --split train --repeat 5 --thinking-budget 4096 --verbose --no-history \
-  --save-payloads "eval-payloads/scratch-thinking-4k"
-npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \
-  --split train --repeat 5 --thinking-budget 16384 --verbose --no-history \
-  --save-payloads "eval-payloads/scratch-thinking-16k"
-```
+**The probe is deferred, and the arithmetic is why.** Work it before
+spending, from the 2.6.0 record:
 
-(`--no-history` while these are probes; a real thinking arm records
-like any other and the row carries `thinking=<n>`. Thinking bills as
-output tokens, so a 16k budget adds at most ~8 cents per haiku call.)
+- Suite level. haiku45-2 train is 0.973 +/- 0.018, so two legs carry a
+  combined margin of ~0.025. Conference is one case of seven at 0.937;
+  fixing it PERFECTLY moves the suite mean 0.063/7 = **+0.009**.
+  A third of the threshold, so a perfect result reads as noise.
+- Case level, which is where the effect actually lives. Conference is
+  0.937 with sd 0.142 at five samples: a 95% margin of 0.124 a leg,
+  ~0.176 combined, against that same best-case +0.063. Also
+  unresolvable.
+- What would resolve it: a per-leg margin under ~0.045, which needs
+  **~40 samples a leg** -- about 550 calls across both legs, since
+  `eval` runs whole splits and conference is one of seven cases in
+  train.
+
+So the honest reading is that this suite cannot currently measure the
+thinking dial on haiku at any price worth paying, and the blocker is
+discrimination, not the dial. Two things change that, both already
+queued: a `--case` filter (barwise-898) makes 40 samples cost 40 calls
+instead of 280, and the barwise-846 workstream-3 transcripts give
+haiku cases with real headroom. Revisit after either; until then the
+flag exists, is recorded, and is unexercised on purpose.
+
+The shape when it is worth running -- both legs on train, only the dial
+moving, the no-thinking leg run fresh rather than read from an older
+suite version -- is `ARMS=thinking ./eval-runner.sh`.
 
 ## Record or not
 

@@ -95,13 +95,36 @@ def _extract_payload(prediction) -> str | None:
     return text or None
 
 
-def make_metric(log: MetricLog | None = None):
+def _report(progress, example, score: float, outcome: str | None) -> None:
+    """Hand one evaluation to the progress callback, if there is one.
+
+    Swallows a throwing callback for the reason the observability sinks
+    do: progress that can fail the run it reports on is worse than no
+    progress, and a compile costs real money to reach this point.
+    """
+    if progress is None:
+        return
+    try:
+        progress(getattr(example, "case_id", "?"), score, outcome)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def make_metric(log: MetricLog | None = None, progress=None):
     """Build the metric DSPy calls, optionally accumulating into `log`.
 
     A candidate that produces nothing parseable scores 0 rather than
     raising. That matches the suite runner's treatment and it is the
     right shape for a search: an unparseable answer *is* a bad answer,
     and aborting the compile on one would throw away the run.
+
+    `progress(case_id, score, outcome)` is called once per evaluation
+    when supplied. It exists because a compile is otherwise silent
+    between tqdm ticks that are ~80s apart at sonnet latency, and a
+    healthy run and a hung one look identical from outside
+    (barwise-897). Every return path reports, including the two that
+    score zero without calling the scorer -- silence on the failure
+    paths is exactly what made the silence dangerous.
     """
 
     def metric(example, prediction, trace=None) -> float:
@@ -110,6 +133,7 @@ def make_metric(log: MetricLog | None = None):
             if log is not None:
                 log.unparseable += 1
                 log.scores.append(0.0)
+            _report(progress, example, 0.0, "no extraction field")
             return 0.0
         try:
             json.loads(payload)
@@ -117,6 +141,7 @@ def make_metric(log: MetricLog | None = None):
             if log is not None:
                 log.unparseable += 1
                 log.scores.append(0.0)
+            _report(progress, example, 0.0, "not JSON")
             return 0.0
 
         try:
@@ -128,10 +153,12 @@ def make_metric(log: MetricLog | None = None):
             if log is not None:
                 log.failed += 1
                 log.scores.append(0.0)
+            _report(progress, example, 0.0, "scorer refused")
             return 0.0
 
         if log is not None:
             log.record(case)
+        _report(progress, example, case.score, None)
         return case.score
 
     return metric
