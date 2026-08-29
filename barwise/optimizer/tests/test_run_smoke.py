@@ -33,6 +33,7 @@ from dspy.utils.dummies import DummyLM
 
 from barwise_optimizer.barwise_cli import resolve_cli
 from barwise_optimizer.compile import RunConfig, run
+from barwise_optimizer.dataset import report_set
 
 TARGET = "anthropic/claude-haiku-4-5"
 
@@ -114,6 +115,17 @@ def test_the_run_writes_its_own_report_json(compiled):
     # sends the reader back to grepping the delta report's prose.
     assert doc["verdict"]["gate"] in {"beats", "ties", "loses", "unmeasurable"}
     assert doc["artifact"] == compiled["artifact"]
+
+    # The call-site assertion for barwise-908, and the reason the report
+    # records the unit at all. `resolvable` is computed over CASE means
+    # with n = cases; it used to be computed over every score with n =
+    # `samples_per_candidate`. Both produce a plausible-looking float,
+    # so the figure alone cannot distinguish them -- but the n can, and
+    # here the two differ (this run uses samples_per_candidate=2).
+    over = doc["resolvableOver"]
+    assert over["unit"] == "cases"
+    assert over["n"] != 2, "n must be the case count, not samples_per_candidate"
+    assert over["n"] == len(report_set()), "n must be the size of the dev split"
 
 
 def test_the_candidate_is_small_because_the_schema_stays_out_of_it(compiled):

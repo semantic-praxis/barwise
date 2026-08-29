@@ -139,6 +139,68 @@ def test_one_sample_resolves_nothing():
     assert resolvable_difference(0.1, 1) == float("inf")
 
 
+def test_case_means_collapse_repeats_of_one_case():
+    log = MetricLog()
+    for case_id, score in [("vendor", 0.281), ("sub", 0.460), ("inc", 0.646)]:
+        for _ in range(5):
+            log._append(case_id, score)
+    # approx, not ==: summing five copies of 0.460 and dividing lands on
+    # 0.4600000000000001. The mean is right; binary floating point is
+    # not the thing under test.
+    assert log.case_means() == pytest.approx([0.281, 0.460, 0.646])
+    # 15 evaluations, 3 independent observations. The distinction is the
+    # whole fix; a flat `scores` list cannot express it.
+    assert len(log.scores) == 15
+
+
+def test_resolvable_is_computed_over_cases_not_repeats():
+    """The barwise-908 arithmetic, pinned.
+
+    The 2026-08-29 mipro run scored three dev cases five times each and
+    got byte-identical scores per case -- DSPy defaults to `cache=True`,
+    so the repeats were the same response read again. The old pairing
+    took the sd over all 15 scores (dominated by BETWEEN-CASE spread,
+    0.154) and divided by sqrt(5 repeats), reporting 0.191 where the
+    honest figure over case means is 0.292. It understated the threshold
+    by 35%, which is the direction that calls margins resolvable when
+    they are not.
+
+    Written with identical repeats on purpose: that is the input where
+    the two computations diverge most, and it is the input a cached run
+    actually produces.
+    """
+    log = MetricLog()
+    for case_id, score in [("vendor", 0.281), ("sub", 0.460), ("inc", 0.646)]:
+        for _ in range(5):
+            log._append(case_id, score)
+
+    means = log.case_means()
+    honest = resolvable_difference(sample_sd(means), len(means))
+    assert honest == pytest.approx(0.292, abs=0.001)
+
+    # And it must NOT be the old figure. Asserting the correct value
+    # alone would still pass if someone reverted to the flat list and
+    # the constant drifted with it; naming the wrong answer is what
+    # makes the regression visible.
+    flat = resolvable_difference(sample_sd(log.scores), 5)
+    assert flat == pytest.approx(0.191, abs=0.001)
+    assert honest > flat
+
+
+def test_a_failure_keeps_scores_and_case_ids_in_step():
+    # The three failure paths used to append to `scores` directly. A
+    # fourth appender that forgot `case_ids` would desynchronise the
+    # pair, and `case_means` would then silently attribute scores to the
+    # wrong cases rather than fail.
+    log = MetricLog()
+    log._append("vendor", 0.9)
+    log.record_failure("sub", "unparseable")
+    log.record_failure("inc", "failed")
+    assert len(log.scores) == len(log.case_ids) == 3
+    assert log.unparseable == 1 and log.failed == 1
+    assert log.case_means() == pytest.approx([0.9, 0.0, 0.0])
+
+
 def test_sample_sd_uses_n_minus_one():
     assert sample_sd([1.0, 2.0, 3.0]) == pytest.approx(1.0)
     assert sample_sd([1.0]) == 0.0

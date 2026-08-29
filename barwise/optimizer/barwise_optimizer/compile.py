@@ -40,7 +40,7 @@ from .export import (
     write_delta_report,
 )
 from .barwise_cli import default_instructions
-from .metric import MetricLog, make_metric, resolvable_difference, sample_sd
+from .metric import MetricLog, make_metric
 from .verdict import decide
 from .program import SEED_INSTRUCTIONS, ExtractionProgram
 
@@ -328,8 +328,16 @@ def _run_under_budget(config: RunConfig, out_dir: Path, suite, budget: CallBudge
     progress.phase = "candidate"
     evaluate(compiled, dev, make_metric(candidate_log, progress), config.samples_per_candidate)
 
-    sd = sample_sd(candidate_log.scores)
-    resolvable = resolvable_difference(sd, config.samples_per_candidate)
+    # Over CASE MEANS, with n = cases -- not over every score with n =
+    # repeats. Repeats of one case are not independent observations:
+    # under DSPy's default `cache=True` they are the same response read
+    # again, which the 2026-08-29 mipro run showed as byte-identical
+    # scores across all five. The old pairing divided a between-case
+    # spread by the repeat count and understated the threshold by 35%
+    # (barwise-908). Computing over case means is also the right answer
+    # when the cache is off, since it makes no independence assumption
+    # about repeats at all.
+    resolvable, resolvable_n = candidate_log.resolvable()
 
     version = f"dspy-{config.optimizer}-{config.seed_from}-1"
     artifact_path = out_dir / f"extraction.{version}.prompt.yaml"
@@ -391,6 +399,12 @@ def _run_under_budget(config: RunConfig, out_dir: Path, suite, budget: CallBudge
         "baseline": baseline_summary,
         "candidate": candidate_summary,
         "resolvable": resolvable,
+        # The UNIT the figure was computed over, recorded rather than
+        # assumed. The barwise-908 defect was invisible in the report:
+        # 0.191 looks like a threshold whether it came from cases or
+        # repeats. With `n` beside it, a reader (and a test) can see
+        # that it is the case count and not `samples_per_candidate`.
+        "resolvableOver": {"unit": "cases", "n": resolvable_n},
         "budget": budget.summary(),
         "verdict": gate.as_dict(),
     }
