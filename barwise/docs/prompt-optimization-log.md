@@ -257,6 +257,26 @@ document**, which is now a rule in CLAUDE.md and a third pass in the
 `assertion-audit` skill, so the next audit starts from here instead of
 from scratch.
 
+## 2026-08-29, later still: the re-score becomes a command
+
+The reification review after #379 asked which of this session's work was
+done in an ephemeral context. Most had already landed as a script, a
+gate or a skill. One had not, and it was the one with recorded
+consequences: the offline re-score, described as a procedure in eight
+documents, quoted as a finding in three appendices, implemented nowhere,
+and written from scratch as a throwaway three times in two days.
+
+`barwise prompt rescore` and `barwise prompt compare` are now that
+procedure. The test of the work is that it reproduces the numbers it was
+written for: `unchanged 75, fell 40, rose 0, mean -0.131, worst -0.286`
+for the 2.8.0 appendix, and `+0.086 against 0.062 -- resolved` for the
+2.6.0 headline verdict.
+
+It also refined one of them. That haiku45-2 win is carried entirely by
+`vendor-onboarding` (+0.176, resolved); the other two dev cases are
+unresolved. A one-case win is a different claim from a suite win, and
+nobody had computed the per-case verdicts by hand.
+
 ## Open
 
 - The DSPy loop is **not closed**: no instruction-rewriting run

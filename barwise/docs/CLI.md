@@ -562,8 +562,9 @@ missing element prints a "not found" message and exits 0.
 ### prompt
 
 Prompt evaluation for the LLM surfaces: dev tooling over the eval
-suite, the score history, and the shipped prompt artifacts. Six
-subcommands: `eval`, `score`, `schema`, `artifact`, `run`, `history`.
+suite, the score history, and the shipped prompt artifacts. Eight
+subcommands: `eval`, `score`, `schema`, `artifact`, `run`, `history`,
+`rescore`, `compare`.
 
 ```sh
 barwise prompt eval --split dev --repeat 3
@@ -572,6 +573,8 @@ barwise prompt schema --surface review
 barwise prompt artifact --provider anthropic --model claude-haiku-4-5
 barwise prompt run notes.md --artifacts ./candidates
 barwise prompt history --format json
+barwise prompt rescore --payloads eval-payloads/20260828-1647 --baseline before.json
+barwise prompt compare --a 13 --b 9
 ```
 
 - `eval` -- run the eval suite against a live provider and record the
@@ -608,6 +611,23 @@ barwise prompt history --format json
   `.orm.yaml` for review.
 - `history` -- show the suite's recorded eval scores. Options:
   `--suite <manifest>`, `--format <text|json>`.
+- `rescore` -- score a recorded round's saved payloads under the current
+  build, which is how a scorer change is judged. Options:
+  `--payloads <dir>` (required, searched recursively),
+  `--baseline <file>` (an earlier `--format json` result, to diff
+  against), `--suite <manifest>`, `--format <text|json>`. It crosses
+  suite versions deliberately -- the question is what a round _would_
+  score under today's rules -- and reports both versions. It fails
+  rather than skips on a payload whose case the manifest does not
+  declare, and refuses a diff whose two sides cover different payloads,
+  because either would report a count smaller than the round it names.
+- `compare` -- compare two recorded history rows, with the resolvability
+  verdicts that were previously computed by hand. Options: `--a <index>`
+  and `--b <index>` (required, 1-based into `prompt history`),
+  `--suite <manifest>`, `--format <text|json>`. Deltas read as _b minus
+  a_. It refuses rows from different suite versions: a bump changes what
+  a score means, which is exactly what the version field records
+  (barwise-893, docs/specs/recorded-evidence-commands.spec.md).
 
 `--artifacts <dir>` loads unshipped `.prompt.yaml` candidates and is
 deliberately confined to this lane: `eval`, `artifact`, and `run`
