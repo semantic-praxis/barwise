@@ -31,11 +31,11 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = execFileSync("git", ["rev-parse", "--show-toplevel"], {
@@ -241,4 +241,61 @@ test("audit-spec-status refuses a shallow clone rather than reporting OK", () =>
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// --- barwise-919: a version pinned in two files is a must-agree copy ---
+//
+// `check-parity` grew a {file,field} member so a value duplicated across
+// JSON files is checked the way a duplicated function already was. The
+// motivating drift shipped: package.json said engines.node >=26.0.0
+// while package-lock.json, which embeds its own copy, said >=20.0.0, and
+// all 25 gates passed over the pair.
+//
+// The comparison loop itself is unchanged and six existing sets exercise
+// it. What is new is the path parser and the value resolution, tested
+// directly here -- `root` inside the gate is script-relative by design
+// (barwise-905 again), so a fixture repo cannot reach `main()`.
+
+const { parseFieldPath, fieldValue } = await import(
+  pathToFileURL(join(SCRIPTS, "check-parity.mjs")).href
+);
+
+test("parseFieldPath splits dotted keys and bracketed non-identifiers", () => {
+  assert.deepEqual(parseFieldPath("version"), ["version"]);
+  assert.deepEqual(parseFieldPath("engines.node"), ["engines", "node"]);
+  // npm names the lockfile's root package with the empty string, which
+  // is the whole reason the bracket form exists.
+  assert.deepEqual(
+    parseFieldPath('packages[""].engines.node'),
+    ["packages", "", "engines", "node"],
+  );
+  assert.deepEqual(parseFieldPath('a["b.c"].d'), ["a", "b.c", "d"]);
+});
+
+test("fieldValue resolves the pair that actually drifted", () => {
+  const declared = fieldValue("package.json", "engines.node");
+  const embedded = fieldValue("package-lock.json", 'packages[""].engines.node');
+  assert.equal(declared, embedded, "engines.node disagrees between package.json and its lockfile");
+  assert.match(declared, /^">=\d+\.\d+\.\d+"$/, `unexpected shape: ${declared}`);
+});
+
+test("fieldValue treats a path that no longer resolves as an error", () => {
+  // A manifest naming a field nobody writes any more is itself drift, so
+  // it must fail rather than compare two undefineds and call them equal.
+  assert.throws(
+    () => fieldValue("package.json", "engines.nodeVersion"),
+    /no value at "engines" -> "nodeVersion"/,
+  );
+  assert.throws(() => fieldValue("package.json", "version.major"), /no value at/);
+});
+
+test("every registered field member still resolves", () => {
+  const manifest = JSON.parse(
+    readFileSync(join(SCRIPTS, "..", "parity.manifest.json"), "utf8"),
+  );
+  const fields = manifest.sets.flatMap((s) =>
+    s.members.filter((m) => typeof m === "object" && m.field !== undefined)
+  );
+  assert.ok(fields.length > 0, "no field members registered; this test would pass vacuously");
+  for (const m of fields) fieldValue(m.file, m.field);
 });

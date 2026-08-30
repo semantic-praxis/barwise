@@ -23,32 +23,128 @@
       "name": "pascal-case-avro",
       "why": "record names must align between core's Avro mapper and the formats exporter or exported schemas reference names the mapping never produced",
       "members": [
-        { "file": "packages/core/src/mapping/renderers/avro.ts", "symbol": "toPascalCase" },
-        { "file": "packages/formats/src/avro/AvroExportFormat.ts", "symbol": "toPascalCase" }
+        {
+          "file": "packages/core/src/mapping/renderers/avro.ts",
+          "symbol": "toPascalCase"
+        },
+        {
+          "file": "packages/formats/src/avro/AvroExportFormat.ts",
+          "symbol": "toPascalCase"
+        }
       ]
     },
     {
       "name": "pascal-case-openapi",
       "why": "schema names must align between core's OpenAPI mapper and the formats exporter, same shape as the Avro pair",
       "members": [
-        { "file": "packages/core/src/mapping/renderers/openapi.ts", "symbol": "toPascalCase" },
-        { "file": "packages/formats/src/openapi/OpenApiExportFormat.ts", "symbol": "toPascalCase" }
+        {
+          "file": "packages/core/src/mapping/renderers/openapi.ts",
+          "symbol": "toPascalCase"
+        },
+        {
+          "file": "packages/formats/src/openapi/OpenApiExportFormat.ts",
+          "symbol": "toPascalCase"
+        }
       ]
     },
     {
       "name": "sql-quote-ident",
       "why": "CREATE TABLE and its own population INSERTs must quote identifiers identically or the INSERTs target tables the DDL never created",
       "members": [
-        { "file": "packages/core/src/mapping/renderers/ddl.ts", "symbol": "quoteIdent" },
-        { "file": "packages/core/src/export/populationRenderer.ts", "symbol": "quoteIdent" }
+        {
+          "file": "packages/core/src/mapping/renderers/ddl.ts",
+          "symbol": "quoteIdent"
+        },
+        {
+          "file": "packages/core/src/export/populationRenderer.ts",
+          "symbol": "quoteIdent"
+        }
       ]
     },
     {
       "name": "import-alternatives-diff-summary",
       "why": "the alternative-framing diff summary is one sentence shape shown on both surfaces; the surrounding wrappers deliberately differ (plain text vs markdown), the summary may not",
       "members": [
-        { "file": "packages/cli/src/commands/import/shared.ts", "symbol": "summarizeDiff" },
-        { "file": "packages/mcp/src/tools/import.ts", "symbol": "summarizeDiff" }
+        {
+          "file": "packages/cli/src/commands/import/shared.ts",
+          "symbol": "summarizeDiff"
+        },
+        {
+          "file": "packages/mcp/src/tools/import.ts",
+          "symbol": "summarizeDiff"
+        }
+      ]
+    },
+    {
+      "name": "node-engines",
+      "why": "package-lock.json embeds its own copy of the root package's engines field; 0f8bdaa raised package.json to >=26.0.0 and left the lock at >=20.0.0, and every gate stayed green (barwise-919)",
+      "members": [
+        {
+          "file": "package.json",
+          "field": "engines.node"
+        },
+        {
+          "file": "package-lock.json",
+          "field": "packages[\"\"].engines.node"
+        }
+      ]
+    },
+    {
+      "name": "monorepo-version",
+      "why": "the project uses a single version across all packages, written in thirteen files and held together by the release procedure; exactly one pair was guarded before this entry, by the SERVER_VERSION drift test in packages/mcp/tests/server.test.ts",
+      "members": [
+        {
+          "file": "package.json",
+          "field": "version"
+        },
+        {
+          "file": "packages/cli/package.json",
+          "field": "version"
+        },
+        {
+          "file": "packages/code-analysis/package.json",
+          "field": "version"
+        },
+        {
+          "file": "packages/core/package.json",
+          "field": "version"
+        },
+        {
+          "file": "packages/dbt/package.json",
+          "field": "version"
+        },
+        {
+          "file": "packages/diagram-ui/package.json",
+          "field": "version"
+        },
+        {
+          "file": "packages/diagram/package.json",
+          "field": "version"
+        },
+        {
+          "file": "packages/formats/package.json",
+          "field": "version"
+        },
+        {
+          "file": "packages/learn/package.json",
+          "field": "version"
+        },
+        {
+          "file": "packages/llm/package.json",
+          "field": "version"
+        },
+        {
+          "file": "packages/mcp/package.json",
+          "field": "version"
+        },
+        {
+          "file": "packages/promptlab/package.json",
+          "field": "version"
+        },
+        {
+          "file": "packages/vscode/package.json",
+          "field": "version"
+        }
       ]
     }
   ]

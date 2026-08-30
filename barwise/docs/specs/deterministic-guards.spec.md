@@ -1,6 +1,7 @@
 # Make the guards that only diligence enforces fail on their own
 
-Status: Draft -- no workstream implemented
+Status: Workstream 1 implemented; 2-4 approved and pending (see
+Implementation notes)
 Created: 2026-08-30
 Last-updated: 2026-08-30
 Tracking: barwise-915 (Python interpreter unpinned), barwise-916
@@ -323,6 +324,45 @@ forwarder in the same commit.
 - Run `npm run ci:local` after each; the coverage thresholds in
   `@barwise/llm` are tight enough (92% functions) that a new branch in a
   provider needs its test in the same PR.
+
+## Implementation notes
+
+**Workstream 1 landed.** `check-parity.mjs` takes a `{file, field}`
+member that resolves a path in a JSON file and compares values rather
+than text; `parity.manifest.json` registers `node-engines` (2 members)
+and `monorepo-version` (13). Shown red on three planted defects before
+being accepted -- the reproduced `0f8bdaa` divergence, a single package
+version bumped out of step, and a manifest field that no longer resolves
+-- and `scripts/tests/gates.test.mjs` gained four tests, themselves
+verified red by breaking the lockfile pair and by disabling the bracket
+branch of the path parser.
+
+Two deviations from the brief, neither anticipated:
+
+- **The script had to be restructured.** The spec assumed the member
+  form was the whole change. But `root` is resolved script-relative by
+  design (barwise-905: a gate's coverage must not depend on its cwd),
+  so a fixture repo cannot reach the comparison loop, and the loop calls
+  `process.exit`. The check now runs under a direct-invocation guard
+  with `parseFieldPath` and `fieldValue` exported, which is ordinary
+  module structure rather than a seam that exists for a test.
+
+- **The hand-run mutation pass produced a green result over a manifest
+  that had silently lost both new sets.** Reverting a planted defect with
+  `git checkout parity.manifest.json` also reverted the uncommitted
+  entries, after which the gate reported `6 set(s), all members
+  identical. OK` -- correct about what it checked, and no longer checking
+  what it was written for. That is the class this spec is about,
+  reproduced inside the work closing it, which is why the fourth test
+  asserts that at least one field member is registered before it walks
+  them: a for-loop over an empty list passes.
+
+**Workstreams 2, 3 and 4 are approved but not started.** Each is blocked
+on an open decision below rather than on workstream 1: workstream 2 on
+what to do if a provider echoes an alias back and on whether Ollama is
+worth closing, workstream 3 on whether sqlglot is installed in CI as
+well as declared, and workstream 4 on the Python version and on whether
+action refs are in scope.
 
 ## Non-goals
 
