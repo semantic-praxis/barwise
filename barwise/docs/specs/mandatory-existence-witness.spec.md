@@ -1,6 +1,6 @@
 # A subtype instance witnesses its supertype's existence
 
-Status: Accepted (implemented with this spec; see Implementation notes)
+Status: Implemented with this spec (see Implementation notes); barwise-880, barwise-881 closed
 Created: 2026-08-27
 Last-updated: 2026-08-27
 Tracking: barwise-880 (finding F5 of

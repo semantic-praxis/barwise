@@ -1,6 +1,6 @@
 # Population correspondence sees through objectification
 
-Status: Accepted (implemented with this spec; see Implementation notes)
+Status: Implemented with this spec (see Implementation notes); barwise-881 closed
 Created: 2026-08-27
 Last-updated: 2026-08-27
 Tracking: barwise-881 (finding F6 of

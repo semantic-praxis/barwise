@@ -35,6 +35,15 @@
  * `--check` ratchets against spec-status-baseline.json and fails BOTH
  * on a new unclassified spec and on a stale row, so the baseline always
  * enumerates exactly what is outstanding.
+ *
+ * `--survey` answers the neighbouring question the gate deliberately
+ * does NOT: of the specs claiming PARTIAL implementation, which ones can
+ * have that claim settled cheaply. It reports rather than fails, and it
+ * lives here rather than in a second script so that "how a spec header
+ * is read" keeps one owner -- a parallel parser would be the must-agree
+ * copy this repo has a rule about. See barwise-912 for what it is for:
+ * a spec whose Tracking names its workstream issues has a Status that is
+ * DERIVABLE from the beads store instead of hand-written.
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -60,6 +69,9 @@ const BASELINE = resolve(REPO_ROOT, "barwise/spec-status-baseline.json");
 const CLAIMS_NOTHING_BUILT = /^\s*(draft|proposed|design only)\b/i;
 
 const CODE = /\.(ts|tsx|mjs|cjs|js|json|ya?ml|py|sh)$/;
+
+/** A Status that claims some workstreams landed and others did not. */
+const TERMINAL = /^\s*(implemented|complete|shipped)\b/i;
 
 /**
  * A package barrel is touched by every change to its package, so a spec
@@ -145,8 +157,23 @@ function namedPaths(text) {
   return [...out];
 }
 
+/**
+ * A header value, which may run over several lines. `Tracking:` usually
+ * does -- it mixes issue ids, sibling specs and review documents across
+ * a paragraph -- and reading only its first line silently loses the ids
+ * on the rest. That is not hypothetical: it dropped `norma-export`'s
+ * three issues and one of `mandatory-existence-witness`'s two, which
+ * moved both specs into the wrong survey class. A value ends at the next
+ * header field or the first blank line.
+ */
 function header(text, field) {
-  const m = new RegExp(`^${field}:[ \\t]*(.+)$`, "m").exec(text);
+  const m = new RegExp(
+    // `$` is NOT the terminator: under the `m` flag it matches at every
+    // line end, so the lookahead fires immediately and the value is
+    // truncated to its first line. `(?![\\s\\S])` is end of input.
+    `^${field}:[ \\t]*([\\s\\S]*?)(?=\\n[A-Z][A-Za-z-]*:[ \\t]|\\n[ \\t]*\\n|(?![\\s\\S]))`,
+    "m",
+  ).exec(text);
   return m ? m[1].trim() : undefined;
 }
 
@@ -175,6 +202,77 @@ function findings() {
     });
   }
   return found.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * Issue ids a spec's Tracking line names, with their state. Tracking is
+ * free text -- it mixes issue ids, sibling specs and review documents --
+ * so this takes every id the beads store actually knows.
+ */
+function trackedIssues(text) {
+  const store = new Map();
+  for (const line of readFileSync(resolve(REPO_ROOT, ".beads/issues.jsonl"), "utf8").split("\n")) {
+    if (!line.trim()) continue;
+    const issue = JSON.parse(line);
+    if (issue.id) store.set(issue.id, issue.status);
+  }
+  const tracking = header(text, "Tracking") ?? "";
+  const ids = [...new Set([...tracking.matchAll(/\bbarwise-[a-z0-9]+\b/g)].map((m) => m[0]))]
+    .filter((id) => store.has(id));
+  return { ids, open: ids.filter((id) => store.get(id) !== "closed") };
+}
+
+/**
+ * The specs claiming partial implementation, ranked by how cheaply the
+ * claim can be settled. The ranking is the point: it separates the three
+ * that a reader can confirm from the store from the thirteen that need
+ * the code read workstream by workstream, so the work can be sized
+ * before it is started rather than after.
+ */
+function survey() {
+  const CLASSES = [
+    "A  settled from the store: every named issue is closed",
+    "B  settled from the store: named issues cover the workstreams, some open",
+    "C  partly settled: fewer issues named than the spec has workstreams",
+    "D  nothing named: needs artifact-level verification, per workstream",
+  ];
+  const rows = [];
+  for (const file of specFiles()) {
+    const text = readSpec(file);
+    const status = header(text, "Status") ?? "<none>";
+    if (TERMINAL.test(status) || CLAIMS_NOTHING_BUILT.test(status)) continue;
+
+    const workstreams = [...text.matchAll(/^### (\d+)\.\s+(.+)$/gm)].length;
+    const { ids, open } = trackedIssues(text);
+    const notes = /^## Implementation notes/m.test(text);
+    const cls = ids.length === 0
+      ? 3
+      : ids.length < workstreams
+      ? 2
+      : open.length > 0
+      ? 1
+      : 0;
+    rows.push({ id: file.slice(SPEC_DIR.length), workstreams, ids, open, notes, cls });
+  }
+  rows.sort((a, b) => a.cls - b.cls || a.id.localeCompare(b.id));
+
+  let last = -1;
+  for (const r of rows) {
+    if (r.cls !== last) {
+      console.log(`\n${CLASSES[r.cls]}\n${"-".repeat(70)}`);
+      last = r.cls;
+    }
+    const bits = [`${r.workstreams} workstream(s)`, `${r.ids.length} issue(s)`];
+    if (r.open.length > 0) bits.push(`${r.open.length} open: ${r.open.join(", ")}`);
+    if (r.notes) bits.push("has Implementation notes");
+    console.log(`  ${r.id}\n      ${bits.join(" | ")}`);
+  }
+  console.log(`\n${rows.length} spec(s) claiming partial implementation (barwise-912).`);
+}
+
+if (process.argv.includes("--survey")) {
+  survey();
+  process.exit(0);
 }
 
 requireFullHistory();
