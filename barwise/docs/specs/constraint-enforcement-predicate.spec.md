@@ -1,6 +1,6 @@
 # Ask the constraint whether it rejects the population
 
-Status: Workstream 1 implemented; 2 pending, 3 deferred
+Status: Workstreams 1-2 implemented; 3 deferred (Open decision 2)
 Created: 2026-08-30
 Last-updated: 2026-08-30
 Tracking: barwise-904
@@ -182,6 +182,26 @@ still discriminate**, and `rubric-baseline.json` must not gain a row. A
 suite bump is expected to be unnecessary -- the answers should not move, only
 how they are computed -- and if any score does move, that is a finding to
 report before bumping, not a bump to apply quietly.
+
+**Outcome.** 43/43 still discriminate, the baseline is unchanged, and
+`prompt rescore` over all 192 committed payloads moves **zero** scores, so
+no suite bump. Two of the three layers are gone: rule-id filtering and
+`namesTheCarrier` are the predicate call itself. The before/after delta
+stays and is not a leftover -- `evaluateConstraintEnforcement` answers
+"does this constraint reject this model's population", which on a
+candidate carrying its own populations is already true before anything is
+injected, so the delta is what "the injection caused this" means. It is
+now per-constraint rather than model-wide, and pinned by
+`tests/injectionCausation.test.ts`, which nothing did before: dropping the
+delta from the OLD implementation left all 97 tests green and all 43
+checks discriminating.
+
+The kind-to-rule map is replaced by a kind-to-guard map, which is a
+different object rather than the same one renamed. Rule ids are strings
+core can change silently, which is what the drift test existed to catch;
+`CANDIDATE_GUARDS` holds core's own exported type guards, so the same
+rename fails the build. Its two widened rows are, on measurement,
+unexercised -- see barwise-911.
 
 ### 3. Structured `constraintId` on `Diagnostic` (provisional: not yet grounded)
 
