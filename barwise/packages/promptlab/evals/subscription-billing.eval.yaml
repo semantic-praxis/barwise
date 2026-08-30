@@ -35,7 +35,12 @@ checks:
       factTypeBetween: [Subscription, Product]
     hint: Without this, the account-product combination cannot be constrained.
   - kind: requires_ambiguity
-    matches: [cancel]
+    # Both terms, in the SAME ambiguity: `matches` is conjunctive. "cancel"
+    # alone passed on any candidate that merely listed the status vocabulary
+    # ("trialing, active, past due, cancelled"), which every competent model
+    # does -- a guaranteed point, not a measurement (barwise-901). "mid-term"
+    # appears in the policy question and in neither status list.
+    matches: [cancel, mid-term]
     hint: The room parked what happens commercially when an annual subscription is cancelled mid-term.
   - kind: forbids_population
     factType: Subscription has BillingPeriod
