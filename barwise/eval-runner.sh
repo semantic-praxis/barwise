@@ -131,10 +131,15 @@ if [[ "${ARMS}" = "candidate" ]] || [[ "${ARMS}" = "both" ]]; then
 
   # Resolve the artifact before spending anything: offline, no API key,
   # under a second. Otherwise a bad version surfaces inside the first arm.
-  if ! npx barwise prompt artifact --provider anthropic --model claude-sonnet-5 \
-       --artifacts "${CANDIDATE_DIR}" --artifact-version "${CANDIDATE_VERSION}" >/dev/null; then
-    echo >&2
-    echo "candidate \"${CANDIDATE_VERSION}\" does not resolve in ${CANDIDATE_DIR} (see above)." >&2
+  # Captured, not redirected: the command reports on stderr, so a bare
+  # `>/dev/null` silences nothing and every run gains three lines of
+  # noise. Held back and printed only on failure, where the list of
+  # available versions is the whole point.
+  if ! _probe="$(npx barwise prompt artifact --provider anthropic \
+       --model claude-sonnet-5 --artifacts "${CANDIDATE_DIR}" \
+       --artifact-version "${CANDIDATE_VERSION}" 2>&1)"; then
+    echo "${_probe}" >&2
+    echo "candidate \"${CANDIDATE_VERSION}\" does not resolve in ${CANDIDATE_DIR}." >&2
     echo "  Set CANDIDATE_VERSION to one of the versions listed, or unset it to" >&2
     echo "  derive it when the directory holds exactly one candidate." >&2
     exit 1
