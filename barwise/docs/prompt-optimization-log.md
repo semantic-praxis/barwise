@@ -360,6 +360,58 @@ Both defects share a shape worth naming: **nothing offline exercised
 the path**, so the only place either could fail was in front of an
 operator who had already spent the money.
 
+## 2026-08-30: what the two scoring changes cost, per case (barwise-909)
+
+Workstream 3 of `must-validate-outside-the-rubric.spec.md` was never
+done when 1 and 2 shipped, so no reader could see what the 2.9.0 bump
+cost each case. The suite has since moved to 2.10.0 (barwise-901), so
+this covers both changes at once. All 192 committed payloads, re-scored
+under three builds checked out at their own commits -- `074ddb1~1`
+(2.8.0), `074ddb1` (2.9.0), `28b4392` (2.10.0) -- not under a
+reconstruction of them.
+
+| case                    |   n | 2.8.0  | 2.9.0  | 2.10.0 | d(902)  | d(901) | rubric total |
+| ----------------------- | --: | ------ | ------ | ------ | ------- | ------ | ------------ |
+| `clinic-appointments`   |  18 | 0.9801 | 0.9794 | 0.9794 | -0.0006 | 0      | 10 -> 9      |
+| `conference-reviews`    |  14 | 0.8212 | 0.7940 | 0.7940 | -0.0272 | 0      | 7 -> 6       |
+| `employee-hierarchy`    |  15 | 0.8732 | 0.8510 | 0.8510 | -0.0222 | 0      | 6 -> 5       |
+| `freight-corrections`   |  13 | 0.9196 | 0.9171 | 0.9171 | -0.0026 | 0      | 6 -> 5       |
+| `incident-response`     |  25 | 0.8863 | 0.8815 | 0.8815 | -0.0047 | 0      | 11 -> 10     |
+| `order-management`      |  17 | 0.8559 | 0.8380 | 0.8380 | -0.0179 | 0      | 8 -> 7       |
+| `project-staffing`      |  16 | 0.8450 | 0.8294 | 0.8294 | -0.0156 | 0      | 9 -> 8       |
+| `subscription-billing`  |  26 | 0.9091 | 0.9042 | 0.9042 | -0.0049 | 0      | 13 -> 12     |
+| `university-enrollment` |  22 | 0.9787 | 0.9787 | 0.9787 | 0       | 0      | 9 -> 8       |
+| `vendor-onboarding`     |  26 | 0.8911 | 0.8883 | 0.8883 | -0.0028 | 0      | 11 -> 10     |
+| **overall**             | 192 | 0.8998 | 0.8913 | 0.8913 | -0.0085 | 0      |              |
+
+**barwise-902 cost 0.85 points overall**, and the spread across cases is
+the interesting part rather than the mean. The drop is not uniform
+because removing a guaranteed pass from both halves of a fraction leaves
+a case that was scoring 1.0 on its rubric exactly where it was:
+`university-enrollment` moves 0 of 22 payloads, because its rubric was
+already full. The cases that move most are the ones that were failing
+other checks, where the free point had been diluting the failures --
+`conference-reviews` at -0.0272 with 9 of 14 payloads moving, and
+`employee-hierarchy` at -0.0222 with 10 of 15. That is the defect stated
+as a number: the smaller the rubric and the more it was failing, the
+more the constant was worth.
+
+**barwise-901 cost nothing measurable, and that is not a null result.**
+Zero of 192 payloads move, and all 26 `subscription-billing` payloads
+still pass the tightened `matches: [cancel, mid-term]`. The fix was
+justified by mutation -- deleting the intended ambiguity from the answer
+key left the check passing on the status vocabulary alone -- and that
+evidence stands. What this measurement adds is that no candidate in
+either recorded round was ever in the exploiting state: every one of
+them parked the mid-term policy question explicitly. So 901 removed a
+**latent** guaranteed point rather than one anybody was banking. It
+would have paid out on a weaker model, which is exactly when a rubric
+needs to be right.
+
+The 2.10.0 rescore is byte-identical to the current build's, which
+re-confirms across the version boundary that barwise-904 workstream 2
+changed no answer.
+
 ## Open
 
 - The DSPy loop is **not closed**: no instruction-rewriting run
@@ -368,12 +420,24 @@ operator who had already spent the money.
   compile was `bootstrap`, which structurally cannot win. Everything
   needed is now in place -- three arms, a shipped comparator, per-call
   progress, a correct gating command.
-- No keyed round has been measured at suite 2.7.0.
+- No keyed round has been measured at suite **2.10.0**. (This line read
+  2.7.0 for two suite bumps after the round it named stopped being the
+  current one, which is the same staleness the entries below keep
+  finding elsewhere.)
 - barwise-900: nothing catches a red optimizer test.
-- Three rubric defects now open from the audit: barwise-894 (P1, 16
-  vacuous passes), barwise-901 (one false pass), barwise-902
-  (`must_validate` unreachable). `requires_element` is the only kind
-  that came through clean.
+- ~~Three rubric defects open from the audit.~~ All three closed:
+  barwise-894 (16 vacuous passes, suite 2.8.0), barwise-901 (one false
+  pass, 2.9.0 -> 2.10.0), barwise-902 (`must_validate` unreachable,
+  2.8.0 -> 2.9.0). `requires_element` came through clean and still is.
+  What each cost is in the 2026-08-30 entry above.
+- barwise-911: the two widened constraint guards in `forbids_population`
+  (external uniqueness, disjunctive mandatory) are unexercised --
+  dropping either changes no test, no discrimination count and no
+  payload score. They stay, because deleting a false-miss guard nothing
+  currently trips is how barwise-892 and barwise-896 come back.
+- barwise-910: a spec's `Status` header decays with nothing reading it
+  back. Three mechanical proxies were tried and rejected on evidence;
+  none of them fires on the instance that prompted it.
 - ~~Nothing re-runs this audit.~~ Closed by barwise-903: it is
   `npm run audit:rubric -- --check`, ratcheted against
   `rubric-baseline.json` and gated in CI. See below.

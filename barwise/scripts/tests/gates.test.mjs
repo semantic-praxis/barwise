@@ -178,3 +178,67 @@ test("check-root-scripts fails on drift in either direction", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// --- barwise-910: the spec-status gate, pinned against real history ---
+
+/**
+ * This gate's whole claim is "it would have caught the header that went
+ * stale", and that claim is checkable rather than assertable: `--at
+ * <commit>` runs it against a historical tree. 7fbbba7 shipped
+ * workstream 1 of barwise-902 while
+ * `must-validate-outside-the-rubric.spec.md` still read "design only --
+ * no implementation in this PR".
+ *
+ * Mutating a Status on today's tree would NOT reproduce that condition:
+ * the gate compares against the commit that last touched the spec, and
+ * both specs involved have been edited since. A red test written that
+ * way passes, which is the barwise-906 shape -- so the red reading has
+ * to come from the commit where the defect actually was.
+ */
+test("audit-spec-status fires on the header that went stale at 7fbbba7", () => {
+  const r = gate("audit-spec-status.mjs", REPO, "--at", "7fbbba7");
+  assert.equal(r.status, 0, `--at failed:\n${r.stdout}${r.stderr}`);
+  assert.match(
+    r.stdout,
+    /must-validate-outside-the-rubric\.spec\.md/,
+    `the gate did not fire on the defect it exists for:\n${r.stdout}`,
+  );
+  assert.match(r.stdout, /since: 7fbbba7/, `wrong reason:\n${r.stdout}`);
+});
+
+test("audit-spec-status --check is green on the current tree, from every cwd", (t) => {
+  // A shallow clone cannot answer this gate's question, and the gate now
+  // says so instead of printing OK -- which is how it shipped red once:
+  // 309 commits locally against CI's full history. Skipping loudly here
+  // is not the silent hole; reporting the smaller question's answer was.
+  const shallow = execFileSync("git", ["rev-parse", "--is-shallow-repository"], {
+    cwd: REPO,
+    encoding: "utf8",
+  }).trim() === "true";
+  if (shallow) {
+    t.skip("shallow clone: run `git fetch --unshallow` to exercise this gate");
+    return;
+  }
+  for (const cwd of CWDS) {
+    const r = gate("audit-spec-status.mjs", cwd, "--check");
+    assert.equal(r.status, 0, `--check failed in ${cwd}:\n${r.stdout}${r.stderr}`);
+  }
+});
+
+test("audit-spec-status refuses a shallow clone rather than reporting OK", () => {
+  const dir = tempRepo();
+  try {
+    // A repo with no `--unshallow` marker is not shallow, so this makes
+    // one the way git does: the guard reads `rev-parse
+    // --is-shallow-repository`, which is true exactly when .git/shallow
+    // exists.
+    writeFileSync(join(dir, ".git", "shallow"), `${"0".repeat(40)}\n`);
+    stage(dir, "barwise/docs/specs/x.spec.md", "# x\n\nStatus: draft\n");
+    execFileSync("git", ["commit", "-qm", "spec"], { cwd: dir });
+    const r = gate("audit-spec-status.mjs", dir, "--check");
+    assert.equal(r.status, 1, `expected refusal, got:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /shallow clone/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -1,0 +1,13 @@
+{
+  "$comment": "Specs whose Status claims no implementation while commits have landed on the source files they name. Each row needs a note saying why the header is still right, or what it should say instead. Ratcheted by `npm run audit:specs -- --check` (scripts/audit-spec-status.mjs).",
+  "specs": {
+    "implicit-sensemaking.spec.md": {
+      "status": "draft",
+      "note": "Genuinely still a draft; the commits below are unrelated work on modules the spec happens to name. 8a62161 is model-lint's four workstreams touching populationValidation.ts; 8175c7c moved mcp output-size guidance, touching verbalize.ts. Neither implements anything here -- no rival-frame or premortem code exists in any package's src. The spec's own Tracking line says it files bd issues per workstream WHEN IT LANDS, so nothing has landed to report. Remove this row when the first workstream ships and the Status says so.",
+      "commits": [
+        "8a62161",
+        "8175c7c"
+      ]
+    }
+  }
+}

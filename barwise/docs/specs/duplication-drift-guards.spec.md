@@ -1,16 +1,25 @@
 # Make must-agree code pairs fail loudly when they drift, without removing the duplication the principles keep
 
-Status: Draft for review (design only -- no implementation in this PR)
-Created: 2026-08-26
-Last-updated: 2026-08-26
-Tracking: `docs/logic-duplication-audit-2026-08-26.md` (all classes);
-extends the remedy of `docs/specs/artifact-resolution-parity.spec.md`
-(implemented, PR #347) from one instance to the class. Issues:
-barwise-862 (W1), barwise-868 (W2), barwise-869 (W3), barwise-870
-(W4), barwise-871 (W5), barwise-872 (W6); the audit's diverged-copy
-findings are barwise-863..867 and 873. Hand-authored into
-`.beads/issues.jsonl` (canonical form, `check:beads --strict` clean);
-`bd` itself is unavailable in this container.
+Status: Implemented (all six workstreams)
+Status-evidence: `scripts/check-depcruise-gate.mjs` (WS1); `parity.manifest.json`
+
+- `scripts/check-parity.mjs` (WS2); `packages/core/src/util/assertNever.ts` (WS3);
+  `scripts/regen-example-output.sh` + `packages/core/tests/integration/exampleOutputDrift.test.ts`
+  (WS4); `scripts/audit-duplication.mjs` + `audit-baseline.json` (WS5); the
+  must-agree rule in CLAUDE.md (WS6). The header read "Draft for review (design
+  only -- no implementation in this PR)" until 2026-08-30, while CLAUDE.md cited
+  the ratchet this spec designed as landed and gated in CI. Found by
+  `npm run audit:specs`, which exists because of it (barwise-910).
+  Created: 2026-08-26
+  Last-updated: 2026-08-26
+  Tracking: `docs/logic-duplication-audit-2026-08-26.md` (all classes);
+  extends the remedy of `docs/specs/artifact-resolution-parity.spec.md`
+  (implemented, PR #347) from one instance to the class. Issues:
+  barwise-862 (W1), barwise-868 (W2), barwise-869 (W3), barwise-870
+  (W4), barwise-871 (W5), barwise-872 (W6); the audit's diverged-copy
+  findings are barwise-863..867 and 873. Hand-authored into
+  `.beads/issues.jsonl` (canonical form, `check:beads --strict` clean);
+  `bd` itself is unavailable in this container.
 
 ## Principle
 
