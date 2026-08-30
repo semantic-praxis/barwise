@@ -8,6 +8,16 @@
         "8a62161",
         "8175c7c"
       ]
+    },
+    "conformance-property.spec.md": {
+      "status": "Accepted (all decisions resolved 2026-08-25; both workstreams open -- design only, no implementation in this PR)",
+      "note": "Genuinely unimplemented, and the header is right. Both workstreams are property-based testing (an extraction-response arbitrary, then parser totality over generated responses) and nothing of the sort exists: fast-check is not a dependency of any package, and the only 'arbitrary' in llm or promptlab is a comment in an unrelated test. The four commits below are unrelated work on files it names -- a dependabot bump, suite 2.5.0, the assertNever sweep, and the npm-audit gate. Remove this row when workstream 1 ships and the Status says so. Caught only after the gate's pattern was fixed to see the claim mid-line; it had escaped on position alone (barwise-912 class-C pass).",
+      "commits": [
+        "c14cb71",
+        "0a79c25",
+        "369f041",
+        "1c524f6"
+      ]
     }
   }
 }

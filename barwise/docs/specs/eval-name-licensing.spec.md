@@ -3,6 +3,12 @@
 Status: Accepted; workstreams 1 and 2 implemented (see Implementation
 notes). Workstream 3 stays provisional: measure alias compliance
 against the now-honest metric before editing the prompt.
+Workstream map: WS1 and WS2 shipped under barwise-852 (closed) --
+verified 2026-08-30 by the artifacts, `NameLicence` threaded through the
+resolver in `packages/learn/src/evaluate/populationMapping.ts` and the
+licence declared in `packages/promptlab/evals/university-enrollment.eval.yaml`.
+WS3 is provisional and deliberately has no issue until the measurement
+it waits on exists.
 Created: 2026-08-26
 Last-updated: 2026-08-27
 Tracking: barwise-852. Evidence:

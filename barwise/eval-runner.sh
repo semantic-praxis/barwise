@@ -73,9 +73,13 @@ run_arm() {
 #   both       one after the other, into one round
 ARMS="${ARMS:-candidate}"
 
-# The compiled-candidate measurement at suite 2.7.0. The control is run
-# FRESH rather than read from the 2.6.0 rows: comparing across a suite
-# bump is what the version field exists to forbid.
+# The compiled-candidate measurement. The control is run FRESH rather
+# than read from an older round's rows: comparing across a suite bump is
+# what the version field exists to forbid -- which is also why this
+# comment no longer names a suite version. It said 2.7.0 through three
+# bumps (2.8.0, 2.9.0, 2.10.0), and a hard-coded version here is a claim
+# that goes stale every time the thing it names moves. `suite.yaml` is
+# the authority, and each recorded row carries the version it ran at.
 #
 # CANDIDATE_DIR holds the exported candidate .prompt.yaml;
 # CANDIDATE_VERSION is its `version:` field. Both flags are needed --
