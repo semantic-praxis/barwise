@@ -54,12 +54,17 @@ const fail = (message: string, hint?: string): CheckResult => ({
  * `tests/rejectingRulesDrift.test.ts` to guard it. These are core's own
  * exported type guards: a rename fails the build instead (barwise-904).
  *
- * The two widened rows are carried forward from that map and are, on
- * measurement, unexercised: dropping either changes no test, no
+ * Both widened rows are reachable, and `tests/widenedGuards.test.ts`
+ * pins them. They were carried forward from `REJECTING_RULES` with
+ * nothing exercising either -- dropping one changed no test, no
  * discrimination count, and no score on any of the 192 committed
- * payloads. They stay because deleting a false-miss guard on the grounds
- * that nothing currently trips it is how barwise-892 and barwise-896 come
- * back on a candidate nobody has seen yet. Tracked as barwise-911.
+ * payloads (barwise-911). The external-uniqueness case needs a specific
+ * shape to reach, and an early reading of the counterexample generator
+ * concluded it was unreachable by construction. That was wrong: it holds
+ * only when the reference uniqueness sits on the ENTITY role, where
+ * `forUniqueness` mints one entity twice. Constrain the VALUE role and
+ * it mints two distinct entities, which is exactly the pair external
+ * uniqueness needs.
  */
 const CANDIDATE_GUARDS: Record<ConstraintKind, readonly ((c: Constraint) => boolean)[]> = {
   internal_uniqueness: [isInternalUniqueness, isExternalUniqueness],
