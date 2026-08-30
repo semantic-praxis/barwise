@@ -1,6 +1,9 @@
 import {
   type Constraint,
-  type Diagnostic,
+  evaluateConstraintEnforcement,
+  type FactType,
+  isDisjunctiveMandatory,
+  isExternalUniqueness,
   isFrequency,
   isInternalUniqueness,
   isMandatoryRole,
@@ -8,7 +11,6 @@ import {
   isValueConstraint,
   type OrmModel,
   type PopulationConfig,
-  ValidationEngine,
 } from "@barwise/core";
 import { generateCounterexampleForConstraint } from "@barwise/core/counterexample";
 import type { ConstraintKind, NameLicence } from "../../exercise/types.js";
@@ -20,6 +22,7 @@ import {
   projectionMappings,
 } from "../populationMapping.js";
 
+/** Which constraint in the REFERENCE model the check names. One kind, one guard. */
 const GUARDS: Record<ConstraintKind, (c: Constraint) => boolean> = {
   internal_uniqueness: isInternalUniqueness,
   mandatory: isMandatoryRole,
@@ -36,131 +39,135 @@ const fail = (message: string, hint?: string): CheckResult => ({
 });
 
 /**
- * The population rules that constitute rejection for each constraint
- * kind. Counting ANY new `population/*` error is what let a check pass
- * for the wrong reason: on a constraint-heavy candidate the injection
- * trips some unrelated rule and the check certifies a constraint the
- * model never encoded. Measured before this landed: 18 of 43
- * `forbids_population` checks survived deleting the whole constraint
- * class they name (barwise-894,
- * docs/specs/attributable-rejection.spec.md).
+ * Which of the CANDIDATE's constraints answer to a reference constraint
+ * kind.
  *
- * External uniqueness counts for `internal_uniqueness`: a candidate that
- * expresses the same rule that way has expressed it, and refusing it is
- * the false-miss shape barwise-892 and barwise-896 both fixed.
+ * Two guards per kind wherever a candidate can express the same rule in a
+ * wider form: a model that says "employee number is unique across the
+ * company" as an external uniqueness has expressed the rule, and refusing
+ * it is the false-miss shape barwise-892 and barwise-896 both fixed.
  *
- * These ids belong to `@barwise/core`, so this is a copy that must agree
- * with code in another package. `tests/rejectingRulesDrift.test.ts` is
- * its guard, and it checks the PAIRING behaviourally rather than the
- * strings: a rename in core, or a rule that starts emitting a different
- * id, fails there rather than silently making a whole constraint kind
- * vacuous again -- which is the defect this map exists to fix.
+ * This replaces `REJECTING_RULES`, a map from kind to the `population/*`
+ * rule ids that counted as rejection. That map restated strings core owns,
+ * so a rename there would have emptied one kind's accept-list silently and
+ * made every check of that kind vacuous again -- which is why it needed
+ * `tests/rejectingRulesDrift.test.ts` to guard it. These are core's own
+ * exported type guards: a rename fails the build instead (barwise-904).
+ *
+ * The two widened rows are carried forward from that map and are, on
+ * measurement, unexercised: dropping either changes no test, no
+ * discrimination count, and no score on any of the 192 committed
+ * payloads. They stay because deleting a false-miss guard on the grounds
+ * that nothing currently trips it is how barwise-892 and barwise-896 come
+ * back on a candidate nobody has seen yet. Tracked as barwise-911.
  */
-export const REJECTING_RULES: Record<ConstraintKind, readonly string[]> = {
-  internal_uniqueness: [
-    "population/uniqueness-violation",
-    "population/external-uniqueness-violation",
-  ],
-  mandatory: [
-    "population/mandatory-violation",
-    "population/disjunctive-mandatory-violation",
-  ],
-  value: ["population/value-constraint-violation"],
-  frequency: ["population/frequency-violation"],
-  ring: ["population/ring-violation"],
+const CANDIDATE_GUARDS: Record<ConstraintKind, readonly ((c: Constraint) => boolean)[]> = {
+  internal_uniqueness: [isInternalUniqueness, isExternalUniqueness],
+  mandatory: [isMandatoryRole, isDisjunctiveMandatory],
+  value: [isValueConstraint],
+  frequency: [isFrequency],
+  ring: [isRing],
 };
 
-/** Does `elementId` name one of these fact types, or a constraint on one? */
-function namesTheCarrier(
-  elementId: string,
-  candidate: OrmModel,
-  carriers: readonly { readonly id: string; }[],
-): boolean {
-  const ids = new Set(carriers.map((ft) => ft.id));
-  if (ids.has(elementId)) return true;
-  return candidate.factTypes.some((ft) =>
-    ids.has(ft.id) && ft.constraints.some((c) => c.id === elementId)
-  );
-}
-
 /**
- * Whether a diagnostic counts as this check's rejection.
+ * Every (fact type, constraint) pair in the candidate that could carry
+ * the rule, for one set of populations about to be injected.
  *
- * Rule kind is necessary and, for the mandatory family, not sufficient.
- * `population/mandatory-violation` attaches to the CONSTRAINT
- * (`c.id ?? ft.id`), never to the injected population, and a mandatory
- * counterexample works by minting fresh values in the anchor's other
- * roles -- so every mandatory constraint in the candidate fires on those
- * minted players. Measured: filtering by rule kind alone still left 12
- * of 43 checks passing with their named constraint deleted, all
- * mandatory; scoping to the player left 8, because a candidate with a
- * DIFFERENT mandatory on the same object type still rejected.
+ * Two sources, and the asymmetry between them is load-bearing.
+ * `correspondents` is the candidate's answer to the fact type the check
+ * NAMES; it is the only source for `mandatory`, because a mandatory
+ * counterexample mints a fresh entity in an ANCHOR fact type, so the
+ * fact type injected into is by construction not the one carrying the
+ * rule, and every other mandatory constraint in the candidate fires on
+ * those minted players -- the noise that left 12 of 43 checks vacuous
+ * (barwise-894). `correspondingFactTypes` also excludes the entity-fold
+ * tier for the same reason: a fold absorbs value roles into an entity,
+ * so the reference's mandatory role has no counterpart to be mandatory
+ * on.
  *
- * So a mandatory rejection must name a constraint on a fact type that
- * corresponds to the one the check names. That keeps the anchor
- * barwise-894 warns about -- the violation legitimately fires on a
- * different fact type from the injected population -- while dropping
- * the minted-player noise, which lands on other fact types entirely.
+ * For every other kind the population lands in the very fact type whose
+ * constraint should reject it, and that fact type may be one no
+ * correspondence tier admits -- a wider ternary, or an objectified
+ * shape. Those are legitimate carriers of the same rule
+ * (docs/specs/wider-shape-correspondence.spec.md), so the injected fact
+ * types join the set.
  */
-function attributable(
-  kind: ConstraintKind,
+function constraintsUnderTest(
   candidate: OrmModel,
-  carriers: readonly { readonly id: string; }[] | undefined,
-): (d: Diagnostic) => boolean {
-  const accept = REJECTING_RULES[kind];
-  if (kind !== "mandatory" || carriers === undefined) {
-    return (d) => accept.includes(d.ruleId);
+  correspondents: readonly FactType[],
+  configs: readonly PopulationConfig[],
+  kind: ConstraintKind,
+): Array<{ readonly ft: FactType; readonly c: Constraint; }> {
+  const carriers = new Map<string, FactType>();
+  for (const ft of correspondents) carriers.set(ft.id, ft);
+  if (kind !== "mandatory") {
+    for (const cfg of configs) {
+      const ft = candidate.getFactType(cfg.factTypeId);
+      if (ft) carriers.set(ft.id, ft);
+    }
   }
-  return (d) => accept.includes(d.ruleId) && namesTheCarrier(d.elementId, candidate, carriers);
+
+  const guards = CANDIDATE_GUARDS[kind];
+  const pairs: Array<{ ft: FactType; c: Constraint; }> = [];
+  for (const ft of carriers.values()) {
+    for (const c of ft.constraints) {
+      if (guards.some((g) => g(c))) pairs.push({ ft, c });
+    }
+  }
+  return pairs;
 }
 
 /**
- * Add the given populations to the candidate, check whether the
- * candidate's own constraints reject any of them, then remove them again
- * (the candidate is left unchanged). "Reject" means the injection CAUSED
- * a new error-severity `population/*` diagnostic: errors are collected
- * before and after as a multiset keyed by rule, element and message, and
- * the candidate rejects iff some key occurs more times after.
+ * Add the given populations to the candidate, ask each constraint under
+ * test whether IT rejects them, then remove them again (the candidate is
+ * left unchanged).
  *
- * Causation is observed as the delta rather than attributed, because
- * attribution is a fiction the validator never promised: mandatory and
- * cardinality violations attach to the constraint or object type, never
- * to a population, so the previous elementId filter silently discarded
- * every forMandatory rejection the moment a candidate carried one
- * population of its own -- and the extraction prompt instructs models to
- * capture populations (barwise-895,
- * docs/specs/population-blind-rejection.spec.md). The delta keeps what
- * that filter was reaching for: a candidate whose own data already
- * violates its constraints does not vacuously pass, since pre-existing
- * errors appear on both sides and cancel.
+ * Before barwise-904 this had to infer the answer: it collected
+ * error-severity `population/*` diagnostics from a model-wide
+ * `validate()`, filtered them by rule id, decided by inspecting
+ * `elementId` whether each one named the right fact type, and took a
+ * before/after multiset delta to separate what the injection caused from
+ * what the candidate's own data already violated. Three layers, all
+ * compensating for a question core could not be asked directly. Two are
+ * gone: `evaluateConstraintEnforcement` names the constraint, so rule-id
+ * filtering and attribution are the call itself.
  *
- * `countsAs` narrows which diagnostics are eligible at all, to those
- * attributable to the constraint under test. The delta and the
- * attribution answer different questions -- "did the injection cause
- * this?" and "is this the rule we asked about?" -- and a check needs
- * both.
+ * The delta stays, and is not a leftover. A candidate whose own
+ * populations already violate its constraints would otherwise pass every
+ * check of that kind vacuously -- the constraint rejects, but not because
+ * of anything this check injected. Comparing the SAME constraint's
+ * diagnostics before and after is what "the injection caused this" means,
+ * and it is now per-constraint rather than model-wide
+ * (barwise-895, docs/specs/population-blind-rejection.spec.md).
  */
 function candidateRejects(
   candidate: OrmModel,
   configs: PopulationConfig[],
-  countsAs: (d: Diagnostic) => boolean,
+  under: ReadonlyArray<{ readonly ft: FactType; readonly c: Constraint; }>,
 ): boolean {
-  const errorCounts = (): Map<string, number> => {
+  if (under.length === 0) return false;
+
+  const errorCounts = (ft: FactType, c: Constraint): Map<string, number> => {
     const counts = new Map<string, number>();
-    for (const d of new ValidationEngine().validate(candidate)) {
-      if (d.severity !== "error" || !countsAs(d)) continue;
+    const verdict = evaluateConstraintEnforcement(candidate, ft, c);
+    if (!verdict.enforced) return counts;
+    for (const d of verdict.diagnostics) {
+      if (d.severity !== "error") continue;
       const key = JSON.stringify([d.ruleId, d.elementId, d.message]);
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     return counts;
   };
 
-  const before = errorCounts();
+  const before = under.map(({ ft, c }) => errorCounts(ft, c));
   const addedIds: string[] = [];
   try {
     for (const cfg of configs) addedIds.push(candidate.addPopulation(cfg).id);
-    for (const [key, count] of errorCounts()) {
-      if (count > (before.get(key) ?? 0)) return true;
+    for (const [i, { ft, c }] of under.entries()) {
+      const was = before[i]!;
+      for (const [key, count] of errorCounts(ft, c)) {
+        if (count > (was.get(key) ?? 0)) return true;
+      }
     }
     return false;
   } finally {
@@ -240,15 +247,16 @@ export function forbidsPopulation(
     );
   }
 
-  const countsAs = attributable(
-    constraintKind,
-    candidate,
-    constraintKind === "mandatory"
-      ? correspondingFactTypes(refFt, reference, candidate, licence)
-      : undefined,
-  );
+  // The constraint under test lives on the candidate correspondent of
+  // the fact type the check NAMES -- not on whichever fact type the
+  // population was injected into. For mandatory those differ by
+  // construction: the counterexample mints a fresh entity in an anchor
+  // fact type, and the rule it breaks is the mandatory one back on the
+  // named fact type (barwise-894).
+  const correspondents = correspondingFactTypes(refFt, reference, candidate, licence);
   for (const configs of combinations(options)) {
-    if (candidateRejects(candidate, configs, countsAs)) {
+    const under = constraintsUnderTest(candidate, correspondents, configs, constraintKind);
+    if (candidateRejects(candidate, configs, under)) {
       return {
         kind: "forbids_population",
         passed: true,
