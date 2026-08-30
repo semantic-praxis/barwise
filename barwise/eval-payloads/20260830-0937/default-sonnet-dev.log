@@ -1,0 +1,31 @@
+Using artifact version 1.1.0 (forced by --artifact-version; client is anthropic/claude-sonnet-5).
+[ 1/3] vendor-onboarding      run 1/5  0.883  82.5s  11651/41640 out  0 cached
+[ 3/3] incident-response      run 1/5  0.800  70.2s  10020/31700 out  8710 cached
+[ 1/3] vendor-onboarding      run 2/5  0.908  80.7s  11638/41640 out  15877 cached
+[ 2/3] subscription-billing   run 1/5  0.922  83.8s  12153/35255 out  8710 cached
+[ 3/3] incident-response      run 2/5  0.752  73.2s  10669/31700 out  14306 cached
+[ 1/3] vendor-onboarding      run 3/5  0.889  75.8s  10851/41640 out  15877 cached
+[ 2/3] subscription-billing   run 2/5  0.938  82.6s  12264/35255 out  14736 cached
+[ 3/3] incident-response      run 3/5  0.957  67.5s  9366/31700 out  14306 cached
+[ 1/3] vendor-onboarding      run 4/5  0.919  82.7s  11940/41640 out  15877 cached
+[ 2/3] subscription-billing   run 3/5  0.978  79.6s  11512/35255 out  14736 cached
+[ 3/3] incident-response      run 4/5  0.915  60.3s  8654/31700 out  14306 cached
+[ 2/3] subscription-billing   run 4/5  0.947  74.9s  10675/35255 out  14736 cached
+[ 1/3] vendor-onboarding      run 5/5  0.911  84.0s  12019/41640 out  15877 cached
+[ 3/3] incident-response      run 5/5  0.946  63.6s  8970/31700 out  14306 cached
+[ 2/3] subscription-billing   run 5/5  0.972  84.3s  12505/35255 out  14736 cached
+vendor-onboarding  mean=0.902  worst=0.883  sd=0.015  ok=5/5  quality=0.902+/-0.015  [corrections=3 errors=0.2 warnings=7]
+  must_validate: The model has 1 validation error(s): Population "01a05326-93be-7000-9ce4-c3b33cdc88eb": instance "01a05326-93be-7001-83a9-0690353e3767" has value "Meridian Components" for role "01a05326-93bd-700a-87c2-468e4a885ca7" which is not in the allowed set [active].
+subscription-billing  mean=0.952  worst=0.922  sd=0.023  ok=5/5  quality=0.952+/-0.023  [corrections=4.8 warnings=2]
+incident-response  mean=0.874  worst=0.752  sd=0.093  ok=5/5  quality=0.874+/-0.093  [corrections=5.2 warnings=3.2]
+  forbids_population: Your model still allows what it should forbid: Rules out: two facts of Incident is duplicate of Incident that agree on Incident -- e.g. {Incident=Incident#1, Incident=Incident#1}; {Incident=Incident#1, Incident=Incident#2}
+  forbids_population: Your model still allows what it should forbid: Rules out: two facts of Incident is duplicate of Incident that agree on Incident -- e.g. {Incident=Incident#1, Incident=Incident#1}; {Incident=Incident#1, Incident=Incident#2}
+suite 2.10.0  artifact=1.1.0@08b024dc2a29  mean=0.909 +/- 0.028 (95%)  worst=0.752  (repeat=5)
+  errors:   population/value-constraint-violation x1
+  warnings: completeness/fact-type-without-constraints x39, completeness/fact-type-without-uniqueness x17, constraint/external-uniqueness-all-local x3, completeness/multiple-preferred-identifiers x2
+  fixed:    missing_identifier_population x16, duplicate_value_constraint_population x16, misplaced_is_preferred x12, arity_mismatch x6, invalid_bounds x4, empty_population x4, invalid_role_player x4, duplicate_constraint x3
+  cache: 197096 read, 27499 written
+  gaps below 0.040 are not resolvable against a comparable run
+  92% of that noise is incident-response alone
+Wrote 15 payload(s) to /Users/gschenz/repos/barwise/barwise/eval-payloads/20260830-0937/default-sonnet-dev.
+NOTE: recording against a modified working tree (1.7.0 (0fbd2d8-dirty)). The commit alone will not reproduce this run.

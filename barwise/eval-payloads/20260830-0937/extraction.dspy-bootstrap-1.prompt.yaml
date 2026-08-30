@@ -1,0 +1,132 @@
+surface: extraction
+version: dspy-bootstrap-1
+match:
+  provider: anthropic
+  modelPrefix: claude-haiku-4-5
+instructions: 'You are an expert data modeler working in Object-Role Modeling (ORM
+  2).
+
+
+  Read the transcript of a business working session and extract a
+
+  conceptual model: the object types (entities identified by a reference
+
+  mode, and self-identifying value types), the fact types relating them
+
+  with natural-language readings, any subtypes, the constraints the
+
+  transcript states or implies, and example populations where the
+
+  transcript gives concrete instances.
+
+
+  Report genuine ambiguities rather than guessing. Emit a single JSON
+
+  object matching the schema exactly.'
+demos:
+- transcriptExcerpt: 'Facilitator: Let''s talk about how orders work in your system.
+    What''s the basic flow?
+
+
+    Product Manager: A customer places an order. Every order belongs to exactly one
+    customer, and customers can place multiple orders over time.
+
+
+    Facilitator: How do you identify customers?
+
+
+    Product Manager: Each customer has a unique customer ID in the CRM system.
+
+
+    Facilitator: And orders?
+
+
+    Product Manager: Each order has an order number. That''s the primary identifier.
+
+
+    Facilitator: What about products? How do they relate to orders?
+
+
+    Product Manager: An order contains one or more products. Each line in the order
+    specifies a product and a quantity. A product can appear in many different orders.
+
+
+    Facilitator: How are products identified?
+
+
+    Product Manager: By SKU -- a unique stock-keeping unit code.
+
+
+    Facilitator: Are there any status values for orders?
+
+
+    Product Manager: Yes, an order has a status. The possible values are: pending,
+    confirmed, shipped, and delivered. Every order must have a status.
+
+
+    Facilitator: What about the customer''s name? Is that tracked?
+
+
+    Product Manager: Yes, every customer has a name. It''s just a text field.
+
+
+    Facilitator: One more thing -- I''ve heard some peopl
+
+    ... [truncated]'
+  extraction: "```json\n{\n  \"object_types\": [\n    {\n      \"name\": \"Customer\"\
+    ,\n      \"kind\": \"entity\",\n      \"definition\": \"A party that places orders\
+    \ in the system\",\n      \"reference_mode\": \"customer ID\",\n      \"aliases\"\
+    : [\n        \"Client\"\n      ],\n      \"source_references\": [\n        {\n\
+    \          \"lines\": [1, 2],\n          \"excerpt\": \"A customer places an order.\
+    \ Every order belongs to exactly one customer\"\n        },\n        {\n     \
+    \     \"lines\": [3, 4],\n          \"excerpt\": \"Each customer has a unique\
+    \ customer ID in the CRM system\"\n        }\n      ]\n    },\n    {\n      \"\
+    name\": \"Order\",\n      \"kind\": \"entity\",\n      \"definition\": \"A request\
+    \ for products placed by a customer\",\n      \"reference_mode\": \"order number\"\
+    ,\n      \"source_references\": [\n        {\n          \"lines\": [1, 2],\n \
+    \         \"excerpt\": \"A customer places an order. Every order belongs to exactly\
+    \ one customer\"\n        },\n        {\n          \"lines\": [5, 6],\n      \
+    \    \"excerpt\": \"Each order has an order number. That's the primary identifier\"\
+    \n        }\n      ]\n    },\n    {\n      \"name\": \"Product\",\n      \"kind\"\
+    : \"entity\",\n      \"definition\": \"An item that can be ordered\",\n      \"\
+    reference_mode\": \"SKU\",\n      \"source_references\": [\n        {\n      \
+    \    \"lines\": [7, 8],\n          \"excerpt\": \"What about products? How do\
+    \ they relate to orders?\"\n        },\n        {\n          \"lines\": [9, 10],\n\
+    \          \"excerpt\": \"Each line in the order specifies a product and a quantity.\
+    \ A product can appear in many different orders\"\n        }\n      ]\n    },\n\
+    \    {\n      \"name\": \"Order Status\",\n      \"kind\": \"value\",\n      \"\
+    definition\": \"The status state of an order\",\n      \"value_constraint\": {\n\
+    \        \"values\": [\n          \"pending\",\n          \"confirmed\",\n   \
+    \       \"shipped\",\n          \"delivered\"\n        ]\n      },\n      \"source_references\"\
+    : [\n        {\n          \"lines\": [11, 12],\n          \"excerpt\": \"The possible\
+    \ values are: pending, confirmed, shipped, and delivered\"\n        }\n      ]\n\
+    \    },\n    {\n      \"name\": \"Customer Name\",\n      \"kind\": \"value\"\
+    ,\n      \"definition\": \"The text name of a customer\",\n      \"data_type\"\
+    : {\n        \"name\": \"text\"\n      },\n      \"source_references\": [\n  \
+    \      {\n          \"lines\": [13, 14],\n          \"excerpt\": \"Every customer\
+    \ has a name. It's just a text field\"\n        }\n      ]\n    },\n    {\n  \
+    \    \"name\": \"Quantity\",\n      \"kind\": \"value\",\n      \"definition\"\
+    : \"The number of units of a product in an order line\",\n      \"data_type\"\
+    : {\n        \"name\": \"integer\"\n      },\n      \"source_references\": [\n\
+    \        {\n          \"lines\": [9, 10],\n          \"excerpt\": \"Each line\
+    \ in the order specifies a product and a quantity\"\n        }\n      ]\n    }\n\
+    \  ],\n  \"fact_types\": [\n    {\n      \"name\": \"Customer places Order\",\n\
+    \      \"roles\": [\n        {\n          \"player\": \"Customer\",\n        \
+    \  \"role_name\": \"placer\"\n        },\n        {\n          \"player\": \"\
+    Order\",\n          \"role_name\": \"placed\"\n        }\n      ],\n      \"readings\"\
+    : [\n        \"Customer places Order\",\n        \"Order is placed by Customer\"\
+    \n      ],\n      \"source_references\": [\n        {\n          \"lines\": [1,\
+    \ 2],\n          \"excerpt\": \"A customer places an order. Every order belongs\
+    \ to exactly one customer, and customers can place multiple orders over time\"\
+    \n        }\n      ]\n    },\n    {\n      \"name\": \"Order contains Product\"\
+    ,\n      \"roles\": [\n        {\n          \"player\": \"Order\",\n         \
+    \ \"role_name\": \"containing\"\n        },\n        {\n          \"player\":\
+    \ \"Product\",\n          \"role_name\": \"contained\"\n        }\n      ],\n\
+    \      \"readings\": [\n        \"Order contains Product\",\n        \"Product\
+    \ is contained in Order\"\n... [truncated]"
+provenance:
+  optimizer: dspy/bootstrap (3.3.1)
+  scoredAgainst: anthropic/claude-haiku-4-5
+  suiteVersion: 1.3.0
+  score: 0.0011
+  date: '2026-08-24'

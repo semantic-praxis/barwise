@@ -1,0 +1,129 @@
+surface: extraction
+version: dspy-bootstrap-minimal-1
+match:
+  provider: anthropic
+  modelPrefix: claude-sonnet-5
+instructions: 'You are an expert data modeler working in Object-Role Modeling (ORM
+  2).
+
+
+  Read the transcript of a business working session and extract a
+
+  conceptual model: the object types (entities identified by a reference
+
+  mode, and self-identifying value types), the fact types relating them
+
+  with natural-language readings, any subtypes, the constraints the
+
+  transcript states or implies, and example populations where the
+
+  transcript gives concrete instances.
+
+
+  Report genuine ambiguities rather than guessing. Emit a single JSON
+
+  object matching the schema exactly.'
+demos:
+- transcriptExcerpt: 'Facilitator: Walk me through how enrollment works at the university.
+
+
+    Registrar: Students enroll in course offerings, not in courses directly. A course
+    offering is a specific course offered in a specific semester.
+
+
+    Facilitator: So the same course can have multiple offerings?
+
+
+    Registrar: Right. Each offering is of exactly one course and belongs to exactly
+    one semester. Intro to Databases might run in both Fall and Spring.
+
+
+    Facilitator: Who teaches an offering?
+
+
+    Registrar: Each offering is taught by exactly one instructor. An instructor can
+    teach several offerings in the same semester.
+
+
+    Facilitator: How are these things identified?
+
+
+    Registrar: Students have a student number. Courses have a course code, like CS101.
+    Offerings get an offering ID. Instructors have a staff ID, and semesters have
+    a semester code like 2026-FA.
+
+
+    Facilitator: What do you track about a course itself?
+
+
+    Registrar: Every course has a title and a credit value. The credit value is a
+    whole number, usually between 1 and 6.
+
+
+    Facilitator: Anything on the offering besides course and semester?
+
+
+    Registrar: Each offering has a maximum capacity -- a cap on how many students
+    can enroll.
+
+
+    Facilitator: And
+
+    ... [truncated]'
+  extraction: "{\n  \"object_types\": [\n    {\n      \"name\": \"Student\",\n   \
+    \   \"kind\": \"entity\",\n      \"definition\": \"A person who enrolls in course\
+    \ offerings at the university.\",\n      \"reference_mode\": \"student number\"\
+    ,\n      \"aliases\": [\"student\"],\n      \"source_references\": [\n       \
+    \ {\"lines\": [2,2], \"excerpt\": \"Students enroll in course offerings, not in\
+    \ courses directly.\"},\n        {\"lines\": [8,8], \"excerpt\": \"Students have\
+    \ a student number.\"}\n      ]\n    },\n    {\n      \"name\": \"Course\",\n\
+    \      \"kind\": \"entity\",\n      \"definition\": \"A subject of study that\
+    \ may be offered in one or more semesters.\",\n      \"reference_mode\": \"course\
+    \ code\",\n      \"aliases\": [\"course\"],\n      \"source_references\": [\n\
+    \        {\"lines\": [2,2], \"excerpt\": \"A course offering is a specific course\
+    \ offered in a specific semester.\"},\n        {\"lines\": [8,8], \"excerpt\"\
+    : \"Courses have a course code, like CS101.\"}\n      ]\n    },\n    {\n     \
+    \ \"name\": \"CourseOffering\",\n      \"kind\": \"entity\",\n      \"definition\"\
+    : \"A specific course offered in a specific semester.\",\n      \"reference_mode\"\
+    : \"offering ID\",\n      \"aliases\": [\"offering\", \"course offering\"],\n\
+    \      \"source_references\": [\n        {\"lines\": [2,2], \"excerpt\": \"A course\
+    \ offering is a specific course offered in a specific semester.\"},\n        {\"\
+    lines\": [8,8], \"excerpt\": \"Offerings get an offering ID.\"}\n      ]\n   \
+    \ },\n    {\n      \"name\": \"Instructor\",\n      \"kind\": \"entity\",\n  \
+    \    \"definition\": \"A staff member who teaches course offerings.\",\n     \
+    \ \"reference_mode\": \"staff ID\",\n      \"aliases\": [\"instructor\"],\n  \
+    \    \"source_references\": [\n        {\"lines\": [6,6], \"excerpt\": \"Each\
+    \ offering is taught by exactly one instructor.\"},\n        {\"lines\": [8,8],\
+    \ \"excerpt\": \"Instructors have a staff ID\"}\n      ]\n    },\n    {\n    \
+    \  \"name\": \"Semester\",\n      \"kind\": \"entity\",\n      \"definition\"\
+    : \"A period of time during which course offerings run.\",\n      \"reference_mode\"\
+    : \"semester code\",\n      \"aliases\": [\"semester\"],\n      \"source_references\"\
+    : [\n        {\"lines\": [8,8], \"excerpt\": \"semesters have a semester code\
+    \ like 2026-FA.\"},\n        {\"lines\": [14,14], \"excerpt\": \"A semester has\
+    \ a start date and an end date.\"}\n      ]\n    },\n    {\n      \"name\": \"\
+    Grade\",\n      \"kind\": \"value\",\n      \"definition\": \"A letter grade awarded\
+    \ to a student for a course offering.\",\n      \"data_type\": {\"name\": \"text\"\
+    , \"length\": 1},\n      \"value_constraint\": {\"values\": [\"A\", \"B\", \"\
+    C\", \"D\", \"F\"]},\n      \"aliases\": [\"letter grade\"],\n      \"source_references\"\
+    : [\n        {\"lines\": [16,16], \"excerpt\": \"The grade is one of A, B, C,\
+    \ D, or F.\"}\n      ]\n    },\n    {\n      \"name\": \"Title\",\n      \"kind\"\
+    : \"value\",\n      \"definition\": \"The title of a course.\",\n      \"data_type\"\
+    : {\"name\": \"text\"},\n      \"source_references\": [\n        {\"lines\": [10,10],\
+    \ \"excerpt\": \"Every course has a title and a credit value.\"}\n      ]\n  \
+    \  },\n    {\n      \"name\": \"CreditValue\",\n      \"kind\": \"value\",\n \
+    \     \"definition\": \"The number of credits a course is worth.\",\n      \"\
+    data_type\": {\"name\": \"integer\"},\n      \"aliases\": [\"credit value\", \"\
+    credits\"],\n      \"source_references\": [\n        {\"lines\": [10,10], \"excerpt\"\
+    : \"The credit value is a whole number, usually between 1 and 6.\"}\n      ]\n\
+    \    },\n    {\n      \"name\": \"MaxCapacity\",\n      \"kind\": \"value\",\n\
+    \      \"definition\": \"The maximum number of students who can enroll in an offering.\"\
+    ,\n      \"data_type\": {\"name\": \"integer\"},\n      \"aliases\": [\"maximum\
+    \ capacity\", \"cap\"],\n      \"source_references\": [\n        {\"lines\": [12,12],\
+    \ \"excerpt\": \"Each offering has a maximum capacity -- a cap on how many students\
+    \ can enroll.\"}\n      ]\n    },\n    {\n... [truncated]"
+provenance:
+  optimizer: dspy/bootstrap (3.3.1)
+  scoredAgainst: anthropic/claude-sonnet-5
+  suiteVersion: 2.7.0
+  score: 0.3552
+  date: '2026-08-28'

@@ -1,0 +1,83 @@
+Using artifact version dspy-mipro-minimal-1 (forced by --artifact-version; client is anthropic/claude-sonnet-5).
+[ 1/7] order-management       run 1/5  0.354  25.9s  3929/16384 out  5382 cached
+[ 7/7] freight-corrections    run 1/5  0.000  18.6s  2568/16384 out  5382 cached  COLLAPSE
+[ 5/7] project-staffing       run 1/5  0.700  22.8s  3212/16384 out  5382 cached
+[ 6/7] conference-reviews     run 1/5  0.833  22.8s  3218/16384 out  5382 cached
+[ 4/7] employee-hierarchy     run 1/5  0.675  24.7s  3506/16384 out  5382 cached
+[ 1/7] order-management       run 2/5  0.557  30.3s  4465/16384 out  6202 cached
+[ 7/7] freight-corrections    run 2/5  0.800  17.5s  2382/16384 out  6072 cached
+[ 6/7] conference-reviews     run 2/5  0.833  23.3s  3252/16384 out  6029 cached
+[ 3/7] clinic-appointments    run 1/5  0.621  46.8s  7266/16384 out  5382 cached
+[ 2/7] university-enrollment  run 1/5  0.542  46.8s  7270/16384 out  5382 cached
+[ 5/7] project-staffing       run 2/5  0.000  24.9s  3553/16384 out  6097 cached  COLLAPSE
+[ 4/7] employee-hierarchy     run 2/5  0.650  28.4s  4030/16384 out  5989 cached
+[ 7/7] freight-corrections    run 3/5  0.767  19.0s  2668/16384 out  6072 cached
+[ 1/7] order-management       run 3/5  0.517  30.8s  4321/16384 out  6202 cached
+[ 6/7] conference-reviews     run 3/5  0.833  21.9s  3080/16384 out  6029 cached
+[ 5/7] project-staffing       run 3/5  0.508  24.7s  3477/16384 out  6097 cached
+[ 7/7] freight-corrections    run 4/5  0.800  18.8s  2666/16384 out  6072 cached
+[ 4/7] employee-hierarchy     run 3/5  0.300  21.7s  3088/16384 out  5989 cached  COLLAPSE
+[ 3/7] clinic-appointments    run 2/5  0.705  35.9s  5392/16384 out  6249 cached
+[ 6/7] conference-reviews     run 4/5  0.800  23.0s  3166/16384 out  6029 cached
+[ 1/7] order-management       run 4/5  0.394  29.9s  4403/16384 out  6202 cached
+[ 2/7] university-enrollment  run 2/5  0.667  46.4s  7358/16384 out  6210 cached
+[ 7/7] freight-corrections    run 5/5  0.800  19.6s  2730/16384 out  6072 cached
+[ 5/7] project-staffing       run 4/5  0.508  23.6s  3393/16384 out  6097 cached
+[ 4/7] employee-hierarchy     run 4/5  0.525  26.9s  3817/16384 out  5989 cached
+[ 6/7] conference-reviews     run 5/5  0.833  22.2s  3157/16384 out  6029 cached
+[ 5/7] project-staffing       run 5/5  0.508  22.3s  3180/16384 out  6097 cached
+[ 1/7] order-management       run 5/5  0.434  29.5s  4273/16384 out  6202 cached
+[ 3/7] clinic-appointments    run 3/5  0.684  39.6s  5843/16384 out  6249 cached
+[ 4/7] employee-hierarchy     run 5/5  0.525  22.0s  3225/16384 out  5989 cached
+[ 2/7] university-enrollment  run 3/5  0.542  49.5s  7598/16384 out  6210 cached
+[ 3/7] clinic-appointments    run 4/5  0.726  45.2s  6841/16384 out  6249 cached
+[ 2/7] university-enrollment  run 4/5  0.695  45.3s  7047/16384 out  6210 cached
+[ 3/7] clinic-appointments    run 5/5  0.684  45.7s  7016/16384 out  6249 cached
+[ 2/7] university-enrollment  run 5/5  0.648  47.2s  7177/16384 out  6210 cached
+order-management  mean=0.451  worst=0.354  sd=0.084  ok=5/5  quality=0.451+/-0.084  [corrections=7.2 warnings=4.4]
+  forbids_population: Your model still allows what it should forbid: Rules out: two facts of Customer places Order that agree on Order -- e.g. {Customer=Customer#1, Order=Order#1}; {Customer=Customer#2, Order=Order#1}
+  forbids_population: Your model still allows what it should forbid: Rules out: a Customer that exists but never plays "Customer has Name" -- e.g. Customer#1 appears in Customer places Order but not in Customer has Name
+  forbids_population: Your model still allows what it should forbid: Rules out: a Customer that exists but never plays "Customer has Name" -- e.g. Customer#1 appears in Customer places Order but not in Customer has Name
+  forbids_population: Your model still allows what it should forbid: Rules out: a Customer that exists but never plays "Customer has Name" -- e.g. Customer#1 appears in Customer places Order but not in Customer has Name
+  forbids_population: Your model still allows what it should forbid: Rules out: a Order that exists but never plays "Customer places Order" -- e.g. Order#1 appears in Order contains Product with Quantity but not in Customer places Order
+  forbids_population: Your model still allows what it should forbid: Rules out: a Customer that exists but never plays "Customer has Name" -- e.g. Customer#1 appears in Customer places Order but not in Customer has Name
+  forbids_population: Your model still allows what it should forbid: Rules out: a Order that exists but never plays "Customer places Order" -- e.g. Order#1 appears in Order contains Product with Quantity but not in Customer places Order
+  forbids_population: Your model still allows what it should forbid: Rules out: a Customer that exists but never plays "Customer has Name" -- e.g. Customer#1 appears in Customer places Order but not in Customer has Name
+university-enrollment  mean=0.619  worst=0.542  sd=0.072  ok=5/5  quality=0.619+/-0.072  [corrections=9.6 warnings=12.6]
+  forbids_population: Your model still allows what it should forbid: Rules out: two facts of Student receives LetterGrade for CourseOffering that agree on Student, CourseOffering -- e.g. {Student=Student#1, LetterGrade=LetterGrade#1, CourseOffering=CourseOffering#1}; {Student=Student#1, LetterGrade=LetterGrade#2, CourseOffering=CourseOffering#1}
+  forbids_population: Your model still allows what it should forbid: Rules out: two facts of Student receives LetterGrade for CourseOffering that agree on Student, CourseOffering -- e.g. {Student=Student#1, LetterGrade=LetterGrade#1, CourseOffering=CourseOffering#1}; {Student=Student#1, LetterGrade=LetterGrade#2, CourseOffering=CourseOffering#1}
+clinic-appointments  mean=0.684  worst=0.621  sd=0.039  ok=5/5  quality=0.684+/-0.039  [corrections=8 errors=0.4 warnings=10.2]
+  must_validate: The model has 2 validation error(s): Population "01a05322-6f69-700e-b5e8-f925ef068e65": instance "01a05322-6f69-7010-9918-aa57a9a83831" violates internal uniqueness constraint on role(s) [01a05322-6f68-7011-9659-4c1e301d8303]. Duplicate of instance "01a05322-6f69-700f-a867-60d920cc710e". (and 1 more)
+employee-hierarchy  mean=0.535  worst=0.300  sd=0.149  ok=4/5  quality=0.594+/-0.080  [corrections=5.4 warnings=3.4]
+  forbids_population: Your model still allows what it should forbid: Rules out: two facts of Department has DepartmentName that agree on Department -- e.g. {Department=Department#1, DepartmentName=DepartmentName#1}; {Department=Department#1, DepartmentName=DepartmentName#2}
+  forbids_population: Your model still allows what it should forbid: Rules out: a Employee that exists but never plays "Employee works in Department" -- e.g. Employee#1 appears in Manager manages Department but not in Employee works in Department
+  forbids_population: Your model still allows what it should forbid: Rules out: two facts of Department has DepartmentName that agree on Department -- e.g. {Department=Department#1, DepartmentName=DepartmentName#1}; {Department=Department#1, DepartmentName=DepartmentName#2}
+  forbids_population: Your model still allows what it should forbid: Rules out: two facts of Department has DepartmentName that agree on Department -- e.g. {Department=Department#1, DepartmentName=DepartmentName#1}; {Department=Department#1, DepartmentName=DepartmentName#2}
+project-staffing  mean=0.445  worst=0.000  sd=0.262  ok=4/5  quality=0.556+/-0.096  [corrections=2.4 warnings=3]
+  requires_element: The model has no object type named "Employee".
+  requires_element: The model has no object type named "Project".
+  requires_element: The model has no fact type connecting "Employee" and "Employee".
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Project has ProjectName"), so it cannot rule out: Rules out: two facts of Project has ProjectName that agree on Project -- e.g. {Project=Project#1, ProjectName=ProjectName#1}; {Project=Project#1, ProjectName=ProjectName#2}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Employee mentors Employee"), so it cannot rule out: Rules out: a acyclic ring violation among Employee instances -- e.g. {Employee=Employee#1, Employee=Employee#2}; {Employee=Employee#2, Employee=Employee#1}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Employee is assigned to Project"), so it cannot rule out: Rules out: the same Employee in Employee is assigned to Project more than 3 time(s) -- e.g. {Employee=Employee#1, Project=Project#1}; {Employee=Employee#1, Project=Project#2}; {Employee=Employee#1, Project=Project#3}; {Employee=Employee#1, Project=Project#4}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Employee mentors Employee"), so it cannot rule out: Rules out: two facts of Employee mentors Employee that agree on Employee -- e.g. {Employee=Employee#1, Employee=Employee#1}; {Employee=Employee#2, Employee=Employee#1}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Employee is assigned to Project"), so it cannot rule out: Rules out: two facts of Employee is assigned to Project that agree on Employee, Project -- e.g. {Employee=Employee#1, Project=Project#1}; {Employee=Employee#1, Project=Project#1}
+  forbids_population: Your model still allows what it should forbid: Rules out: two facts of Employee mentors Employee that agree on Employee -- e.g. {Employee=Employee#1, Employee=Employee#1}; {Employee=Employee#2, Employee=Employee#1}
+  forbids_population: Your model still allows what it should forbid: Rules out: two facts of Employee mentors Employee that agree on Employee -- e.g. {Employee=Employee#1, Employee=Employee#1}; {Employee=Employee#2, Employee=Employee#1}
+  forbids_population: Your model still allows what it should forbid: Rules out: two facts of Employee mentors Employee that agree on Employee -- e.g. {Employee=Employee#1, Employee=Employee#1}; {Employee=Employee#2, Employee=Employee#1}
+conference-reviews  mean=0.827  worst=0.800  sd=0.015  ok=5/5  quality=0.827+/-0.015  [corrections=1.2 warnings=2]
+freight-corrections  mean=0.633  worst=0.000  sd=0.354  ok=4/5  quality=0.792+/-0.017  [corrections=1.8 warnings=1.6]
+  requires_element: The model has no object type named "Shipment".
+  requires_element: The model has no object type named "Warehouse".
+  requires_element: The model has no fact type connecting "Shipment" and "Warehouse".
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Shipment contains Product in Quantity"), so it cannot rule out: Rules out: two facts of Shipment contains Product in Quantity that agree on Shipment, Product -- e.g. {Shipment=Shipment#1, Product=Product#1, Quantity=Quantity#1}; {Shipment=Shipment#1, Product=Product#1, Quantity=Quantity#2}
+  forbids_population: Your model does not yet carry the relationship this rule guards (no fact type matching "Shipment is stored in Warehouse"), so it cannot rule out: Rules out: the same Shipment in Shipment is stored in Warehouse more than 2 time(s) -- e.g. {Shipment=Shipment#1, Warehouse=Warehouse#1}; {Shipment=Shipment#1, Warehouse=Warehouse#2}; {Shipment=Shipment#1, Warehouse=Warehouse#3}
+suite 2.10.0  artifact=dspy-mipro-minimal-1@910062d7a232  mean=0.599 +/- 0.060 (95%)  worst=0.000  (repeat=5)
+  errors:   population/uniqueness-violation x2
+  warnings: structural/binary-missing-inverse-reading x146, completeness/multiple-preferred-identifiers x15, completeness/fact-type-without-uniqueness x12, constraint/external-uniqueness-all-local x7, completeness/fact-type-without-constraints x6
+  fixed:    misplaced_is_preferred x118, incomplete_instance x44, arity_mismatch x8, invalid_bounds x5, duplicate_value_constraint_population x2, missing_identifier_population x1
+  cache: 209066 read, 5174 written
+  gaps below 0.085 are not resolvable against a comparable run
+  54% of that noise is freight-corrections alone
+Wrote 25 payload(s) to /Users/gschenz/repos/barwise/barwise/eval-payloads/20260830-0937/candidate-sonnet-train.
+NOTE: recording against a modified working tree (1.7.0 (0fbd2d8-dirty)). The commit alone will not reproduce this run.
