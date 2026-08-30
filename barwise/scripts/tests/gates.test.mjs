@@ -178,3 +178,37 @@ test("check-root-scripts fails on drift in either direction", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// --- barwise-910: the spec-status gate, pinned against real history ---
+
+/**
+ * This gate's whole claim is "it would have caught the header that went
+ * stale", and that claim is checkable rather than assertable: `--at
+ * <commit>` runs it against a historical tree. 7fbbba7 shipped
+ * workstream 1 of barwise-902 while
+ * `must-validate-outside-the-rubric.spec.md` still read "design only --
+ * no implementation in this PR".
+ *
+ * Mutating a Status on today's tree would NOT reproduce that condition:
+ * the gate compares against the commit that last touched the spec, and
+ * both specs involved have been edited since. A red test written that
+ * way passes, which is the barwise-906 shape -- so the red reading has
+ * to come from the commit where the defect actually was.
+ */
+test("audit-spec-status fires on the header that went stale at 7fbbba7", () => {
+  const r = gate("audit-spec-status.mjs", REPO, "--at", "7fbbba7");
+  assert.equal(r.status, 0, `--at failed:\n${r.stdout}${r.stderr}`);
+  assert.match(
+    r.stdout,
+    /must-validate-outside-the-rubric\.spec\.md/,
+    `the gate did not fire on the defect it exists for:\n${r.stdout}`,
+  );
+  assert.match(r.stdout, /since: 7fbbba7/, `wrong reason:\n${r.stdout}`);
+});
+
+test("audit-spec-status --check is green on the current tree, from every cwd", () => {
+  for (const cwd of CWDS) {
+    const r = gate("audit-spec-status.mjs", cwd, "--check");
+    assert.equal(r.status, 0, `--check failed in ${cwd}:\n${r.stdout}${r.stderr}`);
+  }
+});

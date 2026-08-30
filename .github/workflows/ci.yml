@@ -147,6 +147,17 @@ jobs:
       - run: npm run check:root-scripts
         if: steps.changes.outputs.docs_only != 'true'
 
+      # A spec that says nothing has been built must not be sitting on
+      # top of the commits that built it. `must-validate-outside-the-
+      # rubric.spec.md` read "design only -- no implementation in this
+      # PR" while two of its three workstreams were merged, and
+      # `duplication-drift-guards.spec.md` said it while CLAUDE.md cited
+      # its ratchet as landed and gated here. Nothing reads a spec header
+      # back. Ratcheted against spec-status-baseline.json, and pinned
+      # against the commit where the real one went stale by
+      # test:scripts (barwise-910).
+      - run: npm run audit:specs -- --check
+
       # The gates' own tests. Every enumerating gate is proven to report
       # the same coverage from three different cwds (barwise-905: one of
       # them silently scanned 1426 of 1483 files under `npm run`), and

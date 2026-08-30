@@ -22,6 +22,7 @@
     "check:root-scripts": "node scripts/regen-root-package.mjs --check",
     "test:scripts": "node --test scripts/tests/*.test.mjs",
     "audit:duplication": "node scripts/audit-duplication.mjs",
+    "audit:specs": "node scripts/audit-spec-status.mjs",
     "audit:rubric": "node scripts/audit-rubric.mjs",
     "ci:local": "node scripts/ci-local.mjs",
     "purity": "node scripts/check-core-purity.mjs",

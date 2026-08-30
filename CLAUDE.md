@@ -318,7 +318,10 @@ skill (`.claude/skills/release/`).
   -- --check` ratchets the eval rubric's discriminating checks against
   `barwise/rubric-baseline.json` the way `audit:duplication` ratchets
   the copies; both fail on a new unclassified finding AND on a stale
-  entry, so the baselines always enumerate exactly what is open. A
+  entry, so the baselines always enumerate exactly what is open.
+  `npm run audit:specs -- --check` is the third: a spec whose `Status`
+  claims no implementation must not be sitting on top of commits that
+  touched the source it names (barwise-910). A
   sweep run by hand runs once, and the next edit reintroduces what it
   found. The `assertion-audit` skill carries the three mutation passes
   and the method rules.
