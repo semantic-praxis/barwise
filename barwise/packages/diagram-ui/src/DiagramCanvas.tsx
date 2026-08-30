@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 /**
  * Interactive diagram canvas: pan, zoom, fit, and drag-to-reposition.
  *

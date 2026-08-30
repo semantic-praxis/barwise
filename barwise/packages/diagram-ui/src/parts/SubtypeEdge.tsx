@@ -1,5 +1,6 @@
 import type { PositionedSubtypeEdge } from "@barwise/diagram";
 import * as t from "@barwise/diagram/theme";
+import type { JSX } from "react";
 import { pathData } from "./pathData.js";
 
 export function SubtypeEdge(props: {

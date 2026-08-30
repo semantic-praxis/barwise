@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 /**
  * React/SVG renderer for a positioned ORM graph.
  *

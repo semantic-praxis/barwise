@@ -1,5 +1,6 @@
 import type { PositionedObjectTypeNode } from "@barwise/diagram";
 import * as t from "@barwise/diagram/theme";
+import type { JSX } from "react";
 
 export function ObjectTypeNode(props: {
   node: PositionedObjectTypeNode;
