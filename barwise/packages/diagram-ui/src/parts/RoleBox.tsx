@@ -1,5 +1,6 @@
 import type { PositionedRoleBox } from "@barwise/diagram";
 import * as t from "@barwise/diagram/theme";
+import type { JSX } from "react";
 
 export function RoleBox(props: {
   parentX: number;

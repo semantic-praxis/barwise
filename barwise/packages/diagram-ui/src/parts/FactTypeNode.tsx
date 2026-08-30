@@ -1,5 +1,6 @@
 import type { PositionedFactTypeNode } from "@barwise/diagram";
 import * as t from "@barwise/diagram/theme";
+import type { JSX } from "react";
 import { RoleBox } from "./RoleBox.js";
 
 export function FactTypeNode(props: {
