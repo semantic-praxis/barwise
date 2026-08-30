@@ -271,6 +271,16 @@ nineteen on Node 26 -- `@barwise/code-analysis` read 95% functions on one
 and 81% on the other from identical source. A floating runtime means the
 gate passes or fails by whichever Node you happen to have.
 
+**Python is pinned in `.python-version`, beside `.nvmrc`, and only to the
+minor.** `uv.lock` branched on `python_full_version < '3.12'`, so `uv sync
+--frozen` honoured the lock and still installed numpy 2.4.6 locally against
+2.5.2 in CI, from one commit -- the interpreter selects which half of the
+lock applies, and nothing pinned it. The lock now carries a single
+resolution. The pin stops at the minor because an exact patch is not
+enforced: with `.python-version` reading `3.13.12`, `uv sync` prints "Using
+CPython 3.13.7" and exits 0. Verify the interpreter that ran, never the
+file that asked.
+
 **The hooks split by cost, not by preference.** Pre-commit is the fast
 path: staged-file linting, a build, and the tests of packages a change
 touches. Pre-push runs `npm run ci:local`, which is the whole CI gate

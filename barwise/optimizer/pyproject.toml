@@ -2,7 +2,7 @@
 name = "barwise-optimizer"
 version = "0.1.0"
 description = "DSPy optimization lane for the barwise extraction prompt (offline, dev-time only)"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
     "dspy==3.3.1",
     # MIPROv2 imports optuna lazily, at the optimization step -- after the

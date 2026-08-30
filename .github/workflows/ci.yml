@@ -197,6 +197,13 @@ jobs:
       # haiku45-2 variant shipped until it was noticed by accident weeks
       # later (barwise-900).
       #
+      # `uv python install` reads .python-version beside .nvmrc, so the
+      # interpreter is pinned the same way the runtime is. It is not a
+      # style preference: uv.lock resolved TWO dependency sets, branching
+      # on `python_full_version < '3.12'`, so `--frozen` was honoured and
+      # still produced numpy 2.4.6 locally against 2.5.2 here, from one
+      # commit. The lock now carries a single resolution.
+      #
       # After build, because the metric tests shell out to the real
       # `packages/cli/dist` rather than mocking it. `--frozen` respects
       # the committed uv.lock rather than re-resolving, which is the same
@@ -209,6 +216,7 @@ jobs:
         working-directory: barwise/optimizer
         run: |
           python3 -m pip install --quiet uv
+          uv python install
           uv sync --extra dev --frozen
           uv run --frozen pytest -q
 
