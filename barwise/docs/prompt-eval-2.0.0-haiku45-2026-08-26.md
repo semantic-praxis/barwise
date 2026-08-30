@@ -180,7 +180,7 @@ modelling.
    answer keys; the sonnet dev arm's trigger condition (a best sample
    that cannot pass its own rubric) did not fire. Identify the best
    payload per case with `barwise prompt score --case <id> --extraction
-<file>`, install it as `tests/fixtures/responses/<caseId>.json`, and
+   <file>`, install it as `tests/fixtures/responses/<caseId>.json`, and
    run `npm run regen:references`.
 
    One thing to watch when pinning: the existing seven answer keys score

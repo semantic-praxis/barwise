@@ -150,8 +150,7 @@ through. `BARWISE_CLI` overrides what gets run.
   requires it and `match_for_target` derives it from `provider/model`.
 - **Gate a candidate with `--artifacts` AND `--artifact-version`.**
   The match block is derived from the target, so a candidate claims the
-  same provider and model prefix as the shipped variant for that model
-  -- `--artifacts` alone is therefore genuinely ambiguous and the
+  same provider and model prefix as the shipped variant for that model -- `--artifacts` alone is therefore genuinely ambiguous and the
   resolver refuses to guess. That refusal is the good outcome; the bad
   one is the report that used to say `--artifacts packages/llm/prompts`,
   which widens the set with the directory the shipped builtins come

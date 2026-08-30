@@ -2,8 +2,7 @@
 
 Barwise builds capabilities in `core` and the mid-tier packages, then
 exposes them through three surfaces: the CLI, the MCP server, and the
-VS Code extension. This audit asks a narrow question of each capability
--- **can a user actually reach it?** -- and finds seven places where the
+VS Code extension. This audit asks a narrow question of each capability -- **can a user actually reach it?** -- and finds seven places where the
 answer is no or partly no.
 
 The question is worth asking mechanically rather than by intuition,
