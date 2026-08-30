@@ -7,7 +7,11 @@ inch coordinates at 96 px/inch, encodings grounded against the NORMA
 project's own `ORM2Core.xsd` and a real NORMA-authored model), and import
 reads shape geometry back into `diagrams:` layouts -- positions
 round-trip exactly. One manual NORMA-load check of an exported diagram
-remains for the manual test plan. WS3 substantially landed: join
+remains for the manual test plan -- tracked by barwise-e3g, which stays
+open for exactly that. barwise-cb6 (the `import norma` subcommand) was
+closed 2026-08-30 after being verified end to end; it had been done for
+some time and simply never closed. barwise-5t9 is a live epic with 15
+children in mixed states and is not this spec's to finish. WS3 substantially landed: join
 constraints (#267), multi-role frequency (already carried), and now
 deontic modality (`Modality="Deontic"`), object-type cardinality
 (`CardinalityRestriction`, first range; NORMA multi-ranges collapse to

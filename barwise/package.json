@@ -23,6 +23,7 @@
     "test:scripts": "node --test scripts/tests/*.test.mjs",
     "audit:duplication": "node scripts/audit-duplication.mjs",
     "audit:specs": "node scripts/audit-spec-status.mjs",
+    "survey:specs": "node scripts/audit-spec-status.mjs --survey",
     "audit:rubric": "node scripts/audit-rubric.mjs",
     "ci:local": "node scripts/ci-local.mjs",
     "purity": "node scripts/check-core-purity.mjs",

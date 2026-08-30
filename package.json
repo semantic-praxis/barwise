@@ -24,6 +24,7 @@
     "test:scripts": "npm --prefix barwise run test:scripts --",
     "audit:duplication": "npm --prefix barwise run audit:duplication --",
     "audit:specs": "npm --prefix barwise run audit:specs --",
+    "survey:specs": "npm --prefix barwise run survey:specs --",
     "audit:rubric": "npm --prefix barwise run audit:rubric --",
     "ci:local": "npm --prefix barwise run ci:local --",
     "purity": "npm --prefix barwise run purity --",
