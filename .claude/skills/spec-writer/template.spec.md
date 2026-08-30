@@ -1,6 +1,13 @@
 # <Title: what this change achieves>
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Draft -- no workstream implemented
+<!-- A claim about the SPEC, never about a pull request. The old default
+read "design only -- no implementation in this PR", which is true for
+exactly one merge and false forever after: two specs carried it through
+their own workstreams shipping. Update this line in the commit that
+lands a workstream, saying what shipped and what did not.
+`npm run audit:specs -- --check` fails when a spec still claims nothing
+was built while commits have touched the source it names (barwise-910). -->
 Created: <YYYY-MM-DD>
 Last-updated: <YYYY-MM-DD>
 Tracking: REPO_REVIEW-<YYYY-MM-DD>.md finding #<n> (or: feature/issue link)
