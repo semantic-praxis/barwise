@@ -90,8 +90,53 @@ ARMS="${ARMS:-candidate}"
 #   npx barwise prompt artifact --provider anthropic --model claude-sonnet-5 \
 #     --artifacts "$CANDIDATE_DIR" --artifact-version "$CANDIDATE_VERSION"
 if [[ "${ARMS}" = "candidate" ]] || [[ "${ARMS}" = "both" ]]; then
-  CANDIDATE_DIR="${CANDIDATE_DIR:-../optimizer/out}"
-  : "${CANDIDATE_VERSION:?set it to the version field of the exported candidate}"
+  # `compile.py --out` defaults to "out" and is run from optimizer/, so
+  # the candidate lands here. This said `../optimizer/out` until
+  # 2026-08-30 -- one level too high, a path outside the repo that has
+  # never existed, so every run died inside artifact resolution instead
+  # of at the flag.
+  CANDIDATE_DIR="${CANDIDATE_DIR:-optimizer/out}"
+
+  if [[ ! -d "${CANDIDATE_DIR}" ]]; then
+    echo "no candidate directory at ${CANDIDATE_DIR}." >&2
+    echo "  Compile one first (cd optimizer && python -m barwise_optimizer.compile)," >&2
+    echo "  or point CANDIDATE_DIR at an exported candidate." >&2
+    exit 1
+  fi
+
+  # The version is a field in the candidate's own file, so read it rather
+  # than demand it. Asking the operator to retype a fact that is sitting
+  # on disk is not "explicit over implicit" -- it is a failure case that
+  # did not need to exist. Only a directory holding SEVERAL candidates
+  # poses a real question, and that is the one case that still asks.
+  if [[ -z "${CANDIDATE_VERSION:-}" ]]; then
+    # `find | sort` in a process substitution masks both exit statuses,
+    # and a silent failure here would look like "no candidates" -- the
+    # same shape as the dirty-tree guard above. A glob needs neither.
+    _candidates=()
+    for _c in "${CANDIDATE_DIR}"/*.prompt.yaml; do
+      [[ -f "${_c}" ]] && _candidates+=("${_c}")
+    done
+    if [[ ${#_candidates[@]} -eq 0 ]]; then
+      echo "no *.prompt.yaml in ${CANDIDATE_DIR} -- has a compile finished?" >&2
+      exit 1
+    fi
+    if [[ ${#_candidates[@]} -gt 1 ]]; then
+      echo "${#_candidates[@]} candidates in ${CANDIDATE_DIR}; set CANDIDATE_VERSION to pick one:" >&2
+      for c in "${_candidates[@]}"; do
+        local_version="$(sed -n 's/^version: *//p' "${c}")"
+        echo "  ${local_version%%$'\n'*}  (${c})" >&2
+      done
+      exit 1
+    fi
+    CANDIDATE_VERSION="$(sed -n 's/^version: *//p' "${_candidates[0]}")"
+    CANDIDATE_VERSION="${CANDIDATE_VERSION%%$'\n'*}"
+    if [[ -z "${CANDIDATE_VERSION}" ]]; then
+      echo "${_candidates[0]} has no 'version:' field" >&2
+      exit 1
+    fi
+    echo "candidate: ${CANDIDATE_VERSION} (from ${_candidates[0]})"
+  fi
 
   run_arm candidate-sonnet-dev dev \
     --model claude-sonnet-5 --artifacts "${CANDIDATE_DIR}" --artifact-version "${CANDIDATE_VERSION}"
