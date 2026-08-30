@@ -2,6 +2,12 @@
 
 Status: Accepted (companion to ADR 0002, which holds the policy; this
 file holds the state that changes as coverage closes)
+Workstream map: WS1 done at suite 2.5.0 (barwise-845 closed; the
+irreflexive check carries a real answer key in
+`packages/promptlab/evals/incident-response.eval.yaml`). WS2 rides
+barwise-846 (open). WS3 and WS4 are provisional and unscheduled
+respectively, so neither has an issue. barwise-878 (closed) is the
+reference audit this file's inventory came from. Verified 2026-08-30.
 Created: 2026-08-27
 Last-updated: 2026-08-28 (workstream 1 done: the irreflexive check is
 live at suite 2.5.0)

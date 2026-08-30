@@ -1,6 +1,12 @@
 # Ask the constraint whether it rejects the population
 
 Status: Workstreams 1-2 implemented; 3 deferred (Open decision 2)
+Workstream map: WS1 and WS2 both shipped under barwise-904 (closed), in
+PRs #399 and #400 -- one issue for two workstreams because they are one
+change split for review, not two pieces of work. WS3 has no issue by
+design: Open decision 2 makes it conditional on a consumer appearing,
+and filing an issue for work nobody has asked for is how a tracker fills
+with intentions.
 Created: 2026-08-30
 Last-updated: 2026-08-30
 Tracking: barwise-904

@@ -3,6 +3,11 @@
 Status: Accepted (all decisions resolved 2026-08-24). Workstream 1
 (the artifact seam in `reviewModel` and response validation)
 implemented 2026-08-24; workstreams 2-4 open.
+Workstream map: WS1 barwise-847 (closed; verified 2026-08-30 -- the
+review options carry a `PromptArtifact` override, matching
+`ProcessorOptions.artifact`). WS2 barwise-848 (open). WS3 and WS4 both
+ride barwise-849 (open), which covers authoring the seed corpus,
+baselining it and deciding whether to optimise.
 Created: 2026-08-24
 Last-updated: 2026-08-24
 Tracking: barwise-847, barwise-848, barwise-849. Grounds workstream 5

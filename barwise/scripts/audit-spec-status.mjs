@@ -65,8 +65,24 @@ const AT = atIndex === -1 ? undefined : process.argv[atIndex + 1];
 const SPEC_DIR = "barwise/docs/specs/";
 const BASELINE = resolve(REPO_ROOT, "barwise/spec-status-baseline.json");
 
-/** The shape of Status that claims nothing exists yet. */
-const CLAIMS_NOTHING_BUILT = /^\s*(draft|proposed|design only)\b/i;
+/**
+ * The shape of Status that claims nothing exists yet.
+ *
+ * Two alternatives, because the same claim appears in two positions. The
+ * anchored one is the common case (`Draft ...`, `Proposed ...`). The
+ * unanchored phrase catches it mid-line: `conformance-property.spec.md`
+ * reads "Accepted (all decisions resolved 2026-08-25; both workstreams
+ * open -- design only, no implementation in this PR)", which asserts
+ * exactly what an anchored `Draft` does and escaped this gate purely on
+ * where its author put it.
+ *
+ * This is NOT the widening to partial specs that barwise-912 warns
+ * against. That would mean inferring from "workstreams 1 and 2
+ * implemented" which ones actually shipped, which no header can settle.
+ * This is the identical claim -- nothing was built -- matched wherever
+ * it sits.
+ */
+const CLAIMS_NOTHING_BUILT = /^\s*(draft|proposed|design only)\b|\bno implementation\b/i;
 
 const CODE = /\.(ts|tsx|mjs|cjs|js|json|ya?ml|py|sh)$/;
 

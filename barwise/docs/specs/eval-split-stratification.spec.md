@@ -3,7 +3,19 @@
 Status: Accepted (all decisions resolved 2026-08-24). Workstream 1
 (rate-based penalties, suite 2.0.0, including the `evals/`
 client-material rule in the package CLAUDE.md) implemented 2026-08-24
-in PR #336; workstreams 2-4 open.
+in PR #336. Workstream 2 (references and the full rubric for the three
+realism cases) has ALSO shipped, which this line claimed otherwise until
+2026-08-30: all ten cases now carry `reference:`, the three dev cases
+(`vendor-onboarding`, `subscription-billing`, `incident-response`) carry
+5, 7 and 4 `forbids_population` checks respectively where they carried
+none, and barwise-845 -- the issue naming exactly that gap, "reference
+model: train all 7, dev none" -- is closed. Workstreams 3 (barwise-846,
+open) and 4 (needs a key) remain.
+Workstream map: WS1 barwise-844 (closed 2026-08-30 -- it had shipped in
+PR #336 and was never closed; `scoreExtraction.ts` rates every penalty
+by model size, `rated()` at line 187). WS2 barwise-845 (closed). WS3
+barwise-846 (open). WS4 has no issue: it needs a keyed round, which is
+an act rather than a task.
 Created: 2026-08-24
 Last-updated: 2026-08-25
 Tracking: barwise-844, barwise-845, barwise-846. Parent
