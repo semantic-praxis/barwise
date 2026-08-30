@@ -1,7 +1,27 @@
 #! /usr/bin/env bash
 #
-# One keyed eval round. Run from `barwise/`, with ANTHROPIC_API_KEY
-# exported (never passed as an argument -- it lands in shell history).
+# One keyed eval round. Run from `barwise/`.
+#
+#   export ANTHROPIC_API_KEY=...        # never an argument: shell history
+#   ./eval-runner.sh                    # the candidate arm
+#   CANDIDATE_VERSION=mipro-3 ./eval-runner.sh
+#   ARMS=thinking ./eval-runner.sh
+#
+# Every knob, its default, and what it decides:
+#
+#   ARMS               candidate    which experiment: candidate | thinking | both
+#   CANDIDATE_DIR      optimizer/out  where compile.py wrote the candidate
+#   CANDIDATE_VERSION  (derived)    read from the candidate's own `version:`
+#                                   field; required only when the directory
+#                                   holds several, and the error lists them
+#   STAMP              (now)        set it to an existing round to RESUME:
+#                                   finished arms are skipped
+#   THINKING_BUDGET    8192         thinking arm only; haiku takes a token
+#                                   budget, sonnet rejects it outright
+#
+# The script refuses a dirty tree (a history row names the commit that
+# produced it) and, at the end, commits the round to a new branch and
+# pushes it.
 #
 # The arm table near the bottom is edited per round and committed with
 # the round's record, so what ran is recoverable from the record itself.
@@ -9,21 +29,14 @@
 
 set -euo pipefail
 
-# One stamp per round. Override to RESUME an interrupted round --
-# `STAMP=20260829-0930 ./eval-runner.sh` re-enters the same directory and
-# skips the arms that finished. Minted fresh otherwise, which is what
-# keeps two rounds from overwriting each other by run index.
+# One stamp per round; a fresh one keeps two rounds from colliding.
 STAMP="${STAMP:-$(date '+%Y%m%d-%H%M')}"
 ROUND="eval-payloads/${STAMP}"
 
-# Preflight, both free, both paid for once already. A row written off a
-# modified tree names a commit that never produced it, and the `barwise`
-# bin reads `dist`, so an unbuilt checkout measures the previous build
-# while the footer names this suite version.
-# Captured separately, not inlined into the test: a failed `git
-# status` produces empty output, which an inline `-n` test reads as
-# a CLEAN tree -- so a broken git would wave through the guard whose
-# whole job is to stop a run that records a commit.
+# A row written off a modified tree names a commit that never produced
+# it, and the `barwise` bin reads `dist`, so an unbuilt checkout scores
+# the previous build. Status is captured separately because an inlined
+# `-n "$(git status)"` reads a FAILED git as a clean tree.
 if ! dirty="$(git status --porcelain)"; then
   echo "git status failed; refusing to run rather than assume a clean tree" >&2
   exit 1
@@ -36,15 +49,12 @@ npm run build >/dev/null
 
 mkdir -p "${ROUND}"
 
-# The recorded concurrency: case chains in parallel, repeats within a
-# case serial, first call alone for the cache write.
+# Case chains in parallel; repeats within a case stay serial.
 concurrency_for() { if [[ "$1" = "dev" ]]; then echo 3; else echo 7; fi; }
 
 # run_arm <name> <split> [extra barwise flags...]
-#
-# Writes payloads to $ROUND/<name>/ and the log to $ROUND/<name>.log.
-# A `.done` marker (not the log) marks completion, so a resumed round
-# re-runs an arm that died mid-sweep rather than trusting its partial log.
+# A `.done` marker rather than the log marks completion, so a resumed
+# round re-runs an arm that died mid-sweep.
 run_arm() {
   local name=$1 split=$2
   shift 2
@@ -52,10 +62,8 @@ run_arm() {
     echo "== ${name}: already complete in this round, skipping"
     return
   fi
-  # Resolved to its own variable rather than inlined into the npx call:
-  # a substitution nested inside another command throws its exit status
-  # away, which is the shape that made the dirty-tree guard above read a
-  # failed `git status` as a clean tree.
+  # Its own variable: a substitution nested in another command throws
+  # its exit status away.
   local concurrency
   concurrency="$(concurrency_for "${split}")"
   echo "== ${name} (${split} split)"
@@ -73,28 +81,15 @@ run_arm() {
 #   both       one after the other, into one round
 ARMS="${ARMS:-candidate}"
 
-# The compiled-candidate measurement. The control is run FRESH rather
-# than read from an older round's rows: comparing across a suite bump is
-# what the version field exists to forbid -- which is also why this
-# comment no longer names a suite version. It said 2.7.0 through three
-# bumps (2.8.0, 2.9.0, 2.10.0), and a hard-coded version here is a claim
-# that goes stale every time the thing it names moves. `suite.yaml` is
-# the authority, and each recorded row carries the version it ran at.
+# The control is run fresh rather than read from an older round: across
+# a suite bump the rows are not comparable, which is what the version
+# field is for.
 #
-# CANDIDATE_DIR holds the exported candidate .prompt.yaml;
-# CANDIDATE_VERSION is its `version:` field. Both flags are needed --
-# --artifacts widens the candidate set, --artifact-version picks the
-# candidate out of it rather than letting the shipped sonnet5-3 win on
-# provider/model match. Confirm free, before spending anything:
-#
-#   npx barwise prompt artifact --provider anthropic --model claude-sonnet-5 \
-#     --artifacts "$CANDIDATE_DIR" --artifact-version "$CANDIDATE_VERSION"
+# Both artifact flags are needed -- --artifacts widens the candidate set,
+# --artifact-version picks from it rather than letting the shipped
+# sonnet5-3 win on provider/model match.
 if [[ "${ARMS}" = "candidate" ]] || [[ "${ARMS}" = "both" ]]; then
-  # `compile.py --out` defaults to "out" and is run from optimizer/, so
-  # the candidate lands here. This said `../optimizer/out` until
-  # 2026-08-30 -- one level too high, a path outside the repo that has
-  # never existed, so every run died inside artifact resolution instead
-  # of at the flag.
+  # `compile.py --out` defaults to "out", run from optimizer/.
   CANDIDATE_DIR="${CANDIDATE_DIR:-optimizer/out}"
 
   if [[ ! -d "${CANDIDATE_DIR}" ]]; then
@@ -104,15 +99,11 @@ if [[ "${ARMS}" = "candidate" ]] || [[ "${ARMS}" = "both" ]]; then
     exit 1
   fi
 
-  # The version is a field in the candidate's own file, so read it rather
-  # than demand it. Asking the operator to retype a fact that is sitting
-  # on disk is not "explicit over implicit" -- it is a failure case that
-  # did not need to exist. Only a directory holding SEVERAL candidates
-  # poses a real question, and that is the one case that still asks.
+  # Read the version from the candidate rather than demand it. Only a
+  # directory holding several poses a real question.
   if [[ -z "${CANDIDATE_VERSION:-}" ]]; then
-    # `find | sort` in a process substitution masks both exit statuses,
-    # and a silent failure here would look like "no candidates" -- the
-    # same shape as the dirty-tree guard above. A glob needs neither.
+    # A glob, not `find | sort`: a process substitution masks the exit
+    # status, so a failing find would read as "no candidates".
     _candidates=()
     for _c in "${CANDIDATE_DIR}"/*.prompt.yaml; do
       [[ -f "${_c}" ]] && _candidates+=("${_c}")
@@ -138,6 +129,17 @@ if [[ "${ARMS}" = "candidate" ]] || [[ "${ARMS}" = "both" ]]; then
     echo "candidate: ${CANDIDATE_VERSION} (from ${_candidates[0]})"
   fi
 
+  # Resolve the artifact before spending anything: offline, no API key,
+  # under a second. Otherwise a bad version surfaces inside the first arm.
+  if ! npx barwise prompt artifact --provider anthropic --model claude-sonnet-5 \
+       --artifacts "${CANDIDATE_DIR}" --artifact-version "${CANDIDATE_VERSION}" >/dev/null; then
+    echo >&2
+    echo "candidate \"${CANDIDATE_VERSION}\" does not resolve in ${CANDIDATE_DIR} (see above)." >&2
+    echo "  Set CANDIDATE_VERSION to one of the versions listed, or unset it to" >&2
+    echo "  derive it when the directory holds exactly one candidate." >&2
+    exit 1
+  fi
+
   run_arm candidate-sonnet-dev dev \
     --model claude-sonnet-5 --artifacts "${CANDIDATE_DIR}" --artifact-version "${CANDIDATE_VERSION}"
   run_arm candidate-sonnet-train train \
@@ -148,23 +150,15 @@ if [[ "${ARMS}" = "candidate" ]] || [[ "${ARMS}" = "both" ]]; then
   run_arm default-sonnet-train train \
     --model claude-sonnet-5 --artifact-version default
 
-  # The candidate prompt travels with the round: it is not a shipped
-  # artifact, so its recorded promptHash resolves to nothing unless the
-  # bytes that produced it sit in the record beside the scores.
+  # The candidate travels with the round: unshipped, so its recorded
+  # promptHash resolves to nothing without the bytes beside the scores.
   cp "${CANDIDATE_DIR}"/*.prompt.yaml "${ROUND}/" 2>/dev/null || true
 fi
 
-# The haiku thinking probe. Both legs send the shipped haiku45-2 prompt,
-# so the only thing that moves is the dial -- and the no-thinking leg is
-# run rather than taken from the 2.6.0 record, for the same reason the
-# candidate control is.
-#
-# Train, not dev: conference-reviews is the target (haiku's one
-# reproducible bimodal drop) and it lives in the train half; there is no
-# per-case filter, so the whole split runs. 35 calls per leg.
-#
-# Haiku 4.5 takes a token budget; Sonnet 5 rejects budget_tokens outright
-# (its dial is effort), which is why this probe is haiku-only.
+# Both legs send the shipped haiku45-2 prompt, so only the dial moves.
+# Train, not dev: the target is conference-reviews (haiku's one
+# reproducible bimodal drop) and it lives in train. 35 calls per leg.
+# Haiku-only because Sonnet 5 rejects budget_tokens outright.
 if [[ "${ARMS}" = "thinking" ]] || [[ "${ARMS}" = "both" ]]; then
   THINKING_BUDGET="${THINKING_BUDGET:-8192}"
 
