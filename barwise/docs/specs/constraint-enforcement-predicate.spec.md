@@ -1,6 +1,6 @@
 # Ask the constraint whether it rejects the population
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Workstream 1 implemented; 2 pending, 3 deferred
 Created: 2026-08-30
 Last-updated: 2026-08-30
 Tracking: barwise-904
@@ -196,21 +196,27 @@ Independent of 1 and 2, and only if Open decision 2 says yes.
   workstream 1 runs the full monorepo build and test per CLAUDE.md, not just
   core's.
 
-## Open decisions (for review)
+## Open decisions (resolved as recommended)
 
 - **Does the predicate return a boolean or the diagnostics?**
-  Recommended: the discriminated union above, carrying `diagnostics` on the
+  Resolved: the discriminated union above, carrying `diagnostics` on the
   `enforced: true` arm. `forbids_population` needs only `rejects`, but the
   gym's miss-card wants to say _what_ was violated, and a boolean would send
   it straight back to the model-wide array this spec exists to avoid. The
   cost is a wider return type than the immediate caller needs.
 - **Does `constraintId` land here or separately?**
-  Recommended: separately, and only if a consumer needs it. Workstreams 1
+  Resolved: separately, and only if a consumer needs it. Workstreams 1
   and 2 remove the only caller that currently has to disambiguate
   `c.id ?? ft.id`, so the lossiness may stop mattering. Deciding now would
   price a fix for a problem this spec might delete.
 - **Five kinds or all constraint-driven kinds?**
-  Recommended: five, matching what `forbids_population` asks. Building the
+  Resolved: the five, plus the two spanning forms
+  (`external_uniqueness`, `disjunctive_mandatory`). `learn` looks up the
+  _candidate's_ corresponding constraint, not the reference's, which is why
+  `REJECTING_RULES` already accepted two rule ids per kind: a candidate may
+  express as external uniqueness what the answer key expressed as internal.
+  Covering five would have made those candidates unanswerable. The
+  remaining kinds stay out, on the reasoning below. Building the
   rest speculatively adds surface with no caller to prove it right --
   precisely the shape of `buildCodeExtractionPrompt` (barwise-811), which
   has had no call site for two years.

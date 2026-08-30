@@ -133,6 +133,10 @@ export {
 export { CURRENT_ORM_VERSION, type OrmVersionMigration } from "./serialization/schemaVersion.js";
 
 // Validation
+export {
+  type EnforcementVerdict,
+  evaluateConstraintEnforcement,
+} from "./validation/constraintEnforcement.js";
 export { type Diagnostic, type DiagnosticSeverity } from "./validation/Diagnostic.js";
 export { completenessWarnings } from "./validation/rules/completenessWarnings.js";
 export { constraintConsistencyRules } from "./validation/rules/constraintConsistency.js";
