@@ -12,8 +12,8 @@ import { type OrmModel, OrmYamlSerializer } from "@barwise/core";
 import { diffModels, type ModelDelta } from "@barwise/core/diff";
 import type { Command } from "commander";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { readFileSync, realpathSync } from "node:fs";
+import { dirname, relative, resolve } from "node:path";
 
 const serializer = new OrmYamlSerializer();
 
@@ -46,11 +46,20 @@ export function registerHistoryCommand(program: Command): void {
 
 /** Render the full history text for a model file. */
 export function renderHistory(file: string, limit: number): string {
-  const absolute = resolve(file);
+  // realpath, not just resolve: `git rev-parse --show-toplevel` reports
+  // the real path, so on any system where the file is reached through a
+  // symlink the two live in different namespaces. macOS makes this the
+  // common case -- `tmpdir()` is /var/folders/..., a symlink to
+  // /private/var/folders/... -- and the two differ by 8 characters.
+  const absolute = realpathSync(resolve(file));
   const cwd = dirname(absolute);
 
   const repoRoot = git(cwd, ["rev-parse", "--show-toplevel"]).trim();
-  const relPath = absolute.slice(repoRoot.length + 1).replaceAll("\\", "/");
+  // `relative`, not `slice(repoRoot.length + 1)`: a slice on a mismatched
+  // prefix silently yields a truncated path or an empty string, and the
+  // failure surfaces as "No git history" or an empty-pathspec fatal from
+  // git rather than as the path bug it is.
+  const relPath = relative(repoRoot, absolute).replaceAll("\\", "/");
 
   const revisions = listRevisions(cwd, relPath, limit);
   if (revisions.length === 0) {
