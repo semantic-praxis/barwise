@@ -263,6 +263,14 @@ the pre-commit hook with "Property X does not exist on type Y" naming
 something you plainly just added. Run `npm run build` from `barwise/`
 first whenever a change crossed a package boundary.
 
+**Node is pinned in `.nvmrc`, and both workflows read it.** Not a
+preference: v8 coverage thresholds are not portable across Node versions.
+V8 leaves functions it never compiled out of its coverage report, so a
+module no test constructs is counted as one function on Node 22 and
+nineteen on Node 26 -- `@barwise/code-analysis` read 95% functions on one
+and 81% on the other from identical source. A floating runtime means the
+gate passes or fails by whichever Node you happen to have.
+
 **The hooks split by cost, not by preference.** Pre-commit is the fast
 path: staged-file linting, a build, and the tests of packages a change
 touches. Pre-push runs `npm run ci:local`, which is the whole CI gate
