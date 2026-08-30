@@ -73,6 +73,26 @@ function git(...args) {
   return execFileSync("git", args, { cwd: REPO_ROOT, encoding: "utf8" }).trim();
 }
 
+/**
+ * This gate reads history, so a shallow clone makes it answer a smaller
+ * question and print OK for it -- which is how it shipped red: 309
+ * commits locally against CI's full history, so the local run reported
+ * zero findings and CI reported one. A gate that under-reports silently
+ * is the barwise-905/906 defect in a new coordinate, so refuse rather
+ * than reassure. CI checks out with `fetch-depth: 0`; a working copy
+ * needs `git fetch --unshallow` once.
+ */
+function requireFullHistory() {
+  if (git("rev-parse", "--is-shallow-repository") !== "true") return;
+  console.error(
+    "audit-spec-status: this is a shallow clone, so `git log` cannot see far\n"
+      + "  enough back to answer whether a spec's subject moved after it was\n"
+      + "  written. Refusing rather than reporting a smaller question's answer.\n"
+      + "  Fix: git fetch --unshallow",
+  );
+  process.exit(1);
+}
+
 function exists(path) {
   try {
     if (AT === undefined) {
@@ -156,6 +176,8 @@ function findings() {
   }
   return found.sort((a, b) => a.id.localeCompare(b.id));
 }
+
+requireFullHistory();
 
 const found = findings();
 const check = process.argv.includes("--check");
