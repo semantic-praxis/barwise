@@ -1,25 +1,16 @@
 # Make must-agree code pairs fail loudly when they drift, without removing the duplication the principles keep
 
-Status: Implemented (all six workstreams)
-Status-evidence: `scripts/check-depcruise-gate.mjs` (WS1); `parity.manifest.json`
-
-- `scripts/check-parity.mjs` (WS2); `packages/core/src/util/assertNever.ts` (WS3);
-  `scripts/regen-example-output.sh` + `packages/core/tests/integration/exampleOutputDrift.test.ts`
-  (WS4); `scripts/audit-duplication.mjs` + `audit-baseline.json` (WS5); the
-  must-agree rule in CLAUDE.md (WS6). The header read "Draft for review (design
-  only -- no implementation in this PR)" until 2026-08-30, while CLAUDE.md cited
-  the ratchet this spec designed as landed and gated in CI. Found by
-  `npm run audit:specs`, which exists because of it (barwise-910).
-  Created: 2026-08-26
-  Last-updated: 2026-08-26
-  Tracking: `docs/logic-duplication-audit-2026-08-26.md` (all classes);
-  extends the remedy of `docs/specs/artifact-resolution-parity.spec.md`
-  (implemented, PR #347) from one instance to the class. Issues:
-  barwise-862 (W1), barwise-868 (W2), barwise-869 (W3), barwise-870
-  (W4), barwise-871 (W5), barwise-872 (W6); the audit's diverged-copy
-  findings are barwise-863..867 and 873. Hand-authored into
-  `.beads/issues.jsonl` (canonical form, `check:beads --strict` clean);
-  `bd` itself is unavailable in this container.
+Status: Implemented (all six workstreams; see Implementation notes)
+Created: 2026-08-26
+Last-updated: 2026-08-26
+Tracking: `docs/logic-duplication-audit-2026-08-26.md` (all classes);
+extends the remedy of `docs/specs/artifact-resolution-parity.spec.md`
+(implemented, PR #347) from one instance to the class. Issues:
+barwise-862 (W1), barwise-868 (W2), barwise-869 (W3), barwise-870
+(W4), barwise-871 (W5), barwise-872 (W6); the audit's diverged-copy
+findings are barwise-863..867 and 873. Hand-authored into
+`.beads/issues.jsonl` (canonical form, `check:beads --strict` clean);
+`bd` itself is unavailable in this container.
 
 ## Principle
 
@@ -530,3 +521,24 @@ under the names it cites.
   decision 3.
 - No new lint dependencies, clone detectors, or CI infrastructure
   beyond one node script.
+
+## Implementation notes
+
+All six workstreams landed, each with the artifact that proves it:
+
+| WS | What it asked for                                 | Artifact                                                                                         |
+| -- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| 1  | the dependency gate sees the subpath edges        | `scripts/check-depcruise-gate.mjs` -- subpath coverage plus a hostile-import probe, gated in CI  |
+| 2  | registered must-agree copies fail on drift        | `parity.manifest.json` + `scripts/check-parity.mjs`                                              |
+| 3  | exhaustiveness for the vocabulary unions          | `packages/core/src/util/assertNever.ts`                                                          |
+| 4  | one regenerator and a drift test for the examples | `scripts/regen-example-output.sh` + `packages/core/tests/integration/exampleOutputDrift.test.ts` |
+| 5  | mechanize the sweep's detection half              | `scripts/audit-duplication.mjs` + `audit-baseline.json`                                          |
+| 6  | write the rule where authors meet it              | the must-agree rule in the root `CLAUDE.md`                                                      |
+
+The header read "Draft for review (design only -- no implementation in
+this PR)" until 2026-08-30, while CLAUDE.md cited the ratchet this spec
+designed as landed and gated in CI. It was found by `npm run
+audit:specs`, which exists because of it (barwise-910) -- and the
+template that supplied that default now says something about the spec
+rather than about a pull request, so the next one does not start life
+with a claim that expires on merge.
