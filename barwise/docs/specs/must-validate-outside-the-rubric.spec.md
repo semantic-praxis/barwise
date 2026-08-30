@@ -1,8 +1,8 @@
 # must_validate stops banking a guaranteed point
 
-Status: Draft for review (design only -- no implementation in this PR)
+Status: Workstreams 1-2 implemented (suite 2.9.0); 3 not done
 Created: 2026-08-29
-Last-updated: 2026-08-29
+Last-updated: 2026-08-30
 Tracking: barwise-902
 
 ## Principle
@@ -188,12 +188,16 @@ under a version that claims comparability. Touches `scoreExtraction.ts`,
 `suite.yaml`, and the scorer tests that assert rubric fractions on cases
 declaring `must_validate`.
 
-### 3. Record the new baseline
+### 3. Record the new baseline -- NOT DONE
 
 Re-score the 192 committed payloads at 2.9.0 via `prompt rescore` and
 record the shift in `docs/prompt-optimization-log.md`, so the next
 reader can see what the bump cost each case rather than inferring it.
 No code changes.
+
+Left undone when 1 and 2 shipped, and the suite has since moved to
+2.10.0 (barwise-901), so the re-score is now against that. Tracked as
+barwise-909 rather than left as a workstream nobody is counting.
 
 ## API and migration impact
 
