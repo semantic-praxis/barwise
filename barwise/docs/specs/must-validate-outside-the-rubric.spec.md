@@ -1,6 +1,6 @@
 # must_validate stops banking a guaranteed point
 
-Status: Workstreams 1-2 implemented (suite 2.9.0); 3 not done
+Status: Implemented (all three workstreams; suite 2.9.0, re-scored at 2.10.0)
 Created: 2026-08-29
 Last-updated: 2026-08-30
 Tracking: barwise-902
@@ -188,16 +188,24 @@ under a version that claims comparability. Touches `scoreExtraction.ts`,
 `suite.yaml`, and the scorer tests that assert rubric fractions on cases
 declaring `must_validate`.
 
-### 3. Record the new baseline -- NOT DONE
+### 3. Record the new baseline
 
 Re-score the 192 committed payloads at 2.9.0 via `prompt rescore` and
 record the shift in `docs/prompt-optimization-log.md`, so the next
 reader can see what the bump cost each case rather than inferring it.
 No code changes.
 
-Left undone when 1 and 2 shipped, and the suite has since moved to
-2.10.0 (barwise-901), so the re-score is now against that. Tracked as
-barwise-909 rather than left as a workstream nobody is counting.
+Left undone when 1 and 2 shipped and tracked as barwise-909; done
+2026-08-30, covering 2.10.0 (barwise-901) in the same pass since the
+suite had moved by then. Each version was re-scored under a build
+checked out at its own commit rather than a reconstruction of it. The
+per-case table is the 2026-08-30 entry in the log. Overall cost of this
+spec's change: **-0.0085**, and it is not uniform -- a case already
+scoring a full rubric does not move at all (`university-enrollment`, 0
+of 22 payloads), while the cases that were failing other checks move
+most (`conference-reviews` -0.0272), because the constant had been
+diluting their failures. That distribution is the defect stated as a
+number.
 
 ## API and migration impact
 
