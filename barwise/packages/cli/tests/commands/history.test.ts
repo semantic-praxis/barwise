@@ -4,7 +4,7 @@
  * command's semantic narration is asserted against it.
  */
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -41,6 +41,33 @@ describe("barwise history", () => {
 
   afterEach(() => {
     rmSync(repoDir, { recursive: true, force: true });
+  });
+
+  /**
+   * macOS reaches `tmpdir()` through a symlink -- /var/folders/... to
+   * /private/var/folders/... -- and `git rev-parse --show-toplevel`
+   * reports the real path while `resolve()` does not. Every test here
+   * failed on macOS and passed on Linux for that reason alone. The
+   * symlink is explicit so the case is exercised on both.
+   */
+  it("resolves a model reached through a symlinked directory", async () => {
+    const modelPath = join(repoDir, "simple.orm.yaml");
+    copyFileSync(join(fixtures, "simple.orm.yaml"), modelPath);
+    git("add", "simple.orm.yaml");
+    git("commit", "--quiet", "-m", "add simple model");
+
+    // A link whose name differs in LENGTH from its target: an equal
+    // length makes the old prefix-slice produce the right answer by
+    // accident, which is how this hid.
+    const link = `${repoDir}-l`;
+    symlinkSync(repoDir, link);
+    try {
+      const result = await runCli(["history", join(link, "simple.orm.yaml")]);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("add simple model");
+    } finally {
+      rmSync(link, { force: true });
+    }
   });
 
   it("narrates revisions with semantic deltas", async () => {

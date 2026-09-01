@@ -1,29 +1,103 @@
 #! /usr/bin/env bash
 #
-# One keyed eval round. Run from `barwise/`, with ANTHROPIC_API_KEY
-# exported (never passed as an argument -- it lands in shell history).
+# One keyed eval round. Run from `barwise/`.
 #
-# The arm table near the bottom is edited per round and committed with
-# the round's record, so what ran is recoverable from the record itself.
+#   export ANTHROPIC_API_KEY=...        # never an argument: shell history
+#   ./eval-runner.sh                    # asks for anything it needs
+#   MODEL=haiku EXPERIMENT=thinking ./eval-runner.sh
+#   MODEL=sonnet EXPERIMENT=candidate SPLITS=dev ./eval-runner.sh
+#
+# Set what you have opinions about; the rest is asked for at a menu, or
+# is an error naming the choices when stdin is not a terminal.
+#
+#   MODEL              haiku | sonnet
+#   EXPERIMENT         variant | candidate | thinking
+#   SPLITS             both | dev | train
+#   CANDIDATE_DIR      optimizer/out   candidate experiment only
+#   CANDIDATE_VERSION  (derived)       asked when the directory holds several
+#   THINKING_BUDGET    8192            thinking experiment only
+#   STAMP              (now)           set it to an existing round to RESUME
+#
+# Each experiment runs its own control on the same model, so a round is
+# always a comparison rather than a number.
+#
+# Refuses a dirty tree (a history row names the commit that produced it)
+# and, at the end, commits the round to a new branch and pushes it.
 # Procedure and judgment calls: docs/local-eval-runbook.md.
 
 set -euo pipefail
 
-# One stamp per round. Override to RESUME an interrupted round --
-# `STAMP=20260829-0930 ./eval-runner.sh` re-enters the same directory and
-# skips the arms that finished. Minted fresh otherwise, which is what
-# keeps two rounds from overwriting each other by run index.
+# One stamp per round; a fresh one keeps two rounds from colliding.
 STAMP="${STAMP:-$(date '+%Y%m%d-%H%M')}"
 ROUND="eval-payloads/${STAMP}"
 
-# Preflight, both free, both paid for once already. A row written off a
-# modified tree names a commit that never produced it, and the `barwise`
-# bin reads `dist`, so an unbuilt checkout measures the previous build
-# while the footer names this suite version.
-# Captured separately, not inlined into the test: a failed `git
-# status` produces empty output, which an inline `-n` test reads as
-# a CLEAN tree -- so a broken git would wave through the guard whose
-# whole job is to stop a run that records a commit.
+# --- What to run -----------------------------------------------------
+#
+# Three axes. Anything unset is asked for when stdin is a terminal, and
+# is an error naming the choices otherwise.
+#
+#   MODEL       haiku | sonnet
+#   EXPERIMENT  variant    the model's shipped prompt vs the default
+#               candidate  a compiled candidate vs the default
+#               thinking   a thinking budget vs none (haiku only)
+#   SPLITS      both | dev | train
+#
+# Each experiment runs its own control, which is the point of choosing
+# one: a variant measured without a same-model default answers nothing.
+
+choose() { # choose VAR "prompt" choice...
+  local var=$1 prompt=$2
+  shift 2
+  if [[ -n "${!var:-}" ]]; then
+    [[ " $* " == *" ${!var} "* ]] || {
+      echo "${var}=${!var} must be one of: $*" >&2
+      exit 1
+    }
+    return
+  fi
+  [[ -t 0 ]] || {
+    echo "${var} is unset and this is not a terminal. Set it to one of: $*" >&2
+    exit 1
+  }
+  local choice
+  PS3="${prompt} "
+  select choice in "$@"; do
+    [[ -n "${choice}" ]] && {
+      printf -v "${var}" '%s' "${choice}"
+      break
+    }
+  done
+}
+
+choose MODEL "model? " haiku sonnet
+choose EXPERIMENT "experiment? " variant candidate thinking
+choose SPLITS "splits? " both dev train
+
+case "${MODEL}" in
+  haiku) MODEL_ID=claude-haiku-4-5 ;;
+  sonnet) MODEL_ID=claude-sonnet-5 ;;
+esac
+
+# Sonnet 5's dial is effort, not tokens: it rejects budget_tokens.
+if [[ "${EXPERIMENT}" = thinking && "${MODEL}" != haiku ]]; then
+  echo "the thinking experiment is haiku-only -- ${MODEL} rejects a token budget" >&2
+  exit 1
+fi
+
+case "${SPLITS}" in
+  both) SPLIT_LIST=(dev train) ;;
+  *) SPLIT_LIST=("${SPLITS}") ;;
+esac
+
+echo "round ${STAMP}: ${EXPERIMENT} on ${MODEL} (${SPLIT_LIST[*]})"
+
+# Guards come AFTER the selection above: a typo should not cost you a
+# commit before you learn about it.
+#
+# A row written off a modified tree names a commit that never produced
+# it, and the `barwise` bin reads `dist`, so an unbuilt checkout scores
+# the previous build. Status is captured separately because an inlined
+# `-n "$(git status)"` reads a FAILED git as a clean tree.
 if ! dirty="$(git status --porcelain)"; then
   echo "git status failed; refusing to run rather than assume a clean tree" >&2
   exit 1
@@ -36,15 +110,12 @@ npm run build >/dev/null
 
 mkdir -p "${ROUND}"
 
-# The recorded concurrency: case chains in parallel, repeats within a
-# case serial, first call alone for the cache write.
+# Case chains in parallel; repeats within a case stay serial.
 concurrency_for() { if [[ "$1" = "dev" ]]; then echo 3; else echo 7; fi; }
 
 # run_arm <name> <split> [extra barwise flags...]
-#
-# Writes payloads to $ROUND/<name>/ and the log to $ROUND/<name>.log.
-# A `.done` marker (not the log) marks completion, so a resumed round
-# re-runs an arm that died mid-sweep rather than trusting its partial log.
+# A `.done` marker rather than the log marks completion, so a resumed
+# round re-runs an arm that died mid-sweep.
 run_arm() {
   local name=$1 split=$2
   shift 2
@@ -52,10 +123,8 @@ run_arm() {
     echo "== ${name}: already complete in this round, skipping"
     return
   fi
-  # Resolved to its own variable rather than inlined into the npx call:
-  # a substitution nested inside another command throws its exit status
-  # away, which is the shape that made the dirty-tree guard above read a
-  # failed `git status` as a clean tree.
+  # Its own variable: a substitution nested in another command throws
+  # its exit status away.
   local concurrency
   concurrency="$(concurrency_for "${split}")"
   echo "== ${name} (${split} split)"
@@ -65,67 +134,86 @@ run_arm() {
   touch "${ROUND}/${name}.done"
 }
 
-# --- The round --------------------------------------------------------
+# --- The arms --------------------------------------------------------
 #
-# Two independent experiments; ARMS picks which runs.
-#   candidate  the compiled DSPy candidate vs a fresh default control
-#   thinking   haiku with and without a thinking budget
-#   both       one after the other, into one round
-ARMS="${ARMS:-candidate}"
+# Two legs per split: the thing under test and its control. The control
+# is run fresh rather than read from an older round, because across a
+# suite bump the rows are not comparable.
 
-# The compiled-candidate measurement. The control is run FRESH rather
-# than read from an older round's rows: comparing across a suite bump is
-# what the version field exists to forbid -- which is also why this
-# comment no longer names a suite version. It said 2.7.0 through three
-# bumps (2.8.0, 2.9.0, 2.10.0), and a hard-coded version here is a claim
-# that goes stale every time the thing it names moves. `suite.yaml` is
-# the authority, and each recorded row carries the version it ran at.
-#
-# CANDIDATE_DIR holds the exported candidate .prompt.yaml;
-# CANDIDATE_VERSION is its `version:` field. Both flags are needed --
-# --artifacts widens the candidate set, --artifact-version picks the
-# candidate out of it rather than letting the shipped sonnet5-3 win on
-# provider/model match. Confirm free, before spending anything:
-#
-#   npx barwise prompt artifact --provider anthropic --model claude-sonnet-5 \
-#     --artifacts "$CANDIDATE_DIR" --artifact-version "$CANDIDATE_VERSION"
-if [[ "${ARMS}" = "candidate" ]] || [[ "${ARMS}" = "both" ]]; then
-  CANDIDATE_DIR="${CANDIDATE_DIR:-../optimizer/out}"
-  : "${CANDIDATE_VERSION:?set it to the version field of the exported candidate}"
+if [[ "${EXPERIMENT}" = candidate ]]; then
+  CANDIDATE_DIR="${CANDIDATE_DIR:-optimizer/out}"
 
-  run_arm candidate-sonnet-dev dev \
-    --model claude-sonnet-5 --artifacts "${CANDIDATE_DIR}" --artifact-version "${CANDIDATE_VERSION}"
-  run_arm candidate-sonnet-train train \
-    --model claude-sonnet-5 --artifacts "${CANDIDATE_DIR}" --artifact-version "${CANDIDATE_VERSION}"
+  if [[ ! -d "${CANDIDATE_DIR}" ]]; then
+    echo "no candidate directory at ${CANDIDATE_DIR}." >&2
+    echo "  Compile one first (cd optimizer && python -m barwise_optimizer.compile)," >&2
+    echo "  or point CANDIDATE_DIR at an exported candidate." >&2
+    exit 1
+  fi
 
-  run_arm default-sonnet-dev dev \
-    --model claude-sonnet-5 --artifact-version default
-  run_arm default-sonnet-train train \
-    --model claude-sonnet-5 --artifact-version default
+  # Read the version from the candidate rather than demand it; only a
+  # directory holding several poses a real question.
+  if [[ -z "${CANDIDATE_VERSION:-}" ]]; then
+    # A glob, not `find | sort`: a process substitution masks the exit
+    # status, so a failing find would read as "no candidates".
+    _candidates=()
+    for _c in "${CANDIDATE_DIR}"/*.prompt.yaml; do
+      [[ -f "${_c}" ]] && _candidates+=("${_c}")
+    done
+    if [[ ${#_candidates[@]} -eq 0 ]]; then
+      echo "no *.prompt.yaml in ${CANDIDATE_DIR} -- has a compile finished?" >&2
+      exit 1
+    fi
+    _versions=()
+    for _c in "${_candidates[@]}"; do
+      _v="$(sed -n 's/^version: *//p' "${_c}")"
+      _versions+=("${_v%%$'\n'*}")
+    done
+    if [[ ${#_versions[@]} -gt 1 ]]; then
+      choose CANDIDATE_VERSION "candidate? " "${_versions[@]}"
+    else
+      CANDIDATE_VERSION="${_versions[0]}"
+      echo "candidate: ${CANDIDATE_VERSION}"
+    fi
+  fi
 
-  # The candidate prompt travels with the round: it is not a shipped
-  # artifact, so its recorded promptHash resolves to nothing unless the
-  # bytes that produced it sit in the record beside the scores.
-  cp "${CANDIDATE_DIR}"/*.prompt.yaml "${ROUND}/" 2>/dev/null || true
+  # Resolve before spending anything: offline, no API key, under a
+  # second. Captured because the command reports on stderr, and held
+  # back until failure where the list of versions is the whole point.
+  if ! _probe="$(npx barwise prompt artifact --provider anthropic \
+       --model "${MODEL_ID}" --artifacts "${CANDIDATE_DIR}" \
+       --artifact-version "${CANDIDATE_VERSION}" 2>&1)"; then
+    echo "${_probe}" >&2
+    echo "candidate \"${CANDIDATE_VERSION}\" does not resolve in ${CANDIDATE_DIR}." >&2
+    exit 1
+  fi
 fi
 
-# The haiku thinking probe. Both legs send the shipped haiku45-2 prompt,
-# so the only thing that moves is the dial -- and the no-thinking leg is
-# run rather than taken from the 2.6.0 record, for the same reason the
-# candidate control is.
-#
-# Train, not dev: conference-reviews is the target (haiku's one
-# reproducible bimodal drop) and it lives in the train half; there is no
-# per-case filter, so the whole split runs. 35 calls per leg.
-#
-# Haiku 4.5 takes a token budget; Sonnet 5 rejects budget_tokens outright
-# (its dial is effort), which is why this probe is haiku-only.
-if [[ "${ARMS}" = "thinking" ]] || [[ "${ARMS}" = "both" ]]; then
-  THINKING_BUDGET="${THINKING_BUDGET:-8192}"
+for split in "${SPLIT_LIST[@]}"; do
+  case "${EXPERIMENT}" in
+    variant)
+      run_arm "variant-${MODEL}-${split}" "${split}" --model "${MODEL_ID}"
+      run_arm "default-${MODEL}-${split}" "${split}" --model "${MODEL_ID}" \
+        --artifact-version default
+      ;;
+    candidate)
+      run_arm "candidate-${MODEL}-${split}" "${split}" --model "${MODEL_ID}" \
+        --artifacts "${CANDIDATE_DIR}" --artifact-version "${CANDIDATE_VERSION}"
+      run_arm "default-${MODEL}-${split}" "${split}" --model "${MODEL_ID}" \
+        --artifact-version default
+      ;;
+    thinking)
+      THINKING_BUDGET="${THINKING_BUDGET:-8192}"
+      run_arm "thinking${THINKING_BUDGET}-${MODEL}-${split}" "${split}" \
+        --model "${MODEL_ID}" --thinking-budget "${THINKING_BUDGET}"
+      run_arm "nothinking-${MODEL}-${split}" "${split}" --model "${MODEL_ID}"
+      ;;
+  esac
+done
 
-  run_arm haiku-nothinking-train train --model claude-haiku-4-5
-  run_arm "haiku-thinking${THINKING_BUDGET}-train" train \
-    --model claude-haiku-4-5 --thinking-budget "${THINKING_BUDGET}"
+# The candidate travels with the round: unshipped, so its recorded
+# promptHash resolves to nothing without the bytes beside the scores.
+if [[ "${EXPERIMENT}" = candidate ]]; then
+  cp "${CANDIDATE_DIR}"/*.prompt.yaml "${ROUND}/" 2>/dev/null || true
 fi
 
 # --- The record -------------------------------------------------------

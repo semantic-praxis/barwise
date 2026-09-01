@@ -13,12 +13,17 @@ concurrency:
 jobs:
   ci:
     runs-on: ubuntu-latest
-    # Single-value matrix (not a bare node-version) so the status check stays
-    # named "ci (22)", matching existing branch-protection required checks.
-    # Node 20 was dropped; remove the stale "ci (20)" required check.
-    strategy:
-      matrix:
-        node-version: [22]
+    # The Node version comes from .nvmrc, not from a matrix. It used to be a
+    # single-value matrix, which put the version in the status check's name
+    # ("ci (22)") and so made every upgrade also a branch-protection edit --
+    # miss it and PRs block forever on a check that never reports. The check
+    # is now just "ci" and the version moves in one file.
+    #
+    # It is pinned rather than floated because v8 coverage thresholds are not
+    # portable across Node versions: V8 omits functions it never compiled
+    # from its report, so Node 22 saw one function in packages/code-analysis
+    # src/lsp/LspJsonRpc.ts where Node 26 sees nineteen, and the package's
+    # functions percentage swung 95% to 81% on identical source.
     defaults:
       run:
         working-directory: barwise
@@ -65,7 +70,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: barwise/package-lock.json
 
@@ -192,6 +197,13 @@ jobs:
       # haiku45-2 variant shipped until it was noticed by accident weeks
       # later (barwise-900).
       #
+      # `uv python install` reads .python-version beside .nvmrc, so the
+      # interpreter is pinned the same way the runtime is. It is not a
+      # style preference: uv.lock resolved TWO dependency sets, branching
+      # on `python_full_version < '3.12'`, so `--frozen` was honoured and
+      # still produced numpy 2.4.6 locally against 2.5.2 here, from one
+      # commit. The lock now carries a single resolution.
+      #
       # After build, because the metric tests shell out to the real
       # `packages/cli/dist` rather than mocking it. `--frozen` respects
       # the committed uv.lock rather than re-resolving, which is the same
@@ -204,6 +216,7 @@ jobs:
         working-directory: barwise/optimizer
         run: |
           python3 -m pip install --quiet uv
+          uv python install
           uv sync --extra dev --frozen
           uv run --frozen pytest -q
 

@@ -103,6 +103,32 @@ which is how a variant is measured on the OTHER model when the
 cross-model question comes up. An unknown version fails before any
 call, listing what exists.
 
+## Invoking the runner
+
+`./eval-runner.sh` from `barwise/`, with `ANTHROPIC_API_KEY` exported --
+never passed as an argument, where it lands in shell history.
+
+The script's header carries the full table of environment knobs, their
+defaults and what each decides. It is not repeated here on purpose: a
+copy of it would be a must-agree pair with nothing keeping the two
+honest, which is the drift this repo has a rule about. Read the header.
+
+Enough to start:
+
+```sh
+export ANTHROPIC_API_KEY=...
+./eval-runner.sh                            # the candidate arm
+CANDIDATE_VERSION=mipro-3 ./eval-runner.sh  # when several candidates exist
+ARMS=thinking ./eval-runner.sh              # the haiku thinking probe
+```
+
+`CANDIDATE_VERSION` is read from the candidate's own `version:` field
+and only has to be set when `optimizer/out` holds more than one; the
+error lists them. Until 2026-08-30 it had to be set always, and neither
+it nor `CANDIDATE_DIR` nor `THINKING_BUDGET` was documented anywhere --
+an operator had to reverse-engineer the invocation from mid-file
+comments, and did.
+
 ## The runs
 
 Eight runs: two prompts against two models, each on both splits. Train
