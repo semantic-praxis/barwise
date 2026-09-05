@@ -1,0 +1,24 @@
+{
+  "skill_name": "pr-creation",
+  "evals": [
+    {
+      "id": 0,
+      "name": "write-pr-for-uv-sqlglot-commit",
+      "prompt": "I'm about to open a PR for my branch. Its only commit on top of main is 978eec4 in /home/user/barwise (base 2969e61); the diff is `git -C /home/user/barwise diff 2969e61 978eec4`. Write the PR title and body I should use to {outputs}/pr.md, title on the first line as `# <title>`. The spec for this work is barwise/docs/specs/python-lockfile-execution.spec.md and the tracking issue is barwise-916 (node barwise/scripts/beads-crud.mjs show barwise-916). The checkout at /home/user/barwise is built, and its source matches 978eec4 for every file the commit touches, so run tests or gates there from barwise/ if you need numbers, but do not modify any tracked file, do not push, do not open a PR, and do not post anything to GitHub.",
+      "expected_output": "A PR body that opens with what changed and why, names the spec workstream and barwise-916 with closure deferred to after merge, orders the spine files (the two SqlglotBridge.ts copies, ci.yml, check-beads.sh, compile-runner.sh) with a reason per file and describes the tests as fallout by pattern, marks a stop point and a risk peak, gives measured evidence with the command behind each number (the SqlglotBridge test counts), lists decisions taken and still open, names the least-certain part, states the behaviour change (sqlglot tier fails in CI without uv and skips locally), and ends with a Session review section.",
+      "files": [],
+      "assertions": [
+        "The title is a sentence stating what is now true after the change, not a label such as 'Update X' or 'Fix Y'",
+        "The body has a reading guide that lists spine files in an explicit order with a reason for each position, and describes the remaining files by pattern rather than one by one",
+        "The reading guide marks where a reviewer with ten minutes should stop and names a risk peak",
+        "Every number measured at this commit is paired with the command that produced it and a retained raw output the grader can open; every number inherited from elsewhere (an earlier CI run, the issue) is attributed to its source rather than presented as measured",
+        "The body has a section naming the part the author is least sure of, or states plainly that a part had no formed reason",
+        "The body states the behaviour change a user or CI sees (the sqlglot tier fails in CI when uv is absent and skips locally)",
+        "The body ends with a '## Session review' section",
+        "The body names the spec workstream and barwise-916, and flags that the commit closes the issue in its own tracker edit against the closure-after-merge rule (or, for a commit that does not, says the closure follows after merge)",
+        "Every reason stated in the body is traceable to the commit message, the spec, or the diff; none is invented",
+        "The body contains no emoji outside the harness-mandated footer, names no model in its prose, and narrates no first-person session events that the commit, spec, or diff do not record"
+      ]
+    }
+  ]
+}
