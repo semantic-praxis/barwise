@@ -318,6 +318,17 @@ skill (`.claude/skills/release/`).
   by JavaScript or Node core (e.g. use `node:crypto.randomUUID()` not
   `uuid`). High-quality libraries that solve real problems (yaml, ajv)
   are fine.
+- **Every Python execution goes through `uv`.** Not `python3`, not a
+  `python` on PATH, not `pip` -- `uv run`, `uv sync`, `uv python`. This
+  is the operational half of the `.python-version` pin above: the pin
+  binds only what uv selects, so a bare `python3` runs the ambient
+  interpreter with the ambient site-packages and silently escapes both
+  the pinned minor and the locked dependency set. That is the same
+  divergence the pin was landed to close (numpy 2.4.6 against 2.5.2
+  from one commit), reintroduced one subprocess lower. A subprocess
+  that must invoke an interpreter runs under `uv run`, which puts the
+  managed venv on PATH so even a grandchild resolves into it. The one
+  standing exception is bootstrapping uv itself.
 - A copy that must agree with other code is never guarded by a
   comment: share it, derive it from the authority, register the pair
   in `barwise/parity.manifest.json` (checked by `npm run
@@ -349,12 +360,26 @@ skill (`.claude/skills/release/`).
 
 ## Beads Issue Tracker
 
-Task tracking goes through **bd (beads)** rather than TodoWrite,
-TaskCreate, or markdown TODO lists, so state survives across sessions
-and machines. Run `bd prime` for the full workflow context; the core
-loop is `bd ready` (find work), `bd show <id>`, `bd update <id>
---claim`, `bd close <id>`. Use `bd remember` for persistent knowledge
-rather than MEMORY.md files.
+Task tracking goes through **beads** rather than TodoWrite, TaskCreate,
+or markdown TODO lists, so state survives across sessions and machines.
+
+**The interface is `node barwise/scripts/beads-crud.mjs`, run from the
+repo root -- the `bd` binary does not need to be installed.** The
+scripts read and write `.beads/issues.jsonl` directly, so a container
+without `bd` on PATH is fully equipped, not degraded; do not report a
+missing `bd` as a blocker or install one to work around it. Subcommands
+are `create`, `show`, `list`, `update`, `close`, `delete`
+(`docs/specs/beads-issue-crud-scripts.spec.md`); `create` takes
+`--title`, `--type`, `--priority`, `--status`, `--description`,
+`--design`, `--acceptance-criteria`, `--notes`, `--labels`,
+`--depends-on`, `--parent`, and the rest. `scripts/check-beads.sh`
+validates the JSONL.
+
+The core loop is unchanged in shape: `list` to find work, `show <id>`
+to read it, `update <id>` to claim it, `close <id>` when it is done.
+There is no `remember` subcommand -- persistent project knowledge goes
+in this file, as a convention with the reason attached, not a
+MEMORY.md.
 
 ## Session Completion
 
