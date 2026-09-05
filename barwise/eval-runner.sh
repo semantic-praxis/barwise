@@ -145,7 +145,7 @@ if [[ "${EXPERIMENT}" = candidate ]]; then
 
   if [[ ! -d "${CANDIDATE_DIR}" ]]; then
     echo "no candidate directory at ${CANDIDATE_DIR}." >&2
-    echo "  Compile one first (cd optimizer && python -m barwise_optimizer.compile)," >&2
+    echo "  Compile one first (cd optimizer && uv run --frozen python -m barwise_optimizer.compile)," >&2
     echo "  or point CANDIDATE_DIR at an exported candidate." >&2
     exit 1
   fi

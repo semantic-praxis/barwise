@@ -143,7 +143,7 @@ def build_optimizer(config: RunConfig, metric):
                 "mipro needs optuna, which DSPy imports only at the "
                 "optimization step -- so without it a run dies after paying "
                 "for bootstrapping and instruction proposal. Install it with "
-                "`uv sync` (it is declared in pyproject.toml)."
+                "`uv sync --frozen --extra dev` (it is declared in pyproject.toml)."
             ) from missing
         return dspy.MIPROv2(
             metric=metric,
