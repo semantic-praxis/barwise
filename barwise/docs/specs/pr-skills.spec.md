@@ -72,16 +72,17 @@ what barwise has (spec workstreams, and commits within one PR).
 
 ## Inventory
 
-| Module                                  | Current state                                    | Verdict                                       |
-| --------------------------------------- | ------------------------------------------------ | --------------------------------------------- |
-| `.claude/skills/pr-creation/SKILL.md`   | Does not exist                                   | New: the author's side                        |
-| `.claude/skills/pr-review/SKILL.md`     | Does not exist                                   | New: the reader's side                        |
-| `.claude/skills/pr-review/checklist.md` | Does not exist                                   | New: single owner of the CI-blind invariants  |
-| `.github/pull_request_template.md`      | Fixes only the Session review section            | Unchanged; `pr-creation` orders what precedes |
-| `.claude/skills/session-review`         | Owns the last body section                       | Unchanged; pointed at                         |
-| `.claude/skills/steward`                | Owns post-open mechanics                         | Unchanged; pointed at                         |
-| `CLAUDE.md` (root)                      | Names `spec-writer`, `release`, `steward` skills | One pointer sentence added under Conventions  |
-| `.github/workflows/ci.yml`              | Owns the gate list                               | Unchanged; the checklist excludes it by name  |
+| Module                                  | Current state                                    | Verdict                                                |
+| --------------------------------------- | ------------------------------------------------ | ------------------------------------------------------ |
+| `.claude/skills/pr-creation/SKILL.md`   | Does not exist                                   | New: the author's side                                 |
+| `.claude/skills/pr-review/SKILL.md`     | Does not exist                                   | New: the reader's side                                 |
+| `.claude/skills/pr-review/checklist.md` | Does not exist                                   | New: single owner of the CI-blind invariants           |
+| `.claude/skills/*/evals/evals.json`     | Does not exist                                   | New: one skill-forge eval per skill, versioned with it |
+| `.github/pull_request_template.md`      | Fixes only the Session review section            | Unchanged; `pr-creation` orders what precedes          |
+| `.claude/skills/session-review`         | Owns the last body section                       | Unchanged; pointed at                                  |
+| `.claude/skills/steward`                | Owns post-open mechanics                         | Unchanged; pointed at                                  |
+| `CLAUDE.md` (root)                      | Names `spec-writer`, `release`, `steward` skills | One pointer sentence added under Conventions           |
+| `.github/workflows/ci.yml`              | Owns the gate list                               | Unchanged; the checklist excludes it by name           |
 
 The built-in `/code-review`, `security-review`, `duplication-audit`,
 `assertion-audit`, and `articulation` skills are composed, not
@@ -198,6 +199,13 @@ producing guides that miss files. Filed on barwise-922; not built.
 - The risk is the one the design names: the review skill is prose with
   no test. Mitigated by the external signal (author acceptance,
   recorded in the process ledger) rather than more self-review.
+- Each skill ships one `skill-forge` eval (`evals/evals.json`): a
+  real merged PR (#409) is the fixture, and the run compares the skill
+  against a no-skill baseline on assertions the north stars imply
+  (reading guide present, every number backed by a command in the
+  transcript, a non-empty "not checked", no approval). Iteration 1
+  results are in the PR that landed the skills; the workspace is not
+  committed.
 
 ## Non-goals
 

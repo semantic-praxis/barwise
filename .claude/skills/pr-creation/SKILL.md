@@ -1,6 +1,6 @@
 ---
 name: pr-creation
-description: Use when opening a pull request on barwise - from a branch that is ready to push through to a PR that is open, watched, and handed to the steward. Speaks for the author - transmits the model they hold of the change (why, which files carry the decision, what order to read, what was verified and how, where they are least sure) so the reviewer judges instead of reconstructs. The conventions themselves live in CLAUDE.md, the PR template, and the skills this file points at.
+description: Use when opening a pull request on barwise, writing or revising a PR title and body, or deciding whether a branch is ready to ship - from a branch that is ready to push through to a PR that is open, watched, and handed to the steward. Speaks for the author - transmits the model they hold of the change (why, which files carry the decision, what order to read, what was verified and how, where they are least sure) so the reviewer judges instead of reconstructs. The conventions themselves live in CLAUDE.md, the PR template, and the skills this file points at.
 ---
 
 # Opening a barwise PR
@@ -82,6 +82,12 @@ saying "read by commit".
 - **Do not manufacture structure.** A tight single-concern change
   stays one PR. A forced split is overhead in the costume of rigour.
 
+The rule for when to cut, so it is not left to mood: a spine of more
+than five files, or fallout that needs more than one pattern to
+describe, or a reading guide whose spine takes more than about ten
+minutes to read, is the signal to look for a seam. Below all three,
+do not cut.
+
 ## 3. The title states the outcome
 
 A title is a sentence about what is now true, not a label for the
@@ -145,6 +151,38 @@ checkable.
    process ledger) before writing a word. "Nothing this session" is
    legitimate, and false in any session where a human corrected you.
 9. **The attribution footer** the harness requires.
+
+The skeleton, so nothing above is left without a slot:
+
+```
+<what and why, one paragraph: spec + workstream, resolution, issue,
+ ask vs delivered>
+
+## Reading guide
+<ordering chosen and why>
+1. <spine file> -- <why it comes first>
+2. <spine file> -- <why next>
+Fallout: <pattern>: <what to verify instead of reading each file>.
+Ten minutes: stop after <n>. Risk peak: <file or section>.
+
+## Evidence, measured
+<command -> result, before/after where there is one>
+
+## Decisions
+<taken as recommended / still open / decided that was the reviewer's call>
+
+## Where I am least sure
+<the part and why, or "generated; no reason was formed">
+
+## Behaviour change
+<what a user, bundle, or CI sees differently, or "none">
+
+## What the spec did not anticipate
+<deviations, also recorded in the spec>
+
+## Session review
+<per the session-review skill>
+```
 
 Leave out the session narrative, a restatement of the diff, and praise
 for the change. The diff records what changed; the body records what

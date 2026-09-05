@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description: Use when reviewing a barwise pull request - your own diff before opening it, another session's PR, or one the user asks you to review. Speaks for the reader - locates the risk, settles what a machine can settle, verifies the body's claims, and hands the human a defensible recommendation with what was and was not checked. Recommends; never approves or merges. The barwise invariants CI cannot check live in checklist.md beside this file.
+description: Use when reviewing a barwise pull request, judging whether a PR or diff is mergeable, or asked what you think of a change - your own diff before opening it, another session's PR, or one the user asks you to review. Speaks for the reader - locates the risk, settles what a machine can settle, verifies the body's claims, and hands the human a defensible recommendation with what was and was not checked. Recommends; never approves or merges. The barwise invariants CI cannot check live in checklist.md beside this file.
 ---
 
 # Reviewing a barwise PR
@@ -29,11 +29,19 @@ applies when the diff touches subprocess, network, or file I/O;
 adds a test for a refusal or error; `articulation` in critique mode
 for the body and any doc. What `npm run ci:local` checks is never a
 finding here: CI will say it, and saying it twice costs a round trip.
+Where `/code-review` is not available (another harness, a Copilot
+session), run its angles yourself on the spine and say so under Not
+checked: read each hunk and its enclosing function, audit each deleted
+line, trace callers of each changed function, scan for the language's
+pitfalls.
 
 ## 1. Read in this order
 
 1. **The body**, as a set of claims: the reading guide, the evidence,
-   the decisions, the part the author is least sure of. With a reading
+   the decisions, the part the author is least sure of. (The guide
+   splits the diff into _spine_, the few files where the decision
+   lives, and _fallout_, the rest, described by pattern; `pr-creation`
+   section 4 defines both.) With a reading
    guide, the review's job is to verify it. Without one, build the
    spine/fallout split yourself, report it at the top of the review,
    and note that the author's side (`pr-creation`) did not run: that
@@ -128,7 +136,9 @@ finding.
   trigger is a realistic runtime state (a cold cache, a missing
   optional field, a boundary the code does not exclude); report it
   labelled as such, ranked below confirmed, and only when being wrong
-  is cheap for the reader -- otherwise it is a question on the thread.
+  is cheap for the reader -- cheap meaning they can dismiss it from
+  the cited line without running anything; otherwise it is a question
+  on the thread.
   REFUTED needs the quoted line, type, or guard that makes the
   candidate impossible; "seems unlikely" refutes nothing, and a wrong
   refutation is the same confident wrong answer as a wrong finding.
@@ -145,7 +155,7 @@ Five parts, in this order, and nothing else:
 
 ```
 Recommendation: merge / merge after <items> / do not merge -- <one sentence>.
-Read: <spine, in order, with the minutes it costs>. Risk peak: <file>.
+Read: <spine, in order, minutes it costs and the basis>. Risk peak: <file>.
 Cleared: <regions>, because <the test that clears each one>.
 Findings: <ranked, per section 4>.
 Not checked: <what, and why>.
@@ -164,8 +174,9 @@ Not checked is never empty by omission, and it names which passes ran
 - The user asked for the review in conversation: deliver it there,
   and post to GitHub only if asked.
 - Another PR: post as a review (a pending review, inline comments,
-  then submit as COMMENT or REQUEST_CHANGES) with the attribution
-  footer. Never APPROVE and never merge. The merge decision and its
+  then submit as COMMENT, or REQUEST_CHANGES when a finding blocks)
+  through the GitHub MCP tools or `gh`, with the attribution footer.
+  Never APPROVE and never merge. The merge decision and its
   accountability stay with a person; a model cannot be paged and
   cannot answer for what it shipped.
 

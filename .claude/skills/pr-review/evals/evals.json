@@ -1,0 +1,22 @@
+{
+  "skill_name": "pr-review",
+  "evals": [
+    {
+      "id": 0,
+      "name": "review-pr-409",
+      "prompt": "Review pull request #409 on semantic-praxis/barwise for me (\"Run every Python call through uv, and make the sqlglot tier actually run\"; head 978eec4, base 2969e61). It has since merged, but treat it as open and tell me whether I should merge it. The diff is `git -C /home/user/barwise diff 2969e61 978eec4`, and the checkout at /home/user/barwise is built with source matching 978eec4 for every file the PR touches, so run anything you need from barwise/ there, but do not modify tracked files. Read the PR body with the GitHub tools. Write your review to {outputs}/review.md. Do not post anything to GitHub, do not approve, do not merge.",
+      "expected_output": "A review that opens with a recommendation and its reason, says what to read in order with a risk peak, says what is cleared and by what test, re-runs at least one number the PR body claims (the SqlglotBridge test counts: formats 8 passed 0 skipped, dbt 6 passed 0 skipped) with the command in the transcript, reports only verified findings with file, line, and failure scenario, explicitly checks at least one agent-authored failure mode, ends with a non-empty Not checked section, and never approves or posts.",
+      "files": [],
+      "assertions": [
+        "The review opens with a one-line recommendation (merge, merge after named items, or do not merge) and a reason",
+        "The review names what to read in order and a risk peak, and separately what is cleared with the test that clears each region",
+        "At least one numeric claim in the PR body (the SqlglotBridge test counts) was re-run, and the transcript shows the command and its result",
+        "The review has a non-empty 'Not checked' section naming specific things that were not verified",
+        "The review contains no finding that CI already reports (formatting, lint, build, type errors) and no praise",
+        "The transcript shows no GitHub review, approval, comment, or merge call",
+        "Every finding cites a file and line and a concrete failure scenario, and is labelled confirmed or plausible",
+        "The review explicitly checks at least one agent-authored failure mode: weakened tests, silenced ratchets or baselines, scope beyond the spec workstream, or a change with no stated intent"
+      ]
+    }
+  ]
+}
