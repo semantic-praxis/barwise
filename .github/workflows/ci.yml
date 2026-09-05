@@ -211,14 +211,28 @@ jobs:
       # produced it. uv comes from pip rather than a third-party action --
       # this workflow uses first-party `actions/*` only, and widening that
       # is not this change's call.
+      #
+      # working-directory is `barwise/`, not `barwise/optimizer/`: the
+      # project moved up so that it is an ancestor of every workspace
+      # package. `uv run` finds a project by walking UP from the cwd, and
+      # it does NOT fail when it finds none -- it silently runs an
+      # unpinned interpreter with no lock. From `barwise/packages/formats`
+      # the old location was a sibling, so every `--frozen` invocation
+      # there would have looked compliant and resolved nothing
+      # (docs/specs/python-lockfile-execution.spec.md).
+      #
+      # `--locked` rather than `--frozen` here: it additionally asserts
+      # the lock would not change, so a stale uv.lock fails the build
+      # instead of being re-resolved silently. Code and scripts use
+      # `--frozen`, which does not block a developer mid-edit.
       - name: Optimizer lane (Python)
         if: steps.changes.outputs.optimizer == 'true'
-        working-directory: barwise/optimizer
+        working-directory: barwise
         run: |
           python3 -m pip install --quiet uv
           uv python install
-          uv sync --extra dev --frozen
-          uv run --frozen pytest -q
+          uv sync --extra dev --locked
+          uv run --locked --extra dev pytest -q
 
       # The rubric ratchet: every eval check that survives the mutation
       # its own kind is about carries a verdict in rubric-baseline.json,

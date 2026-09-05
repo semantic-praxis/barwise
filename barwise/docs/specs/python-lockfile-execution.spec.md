@@ -1,6 +1,7 @@
 # Every Python execution resolves from the lockfile, and the sqlglot tier stops vanishing
 
-Status: Draft -- no workstream implemented
+Status: Workstream 1 implemented (the project moved to `barwise/`);
+workstreams 2-4 pending
 Created: 2026-09-05
 Last-updated: 2026-09-05
 Tracking: barwise-921 (uv execution gate), barwise-916 (sqlglot absent in
@@ -297,3 +298,49 @@ time; if it does, the implementation is wrong.
   not provisioned a Python project. That is a packaging question, and
   pretending it is solved is what this spec exists to stop.
 - No retroactive change to models produced by an unpinned sqlglot.
+
+## Implementation notes
+
+**Workstream 1 landed.** `pyproject.toml` and `uv.lock` moved from
+`barwise/optimizer/` to `barwise/`; the two dependency-groups were added;
+`[tool.hatch.build.targets.wheel]` and `[tool.pytest.ini_options]` were
+repointed at `optimizer/`; CI's `working-directory` became `barwise` and
+its uv calls became `--locked`; `compile-runner.sh` gained `--frozen` on
+all three of its uv invocations; and both CLAUDE.md files were amended.
+
+The move is verified by the property it exists for, red before and green
+after, from the directory the bridges actually run in:
+
+```
+before:  cd barwise/packages/formats
+         uv run --frozen python -c "import sqlglot"
+         -> ModuleNotFoundError                      (exit 0 from uv)
+
+after:   cd barwise/packages/formats
+         uv run --frozen --only-group sqlglot python -c "import sqlglot"
+         -> sqlglot 27.28.0
+            exe /home/user/barwise/barwise/.venv/bin/python3
+```
+
+The optimizer's 99 tests pass from the new root
+(`uv run --frozen --extra dev pytest -q`, 76.9s), which is what proves
+the relocated hatch build target and `testpaths` are right rather than
+merely plausible.
+
+Two things went better than the brief predicted, both worth recording so
+workstream 2 is not scoped from a stale assumption:
+
+- **`compile-runner.sh` needed no restructuring.** The brief assumed its
+  `cd optimizer && uv run ...` calls would have to change, because they
+  name a directory that is no longer the project root. They do not:
+  `barwise/` is now an ancestor of `optimizer/` as well, so discovery
+  from inside `optimizer/` walks up and finds it. Only `--frozen` was
+  added. The same reasoning is why no call site needs a `--project`
+  flag anywhere.
+
+- **The empty `scripts` group is faster than what it replaces**, not a
+  tax paid for consistency: ~35ms warm against ~79ms for a bare
+  `python3`, because naming a group with no packages skips the work of
+  resolving any. `check-beads.sh` runs on every commit, so this was the
+  cost most likely to make the rule unpopular, and it turns out to be a
+  saving.

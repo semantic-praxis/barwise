@@ -1,0 +1,49 @@
+[project]
+name = "barwise-optimizer"
+version = "0.1.0"
+description = "DSPy optimization lane for the barwise extraction prompt (offline, dev-time only)"
+requires-python = ">=3.13"
+dependencies = [
+    "dspy==3.3.1",
+    # MIPROv2 imports optuna lazily, at the optimization step -- after the
+    # bootstrap and instruction-proposal calls have already been paid for.
+    # Declared here so a compile cannot die a dozen paid calls in.
+    "optuna>=3.6",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+# Dependency-groups, not extras, because an extra is ADDITIVE to the base
+# dependencies: `--extra sqlglot` would drag dspy and optuna into the
+# JavaScript test lane, while `--only-group sqlglot` installs one package.
+# Both groups live in uv.lock, which is what makes `uv run --frozen` a
+# pinned run rather than a fresh resolution (docs/specs/python-lockfile-execution.spec.md).
+[dependency-groups]
+# The SQL parsing tier behind @barwise/formats and @barwise/dbt. The two
+# SqlglotBridge copies name this group and never a version, so the pin
+# lives here alone.
+sqlglot = ["sqlglot==27.28.0"]
+# Empty on purpose: repo scripts that need only the standard library
+# still need a PINNED interpreter, and naming a group with no packages
+# buys that without installing dspy to validate a JSONL file. Measured at
+# ~35ms warm, against ~79ms for the bare `python3` it replaces.
+scripts = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Paths are relative to this file, which now sits at `barwise/` rather
+# than `barwise/optimizer/`. It moved so that it is an ANCESTOR of every
+# workspace package: `uv run` discovers a project by walking up from the
+# cwd, and from `barwise/packages/formats` the old location was a sibling
+# and so invisible. `uv run --frozen` does not fail when it discovers
+# nothing -- it silently runs an unpinned interpreter -- so the move is
+# what makes the flag mean anything from a package directory.
+[tool.hatch.build.targets.wheel]
+packages = ["optimizer/barwise_optimizer"]
+
+[tool.pytest.ini_options]
+testpaths = ["optimizer/tests"]
