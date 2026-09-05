@@ -187,9 +187,34 @@ point of the registered pair.
 `check-beads.sh` runs in the pre-commit hook, so its cost is measured,
 not assumed: `--only-group scripts` is **~35ms** warm against ~79ms for
 a bare `python3`, because the empty group installs nothing. The
-`sqlglot` group is ~110ms. The two groups coexist without thrashing --
-uv does not prune extraneous packages absent `--exact`, verified by
-alternating them.
+`sqlglot` group is ~110ms. The two groups coexist without thrashing
+across `uv run` invocations, verified by alternating them.
+
+**`uv sync` and `uv run` differ here, and the difference is
+load-bearing.** `uv sync` is exact by default -- it removes packages not
+declared for the selection it was given, and `--inexact` opts out --
+whereas `uv run` is inexact by default, with `--exact` as the opt-in.
+So `uv sync --extra dev` **prunes** the sqlglot group (observed:
+`Uninstalled 1 package - sqlglot==27.28.0`) while alternating
+`uv run --only-group` calls leave each other alone. An earlier revision
+of this spec asserted the reverse -- "uv does not prune extraneous
+packages absent `--exact`" -- which is true of `uv run` and false of
+`uv sync`; the observations were right and the reason attached to them
+was not.
+
+The same asymmetry explains why this spec's central defect was
+invisible for as long as it was:
+
+```
+cd <a directory with no project>
+uv sync --frozen  -> error: No `pyproject.toml` found in current
+                     directory or any parent directory
+uv run  --frozen  -> ran anyway
+```
+
+**`uv sync` fails closed; `uv run` fails open.** Every diagnostic
+instinct that reaches for `sync` gets told the truth, and the one
+command the bridges actually use does not.
 
 **This workstream also wires CI's JS lane**, and without that half it
 delivers nothing: converting the bridges makes them ask uv for sqlglot,
