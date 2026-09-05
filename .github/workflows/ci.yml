@@ -179,6 +179,11 @@ jobs:
       # missing one restores the papercut for exactly the newest script.
       # Generated from barwise/package.json, so this fails on drift in
       # either direction rather than trusting anyone to remember.
+      # Every Python execution resolves from the lockfile. The rule is only
+      # worth what checks it: .python-version shipped while six bare python3
+      # calls stood in tracked source, and nothing noticed.
+      - run: npm run check:python-uv
+
       - run: npm run check:root-scripts
         if: steps.changes.outputs.docs_only != 'true'
 

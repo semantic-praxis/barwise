@@ -20,6 +20,7 @@
     "check:parity": "npm --prefix barwise run check:parity --",
     "check:no-nul": "npm --prefix barwise run check:no-nul --",
     "check:shell": "npm --prefix barwise run check:shell --",
+    "check:python-uv": "npm --prefix barwise run check:python-uv --",
     "check:root-scripts": "npm --prefix barwise run check:root-scripts --",
     "test:scripts": "npm --prefix barwise run test:scripts --",
     "audit:duplication": "npm --prefix barwise run audit:duplication --",

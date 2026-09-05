@@ -299,3 +299,99 @@ test("every registered field member still resolves", () => {
   assert.ok(fields.length > 0, "no field members registered; this test would pass vacuously");
   for (const m of fields) fieldValue(m.file, m.field);
 });
+
+// --- barwise-921: every Python execution resolves from the lockfile ---
+//
+// The gate's ALLOWLIST names `.github/workflows/ci.yml` and is ratcheted,
+// so a fixture repo WITHOUT that bootstrap line fails as stale -- which is
+// itself one of the cases below. Every other fixture stages the line, so
+// the only variable under test is the planted violation.
+const UV_BOOTSTRAP = "          python3 -m pip install --quiet uv==0.12.7\n";
+
+function pythonUvRepo(files = {}) {
+  const dir = tempRepo();
+  stage(dir, ".github/workflows/ci.yml", `jobs:\n  ci:\n    steps:\n${UV_BOOTSTRAP}`);
+  for (const [name, contents] of Object.entries(files)) stage(dir, name, contents);
+  return dir;
+}
+
+test("check-python-uv passes a repo whose only Python call is the allowlisted bootstrap", () => {
+  const r = gate("check-python-uv.mjs", pythonUvRepo());
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /no bare interpreters/);
+});
+
+// One planted defect per banned form. A gate verified only in aggregate can
+// be blind to a whole rule and still look green.
+const VIOLATIONS = [
+  ["bare python3 in a script", { "s.sh": "#!/bin/sh\npython3 -c 'print(1)'\n" }, /bare `python3`/],
+  ["bare pip in a script", { "s.sh": "#!/bin/sh\npip install requests\n" }, /bare `pip`/],
+  [
+    "bare interpreter behind an env assignment",
+    { "s.sh": "#!/bin/sh\nFOO=1 python -c 'print(1)'\n" },
+    /bare `python`/,
+  ],
+  [
+    "child_process interpreter in TypeScript",
+    { "a.ts": 'execFileSync("python3", ["-c", "import sys"]);\n' },
+    /bare `python3` subprocess/,
+  ],
+  [
+    "uv run --with, the lock bypass",
+    { "s.sh": "#!/bin/sh\nuv run --frozen --with sqlglot==27.20.0 python -c ''\n" },
+    /--with.*lock bypass/,
+  ],
+  [
+    "uv run --isolated",
+    { "s.sh": "#!/bin/sh\nuv run --frozen --isolated python -c ''\n" },
+    /--isolated/,
+  ],
+  ["uv pip", { "s.sh": "#!/bin/sh\nuv pip install requests\n" }, /`uv pip`/],
+  [
+    "uv run with neither --frozen nor --locked",
+    { "s.sh": "#!/bin/sh\nuv run python -c ''\n" },
+    /neither --frozen nor --locked/,
+  ],
+  [
+    "PEP 723 inline script metadata",
+    { "t.py": '# /// script\n# dependencies = ["sqlglot"]\n# ///\n' },
+    /PEP 723/,
+  ],
+];
+
+for (const [name, files, expected] of VIOLATIONS) {
+  test(`check-python-uv fails on ${name}`, () => {
+    const r = gate("check-python-uv.mjs", pythonUvRepo(files));
+    assert.equal(r.status, 1, `expected failure, got:\n${r.stdout}`);
+    assert.match(r.stderr, expected);
+  });
+}
+
+test("check-python-uv fails on a STALE allowlist entry, so a fixed site forces its row out", () => {
+  // No ci.yml at all: the bootstrap the allowlist exempts no longer exists.
+  const dir = tempRepo();
+  stage(dir, "README.md", "nothing to see\n");
+  const r = gate("check-python-uv.mjs", dir);
+  assert.equal(r.status, 1, `expected failure, got:\n${r.stdout}`);
+  assert.match(r.stderr, /STALE allowlist entry/);
+});
+
+test("check-python-uv does not flag a mention inside a quoted string", () => {
+  // `echo "== uv sync"` is a heading, not an invocation. Flagging it is how
+  // a gate cries wolf on the repo's own error messages and gets disabled.
+  const r = gate(
+    "check-python-uv.mjs",
+    pythonUvRepo({ "s.sh": '#!/bin/sh\necho "== uv sync"\nuv sync --frozen\n' }),
+  );
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test("check-python-uv does not flag `python` as a language label", () => {
+  // packages/code-analysis maps ".py" -> "python". A quoted name alone is
+  // not an invocation; the child_process call around it is what matters.
+  const r = gate(
+    "check-python-uv.mjs",
+    pythonUvRepo({ "a.ts": 'const LANG = { ".py": "python" } as const;\n' }),
+  );
+  assert.equal(r.status, 0, r.stderr);
+});

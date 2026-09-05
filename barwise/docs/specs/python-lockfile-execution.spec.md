@@ -1,7 +1,8 @@
 # Every Python execution resolves from the lockfile, and the sqlglot tier stops vanishing
 
-Status: Workstreams 1 and 2 implemented (project moved; all six call sites
-converted and the sqlglot tier now runs in CI); workstreams 3-4 pending
+Status: Workstreams 1-3 implemented (project moved; all six call sites
+converted and the sqlglot tier runs in CI; check:python-uv gating the
+rule); workstream 4 pending
 Created: 2026-09-05
 Last-updated: 2026-09-05
 Tracking: barwise-921 (uv execution gate), barwise-916 (sqlglot absent in
@@ -417,3 +418,28 @@ Four things the brief did not anticipate:
   three behaviours the design rests on were verified identical on both
   versions first, so the pin is for reproducibility, not a known
   incompatibility.
+
+**Workstream 3 landed.** `check:python-uv` is gate 9 of 26, wired into
+`ci.yml` (from which `ci-local.mjs` derives its list, so it appeared in
+both at once). Nine planted violations, one per banned form, plus a
+stale-allowlist case and two false-positive guards.
+
+The per-form requirement earned its keep immediately: **the PEP 723 rule
+was dead on arrival**, because `isComment()` skips `#` lines for `.py`
+and a PEP 723 block _is_ a `#` block, so the check was unreachable. An
+aggregate "gate goes red on a bad repo" test would have passed while one
+of five rules did nothing.
+
+The gate also found two live defects on its first run, neither of them
+an invocation: `eval-runner.sh` told operators to
+`cd optimizer && python -m barwise_optimizer.compile`, and `compile.py`
+told them to `uv sync`. Both were instructions to run Python the banned
+way, in a repo whose rule says otherwise. Both now name the command
+`compile-runner.sh` actually uses.
+
+One deliberate limit, stated rather than discovered later: the gate
+blanks quoted strings before looking for a command, so
+`echo "== uv sync"` is prose rather than an invocation. The trade is that
+a genuine `bash -c "python3 ..."` would be missed. None exists here, and
+the alternative -- flagging every mention, including the gate's own error
+text -- is how a gate gets switched off.
