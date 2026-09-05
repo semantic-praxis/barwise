@@ -1,6 +1,6 @@
 ---
 name: pr-creation
-description: Use when opening a pull request on barwise, writing or revising a PR title and body, or deciding whether a branch is ready to ship - from a branch that is ready to push through to a PR that is open, watched, and handed to the steward. Speaks for the author - transmits the model they hold of the change (why, which files carry the decision, what order to read, what was verified and how, where they are least sure) so the reviewer judges instead of reconstructs. The conventions themselves live in CLAUDE.md, the PR template, and the skills this file points at.
+description: Use when opening a pull request on barwise, writing or revising a PR title and body, or deciding whether a branch is ready to ship or should be split into smaller reviewable PRs - from a branch that is ready to push through to a PR that is open, watched, and handed to the steward. Speaks for the author - transmits the model they hold of the change (why, which files carry the decision, what order to read, what was verified and how, where they are least sure) so the reviewer judges instead of reconstructs. The conventions themselves live in CLAUDE.md, the PR template, and the skills this file points at.
 ---
 
 # Opening a barwise PR
