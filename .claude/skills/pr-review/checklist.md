@@ -26,8 +26,11 @@ output specification for the PR body (spec:
 - The Session review section is present; each entry names its
   landing or says it landed nowhere and why; a repeat names the ledger
   issue. Authority: `session-review` skill.
-- No emoji; no model identifier in any commit or PR text. Authority:
-  root `CLAUDE.md` conventions; the harness rule on model identity.
+- No emoji in prose, and no model identifier in commit or PR prose.
+  The harness-mandated footer and `Co-Authored-By` trailer are the
+  exceptions: the repo tolerates the first, and the second is where a
+  model name belongs. Authority: root `CLAUDE.md` conventions; the
+  harness rule on model identity.
 - The branch is on current `main` and carries no merge markers.
 
 ## When a surface changed (CLI, MCP, VS Code)

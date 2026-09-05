@@ -53,7 +53,10 @@ least once:
   promised.
 - **The commits are the record.** Subjects prefixed as the log does
   (`feat:`, `fix:`, `docs:`, `chore:`), one concern per commit, no
-  merge markers, no model identifiers in any commit or PR text.
+  merge markers, and no model identifier in commit or PR prose; the
+  harness-mandated `Co-Authored-By` trailer is the one place a model
+  name belongs, and an eval run flagged it as a violation before this
+  sentence said so.
 
 ## 2. Cut the diff for reading, not only for correctness
 
