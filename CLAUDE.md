@@ -318,6 +318,32 @@ skill (`.claude/skills/release/`).
   by JavaScript or Node core (e.g. use `node:crypto.randomUUID()` not
   `uuid`). High-quality libraries that solve real problems (yaml, ajv)
   are fine.
+- **Every Python execution resolves from the project lockfile.** The
+  form is `uv run --frozen [--only-group <g>] ...`, and `--locked` in
+  CI so a stale lock fails the build instead of being re-resolved
+  silently. Never a bare `python3`, `python` or `pip`. Never `--with`,
+  `--with-requirements`, `--isolated`, or `uv pip`. An optional tier
+  (sqlglot) is a dependency-group in the single `pyproject.toml`, so it
+  lives in the lock and `--only-group` installs it alone.
+
+  Pinning the interpreter is not enough, and neither is `uv run` by
+  itself. Against a lock pinning `sqlglot==27.28.0`, `uv run --with
+  sqlglot==27.20.0` runs 27.20.0 -- and so do the `--frozen` and
+  `--locked` spellings of it, while `uv lock --check` still reports
+  clean. An older library, silently, undetected: `--with` is a lock
+  bypass the assertion flags do not close, which is why it is banned
+  outright rather than paired with something. The interpreter half of
+  this is the `.python-version` pin above; this is the dependency half,
+  and the failure is the same one (numpy 2.4.6 against 2.5.2 from one
+  commit) one layer down.
+
+  A one-off is still a run of this project: put the script in the repo
+  and run it `--frozen`. Not `--with`, and not PEP 723 inline script
+  metadata, which pins versions in the script where the lock does not
+  govern them. Every required and banned form above is literal text in
+  a command, which is what makes this checkable where "activate the
+  venv first" is not (barwise-921). The one standing exception is
+  bootstrapping uv itself.
 - A copy that must agree with other code is never guarded by a
   comment: share it, derive it from the authority, register the pair
   in `barwise/parity.manifest.json` (checked by `npm run
@@ -349,12 +375,26 @@ skill (`.claude/skills/release/`).
 
 ## Beads Issue Tracker
 
-Task tracking goes through **bd (beads)** rather than TodoWrite,
-TaskCreate, or markdown TODO lists, so state survives across sessions
-and machines. Run `bd prime` for the full workflow context; the core
-loop is `bd ready` (find work), `bd show <id>`, `bd update <id>
---claim`, `bd close <id>`. Use `bd remember` for persistent knowledge
-rather than MEMORY.md files.
+Task tracking goes through **beads** rather than TodoWrite, TaskCreate,
+or markdown TODO lists, so state survives across sessions and machines.
+
+**The interface is `node barwise/scripts/beads-crud.mjs`, run from the
+repo root -- the `bd` binary does not need to be installed.** The
+scripts read and write `.beads/issues.jsonl` directly, so a container
+without `bd` on PATH is fully equipped, not degraded; do not report a
+missing `bd` as a blocker or install one to work around it. Subcommands
+are `create`, `show`, `list`, `update`, `close`, `delete`
+(`docs/specs/beads-issue-crud-scripts.spec.md`); `create` takes
+`--title`, `--type`, `--priority`, `--status`, `--description`,
+`--design`, `--acceptance-criteria`, `--notes`, `--labels`,
+`--depends-on`, `--parent`, and the rest. `scripts/check-beads.sh`
+validates the JSONL.
+
+The core loop is unchanged in shape: `list` to find work, `show <id>`
+to read it, `update <id>` to claim it, `close <id>` when it is done.
+There is no `remember` subcommand -- persistent project knowledge goes
+in this file, as a convention with the reason attached, not a
+MEMORY.md.
 
 ## Session Completion
 
