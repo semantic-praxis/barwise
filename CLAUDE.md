@@ -326,6 +326,17 @@ skill (`.claude/skills/release/`).
   (sqlglot) is a dependency-group in the single `pyproject.toml`, so it
   lives in the lock and `--only-group` installs it alone.
 
+  **The flag only means anything when a project is discovered.**
+  `uv run --frozen` does not fail where there is no `pyproject.toml` to
+  find -- it silently runs a uv-managed interpreter with no lock and no
+  dependencies, and exits 0. That is why the project sits at `barwise/`
+  rather than in `barwise/optimizer/`: `uv run` discovers a project by
+  walking UP from the cwd, so from `barwise/packages/formats` the old
+  location was a sibling and invisible, and every `--frozen` call there
+  would have read as compliant while resolving nothing. Keep
+  `pyproject.toml` an ancestor of anything that runs Python, and never
+  take a green `uv run --frozen` as evidence the lock was used.
+
   Pinning the interpreter is not enough, and neither is `uv run` by
   itself. Against a lock pinning `sqlglot==27.28.0`, `uv run --with
   sqlglot==27.20.0` runs 27.20.0 -- and so do the `--frozen` and

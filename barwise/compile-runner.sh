@@ -70,14 +70,14 @@ echo "== build (the seam runs dist, not src)"
 npm run build >/dev/null
 
 echo "== uv sync"
-(cd optimizer && uv sync --extra dev >/dev/null)
+(cd optimizer && uv sync --frozen --extra dev >/dev/null)
 
 # barwise-900: nothing else catches a red optimizer test -- the lane sits
 # outside CI and its whole guard is "executed by hand". The minute before
 # spending money is when hand-running actually pays: the loader round trip
 # is what proves an exported candidate will resolve at all.
 echo "== pytest (the only guard this lane has)"
-(cd optimizer && uv run pytest -q)
+(cd optimizer && uv run --frozen --extra dev pytest -q)
 
 # mipro and gepa both need a second model to propose instructions, and
 # compile.py refuses at config time -- but refusing here costs nothing
@@ -114,7 +114,7 @@ mkdir -p "${OUT}"
 echo "== compile: ${OPTIMIZER} -> ${TARGET}, ceiling ${MAX_CALLS} calls"
 echo "   progress and report.json both land in ${OUT}"
 (
-  cd optimizer && uv run python -m barwise_optimizer.compile \
+  cd optimizer && uv run --frozen python -m barwise_optimizer.compile \
     --target-model "${TARGET}" \
     --optimizer "${OPTIMIZER}" \
     --max-calls "${MAX_CALLS}" \

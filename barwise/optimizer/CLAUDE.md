@@ -33,8 +33,10 @@ non-determinism out of `core`, applied one layer further out.
 ## Layout
 
 ```
-pyproject.toml            uv-managed; dspy pinned exactly
-uv.lock                   committed -- a run costs money, so pin what produced it
+../pyproject.toml         the project root is `barwise/`, NOT here -- it must be an
+                          ancestor of every package or `uv run --frozen`
+                          silently resolves nothing (see the repo CLAUDE.md)
+../uv.lock                committed -- a run costs money, so pin what produced it
 barwise_optimizer/
   barwise_cli.py          THE seam: `prompt schema` / `prompt artifact` / `prompt score`
   dataset.py              evals/ -> dspy.Example, honouring the manifest splits
@@ -48,12 +50,12 @@ tests/                    all offline: no API key, no network
 ## Commands
 
 ```sh
-uv sync --extra dev        # install
-uv run pytest -q           # the whole suite, offline, ~75s
+uv sync --frozen --extra dev   # install; --frozen honours the committed lock
+uv run --frozen --extra dev pytest -q   # the whole suite, offline, ~75s
 
 # A real compilation. Costs money. Requires a key in the environment --
 # never pass one as an argument.
-uv run python -m barwise_optimizer.compile \
+uv run --frozen python -m barwise_optimizer.compile \
   --target-model anthropic/claude-haiku-4-5 \
   --optimizer bootstrap --max-calls 200 --samples-per-candidate 5
 ```
