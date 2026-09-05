@@ -315,8 +315,19 @@ function pythonUvRepo(files = {}) {
   return dir;
 }
 
+/** Run the gate over a fixture repo and drop the repo, as every other
+ *  temp-repo test here does. Twelve fixtures per run is twelve leaks. */
+function pythonUv(files) {
+  const dir = pythonUvRepo(files);
+  try {
+    return gate("check-python-uv.mjs", dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 test("check-python-uv passes a repo whose only Python call is the allowlisted bootstrap", () => {
-  const r = gate("check-python-uv.mjs", pythonUvRepo());
+  const r = pythonUv();
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /no bare interpreters/);
 });
@@ -357,11 +368,28 @@ const VIOLATIONS = [
     { "t.py": '# /// script\n# dependencies = ["sqlglot"]\n# ///\n' },
     /PEP 723/,
   ],
+  [
+    "bare interpreter in a workflow's single-line `- run:` form",
+    { "w.yml": "jobs:\n  a:\n    steps:\n      - run: python3 -m tool\n" },
+    /bare `python3`/,
+  ],
+  [
+    "a Python file spawning a bare interpreter",
+    { "t.py": 'import subprocess\n\nsubprocess.run(["python3", "-c", "print(1)"])\n' },
+    /bare `python3` subprocess/,
+  ],
+  [
+    "uv run --no-project",
+    { "s.sh": "#!/bin/sh\nuv run --frozen --no-project python -c ''\n" },
+    /--no-project/,
+  ],
+  ["uvx, which resolves from the index", { "s.sh": "#!/bin/sh\nuvx sqlglot --version\n" }, /uvx/],
+  ["uv tool run", { "s.sh": "#!/bin/sh\nuv tool run sqlglot\n" }, /uv tool run/],
 ];
 
 for (const [name, files, expected] of VIOLATIONS) {
   test(`check-python-uv fails on ${name}`, () => {
-    const r = gate("check-python-uv.mjs", pythonUvRepo(files));
+    const r = pythonUv(files);
     assert.equal(r.status, 1, `expected failure, got:\n${r.stdout}`);
     assert.match(r.stderr, expected);
   });
@@ -379,19 +407,54 @@ test("check-python-uv fails on a STALE allowlist entry, so a fixed site forces i
 test("check-python-uv does not flag a mention inside a quoted string", () => {
   // `echo "== uv sync"` is a heading, not an invocation. Flagging it is how
   // a gate cries wolf on the repo's own error messages and gets disabled.
-  const r = gate(
-    "check-python-uv.mjs",
-    pythonUvRepo({ "s.sh": '#!/bin/sh\necho "== uv sync"\nuv sync --frozen\n' }),
-  );
+  const r = pythonUv({ "s.sh": '#!/bin/sh\necho "== uv sync"\nuv sync --frozen\n' });
   assert.equal(r.status, 0, r.stderr);
 });
 
 test("check-python-uv does not flag `python` as a language label", () => {
   // packages/code-analysis maps ".py" -> "python". A quoted name alone is
   // not an invocation; the child_process call around it is what matters.
-  const r = gate(
-    "check-python-uv.mjs",
-    pythonUvRepo({ "a.ts": 'const LANG = { ".py": "python" } as const;\n' }),
-  );
+  const r = pythonUv({ "a.ts": 'const LANG = { ".py": "python" } as const;\n' });
+  assert.equal(r.status, 0, r.stderr);
+});
+
+// The six call sites this rule was written for spell uv as
+// `execFileSync("uv", [...UV_PYTHON, "-c", src])`, with the flags in a
+// spread const several lines up. A line matcher cannot see that at all --
+// deleting "--frozen" from both SqlglotBridge copies passed check:parity
+// AND this gate before these cases existed.
+const ARGS_ARRAY = [
+  [
+    "uv args array carrying neither --frozen nor --locked",
+    'const UV = ["run", "--only-group", "sqlglot", "python"] as const;\n'
+    + 'execFileSync("uv", [...UV, "-c", src]);\n',
+    /neither --frozen nor --locked/,
+  ],
+  [
+    "uv args array carrying --with, the lock bypass",
+    'const UV = ["run", "--frozen", "--with", "sqlglot==1.0", "python"] as const;\n'
+    + 'execFileSync("uv", [...UV, "-c", src]);\n',
+    /--with.*lock bypass/,
+  ],
+  [
+    "uv pip through an args array",
+    'execFileSync("uv", ["pip", "install", "sqlglot"]);\n',
+    /`uv pip`/,
+  ],
+];
+
+for (const [name, source, expected] of ARGS_ARRAY) {
+  test(`check-python-uv fails on ${name}`, () => {
+    const r = pythonUv({ "a.ts": source });
+    assert.equal(r.status, 1, `expected failure, got:\n${r.stdout}`);
+    assert.match(r.stderr, expected);
+  });
+}
+
+test("check-python-uv passes a compliant uv args array", () => {
+  const r = pythonUv({
+    "a.ts": 'const UV = ["run", "--frozen", "--only-group", "sqlglot", "python"] as const;\n'
+      + 'execFileSync("uv", [...UV, "-c", src]);\n',
+  });
   assert.equal(r.status, 0, r.stderr);
 });

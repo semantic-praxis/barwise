@@ -419,7 +419,7 @@ Four things the brief did not anticipate:
   versions first, so the pin is for reproducibility, not a known
   incompatibility.
 
-**Workstream 3 landed.** `check:python-uv` is gate 9 of 26, wired into
+**Workstream 3 landed.** `check:python-uv` is gate 10 of 26, wired into
 `ci.yml` (from which `ci-local.mjs` derives its list, so it appeared in
 both at once). Nine planted violations, one per banned form, plus a
 stale-allowlist case and two false-positive guards.
@@ -430,16 +430,43 @@ and a PEP 723 block _is_ a `#` block, so the check was unreachable. An
 aggregate "gate goes red on a bad repo" test would have passed while one
 of five rules did nothing.
 
-The gate also found two live defects on its first run, neither of them
-an invocation: `eval-runner.sh` told operators to
+An early, cruder matcher found two live defects, neither of them an
+invocation: `eval-runner.sh` told operators to
 `cd optimizer && python -m barwise_optimizer.compile`, and `compile.py`
 told them to `uv sync`. Both were instructions to run Python the banned
-way, in a repo whose rule says otherwise. Both now name the command
+way, in a repo whose rule says otherwise, and both now name the command
 `compile-runner.sh` actually uses.
 
-One deliberate limit, stated rather than discovered later: the gate
-blanks quoted strings before looking for a command, so
-`echo "== uv sync"` is prose rather than an invocation. The trade is that
-a genuine `bash -c "python3 ..."` would be missed. None exists here, and
-the alternative -- flagging every mention, including the gate's own error
-text -- is how a gate gets switched off.
+**The shipped gate can no longer find either.** Both strings are quoted,
+and the matcher gained `blankQuoted` in between -- so this pair is an
+argument for reading a repo's own instructions, not evidence of what the
+gate catches. Saying otherwise would leave a reader believing a check
+covers guidance when it covers commands. Prose files (`.md`, `Makefile`,
+`package.json`) are outside the scan for the same reason, and the gate's
+docblock now says so rather than leaving it to be inferred.
+
+That limit is the price of not crying wolf: `echo "== uv sync"` is prose,
+and a gate that flags its own error text is a gate someone switches off.
+A genuine `bash -c "python3 ..."` is missed by the same rule.
+
+**Review of this workstream found three holes and closed them
+(PR #410).** All three were rules that could not reach the code they
+were written for, which is the same failure as the dead-on-arrival PEP
+723 rule, found the same way -- by asking what the tests did not plant:
+
+1. **The args-array form was invisible.** All six converted call sites
+   spell uv as `execFileSync("uv", [...UV_PYTHON, "-c", src])`, with the
+   flags in a spread const several lines up, so no single line carries
+   the invocation. Deleting `"--frozen"` from both `SqlglotBridge`
+   copies passed `check:parity` (they stayed identical) and passed this
+   gate. Now checked over the file.
+2. **The single-line `- run:` step was invisible.** `COMMAND_POS`
+   anchors on a shell separator, and a YAML list item is not one -- so
+   `- run: python3 -m tool` passed while the block form failed. That is
+   the form nearly every step in this repo's `ci.yml` uses.
+3. **`.py` files were scanned only for PEP 723.** A Python file
+   spawning `python3` through `subprocess` or `os.system` passed.
+
+`uvx`, `uv tool run` and `--no-project` were banned at the same time:
+each resolves outside `uv.lock`, and the first two are the obvious route
+round `uv pip` once `uv pip` is closed.
