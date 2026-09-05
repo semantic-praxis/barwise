@@ -2,7 +2,7 @@
  * The dbt connector's sqlglot sidecar: high-fidelity structural SQL
  * parsing for mined dbt model SQL (sql-dialect-capability spec, WS1).
  *
- * Runs a short-lived `python3` subprocess with an embedded program
+ * Runs a short-lived `uv run` subprocess with an embedded program
  * that parses SQL through sqlglot's multi-dialect AST and emits the
  * same pattern shapes the regex tier produces, tagged
  * `parseLevel: "sqlglot"`. The sidecar is optional: availability is
@@ -154,13 +154,36 @@ for t in texts:
 print(json.dumps(out))
 `;
 
+/**
+ * The interpreter invocation, as argv. Never a bare `python3`: that runs
+ * whatever the machine happens to carry, and this bridge has no version
+ * check, so an ambient sqlglot would silently shape `parseLevel:
+ * "sqlglot"` output (docs/specs/python-lockfile-execution.spec.md).
+ *
+ * Naming the group is load-bearing beyond installing less. It asserts
+ * that the discovered project is OURS: inside an unrelated Python
+ * project uv exits with "Group `sqlglot` is not defined in the
+ * project's `dependency-groups` table", so the bridge reports
+ * unavailable rather than borrowing a stranger's sqlglot. With no
+ * project at all, uv runs an interpreter that has no sqlglot and the
+ * import fails. All three paths end at the regex cascade, which is the
+ * degradation this sidecar always promised.
+ */
+const UV_PYTHON = [
+  "run",
+  "--frozen",
+  "--only-group",
+  "sqlglot",
+  "python",
+] as const;
+
 let availability: boolean | undefined;
 
-/** Probe once per process whether python3 + sqlglot are present. */
+/** Probe once per process whether uv can resolve our sqlglot group. */
 export function sqlglotAvailable(): boolean {
   if (availability !== undefined) return availability;
   try {
-    execFileSync("python3", ["-c", "import sqlglot"], {
+    execFileSync("uv", [...UV_PYTHON, "-c", "import sqlglot"], {
       stdio: "ignore",
       timeout: 10_000,
     });
@@ -199,8 +222,8 @@ export function parseSqlWithSqlglot(
   let stdout: string;
   try {
     stdout = execFileSync(
-      "python3",
-      ["-c", SIDECAR_PROGRAM, DIALECT_MAP[dialect]],
+      "uv",
+      [...UV_PYTHON, "-c", SIDECAR_PROGRAM, DIALECT_MAP[dialect]],
       { input: sql, encoding: "utf-8", timeout: 30_000 },
     );
   } catch {
@@ -256,8 +279,8 @@ export function normalizeSqlTexts(
   let stdout: string;
   try {
     stdout = execFileSync(
-      "python3",
-      ["-c", NORMALIZE_PROGRAM, DIALECT_MAP[dialect]],
+      "uv",
+      [...UV_PYTHON, "-c", NORMALIZE_PROGRAM, DIALECT_MAP[dialect]],
       { input: JSON.stringify(texts), encoding: "utf-8", timeout: 30_000 },
     );
   } catch {

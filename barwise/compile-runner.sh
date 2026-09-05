@@ -155,7 +155,7 @@ if [[ ! -s "${OUT}/report.json" ]]; then
   echo "delta-*.md, which carries the same three arms as prose." >&2
   exit 1
 fi
-python3 - "${OUT}/report.json" <<'PYEOF'
+uv run --frozen --only-group scripts python - "${OUT}/report.json" <<'PYEOF'
 import json, sys
 try:
     v = json.load(open(sys.argv[1])).get("verdict")

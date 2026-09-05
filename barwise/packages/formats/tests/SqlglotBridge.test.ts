@@ -14,6 +14,25 @@ import {
 
 const available = sqlglotAvailable();
 
+// A suite that silently shrinks is indistinguishable from one that passes,
+// which is precisely barwise-916: these tests skipped in every CI run for
+// as long as they existed, because nothing installed sqlglot. In CI the
+// tier is a hard requirement and its absence is a collection failure, loud
+// and unmissable. Locally it stays a skip with a printed reason, so a fresh
+// checkout without uv can still run everything else.
+if (!available && process.env.CI) {
+  throw new Error(
+    "sqlglot tier unavailable in CI: `uv run --frozen --only-group sqlglot` "
+      + "could not import sqlglot. CI must sync the group before the tests "
+      + "run (see docs/specs/python-lockfile-execution.spec.md).",
+  );
+}
+if (!available) {
+  console.warn(
+    "sqlglot tier unavailable -- sidecar tests skipped. Install uv to run them.",
+  );
+}
+
 describe("sqlglot sidecar", () => {
   it.runIf(available)("mines joins, where, and case from a query", () => {
     const sql = `
