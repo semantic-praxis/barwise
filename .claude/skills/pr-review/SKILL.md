@@ -22,8 +22,10 @@ and the enclosing function (a bug on an unchanged line of a touched
 function is in scope), audits every removed line for the invariant it
 enforced and where that invariant now lives, traces callers and
 callees across files, and hunts language pitfalls. Run it on the spine
-at high effort and on the fallout at low; take its CONFIRMED findings
-and treat its PLAUSIBLE ones under section 4's rule. `security-review`
+at high effort and on the fallout at low, never with `--comment`, and
+afterwards confirm the PR carries no review or comment from you; take
+its CONFIRMED findings and treat its PLAUSIBLE ones under section 4's
+rule. `security-review`
 applies when the diff touches subprocess, network, or file I/O;
 `duplication-audit` when it adds a copy; `assertion-audit` when it
 adds a test for a refusal or error; `articulation` in critique mode
@@ -57,6 +59,13 @@ pitfalls.
 
 ## 2. Verify claims; never infer them
 
+- Rank the body's claims first and test the load-bearing one before
+  anything else: the claim the design turns on ("naming the group
+  stops a foreign project's copy being borrowed", "the flag resolves
+  from the lockfile"). In the first run of this skill, the reviewer
+  without it disproved the PR's central claim while the reviewer with
+  it had listed that case under Not checked. Everything below this
+  bullet is cheaper than that mistake.
 - Check out the head. Re-run the command behind every number in the
   body. A figure without a command is a finding in itself.
 - A new gate, check, hook, or test is verified only after you have
@@ -166,7 +175,9 @@ State the asymmetry to yourself when filling in Cleared: a false
 When in doubt, it goes under Read. And a partial review that looks
 complete is worse than none, because it is trusted on false pretences;
 Not checked is never empty by omission, and it names which passes ran
-(a single pass with no verification says so).
+(a single pass with no verification says so). Not checked may
+never hold the claim the design rests on: an untested load-bearing
+claim makes the verdict "cannot tell", not "merge".
 
 ## 6. Posting, and who decides
 

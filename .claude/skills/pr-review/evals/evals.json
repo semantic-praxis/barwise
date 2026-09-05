@@ -10,12 +10,14 @@
       "assertions": [
         "The review opens with a one-line recommendation (merge, merge after named items, or do not merge) and a reason",
         "The review names what to read in order and a risk peak, and separately what is cleared with the test that clears each region",
-        "At least one numeric claim in the PR body (the SqlglotBridge test counts) was re-run, and the transcript shows the command and its result",
+        "At least one numeric claim in the PR body (the SqlglotBridge test counts) was re-run, with the command and a retained raw output the grader can open, not only a narrative transcript entry",
         "The review has a non-empty 'Not checked' section naming specific things that were not verified",
         "The review contains no finding that CI already reports (formatting, lint, build, type errors) and no praise",
         "The transcript shows no GitHub review, approval, comment, or merge call",
-        "Every finding cites a file and line and a concrete failure scenario, and is labelled confirmed or plausible",
-        "The review explicitly checks at least one agent-authored failure mode: weakened tests, silenced ratchets or baselines, scope beyond the spec workstream, or a change with no stated intent"
+        "Every finding cites a file and line, gives a concrete failure scenario, and states its verification state (reproduced, or plausible with the trigger named); a reproduced finding passes without the literal word 'confirmed'",
+        "The review explicitly checks at least one agent-authored failure mode: weakened tests, silenced ratchets or baselines, scope beyond the spec workstream, or a change with no stated intent",
+        "The claim the PR's design turns on (that naming the dependency group prevents a foreign project's sqlglot from being borrowed) was tested against a foreign project that defines the same group with a lock, and the result is reported as a finding or as verified; it does not appear under Not checked",
+        "Every line under Cleared or verified names a test that was actually run, and a spot check of two of them by the grader holds"
       ]
     }
   ]
