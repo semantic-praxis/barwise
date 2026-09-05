@@ -1,7 +1,7 @@
 # Every Python execution resolves from the lockfile, and the sqlglot tier stops vanishing
 
-Status: Workstream 1 implemented (the project moved to `barwise/`);
-workstreams 2-4 pending
+Status: Workstreams 1 and 2 implemented (project moved; all six call sites
+converted and the sqlglot tier now runs in CI); workstreams 3-4 pending
 Created: 2026-09-05
 Last-updated: 2026-09-05
 Tracking: barwise-921 (uv execution gate), barwise-916 (sqlglot absent in
@@ -369,3 +369,51 @@ workstream 2 is not scoped from a stale assumption:
   resolving any. `check-beads.sh` runs on every commit, so this was the
   cost most likely to make the rule unpopular, and it turns out to be a
   saving.
+
+**Workstream 2 landed.** Both `SqlglotBridge` copies, `compile-runner.sh`
+and `check-beads.sh` now invoke uv; CI gained an unconditional uv
+toolchain step; and the sqlglot tier runs instead of skipping. The
+acceptance criterion is met exactly:
+
+```
+before:  formats  3 passed | 5 skipped (8)      dbt  3 passed | 3 skipped (6)
+after:   formats  8 passed | 0 skipped (8)      dbt  6 passed | 0 skipped (6)
+```
+
+Open decision 2 resolved as recommended, and both halves are verified
+against a genuinely absent uv rather than argued:
+
+| condition           | behaviour                                              |
+| ------------------- | ------------------------------------------------------ |
+| `CI=1`, uv absent   | `Failed Suites 1` -- the tier is a hard CI requirement |
+| CI unset, uv absent | warning printed, `3 passed \| 5 skipped`               |
+| uv present          | `8 passed \| 0 skipped`                                |
+
+Four things the brief did not anticipate:
+
+- **Naming the group is a safety mechanism, not just a smaller install.**
+  In an unrelated Python project uv exits with ``Group `sqlglot` is not
+  defined in the project's `dependency-groups` table``, so a shipped CLI
+  run from inside someone else's repo reports the tier unavailable rather
+  than silently borrowing their sqlglot version. Without the group name
+  that case would have been "available and unpinned", which is the defect
+  this spec exists to close, merely relocated.
+
+- **`check-beads.sh` needs an explicit `--project`.** It may be sourced
+  from anywhere and runs from the repo root, which is _above_
+  `barwise/`, so cwd-based discovery would have failed there -- the same
+  trap workstream 1 fixed for packages. It derives the path from
+  `git rev-parse --show-toplevel`, which it already called.
+
+- **uv became a dependency of every CI run, including docs-only ones**,
+  because `check:beads` runs on those by design (tracker edits _are_ the
+  docs-only case). That is a real cost on the deliberately-cheap path,
+  accepted rather than hidden.
+
+- **uv itself was unpinned**, which is this spec's own principle
+  unapplied one level up: the tool that enforces the pins had none. This
+  container carries 0.8.17 and 0.12.7 on PATH simultaneously, and CI's
+  `pip install uv` took whatever pip resolved that day. Now pinned. The
+  three behaviours the design rests on were verified identical on both
+  versions first, so the pin is for reproducibility, not a known
+  incompatibility.

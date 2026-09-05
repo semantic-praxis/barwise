@@ -13,7 +13,8 @@
 # json.Marshal output (compact separators, < > & HTML-escaped, UTF-8 kept, _type
 # first, one object + trailing newline per line) -- so it catches the
 # non-canonical hand-edits that get clobbered when a bd-equipped session
-# re-exports across branches. Requires python3.
+# re-exports across branches. Requires uv (never a bare python3: every
+# Python execution resolves from the lockfile -- see the repo CLAUDE.md).
 
 beads_check() {
   local strict="${BEADS_STRICT:-0}" f=""
@@ -24,10 +25,13 @@ beads_check() {
       *) f="${a}" ;;
     esac
   done
-  f="${f:-$(git rev-parse --show-toplevel 2>/dev/null)/.beads/issues.jsonl}"
+  local root
+  root="$(git rev-parse --show-toplevel 2>/dev/null)"
+  f="${f:-${root}/.beads/issues.jsonl}"
   [[ -f "${f}" ]] || { echo "beads_check: no such file: ${f}" >&2; return 2; }
-  command -v python3 >/dev/null 2>&1 || { echo "beads_check: python3 required" >&2; return 2; }
-  BEADS_STRICT="${strict}" python3 - "${f}" <<'PY'
+  command -v uv >/dev/null 2>&1 || { echo "beads_check: uv required" >&2; return 2; }
+  BEADS_STRICT="${strict}" uv run --project "${root}/barwise" --frozen \
+    --only-group scripts python - "${f}" <<'PY'
 import json, os, re, sys
 
 PATH = sys.argv[1]

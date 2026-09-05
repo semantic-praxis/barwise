@@ -91,6 +91,36 @@ jobs:
       # dev dependency.
       - run: npm ci
 
+      # uv is a JavaScript-lane dependency now, not just the optimizer's.
+      # check:beads validates the tracker through a stdlib-only Python
+      # script, and the SqlglotBridge tests exercise the sqlglot tier;
+      # both resolve from barwise/uv.lock. This step is UNCONDITIONAL
+      # because check:beads runs on every PR including docs-only ones --
+      # tracker edits ARE the docs-only case -- so gating it on
+      # docs_only would break exactly the PRs it is meant to validate.
+      # That is a real cost on the cheap path, accepted so that no Python
+      # anywhere runs unpinned (docs/specs/python-lockfile-execution.spec.md).
+      #
+      # uv itself is pinned, because it is a version input like any other
+      # and it was the one left floating. This container carries 0.8.17 and
+      # 0.12.7 on PATH simultaneously, and an unpinned `pip install uv`
+      # takes whatever pip resolves that day. The three behaviours this
+      # design rests on -- `uv run` failing OPEN with no project, `uv sync`
+      # failing closed, and `--only-group` erroring on a project that does
+      # not define the group -- were verified identical on both, so the pin
+      # is about reproducibility rather than a known incompatibility.
+      #
+      # --locked, not --frozen: a stale lock should fail the build here
+      # rather than be re-resolved silently. The sqlglot group is synced
+      # up front so the eight bridge tests RUN; without it they skip, and
+      # a suite that silently shrinks is the failure barwise-916 is about.
+      - name: Python toolchain (uv)
+        working-directory: barwise
+        run: |
+          python3 -m pip install --quiet uv==0.12.7
+          uv python install
+          uv sync --locked --only-group sqlglot
+
       # fmt:check runs first among the checks: it is the cheapest gate and
       # historically the most common failure, and it needs only npm ci (not
       # the build), so front-loading it fails a misformatted PR in seconds
@@ -229,9 +259,7 @@ jobs:
         if: steps.changes.outputs.optimizer == 'true'
         working-directory: barwise
         run: |
-          python3 -m pip install --quiet uv
-          uv python install
-          uv sync --extra dev --locked
+          uv sync --extra dev --group sqlglot --locked
           uv run --locked --extra dev pytest -q
 
       # The rubric ratchet: every eval check that survives the mutation
