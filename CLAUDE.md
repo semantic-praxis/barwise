@@ -308,6 +308,10 @@ skill (`.claude/skills/release/`).
 - Doc naming and dating (stable kebab names for specs, dated filenames
   for point-in-time artifacts) follows the convention in the
   `spec-writer` skill.
+- Opening a PR follows the `pr-creation` skill and reviewing one
+  follows `pr-review`; the barwise invariants CI cannot check live once,
+  in `pr-review/checklist.md`, which the author runs before a reviewer
+  has to (`docs/specs/pr-skills.spec.md`).
 - TypeScript strict mode. Base config in `barwise/tsconfig.base.json`
   uses NodeNext module resolution; the vscode package overrides to
   Bundler resolution for esbuild.
