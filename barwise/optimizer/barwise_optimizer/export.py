@@ -227,6 +227,37 @@ def _scored(summary: dict) -> int:
     return int(summary.get("evaluations", 0))
 
 
+#: Relative rise in mean element count, alongside a rising score, above
+#: which the report says the denominator may be doing the work. The
+#: penalty rates are per element, so a candidate that emits more
+#: elements dilutes the same defects; eval-split-stratification.spec.md
+#: names this tripwire and recorded the field for it, and until
+#: barwise-853 nothing read the field.
+ELEMENT_COUNT_RISE = 0.25
+
+
+def _denominator_lines(baseline: dict, candidate: dict, margin: float) -> list[str]:
+    """The per-arm model size, and a warning when it moved with the score.
+
+    Silent for summaries written before `meanElementCount` existed: a
+    report that fabricated a 0.0 denominator for an old run would read
+    as "the candidate emitted nothing", which is worse than no line.
+    """
+    if "meanElementCount" not in baseline or "meanElementCount" not in candidate:
+        return []
+    base = float(baseline["meanElementCount"])
+    cand = float(candidate["meanElementCount"])
+    lines = [f"- mean element count: baseline {base:.1f} / candidate {cand:.1f}"]
+    if base > 0 and margin > 0 and (cand - base) / base >= ELEMENT_COUNT_RISE:
+        rise = (cand - base) / base
+        lines.append(
+            f"- **the candidate emitted {rise:+.0%} more elements and scored "
+            "higher: the penalty rates are per element, so check whether the "
+            "denominator, not the model, is what improved**"
+        )
+    return lines
+
+
 def render_delta_report(
     *,
     candidate_version: str,
@@ -297,6 +328,7 @@ def render_delta_report(
     if floored:
         lines.append(f"- evaluations floored at zero: {floored} of {total}")
     lines.append(f"- resolvable difference at that sample count: {resolvable:.3f}")
+    lines.extend(_denominator_lines(baseline, candidate, margin))
     for label, arm in (("baseline", baseline), ("candidate", candidate)):
         evaluations = int(arm.get("evaluations", 0))
         scored = _scored(arm)

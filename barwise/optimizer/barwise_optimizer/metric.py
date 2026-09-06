@@ -41,12 +41,17 @@ class MetricLog:
     errors_by_rule: Counter = field(default_factory=Counter)
     warnings_by_rule: Counter = field(default_factory=Counter)
     corrections_by_category: Counter = field(default_factory=Counter)
+    # One entry per SCORED evaluation, not per evaluation: a run that
+    # produced nothing scorable produced no elements either, and a zero
+    # here would read as restraint (barwise-853).
+    element_counts: list[int] = field(default_factory=list)
     unparseable: int = 0
     failed: int = 0
     floored: int = 0
 
     def record(self, case: CaseScore) -> None:
         self._append(case.case_id, case.score)
+        self.element_counts.append(case.element_count)
         if case.floored:
             self.floored += 1
         self.errors_by_rule.update(case.errors_by_rule)
@@ -117,11 +122,18 @@ class MetricLog:
     def mean(self) -> float:
         return sum(self.scores) / len(self.scores) if self.scores else 0.0
 
+    @property
+    def mean_element_count(self) -> float:
+        """Mean model size over scored runs -- the denominator behind the mean."""
+        counts = self.element_counts
+        return sum(counts) / len(counts) if counts else 0.0
+
     def summary(self) -> dict:
         return {
             "evaluations": len(self.scores),
             "scored": self.scored,
             "mean": self.mean,
+            "meanElementCount": self.mean_element_count,
             "unparseable": self.unparseable,
             "failed": self.failed,
             "floored": self.floored,
