@@ -1,7 +1,8 @@
 # Core in ReScript: an experiment measured against the TypeScript sealed-record metamodel
 
-Status: Draft -- no workstream implemented; to run on a long-lived
-branch with the decision criteria below fixed before the branch starts
+Status: Accepted (all five decisions resolved 2026-09-06) -- no workstream
+implemented; to run on a long-lived branch with the decision criteria
+below fixed before the branch starts
 Created: 2026-09-06
 Last-updated: 2026-09-06
 Tracking: barwise-933; depends on `core-branching-load.spec.md` (its WS1
@@ -126,7 +127,7 @@ compares what the criteria table names instead.
 
 ```
 packages/core-rescript/                     @barwise/core-rescript, private, in the workspace so every gate sees it
-  package.json                              "build": "rescript build", devDependency rescript 12.3.1 (Open decision 1)
+  package.json                              "build": "rescript build", devDependency rescript 12.3.1 (pinned; Decisions)
   rescript.json                             sources: src (subdirs); module: esmodule; in-source: false; suffix: .res.mjs
                                             warnings: { "error": "+8" }   // non-exhaustive match is a build failure
                                             gentypeconfig: { "module": "esmodule" }   // .gen.tsx beside each .res
@@ -139,7 +140,7 @@ packages/core-rescript/                     @barwise/core-rescript, private, in 
   src/model/Constraint.res                  @tag("type") variant of sixteen inline records; id: string; modality: t
   src/model/Model.res                       type t = { name, objectTypes: array<ObjectType.t>, factTypes: array<FactType.t>, ... }
   src/model/Builder.res                     a module holding a mutable state record; add* functions with the TypeScript names;
-                                            build: t => buildResult   (shape aligned with the TypeScript spec: Open decision 4)
+                                            build: t => buildResult   (shape settled in WS0 and aligned across both specs; Decisions)
   src/model/Graph.res                       graphOf: Model.t => t; player, rolesOf, hopsFrom, resolve -- total by construction
   src/validation/**                         WS2: rules over Graph.t; ring algebra as a record of property handlers
   src/verbalization/**                      WS3: the sentence tables
@@ -235,7 +236,7 @@ workstream is a PR into the branch, reviewed like any other.
 
 ### 0. Pin and probe (Phase A: interop, before the TypeScript WS1 lands)
 
-The package skeleton with ReScript pinned (Open decision 1);
+The package skeleton with ReScript pinned at 12.3.1;
 `ObjectType`, `Constraint`, `Role` and `FactType` as variants and
 records; `@genType` on each; one TypeScript vitest file in the new
 package that imports the emitted modules and asserts, field by field,
@@ -319,37 +320,36 @@ adoption spec's shape if one is written; they do not decide.
   the existing `dependsOn`; the extension's esbuild consumes ES modules
   and needs no change.
 
-## Open decisions (for review)
+## Decisions (resolved in review, 2026-09-06)
 
-- **The ReScript pin.** `rescript@12.3.1` is `latest` on npm today;
-  `13.0.0-alpha.5` exists under `next`. Options: (a) 12.3.1, the
-  release line; (b) the 13 alpha, to avoid porting twice if 13 changes
-  the standard library or genType. Recommended: (a); an alpha is not a
-  pin, and the experiment's numbers must be reproducible.
-- **In the workspace or beside it.** Options: (a) `packages/core-rescript`
-  inside the npm workspace, so turbo and every gate see it and the
-  Inventory's treatments are real; (b) a directory outside the
-  workspace like `optimizer/`, invisible to the gates. Recommended:
-  (a); criterion 8 is the point, and (b) would measure nothing about
-  the toolchain cost.
-- **Committing emitted JavaScript.** Options: (a) gitignore `lib/` and
-  build in turbo; (b) commit the emitted files so a reader can see the
-  output in review. Recommended: (a), with WS0's Implementation notes
-  quoting representative output; committed build output is the drift
-  the repo's regen gates exist to prevent.
-- **The runtime shape of `buildResult`, aligned across both specs.**
-  The sealed-record spec sketches `{ ok: true; model } | { ok: false;
-  diagnostics }`. Whether ReScript can emit a boolean-valued tag on a
-  tagged variant is a WS0 finding. Options: (a) keep the boolean shape
-  if the compiler supports it; (b) change both specs to a string tag
-  (`status: "ok" | "failed"`). Recommended: decide in WS0 and edit
-  whichever spec has to move, in the same PR, so the two never
-  disagree.
-- **Who reviews ReScript.** A PR into the branch needs a reader who
-  can read `.res`. Options: (a) the owner reviews, and the experiment
-  doubles as learning the language; (b) accept self-review on the
-  branch and hold review for the adoption spec. Recommended: (a);
-  criterion 9 is empty otherwise.
+Five questions were put to the owner as open decisions and settled.
+They are recorded here with the choice and its reason so the branch
+does not reopen them.
+
+- **The ReScript pin is 12.3.1.** The release line, not the 13 alpha
+  under `next`: an alpha is not a pin, and the experiment's numbers
+  must be reproducible. Re-pinning is a WS0-style probe, not a
+  re-decision.
+- **The package is `packages/core-rescript`, inside the workspace.**
+  Turbo and every gate see it, so the Inventory's treatments are real
+  and criterion 8 measures something. A directory beside the workspace
+  would have measured nothing about the toolchain cost.
+- **Emitted JavaScript is not committed.** `lib/` is gitignored and
+  turbo builds it; WS0's Implementation notes quote representative
+  output so a reviewer can see it without a checkout. Committed build
+  output is the drift the repo's regen gates exist to prevent.
+- **The runtime shape of `buildResult` is settled in WS0.** The
+  sealed-record spec sketches a boolean `ok` tag; whether ReScript can
+  emit that on a tagged variant is the first thing WS0 finds out. The
+  PR that finds out edits whichever spec has to move, in the same PR,
+  so the two specs never disagree.
+- **The owner reviews every ReScript PR, with guidance from the
+  session that wrote it.** Each PR into the branch carries, in its
+  body, a reading guide written for someone reading `.res` for the
+  first time: what each construct is, which TypeScript construct it
+  replaces, and where the compiler is doing work a reviewer would
+  otherwise do by hand. Criterion 9 is the owner's paragraph after
+  each review. Self-review is not accepted on the branch.
 
 ## Risks and testing
 
