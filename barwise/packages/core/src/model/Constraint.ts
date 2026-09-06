@@ -218,6 +218,61 @@ const RING_TYPE_MEMBERS: Record<RingType, true> = {
 export const RING_TYPES = Object.keys(RING_TYPE_MEMBERS) as readonly RingType[];
 
 /**
+ * A property of the binary relation R a ring constraint holds over, on
+ * the directed pairs (roleId1 -> roleId2) of a population.
+ *
+ *   irreflexive       no R(a, a)
+ *   symmetric         R(a, b) implies R(b, a)
+ *   antisymmetric     R(a, b) and R(b, a) imply a = b
+ *   transitive        R(a, b) and R(b, c) imply R(a, c)
+ *   intransitive      R(a, b) and R(b, c) imply not R(a, c)
+ *   acyclic           the transitive closure is irreflexive
+ *   purely_reflexive  R(a, b) implies a = b
+ */
+export type RingProperty =
+  | "irreflexive"
+  | "symmetric"
+  | "antisymmetric"
+  | "transitive"
+  | "intransitive"
+  | "acyclic"
+  | "purely_reflexive";
+
+/**
+ * The properties each ring type is the conjunction of: the algebra the
+ * consumers used to spell out by hand, declared once.
+ *
+ * Seven of the eight are a single property and asymmetric is two, which
+ * is why `population/ring.ts` and `CounterexampleGenerator` each carried
+ * eight arms to say what a handler per property says once. Adding a ring
+ * type to ORM 2's vocabulary is a row here plus, at most, one new
+ * property handler in each consumer; without this table it was two
+ * hand-written arms that nothing required to agree.
+ *
+ * **Order is load-bearing.** A consumer that must choose one property --
+ * the counterexample generator, which shows a single witness -- takes
+ * the first. Asymmetric therefore lists `antisymmetric` first, because
+ * the witness ORM 2 expects for it is the reverse pair (a, b), (b, a)
+ * rather than the self-loop that `irreflexive` would yield.
+ *
+ * `Record<RingType, ...>` for the same reason as `RING_TYPE_MEMBERS`
+ * above (barwise-869): a member added to the union without a row here is
+ * a compile error, where a lookup keyed on a plain object would silently
+ * return undefined. The non-empty tuple type is what lets a consumer
+ * read `[0]` without a guard for a row nobody filled in.
+ */
+export const RING_PROPERTIES: Record<RingType, readonly [RingProperty, ...RingProperty[]]> = {
+  irreflexive: ["irreflexive"],
+  asymmetric: ["antisymmetric", "irreflexive"],
+  antisymmetric: ["antisymmetric"],
+  intransitive: ["intransitive"],
+  acyclic: ["acyclic"],
+  symmetric: ["symmetric"],
+  transitive: ["transitive"],
+  purely_reflexive: ["purely_reflexive"],
+};
+
+/**
  * Ring constraint.
  *
  * Constrains a reflexive relationship: a pair of roles in a single
