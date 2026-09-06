@@ -273,3 +273,33 @@ describe("extractJson", () => {
     expect(extractJson("```\n\n```")).toBe("");
   });
 });
+
+// --- barwise-917: report what answered, not what was asked for ---
+describe("OllamaLlmClient model attribution", () => {
+  it("reports the tag the server answered under", async () => {
+    // `/api/chat` echoes a tag, not a digest, so this narrows the
+    // finding here rather than closing it: the value is still mutable.
+    // Reading the server's answer is what stops the two diverging
+    // silently, and the field was undeclared until now.
+    fetchMock.mockResolvedValueOnce(
+      ndjson([
+        { message: { content: "hi" }, model: "llama3.1:8b", done: false },
+        { message: { content: "" }, model: "llama3.1:8b", done: true, done_reason: "stop" },
+      ]),
+    );
+    const client = new OllamaLlmClient({ model: "llama3.1" });
+
+    const result = await client.complete({ systemPrompt: "s", userMessage: "u" });
+
+    expect(result.modelUsed).toBe("llama3.1:8b");
+  });
+
+  it("falls back to the configured tag when the server reports none", async () => {
+    fetchMock.mockResolvedValueOnce(chatResponse("hi"));
+    const client = new OllamaLlmClient({ model: "llama3.1" });
+
+    const result = await client.complete({ systemPrompt: "s", userMessage: "u" });
+
+    expect(result.modelUsed).toBe("llama3.1");
+  });
+});

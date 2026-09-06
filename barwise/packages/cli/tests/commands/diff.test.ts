@@ -1,7 +1,7 @@
 /**
  * Tests for the diff command.
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -97,6 +97,12 @@ describe("barwise diff", () => {
     const jsonResult = await runCli(["diff", base, incoming, "--format", "json"]);
     const parsed = JSON.parse(jsonResult.stdout);
     expect(parsed.deltas.some((d: { name: string; }) => d.name === "Order")).toBe(true);
+
+    // `test-output` is shared and transient, and every other writer here
+    // removes what it wrote (new-export.test.ts, throughout). This one did
+    // not, so a run left an untracked .orm.yaml behind -- noise in every
+    // later `git status`, and a file a careless `git add -A` would commit.
+    rmSync(incoming);
   });
 
   it("reports error for nonexistent file", async () => {

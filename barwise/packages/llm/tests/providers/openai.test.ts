@@ -253,3 +253,33 @@ describe("OpenAI output budget and stop reason", () => {
     expect(result.stopReason).toBeUndefined();
   });
 });
+
+// --- barwise-917: report what answered, not what was asked for ---
+describe("OpenAILlmClient model attribution", () => {
+  beforeEach(() => {
+    mockCreate.mockReset();
+  });
+
+  it("reports the identifier the API answered with, not the alias requested", async () => {
+    // `gpt-5` is a floating alias; the completion names the snapshot
+    // that served it. A row recorded under the alias cannot.
+    const client = new OpenAILlmClient({ model: "gpt-5" });
+    mockCreate.mockResolvedValueOnce({
+      choices: [{ message: { content: "hello" } }],
+      model: "gpt-5-2026-04-01",
+    });
+
+    const result = await client.complete({ systemPrompt: "s", userMessage: "u" });
+
+    expect(result.modelUsed).toBe("gpt-5-2026-04-01");
+  });
+
+  it("falls back to the requested identifier when the response carries none", async () => {
+    const client = new OpenAILlmClient({ model: "gpt-5" });
+    mockCreate.mockResolvedValueOnce({ choices: [{ message: { content: "hello" } }] });
+
+    const result = await client.complete({ systemPrompt: "s", userMessage: "u" });
+
+    expect(result.modelUsed).toBe("gpt-5");
+  });
+});

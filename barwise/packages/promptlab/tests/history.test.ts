@@ -306,3 +306,69 @@ describe("token totals in a history row", () => {
     expect(entry.tokens).toBeUndefined();
   });
 });
+
+// --- barwise-917: a row must say what answered, not what was asked for ---
+//
+// `--model claude-sonnet-5` is an alias the provider resolves server-side.
+// Two rows a month apart could name it and be two different snapshots,
+// with nothing in the file to say so. The runs carry the provider's own
+// answer; the entry reads it back.
+
+/** The report above, with each run reporting the model that answered. */
+function reportWithRuns(...modelsPerCase: readonly (readonly string[])[]): SuiteReport {
+  return {
+    ...report,
+    cases: report.cases.map((c, i) => ({
+      ...c,
+      runs: (modelsPerCase[i] ?? []).map((modelUsed) => ({
+        attempts: 1,
+        maxTokens: 8192,
+        modelUsed,
+      })),
+    })),
+  };
+}
+
+describe("toHistoryEntry model attribution", () => {
+  it("records the identifier the runs reported, not the alias requested", () => {
+    const entry = toHistoryEntry(
+      reportWithRuns(["claude-sonnet-5-20260401"], ["claude-sonnet-5-20260401"]),
+      "2026-08-08T00:00:00Z",
+      { provider: "anthropic", model: "claude-sonnet-5" },
+    );
+
+    expect(entry.model).toBe("claude-sonnet-5-20260401");
+  });
+
+  it("falls back to the requested identifier when no run reported one", () => {
+    // Ollama reports a tag rather than a digest, and an older recorded
+    // run carries nothing at all. Neither is a reason to drop the field.
+    const entry = toHistoryEntry(report, "2026-08-08T00:00:00Z", {
+      model: "claude-sonnet-5",
+    });
+
+    expect(entry.model).toBe("claude-sonnet-5");
+  });
+
+  it("refuses to name one snapshot when the runs disagree", () => {
+    // A provider that rolls its alias mid-run leaves a row no single
+    // identifier describes. Naming either half would be a false record;
+    // the alias the operator asked for is at least true.
+    const entry = toHistoryEntry(
+      reportWithRuns(["claude-sonnet-5-20260401"], ["claude-sonnet-5-20260514"]),
+      "2026-08-08T00:00:00Z",
+      { model: "claude-sonnet-5" },
+    );
+
+    expect(entry.model).toBe("claude-sonnet-5");
+  });
+
+  it("omits the field when the runs disagree and nothing was requested", () => {
+    const entry = toHistoryEntry(
+      reportWithRuns(["a-20260401"], ["a-20260514"]),
+      "2026-08-08T00:00:00Z",
+    );
+
+    expect(entry.model).toBeUndefined();
+  });
+});

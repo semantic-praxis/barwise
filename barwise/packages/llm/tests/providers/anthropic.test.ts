@@ -475,3 +475,29 @@ describe("thinking budget (docs/specs/thinking-budget-dimension.spec.md)", () =>
     expect(body["max_tokens"]).toBe(8192);
   });
 });
+
+// --- barwise-917: report what answered, not what was asked for ---
+describe("model attribution", () => {
+  it("reports the identifier the API answered with, not the alias requested", async () => {
+    // The API resolves an alias to a dated snapshot server-side. A row
+    // recorded under the alias cannot say which snapshot produced it.
+    const client = new AnthropicLlmClient({ model: "claude-sonnet-5" });
+    mockCreate.mockResolvedValueOnce({
+      ...textResponse("hi"),
+      model: "claude-sonnet-5-20260401",
+    });
+
+    const result = await client.complete({ systemPrompt: "s", userMessage: "u" });
+
+    expect(result.modelUsed).toBe("claude-sonnet-5-20260401");
+  });
+
+  it("falls back to the requested identifier when the response carries none", async () => {
+    const client = new AnthropicLlmClient({ model: "claude-sonnet-5" });
+    mockCreate.mockResolvedValueOnce(textResponse("hi"));
+
+    const result = await client.complete({ systemPrompt: "s", userMessage: "u" });
+
+    expect(result.modelUsed).toBe("claude-sonnet-5");
+  });
+});
