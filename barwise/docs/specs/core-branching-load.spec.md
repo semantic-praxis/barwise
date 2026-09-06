@@ -1,10 +1,10 @@
 # Core's branching load: half is the domain, and the other half goes with a sealed record metamodel
 
-Status: Design review complete, design revised in review -- no workstream
-implemented; WS0 (the defects) is filed as barwise-927..932 and is the
-first thing to land
+Status: WS0 landing, one defect per PR. barwise-927 (ModelMerge dropped
+independent/defaultValue/note/cardinality and note/derivation) shipped;
+barwise-928..931 remain open. WS1-WS8 not implemented.
 Created: 2026-09-06
-Last-updated: 2026-09-06
+Last-updated: 2026-09-06 (WS0 status update)
 Tracking: barwise-924 (this review), barwise-x4z (the wider
 functional/type analysis this partly answers), barwise-e8m (the
 functional-core commitment), barwise-923 (the hashModel bug the same

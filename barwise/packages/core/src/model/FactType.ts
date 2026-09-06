@@ -174,3 +174,24 @@ export class FactType extends ModelElement {
     return this._roles.filter((r) => r.playerId === playerId);
   }
 }
+
+/**
+ * Project a FactType back to the config shape that constructed it,
+ * listing every field once. Callers that rebuild a fact type (merge,
+ * split) spread this and override only what they mean to change, so a
+ * field added to `FactTypeConfig` cannot be dropped by a hand-copied
+ * literal elsewhere (barwise-927). WS1's sealed records make this
+ * redundant -- a spread of the record itself will do the same job.
+ */
+export function toFactTypeConfig(ft: FactType): FactTypeConfig {
+  return {
+    name: ft.name,
+    id: ft.id,
+    roles: ft.roles.map((r) => ({ name: r.name, id: r.id, playerId: r.playerId })),
+    readings: ft.readings.map((r) => r.template),
+    constraints: ft.constraints,
+    definition: ft.definition,
+    note: ft.note,
+    derivation: ft.derivation,
+  };
+}

@@ -289,3 +289,29 @@ export class ObjectType extends ModelElement {
     return this.kind === "value";
   }
 }
+
+/**
+ * Project an ObjectType back to the config shape that constructed it,
+ * listing every field once. Callers that rebuild an object type (merge,
+ * split) spread this and override only what they mean to change, so a
+ * field added to `ObjectTypeConfig` cannot be dropped by a hand-copied
+ * literal elsewhere (barwise-927). WS1's sealed records make this
+ * redundant -- a spread of the record itself will do the same job.
+ */
+export function toObjectTypeConfig(ot: ObjectType): ObjectTypeConfig {
+  return {
+    name: ot.name,
+    id: ot.id,
+    kind: ot.kind,
+    referenceMode: ot.referenceMode,
+    definition: ot.definition,
+    sourceContext: ot.sourceContext,
+    valueConstraint: ot.valueConstraint,
+    dataType: ot.dataType,
+    aliases: ot.aliases,
+    independent: ot.independent,
+    defaultValue: ot.defaultValue,
+    note: ot.note,
+    cardinality: ot.cardinality,
+  };
+}

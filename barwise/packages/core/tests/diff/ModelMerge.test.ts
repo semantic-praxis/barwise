@@ -621,6 +621,107 @@ describe("mergeModels", () => {
     expect(code.dataType!.length).toBe(10);
   });
 
+  it("preserves independent, defaultValue, note and cardinality on unchanged object types", () => {
+    const existing = new OrmModel({ name: "Test" });
+    existing.addObjectType({
+      name: "Customer",
+      kind: "entity",
+      referenceMode: "customer_id",
+      independent: true,
+      note: "a note on Customer",
+      cardinality: { min: 1, max: 100 },
+    });
+    existing.addObjectType({
+      name: "Amount",
+      kind: "value",
+      dataType: { name: "money" },
+      defaultValue: "0",
+    });
+
+    const incoming = new OrmModel({ name: "Test" });
+    incoming.addObjectType({
+      name: "Customer",
+      kind: "entity",
+      referenceMode: "customer_id",
+      independent: true,
+      note: "a note on Customer",
+      cardinality: { min: 1, max: 100 },
+    });
+    incoming.addObjectType({
+      name: "Amount",
+      kind: "value",
+      dataType: { name: "money" },
+      defaultValue: "0",
+    });
+
+    const diff = diffModels(existing, incoming);
+    const merged = mergeModels(existing, incoming, diff.deltas, new Set());
+
+    const customer = merged.getObjectTypeByName("Customer")!;
+    expect(customer.independent).toBe(true);
+    expect(customer.note).toBe("a note on Customer");
+    expect(customer.cardinality).toEqual({ min: 1, max: 100 });
+
+    const amount = merged.getObjectTypeByName("Amount")!;
+    expect(amount.defaultValue).toBe("0");
+  });
+
+  it("preserves note and derivation on unchanged fact types", () => {
+    const existing = new OrmModel({ name: "Test" });
+    const existingCustomer = existing.addObjectType({
+      name: "Customer",
+      kind: "entity",
+      referenceMode: "customer_id",
+    });
+    const existingOrder = existing.addObjectType({
+      name: "Order",
+      kind: "entity",
+      referenceMode: "order_number",
+    });
+    existing.addFactType({
+      name: "Customer places Order",
+      roles: [
+        { name: "places", playerId: existingCustomer.id },
+        { name: "is placed by", playerId: existingOrder.id },
+      ],
+      readings: ["{0} places {1}"],
+      note: "a note on the fact type",
+      derivation: { kind: "derived", expression: "Customer places Order if ..." },
+    });
+
+    const incoming = new OrmModel({ name: "Test" });
+    const incomingCustomer = incoming.addObjectType({
+      name: "Customer",
+      kind: "entity",
+      referenceMode: "customer_id",
+    });
+    const incomingOrder = incoming.addObjectType({
+      name: "Order",
+      kind: "entity",
+      referenceMode: "order_number",
+    });
+    incoming.addFactType({
+      name: "Customer places Order",
+      roles: [
+        { name: "places", playerId: incomingCustomer.id },
+        { name: "is placed by", playerId: incomingOrder.id },
+      ],
+      readings: ["{0} places {1}"],
+      note: "a note on the fact type",
+      derivation: { kind: "derived", expression: "Customer places Order if ..." },
+    });
+
+    const diff = diffModels(existing, incoming);
+    const merged = mergeModels(existing, incoming, diff.deltas, new Set());
+
+    const ft = merged.getFactTypeByName("Customer places Order")!;
+    expect(ft.note).toBe("a note on the fact type");
+    expect(ft.derivation).toEqual({
+      kind: "derived",
+      expression: "Customer places Order if ...",
+    });
+  });
+
   it("remaps a join constraint's path root to the merged object-type id", () => {
     // The existing model already has Person and Country (their ids win in
     // the merge); the incoming model brings the same object types under
