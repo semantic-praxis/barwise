@@ -304,6 +304,60 @@ model:
     expect(first.getFactTypeByName("X relates Y")).toBeDefined();
   });
 
+  it("drops a join constraint whose operands reach roles in two domains", () => {
+    // "Person was born in Country" (homed in "identity", Person is its
+    // first role) carries a join_equality constraint whose second operand
+    // walks the roles of "Country grants citizenship to Person" -- a fact
+    // type homed in "geo" (Country is ITS first role). The constraint's
+    // own roles are local to "identity", but one operand reaches into
+    // "geo", so it must be dropped from both domains with the existing
+    // cross-domain warning, not kept because its own fact type is local.
+    const model = `orm_version: "1.0"
+model:
+  name: citizenship-test
+  object_types:
+    - { id: ot-person, name: Person, kind: entity, reference_mode: person_id }
+    - { id: ot-country, name: Country, kind: entity, reference_mode: country_name }
+  fact_types:
+    - id: ft-born
+      name: Person was born in Country
+      roles:
+        - { id: r-born-person, player: ot-person, role_name: born }
+        - { id: r-born-country, player: ot-country, role_name: birthplace-of }
+      readings: ["{0} was born in {1}"]
+      constraints:
+        - type: join_equality
+          operands:
+            - path: { root: ot-person, steps: [{ entry: r-born-person, exit: r-born-country }] }
+              projection: [0, 1]
+            - path: { root: ot-country, steps: [{ entry: r-citizen-country, exit: r-citizen-person }] }
+              projection: [1, 0]
+    - id: ft-citizen
+      name: Country grants citizenship to Person
+      roles:
+        - { id: r-citizen-country, player: ot-country, role_name: grants-citizenship-to }
+        - { id: r-citizen-person, player: ot-person, role_name: citizen-of }
+      readings: ["{0} grants citizenship to {1}"]
+`;
+    const result = splitModel(model, {
+      projectName: "P",
+      domains: { identity: ["Person"], geo: ["Country"] },
+    });
+
+    const identity = new OrmYamlSerializer().deserialize(
+      result.domains.find((d) => d.context === "identity")!.yaml,
+    );
+    const born = identity.getFactTypeByName("Person was born in Country")!;
+    expect(born.constraints).toHaveLength(0);
+    expect(
+      result.warnings.some((w) =>
+        w.includes('Dropped a "join_equality" constraint')
+        && w.includes('"Person was born in Country"')
+        && w.includes('"identity"')
+      ),
+    ).toBe(true);
+  });
+
   it("resolves objectified fact type home conflicts, carries populations, and warns about diagrams", () => {
     const model = `orm_version: "1.0"
 model:

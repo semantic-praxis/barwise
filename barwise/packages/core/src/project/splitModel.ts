@@ -11,11 +11,13 @@
  */
 
 import { parse, stringify } from "yaml";
+import type { Constraint, JoinOperand } from "../model/Constraint.js";
 import { ContextMapping } from "../model/ContextMapping.js";
 import { OrmProject } from "../model/OrmProject.js";
 import { MappingSerializer } from "../serialization/MappingSerializer.js";
 import { OrmYamlSerializer } from "../serialization/OrmYamlSerializer.js";
 import { ProjectSerializer } from "../serialization/ProjectSerializer.js";
+import { deserializeConstraint, type OrmYamlConstraint } from "../serialization/yaml/constraint.js";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -554,24 +556,58 @@ function pickWinner(votes: ReadonlyMap<string, number>): string | undefined {
   return best;
 }
 
-/** All role ids a constraint references, across every constraint shape. */
+/**
+ * All role ids a constraint references, across every constraint shape.
+ *
+ * Deserializes through the yaml constraint codec rather than hand-listing
+ * the raw document's per-kind keys a second time: that hand-listing is
+ * exactly what dropped join constraints from this walk originally (a
+ * `RawConstraint`'s `subset`/`superset`/`operands` fields matched none of
+ * eight hard-coded keys, so `constraintRoleIds` silently returned `[]` for
+ * every join constraint and `constraintIsLocal` treated it as local no
+ * matter which fact types its operand paths actually reached,
+ * barwise-928). The switch below is exhaustive over the typed `Constraint`
+ * union with no `default` arm, the same shape `elementDiff.ts`'s
+ * `constraintTypeKey` uses, so a constraint kind added later fails to
+ * compile here until it is classified rather than falling through as
+ * "no roles."
+ */
 function constraintRoleIds(constraint: RawConstraint): string[] {
-  const ids: string[] = [];
-  const push = (value: unknown): void => {
-    if (typeof value === "string") ids.push(value);
-    else if (Array.isArray(value)) {
-      for (const v of value) if (typeof v === "string") ids.push(v);
-    }
-  };
-  push(constraint.roles);
-  push(constraint.role);
-  push(constraint.subset_roles);
-  push(constraint.superset_roles);
-  push(constraint.roles_1);
-  push(constraint.roles_2);
-  push(constraint.role_1);
-  push(constraint.role_2);
-  return ids;
+  return roleIdsOf(deserializeConstraint(constraint as unknown as OrmYamlConstraint));
+}
+
+function roleIdsOf(c: Constraint): string[] {
+  switch (c.type) {
+    case "internal_uniqueness":
+    case "external_uniqueness":
+    case "disjunctive_mandatory":
+    case "exclusion":
+    case "exclusive_or":
+    case "frequency":
+      return [...c.roleIds];
+    case "mandatory":
+    case "cardinality":
+      return [c.roleId];
+    case "value_constraint":
+      return c.roleId ? [c.roleId] : [];
+    case "subset":
+      return [...c.subsetRoleIds, ...c.supersetRoleIds];
+    case "equality":
+      return [...c.roleIds1, ...c.roleIds2];
+    case "ring":
+    case "value_comparison":
+      return [c.roleId1, c.roleId2];
+    case "join_subset":
+      return [...operandRoleIds(c.subset), ...operandRoleIds(c.superset)];
+    case "join_equality":
+    case "join_exclusion":
+      return c.operands.flatMap(operandRoleIds);
+  }
+}
+
+/** Role ids a join operand references: both ends of every hop in its path. */
+function operandRoleIds(o: JoinOperand): string[] {
+  return o.path.steps.flatMap((s) => [s.entry, s.exit]);
 }
 
 /**
