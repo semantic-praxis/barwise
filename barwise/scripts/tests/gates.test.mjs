@@ -148,6 +148,69 @@ test("check-shell fails on a tracked script with a shellcheck finding", () => {
   }
 });
 
+// --- check-beads: a note that says "shipped" on an issue that is not closed ---
+
+/** One canonical JSONL line: every required field, `_type` first, compact. */
+function issueLine(overrides) {
+  const stamp = "2026-01-01T00:00:00Z";
+  return JSON.stringify({
+    _type: "issue",
+    id: "t-1",
+    title: "t",
+    status: "open",
+    priority: 2,
+    issue_type: "task",
+    owner: "x",
+    created_at: stamp,
+    created_by: "x",
+    updated_at: stamp,
+    dependency_count: 0,
+    dependent_count: 0,
+    comment_count: 0,
+    ...overrides,
+  }) + "\n";
+}
+
+function beadsCheck(jsonl) {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-beads-"));
+  try {
+    const file = join(dir, "issues.jsonl");
+    writeFileSync(file, jsonl);
+    // bash, not node: the gate is a shell wrapper over `uv run`. Run from
+    // the repo so `git rev-parse` finds the pyproject the wrapper points
+    // uv at; the file under test is the explicit argument.
+    return spawnSync("bash", [join(SCRIPTS, "check-beads.sh"), "--strict", file], {
+      cwd: REPO,
+      encoding: "utf8",
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("check-beads --strict fails an open issue whose notes claim a shipped PR", () => {
+  const red = beadsCheck(issueLine({ notes: "Shipped in PR #236. Done." }));
+  assert.equal(
+    red.status,
+    1,
+    `expected the shipped-but-open line to fail:\n${red.stdout}${red.stderr}`,
+  );
+  assert.match(red.stdout, /notes say 'Shipped in PR #236'/);
+
+  const closed = beadsCheck(issueLine({ status: "closed", notes: "Shipped in PR #236." }));
+  assert.equal(
+    closed.status,
+    0,
+    `a closed issue may say shipped:\n${closed.stdout}${closed.stderr}`,
+  );
+
+  // The wording that is legitimately in_progress must not trip it.
+  const pending = beadsCheck(
+    issueLine({ status: "in_progress", notes: "Implemented (PR pending)." }),
+  );
+  assert.equal(pending.status, 0, `PR pending is not shipped:\n${pending.stdout}${pending.stderr}`);
+});
+
 test("check-root-scripts fails on drift in either direction", () => {
   const dir = tempRepo();
   const inner = (scripts) => `${JSON.stringify({ name: "inner", scripts }, null, 2)}\n`;
