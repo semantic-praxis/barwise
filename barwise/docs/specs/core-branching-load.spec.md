@@ -419,8 +419,14 @@ and `modality` required on the record; the three narrowings
 diagnostics on failure; `lenient` disappears because the builder's
 `BuildResult` is what `lenient` existed to allow. The 12 referential
 structural rules move into the builder under their existing ids;
-`structural.ts` keeps the rest. The builder freezes what it returns
-(`Object.freeze`, deep), so a test that mutates a model fails loudly.
+`structural.ts` keeps the rest, including
+`structural/binary-missing-inverse-reading`, which is a warning and so
+cannot be a refusal. `build()` collects every diagnostic before it
+returns rather than failing on the first, which is what keeps the
+report one pass wide (Decisions). The builder freezes what it returns
+(`Object.freeze`, deep), so a test that mutates a model fails loudly,
+and `ModelBuilder.from(model)` copies the arrays it inherits rather
+than mutating frozen ones.
 
 Radius: every package. The 58 importer sites change their receiver from
 a model to a builder and read `build()`; the 16 direct constructions
@@ -454,7 +460,9 @@ per-call adjacency recompute go. `constraintEnforcement.ts` builds the
 graph internally so `learn` is untouched. Also the `joinSegments`
 helper (six copies of one punctuation ladder) and one `Bound` renderer
 for the four quantifier copies, which already drift (`at most` exists
-in one copy). Depends on WS1.
+in one copy). `graphOf` memoizes per value through a module-level
+`WeakMap` and freezes the graph it returns, since callers share one
+object (Decisions). Depends on WS1.
 
 ### 4. Exhaustiveness: dispatch tables and `assertNever`
 
@@ -581,46 +589,69 @@ comments regardless.
   diagnostics it reports today, through `BuildResult` instead of an
   exception-or-lenient pair.
 
-## Open decisions (for review)
+## Decisions (resolved in review, 2026-09-06)
 
-Four decisions from the first draft were settled in review and are
-recorded in Implementation notes rather than re-opened here:
-`Constraint.id` required on the record (yes, WS1); a `ModelFragment`
-type instead of `skipPlayerValidation` (yes, WS1); WS6 after WS3 (yes);
-the entity/value split (yes, as a sealed union, WS1).
+Eight questions were put to the owner and settled. They are recorded
+here with the choice and its reason so a workstream does not reopen
+them.
 
-- **Which rules move into the builder.** The sketch moves the 12
-  structural rules whose subject is a reference, a duplicate, a cycle
-  or an entity-only referent, plus
-  the two population structural rules, and leaves every semantic rule
-  (`constraint/*`, `population/*-violation`, completeness warnings) on
-  the built model. Options: (a) exactly that set, chosen by the test
-  "can the value exist with this defect", so a built model has no
-  dangling reference and no duplicate name; (b) a narrower set (only
-  dangling references), leaving duplicates and cycles as rules so
-  `barwise validate` can report them alongside semantic findings on a
-  model that still builds. Recommended: (a); `BuildResult` carries the
-  diagnostics with their existing ids, so the operator sees the same
-  report either way, and (b) leaves a value that a subtype cycle can
-  make non-terminating for the graph.
-- **Partial population tuples.** `population/incomplete-instance` is a
-  rule today, and the yaml permits an instance missing a role value.
-  Options: (a) the builder refuses, so `FactInstance.roleValues` is
-  complete and the population rules lose their partial-tuple guards;
-  (b) keep partial tuples as data and give the graph a
-  `completeInstances(pop)` view. Recommended: (a); an incomplete
-  instance is a fact that was not stated, not an open-world fact, and
-  today's rule already reports it as an error.
-- **Freeze at runtime or only at the type level.** `readonly` on every
-  field is free; `Object.freeze` at `build()` catches a mutation that
-  a cast slipped past the type, at a per-build cost no measurement here
-  can see. Recommended: freeze, in the builder only, so the cost is
-  paid once per model.
-- **Whether `graphOf` is memoized on the value.** Rebuilding on every
-  capability call is O(n) and simple; a `WeakMap<OrmModel, ModelGraph>`
-  makes it once per value with no API change. Recommended: start
-  without; add the `WeakMap` if a profile of `barwise validate` on the
-  largest example shows it.
+From the first draft: `Constraint.id` required on the record (yes,
+WS1); a `ModelFragment` type instead of `skipPlayerValidation` (yes,
+WS1); WS6 after WS3 (yes); the entity/value split (yes, as a sealed
+union, WS1).
+
+- **The builder owns the 12 referential structural rules.** Chosen by
+  the test "can the value exist with this defect", so a built model has
+  no dangling reference, no duplicate name and no subtype cycle. The
+  narrower alternative (only dangling references) leaves a value a
+  cycle can make non-terminating for the graph.
+
+  **This costs the operator a pass, and the cost was accepted.** The
+  engine runs every rule unconditionally today and sorts the findings,
+  so a model with a dangling reference and an unrelated constraint
+  problem reports both at once. Under this decision it does not build,
+  the semantic rules never run, and the second problem surfaces only
+  after the first is fixed. The analogy that makes this the right
+  trade is the compiler's: build errors are parse errors and the
+  validation rules are the type checker, and no compiler type-checks a
+  file that will not parse. The mitigation is a WS1 requirement:
+  **`build()` collects every diagnostic it can find before returning,
+  never failing on the first**, so one pass reports every referential
+  problem in the model rather than one at a time. An earlier draft of
+  this spec claimed the operator "sees the same report either way";
+  that was wrong, and the correction is what this paragraph records.
+
+- **The builder refuses a partial population tuple.**
+  `FactInstance.roleValues` is complete on a built model and the
+  population rules lose their partial-tuple guards. Today's
+  `population/incomplete-instance` rule already reports the case as an
+  error, so this changes when the operator hears, not whether.
+
+- **`build()` freezes what it returns**, deeply, so a mutation a cast
+  slipped past the type fails loudly. Two consequences for WS1: this
+  package's modules are always strict mode, so a stray write throws
+  rather than failing silently, which is what makes the freeze useful
+  in a test; and `ModelBuilder.from(model)` copies the arrays it
+  inherits, since it cannot mutate frozen ones.
+
+- **`graphOf` memoizes per model value**, with a module-level
+  `WeakMap<OrmModel, ModelGraph>` inline in the graph module. In
+  JavaScript a weak map is not an addition to memoization, it is how a
+  function memoizes on an object key without pinning every key it ever
+  saw (`functools.lru_cache` keyed on a hash is the strong-reference
+  equivalent). No general `memoize` helper until a second call site
+  wants one.
+
+  The point is idempotence rather than speed: two calls on one value
+  return the same object, so identity comparisons and anything keyed on
+  the graph behave. Three consequences. The cache is sound **because**
+  the model is frozen, since memoizing on identity is only correct when
+  the key cannot change. The graph is frozen too, because callers now
+  share one object. And the purity gate is satisfied: a cache is not
+  I/O, a clock or randomness, and the graph returned is identical
+  whether or not it was cached. Passing the graph down from a
+  capability's entry point stays the house style, because it reads
+  better; the cache means a caller who forgets does not pay for it.
 
 ## Risks and testing
 
@@ -695,6 +726,16 @@ the entity/value split (yes, as a sealed union, WS1).
   entity/value split (few branches removed for a large radius) counted
   the wrong thing; the split's payoff is compile-time refusal at the 58
   construction sites, which a branch count cannot see.
+- The four open decisions were resolved 2026-09-06 and moved into
+  Decisions with their reasons. Resolving them corrected one claim the
+  spec had made: that moving the referential rules into the builder
+  leaves the operator "the same report either way". It does not. The
+  validation engine runs every rule unconditionally and sorts the
+  findings, so today a dangling reference and an unrelated semantic
+  problem arrive together, and after WS1 the second waits for a second
+  pass. The owner accepted that cost; `build()` collecting every
+  diagnostic before returning is the mitigation, and it is now a WS1
+  requirement.
 - Two claims in this revision are argued from reading, not from
   running: that the acyclic handler and the existing witnesses
   reproduce under a property ordering (WS5), and that the 12
