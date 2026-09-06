@@ -191,11 +191,6 @@
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"Path to incoming .orm.yaml file\" in packages/cli/src/commands/diff.ts, packages/cli/src/commands/merge.ts"
     },
-    "literal:ddd09e146c3f": {
-      "status": "accepted-benign",
-      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
-      "detail": "\"No Person is a parent of that same Person.\" in packages/core/src/model/Constraint.ts, packages/core/src/validation/rules/population/ring.ts"
-    },
     "literal:ed82f35862b1": {
       "status": "accepted-benign",
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
@@ -226,6 +221,11 @@
       "note": "descriptive: explains why the hand-maintained value is distrusted, not a live mirror",
       "detail": "packages/promptlab/CLAUDE.md: `version:` being bumped -- which `artifactVersion`, a hand-maintained"
     },
+    "union:0ac7538df8a3": {
+      "status": "accepted-benign",
+      "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
+      "detail": "RingProperty restated as record in packages/core/src/validation/rules/population/ring.ts"
+    },
     "union:0b572648a186": {
       "status": "accepted-benign",
       "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
@@ -255,6 +255,11 @@
       "status": "accepted-benign",
       "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
       "detail": "ConceptualDataTypeName restated as set in packages/llm/src/parse/helpers.ts"
+    },
+    "union:d3eb9886b1d0": {
+      "status": "accepted-benign",
+      "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
+      "detail": "RingType restated as record in packages/core/src/validation/rules/population/ring.ts"
     }
   }
 }
