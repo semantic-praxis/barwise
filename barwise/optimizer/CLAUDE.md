@@ -151,15 +151,22 @@ through. `BARWISE_CLI` overrides what gets run.
   the default while reporting on the candidate. `write_candidate`
   requires it and `match_for_target` derives it from `provider/model`.
 - **Gate a candidate with `--artifacts` AND `--artifact-version`.**
-  The match block is derived from the target, so a candidate claims the
-  same provider and model prefix as the shipped variant for that model -- `--artifacts` alone is therefore genuinely ambiguous and the
-  resolver refuses to guess. That refusal is the good outcome; the bad
-  one is the report that used to say `--artifacts packages/llm/prompts`,
-  which widens the set with the directory the shipped builtins come
-  from and measures a shipped variant while the reader believes they are
-  gating the candidate (barwise-850, reproduced in an instruction). The
-  delta report now prints the candidate's own directory and version,
-  and both halves are pinned in `test_run_smoke.py`.
+  `--artifact-version` pins the candidate whatever else matches, and it
+  is what the delta report's gating command prints. Without it the
+  resolver picks by specificity: the candidate's match block is derived
+  from the target, so its `modelPrefix` is the full model id
+  (`claude-haiku-4-5`) while the shipped variant claims the family
+  (`claude-haiku`), and the longer prefix wins (barwise-854). Between
+  haiku45-2 shipping and that ranking, `--artifacts` alone was refused
+  as ambiguous; a candidate whose prefix EQUALS the shipped one's still
+  is. The bad outcome either way is the report that used to say
+  `--artifacts packages/llm/prompts`, which widens the set with the
+  directory the shipped builtins come from and measures a shipped
+  variant while the reader believes they are gating the candidate
+  (barwise-850, reproduced in an instruction). The delta report now
+  prints the candidate's own directory and version, and both halves --
+  the pinned form and the by-specificity form -- are in
+  `test_run_smoke.py`.
 - **A compile says what it is doing, per call.** `make_metric(log,
   progress)` reports every evaluation -- case, score, phase
   (`baseline` / `shipped` / `compile` / `candidate`) and calls spent

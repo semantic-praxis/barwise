@@ -131,7 +131,11 @@ interface RawPopulation {
 }
 
 interface RawModelDoc {
-  orm_version?: string;
+  // Required by orm-model.schema.json at the root, and the source is
+  // schema-validated before it is read as raw YAML, so the domain docs
+  // carry the source's version through. A `?? "1.0"` fallback lived
+  // here for a year and could never fire (barwise-5t9.14).
+  orm_version: string;
   model: {
     name: string;
     object_types?: RawObjectType[];
@@ -337,7 +341,7 @@ export function splitModel(modelYaml: string, config: SplitConfig): SplitResult 
     }
 
     const domainDoc: RawModelDoc = {
-      orm_version: doc.orm_version ?? "1.0",
+      orm_version: doc.orm_version,
       model: domainModel,
     };
     const yaml = stringify(domainDoc, { lineWidth: 0 });

@@ -1,4 +1,6 @@
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   hashModel,
@@ -8,7 +10,10 @@ import {
   updateManifest,
 } from "../../src/lineage/manifest.js";
 import type { LineageManifest, ManifestExport } from "../../src/lineage/types.js";
+import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const sampleManifest: LineageManifest = {
   version: 1,
@@ -136,6 +141,32 @@ describe("Lineage Manifest", () => {
   });
 
   describe("hashModel", () => {
+    // A hand-authored model: 76 explicit element ids, no constraint ids.
+    const EXAMPLE = resolve(__dirname, "../../../../examples/models/learning-design.orm.yaml");
+
+    it("hashes two independent loads of the same file identically (barwise-923)", () => {
+      // Every id-less constraint is minted a fresh UUID on load, so two
+      // loads serialize differently on every constraint `id:` line and
+      // hashed differently -- which made `barwise lineage status` report
+      // every export stale on every run for any model like this one.
+      const text = readFileSync(EXAMPLE, "utf8");
+      const serializer = new OrmYamlSerializer();
+      const first = serializer.deserialize(text);
+      const second = serializer.deserialize(text);
+      expect(hashModel(first)).toBe(hashModel(second));
+    });
+
+    it("still changes when the content changes, ids aside", () => {
+      const text = readFileSync(EXAMPLE, "utf8");
+      const serializer = new OrmYamlSerializer();
+      const original = serializer.deserialize(text);
+      const renamed = serializer.deserialize(
+        text.replace("name: LearningModule", "name: CourseModule"),
+      );
+      expect(text).toContain("name: LearningModule");
+      expect(hashModel(original)).not.toBe(hashModel(renamed));
+    });
+
     it("should produce a deterministic hash for the same model", () => {
       const model = new ModelBuilder("Test Model")
         .withEntityType("Customer", { referenceMode: "id" })

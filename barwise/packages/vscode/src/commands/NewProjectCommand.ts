@@ -1,13 +1,5 @@
 import * as vscode from "vscode";
-
-const PROJECT_SCAFFOLD = `orm_version: "1.0"
-model:
-  name: "New Domain Model"
-  domain_context: "my_domain"
-  object_types: []
-  fact_types: []
-  definitions: []
-`;
+import { PROJECT_SCAFFOLD } from "./projectScaffold.js";
 
 /**
  * Creates a new .orm.yaml file with a scaffold template.
