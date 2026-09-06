@@ -168,6 +168,16 @@ reverse.
   right past it. "The authored diagnosis" with no field to hold it
   reads fine and builds nothing. Ask of each one: which field, in
   which file, from which workstream?
+
+  The dual holds for the nouns a design inherits: an Inventory row
+  that names existing code to change is a claim that the code is
+  reachable, and it is checkable before the row is written. A
+  `?? "1.0"` fallback was spec'd as "redirect to the current
+  version" and turned out to be dead -- the schema required the
+  field and the source was validated first -- so the workstream
+  landed as a deletion the draft never considered
+  (`tracker-quick-wins.spec.md`, WS2). Before an Inventory row says
+  "change X", ask what would make X run, and whether anything can.
 - **Header block is current** -- `Status`, `Created`, `Last-updated`
   (bumped if this push revises an existing spec), `Tracking`.
 - **Parity check**: if the design introduces a copy that must agree
