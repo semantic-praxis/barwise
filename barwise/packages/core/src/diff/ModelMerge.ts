@@ -15,7 +15,6 @@
 import { type FactTypeConfig, toFactTypeConfig } from "../model/FactType.js";
 import { type ObjectType, toObjectTypeConfig } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
-import type { RoleConfig } from "../model/Role.js";
 import type { Diagnostic } from "../validation/Diagnostic.js";
 import { structuralRules } from "../validation/rules/structural.js";
 import type { DefinitionDelta, FactTypeDelta, ModelDelta, ObjectTypeDelta } from "./ModelDiff.js";
@@ -169,16 +168,16 @@ function addFactTypeToMerged(
   overrideId: string | null,
   incomingIdToMergedId: Map<string, string>,
 ): void {
-  const roles: RoleConfig[] = source.roles.map((r) => ({
-    name: r.name,
-    id: r.id,
-    playerId: resolvePlayerId(merged, r.playerId, incomingIdToMergedId, source),
-  }));
-
+  // The projection is the only place a role's fields are listed; this
+  // overrides the one it means to change (barwise-927 review).
+  const projected = toFactTypeConfig(source);
   const config: FactTypeConfig = {
-    ...toFactTypeConfig(source),
+    ...projected,
     id: overrideId ?? source.id,
-    roles,
+    roles: projected.roles.map((r) => ({
+      ...r,
+      playerId: resolvePlayerId(merged, r.playerId, incomingIdToMergedId, source),
+    })),
     constraints: remapConstraintIds(source.constraints, source, merged, incomingIdToMergedId),
   };
 
