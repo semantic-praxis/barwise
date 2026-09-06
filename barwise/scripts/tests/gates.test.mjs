@@ -288,6 +288,47 @@ test("audit-spec-status --check is green on the current tree, from every cwd", (
   }
 });
 
+/**
+ * The claim regex matched "no implementation" and a leading draft or
+ * proposed, and nothing else. Two specs written on 2026-09-06 said
+ * "no workstream implemented" and sat outside the gate for a whole
+ * workstream's worth of commits; the first PR to land one of them
+ * found the hole and said so in its session review (#426). The
+ * planted defect is the exact phrasing, on a spec that names a code
+ * file a later commit touches: red until the regex knows the phrase.
+ */
+test("audit-spec-status fires on 'no workstream implemented', the phrasing that escaped", () => {
+  const dir = tempRepo();
+  try {
+    stage(dir, "barwise/packages/core/src/a.ts", "export const a = 1;\n");
+    stage(
+      dir,
+      "barwise/docs/specs/x.spec.md",
+      "# x\n\nStatus: Design review complete -- no workstream implemented\n\nTouches `packages/core/src/a.ts`.\n",
+    );
+    execFileSync("git", ["commit", "-qm", "spec"], { cwd: dir });
+    stage(dir, "barwise/packages/core/src/a.ts", "export const a = 2;\n");
+    execFileSync("git", ["commit", "-qm", "ws1 lands"], { cwd: dir });
+    const r = gate("audit-spec-status.mjs", dir, "--at", "HEAD");
+    assert.equal(r.status, 0, `--at failed:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stdout, /x\.spec\.md/, `the gate did not fire on the phrasing:\n${r.stdout}`);
+    // A partial claim is a different question (barwise-912) and must not fire.
+    stage(
+      dir,
+      "barwise/docs/specs/x.spec.md",
+      "# x\n\nStatus: WS0 complete; WS1-WS8 not implemented\n\nTouches `packages/core/src/a.ts`.\n",
+    );
+    execFileSync("git", ["commit", "-qm", "status says what shipped"], { cwd: dir });
+    stage(dir, "barwise/packages/core/src/a.ts", "export const a = 3;\n");
+    execFileSync("git", ["commit", "-qm", "more"], { cwd: dir });
+    const r2 = gate("audit-spec-status.mjs", dir, "--at", "HEAD");
+    assert.equal(r2.status, 0, r2.stdout + r2.stderr);
+    assert.match(r2.stdout, /no findings/, `a partial claim fired:\n${r2.stdout}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("audit-spec-status refuses a shallow clone rather than reporting OK", () => {
   const dir = tempRepo();
   try {
