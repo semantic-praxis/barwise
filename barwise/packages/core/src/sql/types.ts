@@ -2,7 +2,7 @@
  * SQL analysis types.
  *
  * Defines the dialect, pattern, and cascade result types used by
- * the SQL parsing cascade (sqlglot sidecar -> regex -> LLM fallback).
+ * the SQL parsing cascade (sqlglot sidecar -> regex).
  */
 
 /**
@@ -36,11 +36,16 @@ export const SQL_DIALECTS = Object.keys(SQL_DIALECT_MEMBERS) as readonly SqlDial
  * Which cascade level produced a parse result.
  *
  * - "sqlglot": Structural AST parsing via the optional sqlglot
- *   sidecar (@barwise/formats owns the subprocess; core stays pure).
+ *   sidecar (@barwise/dbt owns the subprocess; core stays pure).
  * - "regex": Lightweight regex-based pattern extraction.
- * - "llm": Raw SQL sent to LLM for interpretation.
+ *
+ * Two tiers, not three. An "llm" member was declared here for years
+ * and produced by nothing (barwise-858): core cannot make an LLM call,
+ * and no connector did either. A tier only exists once something
+ * produces it; if a connector ever interprets SQL through a model, it
+ * does so behind `ImportFormat.enrich` and adds the member then.
  */
-export type ParseLevel = "sqlglot" | "regex" | "llm";
+export type ParseLevel = "sqlglot" | "regex";
 
 /**
  * A SQL pattern extracted from analysis.
