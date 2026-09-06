@@ -157,6 +157,40 @@ touching a test file. A test that fails against the port is either a
 bug in the port or a test that pinned TypeScript representation rather
 than behaviour, and the experiment records which.
 
+## Beyond core: where the language boundary would fall
+
+The experiment measures core, but a reader will ask whether ReScript
+could replace TypeScript across the monorepo. It could, in the sense
+that it compiles to JavaScript and can bind to anything; the question
+is where it pays, and the package graph already draws the line.
+
+| Package                                                          | Source lines | What it is                                                              | Fit                                                          |
+| ---------------------------------------------------------------- | -----------: | ----------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `core`                                                           |       18,813 | types and algorithms, two external imports                              | this experiment                                              |
+| `learn`, `promptlab`, `diagram`, `diagram-ui`                    |        9,936 | pure over core; the last is a React renderer                            | second wave if core adopts; React is first-class in ReScript |
+| `llm`, `formats`, `dbt`, `code-analysis`, `mcp`, `cli`, `vscode` |       34,919 | glue over SDKs, Node APIs, the TypeScript compiler API, the VS Code API | stays TypeScript, indefinitely                               |
+
+The reason the shell stays is the inverse of the reason core might
+move. Every library the shell touches ships its own TypeScript types
+and the compiler checks each call against them for free. In ReScript
+each of those calls goes through a hand-written `external` binding,
+which is a claim about a library that nothing checks; a wrong binding
+is a runtime error TypeScript would have caught at compile time. At
+the ecosystem boundary the safety argument inverts, and the VS Code
+API is the worst case: enormous, revised monthly, with partial
+community bindings. So the language boundary, if there is one, falls
+where the dependency graph already puts the I/O boundary: an ML core
+and a TypeScript shell, which is "functional core, imperative shell"
+with the languages matched to the halves.
+
+One trade inside core that WS2 must answer: the sealed-record spec's
+field tables and dispatch tables get compiler-checked completeness
+from TypeScript's type-level programming (`keyof`, mapped types,
+`Record<Union, ...>` with `satisfies`). ReScript has none of that; it
+gets exhaustiveness from variants and pattern matching. A field table
+in the port is either an explicit list guarded by a drift test or
+generated, and the experiment records which and what it cost.
+
 ## Alternatives considered
 
 - **Gleam.** Compiles to JavaScript, ML-family, small.
@@ -343,7 +377,8 @@ adoption spec's shape if one is written; they do not decide.
 
 - Deciding to adopt ReScript. This spec decides how to find out.
 - Migrating any consumer, publishing the port, or replacing
-  `@barwise/core` on `main`.
+  `@barwise/core` on `main`. The second wave named above is a
+  candidate list for the adoption spec, not a commitment.
 - Porting anything beyond model, validation and verbalization.
 - Comparing branch counts across languages: the coverage engine
   measures emitted code and the numbers would not mean what they mean
