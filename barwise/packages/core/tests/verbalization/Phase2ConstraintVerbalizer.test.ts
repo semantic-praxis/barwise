@@ -192,11 +192,66 @@ describe("Phase 2 constraint verbalization", () => {
     expect(v.text).toContain("does not");
   });
 
-  it("verbalizes ring (other types)", () => {
+  it("verbalizes ring (antisymmetric)", () => {
+    const { model, ft } = buildSelfRefModel();
+    const c: Constraint = { type: "ring", roleId1: "r1", roleId2: "r2", ringType: "antisymmetric" };
+    const v = verbalizer.verbalize(c, ft, model);
+    expect(v.text).toBe(
+      "If Person1 is parent of Person2 and Person2 is parent of Person1"
+        + " then Person1 is the same Person as Person2.",
+    );
+  });
+
+  it("verbalizes ring (symmetric)", () => {
+    const { model, ft } = buildSelfRefModel();
+    const c: Constraint = { type: "ring", roleId1: "r1", roleId2: "r2", ringType: "symmetric" };
+    const v = verbalizer.verbalize(c, ft, model);
+    expect(v.text).toBe(
+      "If Person1 is parent of Person2 then Person2 is parent of Person1.",
+    );
+  });
+
+  it("verbalizes ring (transitive)", () => {
+    const { model, ft } = buildSelfRefModel();
+    const c: Constraint = { type: "ring", roleId1: "r1", roleId2: "r2", ringType: "transitive" };
+    const v = verbalizer.verbalize(c, ft, model);
+    expect(v.text).toBe(
+      "If Person1 is parent of Person2 and Person2 is parent of Person3"
+        + " then Person1 is parent of Person3.",
+    );
+  });
+
+  it("verbalizes ring (intransitive)", () => {
+    const { model, ft } = buildSelfRefModel();
+    const c: Constraint = { type: "ring", roleId1: "r1", roleId2: "r2", ringType: "intransitive" };
+    const v = verbalizer.verbalize(c, ft, model);
+    expect(v.text).toBe(
+      "If Person1 is parent of Person2 and Person2 is parent of Person3"
+        + " then Person1 does not is parent of Person3.",
+    );
+  });
+
+  it("verbalizes ring (acyclic)", () => {
     const { model, ft } = buildSelfRefModel();
     const c: Constraint = { type: "ring", roleId1: "r1", roleId2: "r2", ringType: "acyclic" };
     const v = verbalizer.verbalize(c, ft, model);
-    expect(v.text).toContain("Acyclic:");
+    expect(v.text).toBe(
+      "No Person is parent of that same Person, directly or through a chain of such relationships.",
+    );
+  });
+
+  it("verbalizes ring (purely_reflexive)", () => {
+    const { model, ft } = buildSelfRefModel();
+    const c: Constraint = {
+      type: "ring",
+      roleId1: "r1",
+      roleId2: "r2",
+      ringType: "purely_reflexive",
+    };
+    const v = verbalizer.verbalize(c, ft, model);
+    expect(v.text).toBe(
+      "If Person1 is parent of Person2 then Person1 is the same Person as Person2.",
+    );
   });
 
   it("verbalizes ring with an unresolved role id, falling back to the raw id", () => {

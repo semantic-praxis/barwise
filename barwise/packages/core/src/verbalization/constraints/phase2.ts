@@ -2,10 +2,12 @@
  * Phase 2 constraint verbalizations: disjunctive mandatory, exclusion,
  * exclusive-or, subset, equality, ring, and frequency.
  */
+import type { RingType } from "../../model/Constraint.js";
 import type { FactType } from "../../model/FactType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import { expandReading } from "../../model/ReadingOrder.js";
 import type { JoinOperand, RolePath } from "../../model/RolePath.js";
+import { assertNever } from "../../util/assertNever.js";
 import {
   buildVerbalization,
   kwSeg,
@@ -178,12 +180,16 @@ export function verbalizeEquality(
 }
 
 /**
- * Ring constraint verbalization, varies by ring type.
+ * Ring constraint verbalization: one FORML sentence shape per ring type
+ * (Halpin), exhaustive over `RingType` so a ninth ring type fails to
+ * compile here rather than falling to a generic "<Label>: X pred X."
+ * rendering (barwise-930). `ring.ts`'s doc comment gives the semantics
+ * this wording follows for each type.
  */
 export function verbalizeRing(
   roleId1: string,
   roleId2: string,
-  ringType: string,
+  ringType: RingType,
   factType: FactType,
   model: OrmModel,
 ): Verbalization {
@@ -191,20 +197,22 @@ export function verbalizeRing(
   const ot = role1 ? model.getObjectType(role1.playerId) : undefined;
   const typeName = ot?.name ?? role1?.name ?? roleId1;
   const typeId = role1?.playerId ?? roleId1;
+  const name1 = refSeg(typeName + "1", typeId);
+  const name2 = refSeg(typeName + "2", typeId);
+  const name3 = refSeg(typeName + "3", typeId);
+  const same = refSeg(typeName, typeId);
 
   const predicate = factType.arity === 2
     ? extractPredicate(factType, 0, 1)
     : "...";
 
-  const ringLabel = ringType.replace(/_/g, " ");
-
   switch (ringType) {
     case "irreflexive": {
       const segments: VerbalizationSegment[] = [
         kwSeg("No "),
-        refSeg(typeName, typeId),
+        same,
         textSeg(" " + predicate + " that same "),
-        refSeg(typeName, typeId),
+        same,
         textSeg("."),
       ];
       return buildVerbalization(factType.id, "constraint", segments);
@@ -212,27 +220,111 @@ export function verbalizeRing(
     case "asymmetric": {
       const segments: VerbalizationSegment[] = [
         kwSeg("If "),
-        refSeg(typeName + "1", typeId),
+        name1,
         textSeg(" " + predicate + " "),
-        refSeg(typeName + "2", typeId),
+        name2,
         kwSeg(" then "),
-        refSeg(typeName + "2", typeId),
+        name2,
         textSeg(" does not " + predicate + " "),
-        refSeg(typeName + "1", typeId),
+        name1,
         textSeg("."),
       ];
       return buildVerbalization(factType.id, "constraint", segments);
     }
-    default: {
+    case "antisymmetric": {
       const segments: VerbalizationSegment[] = [
-        textSeg(ringLabel.charAt(0).toUpperCase() + ringLabel.slice(1) + ": "),
-        refSeg(typeName, typeId),
+        kwSeg("If "),
+        name1,
         textSeg(" " + predicate + " "),
-        refSeg(typeName, typeId),
+        name2,
+        kwSeg(" and "),
+        name2,
+        textSeg(" " + predicate + " "),
+        name1,
+        kwSeg(" then "),
+        name1,
+        textSeg(" is the same " + typeName + " as "),
+        name2,
         textSeg("."),
       ];
       return buildVerbalization(factType.id, "constraint", segments);
     }
+    case "symmetric": {
+      const segments: VerbalizationSegment[] = [
+        kwSeg("If "),
+        name1,
+        textSeg(" " + predicate + " "),
+        name2,
+        kwSeg(" then "),
+        name2,
+        textSeg(" " + predicate + " "),
+        name1,
+        textSeg("."),
+      ];
+      return buildVerbalization(factType.id, "constraint", segments);
+    }
+    case "transitive": {
+      const segments: VerbalizationSegment[] = [
+        kwSeg("If "),
+        name1,
+        textSeg(" " + predicate + " "),
+        name2,
+        kwSeg(" and "),
+        name2,
+        textSeg(" " + predicate + " "),
+        name3,
+        kwSeg(" then "),
+        name1,
+        textSeg(" " + predicate + " "),
+        name3,
+        textSeg("."),
+      ];
+      return buildVerbalization(factType.id, "constraint", segments);
+    }
+    case "intransitive": {
+      const segments: VerbalizationSegment[] = [
+        kwSeg("If "),
+        name1,
+        textSeg(" " + predicate + " "),
+        name2,
+        kwSeg(" and "),
+        name2,
+        textSeg(" " + predicate + " "),
+        name3,
+        kwSeg(" then "),
+        name1,
+        textSeg(" does not " + predicate + " "),
+        name3,
+        textSeg("."),
+      ];
+      return buildVerbalization(factType.id, "constraint", segments);
+    }
+    case "acyclic": {
+      const segments: VerbalizationSegment[] = [
+        kwSeg("No "),
+        same,
+        textSeg(" " + predicate + " that same "),
+        same,
+        textSeg(", directly or through a chain of such relationships."),
+      ];
+      return buildVerbalization(factType.id, "constraint", segments);
+    }
+    case "purely_reflexive": {
+      const segments: VerbalizationSegment[] = [
+        kwSeg("If "),
+        name1,
+        textSeg(" " + predicate + " "),
+        name2,
+        kwSeg(" then "),
+        name1,
+        textSeg(" is the same " + typeName + " as "),
+        name2,
+        textSeg("."),
+      ];
+      return buildVerbalization(factType.id, "constraint", segments);
+    }
+    default:
+      return assertNever(ringType);
   }
 }
 
