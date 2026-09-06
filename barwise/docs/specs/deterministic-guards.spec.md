@@ -1,9 +1,9 @@
 # Make the guards that only diligence enforces fail on their own
 
-Status: Workstream 1 implemented; 2-4 approved and pending (see
-Implementation notes)
+Status: Workstreams 1 and 2 implemented; 3 and 4 approved and pending
+(see Implementation notes)
 Created: 2026-08-30
-Last-updated: 2026-08-30
+Last-updated: 2026-09-06
 Tracking: barwise-915 (Python interpreter unpinned), barwise-916
 (sqlglot tier absent from CI, tests vanish rather than fail), barwise-917
 (model aliases make score rows unattributable), barwise-919 (version
@@ -357,12 +357,51 @@ Two deviations from the brief, neither anticipated:
   asserts that at least one field member is registered before it walks
   them: a for-loop over an empty list passes.
 
-**Workstreams 2, 3 and 4 are approved but not started.** Each is blocked
-on an open decision below rather than on workstream 1: workstream 2 on
-what to do if a provider echoes an alias back and on whether Ollama is
-worth closing, workstream 3 on whether sqlglot is installed in CI as
-well as declared, and workstream 4 on the Python version and on whether
-action refs are in scope.
+**Two of the blockers recorded here were resolved elsewhere, and this
+note said otherwise for a week.** `docs/specs/python-lockfile-execution.spec.md`
+settled both while closing barwise-921: sqlglot **is** installed in CI
+(`uv sync --locked --only-group sqlglot`, `ci.yml`), and the Python
+version **is** pinned (`.python-version` reads `3.13`). Nothing read
+this header back -- `audit:specs --check` covers only specs claiming
+_no_ implementation, which is barwise-912.
+
+**Workstream 2 landed.** The five `modelUsed: this.model` sites now read
+the provider's answer. Anthropic and OpenAI report a model on the
+response; Ollama's chunk type had to be widened to read the field at
+all, and the value there is still the tag the operator typed, so the
+finding is closed for two providers and narrowed for the third.
+
+The half the spec did not name was the one that mattered.
+`toHistoryEntry` built `model` from the CLI's `--model` flag -- the
+request string -- so a provider reporting a resolved snapshot changed
+nothing about the recorded row. It now prefers what the runs reported,
+and **refuses to name one when they disagree**: a row whose calls were
+answered by different snapshots is described by no single identifier,
+and picking one would be a false record where the alias is at least
+true. Four tests, each watched red under its own mutation.
+
+Two corrections to this spec's own text, both the same shape as the
+"JSON reporter that does not exist" finding in the companion spec:
+
+- The acceptance names `ScoreRecord.model`. **There is no `ScoreRecord`
+  type.** The recorded row is `HistoryEntry`, and the per-call value
+  rides on `CaseRun.modelUsed`, which already reached the report and
+  the call log before this workstream.
+- The workstream describes itself as five one-line edits. Four of the
+  five are; the fifth is a type widening, and neither reaches the
+  recorded row without the `toHistoryEntry` change above.
+
+**Still unverified: whether the Anthropic API resolves an alias or
+echoes it.** Settling it needs one live paid call, which this change
+does not require -- the provider's answer is never less accurate than
+the request string. The open decision below recommends warning rather
+than refusing if it echoes; no warning is built, because building one
+on an unverified fact would pin a guess as behaviour.
+
+**Workstreams 3 and 4 remain approved and not started.** Workstream 3
+(`audit:skips`) is blocked on a live decision recorded on barwise-921,
+not on the sqlglot question this note used to name. Workstream 4
+(`check:pins`) is blocked only on whether action refs are in scope.
 
 ## Non-goals
 

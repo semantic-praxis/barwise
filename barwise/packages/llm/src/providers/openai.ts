@@ -77,7 +77,12 @@ export class OpenAILlmClient implements LlmClient {
 
     return {
       content: response.choices[0]?.message?.content ?? "",
-      modelUsed: this.model,
+      // The provider's answer, not the request string. An alias
+      // resolves to a dated snapshot server-side, and a row recorded
+      // under the alias cannot say which snapshot produced it
+      // (barwise-917). The fallback covers a provider that reports
+      // nothing; it is never less accurate than what we asked for.
+      modelUsed: response.model ?? this.model,
       usage: response.usage
         ? {
           promptTokens: response.usage.prompt_tokens,
@@ -115,7 +120,12 @@ export class OpenAILlmClient implements LlmClient {
 
     return {
       content: response.choices[0]?.message?.content ?? "",
-      modelUsed: this.model,
+      // The provider's answer, not the request string. An alias
+      // resolves to a dated snapshot server-side, and a row recorded
+      // under the alias cannot say which snapshot produced it
+      // (barwise-917). The fallback covers a provider that reports
+      // nothing; it is never less accurate than what we asked for.
+      modelUsed: response.model ?? this.model,
       usage: response.usage
         ? {
           promptTokens: response.usage.prompt_tokens,

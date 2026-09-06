@@ -156,7 +156,12 @@ export class AnthropicLlmClient implements LlmClient {
     const textBlock = response.content.find((b) => b.type === "text");
     return {
       content: textBlock?.text ?? "",
-      modelUsed: this.model,
+      // The provider's answer, not the request string. An alias
+      // resolves to a dated snapshot server-side, and a row recorded
+      // under the alias cannot say which snapshot produced it
+      // (barwise-917). The fallback covers a provider that reports
+      // nothing; it is never less accurate than what we asked for.
+      modelUsed: response.model ?? this.model,
       usage: {
         promptTokens: response.usage.input_tokens,
         completionTokens: response.usage.output_tokens,
@@ -209,7 +214,12 @@ export class AnthropicLlmClient implements LlmClient {
 
     return {
       content: JSON.stringify(toolBlock.input),
-      modelUsed: this.model,
+      // The provider's answer, not the request string. An alias
+      // resolves to a dated snapshot server-side, and a row recorded
+      // under the alias cannot say which snapshot produced it
+      // (barwise-917). The fallback covers a provider that reports
+      // nothing; it is never less accurate than what we asked for.
+      modelUsed: response.model ?? this.model,
       usage: {
         promptTokens: response.usage.input_tokens,
         completionTokens: response.usage.output_tokens,

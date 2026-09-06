@@ -54,6 +54,14 @@ export interface OllamaClientOptions {
 /** The subset of Ollama's `/api/chat` response this provider reads. */
 interface OllamaChatChunk {
   readonly message?: { readonly content?: string; };
+  /**
+   * The tag `/api/chat` echoes back. Undeclared until barwise-917, so
+   * the field was unreadable even though the server sends it. It is the
+   * tag the operator typed, not a digest -- Ollama resolves a tag to a
+   * digest only through a separate `/api/show` call -- so this closes
+   * the finding for the other two providers and narrows it here.
+   */
+  readonly model?: string;
   readonly done?: boolean;
   readonly done_reason?: string;
   readonly prompt_eval_count?: number;
@@ -128,7 +136,10 @@ export class OllamaLlmClient implements LlmClient {
       // still fence it. Kept from the previous implementation because
       // the failure it prevents has been seen in the wild.
       content: extractJson(chunk.content),
-      modelUsed: this.model,
+      // The tag the server answered under rather than the one this
+      // client holds. They agree today; reading the server's answer is
+      // what stops them diverging silently (barwise-917).
+      modelUsed: chunk.model ?? this.model,
       ...(chunk.promptTokens !== undefined || chunk.completionTokens !== undefined
         ? {
           usage: {
@@ -153,6 +164,8 @@ export class OllamaLlmClient implements LlmClient {
 interface StreamedChat {
   readonly content: string;
   readonly doneReason?: string;
+  /** The tag the server answered under; see OllamaChatChunk.model. */
+  readonly model?: string;
   readonly promptTokens?: number;
   readonly completionTokens?: number;
 }
@@ -173,6 +186,7 @@ async function readChatStream(response: Response): Promise<StreamedChat> {
   let buffered = "";
   let content = "";
   let doneReason: string | undefined;
+  let model: string | undefined;
   let promptTokens: number | undefined;
   let completionTokens: number | undefined;
 
@@ -189,6 +203,7 @@ async function readChatStream(response: Response): Promise<StreamedChat> {
     }
     if (chunk.message?.content !== undefined) content += chunk.message.content;
     if (chunk.done_reason !== undefined) doneReason = chunk.done_reason;
+    if (chunk.model !== undefined) model = chunk.model;
     if (chunk.prompt_eval_count !== undefined) promptTokens = chunk.prompt_eval_count;
     if (chunk.eval_count !== undefined) completionTokens = chunk.eval_count;
   };
@@ -204,6 +219,7 @@ async function readChatStream(response: Response): Promise<StreamedChat> {
   return {
     content,
     ...(doneReason !== undefined ? { doneReason } : {}),
+    ...(model !== undefined ? { model } : {}),
     ...(promptTokens !== undefined ? { promptTokens } : {}),
     ...(completionTokens !== undefined ? { completionTokens } : {}),
   };

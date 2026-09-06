@@ -155,6 +155,31 @@ export function historyPathFor(manifestPath: string): string {
   return join(dirname(manifestPath), "history.jsonl");
 }
 
+/**
+ * The model identifier the runs actually reported, when they agree.
+ *
+ * A recorded row named whatever the operator typed. `--model
+ * claude-sonnet-5` is an alias the provider resolves to a dated
+ * snapshot, so two rows a month apart could name the same model and be
+ * two different ones, with nothing in the file to say so (barwise-917).
+ * The runs carry the provider's own answer; this reads it back.
+ *
+ * Undefined when the runs disagree, which is not a fallback but a
+ * refusal: no single identifier describes a row whose calls were
+ * answered by different snapshots, and naming one of them would be
+ * worse than naming the alias. The caller's requested value stands in,
+ * as it does when no run reported anything at all.
+ */
+function observedModel(report: SuiteReport): string | undefined {
+  const seen = new Set<string>();
+  for (const c of report.cases) {
+    for (const r of c.runs) {
+      if (r.modelUsed !== undefined) seen.add(r.modelUsed);
+    }
+  }
+  return seen.size === 1 ? [...seen][0] : undefined;
+}
+
 export function toHistoryEntry(
   report: SuiteReport,
   date: string,
@@ -165,6 +190,9 @@ export function toHistoryEntry(
     thinkingBudget?: number;
   },
 ): HistoryEntry {
+  // The provider's answer wins over the request string; the request
+  // stands in only when nothing was reported or the runs disagree.
+  const model = observedModel(report) ?? target?.model;
   return {
     date,
     suiteVersion: report.suiteVersion,
@@ -172,7 +200,7 @@ export function toHistoryEntry(
     promptHash: report.promptHash,
     ...(target?.build !== undefined ? { build: target.build } : {}),
     ...(target?.provider !== undefined ? { provider: target.provider } : {}),
-    ...(target?.model !== undefined ? { model: target.model } : {}),
+    ...(model !== undefined ? { model } : {}),
     ...(target?.thinkingBudget !== undefined
       ? { thinkingBudget: target.thinkingBudget }
       : {}),
