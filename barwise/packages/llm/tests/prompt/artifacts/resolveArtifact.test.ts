@@ -82,6 +82,36 @@ describe("resolveArtifact", () => {
     expect(resolved).toBe(both);
   });
 
+  it("ranks a longer modelPrefix above a shorter one that also matches (barwise-854)", () => {
+    // The shape an operator hits first when testing a per-release
+    // variant against the shipped per-family one. A longer prefix that
+    // still matches is strictly more specific; refusing the pair as
+    // ambiguous told them to narrow the match block they had just
+    // narrowed.
+    const family = artifact({
+      version: "family",
+      match: { provider: "anthropic", modelPrefix: "claude-haiku" },
+    });
+    const release = artifact({
+      version: "release",
+      match: { provider: "anthropic", modelPrefix: "claude-haiku-4-5-2026" },
+    });
+    const resolved = resolveArtifact([family, release], {
+      surface: "extraction",
+      provider: "anthropic",
+      model: "claude-haiku-4-5-20261001",
+    });
+    expect(resolved).toBe(release);
+    // Outside the release, the family variant is the only match.
+    expect(
+      resolveArtifact([family, release], {
+        surface: "extraction",
+        provider: "anthropic",
+        model: "claude-haiku-4-5-20250101",
+      }),
+    ).toBe(family);
+  });
+
   it("throws on an equal-specificity tie", () => {
     const rival = artifact({ version: "rival", match: { provider: "anthropic" } });
     expect(() =>
