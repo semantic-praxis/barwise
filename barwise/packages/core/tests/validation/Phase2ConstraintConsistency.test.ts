@@ -292,4 +292,52 @@ describe("Phase 2 constraint consistency rules", () => {
     const diags = constraintConsistencyRules(model);
     expect(diags.some((d) => d.ruleId === "constraint/frequency-invalid-min")).toBe(true);
   });
+
+  // -- Value comparison --
+
+  it("value comparison with valid roles passes", () => {
+    const model = buildModelWithConstraint({
+      type: "value_comparison",
+      roleId1: "r1",
+      roleId2: "r2",
+      operator: "<",
+    });
+    const diags = constraintConsistencyRules(model);
+    expect(diags).toHaveLength(0);
+  });
+
+  it("value comparison with invalid roleId1 fails", () => {
+    const model = buildModelWithConstraint({
+      type: "value_comparison",
+      roleId1: "bogus",
+      roleId2: "r2",
+      operator: "<",
+    });
+    const diags = constraintConsistencyRules(model);
+    expect(diags.some((d) => d.ruleId === "constraint/value-comparison-invalid-role")).toBe(true);
+    expect(diags.some((d) => d.message.includes('"bogus"'))).toBe(true);
+  });
+
+  it("value comparison with invalid roleId2 fails", () => {
+    const model = buildModelWithConstraint({
+      type: "value_comparison",
+      roleId1: "r1",
+      roleId2: "bogus",
+      operator: ">=",
+    });
+    const diags = constraintConsistencyRules(model);
+    expect(diags.some((d) => d.ruleId === "constraint/value-comparison-invalid-role")).toBe(true);
+  });
+
+  it("value comparison with both role ids invalid fails with two diagnostics", () => {
+    const model = buildModelWithConstraint({
+      type: "value_comparison",
+      roleId1: "bogus1",
+      roleId2: "bogus2",
+      operator: "=",
+    });
+    const diags = constraintConsistencyRules(model);
+    const vcDiags = diags.filter((d) => d.ruleId === "constraint/value-comparison-invalid-role");
+    expect(vcDiags).toHaveLength(2);
+  });
 });
