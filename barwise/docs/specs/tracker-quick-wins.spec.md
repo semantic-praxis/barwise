@@ -1,6 +1,7 @@
 # Six small tracker defects, one batch: fix each where it lives
 
-Status: Draft -- no workstream implemented
+Status: Implemented -- all six workstreams, 2026-09-06 (one PR, six
+commits; WS2 landed differently from the draft, see Implementation notes)
 Created: 2026-09-06
 Last-updated: 2026-09-06
 Tracking: barwise-858, barwise-5t9.14, barwise-857, barwise-854,
@@ -32,8 +33,10 @@ In scope, one EARS requirement per workstream:
 - When `ParseLevel` is read, the system shall offer only the two tiers
   that code produces (`"sqlglot"`, `"regex"`), and the cascade
   docstrings shall describe two tiers.
-- When the VS Code scaffold or `splitModel` emits an `orm_version`, the
-  system shall emit `CURRENT_ORM_VERSION`, never a literal.
+- When the VS Code scaffold emits an `orm_version`, the system shall
+  emit `CURRENT_ORM_VERSION`, never a literal; when `splitModel` reads
+  a source, the system shall carry the source's required `orm_version`
+  through without a fallback.
 - When `@barwise/diagram` is imported, the system shall not export
   `computeLayoutMetrics`; the corpus tolerance test keeps consuming it
   from its module path.
@@ -56,22 +59,22 @@ legitimate answer; un-exporting is the cheaper form of it).
 
 ## Inventory
 
-| Module                                            | Current state                                                      | Verdict                                                |
-| ------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------ |
-| `core/src/sql/types.ts`                           | `ParseLevel` declares `"llm"`; docstring describes three tiers     | Drop the member; two-tier docstring (WS1)              |
-| `core/src/sql/SqlCascadeParser.ts`                | Header lists an "LLM fallback (deferred to enrich() phase)"        | Point at `enrich` as the seam, no third tier (WS1)     |
-| `vscode/src/commands/NewProjectCommand.ts`        | `PROJECT_SCAFFOLD` literal `orm_version: "1.0"`                    | Interpolate `CURRENT_ORM_VERSION` (WS2)                |
-| `core/src/project/splitModel.ts:340`              | `doc.orm_version ?? "1.0"`                                         | Fall back to `CURRENT_ORM_VERSION` (WS2)               |
-| `diagram/src/index.ts:38`                         | Exports `computeLayoutMetrics`, `LayoutMetrics`; no consumer       | Remove the export line (WS3)                           |
-| `diagram/tests/layout/metrics.test.ts`            | Imports from `../../src/layout/metrics.js`; corpus tolerance gate  | Unchanged: it is the consumer                          |
-| `llm/src/prompt/artifacts/resolveArtifact.ts:57`  | `specificity()` scores which fields are present, not prefix length | Rank by (fields, prefix length) (WS4)                  |
-| `cli/tests/workspace/promptArtifacts.test.ts:134` | Pins the tie as documented-not-endorsed                            | Flip to assert the narrower prefix wins (WS4)          |
-| `optimizer/barwise_optimizer/barwise_cli.py:133`  | `CaseScore` has no `element_count`; `from_json` drops it           | Carry it (WS5)                                         |
-| `optimizer/barwise_optimizer/metric.py:26`        | `MetricLog` has no element counts                                  | `element_counts` list + `mean_element_count` (WS5)     |
-| `optimizer/barwise_optimizer/export.py:230`       | `render_delta_report` has no denominator line                      | Per-arm mean line; a sentence when it moves with score |
-| `core/src/lineage/manifest.ts:86`                 | `hashModel` hashes the serialized YAML, ids included               | Hash an id-canonical projection (WS6)                  |
-| `core/src/model/FactType.ts:109`                  | Mints a fresh UUID for every id-less constraint                    | Unchanged: the mint is by design (uuid7 spec)          |
-| `core/src/serialization/yaml/constraint.ts`       | Emits the minted id                                                | Unchanged                                              |
+| Module                                            | Current state                                                      | Verdict                                                 |
+| ------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------- |
+| `core/src/sql/types.ts`                           | `ParseLevel` declares `"llm"`; docstring describes three tiers     | Drop the member; two-tier docstring (WS1)               |
+| `core/src/sql/SqlCascadeParser.ts`                | Header lists an "LLM fallback (deferred to enrich() phase)"        | Point at `enrich` as the seam, no third tier (WS1)      |
+| `vscode/src/commands/NewProjectCommand.ts`        | `PROJECT_SCAFFOLD` literal `orm_version: "1.0"`                    | Interpolate `CURRENT_ORM_VERSION` (WS2)                 |
+| `core/src/project/splitModel.ts:340`              | `doc.orm_version ?? "1.0"`                                         | Delete the fallback: it is unreachable (WS2, see notes) |
+| `diagram/src/index.ts:38`                         | Exports `computeLayoutMetrics`, `LayoutMetrics`; no consumer       | Remove the export line (WS3)                            |
+| `diagram/tests/layout/metrics.test.ts`            | Imports from `../../src/layout/metrics.js`; corpus tolerance gate  | Unchanged: it is the consumer                           |
+| `llm/src/prompt/artifacts/resolveArtifact.ts:57`  | `specificity()` scores which fields are present, not prefix length | Rank by (fields, prefix length) (WS4)                   |
+| `cli/tests/workspace/promptArtifacts.test.ts:134` | Pins the tie as documented-not-endorsed                            | Flip to assert the narrower prefix wins (WS4)           |
+| `optimizer/barwise_optimizer/barwise_cli.py:133`  | `CaseScore` has no `element_count`; `from_json` drops it           | Carry it (WS5)                                          |
+| `optimizer/barwise_optimizer/metric.py:26`        | `MetricLog` has no element counts                                  | `element_counts` list + `mean_element_count` (WS5)      |
+| `optimizer/barwise_optimizer/export.py:230`       | `render_delta_report` has no denominator line                      | Per-arm mean line; a sentence when it moves with score  |
+| `core/src/lineage/manifest.ts:86`                 | `hashModel` hashes the serialized YAML, ids included               | Hash an id-canonical projection (WS6)                   |
+| `core/src/model/FactType.ts:109`                  | Mints a fresh UUID for every id-less constraint                    | Unchanged: the mint is by design (uuid7 spec)           |
+| `core/src/serialization/yaml/constraint.ts`       | Emits the minted id                                                | Unchanged                                               |
 
 `cli/src/commands/prompt.ts:427` writes `scoreExtraction`'s result as
 JSON, so `elementCount` already crosses the CLI boundary; WS5 is the
@@ -99,7 +102,9 @@ WS4 -- resolveArtifact
 
 WS5 -- optimizer
   CaseScore.element_count  <- payload["elementCount"]
-  MetricLog.element_counts <- record()          parallel to scores, like case_ids
+  MetricLog.element_counts <- record()          scored runs only: a failed run
+                                                 emitted no elements, and a 0
+                                                 here would read as restraint
   MetricLog.summary()["meanElementCount"]
   render_delta_report: "- mean element count: baseline x / candidate y"
     + "candidate produced N% more elements and scored higher: check the
@@ -135,11 +140,13 @@ narrows, so the monorepo build follows (only `@barwise/dbt` names a
 
 ### 2. `orm_version` emit points derive from `CURRENT_ORM_VERSION` (barwise-5t9.14)
 
-`splitModel.ts` fallback and the VS Code scaffold. Tests: a `splitModel`
-case with a document lacking `orm_version` asserts the emitted version
-equals `CURRENT_ORM_VERSION`; the scaffold constant is exported and a
-unit test parses it and asserts the same. Both seen red on the literal
-first.
+The VS Code scaffold: the constant moves to `projectScaffold.ts` (no
+`vscode` import, so it is unit-testable) and interpolates
+`CURRENT_ORM_VERSION`; the test parses it and asserts the version, seen
+red on the literal first. The `splitModel.ts` half was drafted as a
+redirect of the `?? "1.0"` fallback and landed as its deletion -- see
+Implementation notes; its test pins that a source without the field is
+refused.
 
 ### 3. Un-export `computeLayoutMetrics` (barwise-857)
 
@@ -210,6 +217,20 @@ every constraint `id:` line and nothing else).
   which case the baseline row is the fix, not a comment.
 - No behaviour a user relies on changes silently: WS6's one-time stale
   report is the only visible effect and is named in the PR body.
+
+## Implementation notes
+
+- **WS2, `splitModel`: the fallback was dead, not stale.** The draft
+  said to redirect `doc.orm_version ?? "1.0"` to `CURRENT_ORM_VERSION`.
+  Writing the test showed the path cannot run: `orm-model.schema.json`
+  requires `orm_version` at the root and `splitModel` schema-validates
+  the source before reading it raw, so a document without the field is
+  refused before line 344. The fallback is deleted, `RawModelDoc`'s
+  field is required with the reason, and the test pins the refusal
+  instead. The scaffold half of WS2 landed as drafted. Lesson for the
+  next draft: an Inventory row that names a literal to change is a
+  claim the literal is reachable, and that is checkable before writing
+  the row.
 
 ## Non-goals
 
