@@ -1,4 +1,5 @@
 import type { OrmModel } from "../../model/OrmModel.js";
+import { assertNever } from "../../util/assertNever.js";
 import type { Diagnostic } from "../Diagnostic.js";
 
 /**
@@ -261,6 +262,40 @@ export function constraintConsistencyRules(model: OrmModel): Diagnostic[] {
           }
           break;
         }
+
+        case "value_comparison": {
+          if (!ft.hasRole(constraint.roleId1)) {
+            diagnostics.push({
+              severity: "error",
+              message: `Value comparison constraint in fact type "${ft.name}" `
+                + `references role id "${constraint.roleId1}" which does not belong to this fact type.`,
+              elementId: ft.id,
+              ruleId: "constraint/value-comparison-invalid-role",
+            });
+          }
+          if (!ft.hasRole(constraint.roleId2)) {
+            diagnostics.push({
+              severity: "error",
+              message: `Value comparison constraint in fact type "${ft.name}" `
+                + `references role id "${constraint.roleId2}" which does not belong to this fact type.`,
+              elementId: ft.id,
+              ruleId: "constraint/value-comparison-invalid-role",
+            });
+          }
+          break;
+        }
+
+        // Join constraints (join_subset, join_equality, join_exclusion)
+        // carry their roles inside path-projected operands rather than a
+        // flat role id attached to this fact type; their consistency is
+        // validated separately in joinConstraintRules.ts.
+        case "join_subset":
+        case "join_equality":
+        case "join_exclusion":
+          break;
+
+        default:
+          assertNever(constraint);
       }
     }
   }
