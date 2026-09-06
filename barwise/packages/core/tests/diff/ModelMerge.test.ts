@@ -666,6 +666,29 @@ describe("mergeModels", () => {
     expect(amount.defaultValue).toBe("0");
   });
 
+  // The user-visible half of barwise-927/-934 together: barwise-927 taught
+  // the merge to carry an existing element's note forward, which made an
+  // INCOMING note unreachable while the diff still called the pair
+  // unchanged. With both fixed the edit is a delta an operator can accept.
+  it("adopts an incoming note on an accepted object-type modification", () => {
+    const make = (note: string) => {
+      const m = new OrmModel({ name: "Test" });
+      m.addObjectType({ name: "Customer", kind: "entity", referenceMode: "customer_id", note });
+      return m;
+    };
+    const existing = make("the old note");
+    const incoming = make("the new note");
+
+    const diff = diffModels(existing, incoming);
+    const modifiedIdx = diff.deltas.findIndex(
+      (d) => d.kind === "modified" && d.name === "Customer",
+    );
+    expect(modifiedIdx).toBeGreaterThanOrEqual(0);
+
+    const merged = mergeModels(existing, incoming, diff.deltas, new Set([modifiedIdx]));
+    expect(merged.getObjectTypeByName("Customer")!.note).toBe("the new note");
+  });
+
   it("preserves note and derivation on unchanged fact types", () => {
     const existing = new OrmModel({ name: "Test" });
     const existingCustomer = existing.addObjectType({

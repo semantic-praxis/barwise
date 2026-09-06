@@ -9,8 +9,9 @@ import type { BreakingLevel, DeltaKind } from "./deltas.js";
  * Returns the severity level for a single change description.
  */
 function classifyChange(change: string): BreakingLevel {
-  // Safe: definition, aliases, source context, readings, role name changes.
+  // Safe: definition, note, aliases, source context, readings, role names.
   if (change === "definition changed") return "safe";
+  if (change === "note changed") return "safe";
   if (change === "aliases changed") return "safe";
   if (change.startsWith("source context:")) return "safe";
   if (change === "readings changed") return "safe";
@@ -28,6 +29,11 @@ function classifyChange(change: string): BreakingLevel {
   ) return "caution";
   if (change.startsWith("reference mode:")) return "caution";
   if (change === "value constraint changed") return "caution";
+  // Independence changes which populations are legal; a default value
+  // reaches generated schemas. Both land on caution explicitly rather than
+  // through the fallback below, so the intent is readable (barwise-934).
+  if (change.startsWith("independent:")) return "caution";
+  if (change.startsWith("default value:")) return "caution";
   if (change.startsWith("constraints added")) return "caution";
   if (change.startsWith("constraints removed")) return "caution";
 
