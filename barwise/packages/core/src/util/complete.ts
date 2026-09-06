@@ -1,8 +1,8 @@
 /**
  * Every key of `T`, required, each with the value type `T` declares.
  *
- * The completeness idiom `RING_TYPE_MEMBERS: Record<RingType, true>`
- * (barwise-869) for object literals that must list every member of a
+ * The completeness idiom of `RING_TYPE_MEMBERS` in `model/Constraint.ts`
+ * (barwise-869), for object literals that must list every member of a
  * type: a literal typed as `T` itself accepts a missing optional key,
  * so a projection of a config type could silently omit a field added
  * later -- the defect barwise-927 closed at six call sites and would
