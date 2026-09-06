@@ -2,7 +2,7 @@
 
 Status: Implemented (with this spec)
 Created: 2026-08-26
-Last-updated: 2026-08-26
+Last-updated: 2026-09-06
 Tracking: barwise-860, barwise-861 (filed because the authoring session's
 container had no `bd`)
 
@@ -81,12 +81,12 @@ Out of scope, deferred:
 
 ## Inventory
 
-| Module                   | Current state                                      | Verdict                                        |
-| ------------------------ | -------------------------------------------------- | ---------------------------------------------- |
-| `scripts/check-beads.sh` | Read-only validator; canonical-form oracle         | Unchanged -- used as the compatibility check   |
-| `scripts/beads-crud.mjs` | Does not exist                                     | New: create/show/list/update/close/delete      |
-| `package.json`           | No entry point for issue writes                    | Add one `bd` script forwarding to the new tool |
-| `.beads/issues.jsonl`    | Hand-edited by bd-less sessions, sometimes wrongly | Unchanged format; now has a correct writer     |
+| Module                   | Current state                                      | Verdict                                                                                                                                                                                                                                                          |
+| ------------------------ | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/check-beads.sh` | Read-only validator; canonical-form oracle         | Compatibility check; since 2026-09-06 also fails `--strict` on a non-closed issue whose notes claim `Shipped in PR #N` (barwise-925: the post-merge closure the steward rule prescribes is a step nothing else verifies; `scripts/tests/gates.test.mjs` pins it) |
+| `scripts/beads-crud.mjs` | Does not exist                                     | New: create/show/list/update/close/delete                                                                                                                                                                                                                        |
+| `package.json`           | No entry point for issue writes                    | Add one `bd` script forwarding to the new tool                                                                                                                                                                                                                   |
+| `.beads/issues.jsonl`    | Hand-edited by bd-less sessions, sometimes wrongly | Unchanged format; now has a correct writer                                                                                                                                                                                                                       |
 
 ## Derived-field rule (verified against the live file)
 

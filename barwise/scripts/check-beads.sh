@@ -47,6 +47,15 @@ DEADLOCK = {"blocks", "conditional-blocks", "waits-for"}
 ID_RE = re.compile(r"^[a-z0-9]+-[0-9a-z.]+$")
 ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
 CONFLICT = re.compile(r"^(<{7}|={7}|>{7})")
+# An issue whose own notes say its PR shipped, still not closed. Three
+# issues (barwise-r4f, -vli, -5dd) sat like that for eleven weeks: the
+# steward rule closes issues in a tracker-only commit AFTER the code PR
+# merges, and that follow-up is a step nothing checked. Narrow on purpose:
+# "Implemented (PR pending)" is a legitimate in_progress note, and
+# "Implemented <date>" turned out to be both (barwise-897 done,
+# barwise-5t9.7 with its importer half still open), so only the explicit
+# shipped-PR claim is flagged.
+SHIPPED_RE = re.compile(r"\b(?:Shipped|Landed|Merged) in PR #\d+")
 
 
 def go_compact(obj):
@@ -114,6 +123,13 @@ for n, raw in enumerate(open(PATH, encoding="utf-8"), 1):
             W.append(f"L{n}: {k} {v!r} not ISO-8601")
     if line != go_compact(obj):
         (E if STRICT else W).append(f"L{n}: not canonical compact form (id={obj.get('id')})")
+    if obj.get("status") != "closed":
+        m = SHIPPED_RE.search(obj.get("notes") or "")
+        if m:
+            (E if STRICT else W).append(
+                f"L{n}: status {obj.get('status')!r} but notes say {m.group(0)!r} "
+                f"(id={obj.get('id')}) -- close it, or reword the note"
+            )
 
 for n, obj, _ in rows:
     src = obj.get("id")
