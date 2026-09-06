@@ -159,17 +159,14 @@ def test_the_candidate_resolves_through_the_production_loader(compiled):
         + [
             "prompt", "eval",
             "--artifacts", str(artifacts_dir),
-            # `--artifacts` alone is AMBIGUOUS for a candidate, and that
-            # is correct behavior rather than a wart: the candidate's
-            # match block is derived from the target, so it claims the
-            # same provider and model prefix as the shipped variant for
-            # that model (here haiku45-2), and the resolver refuses to
-            # guess between two artifacts that both match. This test
-            # asserted the pre-haiku45-2 world, where nothing else
-            # matched, and has been failing since that variant shipped.
-            # `--artifact-version` is how a candidate is selected -- the
-            # same pairing the delta report's gating command and
-            # eval-runner.sh use.
+            # `--artifact-version` is the explicit form: it pins the
+            # candidate whatever else matches, and the delta report's
+            # gating command and eval-runner.sh use it. Without it the
+            # resolver now picks the candidate on its own (the test
+            # below), because its prefix -- the full target model id --
+            # is longer than the shipped family prefix (barwise-854).
+            # Between the two shipping haiku45-2 (2026-07) and that
+            # ranking, `--artifacts` alone was refused as ambiguous.
             "--artifact-version", "dspy-bootstrap-minimal-1",
             "--provider", "anthropic",
             "--model", "claude-haiku-4-5",
@@ -197,14 +194,20 @@ def test_the_candidate_resolves_through_the_production_loader(compiled):
     assert "Using the default prompt artifact" not in proc.stderr
 
 
-def test_artifacts_alone_is_ambiguous_for_a_candidate(compiled):
-    # The other half of the pairing above, asserted rather than assumed:
-    # a candidate claims the same provider/model prefix as the shipped
-    # variant for that model, so `--artifacts` without a version is a
-    # refusal, not a silent pick. Pinned because the failure mode it
-    # prevents -- resolving the SHIPPED prompt while the operator
-    # believes they are gating the candidate -- is barwise-850, and the
-    # delta report used to instruct exactly that.
+def test_artifacts_alone_selects_the_candidate_by_its_narrower_prefix(compiled):
+    # The other half of the pairing above. A candidate's match block is
+    # derived from the target, so its modelPrefix is the full model id
+    # (`claude-haiku-4-5`) while the shipped variant claims the family
+    # (`claude-haiku`). Both match; the longer prefix is strictly more
+    # specific and wins (barwise-854). What this pins is the failure
+    # mode barwise-850 names: `--artifacts` must never quietly measure
+    # the SHIPPED prompt while the operator believes they are gating the
+    # candidate. It used to pin a refusal instead, which was the
+    # resolver scoring only which fields were present -- the same
+    # limitation the CLI test in promptArtifacts.test.ts documented and
+    # did not endorse. A candidate whose prefix EQUALS the shipped one's
+    # is still refused as ambiguous; that case is the llm package's
+    # equal-specificity test.
     artifacts_dir = Path(compiled["artifact"]).parent
     proc = subprocess.run(
         resolve_cli()
@@ -222,6 +225,7 @@ def test_artifacts_alone_is_ambiguous_for_a_candidate(compiled):
         env={"PATH": "/usr/bin:/bin:/usr/local/bin", "HOME": "/tmp"},
     )
 
-    assert "Ambiguous prompt artifacts" in proc.stderr
+    assert "Using artifact version dspy-bootstrap-minimal-1" in proc.stderr
+    assert "Ambiguous prompt artifacts" not in proc.stderr
     # And it must never quietly measure the shipped variant instead.
     assert "Using artifact version haiku45-2" not in proc.stderr
