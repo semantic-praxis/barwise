@@ -2,7 +2,7 @@
   "$schema": "https://unpkg.com/knip@latest/schema.json",
   "ignoreExportsUsedInFile": true,
   "ignore": ["test-plan/**"],
-  "ignoreBinaries": ["depcruise", "jscpd", "shellcheck"],
+  "ignoreBinaries": ["depcruise", "jscpd", "shellcheck", "uv"],
   "ignoreDependencies": ["@dprint/json", "@dprint/markdown", "@dprint/typescript", "dependency-cruiser", "jscpd"],
   "workspaces": {
     "packages/core": {
