@@ -11,6 +11,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
+import type { RelationalSchema } from "../../src/mapping/RelationalSchema.js";
 import { renderDdl } from "../../src/mapping/renderers/ddl.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
@@ -29,6 +30,78 @@ describe("DDL renderer", () => {
     expect(ddl).toContain("CREATE TABLE customer");
     expect(ddl).toContain("customer_id TEXT NOT NULL");
     expect(ddl).toContain("PRIMARY KEY (customer_id)");
+  });
+
+  it("omits the PRIMARY KEY clause for a table with no primary key columns", () => {
+    const schema: RelationalSchema = {
+      sourceModelId: "test",
+      tables: [
+        {
+          name: "log_entry",
+          columns: [{ name: "message", dataType: "TEXT", nullable: false }],
+          primaryKey: { columnNames: [] },
+          foreignKeys: [],
+          sourceElementId: "ft-log-entry",
+        },
+      ],
+    };
+    const ddl = renderDdl(schema);
+    expect(ddl).not.toContain("PRIMARY KEY");
+  });
+
+  it("quotes an identifier that isn't a plain lowercase snake_case name", () => {
+    const schema: RelationalSchema = {
+      sourceModelId: "test",
+      tables: [
+        {
+          name: "Customer Table",
+          columns: [{ name: "id", dataType: "TEXT", nullable: false }],
+          primaryKey: { columnNames: ["id"] },
+          foreignKeys: [],
+          sourceElementId: "ot-customer",
+        },
+      ],
+    };
+    const ddl = renderDdl(schema);
+    expect(ddl).toContain('CREATE TABLE "Customer Table"');
+  });
+
+  it("appends nothing extra when a model is given but has no populations", () => {
+    const model = new ModelBuilder("Test")
+      .withEntityType("Customer", { referenceMode: "customer_id" })
+      .build();
+    const schema = mapper.map(model);
+
+    // No population exists on this model, so renderPopulationAsSql
+    // returns "" -- exercising the "no examples to append" path with a
+    // model present and includeExamples left at its default (true).
+    const ddl = renderDdl(schema, model);
+    expect(ddl).toContain("CREATE TABLE customer");
+    expect(ddl).not.toContain("Sample data");
+  });
+
+  it("omits population INSERTs when includeExamples is false, even with data", () => {
+    const model = new OrmModel({ name: "Test" });
+    const customer = model.addObjectType({
+      name: "Customer",
+      kind: "entity",
+      referenceMode: "customer_id",
+    });
+    const order = model.addObjectType({ name: "Order", kind: "entity", referenceMode: "order_id" });
+    const ft = model.addFactType({
+      name: "Customer places Order",
+      roles: [
+        { id: "r1", name: "places", playerId: customer.id },
+        { id: "r2", name: "is placed by", playerId: order.id },
+      ],
+      readings: ["{0} places {1}", "{1} is placed by {0}"],
+    });
+    const pop = model.addPopulation({ factTypeId: ft.id });
+    pop.addInstance({ roleValues: { r1: "C001", r2: "O123" } });
+
+    const schema = mapper.map(model);
+    const ddl = renderDdl(schema, model, { includeExamples: false });
+    expect(ddl).not.toContain("INSERT INTO");
   });
 
   it("renders a column DEFAULT from a value type's default value", () => {

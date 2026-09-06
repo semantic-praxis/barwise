@@ -268,6 +268,70 @@ describe("Verbalizer", () => {
       );
     });
 
+    it("verbalizes a semiderived, on-request fact type", () => {
+      const model = new OrmModel({ name: "Test" });
+      const order = model.addObjectType({
+        name: "Order",
+        kind: "entity",
+        referenceMode: "order_id",
+      });
+      const status = model.addObjectType({ name: "Status", kind: "value" });
+      model.addFactType({
+        name: "Order has Status",
+        roles: [
+          { name: "has", playerId: order.id, id: "r1" },
+          { name: "of", playerId: status.id, id: "r2" },
+        ],
+        readings: ["{0} has {1}"],
+        derivation: {
+          kind: "semiderived",
+          storage: "derive_on_request",
+          expression: "latest event",
+        },
+      });
+
+      const texts = verbalizer.verbalizeModel(model).map((v) => v.text);
+      expect(texts).toContain(
+        "Fact type 'Order has Status' is semiderived: latest event.",
+      );
+    });
+
+    it("falls back to raw ids when a subtype fact's types are not in this domain", () => {
+      const model = new OrmModel({ name: "Test" });
+      const adult = model.addObjectType({
+        name: "Adult",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      // A cross-domain subtype fact: the supertype lives in another
+      // domain's model and is only known here by id.
+      const sf = model.addSubtypeFact(
+        { subtypeId: adult.id, supertypeId: "person-in-other-domain" },
+        { skipPlayerValidation: true },
+      );
+
+      expect(verbalizer.verbalizeSubtypeFact(sf, model).text).toBe(
+        "Adult is a subtype of person-in-other-domain.",
+      );
+    });
+
+    it("falls back to the raw id for the subtype side too, when it is not in this domain", () => {
+      const model = new OrmModel({ name: "Test" });
+      const person = model.addObjectType({
+        name: "Person",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      const sf = model.addSubtypeFact(
+        { subtypeId: "adult-in-other-domain", supertypeId: person.id },
+        { skipPlayerValidation: true },
+      );
+
+      expect(verbalizer.verbalizeSubtypeFact(sf, model).text).toBe(
+        "adult-in-other-domain is a subtype of Person.",
+      );
+    });
+
     it("appends a subtype defining rule to the subtype verbalization", () => {
       const model = new OrmModel({ name: "Test" });
       const person = model.addObjectType({

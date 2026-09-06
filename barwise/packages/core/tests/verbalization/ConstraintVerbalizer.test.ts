@@ -121,6 +121,134 @@ describe("ConstraintVerbalizer", () => {
         "For each Employee and Project combination, at most one Department applies.",
       );
     });
+
+    it("falls back to the role name when a binary uniqueness role's player type is missing", () => {
+      const model = new OrmModel({ name: "Test" });
+      const order = model.addObjectType({
+        name: "Order",
+        kind: "entity",
+        referenceMode: "order_id",
+      });
+      const ft = model.addFactType(
+        {
+          name: "Customer places Order",
+          roles: [
+            { id: "r1", name: "places", playerId: "missing-customer-type" },
+            { id: "r2", name: "is placed by", playerId: order.id },
+          ],
+          readings: ["{0} places {1}", "{1} is placed by {0}"],
+          constraints: [{ type: "internal_uniqueness", roleIds: ["r2"] }],
+        },
+        { skipPlayerValidation: true },
+      );
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe("Each Order is placed by at most one places.");
+    });
+
+    it("falls back to the role name when the constrained role's own player type is missing", () => {
+      const model = new OrmModel({ name: "Test" });
+      const customer = model.addObjectType({
+        name: "Customer",
+        kind: "entity",
+        referenceMode: "customer_id",
+      });
+      const ft = model.addFactType(
+        {
+          name: "Customer places Order",
+          roles: [
+            { id: "r1", name: "places", playerId: customer.id },
+            { id: "r2", name: "is placed by", playerId: "missing-order-type" },
+          ],
+          readings: ["{0} places {1}", "{1} is placed by {0}"],
+          constraints: [{ type: "internal_uniqueness", roleIds: ["r2"] }],
+        },
+        { skipPlayerValidation: true },
+      );
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe("Each is placed by is placed by at most one Customer.");
+    });
+
+    it("generic (full-spanning) uniqueness separates 3+ roles with commas and falls back for unresolved or unplayered roles", () => {
+      const model = new OrmModel({ name: "Test" });
+      const a = model.addObjectType({ name: "A", kind: "entity", referenceMode: "a_id" });
+      const ft = model.addFactType(
+        {
+          name: "A relates B and C",
+          roles: [
+            { id: "r1", name: "r1", playerId: a.id },
+            { id: "r2", name: "secondrole", playerId: "missing-b-type" },
+          ],
+          readings: ["{0} relates {1}"],
+          // Full spanning uniqueness (roleIds.length === arity) with a
+          // bogus id mixed in -- generic uniqueness is the fallback
+          // branch for input that couldn't be normalized to binary or
+          // multi-role phrasing.
+          constraints: [{ type: "internal_uniqueness", roleIds: ["bogus", "r1", "r2"] }],
+        },
+        { skipPlayerValidation: true },
+      );
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe(
+        "Each combination of bogus, A and secondrole is unique in A relates B and C.",
+      );
+    });
+
+    it("separates three or more constrained roles with commas, and lists three or more unconstrained roles", () => {
+      const model = new OrmModel({ name: "Test" });
+      const a = model.addObjectType({ name: "A", kind: "entity", referenceMode: "a_id" });
+      const b = model.addObjectType({ name: "B", kind: "entity", referenceMode: "b_id" });
+      const c = model.addObjectType({ name: "C", kind: "entity", referenceMode: "c_id" });
+      const d = model.addObjectType({ name: "D", kind: "entity", referenceMode: "d_id" });
+      const e = model.addObjectType({ name: "E", kind: "entity", referenceMode: "e_id" });
+      const ft = model.addFactType({
+        name: "A B C D E relate",
+        roles: [
+          { id: "r1", name: "r1", playerId: a.id },
+          { id: "r2", name: "r2", playerId: b.id },
+          { id: "r3", name: "r3", playerId: c.id },
+          { id: "r4", name: "r4", playerId: d.id },
+          { id: "r5", name: "r5", playerId: e.id },
+        ],
+        readings: ["{0} {1} {2} {3} {4} relate"],
+        // 3 constrained roles (r1, r2, r3) and 2 unconstrained (r4, r5).
+        constraints: [{ type: "internal_uniqueness", roleIds: ["r1", "r2", "r3"] }],
+      });
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe(
+        "For each A, B and C combination, at most one D and E applies.",
+      );
+    });
+
+    it("falls back to the role name on both sides of a multi-role uniqueness when player types are missing", () => {
+      const model = new OrmModel({ name: "Test" });
+      const b = model.addObjectType({ name: "B", kind: "entity", referenceMode: "b_id" });
+      const d = model.addObjectType({ name: "D", kind: "entity", referenceMode: "d_id" });
+      const ft = model.addFactType(
+        {
+          name: "A B C D relate",
+          roles: [
+            { id: "r1", name: "role-a", playerId: "missing-a-type" },
+            { id: "r2", name: "role-b", playerId: b.id },
+            { id: "r3", name: "role-c", playerId: "missing-c-type" },
+            { id: "r4", name: "role-d", playerId: d.id },
+          ],
+          readings: ["{0} {1} {2} {3} relate"],
+          // r1 (unresolved player) and r2 constrained; r3 (unresolved
+          // player) and r4 unconstrained.
+          constraints: [{ type: "internal_uniqueness", roleIds: ["r1", "r2"] }],
+        },
+        { skipPlayerValidation: true },
+      );
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe(
+        "For each role-a and B combination, at most one role-c and D applies.",
+      );
+    });
   });
 
   describe("mandatory", () => {
@@ -163,6 +291,118 @@ describe("ConstraintVerbalizer", () => {
       expect(v[0]!.text).toBe(
         "Each Order is placed by at least one Customer.",
       );
+    });
+
+    it("falls back to the role name when a binary mandatory role's player type is missing", () => {
+      const model = new OrmModel({ name: "Test" });
+      const order = model.addObjectType({
+        name: "Order",
+        kind: "entity",
+        referenceMode: "order_id",
+      });
+      const ft = model.addFactType(
+        {
+          name: "Customer places Order",
+          roles: [
+            { id: "r1", name: "places", playerId: "missing-customer-type" },
+            { id: "r2", name: "is placed by", playerId: order.id },
+          ],
+          readings: ["{0} places {1}", "{1} is placed by {0}"],
+          constraints: [{ type: "mandatory", roleId: "r1" }],
+        },
+        { skipPlayerValidation: true },
+      );
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe("Each places places at least one Order.");
+    });
+
+    it("falls back to the role name when the mandatory constraint's object-role player type is missing", () => {
+      const model = new OrmModel({ name: "Test" });
+      const customer = model.addObjectType({
+        name: "Customer",
+        kind: "entity",
+        referenceMode: "customer_id",
+      });
+      const ft = model.addFactType(
+        {
+          name: "Customer places Order",
+          roles: [
+            { id: "r1", name: "places", playerId: customer.id },
+            { id: "r2", name: "is placed by", playerId: "missing-order-type" },
+          ],
+          readings: ["{0} places {1}", "{1} is placed by {0}"],
+          constraints: [{ type: "mandatory", roleId: "r1" }],
+        },
+        { skipPlayerValidation: true },
+      );
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe("Each Customer places at least one is placed by.");
+    });
+
+    it("verbalizes mandatory on a non-binary fact type using the reading template", () => {
+      const model = new OrmModel({ name: "Test" });
+      const emp = model.addObjectType({
+        name: "Employee",
+        kind: "entity",
+        referenceMode: "emp_id",
+      });
+      const proj = model.addObjectType({
+        name: "Project",
+        kind: "entity",
+        referenceMode: "proj_id",
+      });
+      const dept = model.addObjectType({
+        name: "Department",
+        kind: "entity",
+        referenceMode: "dept_id",
+      });
+      const ft = model.addFactType({
+        name: "Employee works on Project in Department",
+        roles: [
+          { id: "r1", name: "works on", playerId: emp.id },
+          { id: "r2", name: "has worker", playerId: proj.id },
+          { id: "r3", name: "in", playerId: dept.id },
+        ],
+        readings: ["{0} works on {1} in {2}"],
+        constraints: [{ type: "mandatory", roleId: "r1" }],
+      });
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe("Each Employee must: Employee works on Employee in Employee.");
+    });
+
+    it("mandatory on a non-binary fact type falls back to the raw role id when unresolved", () => {
+      const model = new OrmModel({ name: "Test" });
+      const emp = model.addObjectType({
+        name: "Employee",
+        kind: "entity",
+        referenceMode: "emp_id",
+      });
+      const proj = model.addObjectType({
+        name: "Project",
+        kind: "entity",
+        referenceMode: "proj_id",
+      });
+      const dept = model.addObjectType({
+        name: "Department",
+        kind: "entity",
+        referenceMode: "dept_id",
+      });
+      const ft = model.addFactType({
+        name: "Employee works on Project in Department",
+        roles: [
+          { id: "r1", name: "works on", playerId: emp.id },
+          { id: "r2", name: "has worker", playerId: proj.id },
+          { id: "r3", name: "in", playerId: dept.id },
+        ],
+        readings: ["{0} works on {1} in {2}"],
+        constraints: [{ type: "mandatory", roleId: "bogus" }],
+      });
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe("Each bogus must: bogus works on bogus in bogus.");
     });
   });
 
@@ -324,6 +564,86 @@ describe("ConstraintVerbalizer", () => {
       expect(valueLiterals).toHaveLength(1);
       expect(valueLiterals[0]!.text).toBe("'A', 'B'");
     });
+
+    it("falls back to the raw role id when a role-level value constraint's role is unresolved", () => {
+      const model = new OrmModel({ name: "Test" });
+      const student = model.addObjectType({
+        name: "Student",
+        kind: "entity",
+        referenceMode: "student_id",
+      });
+      const ft = model.addFactType({
+        name: "Student has Rating",
+        roles: [{ name: "has", playerId: student.id, id: "r1" }],
+        readings: ["{0} has a rating"],
+        constraints: [
+          { type: "value_constraint", roleId: "bogus", values: ["A"] },
+        ],
+      });
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe("The possible values of bogus are: {'A'}.");
+    });
+
+    it("renders an exclusive lower bound with no upper bound", () => {
+      const model = new OrmModel({ name: "Test" });
+      const person = model.addObjectType({
+        name: "Person",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      const age = model.addObjectType({ name: "Age", kind: "value" });
+      const ft = model.addFactType({
+        name: "Person has Age",
+        roles: [
+          { name: "has", playerId: person.id, id: "r1" },
+          { name: "of", playerId: age.id, id: "r2" },
+        ],
+        readings: ["{0} has {1}", "{1} of {0}"],
+        constraints: [
+          {
+            type: "value_constraint",
+            roleId: "r2",
+            values: [],
+            ranges: [{ min: "0", minInclusive: false }],
+          },
+        ],
+      });
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe("The possible values of Age are: {greater than 0}.");
+    });
+
+    it("renders an upper-bound-only range and a fully open range", () => {
+      const model = new OrmModel({ name: "Test" });
+      const person = model.addObjectType({
+        name: "Person",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      const age = model.addObjectType({ name: "Age", kind: "value" });
+      const ft = model.addFactType({
+        name: "Person has Age",
+        roles: [
+          { name: "has", playerId: person.id, id: "r1" },
+          { name: "of", playerId: age.id, id: "r2" },
+        ],
+        readings: ["{0} has {1}", "{1} of {0}"],
+        constraints: [
+          {
+            type: "value_constraint",
+            roleId: "r2",
+            values: [],
+            ranges: [{ max: "120" }, {}],
+          },
+        ],
+      });
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe(
+        "The possible values of Age are: {at most 120, any value}.",
+      );
+    });
   });
 
   describe("external uniqueness", () => {
@@ -401,6 +721,36 @@ describe("ConstraintVerbalizer", () => {
       // The RoomNumber role lives in the other fact type; its id must not
       // leak into the reading as a fallback.
       expect(text).not.toContain("rn2");
+    });
+
+    it("separates three or more externally-unique roles with commas", () => {
+      const model = new OrmModel({ name: "Test" });
+      const a = model.addObjectType({ name: "A", kind: "value" });
+      const b = model.addObjectType({ name: "B", kind: "value" });
+      const c = model.addObjectType({ name: "C", kind: "value" });
+      const subject = model.addObjectType({
+        name: "Subject",
+        kind: "entity",
+        referenceMode: "subject_id",
+      });
+      const ft = model.addFactType({
+        name: "Subject has A, B, and C",
+        roles: [
+          { id: "s1", name: "has", playerId: subject.id },
+          { id: "ra", name: "of a", playerId: a.id },
+          { id: "rb", name: "of b", playerId: b.id },
+          { id: "rc", name: "of c", playerId: c.id },
+        ],
+        readings: ["{0} has {1}, {2}, and {3}"],
+        constraints: [
+          { type: "external_uniqueness", roleIds: ["ra", "rb", "rc"] },
+        ],
+      });
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toBe(
+        "The combination of A, B and C is unique across fact types.",
+      );
     });
   });
 

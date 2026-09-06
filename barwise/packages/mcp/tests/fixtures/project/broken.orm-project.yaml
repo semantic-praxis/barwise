@@ -1,0 +1,8 @@
+project:
+  name: "MCP Broken Project"
+
+  domains:
+    - path: "./domains/crm.orm.yaml"
+      context: "crm"
+    - path: "./domains/missing.orm.yaml"
+      context: "ghost"

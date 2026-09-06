@@ -248,6 +248,88 @@ describe("populationValidationRules", () => {
       expect(diags).toHaveLength(1); // 100 excluded by exclusive upper bound
     });
 
+    it("respects an exclusive lower bound", () => {
+      const model = makeOrderModel({
+        valueConstraint: {
+          roleId: "r1",
+          values: [],
+          ranges: [{ min: "0", max: "100", minInclusive: false }],
+        },
+      });
+      const ft = model.getFactTypeByName("Customer places Order")!;
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ id: "edge", roleValues: { r1: "0", r2: "O1" } });
+
+      const diags = populationValidationRules(model);
+      expect(diags).toHaveLength(1); // 0 excluded by exclusive lower bound
+    });
+
+    it("compares against a range lexically when the value is not numeric", () => {
+      const model = makeOrderModel({
+        valueConstraint: {
+          roleId: "r1",
+          values: [],
+          ranges: [{ min: "B", max: "D" }],
+        },
+      });
+      const ft = model.getFactTypeByName("Customer places Order")!;
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ id: "in", roleValues: { r1: "C", r2: "O1" } });
+      pop.addInstance({ id: "lo", roleValues: { r1: "A", r2: "O2" } });
+      pop.addInstance({ id: "hi", roleValues: { r1: "E", r2: "O3" } });
+
+      const diags = populationValidationRules(model);
+      expect(diags).toHaveLength(2);
+      expect(diags.map((d) => d.message).join(" ")).toContain('"A"');
+      expect(diags.map((d) => d.message).join(" ")).toContain('"E"');
+    });
+
+    it("respects exclusive bounds when comparing lexically", () => {
+      const model = makeOrderModel({
+        valueConstraint: {
+          roleId: "r1",
+          values: [],
+          ranges: [{ min: "B", max: "D", minInclusive: false, maxInclusive: false }],
+        },
+      });
+      const ft = model.getFactTypeByName("Customer places Order")!;
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ id: "min-edge", roleValues: { r1: "B", r2: "O1" } });
+      pop.addInstance({ id: "max-edge", roleValues: { r1: "D", r2: "O2" } });
+
+      const diags = populationValidationRules(model);
+      // Both edges are excluded by the exclusive bounds.
+      expect(diags).toHaveLength(2);
+    });
+
+    it("ignores an instance missing the constrained role's value", () => {
+      const model = makeOrderModel({
+        valueConstraint: { roleId: "r1", values: ["C001"] },
+      });
+      const ft = model.getFactTypeByName("Customer places Order")!;
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ roleValues: { r2: "O123" } }); // r1 absent entirely
+
+      const diags = populationValidationRules(model).filter(
+        (d) => d.ruleId === "population/value-constraint-violation",
+      );
+      expect(diags).toHaveLength(0);
+    });
+
+    it("never flags a type-level value constraint (no role id)", () => {
+      const model = makeOrderModel({
+        valueConstraint: { roleId: undefined as unknown as string, values: ["C001"] },
+      });
+      const ft = model.getFactTypeByName("Customer places Order")!;
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ roleValues: { r1: "C999", r2: "O123" } });
+
+      const diags = populationValidationRules(model).filter(
+        (d) => d.ruleId === "population/value-constraint-violation",
+      );
+      expect(diags).toHaveLength(0);
+    });
+
     it("passes when value is in allowed set", () => {
       const model = makeOrderModel({
         valueConstraint: { roleId: "r1", values: ["C001", "C002"] },
@@ -354,6 +436,60 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "C001", r2: "O124" } });
 
       const diags = populationValidationRules(model);
+      expect(diags).toHaveLength(0);
+    });
+
+    it("ignores an instance with an incomplete value combination", () => {
+      const model = new OrmModel({ name: "Test" });
+      const room = model.addObjectType({
+        name: "Room",
+        kind: "entity",
+        referenceMode: "room_id",
+      });
+      const slot = model.addObjectType({
+        name: "TimeSlot",
+        kind: "entity",
+        referenceMode: "slot_id",
+      });
+      const ft = model.addFactType({
+        name: "Room is booked for TimeSlot",
+        roles: [
+          { name: "is booked for", playerId: room.id, id: "r1" },
+          { name: "books", playerId: slot.id, id: "r2" },
+        ],
+        readings: ["{0} is booked for {1}"],
+        constraints: [{ type: "frequency", roleIds: ["r1", "r2"], min: 1, max: 1 }],
+      });
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ roleValues: { r1: "R1" } }); // r2 missing: not a full tuple
+
+      const diags = populationValidationRules(model).filter(
+        (d) => d.ruleId === "population/frequency-violation",
+      );
+      expect(diags).toHaveLength(0);
+    });
+
+    it("does nothing for a frequency constraint with no constrained roles", () => {
+      const model = new OrmModel({ name: "Test" });
+      const room = model.addObjectType({
+        name: "Room",
+        kind: "entity",
+        referenceMode: "room_id",
+      });
+      const ft = model.addFactType({
+        name: "Room is active",
+        roles: [{ name: "is active", playerId: room.id, id: "r1" }],
+        readings: ["{0} is active"],
+      });
+      // addConstraint bypasses the fact-type constructor's validation, so
+      // this exercises the defensive empty-roleIds guard directly.
+      ft.addConstraint({ type: "frequency", roleIds: [], min: 1, max: 1 });
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ roleValues: { r1: "R1" } });
+
+      const diags = populationValidationRules(model).filter(
+        (d) => d.ruleId === "population/frequency-violation",
+      );
       expect(diags).toHaveLength(0);
     });
 
@@ -940,6 +1076,31 @@ describe("value comparison violations", () => {
     expect(diags[0]!.message).toContain("bad");
   });
 
+  it("evaluates '=', '<>', and '>' correctly, including a lexical tie", () => {
+    const eq = makeComparisonModel("=");
+    const eqPop = eq.model.addPopulation({ factTypeId: eq.ft.id });
+    eqPop.addInstance({ id: "same", roleValues: { r0: "T1", r1: "apple", r2: "apple" } });
+    eqPop.addInstance({ id: "diff", roleValues: { r0: "T2", r1: "apple", r2: "banana" } });
+    const eqDiags = populationValidationRules(eq.model);
+    expect(eqDiags).toHaveLength(1);
+    expect(eqDiags[0]!.message).toContain("diff");
+
+    const ne = makeComparisonModel("<>");
+    const nePop = ne.model.addPopulation({ factTypeId: ne.ft.id });
+    nePop.addInstance({ id: "same", roleValues: { r0: "T1", r1: "5", r2: "5" } });
+    const neDiags = populationValidationRules(ne.model);
+    expect(neDiags).toHaveLength(1);
+    expect(neDiags[0]!.message).toContain("same");
+
+    const gt = makeComparisonModel(">");
+    const gtPop = gt.model.addPopulation({ factTypeId: gt.ft.id });
+    gtPop.addInstance({ id: "ok", roleValues: { r0: "T1", r1: "9", r2: "3" } });
+    gtPop.addInstance({ id: "bad", roleValues: { r0: "T2", r1: "1", r2: "5" } });
+    const gtDiags = populationValidationRules(gt.model);
+    expect(gtDiags).toHaveLength(1);
+    expect(gtDiags[0]!.message).toContain("bad");
+  });
+
   it("ignores instances missing either compared role", () => {
     const { model, ft } = makeComparisonModel(">=");
     const pop = model.addPopulation({ factTypeId: ft.id });
@@ -1084,6 +1245,19 @@ describe("deontic modality", () => {
       expect(diags[0]!.message).toContain("at most 2");
     });
 
+    it("flags an object type whose population falls short of its min cardinality", () => {
+      const model = makeDeptModel({ min: 3, max: "unbounded" });
+      const ft = model.getFactTypeByName("Department has Code")!;
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ roleValues: { d1: "D1", c1: "X" } });
+
+      const diags = populationValidationRules(model).filter(
+        (d) => d.ruleId === "population/object-cardinality-violation",
+      );
+      expect(diags).toHaveLength(1);
+      expect(diags[0]!.message).toContain("at least 3");
+    });
+
     it("accepts an object-type population within its cardinality bound", () => {
       const model = makeDeptModel({ min: 2, max: 10 });
       const ft = model.getFactTypeByName("Department has Code")!;
@@ -1127,6 +1301,102 @@ describe("deontic modality", () => {
       );
       expect(diags).toHaveLength(1);
       expect(diags[0]!.severity).toBe("warning");
+    });
+
+    it("skips a unary-role cardinality constraint when the role has no population data", () => {
+      const model = new OrmModel({ name: "Test" });
+      const promo = model.addObjectType({
+        name: "Promotion",
+        kind: "entity",
+        referenceMode: "promo_id",
+      });
+      model.addFactType({
+        name: "Promotion is active",
+        roles: [{ name: "is active", playerId: promo.id, id: "p1" }],
+        readings: ["{0} is active"],
+        constraints: [{ type: "cardinality", roleId: "p1", min: 1, max: 5 }],
+      });
+      // No population added at all.
+
+      expect(populationValidationRules(model)).toHaveLength(0);
+    });
+
+    it("flags a unary role played by fewer instances than its min", () => {
+      const model = new OrmModel({ name: "Test" });
+      const promo = model.addObjectType({
+        name: "Promotion",
+        kind: "entity",
+        referenceMode: "promo_id",
+      });
+      const ft = model.addFactType({
+        name: "Promotion is active",
+        roles: [{ name: "is active", playerId: promo.id, id: "p1" }],
+        readings: ["{0} is active"],
+        constraints: [{ type: "cardinality", roleId: "p1", min: 3, max: "unbounded" }],
+      });
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ roleValues: { p1: "P1" } });
+
+      const diags = populationValidationRules(model).filter(
+        (d) => d.ruleId === "population/unary-role-cardinality-violation",
+      );
+      expect(diags).toHaveLength(1);
+      expect(diags[0]!.message).toContain("requires at least 3");
+    });
+
+    it("accepts a unary-role population within its cardinality bound", () => {
+      const model = new OrmModel({ name: "Test" });
+      const promo = model.addObjectType({
+        name: "Promotion",
+        kind: "entity",
+        referenceMode: "promo_id",
+      });
+      const ft = model.addFactType({
+        name: "Promotion is active",
+        roles: [{ name: "is active", playerId: promo.id, id: "p1" }],
+        readings: ["{0} is active"],
+        constraints: [{ type: "cardinality", roleId: "p1", min: 1, max: 5 }],
+      });
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ roleValues: { p1: "P1" } });
+      pop.addInstance({ roleValues: { p1: "P2" } });
+
+      expect(populationValidationRules(model)).toHaveLength(0);
+    });
+
+    it("falls back to the fact type id when a min- or max-violating cardinality constraint has no id", () => {
+      const model = new OrmModel({ name: "Test" });
+      const promo = model.addObjectType({
+        name: "Promotion",
+        kind: "entity",
+        referenceMode: "promo_id",
+      });
+      const underMin = model.addFactType({
+        name: "Promotion is featured",
+        roles: [{ name: "is featured", playerId: promo.id, id: "p1" }],
+        readings: ["{0} is featured"],
+      });
+      // addConstraint (unlike the fact-type constructor) does not
+      // backfill a missing id.
+      underMin.addConstraint({ type: "cardinality", roleId: "p1", min: 3, max: "unbounded" });
+      const underPop = model.addPopulation({ factTypeId: underMin.id });
+      underPop.addInstance({ roleValues: { p1: "P1" } });
+
+      const overMax = model.addFactType({
+        name: "Promotion is discounted",
+        roles: [{ name: "is discounted", playerId: promo.id, id: "p1" }],
+        readings: ["{0} is discounted"],
+      });
+      overMax.addConstraint({ type: "cardinality", roleId: "p1", min: 0, max: 1 });
+      const overPop = model.addPopulation({ factTypeId: overMax.id });
+      overPop.addInstance({ roleValues: { p1: "P1" } });
+      overPop.addInstance({ roleValues: { p1: "P2" } });
+
+      const diags = populationValidationRules(model).filter(
+        (d) => d.ruleId === "population/unary-role-cardinality-violation",
+      );
+      expect(diags).toHaveLength(2);
+      expect(diags.map((d) => d.elementId)).toEqual([underMin.id, overMax.id]);
     });
   });
 });

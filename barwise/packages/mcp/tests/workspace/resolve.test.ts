@@ -100,4 +100,10 @@ describe("resolveModels", () => {
       /manifest.*must be given as a path/i,
     );
   });
+
+  it("throws a clear error when the manifest file does not exist", () => {
+    expect(() => resolveModels(`${fixtures}/project/does-not-exist.orm-project.yaml`)).toThrow(
+      /not found/i,
+    );
+  });
 });

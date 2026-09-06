@@ -97,6 +97,68 @@ describe("verbalize_model tool", () => {
     expect(asObject).toContain(resolve(fixtures, ".barwise"));
   });
 
+  it("omits an empty counterexamples section for a fact type with no constraints", () => {
+    const yaml = `
+orm_version: "1.0"
+model:
+  name: Unconstrained Model
+  object_types:
+    - id: ot-a
+      name: A
+      kind: entity
+      reference_mode: a_id
+    - id: ot-b
+      name: B
+      kind: entity
+      reference_mode: b_id
+  fact_types:
+    - id: ft-a-b
+      name: A relates B
+      roles:
+        - id: r-a
+          player: ot-a
+          role_name: relates
+        - id: r-b
+          player: ot-b
+          role_name: is related to
+      readings:
+        - "{0} relates {1}"
+`;
+    const result = executeVerbalize(yaml, "A relates B", "full", true);
+    expect(result.content[0]!.text).not.toContain("Counterexamples (");
+  });
+
+  it("elides readings past the summary preview and says how many more", () => {
+    const facts = Array.from({ length: 25 }, (_, i) =>
+      [
+        `    - id: "ft-${i}"`,
+        `      name: "A relates${i} B"`,
+        "      roles:",
+        `        - id: "r-a-${i}"`,
+        "          player: ot-a",
+        `          role_name: "relates${i}"`,
+        `        - id: "r-b-${i}"`,
+        "          player: ot-b",
+        `          role_name: "is related${i} to"`,
+        "      readings:",
+        `        - "{0} relates${i} {1}"`,
+        "      constraints:",
+        "        - type: internal_uniqueness",
+        `          roles: ["r-a-${i}"]`,
+        "        - type: mandatory",
+        `          role: "r-a-${i}"`,
+      ].join("\n")).join("\n");
+    const yaml = `orm_version: "1.0"\nmodel:\n  name: Big Verbalize Model\n`
+      + "  object_types:\n"
+      + "    - id: ot-a\n      name: A\n      kind: entity\n      reference_mode: a_id\n"
+      + "    - id: ot-b\n      name: B\n      kind: entity\n      reference_mode: b_id\n"
+      + `  fact_types:\n${facts}\n`;
+
+    const result = executeVerbalize(yaml, undefined, "summary");
+    const text = result.content[0]!.text;
+    expect(text).toContain("more -- call again with mode='full'");
+  });
+
   describe("project source", () => {
     const project = `${fixtures}/project/project.orm-project.yaml`;
 
@@ -119,6 +181,29 @@ describe("verbalize_model tool", () => {
       expect(text).toContain("Customer");
       expect(text).not.toContain("Account");
       expect(text).not.toContain("== crm ==");
+    });
+
+    it("filters by a fact type that exists in only one domain", () => {
+      // crm has "Customer has Email"; billing does not -- the multi-model
+      // path formats a not-found message for the domain lacking it.
+      const result = executeVerbalize(project, "Customer has Email");
+      const text = result.content[0]!.text;
+      expect(text).toContain("has Email");
+      expect(text).toContain('No fact type found matching "Customer has Email"');
+    });
+
+    it("summarizes each domain when mode is summary", () => {
+      const result = executeVerbalize(project, undefined, "summary");
+      const text = result.content[0]!.text;
+      expect(text).toContain("Verbalization summary");
+    });
+
+    it("carries assembly warnings alongside the resolved domain's output", () => {
+      const broken = `${fixtures}/project/broken.orm-project.yaml`;
+      const result = executeVerbalize(broken);
+      const text = result.content[0]!.text;
+      expect(text).toContain("Warning:");
+      expect(text).toContain("ghost");
     });
   });
 });

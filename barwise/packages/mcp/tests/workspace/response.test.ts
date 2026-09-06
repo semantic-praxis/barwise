@@ -90,6 +90,41 @@ describe("boundedTextResult", () => {
     expect(first).toBe(second);
   });
 
+  it("falls back to the default limit when the env override is not a positive number", () => {
+    process.env.BARWISE_MCP_INLINE_LIMIT = "not-a-number";
+    try {
+      // 100 bytes exceeds the (invalid-override -> default) inline limit
+      // only if the default itself is large enough to swallow it, so
+      // assert the opposite: this text is small enough to stay inline
+      // under the real default, proving the invalid override was ignored
+      // rather than parsed as 0 or NaN (which would force every call to spill).
+      const text = "x".repeat(100);
+      const result = boundedTextResult(text, { kind: "test" });
+      expect(result.content[0]!.text).toBe(text);
+    } finally {
+      delete process.env.BARWISE_MCP_INLINE_LIMIT;
+    }
+  });
+
+  it("falls back to the cwd for a spill source that is not a file path", () => {
+    const text = Array.from({ length: 50 }, (_, i) => `line ${i}`).join("\n");
+    const result = boundedTextResult(text, {
+      kind: "test",
+      source: 'orm_version: "1.0"\nmodel:\n  name: Inline\n',
+      limit: 50,
+    });
+    const spill = spillPathFrom(result.content[0]!.text);
+    expect(spill.startsWith(process.cwd())).toBe(true);
+    rmSync(join(process.cwd(), ".barwise", "mcp-cache"), { recursive: true, force: true });
+  });
+
+  it("formats a multi-megabyte payload size in MB", () => {
+    const text = "x".repeat(1_100_000);
+    const result = boundedTextResult(text, { kind: "test", source: join(tmp, "big.orm.yaml") });
+    const out = result.content[0]!.text;
+    expect(out).toMatch(/\d+\.\d MB/);
+  });
+
   it("reports how many lines were elided", () => {
     const text = Array.from({ length: 120 }, (_, i) => `n${i}`).join("\n");
     const result = boundedTextResult(text, {

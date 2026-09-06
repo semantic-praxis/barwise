@@ -1,18 +1,65 @@
 /**
- * Unit tests for the chat participant prompts and configuration.
- *
- * The handler itself requires the VS Code runtime (vscode.chat,
- * vscode.lm, etc.), so it is covered by integration tests. These
- * unit tests verify the exported constants and configuration that
- * drive the participant's behavior. The constants live in
- * chatPrompts.ts (no VS Code dependency) so they can be tested here.
+ * Unit tests for the chat participant: its prompts/configuration
+ * (no VS Code dependency, tested directly against chatPrompts.ts) and
+ * the handler/registration wiring in ChatParticipant.ts itself. The
+ * latter imports the real `vscode` API and `@vscode/chat-extension-utils`,
+ * neither resolvable outside the editor, so both are mocked here as the
+ * boundary -- the same way DiagnosticsProvider's tests mock the LSP
+ * Connection rather than the editor. What we exercise is our own logic:
+ * prompt assembly, model-path resolution, and tool-tag filtering.
  */
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   COMMAND_INSTRUCTIONS,
   FOLLOWUP_SUGGESTIONS,
+  PARTICIPANT_ID,
   SYSTEM_PROMPT,
 } from "../../src/chat/chatPrompts.js";
+
+class MockUri {
+  constructor(public readonly fsPath: string) {}
+  static joinPath(base: MockUri, ...parts: string[]): MockUri {
+    return new MockUri([base.fsPath, ...parts].join("/"));
+  }
+}
+
+vi.mock("vscode", () => ({
+  Uri: MockUri,
+  window: { activeTextEditor: undefined, visibleTextEditors: [] },
+  workspace: { textDocuments: [] },
+  chat: {
+    createChatParticipant: vi.fn((id: string, handler: unknown) => ({
+      id,
+      handler,
+      iconPath: undefined,
+      followupProvider: undefined,
+    })),
+  },
+  lm: { tools: [] },
+}));
+
+vi.mock("@vscode/chat-extension-utils", () => ({
+  sendChatParticipantRequest: vi.fn(() => ({ result: Promise.resolve({ metadata: {} }) })),
+}));
+
+const vscode = (await import("vscode")) as unknown as {
+  Uri: typeof MockUri;
+  window: { activeTextEditor: unknown; visibleTextEditors: unknown[]; };
+  lm: { tools: Array<{ tags: string[]; }>; };
+};
+const { sendChatParticipantRequest } = await import("@vscode/chat-extension-utils");
+const { registerChatParticipant } = await import("../../src/chat/ChatParticipant.js");
+
+function makeContext() {
+  return {
+    extensionUri: new vscode.Uri("/ext"),
+    subscriptions: [] as unknown[],
+  };
+}
+
+function makeRequest(command?: string, references: unknown[] = []) {
+  return { command, references } as never;
+}
 
 describe("ChatParticipant", () => {
   describe("SYSTEM_PROMPT", () => {
@@ -208,6 +255,131 @@ describe("ChatParticipant", () => {
       for (const suggestion of FOLLOWUP_SUGGESTIONS) {
         expect(suggestion.prompt.length).toBeGreaterThan(0);
       }
+    });
+  });
+});
+
+describe("registerChatParticipant", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vscode.window.activeTextEditor = undefined;
+    vscode.window.visibleTextEditors = [];
+    vscode.lm.tools = [
+      { tags: ["orm"] },
+      { tags: ["other"] },
+    ];
+  });
+
+  it("registers the @barwise participant with its icon and followup provider", () => {
+    const context = makeContext();
+    registerChatParticipant(context as never);
+
+    expect(context.subscriptions).toHaveLength(1);
+    const participant = context.subscriptions[0] as {
+      id: string;
+      iconPath: MockUri;
+      followupProvider: { provideFollowups: (...args: never[]) => unknown; };
+    };
+    expect(participant.id).toBe(PARTICIPANT_ID);
+    expect(participant.iconPath.fsPath).toBe("/ext/media/icon.png");
+    expect(participant.followupProvider).toBeDefined();
+  });
+
+  it("follow-up provider returns the configured suggestions", async () => {
+    const context = makeContext();
+    registerChatParticipant(context as never);
+    const participant = context.subscriptions[0] as {
+      followupProvider: {
+        provideFollowups: (...args: never[]) => Promise<unknown> | unknown;
+      };
+    };
+
+    const followups = await participant.followupProvider.provideFollowups(
+      undefined as never,
+      undefined as never,
+      undefined as never,
+    );
+    expect(followups).toEqual(FOLLOWUP_SUGGESTIONS);
+  });
+
+  describe("the request handler", () => {
+    function registerAndGetHandler() {
+      const context = makeContext();
+      registerChatParticipant(context as never);
+      const participant = context.subscriptions[0] as {
+        handler: (
+          request: unknown,
+          context: unknown,
+          stream: unknown,
+          token: unknown,
+        ) => Promise<unknown>;
+      };
+      return participant.handler;
+    }
+
+    it("uses the base system prompt and only orm-tagged tools when there is no command or open model", async () => {
+      const handler = registerAndGetHandler();
+      const request = makeRequest(undefined);
+
+      const result = await handler(request, {}, {}, {});
+
+      expect(sendChatParticipantRequest).toHaveBeenCalledTimes(1);
+      const [sentRequest, , options] = vi.mocked(sendChatParticipantRequest).mock.calls[0]!;
+      expect(sentRequest).toBe(request);
+      expect(options.prompt).toBe(SYSTEM_PROMPT);
+      // Only the tool tagged "orm" is offered to the model.
+      expect(options.tools).toEqual([{ tags: ["orm"] }]);
+      expect(result).toEqual({ metadata: {} });
+    });
+
+    it("appends the command instructions for a recognized slash command", async () => {
+      const handler = registerAndGetHandler();
+      const request = makeRequest("validate");
+
+      await handler(request, {}, {}, {});
+
+      const [, , options] = vi.mocked(sendChatParticipantRequest).mock.calls[0]!;
+      expect(options.prompt).toContain(SYSTEM_PROMPT);
+      expect(options.prompt).toContain(COMMAND_INSTRUCTIONS.validate);
+    });
+
+    it("does not append instructions for an unrecognized command", async () => {
+      const handler = registerAndGetHandler();
+      const request = makeRequest("not-a-real-command");
+
+      await handler(request, {}, {}, {});
+
+      const [, , options] = vi.mocked(sendChatParticipantRequest).mock.calls[0]!;
+      expect(options.prompt).toBe(SYSTEM_PROMPT);
+    });
+
+    it("tells the model which .orm.yaml file is open in the focused editor", async () => {
+      vscode.window.activeTextEditor = {
+        document: {
+          fileName: "/workspace/clinic.orm.yaml",
+          uri: { fsPath: "/workspace/clinic.orm.yaml" },
+        },
+      };
+      const handler = registerAndGetHandler();
+      const request = makeRequest(undefined);
+
+      await handler(request, {}, {}, {});
+
+      const [, , options] = vi.mocked(sendChatParticipantRequest).mock.calls[0]!;
+      expect(options.prompt).toContain("/workspace/clinic.orm.yaml");
+      expect(options.prompt).toContain("Pass this exact path");
+    });
+
+    it("passes the response stream and token through to sendChatParticipantRequest", async () => {
+      const handler = registerAndGetHandler();
+      const stream = { markdown: vi.fn() };
+      const token = { isCancellationRequested: false };
+
+      await handler(makeRequest(undefined), {}, stream, token);
+
+      const [, , options, sentToken] = vi.mocked(sendChatParticipantRequest).mock.calls[0]!;
+      expect(options.responseStreamOptions?.stream).toBe(stream);
+      expect(sentToken).toBe(token);
     });
   });
 });

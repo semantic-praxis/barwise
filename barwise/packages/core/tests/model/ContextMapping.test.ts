@@ -121,6 +121,66 @@ describe("ContextMapping", () => {
     expect(mapping.semanticConflicts).toHaveLength(1);
   });
 
+  it("rejects an empty source object type in an entity mapping", () => {
+    const mapping = new ContextMapping({
+      path: "./test.map.yaml",
+      sourceContext: "a",
+      targetContext: "b",
+      pattern: "published_language",
+    });
+
+    expect(() => mapping.addEntityMapping({ sourceObjectType: "", targetObjectType: "Bar" }))
+      .toThrow("Source object type must be a non-empty string.");
+  });
+
+  it("rejects a whitespace-only target object type in an entity mapping", () => {
+    const mapping = new ContextMapping({
+      path: "./test.map.yaml",
+      sourceContext: "a",
+      targetContext: "b",
+      pattern: "published_language",
+    });
+
+    expect(() => mapping.addEntityMapping({ sourceObjectType: "Foo", targetObjectType: "   " }))
+      .toThrow("Target object type must be a non-empty string.");
+  });
+
+  it("rejects an empty term in a semantic conflict", () => {
+    const mapping = new ContextMapping({
+      path: "./test.map.yaml",
+      sourceContext: "a",
+      targetContext: "b",
+      pattern: "published_language",
+    });
+
+    expect(() =>
+      mapping.addSemanticConflict({
+        term: "",
+        sourceMeaning: "A",
+        targetMeaning: "B",
+        resolution: "Pick one.",
+      })
+    ).toThrow("Semantic conflict term must be a non-empty string.");
+  });
+
+  it("rejects a whitespace-only resolution in a semantic conflict", () => {
+    const mapping = new ContextMapping({
+      path: "./test.map.yaml",
+      sourceContext: "a",
+      targetContext: "b",
+      pattern: "published_language",
+    });
+
+    expect(() =>
+      mapping.addSemanticConflict({
+        term: "Widget",
+        sourceMeaning: "A",
+        targetMeaning: "B",
+        resolution: "   ",
+      })
+    ).toThrow("Semantic conflict resolution must be a non-empty string.");
+  });
+
   it("checks context involvement", () => {
     const mapping = new ContextMapping({
       path: "./test.map.yaml",

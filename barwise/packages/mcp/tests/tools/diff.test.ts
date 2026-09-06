@@ -61,6 +61,42 @@ describe("diff_models tool", () => {
     expect(result.content[0]!.type).toBe("text");
   });
 
+  it("reports a definition delta labelled by its term (not `name`)", () => {
+    const base = `
+orm_version: "1.0"
+model:
+  name: Glossary Model
+  object_types:
+    - id: ot-a
+      name: A
+      kind: entity
+      reference_mode: a_id
+  definitions:
+    - term: Widget
+      definition: A thing sold in the store.
+`;
+    const incoming = `
+orm_version: "1.0"
+model:
+  name: Glossary Model
+  object_types:
+    - id: ot-a
+      name: A
+      kind: entity
+      reference_mode: a_id
+  definitions:
+    - term: Widget
+      definition: A physical thing sold in the store.
+`;
+    const result = executeDiff(base, incoming);
+    const parsed = JSON.parse(result.content[0]!.text);
+    const definitionDelta = parsed.deltas.find(
+      (d: { elementType: string; }) => d.elementType === "definition",
+    );
+    expect(definitionDelta).toBeDefined();
+    expect(definitionDelta.name).toBe("Widget");
+  });
+
   it("accepts file-object base and incoming", () => {
     const result = executeDiff(
       { path: `${fixtures}/simple.orm.yaml` },

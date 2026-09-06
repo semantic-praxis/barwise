@@ -11,6 +11,35 @@ import { ModelBuilder } from "./helpers/ModelBuilder.js";
 
 const dbtFormat = new DbtExportFormat();
 
+/**
+ * A many-to-many fact type (no uniqueness constraint) maps to its own
+ * associative table (RelationalMapper), and one of its two population
+ * instances omits a role value -- a real "population/incomplete-instance"
+ * validation error, not a fabricated one. This single model exercises
+ * strict-mode rejection, the non-strict warnings section, and seed CSV
+ * generation together.
+ */
+function buildEnrollmentModelWithIncompleteInstance() {
+  return new ModelBuilder("School")
+    .withEntityType("Student", { referenceMode: "student_id" })
+    .withEntityType("Course", { referenceMode: "course_id" })
+    .withBinaryFactType("Student enrolls Course", {
+      role1: { player: "Student", name: "enrolls" },
+      role2: { player: "Course", name: "is enrolled by" },
+    })
+    .withPopulation("Student enrolls Course", [
+      {
+        roleValues: {
+          "Student enrolls Course::role1": "S001",
+          "Student enrolls Course::role2": "Design, 101",
+        },
+      },
+      // Missing the Course role value -- an incomplete instance.
+      { roleValues: { "Student enrolls Course::role1": "S002" } },
+    ])
+    .build();
+}
+
 describe("DbtExportFormat", () => {
   describe("basic export", () => {
     it("exports a simple model to dbt files", () => {
@@ -119,6 +148,60 @@ describe("DbtExportFormat", () => {
         .build();
 
       expect(() => dbtFormat.export(model, { strict: true })).not.toThrow();
+    });
+
+    it("throws in strict mode when the model has real validation errors", () => {
+      const model = buildEnrollmentModelWithIncompleteInstance();
+
+      expect(() => dbtFormat.export(model, { strict: true })).toThrow(
+        /Cannot export model with validation errors in strict mode.*has no value for role/is,
+      );
+    });
+
+    it("includes validation errors as a warnings section in the text output when strict is false", () => {
+      const model = buildEnrollmentModelWithIncompleteInstance();
+
+      const result = dbtFormat.export(model, { strict: false });
+
+      expect(result.text).toContain("# Validation warnings:");
+      expect(result.text).toContain("# ERROR:");
+      expect(result.text).toContain("has no value for role(s) played by: Course");
+    });
+  });
+
+  describe("population seed CSV export", () => {
+    it("renders a many-to-many fact type's population as a seed CSV", () => {
+      const model = buildEnrollmentModelWithIncompleteInstance();
+
+      const result = dbtFormat.export(model, { includeExamples: true });
+
+      const seed = result.files!.find((f) => f.name === "seeds/student_enrolls_course.csv");
+      expect(seed).toBeDefined();
+
+      const lines = seed!.content.trim().split("\n");
+      expect(lines[0]).toBe("student_id,course_id");
+      // Values containing a comma are quoted.
+      expect(lines).toContain('S001,"Design, 101"');
+      // The instance missing a role value renders that column empty.
+      expect(lines).toContain("S002,");
+    });
+
+    it("omits seed files when includeExamples is false", () => {
+      const model = buildEnrollmentModelWithIncompleteInstance();
+
+      const result = dbtFormat.export(model, { includeExamples: false });
+
+      expect(result.files!.some((f) => f.name.startsWith("seeds/"))).toBe(false);
+    });
+
+    it("produces no seed files for a model with no populations", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Customer", { referenceMode: "customer_id" })
+        .build();
+
+      const result = dbtFormat.export(model, { includeExamples: true });
+
+      expect(result.files!.some((f) => f.name.startsWith("seeds/"))).toBe(false);
     });
   });
 

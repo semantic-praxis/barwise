@@ -259,6 +259,62 @@ models:
     expect(stats.constraintsAdded).toBe(0);
   });
 
+  it("merges a SQL UNIQUE constraint on a single column as internal uniqueness, without duplicating", () => {
+    const { model, report } = setup();
+    // "Customers has Email" already carries an internal_uniqueness
+    // constraint on the entity role (single-valued attribute), so the
+    // dedup check that matters is on the *value* role the SQL UNIQUE
+    // pattern targets, not the constraint count overall.
+    const before = constraintsOf(model, "Customers has Email")
+      .filter((c) => c.type === "internal_uniqueness") as { roleIds: string[]; }[];
+    const beforeRoleIdSets = new Set(before.map((c) => c.roleIds.join(",")));
+
+    mergeSqlPatterns(model, [{
+      modelName: "customers",
+      sourcePath: "models/customers.sql",
+      patterns: [
+        pattern({ kind: "not_null", sourceText: "", columns: ["email"] }),
+        pattern({ kind: "unique", sourceText: "", columns: ["email"] }),
+      ],
+    }], report);
+
+    const constraints = constraintsOf(model, "Customers has Email");
+    expect(constraints.some((c) => c.type === "mandatory")).toBe(true);
+    const uniquenessConstraints = constraints.filter((c) => c.type === "internal_uniqueness") as {
+      roleIds: string[];
+    }[];
+    expect(uniquenessConstraints).toHaveLength(before.length + 1);
+    const newUc = uniquenessConstraints.find((c) => !beforeRoleIdSets.has(c.roleIds.join(",")));
+    expect(newUc).toBeDefined();
+
+    // A second UNIQUE pattern on the same column must not add a
+    // duplicate constraint for that same role.
+    const stats = mergeSqlPatterns(model, [{
+      modelName: "customers",
+      sourcePath: "models/customers.sql",
+      patterns: [pattern({ kind: "unique", sourceText: "", columns: ["email"] })],
+    }], report);
+    expect(stats.constraintsAdded).toBe(0);
+    expect(
+      constraintsOf(model, "Customers has Email").filter(
+        (c) =>
+          c.type === "internal_uniqueness"
+          && (c as { roleIds: string[]; }).roleIds[0] === newUc!.roleIds[0],
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("ignores a SQL UNIQUE pattern spanning more than one column", () => {
+    const { model, report } = setup();
+    const stats = mergeSqlPatterns(model, [{
+      modelName: "customers",
+      sourcePath: "models/customers.sql",
+      patterns: [pattern({ kind: "unique", sourceText: "", columns: ["email", "status"] })],
+    }], report);
+
+    expect(stats.constraintsAdded).toBe(0);
+  });
+
   it("strips table qualifiers from mined column names", () => {
     const { model, report } = setup();
     mergeSqlPatterns(model, [{

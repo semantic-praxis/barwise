@@ -219,6 +219,52 @@ describe("Impact Analysis", () => {
     expect(roleReport.affectedArtifacts[0].relationship).toContain("role places");
   });
 
+  it("describes a SubtypeFact relationship, and falls back generically for an unknown element type", () => {
+    const subtypeFactId = "sf-adult-person";
+    const manifest: LineageManifest = {
+      version: 1,
+      sourceModel: "test.orm.yaml",
+      sourceModelHash: "abc123",
+      exports: [
+        {
+          artifact: "adult_view.sql",
+          format: "ddl",
+          exportedAt: "2026-03-06T12:00:00Z",
+          modelHash: "abc123",
+          sources: [
+            {
+              elementId: subtypeFactId,
+              elementType: "SubtypeFact",
+              elementName: "Adult is a subtype of Person",
+            },
+          ],
+        },
+        {
+          artifact: "mystery_view.sql",
+          format: "ddl",
+          exportedAt: "2026-03-06T12:00:00Z",
+          modelHash: "abc123",
+          sources: [
+            {
+              elementId: subtypeFactId,
+              // A future element type this version of the code doesn't
+              // recognize -- must still degrade gracefully.
+              elementType: "SomethingNew" as unknown as "SubtypeFact",
+              elementName: "Mystery",
+            },
+          ],
+        },
+      ],
+    };
+
+    const report = analyzeImpact(manifest, subtypeFactId);
+    expect(report.affectedArtifacts).toHaveLength(2);
+    expect(report.affectedArtifacts[0]!.relationship).toContain(
+      "involves subtype relationship Adult is a subtype of Person",
+    );
+    expect(report.affectedArtifacts[1]!.relationship).toBe("references Mystery");
+  });
+
   it("should handle multiple artifacts with different formats", () => {
     const elementId = "entity-customer-123";
 

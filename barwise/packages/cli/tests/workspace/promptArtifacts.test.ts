@@ -26,13 +26,13 @@
  * are not independent, and a future mutation tripping only the lower
  * one has not been shown to matter to anybody.
  */
-import { builtinArtifacts, resolveArtifact } from "@barwise/llm";
+import { builtinArtifacts, defaultReviewArtifact, resolveArtifact } from "@barwise/llm";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { artifactCandidates } from "../../src/workspace/promptArtifacts.js";
+import { artifactByVersion, artifactCandidates } from "../../src/workspace/promptArtifacts.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 /** The files the built-ins are generated FROM -- the collision case. */
@@ -155,5 +155,27 @@ describe("artifactCandidates", () => {
   it("reads an empty directory as no override rather than as no built-ins", () => {
     mkdirSync(join(dir, "empty"));
     expect(artifactCandidates(join(dir, "empty")).map((a) => a.version)).toContain("haiku45-2");
+  });
+});
+
+describe("artifactByVersion", () => {
+  it("resolves 'default' to the review surface's default artifact", () => {
+    expect(artifactByVersion([], "review", "default").version).toBe(defaultReviewArtifact.version);
+  });
+
+  it("resolves a single exact version match", () => {
+    const candidates = artifactCandidates();
+    expect(artifactByVersion(candidates, "extraction", "haiku45-2").version).toBe("haiku45-2");
+  });
+
+  it("throws naming the available versions when nothing matches", () => {
+    expect(() => artifactByVersion(artifactCandidates(), "extraction", "no-such-version"))
+      .toThrow(/No extraction artifact has version "no-such-version"\. Available: default,/);
+  });
+
+  it("throws when a version is ambiguous across more than one artifact", () => {
+    const dup = { surface: "extraction" as const, version: "dup-1", instructions: "x", demos: [] };
+    expect(() => artifactByVersion([dup, dup], "extraction", "dup-1"))
+      .toThrow(/ambiguous: 2 extraction artifacts carry it/);
   });
 });

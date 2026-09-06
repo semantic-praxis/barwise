@@ -96,6 +96,12 @@ describe("findOrmModel", () => {
     expect(findOrmModel(tempDir, "model.orm.yaml")).toBe(join(tempDir, "model.orm.yaml"));
   });
 
+  it("finds the model by an absolute manifest source path", () => {
+    const modelPath = join(tempDir, "abs-model.orm.yaml");
+    writeFileSync(modelPath, "name: Test", "utf-8");
+    expect(findOrmModel(tempDir, modelPath)).toBe(modelPath);
+  });
+
   it("falls back to scanning for a .orm.yaml file", () => {
     writeFileSync(join(tempDir, "example.orm.yaml"), "name: Test", "utf-8");
     expect(findOrmModel(tempDir)).toBe(join(tempDir, "example.orm.yaml"));

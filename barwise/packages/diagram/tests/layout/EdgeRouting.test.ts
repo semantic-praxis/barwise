@@ -95,6 +95,11 @@ describe("ellipseBorderIntersection", () => {
     expect(p.x).toBeCloseTo(0);
     expect(p.y).toBeCloseTo(-50);
   });
+
+  it("returns the center when direction is zero", () => {
+    const p = ellipseBorderIntersection({ x: 5, y: 5 }, { x: 5, y: 5 }, 0, 0, 100, 50);
+    expect(p).toEqual({ x: 0, y: 0 });
+  });
 });
 
 describe("roleConnectionPoint", () => {

@@ -103,4 +103,11 @@ describe("lineage_status tool", () => {
     expect(typeof result.content[0]!.text).toBe("string");
     expect(() => JSON.parse(result.content[0]!.text)).not.toThrow();
   });
+
+  it("falls back to the current working directory for inline content (no path)", () => {
+    const yaml = fs.readFileSync(`${fixtures}/simple.orm.yaml`, "utf-8");
+    const result = executeLineageStatus(yaml);
+    const parsed = JSON.parse(result.content[0]!.text);
+    expect(parsed.manifestFound).toBe(false);
+  });
 });

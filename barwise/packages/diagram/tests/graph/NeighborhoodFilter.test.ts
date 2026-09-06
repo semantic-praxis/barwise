@@ -102,6 +102,24 @@ describe("computeNeighborhood", () => {
     expect(n.subtypeFactIds.has(sf.id)).toBe(true);
   });
 
+  it("does not revisit a supertype or subtype already reached by another path", () => {
+    // Puppy is a direct subtype of both Dog and Animal (multiple
+    // inheritance), and Dog is itself a subtype of Animal -- so Animal
+    // and Dog are each reachable by two different subtype edges.
+    const model = new OrmModel({ name: "Diamond" });
+    const animal = model.addObjectType({ name: "Animal", kind: "entity", referenceMode: "id" });
+    const dog = model.addObjectType({ name: "Dog", kind: "entity", referenceMode: "id" });
+    const puppy = model.addObjectType({ name: "Puppy", kind: "entity", referenceMode: "id" });
+    model.addSubtypeFact({ subtypeId: dog.id, supertypeId: animal.id });
+    model.addSubtypeFact({ subtypeId: puppy.id, supertypeId: dog.id });
+    model.addSubtypeFact({ subtypeId: puppy.id, supertypeId: animal.id });
+
+    const n = computeNeighborhood(model, puppy.id, 2);
+    expect(n.objectTypeIds.has(animal.id)).toBe(true);
+    expect(n.objectTypeIds.has(dog.id)).toBe(true);
+    expect(n.subtypeFactIds.size).toBe(3);
+  });
+
   it("handles hub entities (many connections)", () => {
     const model = new OrmModel({ name: "Hub" });
     const hub = model.addObjectType({ name: "Hub", kind: "entity", referenceMode: "id" });

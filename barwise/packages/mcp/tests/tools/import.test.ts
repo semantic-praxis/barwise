@@ -510,6 +510,100 @@ describe("import_transcript tool", () => {
     });
   });
 
+  describe("multi-sample extraction", () => {
+    it("routes through sampleTranscript when samples is given", async () => {
+      const complete = stubLlm(emptyExtraction());
+
+      const result = await executeImport(
+        TRANSCRIPT,
+        "Model",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        2,
+      );
+
+      // Two identical draws agree perfectly -- one call per sample.
+      expect(complete).toHaveBeenCalledTimes(2);
+      expect(result.content[0]!.text).toContain("name: Model");
+    });
+  });
+
+  describe("alternative framings", () => {
+    function extractionWithAlternative(): ExtractionResponse {
+      return {
+        object_types: [
+          { name: "A", kind: "entity", source_references: [] },
+          { name: "B", kind: "entity", source_references: [] },
+          { name: "C", kind: "entity", source_references: [] },
+          {
+            name: "Shared",
+            kind: "entity",
+            definition: "Primary framing's definition.",
+            source_references: [],
+          },
+        ],
+        fact_types: [],
+        subtypes: [],
+        inferred_constraints: [],
+        ambiguities: [],
+        alternatives: [
+          {
+            rationale: "Model each department as its own entity type.",
+            ambiguity_description: "Whether department is an attribute or an entity type.",
+            object_types: [
+              { name: "D1", kind: "entity", source_references: [] },
+              { name: "D2", kind: "entity", source_references: [] },
+              { name: "D3", kind: "entity", source_references: [] },
+              { name: "D4", kind: "entity", source_references: [] },
+              { name: "D5", kind: "entity", source_references: [] },
+              { name: "D6", kind: "entity", source_references: [] },
+              { name: "D7", kind: "entity", source_references: [] },
+              {
+                name: "Shared",
+                kind: "entity",
+                definition: "Alternative framing's different definition.",
+                source_references: [],
+              },
+            ],
+            fact_types: [],
+            subtypes: [],
+            inferred_constraints: [],
+          },
+        ],
+      };
+    }
+
+    it("appends an alternative-framings section with a diff summary", async () => {
+      stubLlm(extractionWithAlternative());
+
+      const result = await executeImport(
+        TRANSCRIPT,
+        "Model",
+        undefined,
+        undefined,
+        undefined,
+        true,
+      );
+      const text = result.content[0]!.text;
+
+      expect(text).toContain("## Alternative framings");
+      expect(text).toContain("Model each department as its own entity type.");
+      expect(text).toContain("Resolves: Whether department is an attribute or an entity type.");
+      // 3 removed (A, B, C), 8 added/modified -> truncated with "..." past 6 names.
+      expect(text).toMatch(/Diff vs primary: \d+ added, \d+ modified, \d+ removed/);
+      expect(text).toContain(", ...)");
+    });
+
+    it("omits the section entirely when alternatives is not requested", async () => {
+      stubLlm(extractionWithAlternative());
+
+      const result = await executeImport(TRANSCRIPT, "Model");
+      expect(result.content[0]!.text).not.toContain("## Alternative framings");
+    });
+  });
+
   describe("transcript source resolution", () => {
     it("reads the transcript from a file path", async () => {
       const complete = stubLlm(emptyExtraction());

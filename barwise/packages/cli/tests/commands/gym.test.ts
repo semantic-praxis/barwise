@@ -4,7 +4,7 @@
  * (learning-design C6). XDG_STATE_HOME is pointed at a temp directory
  * so the session record is asserted without touching the real home.
  */
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -60,6 +60,39 @@ describe("barwise gym show", () => {
     const result = await runCli(["gym", "show", "no-such"]);
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain("no exercise");
+  });
+
+  it("prints the starter-model path with --catalog, for an exercise that declares one", async () => {
+    const catalogDir = mkdtempSync(join(tmpdir(), "barwise-gym-catalog-"));
+    try {
+      writeFileSync(
+        join(catalogDir, "starter.orm.yaml"),
+        'orm_version: "1.0"\nmodel:\n  name: Starter\n  domain_context: starter\n',
+      );
+      writeFileSync(
+        join(catalogDir, "custom.gym.yaml"),
+        [
+          'id: "custom"',
+          'title: "Custom exercise"',
+          "transition:",
+          '  from: "novice"',
+          '  to: "initiate"',
+          'exitPerformance: "n/a"',
+          'brief: "n/a"',
+          'starter: "starter.orm.yaml"',
+          "checks:",
+          '  - kind: "must_validate"',
+          '    diagnosis: "n/a"',
+          "",
+        ].join("\n"),
+      );
+
+      const result = await runCli(["gym", "show", "custom", "--catalog", catalogDir]);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain(`Starter model: ${join(catalogDir, "starter.orm.yaml")}`);
+    } finally {
+      rmSync(catalogDir, { recursive: true, force: true });
+    }
   });
 });
 

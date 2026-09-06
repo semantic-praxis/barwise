@@ -100,6 +100,27 @@ describe("review_model tool", () => {
     expect(text).toContain("**INFO (Customer places Order)**");
   });
 
+  it("formats a suggestion with no element without a trailing empty parenthesis", async () => {
+    const { reviewModel } = await import("@barwise/llm");
+
+    vi.mocked(reviewModel).mockResolvedValue({
+      suggestions: [
+        {
+          category: "general",
+          severity: "info",
+          description: "Consider adding a domain_context.",
+          rationale: "Helps disambiguate multi-domain projects.",
+        },
+      ],
+      summary: "General suggestions only.",
+    });
+
+    const result = await executeReview(`${fixtures}/simple.orm.yaml`);
+    const text = result.content[0]!.text;
+
+    expect(text).toContain("**INFO**: Consider adding a domain_context.");
+  });
+
   it("handles no suggestions", async () => {
     const { reviewModel } = await import("@barwise/llm");
 

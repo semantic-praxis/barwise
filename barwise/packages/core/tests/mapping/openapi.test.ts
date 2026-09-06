@@ -15,8 +15,10 @@
  */
 import { describe, expect, it } from "vitest";
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
+import type { RelationalSchema } from "../../src/mapping/RelationalSchema.js";
 import { openApiToJson, renderOpenApi } from "../../src/mapping/renderers/openapi.js";
 import type { OpenApiSpec } from "../../src/mapping/renderers/openapi.js";
+import { OrmModel } from "../../src/model/OrmModel.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 const mapper = new RelationalMapper();
@@ -122,6 +124,94 @@ describe("OpenAPI renderer", () => {
 
       expect(pathKeys.some((p) => p.startsWith("/api/v1/"))).toBe(true);
     });
+
+    it("normalizes a basePath with no leading or trailing slash", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Customer", { referenceMode: "customer_id" })
+        .build();
+
+      const relSchema = mapper.map(model);
+      const spec = renderOpenApi(relSchema, { basePath: "api/v1" });
+      const pathKeys = Object.keys(spec.paths);
+
+      expect(pathKeys).toContain("/api/v1/customer");
+    });
+  });
+
+  describe("model overload (population examples)", () => {
+    function customerModel() {
+      return new ModelBuilder("Test")
+        .withEntityType("Customer", { referenceMode: "customer_id" })
+        .build();
+    }
+
+    it("accepts a model as the second parameter and includes its population examples", () => {
+      // renderPopulationAsOpenApiExamples keys the example object by role
+      // *name*; renderComponentSchema looks examples up by column name --
+      // naming the identifying role after its (reference-mode-derived)
+      // column is what makes a per-property example attach here.
+      const model = new OrmModel({ name: "Test" });
+      const customer = model.addObjectType({
+        name: "Customer",
+        kind: "entity",
+        referenceMode: "customer_id",
+      });
+      const email = model.addObjectType({ name: "Email", kind: "value" });
+      const idFt = model.addFactType({
+        name: "Customer has Email",
+        roles: [
+          { id: "r1", name: "customer_id", playerId: customer.id },
+          { id: "r2", name: "is of", playerId: email.id },
+        ],
+        readings: ["{0} has {1}", "{1} is of {0}"],
+        constraints: [{ type: "internal_uniqueness", roleIds: ["r1"], isPreferred: true }],
+      });
+      const pop = model.addPopulation({ factTypeId: idFt.id });
+      pop.addInstance({ roleValues: { r1: "C001", r2: "c001@example.com" } });
+
+      const relSchema = mapper.map(model);
+      const spec = renderOpenApi(relSchema, model);
+      const schema = getSchema(spec, "Customer")!;
+
+      expect(schema["example"]).toBeDefined();
+      const props = getProperties(schema);
+      expect(props["customer_id"]!["example"]).toBe("C001");
+    });
+
+    it("accepts a model with options as a third parameter", () => {
+      const model = customerModel();
+      const relSchema = mapper.map(model);
+      const spec = renderOpenApi(relSchema, model, { title: "Model + Options API" });
+
+      expect(spec.info.title).toBe("Model + Options API");
+    });
+
+    it("omits examples when includeExamples is false, even with a model", () => {
+      const model = new OrmModel({ name: "Test" });
+      const customer = model.addObjectType({
+        name: "Customer",
+        kind: "entity",
+        referenceMode: "customer_id",
+      });
+      const email = model.addObjectType({ name: "Email", kind: "value" });
+      const idFt = model.addFactType({
+        name: "Customer has Email",
+        roles: [
+          { id: "r1", name: "customer_id", playerId: customer.id },
+          { id: "r2", name: "is of", playerId: email.id },
+        ],
+        readings: ["{0} has {1}", "{1} is of {0}"],
+        constraints: [{ type: "internal_uniqueness", roleIds: ["r1"], isPreferred: true }],
+      });
+      const pop = model.addPopulation({ factTypeId: idFt.id });
+      pop.addInstance({ roleValues: { r1: "C001", r2: "c001@example.com" } });
+
+      const relSchema = mapper.map(model);
+      const spec = renderOpenApi(relSchema, model, { includeExamples: false });
+      const schema = getSchema(spec, "Customer")!;
+
+      expect(schema["example"]).toBeUndefined();
+    });
   });
 
   describe("component schemas", () => {
@@ -156,6 +246,25 @@ describe("OpenAPI renderer", () => {
       const required = schema["required"] as string[];
       expect(required).toContain("customer_id");
       expect(required).not.toContain("email");
+    });
+
+    it("omits the required array entirely when every column is nullable", () => {
+      const relSchema: RelationalSchema = {
+        sourceModelId: "test",
+        tables: [
+          {
+            name: "note",
+            columns: [{ name: "body", dataType: "TEXT", nullable: true }],
+            primaryKey: { columnNames: ["body"] },
+            foreignKeys: [],
+            sourceElementId: "ot-note",
+          },
+        ],
+      };
+      const spec = renderOpenApi(relSchema);
+      const schema = getSchema(spec, "Note")!;
+
+      expect(schema["required"]).toBeUndefined();
     });
 
     it("renders FK columns as $ref", () => {
@@ -296,6 +405,107 @@ describe("OpenAPI renderer", () => {
       expect(props["price"]!["type"]).toBe("number");
     });
 
+    it("maps TIME to string with format time", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Shift", { referenceMode: "shift_id" })
+        .withValueType("StartTime", { dataType: { name: "time" } })
+        .withBinaryFactType("Shift has StartTime", {
+          role1: { player: "Shift", name: "has" },
+          role2: { player: "StartTime", name: "is of" },
+          uniqueness: "role1",
+        })
+        .build();
+
+      const relSchema = mapper.map(model);
+      const spec = renderOpenApi(relSchema);
+      const schema = getSchema(spec, "Shift")!;
+      const props = getProperties(schema);
+
+      expect(props["start_time"]!["type"]).toBe("string");
+      expect(props["start_time"]!["format"]).toBe("time");
+    });
+
+    it("maps BLOB (unbounded binary) to string with format binary", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Document", { referenceMode: "document_id" })
+        .withValueType("Content", { dataType: { name: "binary" } })
+        .withBinaryFactType("Document has Content", {
+          role1: { player: "Document", name: "has" },
+          role2: { player: "Content", name: "is of" },
+          uniqueness: "role1",
+        })
+        .build();
+
+      const relSchema = mapper.map(model);
+      const spec = renderOpenApi(relSchema);
+      const schema = getSchema(spec, "Document")!;
+      const props = getProperties(schema);
+
+      expect(props["content"]!["type"]).toBe("string");
+      expect(props["content"]!["format"]).toBe("binary");
+    });
+
+    it("maps a fixed-length BINARY(n) to string with format binary", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Device", { referenceMode: "device_id" })
+        .withValueType("MacAddress", { dataType: { name: "binary", length: 6 } })
+        .withBinaryFactType("Device has MacAddress", {
+          role1: { player: "Device", name: "has" },
+          role2: { player: "MacAddress", name: "is of" },
+          uniqueness: "role1",
+        })
+        .build();
+
+      const relSchema = mapper.map(model);
+      const spec = renderOpenApi(relSchema);
+      const schema = getSchema(spec, "Device")!;
+      const props = getProperties(schema);
+
+      expect(props["mac_address"]!["type"]).toBe("string");
+      expect(props["mac_address"]!["format"]).toBe("binary");
+    });
+
+    it("maps DATETIME to string with format date-time", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Log", { referenceMode: "log_id" })
+        .withValueType("UpdatedAt", { dataType: { name: "datetime" } })
+        .withBinaryFactType("Log has UpdatedAt", {
+          role1: { player: "Log", name: "has" },
+          role2: { player: "UpdatedAt", name: "is of" },
+          uniqueness: "role1",
+        })
+        .build();
+
+      const relSchema = mapper.map(model);
+      const spec = renderOpenApi(relSchema);
+      const schema = getSchema(spec, "Log")!;
+      const props = getProperties(schema);
+
+      expect(props["updated_at"]!["type"]).toBe("string");
+      expect(props["updated_at"]!["format"]).toBe("date-time");
+    });
+
+    it("falls back to string for an unrecognized SQL type", () => {
+      const relSchema: RelationalSchema = {
+        sourceModelId: "test",
+        tables: [
+          {
+            name: "widget",
+            columns: [{ name: "payload", dataType: "JSONB", nullable: false }],
+            primaryKey: { columnNames: ["payload"] },
+            foreignKeys: [],
+            sourceElementId: "ot-widget",
+          },
+        ],
+      };
+      const spec = renderOpenApi(relSchema);
+      const schema = getSchema(spec, "Widget")!;
+      const props = getProperties(schema);
+
+      expect(props["payload"]!["type"]).toBe("string");
+      expect(props["payload"]!["format"]).toBeUndefined();
+    });
+
     it("maps UUID to string with format uuid", () => {
       const model = new ModelBuilder("Test")
         .withEntityType("Session", { referenceMode: "session_id" })
@@ -398,6 +608,25 @@ describe("OpenAPI renderer", () => {
       expect(schema["type"]).toBe("array");
       const items = schema["items"] as Record<string, string>;
       expect(items["$ref"]).toBe("#/components/schemas/Customer");
+    });
+
+    it("falls back to 'id' as the path parameter when the table declares no primary key columns", () => {
+      const relSchema: RelationalSchema = {
+        sourceModelId: "test",
+        tables: [
+          {
+            name: "log_entry",
+            columns: [{ name: "message", dataType: "TEXT", nullable: false }],
+            primaryKey: { columnNames: [] },
+            foreignKeys: [],
+            sourceElementId: "ft-log-entry",
+          },
+        ],
+      };
+      const spec = renderOpenApi(relSchema);
+      const pathKeys = Object.keys(spec.paths);
+
+      expect(pathKeys).toContain("/log-entry/{id}");
     });
   });
 
