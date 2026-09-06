@@ -23,6 +23,7 @@
     "check:python-uv": "npm --prefix barwise run check:python-uv --",
     "check:root-scripts": "npm --prefix barwise run check:root-scripts --",
     "test:scripts": "npm --prefix barwise run test:scripts --",
+    "test:optimizer": "npm --prefix barwise run test:optimizer --",
     "audit:duplication": "npm --prefix barwise run audit:duplication --",
     "audit:specs": "npm --prefix barwise run audit:specs --",
     "survey:specs": "npm --prefix barwise run survey:specs --",

@@ -175,6 +175,19 @@ describe("splitModel", () => {
     ).toEqual([]);
   });
 
+  it("refuses a source without orm_version rather than inventing one (barwise-5t9.14)", () => {
+    // The schema requires the version at the root, and the source is
+    // validated before it is split, so the fallback that used to write
+    // a literal "1.0" here could never run. Pin the refusal so nobody
+    // reintroduces a default for a path the schema has closed.
+    expect(() =>
+      splitModel("model:\n  name: unversioned\n", {
+        projectName: "Unversioned",
+        domains: { a: [], b: [] },
+      })
+    ).toThrow(/orm_version/);
+  });
+
   it("produces empty domains for a model with no object types or fact types", () => {
     const result = splitModel('orm_version: "1.0"\nmodel:\n  name: empty\n', {
       projectName: "Empty",

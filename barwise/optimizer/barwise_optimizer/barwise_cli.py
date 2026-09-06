@@ -146,6 +146,12 @@ class CaseScore:
     errors_by_rule: dict[str, int] = field(default_factory=dict)
     warnings_by_rule: dict[str, int] = field(default_factory=dict)
     corrections_by_category: dict[str, int] = field(default_factory=dict)
+    # Object types plus fact types in the candidate model: the
+    # denominator its penalty rates were computed over. The scorer
+    # records it so that an arm inflating its denominator is visible --
+    # forty elements, half defective, scores like four with two -- and
+    # this side dropped it for a year (barwise-853).
+    element_count: int = 0
 
     @property
     def floored(self) -> bool:
@@ -170,6 +176,7 @@ class CaseScore:
             errors_by_rule=dict(payload.get("errorsByRule") or {}),
             warnings_by_rule=dict(payload.get("warningsByRule") or {}),
             corrections_by_category=dict(payload.get("correctionsByCategory") or {}),
+            element_count=int(payload.get("elementCount", 0)),
         )
 
 

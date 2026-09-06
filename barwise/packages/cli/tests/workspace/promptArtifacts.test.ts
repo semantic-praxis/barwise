@@ -131,25 +131,20 @@ describe("artifactCandidates", () => {
     expect(resolved?.version).toBe("local-opus-1");
   });
 
-  it("does NOT rank a narrower modelPrefix above a broader one (barwise-854)", () => {
-    // Documented, not endorsed. `specificity()` scores which match
-    // FIELDS are present -- provider 1, modelPrefix 2 -- and never how
-    // specific a prefix is, so `claude-haiku-4-5-2026` ties with
-    // `claude-haiku` and the pair is refused.
-    //
-    // The advice in that error is "narrow the match blocks", which is
-    // the one thing an operator in this position has already done. It
-    // is asserted here rather than left undiscovered: this is the
-    // shape anyone testing a per-release variant will hit first.
+  it("ranks a narrower modelPrefix above the shipped broader one (barwise-854)", () => {
+    // The shape anyone testing a per-release variant against the
+    // shipped per-family one hits first. This used to be pinned as a
+    // refusal ("Ambiguous ... narrow the match blocks" -- the one thing
+    // the operator had already done); `specificity` now breaks the
+    // field tie on prefix length.
     writeVariant("local-narrow-1", ["provider: anthropic", "modelPrefix: claude-haiku-4-5-2026"]);
 
-    expect(() =>
-      resolveArtifact(artifactCandidates(dir), {
-        surface: "extraction",
-        provider: "anthropic",
-        model: "claude-haiku-4-5-20261001",
-      })
-    ).toThrow(/Ambiguous/);
+    const resolved = resolveArtifact(artifactCandidates(dir), {
+      surface: "extraction",
+      provider: "anthropic",
+      model: "claude-haiku-4-5-20261001",
+    });
+    expect(resolved?.version).toBe("local-narrow-1");
   });
 
   it("reads an empty directory as no override rather than as no built-ins", () => {

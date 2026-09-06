@@ -260,12 +260,16 @@ jobs:
       # the lock would not change, so a stale uv.lock fails the build
       # instead of being re-resolved silently. Code and scripts use
       # `--frozen`, which does not block a developer mid-edit.
+      # An npm script rather than the `uv` lines inline, because
+      # `ci:local` derives its gate list from `run: npm ...` steps and a
+      # multi-line `run: |` block is invisible to it -- which is how a
+      # change to the CLI seam this suite shells out to reached CI red
+      # after every local gate passed (PR #422). The lock is asserted
+      # `--locked` by the sqlglot step above; `uv run` syncs the dev extra
+      # itself.
       - name: Optimizer lane (Python)
         if: steps.changes.outputs.optimizer == 'true'
-        working-directory: barwise
-        run: |
-          uv sync --extra dev --group sqlglot --locked
-          uv run --locked --extra dev pytest -q
+        run: npm run test:optimizer
 
       # The rubric ratchet: every eval check that survives the mutation
       # its own kind is about carries a verdict in rubric-baseline.json,

@@ -22,6 +22,7 @@
     "check:python-uv": "node scripts/check-python-uv.mjs",
     "check:root-scripts": "node scripts/regen-root-package.mjs --check",
     "test:scripts": "node --test scripts/tests/*.test.mjs",
+    "test:optimizer": "uv run --frozen --extra dev pytest -q",
     "audit:duplication": "node scripts/audit-duplication.mjs",
     "audit:specs": "node scripts/audit-spec-status.mjs",
     "survey:specs": "node scripts/audit-spec-status.mjs --survey",
