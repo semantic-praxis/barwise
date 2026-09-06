@@ -116,32 +116,82 @@ ValueType` split and branded ids are considered and not recommended
 The clusters, the type looseness each one pays for, and the verdict.
 Line references are to `packages/core/src` at `main` 664b9fe.
 
-| Area / file                                          | Loose type it pays for                                                  | Verdict                                                                          |
-| ---------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `validation/rules/**` (13 prologues, 29 lookups)     | `Population.factTypeId`, `Constraint.roleIds: string[]`, partial tuples | `ValidationContext` built once by the engine (WS4)                               |
-| `validation/rules/constraintConsistency.ts`          | no `assertNever`; `value_comparison` absent                             | defect barwise-929 (WS0), then exhaustive (WS1)                                  |
-| `validation/rules/population/cardinality.ts:27,36`   | `ObjectType.cardinality` has no modality                                | gap barwise-932; keep the branch until the field exists                          |
-| `verbalization/constraints/phase1.ts`, `phase2.ts`   | role ids; `ringType: string`; `operator: string`; `JoinOperand[]`       | `ResolvedConstraint` at the verbalizer entry (WS5); narrow signatures (WS2)      |
-| `verbalization/constraints/phase2.ts:226`            | six ring types on a default arm                                         | defect barwise-930 (WS0)                                                         |
-| `serialization/OrmYamlSerializer.ts`, `yaml/*.ts`    | per-field omit-empty in two directions; `OrmYamlConstraint` lacks `id`  | field table + root `compact()` (WS3)                                             |
-| `serialization/yaml/constraint.ts`                   | 16-case rename switch spelled twice (four times repo-wide)              | codec table (WS3)                                                                |
-| `project/splitModel.ts`                              | `Raw*` re-parse of a schema-validated document; both round-trips        | build typed domain models via `toConfig()` (WS8); defect barwise-928 (WS0)       |
-| `diff/elementDiff.ts`, `breakingLevel.ts`            | hand compares; classification by string prefix                          | `ElementChange` union from the field table (WS7)                                 |
-| `diff/ModelMerge.ts:62-141, 224-231`                 | five copied literals; drops six fields                                  | defect barwise-927 (WS0) via `toConfig()`                                        |
-| `diff/synonyms.ts:61-78`                             | `ModelDelta` optional `existing`/`incoming` forcing `!` and `as`        | `ModelDelta` discriminated on `kind` (WS7)                                       |
-| `mapping/RelationalMapper.ts`                        | `PrimaryKey.columnNames`; `Column.dataType: string`; boolean triple     | typed `RelationalSchema` (WS6); `BinaryPattern` union; defect barwise-931        |
-| `mapping/renderers/openapi.ts`, `avro.ts`            | re-parse `Column.dataType`; case lists disagree; unregistered pair      | falls out of WS6                                                                 |
-| `model/FactType.ts:168` (`addConstraint`)            | accepts dangling `roleIds`, wrong arity, `min > max`                    | validate at construction, fragments excepted (WS4 prerequisite; Open decision 1) |
-| `model/OrmModel.ts:195,268` (`skipPlayerValidation`) | one boolean makes fragment and whole model the same type                | `ModelFragment` type (Open decision 2); not required by any workstream           |
-| `model/Constraint.ts` (`id?`)                        | optional in memory though `FactType` always fills it                    | required on the model type, optional on the config (WS2; Open decision 1)        |
-| `counterexample/CounterexampleGenerator.ts:74-107`   | 11 `is*` guards, five kinds fall through silently                       | `switch` + `assertNever` (WS1)                                                   |
-| `query/evaluate.ts`                                  | name-based `not-found` (inherent); `?? id` player fallbacks             | keep the first; the second goes with WS4's resolver                              |
+| Area / file                                                                               | Loose type it pays for                                                        | Verdict                                                                          |
+| ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `validation/rules/**` (13 prologues, 29 lookups)                                          | `Population.factTypeId`, `Constraint.roleIds: string[]`, partial tuples       | `ValidationContext` built once by the engine (WS4)                               |
+| `validation/rules/constraintConsistency.ts`                                               | no `assertNever`; `value_comparison` absent                                   | defect barwise-929 (WS0), then exhaustive (WS1)                                  |
+| `validation/rules/population/cardinality.ts:27,36`                                        | `ObjectType.cardinality` has no modality                                      | gap barwise-932; keep the branch until the field exists                          |
+| `verbalization/constraints/phase1.ts`, `phase2.ts`                                        | role ids; `ringType: string`; `operator: string`; `JoinOperand[]`             | `ResolvedConstraint` at the verbalizer entry (WS5); narrow signatures (WS2)      |
+| `verbalization/constraints/phase2.ts:226`                                                 | six ring types on a default arm                                               | defect barwise-930 (WS0); eight-row sentence table (WS1)                         |
+| `validation/rules/population/ring.ts:87`, `counterexample/CounterexampleGenerator.ts:226` | eight ring types spelled out per consumer; the algebra they share is implicit | property table beside `RingType`, one handler per property (WS9)                 |
+| `serialization/OrmYamlSerializer.ts`, `yaml/*.ts`                                         | per-field omit-empty in two directions; `OrmYamlConstraint` lacks `id`        | field table + root `compact()` (WS3)                                             |
+| `serialization/yaml/constraint.ts`                                                        | 16-case rename switch spelled twice (four times repo-wide)                    | codec table (WS3)                                                                |
+| `project/splitModel.ts`                                                                   | `Raw*` re-parse of a schema-validated document; both round-trips              | build typed domain models via `toConfig()` (WS8); defect barwise-928 (WS0)       |
+| `diff/elementDiff.ts`, `breakingLevel.ts`                                                 | hand compares; classification by string prefix                                | `ElementChange` union from the field table (WS7)                                 |
+| `diff/ModelMerge.ts:62-141, 224-231`                                                      | five copied literals; drops six fields                                        | defect barwise-927 (WS0) via `toConfig()`                                        |
+| `diff/synonyms.ts:61-78`                                                                  | `ModelDelta` optional `existing`/`incoming` forcing `!` and `as`              | `ModelDelta` discriminated on `kind` (WS7)                                       |
+| `mapping/RelationalMapper.ts`                                                             | `PrimaryKey.columnNames`; `Column.dataType: string`; boolean triple           | typed `RelationalSchema` (WS6); `BinaryPattern` union; defect barwise-931        |
+| `mapping/renderers/openapi.ts`, `avro.ts`                                                 | re-parse `Column.dataType`; case lists disagree; unregistered pair            | falls out of WS6                                                                 |
+| `model/FactType.ts:168` (`addConstraint`)                                                 | accepts dangling `roleIds`, wrong arity, `min > max`                          | validate at construction, fragments excepted (WS4 prerequisite; Open decision 1) |
+| `model/OrmModel.ts:195,268` (`skipPlayerValidation`)                                      | one boolean makes fragment and whole model the same type                      | `ModelFragment` type (Open decision 2); not required by any workstream           |
+| `model/Constraint.ts` (`id?`)                                                             | optional in memory though `FactType` always fills it                          | required on the model type, optional on the config (WS2; Open decision 1)        |
+| `counterexample/CounterexampleGenerator.ts:74-107`                                        | 11 `is*` guards, five kinds fall through silently                             | `switch` + `assertNever` (WS1)                                                   |
+| `query/evaluate.ts`                                                                       | name-based `not-found` (inherent); `?? id` player fallbacks                   | keep the first; the second goes with WS4's resolver                              |
 
 Not affected and worth saying: `Constraint` is already a proper
 discriminated union with guards, and `elementDiff.constraintTypeKey`,
 `ring.ts`, `evaluate.ts`'s query dispatch and the Rmap leaves are the
-package's best pattern. The recommendations extend that pattern; they
+package's best pattern (WS9 keeps `ring.ts`'s exhaustiveness and
+removes its repetition). The recommendations extend that pattern; they
 do not introduce a new one.
+
+## What removes a branch, and what only moves it
+
+Two different things read as a branch to the coverage engine, and the
+workstreams treat them differently.
+
+- **"Could this value be illegal?"** A role id that may not resolve, an
+  optional id, a partial tuple, a `default` arm for a string the type
+  should have narrowed. These are removed by construction: resolve once
+  at the boundary (WS4, WS5) and narrow the type (WS2), so the consumer
+  receives a value that cannot be wrong. Nothing moves elsewhere; the
+  check runs once, where the data enters.
+- **"Which case of ORM 2 is this?"** Sixteen constraint kinds, eight
+  ring types, arity, modality. With N kinds and M operations (validate,
+  verbalize, diff, merge, map, describe, counterexample, lineage)
+  something has to say what an exclusion constraint means to each
+  operation: N x M cells, and no dispatch style removes one. A method
+  per class puts the cells in the kinds; a switch per operation puts
+  them in the operations. Barwise's kinds are ORM 2's fixed vocabulary
+  and its operations keep growing, and orthogonality wants each
+  operation in its own module, so the per-operation orientation the
+  code already has is the right one. What a typed dispatch table
+  changes is not the cell count but who checks completeness: the
+  compiler, at every table, instead of an `assertNever` a reader has to
+  remember to write (WS1).
+
+Where the count genuinely falls rather than moves, the trick is the
+same both times: find the axis along which the cells are the same
+function of a row, and write the rows once.
+
+- **Fields.** Serialize, diff, merge and describe each spell out every
+  field of every element kind: N fields x M operations, all of them
+  "copy, compare, rename or omit this field". One table per element
+  kind and M generic walkers over it (WS3, WS7, WS8) turns that into N
+  rows plus M functions. This is the largest reduction in the spec.
+- **Ring types.** The eight ring types are conjunctions of a handful of
+  algebraic properties of a binary relation, and two of the three
+  consumers that switch on all eight (`population/ring.ts`,
+  `CounterexampleGenerator`) hand-write eight bodies whose semantics are
+  those properties. One property table and one handler per property
+  replaces both (WS9). The third consumer, verbalization, keeps one
+  sentence per ring type, because the standard ORM reading of each ring
+  type is a fixed sentence, not a conjunction of clauses; its fix
+  (barwise-930) is the eight-row table of WS1.
+
+A dispatch table reads as zero branches to coverage-v8, so the branch
+count will fall further than the complexity does once WS1 lands. The
+number is not the target; the two mechanisms above are.
 
 ## Target architecture
 
@@ -209,12 +259,30 @@ exhaustive `switch (c.type)`. The other three are one-file changes.
 
 ### 1. Exhaustiveness sweep
 
-`default: assertNever(x)` on every `switch` over `Constraint["type"]`,
-`RingType`, `DeltaKind`, `ConceptualDataTypeName`; the `is*` chain in
-`CounterexampleGenerator` becomes a `switch` with explicit
-`return undefined` cases for the five kinds it does not handle. No
-behaviour change; the next union member fails to compile at every
-consumer. Deletes the phase2.ts:557 dead doc comment.
+Every `switch` over `Constraint["type"]`, `RingType`, `DeltaKind`,
+`ConceptualDataTypeName` becomes total, by one of two mechanisms:
+
+- **A typed dispatch table** where every member gets a handler of one
+  signature: `const RING_SENTENCES: Record<RingType, (ctx) => Verbalization>`
+  (or `satisfies` over a literal object). A missing member fails to
+  compile at the table, with no `default` arm and no helper to
+  remember. `RING_TYPE_MEMBERS` in `model/Constraint.ts` is the
+  precedent (barwise-869): a `Record<Union, true>` that cannot lag the
+  union. Each operation module owns its own table, so verbalization
+  and validation stay in separate files even though both are keyed by
+  the same kind. The ring verbalizer (`phase2.ts:201`, two arms and a
+  default) becomes this table with eight sentences, which is the
+  barwise-930 fix.
+- **`default: assertNever(x)`** where the arms group members
+  (`case "asymmetric": case "antisymmetric":`) or narrow the value for
+  further use in the same function; a table would force one handler
+  per member and lose the grouping.
+
+The `is*` chain in `CounterexampleGenerator` becomes a `switch` with
+explicit `return undefined` cases for the five kinds it does not
+handle. No behaviour change except the six ring sentences; the next
+union member fails to compile at every consumer. Deletes the
+phase2.ts:557 dead doc comment.
 
 ### 2. Narrow the signatures that widened
 
@@ -286,6 +354,47 @@ integrity. Depends on WS3. The header's justification for the raw path
 does not hold: the schema forbids unknown keys everywhere and
 `parse`/`stringify` drops comments regardless.
 
+### 9. Ring types as algebra
+
+The eight `RingType` members are conjunctions of properties of a binary
+relation R over one object type: irreflexive (no R(a,a)), symmetric
+(R(a,b) implies R(b,a)), antisymmetric (R(a,b) and R(b,a) imply a = b),
+transitive (R(a,b) and R(b,c) imply R(a,c)), intransitive (they imply
+not R(a,c)), acyclic (the transitive closure is irreflexive), and
+purely reflexive (R(a,b) implies a = b). Asymmetric is irreflexive and
+antisymmetric together; acyclic implies both; the rest are single
+properties. Today `population/ring.ts:87` (eight arms, 300 lines) and
+`CounterexampleGenerator.ts:226` (eight arms) each spell the eight out
+by hand, and the generator's `case "asymmetric": case "antisymmetric":
+case "acyclic":` grouping is the algebra showing through the switch.
+
+Declare the algebra once, beside `RingType` in `model/Constraint.ts`:
+
+```
+type RingProperty =
+  | "irreflexive" | "symmetric" | "antisymmetric" | "transitive"
+  | "intransitive" | "acyclic" | "purely_reflexive";
+const RING_PROPERTIES: Record<RingType, readonly [RingProperty, ...RingProperty[]]>;
+  // asymmetric: ["antisymmetric", "irreflexive"], acyclic: ["acyclic"], ...
+```
+
+Each consumer then holds one handler per property in its own module:
+the population rule a `Record<RingProperty, (pairs, ctx) => Diagnostic[]>`
+(`checkAcyclic` is already the acyclic handler), and the generator a
+`Record<RingProperty, (a, b, c) => RoleValues[]>` of violating tuple
+sets. Checking a ring type is the union of its properties' diagnostics;
+its counterexample is the witness of the property listed first, so the
+order in `RING_PROPERTIES` is load-bearing and is chosen to reproduce
+today's witnesses (asymmetric's is the reverse pair, not the self-loop).
+Diagnostics keep their current messages, keyed by ring type, so no
+population golden changes. Two eight-arm switches become one eight-row
+table and two seven-row tables, and a ring type added to ORM 2's
+vocabulary later is one row plus, at most, one new property.
+
+Independent of every other workstream and small enough to land first.
+Verbalization is deliberately not on the property axis (see "What
+removes a branch"); its ring fix is WS1's sentence table.
+
 ## API and migration impact
 
 - Nothing in `.orm.yaml` changes in any workstream; every serializer
@@ -335,7 +444,9 @@ does not hold: the schema forbids unknown keys everywhere and
   and golden examples for the serializer, the corpus for verbalization,
   the Rmap tests for mapping, `populationValidation.test.ts` for the
   rules. A workstream that changes any golden byte is wrong by
-  definition, except WS0 where the golden was the defect.
+  definition, except WS0 where the golden was the defect, and WS1's
+  ring sentence table, which changes the six ring verbalizations the
+  default arm renders today (barwise-930, the same exception).
 - The tests that pin fallback prose ("bogus", "[tuple]", `"!="`) are
   the limitation-pinned class the `assertion-audit` skill names; WS2
   and WS5 delete them deliberately and say so in the commit.
@@ -369,3 +480,12 @@ does not hold: the schema forbids unknown keys everywhere and
 - `DomainModel.principles.md`, which barwise-924 cites, does not exist
   in the repository; the principles it means are the root `CLAUDE.md`
   design principles, and that is what this spec argues from.
+- Revised in review (2026-09-06, same day): "What removes a branch, and
+  what only moves it" was added to separate the two mechanisms the
+  workstreams rely on; WS1 gained the typed dispatch table as its
+  primary mechanism, with `assertNever` for grouped arms; WS9 (ring
+  types as algebra) was added. A first draft of WS9 put verbalization
+  on the property axis too; it was pulled back because the standard
+  reading of a ring type is one fixed sentence, and composing it from
+  property clauses would render asymmetric as two sentences where Halpin
+  gives one.
