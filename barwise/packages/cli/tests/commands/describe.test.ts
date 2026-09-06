@@ -1,9 +1,11 @@
 /**
  * Tests for the describe command.
  */
-import { dirname, resolve } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runCli } from "../workspace/run.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -107,5 +109,80 @@ describe("barwise describe (project)", () => {
     const result = await runCli(["describe", project, "--domain", "ghost"]);
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain("ghost");
+  });
+});
+
+describe("barwise describe --verbose (empty and populated sections)", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "barwise-describe-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("omits every section when the model has no entities, fact types, or constraints", async () => {
+    const modelPath = join(dir, "bare.orm.yaml");
+    writeFileSync(
+      modelPath,
+      'orm_version: "1.0"\nmodel:\n  name: Bare\n  domain_context: bare\n',
+    );
+
+    const result = await runCli(["describe", modelPath, "--verbose"]);
+    expect(result.exitCode).toBe(0);
+    // The summary line always reads "Fact Types: 0" etc.; only the
+    // verbose section header (colon immediately followed by newline)
+    // is what these branches control.
+    expect(result.stdout).not.toContain("Entity Types:\n");
+    expect(result.stdout).not.toContain("Fact Types:\n");
+    expect(result.stdout).not.toContain("Constraints:\n");
+  });
+
+  it("renders a Populations section when the model carries sample instances", async () => {
+    const modelPath = join(dir, "populated.orm.yaml");
+    writeFileSync(
+      modelPath,
+      [
+        'orm_version: "1.0"',
+        "model:",
+        "  name: Populated",
+        "  domain_context: populated",
+        "  object_types:",
+        '    - id: "ot-customer"',
+        '      name: "Customer"',
+        '      kind: "entity"',
+        '      reference_mode: "customer_id"',
+        '    - id: "ot-name"',
+        '      name: "Name"',
+        '      kind: "value"',
+        "  fact_types:",
+        '    - id: "ft-customer-has-name"',
+        '      name: "Customer has Name"',
+        "      roles:",
+        '        - id: "r-has"',
+        '          player: "ot-customer"',
+        '          role_name: "has"',
+        '        - id: "r-of"',
+        '          player: "ot-name"',
+        '          role_name: "is of"',
+        '      readings: ["{0} has {1}"]',
+        "  populations:",
+        '    - id: "pop-1"',
+        '      fact_type: "ft-customer-has-name"',
+        "      instances:",
+        '        - id: "inst-1"',
+        "          role_values:",
+        '            r-has: "C001"',
+        '            r-of: "Ann"',
+        "",
+      ].join("\n"),
+    );
+
+    const result = await runCli(["describe", modelPath, "--verbose"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Populations:");
+    expect(result.stdout).toContain("instances");
   });
 });

@@ -99,4 +99,11 @@ describe("barwise query (project)", () => {
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain("ghost");
   });
+
+  it("labels each block with its domain under --json", async () => {
+    const result = await runCli(["query", project, "entities", "--json"]);
+    expect(result.exitCode).toBe(0);
+    const parsed = JSON.parse(result.stdout) as { domain: string; }[];
+    expect(parsed.map((b) => b.domain).sort()).toEqual(["billing", "crm"]);
+  });
 });

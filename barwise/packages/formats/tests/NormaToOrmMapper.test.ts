@@ -823,6 +823,1004 @@ describe("NormaToOrmMapper", () => {
         expect(valConstraint.values).toEqual(["A", "B", "C"]);
       }
     });
+
+    it("maps value-level range constraint with ranges from the top level", () => {
+      const vc: NormaConstraint = {
+        type: "value_constraint",
+        id: "_vc1",
+        name: "VC1",
+        roleRefs: ["_ft1_r2"],
+        values: [],
+        ranges: [{ min: "1", max: "10" }],
+      };
+      const doc = makeDoc({
+        entityTypes: [makeEntity("_et1", "Employee", "Id")],
+        valueTypes: [makeValue("_vt1", "Age")],
+        factTypes: [
+          makeBinaryFactType("_ft1", "EmployeeHasAge", "_et1", "_vt1"),
+        ],
+        constraints: [vc],
+      });
+      const model = mapNormaToOrm(doc);
+      const ft = model.factTypes[0]!;
+      const valConstraint = ft.constraints.find((c) => c.type === "value_constraint");
+      expect(valConstraint).toBeDefined();
+      if (valConstraint?.type === "value_constraint") {
+        expect(valConstraint.ranges).toEqual([{ min: "1", max: "10" }]);
+      }
+    });
+
+    it("does not duplicate a top-level range value constraint listed twice", () => {
+      const vc1: NormaConstraint = {
+        type: "value_constraint",
+        id: "_vc1",
+        name: "VC1",
+        roleRefs: ["_ft1_r2"],
+        values: [],
+        ranges: [{ min: "1", max: "10" }],
+      };
+      const vc2: NormaConstraint = {
+        type: "value_constraint",
+        id: "_vc2",
+        name: "VC2",
+        roleRefs: ["_ft1_r2"],
+        values: [],
+        ranges: [{ min: "1", max: "10" }],
+      };
+      const doc = makeDoc({
+        entityTypes: [makeEntity("_et1", "Employee", "Id")],
+        valueTypes: [makeValue("_vt1", "Age")],
+        factTypes: [
+          makeBinaryFactType("_ft1", "EmployeeHasAge", "_et1", "_vt1"),
+        ],
+        constraints: [vc1, vc2],
+      });
+      const model = mapNormaToOrm(doc);
+      const ft = model.factTypes[0]!;
+      const valConstraints = ft.constraints.filter((c) => c.type === "value_constraint");
+      expect(valConstraints).toHaveLength(1);
+    });
+
+    it("adds a simple mandatory constraint from the top level when unreferenced", () => {
+      const mc: NormaConstraint = {
+        type: "mandatory",
+        id: "_mc_top",
+        name: "TopMC",
+        isSimple: true,
+        isImplied: false,
+        roleRefs: ["_ft1_r1"],
+      };
+      const doc = makeDoc({
+        entityTypes: [
+          makeEntity("_et1", "Customer", "Id"),
+          makeEntity("_et2", "Order", "Number"),
+        ],
+        factTypes: [
+          // A second fact type ensures the inner search over doc.factTypes
+          // has to skip past a fact type that doesn't own the role.
+          makeBinaryFactType("_ft0", "CustomerBrowsesCatalog", "_et1", "_et2"),
+          makeBinaryFactType("_ft1", "CustomerPlacesOrder", "_et1", "_et2"),
+        ],
+        constraints: [mc],
+      });
+      const model = mapNormaToOrm(doc);
+      const ft = model.factTypes.find((f) => f.name === "CustomerPlacesOrder")!;
+      const mandatory = ft.constraints.find((c) => c.type === "mandatory");
+      expect(mandatory).toBeDefined();
+      if (mandatory?.type === "mandatory") {
+        expect(mandatory.roleId).toBe("_ft1_r1");
+      }
+    });
+
+    it("does not duplicate a top-level simple mandatory constraint listed twice", () => {
+      const mc1: NormaConstraint = {
+        type: "mandatory",
+        id: "_mc1",
+        name: "MC1",
+        isSimple: true,
+        isImplied: false,
+        roleRefs: ["_ft1_r1"],
+      };
+      const mc2: NormaConstraint = {
+        type: "mandatory",
+        id: "_mc2",
+        name: "MC2",
+        isSimple: true,
+        isImplied: false,
+        roleRefs: ["_ft1_r1"],
+      };
+      const doc = makeDoc({
+        entityTypes: [
+          makeEntity("_et1", "Customer", "Id"),
+          makeEntity("_et2", "Order", "Number"),
+        ],
+        factTypes: [
+          makeBinaryFactType("_ft1", "CustomerPlacesOrder", "_et1", "_et2"),
+        ],
+        constraints: [mc1, mc2],
+      });
+      const model = mapNormaToOrm(doc);
+      const ft = model.factTypes[0]!;
+      const mandatories = ft.constraints.filter((c) => c.type === "mandatory");
+      expect(mandatories).toHaveLength(1);
+    });
+
+    it("does not duplicate a top-level external uniqueness constraint listed twice", () => {
+      const extUc1: NormaConstraint = {
+        type: "uniqueness",
+        id: "_uc1",
+        name: "ExtUC1",
+        isInternal: false,
+        isPreferred: false,
+        roleRefs: ["_ft1_r2", "_ft2_r2"],
+      };
+      const extUc2: NormaConstraint = {
+        type: "uniqueness",
+        id: "_uc2",
+        name: "ExtUC2",
+        isInternal: false,
+        isPreferred: false,
+        roleRefs: ["_ft1_r2", "_ft2_r2"],
+      };
+      const doc = makeDoc({
+        entityTypes: [makeEntity("_et1", "Employee", "Id")],
+        valueTypes: [
+          makeValue("_vt1", "FirstName"),
+          makeValue("_vt2", "LastName"),
+        ],
+        factTypes: [
+          makeBinaryFactType("_ft1", "EmployeeHasFirstName", "_et1", "_vt1"),
+          makeBinaryFactType("_ft2", "EmployeeHasLastName", "_et1", "_vt2"),
+        ],
+        constraints: [extUc1, extUc2],
+      });
+      const model = mapNormaToOrm(doc);
+      const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+      const extConstraints = allConstraints.filter((c) => c.type === "external_uniqueness");
+      expect(extConstraints).toHaveLength(1);
+    });
+
+    describe("disjunctive mandatory and exclusive-or", () => {
+      function makeSpanningDoc(constraints: NormaConstraint[]): NormaDocument {
+        return makeDoc({
+          entityTypes: [
+            makeEntity("_etP", "Person", "Id"),
+            makeEntity("_etC", "Car", "Plate"),
+            makeEntity("_etB", "Bus", "Route"),
+          ],
+          factTypes: [
+            makeBinaryFactType("_ft1", "PersonDrivesCar", "_etP", "_etC"),
+            makeBinaryFactType("_ft2", "PersonRidesBus", "_etP", "_etB"),
+          ],
+          constraints,
+        });
+      }
+
+      it("adds a disjunctive mandatory constraint spanning fact types", () => {
+        const mc: NormaConstraint = {
+          type: "mandatory",
+          id: "_mc1",
+          name: "DisjMC",
+          isSimple: false,
+          isImplied: false,
+          roleRefs: ["_ft1_r1", "_ft2_r1"],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([mc]));
+        const ft = model.factTypes.find((f) => f.name === "PersonDrivesCar")!;
+        const disj = ft.constraints.find((c) => c.type === "disjunctive_mandatory");
+        expect(disj).toBeDefined();
+        if (disj?.type === "disjunctive_mandatory") {
+          expect(disj.roleIds).toEqual(["_ft1_r1", "_ft2_r1"]);
+        }
+      });
+
+      it("does not duplicate a disjunctive mandatory constraint listed twice", () => {
+        const mc1: NormaConstraint = {
+          type: "mandatory",
+          id: "_mc1",
+          name: "DisjMC1",
+          isSimple: false,
+          isImplied: false,
+          roleRefs: ["_ft1_r1", "_ft2_r1"],
+        };
+        const mc2: NormaConstraint = {
+          type: "mandatory",
+          id: "_mc2",
+          name: "DisjMC2",
+          isSimple: false,
+          isImplied: false,
+          roleRefs: ["_ft1_r1", "_ft2_r1"],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([mc1, mc2]));
+        const ft = model.factTypes.find((f) => f.name === "PersonDrivesCar")!;
+        const disjs = ft.constraints.filter((c) => c.type === "disjunctive_mandatory");
+        expect(disjs).toHaveLength(1);
+      });
+
+      it("skips a non-simple mandatory constraint with fewer than two roles", () => {
+        const mc: NormaConstraint = {
+          type: "mandatory",
+          id: "_mc1",
+          name: "Malformed",
+          isSimple: false,
+          isImplied: false,
+          roleRefs: ["_ft1_r1"],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([mc]));
+        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        expect(allConstraints.some((c) => c.type === "disjunctive_mandatory")).toBe(false);
+      });
+
+      it("skips a disjunctive mandatory constraint whose roles are unknown", () => {
+        const mc: NormaConstraint = {
+          type: "mandatory",
+          id: "_mc1",
+          name: "Unknown",
+          isSimple: false,
+          isImplied: false,
+          roleRefs: ["_missing_r1", "_missing_r2"],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([mc]));
+        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        expect(allConstraints.some((c) => c.type === "disjunctive_mandatory")).toBe(false);
+      });
+
+      it("maps a mandatory/exclusion pair as one exclusive-or constraint", () => {
+        const mc: NormaConstraint = {
+          type: "mandatory",
+          id: "_mc1",
+          name: "XorMC",
+          isSimple: false,
+          isImplied: false,
+          roleRefs: ["_ft1_r1", "_ft2_r1"],
+          exclusiveOrExclusionRef: "_exc1",
+        };
+        const exc: NormaConstraint = {
+          type: "exclusion",
+          id: "_exc1",
+          name: "XorExc",
+          roleSequences: [["_ft1_r1"], ["_ft2_r1"]],
+          exclusiveOrMandatoryRef: "_mc1",
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([mc, exc]));
+        const ft = model.factTypes.find((f) => f.name === "PersonDrivesCar")!;
+        const xor = ft.constraints.filter((c) => c.type === "exclusive_or");
+        expect(xor).toHaveLength(1);
+        if (xor[0]?.type === "exclusive_or") {
+          expect(xor[0].roleIds).toEqual(["_ft1_r1", "_ft2_r1"]);
+        }
+        // The paired exclusion half must not also surface as a plain exclusion.
+        expect(ft.constraints.some((c) => c.type === "exclusion")).toBe(false);
+      });
+
+      it("does not duplicate an exclusive-or constraint listed as two pairs", () => {
+        const mc1: NormaConstraint = {
+          type: "mandatory",
+          id: "_mc1",
+          name: "XorMC1",
+          isSimple: false,
+          isImplied: false,
+          roleRefs: ["_ft1_r1", "_ft2_r1"],
+          exclusiveOrExclusionRef: "_exc1",
+        };
+        const exc1: NormaConstraint = {
+          type: "exclusion",
+          id: "_exc1",
+          name: "XorExc1",
+          roleSequences: [["_ft1_r1"], ["_ft2_r1"]],
+          exclusiveOrMandatoryRef: "_mc1",
+        };
+        const mc2: NormaConstraint = {
+          type: "mandatory",
+          id: "_mc2",
+          name: "XorMC2",
+          isSimple: false,
+          isImplied: false,
+          roleRefs: ["_ft1_r1", "_ft2_r1"],
+          exclusiveOrExclusionRef: "_exc2",
+        };
+        const exc2: NormaConstraint = {
+          type: "exclusion",
+          id: "_exc2",
+          name: "XorExc2",
+          roleSequences: [["_ft1_r1"], ["_ft2_r1"]],
+          exclusiveOrMandatoryRef: "_mc2",
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([mc1, exc1, mc2, exc2]));
+        const ft = model.factTypes.find((f) => f.name === "PersonDrivesCar")!;
+        const xor = ft.constraints.filter((c) => c.type === "exclusive_or");
+        expect(xor).toHaveLength(1);
+      });
+    });
+
+    describe("top-level subset, exclusion, equality, value comparison, and ring", () => {
+      function makeSpanningDoc(constraints: NormaConstraint[]): NormaDocument {
+        return makeDoc({
+          entityTypes: [
+            makeEntity("_et1", "Customer", "Id"),
+            makeEntity("_et2", "Product", "Code"),
+          ],
+          factTypes: [
+            makeBinaryFactType("_ft1", "CustomerRatesProduct", "_et1", "_et2"),
+            makeBinaryFactType("_ft2", "CustomerBuysProduct", "_et1", "_et2"),
+          ],
+          constraints,
+        });
+      }
+
+      it("adds a top-level subset constraint spanning fact types", () => {
+        const sc: NormaConstraint = {
+          type: "subset",
+          id: "_sc1",
+          name: "SC1",
+          subsetRoleRefs: ["_ft1_r1"],
+          supersetRoleRefs: ["_ft2_r1"],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([sc]));
+        const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
+        const subset = ft.constraints.find((c) => c.type === "subset");
+        expect(subset).toBeDefined();
+      });
+
+      it("does not duplicate a top-level subset constraint listed twice", () => {
+        const sc1: NormaConstraint = {
+          type: "subset",
+          id: "_sc1",
+          name: "SC1",
+          subsetRoleRefs: ["_ft1_r1"],
+          supersetRoleRefs: ["_ft2_r1"],
+        };
+        const sc2: NormaConstraint = {
+          type: "subset",
+          id: "_sc2",
+          name: "SC2",
+          subsetRoleRefs: ["_ft1_r1"],
+          supersetRoleRefs: ["_ft2_r1"],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([sc1, sc2]));
+        const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
+        const subsets = ft.constraints.filter((c) => c.type === "subset");
+        expect(subsets).toHaveLength(1);
+      });
+
+      it("skips a top-level subset constraint with no roles on either side", () => {
+        const sc: NormaConstraint = {
+          type: "subset",
+          id: "_sc1",
+          name: "Empty",
+          subsetRoleRefs: [],
+          supersetRoleRefs: [],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([sc]));
+        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        expect(allConstraints.some((c) => c.type === "subset")).toBe(false);
+      });
+
+      it("skips a top-level subset constraint whose roles are unknown", () => {
+        const sc: NormaConstraint = {
+          type: "subset",
+          id: "_sc1",
+          name: "Unknown",
+          subsetRoleRefs: ["_missing_r1"],
+          supersetRoleRefs: ["_missing_r2"],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([sc]));
+        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        expect(allConstraints.some((c) => c.type === "subset")).toBe(false);
+      });
+
+      it("adds a top-level exclusion constraint spanning fact types", () => {
+        const exc: NormaConstraint = {
+          type: "exclusion",
+          id: "_exc1",
+          name: "Exc1",
+          roleSequences: [["_ft1_r1"], ["_ft2_r1"]],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([exc]));
+        const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
+        const exclusion = ft.constraints.find((c) => c.type === "exclusion");
+        expect(exclusion).toBeDefined();
+        if (exclusion?.type === "exclusion") {
+          expect(exclusion.roleIds).toEqual(["_ft1_r1", "_ft2_r1"]);
+        }
+      });
+
+      it("does not duplicate a top-level exclusion constraint listed twice", () => {
+        const exc1: NormaConstraint = {
+          type: "exclusion",
+          id: "_exc1",
+          name: "Exc1",
+          roleSequences: [["_ft1_r1"], ["_ft2_r1"]],
+        };
+        const exc2: NormaConstraint = {
+          type: "exclusion",
+          id: "_exc2",
+          name: "Exc2",
+          roleSequences: [["_ft1_r1"], ["_ft2_r1"]],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([exc1, exc2]));
+        const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
+        const exclusions = ft.constraints.filter((c) => c.type === "exclusion");
+        expect(exclusions).toHaveLength(1);
+      });
+
+      it("skips a top-level exclusion constraint with no roles", () => {
+        const exc: NormaConstraint = {
+          type: "exclusion",
+          id: "_exc1",
+          name: "Empty",
+          roleSequences: [[], []],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([exc]));
+        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        expect(allConstraints.some((c) => c.type === "exclusion")).toBe(false);
+      });
+
+      it("skips a top-level exclusion constraint whose roles are unknown", () => {
+        const exc: NormaConstraint = {
+          type: "exclusion",
+          id: "_exc1",
+          name: "Unknown",
+          roleSequences: [["_missing_r1"], ["_missing_r2"]],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([exc]));
+        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        expect(allConstraints.some((c) => c.type === "exclusion")).toBe(false);
+      });
+
+      it("adds a top-level equality constraint spanning fact types", () => {
+        const eq: NormaConstraint = {
+          type: "equality",
+          id: "_eq1",
+          name: "Eq1",
+          roleSequences: [["_ft1_r1"], ["_ft2_r1"]],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([eq]));
+        const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
+        const equality = ft.constraints.find((c) => c.type === "equality");
+        expect(equality).toBeDefined();
+        if (equality?.type === "equality") {
+          expect(equality.roleIds1).toEqual(["_ft1_r1"]);
+          expect(equality.roleIds2).toEqual(["_ft2_r1"]);
+        }
+      });
+
+      it("does not duplicate a top-level equality constraint listed twice", () => {
+        const eq1: NormaConstraint = {
+          type: "equality",
+          id: "_eq1",
+          name: "Eq1",
+          roleSequences: [["_ft1_r1"], ["_ft2_r1"]],
+        };
+        const eq2: NormaConstraint = {
+          type: "equality",
+          id: "_eq2",
+          name: "Eq2",
+          roleSequences: [["_ft1_r1"], ["_ft2_r1"]],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([eq1, eq2]));
+        const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
+        const equalities = ft.constraints.filter((c) => c.type === "equality");
+        expect(equalities).toHaveLength(1);
+      });
+
+      it("skips a top-level equality constraint with fewer than two role sequences", () => {
+        const eq: NormaConstraint = {
+          type: "equality",
+          id: "_eq1",
+          name: "OneSeq",
+          roleSequences: [["_ft1_r1"]],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([eq]));
+        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        expect(allConstraints.some((c) => c.type === "equality")).toBe(false);
+      });
+
+      it("skips a top-level equality constraint whose roles are unknown", () => {
+        const eq: NormaConstraint = {
+          type: "equality",
+          id: "_eq1",
+          name: "Unknown",
+          roleSequences: [["_missing_r1"], ["_missing_r2"]],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([eq]));
+        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        expect(allConstraints.some((c) => c.type === "equality")).toBe(false);
+      });
+
+      it("adds a top-level value comparison constraint", () => {
+        const vcmp: NormaConstraint = {
+          type: "value_comparison",
+          id: "_vcmp1",
+          name: "Vcmp1",
+          operator: "LessThan",
+          roleRefs: ["_ft1_r1", "_ft1_r2"],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([vcmp]));
+        const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
+        const vc = ft.constraints.find((c) => c.type === "value_comparison");
+        expect(vc).toBeDefined();
+        if (vc?.type === "value_comparison") {
+          expect(vc.operator).toBe("<");
+        }
+      });
+
+      it("does not duplicate a top-level value comparison constraint listed twice", () => {
+        const vcmp1: NormaConstraint = {
+          type: "value_comparison",
+          id: "_vcmp1",
+          name: "Vcmp1",
+          operator: "LessThan",
+          roleRefs: ["_ft1_r1", "_ft1_r2"],
+        };
+        const vcmp2: NormaConstraint = {
+          type: "value_comparison",
+          id: "_vcmp2",
+          name: "Vcmp2",
+          operator: "LessThan",
+          roleRefs: ["_ft1_r1", "_ft1_r2"],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([vcmp1, vcmp2]));
+        const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
+        const vcs = ft.constraints.filter((c) => c.type === "value_comparison");
+        expect(vcs).toHaveLength(1);
+      });
+
+      it("skips a top-level value comparison constraint with the wrong role count", () => {
+        const vcmp: NormaConstraint = {
+          type: "value_comparison",
+          id: "_vcmp1",
+          name: "OneRole",
+          operator: "LessThan",
+          roleRefs: ["_ft1_r1"],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([vcmp]));
+        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        expect(allConstraints.some((c) => c.type === "value_comparison")).toBe(false);
+      });
+
+      it("skips a top-level value comparison constraint with an undefined operator", () => {
+        const vcmp: NormaConstraint = {
+          type: "value_comparison",
+          id: "_vcmp1",
+          name: "Undef",
+          operator: "Undefined",
+          roleRefs: ["_ft1_r1", "_ft1_r2"],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([vcmp]));
+        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        expect(allConstraints.some((c) => c.type === "value_comparison")).toBe(false);
+      });
+
+      it("skips a top-level value comparison constraint whose roles span fact types", () => {
+        const vcmp: NormaConstraint = {
+          type: "value_comparison",
+          id: "_vcmp1",
+          name: "Spanning",
+          operator: "LessThan",
+          roleRefs: ["_ft1_r1", "_ft2_r1"],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([vcmp]));
+        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        expect(allConstraints.some((c) => c.type === "value_comparison")).toBe(false);
+      });
+
+      it("adds a top-level ring constraint not referenced by internalConstraintRefs", () => {
+        const rc: NormaConstraint = {
+          type: "ring",
+          id: "_rc1",
+          name: "RC1",
+          ringType: "irreflexive",
+          roleRefs: ["_ft1_r1", "_ft1_r2"],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([rc]));
+        const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
+        const ring = ft.constraints.find((c) => c.type === "ring");
+        expect(ring).toBeDefined();
+      });
+
+      it("does not duplicate a top-level ring constraint listed twice", () => {
+        const rc1: NormaConstraint = {
+          type: "ring",
+          id: "_rc1",
+          name: "RC1",
+          ringType: "irreflexive",
+          roleRefs: ["_ft1_r1", "_ft1_r2"],
+        };
+        const rc2: NormaConstraint = {
+          type: "ring",
+          id: "_rc2",
+          name: "RC2",
+          ringType: "irreflexive",
+          roleRefs: ["_ft1_r1", "_ft1_r2"],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([rc1, rc2]));
+        const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
+        const rings = ft.constraints.filter((c) => c.type === "ring");
+        expect(rings).toHaveLength(1);
+      });
+
+      it("skips a top-level ring constraint with fewer than two roles", () => {
+        const rc: NormaConstraint = {
+          type: "ring",
+          id: "_rc1",
+          name: "OneRole",
+          ringType: "irreflexive",
+          roleRefs: ["_ft1_r1"],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([rc]));
+        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        expect(allConstraints.some((c) => c.type === "ring")).toBe(false);
+      });
+
+      it("skips a top-level ring constraint whose roles are unknown", () => {
+        const rc: NormaConstraint = {
+          type: "ring",
+          id: "_rc1",
+          name: "Unknown",
+          ringType: "irreflexive",
+          roleRefs: ["_missing_r1", "_missing_r2"],
+        };
+        const model = mapNormaToOrm(makeSpanningDoc([rc]));
+        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        expect(allConstraints.some((c) => c.type === "ring")).toBe(false);
+      });
+    });
+
+    describe("exclusion, equality, and value comparison via internalConstraintRefs", () => {
+      it("maps an exclusion constraint referenced from internalConstraintRefs", () => {
+        const exc: NormaConstraint = {
+          type: "exclusion",
+          id: "_exc1",
+          name: "Exc1",
+          roleSequences: [["_ft1_r1"], ["_ft1_r2"]],
+        };
+        const doc = makeDoc({
+          entityTypes: [
+            makeEntity("_et1", "Customer", "Id"),
+            makeEntity("_et2", "Product", "Code"),
+          ],
+          factTypes: [
+            makeBinaryFactType("_ft1", "CustomerRatesProduct", "_et1", "_et2", {
+              internalConstraintRefs: ["_exc1"],
+            }),
+          ],
+          constraints: [exc],
+        });
+        const model = mapNormaToOrm(doc);
+        const ft = model.factTypes[0]!;
+        const exclusion = ft.constraints.find((c) => c.type === "exclusion");
+        expect(exclusion).toBeDefined();
+        if (exclusion?.type === "exclusion") {
+          expect(exclusion.roleIds).toEqual(["_ft1_r1", "_ft1_r2"]);
+        }
+      });
+
+      it("maps an equality constraint referenced from internalConstraintRefs", () => {
+        const eq: NormaConstraint = {
+          type: "equality",
+          id: "_eq1",
+          name: "Eq1",
+          roleSequences: [["_ft1_r1"], ["_ft1_r2"]],
+        };
+        const doc = makeDoc({
+          entityTypes: [
+            makeEntity("_et1", "Customer", "Id"),
+            makeEntity("_et2", "Product", "Code"),
+          ],
+          factTypes: [
+            makeBinaryFactType("_ft1", "CustomerRatesProduct", "_et1", "_et2", {
+              internalConstraintRefs: ["_eq1"],
+            }),
+          ],
+          constraints: [eq],
+        });
+        const model = mapNormaToOrm(doc);
+        const ft = model.factTypes[0]!;
+        const equality = ft.constraints.find((c) => c.type === "equality");
+        expect(equality).toBeDefined();
+      });
+
+      it("maps a value comparison constraint referenced from internalConstraintRefs", () => {
+        const vcmp: NormaConstraint = {
+          type: "value_comparison",
+          id: "_vcmp1",
+          name: "Vcmp1",
+          operator: "GreaterThanOrEqual",
+          roleRefs: ["_ft1_r1", "_ft1_r2"],
+        };
+        const doc = makeDoc({
+          entityTypes: [
+            makeEntity("_et1", "Customer", "Id"),
+            makeEntity("_et2", "Product", "Code"),
+          ],
+          factTypes: [
+            makeBinaryFactType("_ft1", "CustomerRatesProduct", "_et1", "_et2", {
+              internalConstraintRefs: ["_vcmp1"],
+            }),
+          ],
+          constraints: [vcmp],
+        });
+        const model = mapNormaToOrm(doc);
+        const ft = model.factTypes[0]!;
+        const vc = ft.constraints.find((c) => c.type === "value_comparison");
+        expect(vc).toBeDefined();
+        if (vc?.type === "value_comparison") {
+          expect(vc.operator).toBe(">=");
+        }
+      });
+
+      it("maps a disjunctive mandatory constraint referenced from internalConstraintRefs", () => {
+        const mc: NormaConstraint = {
+          type: "mandatory",
+          id: "_mc1",
+          name: "DisjMC",
+          isSimple: false,
+          isImplied: false,
+          roleRefs: ["_ft1_r1", "_ft1_r2"],
+        };
+        const doc = makeDoc({
+          entityTypes: [
+            makeEntity("_et1", "Customer", "Id"),
+            makeEntity("_et2", "Product", "Code"),
+          ],
+          factTypes: [
+            makeBinaryFactType("_ft1", "CustomerRatesProduct", "_et1", "_et2", {
+              internalConstraintRefs: ["_mc1"],
+            }),
+          ],
+          constraints: [mc],
+        });
+        const model = mapNormaToOrm(doc);
+        const ft = model.factTypes[0]!;
+        const disj = ft.constraints.find((c) => c.type === "disjunctive_mandatory");
+        expect(disj).toBeDefined();
+      });
+
+      it("maps an exclusive-or constraint referenced from internalConstraintRefs on both roles", () => {
+        const mc: NormaConstraint = {
+          type: "mandatory",
+          id: "_mc1",
+          name: "XorMC",
+          isSimple: false,
+          isImplied: false,
+          roleRefs: ["_ft1_r1", "_ft1_r2"],
+          exclusiveOrExclusionRef: "_exc1",
+        };
+        const doc = makeDoc({
+          entityTypes: [
+            makeEntity("_et1", "Customer", "Id"),
+            makeEntity("_et2", "Product", "Code"),
+          ],
+          factTypes: [
+            makeBinaryFactType("_ft1", "CustomerRatesProduct", "_et1", "_et2", {
+              internalConstraintRefs: ["_mc1"],
+            }),
+          ],
+          constraints: [mc],
+        });
+        const model = mapNormaToOrm(doc);
+        const ft = model.factTypes[0]!;
+        const xor = ft.constraints.find((c) => c.type === "exclusive_or");
+        expect(xor).toBeDefined();
+      });
+
+      it("keeps a single exclusive-or when both halves of the pair are listed in internalConstraintRefs", () => {
+        const mc: NormaConstraint = {
+          type: "mandatory",
+          id: "_mc1",
+          name: "XorMC",
+          isSimple: false,
+          isImplied: false,
+          roleRefs: ["_ft1_r1", "_ft1_r2"],
+          exclusiveOrExclusionRef: "_exc1",
+        };
+        const exc: NormaConstraint = {
+          type: "exclusion",
+          id: "_exc1",
+          name: "XorExc",
+          roleSequences: [["_ft1_r1"], ["_ft1_r2"]],
+          exclusiveOrMandatoryRef: "_mc1",
+        };
+        const doc = makeDoc({
+          entityTypes: [
+            makeEntity("_et1", "Customer", "Id"),
+            makeEntity("_et2", "Product", "Code"),
+          ],
+          factTypes: [
+            makeBinaryFactType("_ft1", "CustomerRatesProduct", "_et1", "_et2", {
+              // Both halves of the exclusive-or coupler listed: the mapper
+              // must collapse them to a single exclusive_or constraint.
+              internalConstraintRefs: ["_mc1", "_exc1"],
+            }),
+          ],
+          constraints: [mc, exc],
+        });
+        const model = mapNormaToOrm(doc);
+        const ft = model.factTypes[0]!;
+        const xor = ft.constraints.filter((c) => c.type === "exclusive_or");
+        expect(xor).toHaveLength(1);
+      });
+
+      it("skips an internal uniqueness constraint whose role is outside the fact type", () => {
+        const uc: NormaConstraint = {
+          type: "uniqueness",
+          id: "_uc1",
+          name: "OutsideUC",
+          isInternal: true,
+          isPreferred: false,
+          roleRefs: ["_unrelated_role"],
+        };
+        const doc = makeDoc({
+          entityTypes: [
+            makeEntity("_et1", "Customer", "Id"),
+            makeEntity("_et2", "Product", "Code"),
+          ],
+          factTypes: [
+            makeBinaryFactType("_ft1", "CustomerRatesProduct", "_et1", "_et2", {
+              internalConstraintRefs: ["_uc1"],
+            }),
+          ],
+          constraints: [uc],
+        });
+        const model = mapNormaToOrm(doc);
+        const ft = model.factTypes[0]!;
+        expect(ft.constraints.some((c) => c.type === "internal_uniqueness")).toBe(false);
+      });
+    });
+
+    describe("constraints referenced from internalConstraintRefs whose roles fall outside the fact type", () => {
+      function makeDocWithRef(nc: NormaConstraint): NormaDocument {
+        return makeDoc({
+          entityTypes: [
+            makeEntity("_et1", "Customer", "Id"),
+            makeEntity("_et2", "Product", "Code"),
+          ],
+          factTypes: [
+            makeBinaryFactType("_ft1", "CustomerRatesProduct", "_et1", "_et2", {
+              internalConstraintRefs: [nc.id],
+            }),
+          ],
+          constraints: [nc],
+        });
+      }
+
+      it("drops a simple mandatory constraint whose role is outside the fact type", () => {
+        const mc: NormaConstraint = {
+          type: "mandatory",
+          id: "_mc1",
+          name: "Outside",
+          isSimple: true,
+          isImplied: false,
+          roleRefs: ["_unrelated_role"],
+        };
+        const model = mapNormaToOrm(makeDocWithRef(mc));
+        const ft = model.factTypes[0]!;
+        expect(ft.constraints.some((c) => c.type === "mandatory")).toBe(false);
+      });
+
+      it("drops a frequency constraint whose role is outside the fact type", () => {
+        const fc: NormaConstraint = {
+          type: "frequency",
+          id: "_fc1",
+          name: "Outside",
+          min: 1,
+          max: 1,
+          roleRefs: ["_unrelated_role"],
+        };
+        const model = mapNormaToOrm(makeDocWithRef(fc));
+        const ft = model.factTypes[0]!;
+        expect(ft.constraints.some((c) => c.type === "frequency")).toBe(false);
+      });
+
+      it("drops a value constraint whose role is outside the fact type", () => {
+        const vc: NormaConstraint = {
+          type: "value_constraint",
+          id: "_vc1",
+          name: "Outside",
+          roleRefs: ["_unrelated_role"],
+          values: ["a"],
+        };
+        const model = mapNormaToOrm(makeDocWithRef(vc));
+        const ft = model.factTypes[0]!;
+        expect(ft.constraints.some((c) => c.type === "value_constraint")).toBe(false);
+      });
+
+      it("maps a value constraint with ranges via internalConstraintRefs", () => {
+        const vc: NormaConstraint = {
+          type: "value_constraint",
+          id: "_vc1",
+          name: "Ranged",
+          roleRefs: ["_ft1_r1"],
+          values: [],
+          ranges: [{ min: "0", max: "100", minInclusive: true }],
+        };
+        const model = mapNormaToOrm(makeDocWithRef(vc));
+        const ft = model.factTypes[0]!;
+        const valConstraint = ft.constraints.find((c) => c.type === "value_constraint");
+        expect(valConstraint).toBeDefined();
+        if (valConstraint?.type === "value_constraint") {
+          expect(valConstraint.ranges).toEqual([{ min: "0", max: "100", minInclusive: true }]);
+        }
+      });
+
+      it("drops an exclusion constraint with no roles in any sequence", () => {
+        const exc: NormaConstraint = {
+          type: "exclusion",
+          id: "_exc1",
+          name: "Empty",
+          roleSequences: [[], []],
+        };
+        const model = mapNormaToOrm(makeDocWithRef(exc));
+        const ft = model.factTypes[0]!;
+        expect(ft.constraints.some((c) => c.type === "exclusion")).toBe(false);
+      });
+
+      it("maps an exclusion constraint as exclusive-or when it carries the coupler ref on its own", () => {
+        const exc: NormaConstraint = {
+          type: "exclusion",
+          id: "_exc1",
+          name: "Coupled",
+          roleSequences: [["_ft1_r1"], ["_ft1_r2"]],
+          exclusiveOrMandatoryRef: "_mc_not_present",
+        };
+        const model = mapNormaToOrm(makeDocWithRef(exc));
+        const ft = model.factTypes[0]!;
+        const xor = ft.constraints.find((c) => c.type === "exclusive_or");
+        expect(xor).toBeDefined();
+      });
+
+      it("drops a value comparison constraint referenced with the wrong role count", () => {
+        const vcmp: NormaConstraint = {
+          type: "value_comparison",
+          id: "_vcmp1",
+          name: "OneRole",
+          operator: "Equal",
+          roleRefs: ["_ft1_r1"],
+        };
+        const model = mapNormaToOrm(makeDocWithRef(vcmp));
+        const ft = model.factTypes[0]!;
+        expect(ft.constraints.some((c) => c.type === "value_comparison")).toBe(false);
+      });
+
+      it("drops a value comparison constraint whose role is outside the fact type", () => {
+        const vcmp: NormaConstraint = {
+          type: "value_comparison",
+          id: "_vcmp1",
+          name: "Outside",
+          operator: "Equal",
+          roleRefs: ["_ft1_r1", "_unrelated_role"],
+        };
+        const model = mapNormaToOrm(makeDocWithRef(vcmp));
+        const ft = model.factTypes[0]!;
+        expect(ft.constraints.some((c) => c.type === "value_comparison")).toBe(false);
+      });
+
+      it("drops an equality constraint referenced with a single role sequence", () => {
+        const eq: NormaConstraint = {
+          type: "equality",
+          id: "_eq1",
+          name: "OneSeq",
+          roleSequences: [["_ft1_r1"]],
+        };
+        const model = mapNormaToOrm(makeDocWithRef(eq));
+        const ft = model.factTypes[0]!;
+        expect(ft.constraints.some((c) => c.type === "equality")).toBe(false);
+      });
+
+      it("drops a ring constraint that resolves to fewer than two roles in the fact type", () => {
+        const rc: NormaConstraint = {
+          type: "ring",
+          id: "_rc1",
+          name: "TooFewRoles",
+          ringType: "irreflexive",
+          roleRefs: ["_ft1_r1", "_unrelated_role"],
+        };
+        const model = mapNormaToOrm(makeDocWithRef(rc));
+        const ft = model.factTypes[0]!;
+        expect(ft.constraints.some((c) => c.type === "ring")).toBe(false);
+      });
+    });
   });
 
   describe("subtype facts", () => {

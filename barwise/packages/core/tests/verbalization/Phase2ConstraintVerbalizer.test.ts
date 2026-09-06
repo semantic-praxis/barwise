@@ -13,7 +13,7 @@
  * important because LLM-generated constraints may have mismatched IDs.
  */
 import { describe, expect, it } from "vitest";
-import type { Constraint } from "../../src/model/Constraint.js";
+import type { Constraint, ValueComparisonOperator } from "../../src/model/Constraint.js";
 import type { FactType } from "../../src/model/FactType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { ConstraintVerbalizer } from "../../src/verbalization/ConstraintVerbalizer.js";
@@ -35,6 +35,29 @@ function buildBinaryModel(): { model: OrmModel; ft: FactType; } {
       { id: "r2", name: "is placed by", playerId: order.id },
     ],
     readings: ["{0} places {1}", "{1} is placed by {0}"],
+    constraints: [],
+  });
+  return { model, ft };
+}
+
+/** A ternary fact type, for constraints spanning three roles. */
+function buildTernaryModel(): { model: OrmModel; ft: FactType; } {
+  const model = new OrmModel({ name: "Test" });
+  const emp = model.addObjectType({ name: "Employee", kind: "entity", referenceMode: "emp_id" });
+  const proj = model.addObjectType({ name: "Project", kind: "entity", referenceMode: "proj_id" });
+  const dept = model.addObjectType({
+    name: "Department",
+    kind: "entity",
+    referenceMode: "dept_id",
+  });
+  const ft = model.addFactType({
+    name: "Employee works on Project in Department",
+    roles: [
+      { id: "r1", name: "works on", playerId: emp.id },
+      { id: "r2", name: "has worker", playerId: proj.id },
+      { id: "r3", name: "in", playerId: dept.id },
+    ],
+    readings: ["{0} works on {1} in {2}"],
     constraints: [],
   });
   return { model, ft };
@@ -102,6 +125,56 @@ describe("Phase 2 constraint verbalization", () => {
     expect(v.text).toContain("if and only if");
   });
 
+  it("verbalizes disjunctive mandatory across three roles with a comma-separated middle item", () => {
+    const { model, ft } = buildTernaryModel();
+    const c: Constraint = { type: "disjunctive_mandatory", roleIds: ["r1", "r2", "r3"] };
+    const v = verbalizer.verbalize(c, ft, model);
+    expect(v.text).toBe(
+      "Each Employee works on some Employee, has worker some Project or in some Department.",
+    );
+  });
+
+  it("verbalizes exclusion across three roles with a comma-separated middle item", () => {
+    const { model, ft } = buildTernaryModel();
+    const c: Constraint = { type: "exclusion", roleIds: ["r1", "r2", "r3"] };
+    const v = verbalizer.verbalize(c, ft, model);
+    expect(v.text).toBe(
+      "No Employee both works on some Employee, has worker some Project and in some Department.",
+    );
+  });
+
+  it("verbalizes exclusive-or across three roles with a comma-separated middle item", () => {
+    const { model, ft } = buildTernaryModel();
+    const c: Constraint = { type: "exclusive_or", roleIds: ["r1", "r2", "r3"] };
+    const v = verbalizer.verbalize(c, ft, model);
+    expect(v.text).toBe(
+      "Each Employee either works on some Employee, has worker some Project or in some Department"
+        + " but not both.",
+    );
+  });
+
+  it("verbalizes subset over multi-role sides, spacing roles after the first", () => {
+    const { model, ft } = buildTernaryModel();
+    const c: Constraint = {
+      type: "subset",
+      subsetRoleIds: ["r1", "r2"],
+      supersetRoleIds: ["r2", "r3"],
+    };
+    const v = verbalizer.verbalize(c, ft, model);
+    expect(v.text).toBe("If Employee Project then Project Department.");
+  });
+
+  it("verbalizes equality over multi-role sides, spacing roles after the first", () => {
+    const { model, ft } = buildTernaryModel();
+    const c: Constraint = {
+      type: "equality",
+      roleIds1: ["r1", "r2"],
+      roleIds2: ["r2", "r3"],
+    };
+    const v = verbalizer.verbalize(c, ft, model);
+    expect(v.text).toBe("Employee Project if and only if Project Department.");
+  });
+
   it("verbalizes ring (irreflexive)", () => {
     const { model, ft } = buildSelfRefModel();
     const c: Constraint = { type: "ring", roleId1: "r1", roleId2: "r2", ringType: "irreflexive" };
@@ -126,12 +199,89 @@ describe("Phase 2 constraint verbalization", () => {
     expect(v.text).toContain("Acyclic:");
   });
 
+  it("verbalizes ring with an unresolved role id, falling back to the raw id", () => {
+    const { model, ft } = buildSelfRefModel();
+    const c: Constraint = {
+      type: "ring",
+      roleId1: "bogus",
+      roleId2: "r2",
+      ringType: "irreflexive",
+    };
+    const v = verbalizer.verbalize(c, ft, model);
+    expect(v.text).toBe("No bogus is parent of that same bogus.");
+  });
+
+  it("verbalizes a ring constraint on a non-binary fact type with a generic '...' predicate", () => {
+    const { model, ft } = buildTernaryModel();
+    const c: Constraint = { type: "ring", roleId1: "r1", roleId2: "r2", ringType: "irreflexive" };
+    const v = verbalizer.verbalize(c, ft, model);
+    expect(v.text).toBe("No Employee ... that same Employee.");
+  });
+
   it("verbalizes frequency with range", () => {
     const { model, ft } = buildBinaryModel();
     const c: Constraint = { type: "frequency", roleIds: ["r1"], min: 2, max: 5 };
     const v = verbalizer.verbalize(c, ft, model);
     expect(v.text).toContain("at least 2 and at most 5");
     expect(v.text).toContain("Customer");
+  });
+
+  it("verbalizes frequency naming the role at index 1 as the subject", () => {
+    const { model, ft } = buildBinaryModel();
+    const c: Constraint = { type: "frequency", roleIds: ["r2"], min: 1, max: 1 };
+    const v = verbalizer.verbalize(c, ft, model);
+    expect(v.text).toContain("Each Order");
+    expect(v.text).toContain("Customer");
+  });
+
+  it("verbalizes frequency falling back to the role name when the player type is not in the model", () => {
+    const model = new OrmModel({ name: "Test" });
+    const customer = model.addObjectType({
+      name: "Customer",
+      kind: "entity",
+      referenceMode: "customer_id",
+    });
+    const ft = model.addFactType(
+      {
+        name: "Customer places Order",
+        roles: [
+          { id: "r1", name: "places", playerId: customer.id },
+          { id: "r2", name: "is placed by", playerId: "missing-order-type" },
+        ],
+        readings: ["{0} places {1}", "{1} is placed by {0}"],
+        constraints: [
+          { type: "frequency", roleIds: ["r1"], min: 1, max: 2 },
+        ],
+      },
+      { skipPlayerValidation: true },
+    );
+
+    const v = verbalizer.verbalizeAll(ft, model);
+    expect(v[0]!.text).toContain("is placed by");
+    expect(v[0]!.text).toContain("at least 1 and at most 2");
+  });
+
+  it("verbalizes frequency falling back to the subject role's name when its player type is missing", () => {
+    const model = new OrmModel({ name: "Test" });
+    const order = model.addObjectType({ name: "Order", kind: "entity", referenceMode: "order_id" });
+    const ft = model.addFactType(
+      {
+        name: "Customer places Order",
+        roles: [
+          { id: "r1", name: "places", playerId: "missing-customer-type" },
+          { id: "r2", name: "is placed by", playerId: order.id },
+        ],
+        readings: ["{0} places {1}", "{1} is placed by {0}"],
+        constraints: [
+          { type: "frequency", roleIds: ["r1"], min: 1, max: 2 },
+        ],
+      },
+      { skipPlayerValidation: true },
+    );
+
+    const v = verbalizer.verbalizeAll(ft, model);
+    expect(v[0]!.text).toContain("places");
+    expect(v[0]!.text).toContain("Order");
   });
 
   it("verbalizes frequency unbounded", () => {
@@ -246,6 +396,169 @@ describe("Phase 2 constraint verbalization", () => {
       expect(v.text).toContain("Object");
     });
 
+    it("exclusion falls back to the raw role id when a role does not resolve", () => {
+      const { model, ft } = buildBinaryModel();
+      const c: Constraint = { type: "exclusion", roleIds: ["bogus", "r1"] };
+      const v = verbalizer.verbalize(c, ft, model);
+      expect(v.text).toBe("No Customer both bogus some bogus and places some Customer.");
+    });
+
+    it("subset falls back to the role name, then the raw id, for an unresolved role", () => {
+      const { model, ft } = buildBinaryModel();
+      const c: Constraint = {
+        type: "subset",
+        subsetRoleIds: ["r1"],
+        supersetRoleIds: ["bogus"],
+      };
+      const v = verbalizer.verbalize(c, ft, model);
+      expect(v.text).toBe("If Customer then bogus.");
+    });
+
+    it("subset falls back for an unresolved role on the subset (antecedent) side", () => {
+      const { model, ft } = buildBinaryModel();
+      const c: Constraint = {
+        type: "subset",
+        subsetRoleIds: ["bogus"],
+        supersetRoleIds: ["r1"],
+      };
+      const v = verbalizer.verbalize(c, ft, model);
+      expect(v.text).toBe("If bogus then Customer.");
+    });
+
+    it("equality falls back to the role name, then the raw id, for an unresolved role", () => {
+      const { model, ft } = buildBinaryModel();
+      const c: Constraint = {
+        type: "equality",
+        roleIds1: ["bogus"],
+        roleIds2: ["r2"],
+      };
+      const v = verbalizer.verbalize(c, ft, model);
+      expect(v.text).toBe("bogus if and only if Order.");
+    });
+
+    it("equality falls back for an unresolved role on the second side", () => {
+      const { model, ft } = buildBinaryModel();
+      const c: Constraint = {
+        type: "equality",
+        roleIds1: ["r1"],
+        roleIds2: ["bogus"],
+      };
+      const v = verbalizer.verbalize(c, ft, model);
+      expect(v.text).toBe("Customer if and only if bogus.");
+    });
+
+    it("verbalizeGenericFrequency falls back to the raw role id when unresolved", () => {
+      const { model, ft } = buildTernaryModel();
+      const c: Constraint = { type: "frequency", roleIds: ["bogus"], min: 1, max: 3 };
+      const v = verbalizer.verbalize(c, ft, model);
+      expect(v.text).toContain("bogus");
+      expect(v.text).toContain("at least 1 and at most 3 times");
+    });
+
+    it("multi-role frequency renders an unbounded quantifier", () => {
+      const { model, ft } = buildTernaryModel();
+      const c: Constraint = { type: "frequency", roleIds: ["r1", "r2"], min: 2, max: "unbounded" };
+      const v = verbalizer.verbalize(c, ft, model);
+      expect(v.text).toBe("Each combination of Employee, Project occurs at least 2 times.");
+    });
+
+    it("multi-role frequency renders a min/max range quantifier", () => {
+      const { model, ft } = buildTernaryModel();
+      const c: Constraint = { type: "frequency", roleIds: ["r1", "r2"], min: 1, max: 3 };
+      const v = verbalizer.verbalize(c, ft, model);
+      expect(v.text).toBe(
+        "Each combination of Employee, Project occurs at least 1 and at most 3 times.",
+      );
+    });
+
+    it("multi-role frequency falls back to the raw role id for an unresolved role", () => {
+      const { model, ft } = buildTernaryModel();
+      const c: Constraint = { type: "frequency", roleIds: ["bogus", "r2"], min: 1, max: 1 };
+      const v = verbalizer.verbalize(c, ft, model);
+      expect(v.text).toBe("Each combination of bogus, Project occurs exactly 1 time.");
+    });
+
+    it("cardinality falls back to the raw role id for an unresolved role", () => {
+      const { model, ft } = buildBinaryModel();
+      const c: Constraint = { type: "cardinality", roleId: "bogus", min: 1, max: 5 };
+      const v = verbalizer.verbalize(c, ft, model);
+      expect(v.text).toContain("bogus instances");
+    });
+
+    it("value comparison falls back to the raw role ids and the literal operator when unresolved", () => {
+      const { model, ft } = buildBinaryModel();
+      const c: Constraint = {
+        type: "value_comparison",
+        roleId1: "bogus1",
+        roleId2: "bogus2",
+        operator: "!=" as ValueComparisonOperator,
+      };
+      const v = verbalizer.verbalize(c, ft, model);
+      expect(v.text).toBe("bogus1 must be != bogus2.");
+    });
+
+    it("cardinalityQuantifier: unbounded, exact, and non-zero-min range", () => {
+      const { model, ft } = buildBinaryModel();
+      const unbounded = verbalizer.verbalize(
+        { type: "cardinality", roleId: "r1", min: 5, max: "unbounded" },
+        ft,
+        model,
+      );
+      expect(unbounded.text).toContain("at least 5");
+
+      const exact = verbalizer.verbalize(
+        { type: "cardinality", roleId: "r1", min: 3, max: 3 },
+        ft,
+        model,
+      );
+      expect(exact.text).toContain("exactly 3");
+
+      const range = verbalizer.verbalize(
+        { type: "cardinality", roleId: "r1", min: 2, max: 8 },
+        ft,
+        model,
+      );
+      expect(range.text).toContain("at least 2 and at most 8");
+    });
+
+    it("unaryPredicate falls back to the reading text with placeholders stripped", () => {
+      const model = new OrmModel({ name: "Test" });
+      const promo = model.addObjectType({
+        name: "Promotion",
+        kind: "entity",
+        referenceMode: "promo_id",
+      });
+      const ft = model.addFactType({
+        name: "Promotion is active",
+        // No text follows the {0} placeholder, so unaryPredicate falls
+        // through to stripping placeholders from the whole template.
+        roles: [{ name: "is active", playerId: promo.id, id: "p1" }],
+        readings: ["Currently active: {0}"],
+        constraints: [{ type: "cardinality", roleId: "p1", min: 1, max: 1 }],
+      });
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toContain("'Currently active:' role");
+    });
+
+    it("unaryPredicate falls back to the fact type name when the reading is only a placeholder", () => {
+      const model = new OrmModel({ name: "Test" });
+      const promo = model.addObjectType({
+        name: "Promotion",
+        kind: "entity",
+        referenceMode: "promo_id",
+      });
+      const ft = model.addFactType({
+        name: "Promotion is active",
+        roles: [{ name: "is active", playerId: promo.id, id: "p1" }],
+        readings: ["{0}"],
+        constraints: [{ type: "cardinality", roleId: "p1", min: 1, max: 1 }],
+      });
+
+      const v = verbalizer.verbalizeAll(ft, model);
+      expect(v[0]!.text).toContain("'Promotion is active' role");
+    });
+
     it("extractPredicate uses fallback when reading order does not match subject/object", () => {
       // Build a fact type where the reading template has {1} before {0}.
       const model = new OrmModel({ name: "Test" });
@@ -342,6 +655,74 @@ describe("Phase 2 constraint verbalization", () => {
         model,
       );
       expect(exc.text).toContain("share no [Person, Country]");
+    });
+
+    it("falls back to '...' in the path chain when a hop's role does not resolve to a fact type", () => {
+      const { model, ft } = buildPersonCountry();
+      const danglingHop = {
+        path: { root: "ot-person", steps: [{ entry: "bogus-entry", exit: "bogus-exit" }] },
+        projection: [0, 1],
+      };
+      const v = verbalizer.verbalize(
+        { type: "join_subset", subset: danglingHop, superset: citizenOf },
+        ft,
+        model,
+      );
+      // The dangling hop's chain renders as "...", and its projected tuple
+      // falls back to the root type at every unresolved node.
+      expect(v.text).toContain('from "..."');
+      expect(v.text).toContain("[Person, Person]");
+    });
+
+    it("falls back to the raw type id when a path's root does not resolve, for a root-only path", () => {
+      const { model, ft } = buildPersonCountry();
+      const rootOnly = {
+        path: { root: "bogus-root", steps: [] },
+        projection: [0],
+      };
+      const v = verbalizer.verbalize(
+        { type: "join_equality", operands: [rootOnly, citizenOf] },
+        ft,
+        model,
+      );
+      // No hops: the chain is just the (unresolved) root type id, and the
+      // tuple projects that same fallback id.
+      expect(v.text).toContain('"bogus-root"');
+      expect(v.text).toContain("[bogus-root]");
+    });
+
+    it("falls back to the path root when a projection index has no corresponding step", () => {
+      const { model, ft } = buildPersonCountry();
+      const outOfRange = {
+        path: bornIn.path,
+        // Index 5 has no step 4 -- pathNodeTypeId should fall back to root.
+        projection: [0, 5],
+      };
+      const v = verbalizer.verbalize(
+        { type: "join_equality", operands: [outOfRange, citizenOf] },
+        ft,
+        model,
+      );
+      expect(v.text).toContain("[Person, Person]");
+    });
+
+    it("falls back to a generic 'object' subject for join_equality/join_exclusion with no operands", () => {
+      const { model, ft } = buildPersonCountry();
+      const equality = verbalizer.verbalize(
+        { type: "join_equality", operands: [] },
+        ft,
+        model,
+      );
+      expect(equality.text).toContain("For each object");
+      expect(equality.text).toContain("project the same [tuple]");
+
+      const exclusion = verbalizer.verbalize(
+        { type: "join_exclusion", operands: [] },
+        ft,
+        model,
+      );
+      expect(exclusion.text).toContain("For each object");
+      expect(exclusion.text).toContain("share no [tuple]");
     });
   });
 });

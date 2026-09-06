@@ -4,10 +4,13 @@
  * Verifies that the tool returns structured domain descriptions.
  */
 
-import { dirname, resolve } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeDescribeDomain } from "../../src/tools/describeDomain.js";
+import { writeManifest } from "../workspace/manifestFixture.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(__dirname, "../fixtures");
@@ -235,6 +238,162 @@ model:
       expect(parsed.truncation.entities).toEqual({ shown: 25, total: 40 });
       expect(parsed.note).toContain("query_model");
     });
+
+    // 30 binary fact types between the same two entities, each carrying
+    // one internal-uniqueness constraint -- one model that exceeds both
+    // the fact-type and the constraint cap in a single call.
+    function modelWithFactTypes(n: number): string {
+      const facts = Array.from({ length: n }, (_, i) => {
+        const id = `ft-${i}`;
+        return [
+          `    - id: "${id}"`,
+          `      name: "A relates${i} B"`,
+          "      roles:",
+          `        - id: "r-a-${i}"`,
+          "          player: ot-a",
+          `          role_name: "relates${i}"`,
+          `        - id: "r-b-${i}"`,
+          "          player: ot-b",
+          `          role_name: "is related${i} to"`,
+          "      readings:",
+          `        - "{0} relates${i} {1}"`,
+          "      constraints:",
+          "        - type: internal_uniqueness",
+          `          roles: ["r-a-${i}"]`,
+        ].join("\n");
+      }).join("\n");
+      return `orm_version: "1.0"\nmodel:\n  name: Fact Model\n`
+        + "  object_types:\n"
+        + "    - id: ot-a\n      name: A\n      kind: entity\n      reference_mode: a_id\n"
+        + "    - id: ot-b\n      name: B\n      kind: entity\n      reference_mode: b_id\n"
+        + `  fact_types:\n${facts}\n`;
+    }
+
+    it("caps the fact-type and constraint arrays and reports truncation", () => {
+      const result = executeDescribeDomain(modelWithFactTypes(30));
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.factTypes).toHaveLength(25);
+      expect(parsed.truncation.factTypes).toEqual({ shown: 25, total: 30 });
+      expect(parsed.constraints).toHaveLength(25);
+      expect(parsed.truncation.constraints).toEqual({ shown: 25, total: 30 });
+    });
+  });
+
+  describe("lineage-aware (filePath) mode", () => {
+    let dir: string;
+
+    beforeEach(() => {
+      dir = mkdtempSync(join(tmpdir(), "mcp-describe-lineage-"));
+    });
+
+    afterEach(() => {
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    function writeModelAndManifest(
+      entitySources: Array<{ elementId: string; elementName: string; }>,
+    ) {
+      const modelPath = join(dir, "model.orm.yaml");
+      writeFileSync(modelPath, simpleModel, "utf-8");
+      const artifactPath = join(dir, "schema.sql");
+      writeFileSync(artifactPath, "CREATE TABLE customer;", "utf-8");
+      writeManifest(dir, {
+        version: 1,
+        sourceModel: "model.orm.yaml",
+        sourceModelHash: "abc123",
+        exports: [
+          {
+            artifact: artifactPath,
+            format: "ddl",
+            exportedAt: "2026-01-01T00:00:00.000Z",
+            modelHash: "abc123",
+            sources: entitySources.map((s) => ({
+              elementId: s.elementId,
+              elementType: "EntityType" as const,
+              elementName: s.elementName,
+            })),
+          },
+        ],
+      });
+      return artifactPath;
+    }
+
+    it("resolves the source model through the lineage manifest and focuses on the single entity source", () => {
+      const artifactPath = writeModelAndManifest([{
+        elementId: "ot-customer",
+        elementName: "Customer",
+      }]);
+
+      const result = executeDescribeDomain("unused", undefined, undefined, artifactPath);
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.lineage.artifact).toBe(artifactPath);
+      expect(parsed.lineage.format).toBe("ddl");
+      expect(parsed.lineage.sourceElements).toEqual([
+        { elementId: "ot-customer", elementType: "EntityType", elementName: "Customer" },
+      ]);
+      // No explicit focus, exactly one entity source -> focused on it.
+      expect(parsed.entities).toHaveLength(1);
+      expect(parsed.entities[0]!.name).toBe("Customer");
+    });
+
+    it("prefers an explicit focus over the single-entity-source default", () => {
+      const artifactPath = writeModelAndManifest([{
+        elementId: "ot-customer",
+        elementName: "Customer",
+      }]);
+
+      const result = executeDescribeDomain("unused", "Order", undefined, artifactPath);
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.entities).toHaveLength(1);
+      expect(parsed.entities[0]!.name).toBe("Order");
+    });
+
+    it("does not default the focus when there are zero or multiple entity sources", () => {
+      const artifactPath = writeModelAndManifest([]);
+
+      const result = executeDescribeDomain("unused", undefined, undefined, artifactPath);
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      // No focus applied -- both entities appear.
+      expect(parsed.entities).toHaveLength(2);
+    });
+
+    it("reports an error when no lineage manifest is found for the artifact", () => {
+      const orphanPath = join(dir, "no-manifest.sql");
+      writeFileSync(orphanPath, "CREATE TABLE x;", "utf-8");
+
+      const result = executeDescribeDomain("unused", undefined, undefined, orphanPath);
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.error).toContain("No lineage manifest found");
+    });
+
+    it("reports an error when the manifest is found but the source model is missing", () => {
+      const artifactPath = join(dir, "schema.sql");
+      writeFileSync(artifactPath, "CREATE TABLE x;", "utf-8");
+      writeManifest(dir, {
+        version: 1,
+        sourceModel: "does-not-exist.orm.yaml",
+        sourceModelHash: "abc123",
+        exports: [
+          {
+            artifact: artifactPath,
+            format: "ddl",
+            exportedAt: "2026-01-01T00:00:00.000Z",
+            modelHash: "abc123",
+            sources: [],
+          },
+        ],
+      });
+
+      const result = executeDescribeDomain("unused", undefined, undefined, artifactPath);
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.error).toContain("source model not located");
+    });
   });
 
   describe("project source", () => {
@@ -261,6 +420,19 @@ model:
       const result = executeDescribeDomain(project, undefined, undefined, undefined, "ghost");
       const parsed = JSON.parse(result.content[0]!.text);
       expect(parsed.error).toContain("crm, billing");
+    });
+
+    it("carries assembly warnings alongside the single resolved domain", () => {
+      // The manifest also lists a "ghost" domain whose file does not exist;
+      // that failure surfaces as a `problems` warning even though only the
+      // one loadable domain ("crm") is returned.
+      const broken = `${fixtures}/project/broken.orm-project.yaml`;
+      const result = executeDescribeDomain(broken);
+      const parsed = JSON.parse(result.content[0]!.text);
+      expect(parsed.domains).toBeUndefined();
+      expect(parsed.summary).toContain("CRM Domain");
+      expect(parsed.warnings).toBeDefined();
+      expect(parsed.warnings[0]).toContain("ghost");
     });
   });
 });

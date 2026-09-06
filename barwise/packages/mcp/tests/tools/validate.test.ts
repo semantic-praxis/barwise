@@ -74,6 +74,53 @@ describe("validate_model tool", () => {
     it("throws for an unknown domain, listing the available ones", () => {
       expect(() => executeValidate(project, "ghost")).toThrow(/crm, billing/);
     });
+
+    it("carries assembly warnings alongside the single resolved domain", () => {
+      const broken = `${fixtures}/project/broken.orm-project.yaml`;
+      const result = executeValidate(broken);
+      const parsed = JSON.parse(result.content[0]!.text);
+      expect(parsed.domains).toBeUndefined();
+      expect(parsed.valid).toBe(true);
+      expect(parsed.warnings).toBeDefined();
+      expect(parsed.warnings[0]).toContain("ghost");
+    });
+  });
+
+  it("formats a warning diagnostic with severity, ruleId, and message", () => {
+    // A fact type with no constraints is a "warning"-severity completeness
+    // finding (a missing definition is only "info" and never hits this).
+    const yaml = `
+orm_version: "1.0"
+model:
+  name: Warning Model
+  object_types:
+    - id: ot-a
+      name: A
+      kind: entity
+      reference_mode: a_id
+    - id: ot-b
+      name: B
+      kind: entity
+      reference_mode: b_id
+  fact_types:
+    - id: ft-a-b
+      name: A relates B
+      roles:
+        - id: r-a
+          player: ot-a
+          role_name: relates
+        - id: r-b
+          player: ot-b
+          role_name: is related to
+      readings:
+        - "{0} relates {1}"
+`;
+    const result = executeValidate(yaml);
+    const parsed = JSON.parse(result.content[0]!.text);
+    expect(parsed.warningCount).toBeGreaterThan(0);
+    expect(parsed.warnings[0]).toMatchObject({ severity: "warning" });
+    expect(parsed.warnings[0]).toHaveProperty("ruleId");
+    expect(parsed.warnings[0]).toHaveProperty("message");
   });
 
   describe("file-object source", () => {

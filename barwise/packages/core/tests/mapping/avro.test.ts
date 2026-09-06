@@ -254,6 +254,93 @@ describe("Avro renderer", () => {
         { type: "string", logicalType: "uuid" },
       ]);
     });
+
+    it("maps TIME to logical type time-millis", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Shift", { referenceMode: "shift_id" })
+        .withValueType("StartTime", { dataType: { name: "time" } })
+        .withBinaryFactType("Shift has StartTime", {
+          role1: { player: "Shift", name: "has" },
+          role2: { player: "StartTime", name: "is of" },
+          uniqueness: "role1",
+        })
+        .build();
+
+      const relSchema = mapper.map(model);
+      const avro = renderAvro(relSchema);
+      const shiftSchema = avro.schemas.find((s) => s.name === "Shift")!;
+      const field = shiftSchema.fields.find((f) => f.name === "start_time")!;
+
+      expect(field.type).toEqual(["null", { type: "int", logicalType: "time-millis" }]);
+    });
+
+    it("maps DATETIME to logical type timestamp-millis", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Log", { referenceMode: "log_id" })
+        .withValueType("UpdatedAt", { dataType: { name: "datetime" } })
+        .withBinaryFactType("Log has UpdatedAt", {
+          role1: { player: "Log", name: "has" },
+          role2: { player: "UpdatedAt", name: "is of" },
+          uniqueness: "role1",
+        })
+        .build();
+
+      const relSchema = mapper.map(model);
+      const avro = renderAvro(relSchema);
+      const logSchema = avro.schemas.find((s) => s.name === "Log")!;
+      const field = logSchema.fields.find((f) => f.name === "updated_at")!;
+
+      expect(field.type).toEqual(["null", { type: "long", logicalType: "timestamp-millis" }]);
+    });
+
+    it("maps BINARY and BLOB to bytes", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Device", { referenceMode: "device_id" })
+        .withValueType("MacAddress", { dataType: { name: "binary", length: 6 } })
+        .withValueType("Firmware", { dataType: { name: "binary" } })
+        .withBinaryFactType("Device has MacAddress", {
+          role1: { player: "Device", name: "has" },
+          role2: { player: "MacAddress", name: "is of" },
+          uniqueness: "role1",
+        })
+        .withBinaryFactType("Device has Firmware", {
+          role1: { player: "Device", name: "has" },
+          role2: { player: "Firmware", name: "is of" },
+          uniqueness: "role1",
+        })
+        .build();
+
+      const relSchema = mapper.map(model);
+      const avro = renderAvro(relSchema);
+      const deviceSchema = avro.schemas.find((s) => s.name === "Device")!;
+
+      expect(deviceSchema.fields.find((f) => f.name === "mac_address")!.type).toEqual([
+        "null",
+        "bytes",
+      ]);
+      expect(deviceSchema.fields.find((f) => f.name === "firmware")!.type).toEqual([
+        "null",
+        "bytes",
+      ]);
+    });
+
+    it("falls back to string for an unrecognized SQL type", () => {
+      const relSchema = {
+        sourceModelId: "test",
+        tables: [
+          {
+            name: "widget",
+            columns: [{ name: "payload", dataType: "JSONB", nullable: false }],
+            primaryKey: { columnNames: ["payload"] },
+            foreignKeys: [],
+            sourceElementId: "ot-widget",
+          },
+        ],
+      };
+      const avro = renderAvro(relSchema);
+      const schema = avro.schemas.find((s) => s.name === "Widget")!;
+      expect(schema.fields.find((f) => f.name === "payload")!.type).toBe("string");
+    });
   });
 
   describe("nullability", () => {

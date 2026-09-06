@@ -26,6 +26,19 @@ describe("OrmProject", () => {
     expect(() => new OrmProject({ name: "" })).toThrow();
   });
 
+  it("rejects an empty name assigned after construction", () => {
+    const project = new OrmProject({ name: "Test" });
+    expect(() => {
+      project.name = "   ";
+    }).toThrow("Project name must be a non-empty string.");
+  });
+
+  it("allows renaming to a valid non-empty name", () => {
+    const project = new OrmProject({ name: "Test" });
+    project.name = "  Renamed  ";
+    expect(project.name).toBe("Renamed");
+  });
+
   describe("domains", () => {
     it("adds a domain", () => {
       const project = new OrmProject({ name: "Test" });
@@ -46,11 +59,38 @@ describe("OrmProject", () => {
       );
     });
 
+    it("rejects domain context colliding with an existing product context", () => {
+      const project = new OrmProject({ name: "Test" });
+      project.addProduct({
+        path: "./clv.orm.yaml",
+        context: "clv",
+        dependsOnDomains: [],
+        dependsOnMappings: [],
+      });
+      expect(() => project.addDomain({ path: "./clv-domain.orm.yaml", context: "clv" })).toThrow(
+        "already used by a data product",
+      );
+    });
+
     it("looks up domain by context", () => {
       const project = new OrmProject({ name: "Test" });
       project.addDomain({ path: "./crm.orm.yaml", context: "crm" });
       expect(project.getDomain("crm")).toBeDefined();
       expect(project.getDomain("billing")).toBeUndefined();
+    });
+
+    it("rejects an empty domain path", () => {
+      const project = new OrmProject({ name: "Test" });
+      expect(() => project.addDomain({ path: "", context: "crm" })).toThrow(
+        "Domain model path must be a non-empty string.",
+      );
+    });
+
+    it("rejects a whitespace-only domain context", () => {
+      const project = new OrmProject({ name: "Test" });
+      expect(() => project.addDomain({ path: "./crm.orm.yaml", context: "   " })).toThrow(
+        "Domain model context must be a non-empty string.",
+      );
     });
   });
 
@@ -132,6 +172,30 @@ describe("OrmProject", () => {
       ).toThrow(/already exists/);
     });
 
+    it("rejects an empty product path", () => {
+      const project = new OrmProject({ name: "Test" });
+      expect(() =>
+        project.addProduct({
+          path: "",
+          context: "clv",
+          dependsOnDomains: [],
+          dependsOnMappings: [],
+        })
+      ).toThrow("Product path must be a non-empty string.");
+    });
+
+    it("rejects a whitespace-only product context", () => {
+      const project = new OrmProject({ name: "Test" });
+      expect(() =>
+        project.addProduct({
+          path: "./clv.orm.yaml",
+          context: "   ",
+          dependsOnDomains: [],
+          dependsOnMappings: [],
+        })
+      ).toThrow("Product context must be a non-empty string.");
+    });
+
     it("rejects product context colliding with domain context", () => {
       const project = new OrmProject({ name: "Test" });
       project.addDomain({ path: "./crm.orm.yaml", context: "crm" });
@@ -191,6 +255,9 @@ describe("OrmProject", () => {
       expect(
         project.resolveQualifiedRef("billing:Invoice"),
       ).toBeUndefined();
+
+      // Malformed reference (no "context:Name" separator).
+      expect(project.resolveQualifiedRef("Customer")).toBeUndefined();
     });
 
     it("lists all context names", () => {

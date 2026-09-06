@@ -154,4 +154,78 @@ describe("barwise history", () => {
     expect(result.stdout).toContain("commit two");
     expect(result.stdout).not.toContain("commit one");
   });
+
+  it("falls back to the default limit when --limit is not a number", async () => {
+    const modelPath = join(repoDir, "simple.orm.yaml");
+    copyFileSync(join(fixtures, "simple.orm.yaml"), modelPath);
+    git("add", "simple.orm.yaml");
+    git("commit", "--quiet", "-m", "commit one");
+
+    const result = await runCli(["history", modelPath, "--limit", "not-a-number"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("commit one");
+  });
+
+  it("reports no git history for a file that was never committed", async () => {
+    const modelPath = join(repoDir, "simple.orm.yaml");
+    copyFileSync(join(fixtures, "simple.orm.yaml"), modelPath);
+    // Committing an unrelated file makes this a real, non-empty repo,
+    // so the failure comes from the file's own log being empty rather
+    // than from having no commits at all.
+    writeFileSync(join(repoDir, "other.txt"), "placeholder");
+    git("add", "other.txt");
+    git("commit", "--quiet", "-m", "unrelated commit");
+
+    const result = await runCli(["history", modelPath]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("No git history for");
+  });
+
+  it("marks the newest revision unreadable and skips the working-tree section", async () => {
+    const modelPath = join(repoDir, "simple.orm.yaml");
+    writeFileSync(modelPath, "not: valid: orm: yaml: at: all:\n");
+    git("add", "simple.orm.yaml");
+    git("commit", "--quiet", "-m", "invalid revision");
+
+    const result = await runCli(["history", modelPath]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("predates the current schema?");
+    expect(result.stdout).not.toContain("working tree");
+  });
+
+  it("marks an unreadable parent revision without treating it as the oldest", async () => {
+    const modelPath = join(repoDir, "simple.orm.yaml");
+    copyFileSync(join(fixtures, "simple.orm.yaml"), modelPath);
+    git("add", "simple.orm.yaml");
+    git("commit", "--quiet", "-m", "oldest, valid");
+
+    writeFileSync(modelPath, "not: valid: orm: yaml: at: all:\n");
+    git("add", "simple.orm.yaml");
+    git("commit", "--quiet", "-m", "middle, invalid");
+
+    copyFileSync(join(fixtures, "simple-modified.orm.yaml"), modelPath);
+    git("add", "simple.orm.yaml");
+    git("commit", "--quiet", "-m", "newest, valid");
+
+    const result = await runCli(["history", modelPath]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("parent revision unreadable -- no diff");
+  });
+
+  it("labels a definition delta by its glossary term", async () => {
+    const modelPath = join(repoDir, "simple.orm.yaml");
+    copyFileSync(join(fixtures, "simple.orm.yaml"), modelPath);
+    git("add", "simple.orm.yaml");
+    git("commit", "--quiet", "-m", "add simple model");
+
+    const withDefinition = readFileSync(modelPath, "utf-8")
+      + '\n  definitions:\n    - term: "Order"\n      definition: "A customer request for goods."\n';
+    writeFileSync(modelPath, withDefinition);
+    git("add", "simple.orm.yaml");
+    git("commit", "--quiet", "-m", "add Order to the glossary");
+
+    const result = await runCli(["history", modelPath]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Definition: Order");
+  });
 });

@@ -11,6 +11,7 @@
  *   - Spanning uniqueness detection
  *   - Empty models produce empty graphs
  */
+import { OrmModel } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { ModelBuilder } from "../../core/tests/helpers/ModelBuilder.js";
 import { modelToGraph } from "../src/graph/ModelToGraph.js";
@@ -744,6 +745,92 @@ describe("ModelToGraph", () => {
     if (ftNode?.kind === "fact_type") {
       expect(ftNode.annotations).toEqual(["Review constraint coverage"]);
     }
+  });
+
+  it("absorbs a preferred-identifying value type even when readings order it first", () => {
+    const model = new ModelBuilder("ReversedIdentifier")
+      .withEntityType("Order", { referenceMode: "order_id" })
+      .withValueType("OrderCode")
+      .withBinaryFactType("OrderCode identifies Order", {
+        role1: { player: "OrderCode", name: "identifies" },
+        role2: { player: "Order", name: "is identified by" },
+        readings: ["{0} identifies {1}", "{1} is identified by {0}"],
+        uniqueness: "role1",
+        isPreferred: true,
+      })
+      .build();
+
+    const graph = modelToGraph(model);
+
+    // The value type and its identifying fact type are absorbed into the
+    // "Order (.order_id)" entity node, not shown as separate nodes.
+    expect(graph.nodes).toHaveLength(1);
+    const otNode = graph.nodes[0]!;
+    expect(otNode.kind).toBe("object_type");
+    if (otNode.kind === "object_type") {
+      expect(otNode.name).toBe("Order");
+    }
+  });
+
+  it("keeps an objectified entity as a visible node when it also plays a role elsewhere", () => {
+    const model = new ModelBuilder("ObjectifiedButConnected")
+      .withEntityType("Customer", { referenceMode: "customer_id" })
+      .withEntityType("Order", { referenceMode: "order_id" })
+      .withEntityType("Item", { referenceMode: "item_id" })
+      .withBinaryFactType("Customer places Order", {
+        role1: { player: "Customer", name: "places" },
+        role2: { player: "Order", name: "is placed by" },
+      })
+      .withObjectifiedFactType("Customer places Order", "Order")
+      .withBinaryFactType("Order includes Item", {
+        role1: { player: "Order", name: "includes" },
+        role2: { player: "Item", name: "is included in" },
+      })
+      .build();
+
+    const graph = modelToGraph(model);
+
+    // Order objectifies "Customer places Order" but also plays a role in
+    // "Order includes Item", so it must stay a visible node rather than
+    // being folded away as a pure objectification.
+    const orderNode = graph.nodes.find(
+      (n) => n.kind === "object_type" && n.name === "Order",
+    );
+    expect(orderNode).toBeDefined();
+  });
+
+  it("shows a placeholder player name and skips reference-mode absorption for a dangling role", () => {
+    const model = new OrmModel({ name: "Fragment" });
+    const order = model.addObjectType({ name: "Order", kind: "entity", referenceMode: "order_id" });
+    model.addFactType(
+      {
+        name: "OrderCode identifies Order",
+        roles: [
+          { name: "identifies", playerId: "missing-value-type", id: "role-0" },
+          { name: "is identified by", playerId: order.id, id: "role-1" },
+        ],
+        readings: ["{0} identifies {1}", "{1} is identified by {0}"],
+        constraints: [
+          { type: "internal_uniqueness", roleIds: ["role-0"], isPreferred: true },
+        ],
+      },
+      { skipPlayerValidation: true },
+    );
+
+    const graph = modelToGraph(model);
+
+    // The dangling role can't be resolved to a real value type, so the
+    // fact type is never absorbed into Order and stays a visible node
+    // with a "?" placeholder for the unresolved role's player name.
+    const ftNode = graph.nodes.find((n) => n.kind === "fact_type");
+    expect(ftNode).toBeDefined();
+    if (ftNode?.kind === "fact_type") {
+      expect(ftNode.roles[0]!.playerName).toBe("?");
+    }
+    const orderNode = graph.nodes.find(
+      (n) => n.kind === "object_type" && n.name === "Order",
+    );
+    expect(orderNode).toBeDefined();
   });
 
   it("omits annotations when options map does not contain the element", () => {

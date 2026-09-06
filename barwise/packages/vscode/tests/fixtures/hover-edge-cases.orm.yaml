@@ -1,0 +1,36 @@
+orm_version: "1.0"
+
+model:
+  name: "Hover Edge Cases"
+  domain_context: "testing"
+
+  object_types:
+    - id: "ot-isolated"
+      name: "Isolated"
+      kind: "entity"
+      reference_mode: "isolated_id"
+      definition: "An entity with no fact types."
+
+    - id: "ot-widget"
+      name: "Widget"
+      kind: "entity"
+      reference_mode: "widget_id"
+      definition: "A thing with an unconstrained fact type."
+
+    - id: "ot-tag"
+      name: "Tag"
+      kind: "value"
+
+  fact_types:
+    - id: "ft-widget-has-tag"
+      name: "Widget has Tag"
+      roles:
+        - id: "r-widget-has"
+          player: "ot-widget"
+          role_name: "has"
+        - id: "r-tag-of"
+          player: "ot-tag"
+          role_name: "is of"
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"

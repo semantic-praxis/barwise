@@ -115,6 +115,28 @@ describe("describeDomain", () => {
   });
 
   describe("entity focus", () => {
+    it("omits populations when includePopulations is false", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Customer", { referenceMode: "cust_id" })
+        .withEntityType("Order", { referenceMode: "order_num" })
+        .withBinaryFactType("Customer places Order", {
+          role1: { player: "Customer", name: "places" },
+          role2: { player: "Order", name: "is placed by" },
+          uniqueness: "role2",
+        })
+        .withPopulation("Customer places Order", [
+          { roleValues: { "0": "C001", "1": "O123" } },
+        ])
+        .build();
+
+      const description = describeDomain(model, {
+        focus: "Customer",
+        includePopulations: false,
+      });
+
+      expect(description.populations).toBeUndefined();
+    });
+
     it("returns only the focused entity and related fact types", () => {
       const model = new ModelBuilder("Test")
         .withEntityType("Patient", { definition: "A person" })
@@ -165,6 +187,28 @@ describe("describeDomain", () => {
   });
 
   describe("fact type focus", () => {
+    it("omits populations when includePopulations is false", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Customer", {})
+        .withEntityType("Order", {})
+        .withBinaryFactType("Customer places Order", {
+          role1: { player: "Customer", name: "places" },
+          role2: { player: "Order", name: "is placed by" },
+          uniqueness: "role2",
+        })
+        .withPopulation("Customer places Order", [
+          { roleValues: { "0": "C001", "1": "O123" } },
+        ])
+        .build();
+
+      const description = describeDomain(model, {
+        focus: "Customer places Order",
+        includePopulations: false,
+      });
+
+      expect(description.populations).toBeUndefined();
+    });
+
     it("returns the focused fact type and involved entities", () => {
       const model = new ModelBuilder("Test")
         .withEntityType("Patient", {})
@@ -220,6 +264,47 @@ describe("describeDomain", () => {
         // Mandatory constraints verbalize as "at least one" or "exactly one"
         expect(c.verbalization.toLowerCase()).toMatch(/at least one|exactly one/);
       }
+    });
+
+    it("omits populations when includePopulations is false", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Customer", {})
+        .withEntityType("Order", {})
+        .withBinaryFactType("Customer places Order", {
+          role1: { player: "Customer", name: "places" },
+          role2: { player: "Order", name: "is placed by" },
+          uniqueness: "role2",
+          mandatory: "role2",
+        })
+        .withPopulation("Customer places Order", [
+          { roleValues: { "0": "C001", "1": "O123" } },
+        ])
+        .build();
+
+      const description = describeDomain(model, {
+        focus: "mandatory",
+        includePopulations: false,
+      });
+
+      expect(description.populations).toBeUndefined();
+    });
+
+    it("lists a fact type only once when more than one of its constraints matches", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Customer", {})
+        .withEntityType("Order", {})
+        .withBinaryFactType("Customer places Order", {
+          role1: { player: "Customer", name: "places" },
+          role2: { player: "Order", name: "is placed by" },
+          // Both roles mandatory: two matching constraints on one fact type.
+          mandatory: "both",
+        })
+        .build();
+
+      const description = describeDomain(model, { focus: "mandatory" });
+
+      expect(description.constraints).toHaveLength(2);
+      expect(description.factTypes).toHaveLength(1);
     });
 
     it("returns empty arrays for unknown constraint types", () => {

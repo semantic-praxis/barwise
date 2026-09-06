@@ -110,4 +110,17 @@ describe("loadProject", () => {
     expect(problems).toEqual([]);
     expect(project.getDomain("solo")?.model?.name).toBe("Solo");
   });
+
+  it("wraps a manifest not found as a ProjectLoadError", () => {
+    const dir = makeTmpDir();
+    expect(() => loadProject(join(dir, "missing.orm-project.yaml"))).toThrow(ProjectLoadError);
+    expect(() => loadProject(join(dir, "missing.orm-project.yaml"))).toThrow(/not found/);
+  });
+
+  it("wraps a non-ENOENT manifest read failure with the underlying message", () => {
+    const dir = makeTmpDir();
+    // A directory where a file is expected raises EISDIR, not ENOENT.
+    expect(() => loadProject(dir)).toThrow(ProjectLoadError);
+    expect(() => loadProject(dir)).toThrow(/Cannot read project manifest/);
+  });
 });

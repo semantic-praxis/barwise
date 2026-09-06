@@ -9,7 +9,7 @@
  * sink that cannot write must not take the command down with it.
  */
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { callLogPath, callLogSink, jsonlSink, stateDir } from "../../src/workspace/callLogSink.js";
@@ -48,6 +48,13 @@ describe("the opt-in gate", () => {
       process.env["BARWISE_CALL_LOG"] = flag;
       expect(callLogPath()).toBe(join(tmp, "barwise", "calls.jsonl"));
     }
+  });
+
+  it("falls back to ~/.local/state when XDG_STATE_HOME is unset", () => {
+    delete process.env["XDG_STATE_HOME"];
+    process.env["BARWISE_CALL_LOG"] = "1";
+
+    expect(callLogPath()).toBe(join(homedir(), ".local", "state", "barwise", "calls.jsonl"));
   });
 
   it("treats any other value as the path itself", () => {

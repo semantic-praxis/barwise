@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { formatQueryResult } from "../../src/query/format.js";
 import { runQuery } from "../../src/query/index.js";
+import type { EntityDetail, FactTypeDetail, QueryResult } from "../../src/query/types.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 const model = new ModelBuilder("Shop")
@@ -69,5 +70,138 @@ describe("formatQueryResult", () => {
   it("renders an empty role list without throwing", () => {
     const text = formatQueryResult(runQuery(model, "mandatory-roles Customer"));
     expect(text).toContain("Roles (0)");
+  });
+
+  it("shows an entity's definition in the entity list line", () => {
+    const withDef = new ModelBuilder("Test")
+      .withEntityType("Customer", { referenceMode: "customer_id", definition: "Buys things" })
+      .build();
+    const text = formatQueryResult(runQuery(withDef, "entities"));
+    expect(text).toContain("Customer (entity) -- Buys things");
+  });
+});
+
+describe("formatQueryResult (synthetic fixtures)", () => {
+  // These cover shapes the query engine itself doesn't produce for the
+  // fixture model above (a value-typed entity-detail subject, an
+  // objectified fact type, path edge cases, and empty result lists) --
+  // formatQueryResult only cares about the QueryResult shape, so
+  // constructing one directly is more direct than contriving a model
+  // and query string to reach it.
+  it("omits the reference-mode line and shows a definition for a value-typed entity detail", () => {
+    const detail: EntityDetail = {
+      entity: { id: "e1", name: "Email", entityKind: "value", definition: "An email address" },
+      factTypes: [],
+      roles: [],
+      constraints: [],
+      subtypes: [],
+      supertypes: [],
+    };
+    const text = formatQueryResult({ kind: "entity-detail", detail });
+    expect(text).toContain("Entity: Email (value)");
+    expect(text).toContain("Definition: An email address");
+    expect(text).not.toContain("Reference mode:");
+  });
+
+  it("marks an objectified fact type in fact-type detail", () => {
+    const detail: FactTypeDetail = {
+      factType: {
+        id: "ft1",
+        name: "Person marries Person",
+        arity: 2,
+        reading: "Person marries Person",
+      },
+      roles: [],
+      readings: ["Person marries Person"],
+      constraints: [],
+      objectified: true,
+    };
+    const text = formatQueryResult({ kind: "fact-type-detail", detail });
+    expect(text).toContain("Objectified: yes");
+  });
+
+  it("reports when no path exists between two entities", () => {
+    const result: QueryResult = { kind: "path", from: "A", to: "B", found: false, steps: [] };
+    expect(formatQueryResult(result)).toBe('No path found between "A" and "B".');
+  });
+
+  it("reports the same entity when a path resolves with zero steps", () => {
+    const result: QueryResult = { kind: "path", from: "A", to: "A", found: true, steps: [] };
+    expect(formatQueryResult(result)).toBe('"A" and "A" are the same entity.');
+  });
+
+  it("uses the singular 'step' for a one-hop path", () => {
+    const result: QueryResult = {
+      kind: "path",
+      from: "A",
+      to: "B",
+      found: true,
+      steps: [{
+        from: "A",
+        to: "B",
+        factType: { id: "ft1", name: "A relates B", arity: 2, reading: "A relates B" },
+      }],
+    };
+    const text = formatQueryResult(result);
+    expect(text).toContain("(1 step):");
+    expect(text).not.toContain("(1 steps)");
+  });
+
+  it("includes the domain context line in stats when present", () => {
+    const result: QueryResult = {
+      kind: "stats",
+      stats: {
+        modelName: "Shop",
+        domainContext: "retail",
+        entityTypes: 1,
+        valueTypes: 0,
+        factTypes: 0,
+        constraints: 0,
+        subtypeRelationships: 0,
+        objectifiedFactTypes: 0,
+        populations: 0,
+      },
+    };
+    expect(formatQueryResult(result)).toContain("Context: retail");
+  });
+
+  it("omits the missing-identifier flag when the anchor has a preferred identifier", () => {
+    const result: QueryResult = {
+      kind: "anchors",
+      anchors: [
+        {
+          entity: "Customer",
+          referenceMode: "customer_id",
+          mandatoryRoles: [],
+          missingIdentifier: false,
+        },
+      ],
+    };
+    const text = formatQueryResult(result);
+    expect(text).toContain("Customer");
+    expect(text).not.toContain("MISSING PREFERRED IDENTIFIER");
+  });
+
+  it("reports 'Anchors: none' for an empty anchors list", () => {
+    expect(formatQueryResult({ kind: "anchors", anchors: [] })).toBe("Anchors: none");
+  });
+
+  it("flags a missing preferred identifier and omits identifier types when there are none", () => {
+    const result: QueryResult = {
+      kind: "anchors",
+      anchors: [
+        {
+          entity: "Ghost",
+          referenceMode: "ghost_id",
+          preferredIdentifier: { factType: "Ghost has GhostId", identifierTypes: [] },
+          mandatoryRoles: [],
+          missingIdentifier: true,
+        },
+      ],
+    };
+    const text = formatQueryResult(result);
+    expect(text).toContain("Ghost  [MISSING PREFERRED IDENTIFIER]");
+    expect(text).toContain("Preferred identifier: Ghost has GhostId");
+    expect(text).not.toContain("Ghost has GhostId (");
   });
 });

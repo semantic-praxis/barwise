@@ -128,6 +128,31 @@ describe("assembleProject", () => {
     expect(problems[0]).toContain('Domain "crm"');
   });
 
+  it("reports mapping content that was not provided as a problem", () => {
+    const files = fullFiles();
+    files.mappings.delete("./mappings/crm-billing.map.yaml");
+
+    const { problems } = assembleProject(MANIFEST, files);
+
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("Mapping (./mappings/crm-billing.map.yaml)");
+    expect(problems[0]).toContain("not provided");
+  });
+
+  it("reports a mapping read error as a non-fatal problem", () => {
+    const files = fullFiles();
+    files.mappings.set("./mappings/crm-billing.map.yaml", {
+      readError: "ENOENT: no such file",
+    });
+
+    const { project, problems } = assembleProject(MANIFEST, files);
+
+    expect(project.mappings).toHaveLength(0);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("Mapping (./mappings/crm-billing.map.yaml)");
+    expect(problems[0]).toContain("ENOENT");
+  });
+
   it("reports an unparseable mapping file as a problem", () => {
     const files = fullFiles();
     files.mappings.set(

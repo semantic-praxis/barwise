@@ -116,4 +116,46 @@ describe("joinConstraintRules", () => {
     expect(idsOf(buildModel({ type: "join_equality", operands: [bornIn] })))
       .toContain("constraint/join-too-few-operands");
   });
+
+  it("flags fewer than two operands for join_exclusion, naming it in the message", () => {
+    const model = buildModel({ type: "join_exclusion", operands: [bornIn] });
+    const diags = joinConstraintRules(model);
+    const tooFew = diags.find((d) => d.ruleId === "constraint/join-too-few-operands");
+    expect(tooFew).toBeDefined();
+    expect(tooFew!.message).toContain("Join exclusion");
+  });
+
+  it("flags an operand with an empty projection", () => {
+    const empty: JoinOperand = { path: bornIn.path, projection: [] };
+    expect(idsOf(buildModel({ type: "join_equality", operands: [empty, citizenOf] })))
+      .toContain("constraint/join-empty-projection");
+  });
+
+  it("falls back to the fact type id when a malformed join constraint has no id of its own", () => {
+    const model = new OrmModel({ name: "Test" });
+    const person = model.addObjectType({
+      id: "ot-person",
+      name: "Person",
+      kind: "entity",
+      referenceMode: "person_id",
+    });
+    model.addObjectType({ name: "Country", kind: "entity", referenceMode: "country_code" });
+    const ft = model.addFactType({
+      name: "Person is citizen of Country",
+      roles: [
+        { name: "is citizen of", playerId: person.id, id: "pc-person" },
+        { name: "has citizen", playerId: person.id, id: "pc-country" },
+      ],
+      readings: ["{0} is citizen of {1}"],
+    });
+    // addConstraint (unlike the fact-type constructor) does not backfill
+    // a missing id.
+    const bad: JoinOperand = { path: { root: "ot-missing", steps: [] }, projection: [0] };
+    ft.addConstraint({ type: "join_equality", operands: [bad, citizenOf] });
+
+    const diags = joinConstraintRules(model);
+    const unknownRoot = diags.find((d) => d.ruleId === "constraint/join-unknown-root");
+    expect(unknownRoot).toBeDefined();
+    expect(unknownRoot!.elementId).toBe(ft.id);
+  });
 });

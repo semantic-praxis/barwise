@@ -110,5 +110,23 @@ describe("CompletionProvider", () => {
       // Should not throw; returns empty because YAML parsing fails.
       expect(completions).toHaveLength(0);
     });
+
+    it("returns empty completions for a player: line when the model has no object_types", () => {
+      const doc = makeDocument("player: \nmodel:\n  name: bare\n");
+      const completions = provider.provideCompletions(doc, {
+        line: 0,
+        character: 8,
+      });
+      expect(completions).toHaveLength(0);
+    });
+
+    it("returns empty completions for a position past the end of the document", () => {
+      const doc = makeDocument(loadFixture("simple.orm.yaml"));
+      const completions = provider.provideCompletions(doc, {
+        line: 9999,
+        character: 0,
+      });
+      expect(completions).toHaveLength(0);
+    });
   });
 });

@@ -105,6 +105,31 @@ describe("barwise review", () => {
     expect(vi.mocked(reviewModel)).not.toHaveBeenCalled();
   });
 
+  it("prints 'No suggestions.' when the review has none", async () => {
+    vi.mocked(reviewModel).mockResolvedValueOnce({ suggestions: [], summary: "Looks solid." });
+    const result = await runCli(["review", model]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("No suggestions.");
+    expect(result.stdout).toContain("Looks solid.");
+  });
+
+  it("omits the element prefix for a suggestion with no element", async () => {
+    vi.mocked(reviewModel).mockResolvedValueOnce({
+      suggestions: [
+        {
+          category: "structure",
+          severity: "suggestion",
+          description: "Consider splitting this domain.",
+          rationale: "It covers two unrelated concerns.",
+        },
+      ],
+      summary: "One structural note.",
+    });
+    const result = await runCli(["review", model]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("[suggestion] Consider splitting this domain.");
+  });
+
   it("reports a provider failure without pretending the review succeeded", async () => {
     vi.mocked(reviewModel).mockRejectedValueOnce(new Error("no API key configured"));
     const result = await runCli(["review", model]);

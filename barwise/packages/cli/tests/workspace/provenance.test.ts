@@ -98,6 +98,31 @@ describe("resolveProvenance", () => {
     expect(resolveProvenance("1.7.0", join(tmpdir(), "barwise-does-not-exist-9137")))
       .toEqual({ version: "1.7.0" });
   });
+
+  it("returns the version alone when process.argv[1] is empty and no fromDir is given", () => {
+    const original = process.argv[1];
+    process.argv[1] = "";
+    try {
+      expect(resolveProvenance("1.7.0")).toEqual({ version: "1.7.0" });
+    } finally {
+      process.argv[1] = original;
+    }
+  });
+
+  it("returns the version alone for a barwise repo with no commits yet", () => {
+    // The marker check is a raw filesystem read, not a git-tracked
+    // one, so an uncommitted marker still resolves the root -- and
+    // `rev-parse HEAD` then fails on the unborn branch.
+    const dir = mkdtempSync(join(tmpdir(), "barwise-prov-"));
+    try {
+      execGit(dir, ["init", "-q"]);
+      mkdirSync(join(dir, "barwise"));
+      writeFileSync(join(dir, "barwise", "package.json"), JSON.stringify({ name: "barwise" }));
+    } catch {
+      return;
+    }
+    expect(resolveProvenance("1.7.0", dir)).toEqual({ version: "1.7.0" });
+  });
 });
 
 describe("describeProvenance", () => {

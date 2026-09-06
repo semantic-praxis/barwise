@@ -15,6 +15,52 @@ import { runCli } from "../workspace/run.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(__dirname, "../fixtures");
 
+/**
+ * `simple.orm.yaml`'s constraints carry no explicit `id`, so each load
+ * assigns them a fresh random one and `hashModel` -- which hashes the
+ * re-serialized YAML -- differs across independent loads of the same
+ * file. Every constraint here is pinned, so hashing the same file
+ * twice (once to build a manifest, once from the command under test)
+ * agrees, which is what an "all fresh" or "mixed" status needs.
+ */
+const DETERMINISTIC_MODEL = `orm_version: "1.0"
+
+model:
+  name: "Deterministic Test"
+  domain_context: "testing"
+
+  object_types:
+    - id: "ot-customer"
+      name: "Customer"
+      kind: "entity"
+      reference_mode: "customer_id"
+
+    - id: "ot-name"
+      name: "Name"
+      kind: "value"
+
+  fact_types:
+    - id: "ft-customer-has-name"
+      name: "Customer has Name"
+      roles:
+        - id: "r-customer-has"
+          player: "ot-customer"
+          role_name: "has"
+        - id: "r-name-of"
+          player: "ot-name"
+          role_name: "is of"
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - id: "c-uniq"
+          type: "internal_uniqueness"
+          roles: ["r-customer-has"]
+        - id: "c-mand"
+          type: "mandatory"
+          role: "r-customer-has"
+`;
+
 describe("barwise lineage", () => {
   let tempDir: string;
 
@@ -40,9 +86,35 @@ describe("barwise lineage", () => {
       expect(result.exitCode).toBe(0);
     });
 
-    // Note: Testing "all artifacts fresh" is tricky because the CLI loads the model
-    // independently and hash computations need to be deterministic across load cycles.
-    // The "stale artifacts" test below validates the core staleness detection logic.
+    it("reports all artifacts fresh when every export's hash matches", async () => {
+      const modelPath = path.join(tempDir, "test.orm.yaml");
+      fs.writeFileSync(modelPath, DETERMINISTIC_MODEL);
+
+      const model = loadModel(modelPath);
+      const modelHash = hashModel(model);
+
+      const manifest: LineageManifest = {
+        version: 1,
+        sourceModel: "test.orm.yaml",
+        sourceModelHash: modelHash,
+        exports: [
+          {
+            artifact: "schema.sql",
+            format: "ddl",
+            exportedAt: "2026-03-06T12:00:00Z",
+            modelHash,
+            sources: [],
+          },
+        ],
+      };
+      writeManifest(tempDir, manifest);
+
+      const result = await runCli(["lineage", "status", modelPath]);
+
+      expect(result.stdout).toContain("All artifacts are fresh.");
+      expect(result.stdout).toContain("1 artifact(s) up to date.");
+      expect(result.exitCode).toBe(0);
+    });
 
     it("reports stale artifacts when model changed and exits 1", async () => {
       // Copy simple.orm.yaml to temp dir
@@ -124,6 +196,44 @@ describe("barwise lineage", () => {
       expect(parsed).toHaveProperty("freshArtifacts");
       expect(Array.isArray(parsed.staleArtifacts)).toBe(true);
       expect(Array.isArray(parsed.freshArtifacts)).toBe(true);
+    });
+
+    it("reports a fresh-artifact count alongside stale ones", async () => {
+      const modelPath = path.join(tempDir, "test.orm.yaml");
+      fs.writeFileSync(modelPath, DETERMINISTIC_MODEL);
+
+      const model = loadModel(modelPath);
+      const modelHash = hashModel(model);
+      const oldHash = "a1b2c3d4e5f6000000000000000000000000000000000000000000000000";
+
+      const manifest: LineageManifest = {
+        version: 1,
+        sourceModel: "test.orm.yaml",
+        sourceModelHash: modelHash,
+        exports: [
+          {
+            artifact: "stale.sql",
+            format: "ddl",
+            exportedAt: "2026-03-06T12:00:00Z",
+            modelHash: oldHash,
+            sources: [],
+          },
+          {
+            artifact: "fresh.sql",
+            format: "ddl",
+            exportedAt: "2026-03-06T12:00:00Z",
+            modelHash,
+            sources: [],
+          },
+        ],
+      };
+      writeManifest(tempDir, manifest);
+
+      const result = await runCli(["lineage", "status", modelPath]);
+
+      expect(result.stdout).toContain("1 stale artifact(s) found");
+      expect(result.stdout).toContain("1 artifact(s) still fresh.");
+      expect(result.exitCode).toBe(1);
     });
   });
 

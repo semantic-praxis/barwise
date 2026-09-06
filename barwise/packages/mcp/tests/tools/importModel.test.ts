@@ -258,6 +258,121 @@ public class Customer {
     });
   });
 
+  describe("SQL format", () => {
+    it("should import a single SQL file path with an explicit dialect", async () => {
+      const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
+      const { join } = await import("node:path");
+      const { tmpdir } = await import("node:os");
+
+      const dir = mkdtempSync(join(tmpdir(), "mcp-sql-file-"));
+      try {
+        const file = join(dir, "schema.sql");
+        writeFileSync(file, "CREATE TABLE accounts (id INT PRIMARY KEY, name VARCHAR(100));");
+
+        const result = await executeImportModel(file, "sql", "SQL File Model", "postgres");
+        const yaml = result.content[0]!.text;
+
+        expect(yaml).toContain("name: SQL File Model");
+        expect(yaml).toContain("# Import confidence:");
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("should import a directory of SQL files (async directory route)", async () => {
+      const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
+      const { join } = await import("node:path");
+      const { tmpdir } = await import("node:os");
+
+      const dir = mkdtempSync(join(tmpdir(), "mcp-sql-dir-"));
+      try {
+        writeFileSync(
+          join(dir, "orders.sql"),
+          "CREATE TABLE orders (id INT PRIMARY KEY, total DECIMAL(10,2));",
+        );
+
+        const result = await executeImportModel(dir, "sql", "SQL Dir Model");
+        const yaml = result.content[0]!.text;
+
+        expect(yaml).toContain("name: SQL Dir Model");
+        // Proves the directory (async) route ran, not the single-file parse.
+        expect(yaml).toContain("SQL file(s)");
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe("dbt format", () => {
+    // Schema-only project (no .sql models): compileDbtSql finds nothing to
+    // compile and returns early, so this exercises the dbt import path
+    // without shelling out to the dbt CLI.
+    async function writeDbtProject(dir: string): Promise<void> {
+      const { mkdirSync, writeFileSync } = await import("node:fs");
+      const { join } = await import("node:path");
+      const modelsDir = join(dir, "models");
+      mkdirSync(modelsDir, { recursive: true });
+      writeFileSync(
+        join(modelsDir, "schema.yml"),
+        [
+          "version: 2",
+          "models:",
+          "  - name: customers",
+          "    columns:",
+          "      - name: id",
+          "      - name: name",
+        ].join("\n"),
+      );
+    }
+
+    it("should import a dbt project directory (env vars unset)", async () => {
+      const { mkdtempSync, rmSync } = await import("node:fs");
+      const { join } = await import("node:path");
+      const { tmpdir } = await import("node:os");
+
+      const dir = mkdtempSync(join(tmpdir(), "mcp-dbt-"));
+      const savedTarget = process.env["DBT_TARGET_TYPE"];
+      const savedAdapter = process.env["DBT_ADAPTER"];
+      delete process.env["DBT_TARGET_TYPE"];
+      delete process.env["DBT_ADAPTER"];
+      try {
+        await writeDbtProject(dir);
+        const result = await executeImportModel(dir, "dbt", "dbt Model");
+        const yaml = result.content[0]!.text;
+        expect(yaml).toContain("name: dbt Model");
+        // Proves the dbt schema-YAML pipeline ran over our fixture model.
+        expect(yaml).toContain("customers");
+      } finally {
+        if (savedTarget !== undefined) process.env["DBT_TARGET_TYPE"] = savedTarget;
+        if (savedAdapter !== undefined) process.env["DBT_ADAPTER"] = savedAdapter;
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("should import a dbt project directory (env vars set)", async () => {
+      const { mkdtempSync, rmSync } = await import("node:fs");
+      const { join } = await import("node:path");
+      const { tmpdir } = await import("node:os");
+
+      const dir = mkdtempSync(join(tmpdir(), "mcp-dbt-env-"));
+      const savedTarget = process.env["DBT_TARGET_TYPE"];
+      const savedHome = process.env["HOME"];
+      process.env["DBT_TARGET_TYPE"] = "postgres";
+      process.env["HOME"] = dir;
+      try {
+        await writeDbtProject(dir);
+        const result = await executeImportModel(dir, "dbt", "dbt Env Model");
+        const yaml = result.content[0]!.text;
+        expect(yaml).toContain("name: dbt Env Model");
+      } finally {
+        if (savedTarget !== undefined) process.env["DBT_TARGET_TYPE"] = savedTarget;
+        else delete process.env["DBT_TARGET_TYPE"];
+        if (savedHome !== undefined) process.env["HOME"] = savedHome;
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe("unknown format", () => {
     it("should return error for unknown format", async () => {
       const result = await executeImportModel(

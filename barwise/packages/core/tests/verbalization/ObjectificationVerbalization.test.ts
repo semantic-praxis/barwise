@@ -6,6 +6,8 @@
  * "{EntityType} is where {primary reading of underlying fact type}."
  */
 import { describe, expect, it } from "vitest";
+import { ObjectifiedFactType } from "../../src/model/ObjectifiedFactType.js";
+import { OrmModel } from "../../src/model/OrmModel.js";
 import { Verbalizer } from "../../src/verbalization/Verbalizer.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
@@ -72,6 +74,68 @@ describe("objectified fact type verbalization", () => {
     expect(objectificationVerbs[0]!.text).toBe(
       "Marriage is where Person marries Person.",
     );
+  });
+
+  it("falls back to the raw object type id when the objectified entity type is not in this domain", () => {
+    // A hand-constructed ObjectifiedFactType, as would arise from a
+    // stale reference rather than model.addObjectifiedFactType (which
+    // validates both ids exist).
+    const model = new ModelBuilder("Test")
+      .withEntityType("Person")
+      .withBinaryFactType("Person marries Person", {
+        role1: { player: "Person", name: "marries" },
+        role2: { player: "Person", name: "is married to" },
+      })
+      .build();
+    const ft = model.factTypes[0]!;
+    const oft = new ObjectifiedFactType({
+      factTypeId: ft.id,
+      objectTypeId: "marriage-in-other-domain",
+    });
+
+    const v = verbalizer.verbalizeObjectifiedFactType(oft, model);
+    expect(v.text).toBe("marriage-in-other-domain is where Person marries Person.");
+  });
+
+  it("falls back to the fact type id when the underlying fact type is not in this domain", () => {
+    const model = new ModelBuilder("Test").withEntityType("Marriage").build();
+    const marriage = model.getObjectTypeByName("Marriage")!;
+    const oft = new ObjectifiedFactType({
+      factTypeId: "fact-in-other-domain",
+      objectTypeId: marriage.id,
+    });
+
+    const v = verbalizer.verbalizeObjectifiedFactType(oft, model);
+    expect(v.text).toBe("Marriage is where fact-in-other-domain.");
+  });
+
+  it("falls back to a role's own name when its player type is not in the model", () => {
+    const model = new OrmModel({ name: "Test" });
+    const person = model.addObjectType({
+      name: "Person",
+      kind: "entity",
+      referenceMode: "person_id",
+    });
+    const marriage = model.addObjectType({
+      name: "Marriage",
+      kind: "entity",
+      referenceMode: "marriage_id",
+    });
+    const ft = model.addFactType(
+      {
+        name: "Person marries Spouse",
+        roles: [
+          { id: "r1", name: "marries", playerId: person.id },
+          { id: "r2", name: "is married to", playerId: "spouse-in-other-domain" },
+        ],
+        readings: ["{0} marries {1}"],
+      },
+      { skipPlayerValidation: true },
+    );
+    const oft = model.addObjectifiedFactType({ factTypeId: ft.id, objectTypeId: marriage.id });
+
+    const v = verbalizer.verbalizeObjectifiedFactType(oft, model);
+    expect(v.text).toBe("Marriage is where Person marries is married to.");
   });
 
   it("handles fact type with different role players", () => {

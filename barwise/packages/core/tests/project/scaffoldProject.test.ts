@@ -23,4 +23,10 @@ describe("scaffoldProject", () => {
   it("rejects an empty name", () => {
     expect(() => scaffoldProject("   ")).toThrow();
   });
+
+  it("rejects a null name (e.g. from an untyped caller)", () => {
+    expect(() => scaffoldProject(null as unknown as string)).toThrow(
+      "Project name must be a non-empty string.",
+    );
+  });
 });

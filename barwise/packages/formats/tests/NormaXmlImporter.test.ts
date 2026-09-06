@@ -516,5 +516,54 @@ describe("NORMA XML Import integration", () => {
         expect((err as NormaImportError).message).toContain("Parse error");
       }
     });
+
+    it("wraps mapping errors with context", () => {
+      // A Role whose RolePlayer references an object type id that was
+      // never declared: parses fine, fails during mapping.
+      const xml = `<?xml version="1.0" encoding="utf-8"?>
+<ormRoot:ORM2 xmlns:orm="http://schemas.neumont.edu/ORM/2006-04/ORMCore" xmlns:ormRoot="http://schemas.neumont.edu/ORM/2006-04/ORMRoot">
+  <orm:ORMModel id="_M1" Name="Broken">
+    <orm:Objects>
+      <orm:EntityType id="_P" Name="Person" _ReferenceMode="id">
+        <orm:PlayedRoles>
+          <orm:Role ref="_R1" />
+        </orm:PlayedRoles>
+      </orm:EntityType>
+    </orm:Objects>
+    <orm:Facts>
+      <orm:Fact id="_F1" _Name="PersonOwnsUnknown">
+        <orm:FactRoles>
+          <orm:Role id="_R1" _IsMandatory="false" _Multiplicity="ZeroToMany" Name="">
+            <orm:RolePlayer ref="_P" />
+          </orm:Role>
+          <orm:Role id="_R2" _IsMandatory="false" _Multiplicity="ZeroToMany" Name="">
+            <orm:RolePlayer ref="_MISSING" />
+          </orm:Role>
+        </orm:FactRoles>
+        <orm:ReadingOrders>
+          <orm:ReadingOrder id="_RO1">
+            <orm:Readings>
+              <orm:Reading id="_RD1">
+                <orm:Data>{0} owns {1}</orm:Data>
+              </orm:Reading>
+            </orm:Readings>
+            <orm:RoleSequence>
+              <orm:Role ref="_R1" />
+              <orm:Role ref="_R2" />
+            </orm:RoleSequence>
+          </orm:ReadingOrder>
+        </orm:ReadingOrders>
+      </orm:Fact>
+    </orm:Facts>
+  </orm:ORMModel>
+</ormRoot:ORM2>`;
+      try {
+        importNormaXml(xml);
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(NormaImportError);
+        expect((err as NormaImportError).message).toContain("Mapping error");
+      }
+    });
   });
 });
