@@ -35,8 +35,6 @@ export type {
   PositionedRoleBox,
   PositionedSubtypeEdge,
 } from "./layout/LayoutTypes.js";
-export { computeLayoutMetrics, type LayoutMetrics } from "./layout/metrics.js";
-
 // Theme constants (also exposed via the ./theme subpath for renderers).
 export * as theme from "./render/theme.js";
 
