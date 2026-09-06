@@ -1,10 +1,10 @@
 # Core's branching load: half is the domain, and the other half goes with a sealed record metamodel
 
-Status: WS0 landing, one defect per PR. barwise-927 (ModelMerge dropped
-independent/defaultValue/note/cardinality and note/derivation) shipped;
-barwise-928..931 remain open. WS1-WS8 not implemented.
+Status: WS0 complete -- barwise-927..931 shipped (PRs #426, #428, #429,
+#432, #434) and closed out; barwise-932 is a WS4 gap, not a defect.
+WS1-WS8 not implemented.
 Created: 2026-09-06
-Last-updated: 2026-09-06 (WS0 status update)
+Last-updated: 2026-09-06
 Tracking: barwise-924 (this review), barwise-x4z (the wider
 functional/type analysis this partly answers), barwise-e8m (the
 functional-core commitment), barwise-923 (the hashModel bug the same
@@ -184,30 +184,30 @@ language, which was a thought experiment in review and not a proposal.
 The clusters, the type looseness each one pays for, and the verdict.
 Line references are to `packages/core/src` at `main` 664b9fe.
 
-| Area / file                                                                                 | Loose type it pays for                                                                              | Verdict                                                                                  |
-| ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `model/ObjectType.ts` (11 optional config fields)                                           | entity and value are one class; four fields are required-or-forbidden by `kind`, enforced by throws | `EntityType \| ValueType` sealed records (WS1)                                           |
-| `model/FactType.ts`, `Role.ts`, `SubtypeFact.ts`, `ObjectifiedFactType.ts`, `Population.ts` | mutable classes with `id?` configs, bare-string references, setters on `ModelElement`               | sealed records; references resolved in the builder (WS1)                                 |
-| `model/Constraint.ts` (`id?`, `modality?`)                                                  | optional in memory though `FactType` always fills `id`; modality defaults at every reader           | `id: string`, `modality: ConstraintModality` on the record; optional on the config (WS1) |
-| `model/OrmModel.ts` (`findRole` scan; `skipPlayerValidation`)                               | id-keyed maps with no adjacency; one boolean makes fragment and whole model the same type           | model as a value; `ModelBuilder` and `ModelFragment` (WS1); adjacency in the graph (WS3) |
-| `model/roleGraph.ts` (`hopsFrom`)                                                           | recomputes adjacency by filtering on every call                                                     | a graph accessor (WS3)                                                                   |
-| `validation/rules/**` (13 prologues, 29 lookups)                                            | `Population.factTypeId`, `Constraint.roleIds: string[]`, partial tuples                             | rules take `ModelGraph` (WS3)                                                            |
-| `validation/rules/structural.ts`, `population/structural.ts`                                | 12 rule ids re-check what construction could have refused                                           | the referential rules move into the builder's diagnostics, same ids (WS1)                |
-| `validation/rules/constraintConsistency.ts`                                                 | no `assertNever`; `value_comparison` absent                                                         | defect barwise-929 (WS0), then exhaustive (WS4)                                          |
-| `validation/rules/population/cardinality.ts:27,36`                                          | `ObjectType.cardinality` has no modality                                                            | gap barwise-932; keep the branch until the field exists                                  |
-| `verbalization/constraints/phase1.ts`, `phase2.ts`                                          | role ids; `ringType: string`; `operator: string`; `JoinOperand[]`                                   | `ResolvedConstraint` from the graph (WS3); narrow signatures (WS1)                       |
-| `verbalization/constraints/phase2.ts:226`                                                   | six ring types on a default arm                                                                     | defect barwise-930 (WS0); eight-row sentence table (WS4)                                 |
-| `validation/rules/population/ring.ts:87`, `counterexample/CounterexampleGenerator.ts:226`   | eight ring types spelled out per consumer; the algebra they share is implicit                       | property table beside `RingType`, one handler per property (WS5)                         |
-| `serialization/OrmYamlSerializer.ts`, `yaml/*.ts`                                           | per-field omit-empty in two directions; `OrmYamlConstraint` lacks `id`                              | field table + root `compact()` (WS2); `fromDocument` feeds the builder (WS1)             |
-| `serialization/yaml/constraint.ts`                                                          | 16-case rename switch spelled twice (four times repo-wide)                                          | codec table (WS2)                                                                        |
-| `project/splitModel.ts`                                                                     | `Raw*` re-parse of a schema-validated document; both round-trips                                    | filter the value's tables, rebuild through the builder (WS8); defect barwise-928 (WS0)   |
-| `diff/elementDiff.ts`, `breakingLevel.ts`                                                   | hand compares; classification by string prefix                                                      | `ElementChange` union from the field table (WS7)                                         |
-| `diff/ModelMerge.ts:62-141, 224-231`                                                        | five copied literals; drops six fields                                                              | defect barwise-927 (WS0); the copy disappears with records (WS1)                         |
-| `diff/synonyms.ts:61-78`                                                                    | `ModelDelta` optional `existing`/`incoming` forcing `!` and `as`                                    | `ModelDelta` discriminated on `kind` (WS7)                                               |
-| `mapping/RelationalMapper.ts`                                                               | `PrimaryKey.columnNames`; `Column.dataType: string`; boolean triple                                 | typed `RelationalSchema` (WS6); `BinaryPattern` union; defect barwise-931                |
-| `mapping/renderers/openapi.ts`, `avro.ts`                                                   | re-parse `Column.dataType`; case lists disagree; unregistered pair                                  | falls out of WS6                                                                         |
-| `counterexample/CounterexampleGenerator.ts:74-107`                                          | 11 `is*` guards, five kinds fall through silently                                                   | `switch` + `assertNever` (WS4)                                                           |
-| `query/evaluate.ts`                                                                         | name-based `not-found` (inherent); `?? id` player fallbacks                                         | keep the first; the second goes with the graph (WS3)                                     |
+| Area / file                                                                                 | Loose type it pays for                                                                                           | Verdict                                                                                  |
+| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `model/ObjectType.ts` (11 optional config fields)                                           | entity and value are one class; four fields are required-or-forbidden by `kind`, enforced by throws              | `EntityType \| ValueType` sealed records (WS1)                                           |
+| `model/FactType.ts`, `Role.ts`, `SubtypeFact.ts`, `ObjectifiedFactType.ts`, `Population.ts` | mutable classes with `id?` configs, bare-string references, setters on `ModelElement`                            | sealed records; references resolved in the builder (WS1)                                 |
+| `model/Constraint.ts` (`id?`, `modality?`)                                                  | optional in memory though `FactType` always fills `id`; modality defaults at every reader                        | `id: string`, `modality: ConstraintModality` on the record; optional on the config (WS1) |
+| `model/OrmModel.ts` (`findRole` scan; `skipPlayerValidation`)                               | id-keyed maps with no adjacency; one boolean makes fragment and whole model the same type                        | model as a value; `ModelBuilder` and `ModelFragment` (WS1); adjacency in the graph (WS3) |
+| `model/roleGraph.ts` (`hopsFrom`)                                                           | recomputes adjacency by filtering on every call                                                                  | a graph accessor (WS3)                                                                   |
+| `validation/rules/**` (13 prologues, 29 lookups)                                            | `Population.factTypeId`, `Constraint.roleIds: string[]`, partial tuples                                          | rules take `ModelGraph` (WS3)                                                            |
+| `validation/rules/structural.ts`, `population/structural.ts`                                | 12 rule ids re-check what construction could have refused                                                        | the referential rules move into the builder's diagnostics, same ids (WS1)                |
+| `validation/rules/constraintConsistency.ts`                                                 | no `assertNever`; `value_comparison` absent                                                                      | defect barwise-929 (WS0), then exhaustive (WS4)                                          |
+| `validation/rules/population/cardinality.ts:27,36`                                          | `ObjectType.cardinality` has no modality                                                                         | gap barwise-932; keep the branch until the field exists                                  |
+| `verbalization/constraints/phase1.ts`, `phase2.ts`                                          | role ids; `ringType: string`; `operator: string`; `JoinOperand[]`                                                | `ResolvedConstraint` from the graph (WS3); narrow signatures (WS1)                       |
+| `verbalization/constraints/phase2.ts:226`                                                   | six ring types on a default arm                                                                                  | defect barwise-930 (WS0); eight-row sentence table (WS4)                                 |
+| `validation/rules/population/ring.ts:87`, `counterexample/CounterexampleGenerator.ts:226`   | eight ring types spelled out per consumer; the algebra they share is implicit                                    | property table beside `RingType`, one handler per property (WS5)                         |
+| `serialization/OrmYamlSerializer.ts`, `yaml/*.ts`                                           | per-field omit-empty in two directions; `OrmYamlConstraint` lacks `id`                                           | field table + root `compact()` (WS2); `fromDocument` feeds the builder (WS1)             |
+| `serialization/yaml/constraint.ts`                                                          | 16-case rename switch spelled twice (four times repo-wide)                                                       | codec table (WS2)                                                                        |
+| `project/splitModel.ts`                                                                     | `Raw*` re-parse of a schema-validated document; both round-trips                                                 | filter the value's tables, rebuild through the builder (WS8); defect barwise-928 (WS0)   |
+| `diff/elementDiff.ts`, `breakingLevel.ts`                                                   | hand compares; classification by string prefix                                                                   | `ElementChange` union from the field table (WS7)                                         |
+| `diff/ModelMerge.ts`                                                                        | was five copied literals dropping six fields; now one `Complete<Config>`-typed projection per kind (barwise-927) | the projection goes when the record spreads (WS1); the diff's half is barwise-934        |
+| `diff/synonyms.ts:61-78`                                                                    | `ModelDelta` optional `existing`/`incoming` forcing `!` and `as`                                                 | `ModelDelta` discriminated on `kind` (WS7)                                               |
+| `mapping/RelationalMapper.ts`                                                               | `PrimaryKey.columnNames`; `Column.dataType: string`; boolean triple                                              | typed `RelationalSchema` (WS6); `BinaryPattern` union; defect barwise-931                |
+| `mapping/renderers/openapi.ts`, `avro.ts`                                                   | re-parse `Column.dataType`; case lists disagree; unregistered pair                                               | falls out of WS6                                                                         |
+| `counterexample/CounterexampleGenerator.ts:74-107`                                          | 11 `is*` guards, five kinds fall through silently                                                                | `switch` + `assertNever` (WS4)                                                           |
+| `query/evaluate.ts`                                                                         | name-based `not-found` (inherent); `?? id` player fallbacks                                                      | keep the first; the second goes with the graph (WS3)                                     |
 
 Not affected and worth saying: `Constraint` is already a sealed union
 of records with a discriminant, and `elementDiff.constraintTypeKey`,
@@ -701,3 +701,13 @@ the entity/value split (yes, as a sealed union, WS1).
   referential structural rules are exactly the set a builder can
   refuse without changing any diagnostic id (WS1). Both are the first
   thing to verify when their workstream is grounded.
+- WS0 landed 2026-09-06 as five PRs from a second session (#426, #428,
+  #429, #432, #434), each with its test seen red first. The review of
+  the first found the 927 projection helpers guarded by a comment only
+  and the role fields still hand-listed; the closeout PR types the
+  literals `Complete<Config>` (`util/complete.ts`), so an unlisted
+  field is a compile error, and derives roles from the projection. The
+  diff half of the 927 symptom (note, independent, defaultValue never
+  compared) is barwise-934, WS7's to absorb. The 927 merge also showed
+  that the spec audit did not match this spec's own "no workstream
+  implemented"; the closeout widens the regex with a gate test.

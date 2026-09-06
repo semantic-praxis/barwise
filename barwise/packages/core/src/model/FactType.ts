@@ -1,3 +1,4 @@
+import type { Complete } from "../util/complete.js";
 import type { Constraint } from "./Constraint.js";
 import { generateId } from "./id.js";
 import { ModelElement } from "./ModelElement.js";
@@ -177,21 +178,29 @@ export class FactType extends ModelElement {
 
 /**
  * Project a FactType back to the config shape that constructed it,
- * listing every field once. Callers that rebuild a fact type (merge,
- * split) spread this and override only what they mean to change, so a
- * field added to `FactTypeConfig` cannot be dropped by a hand-copied
- * literal elsewhere (barwise-927). WS1's sealed records make this
- * redundant -- a spread of the record itself will do the same job.
+ * listing every field once. Callers that rebuild a fact type (the merge
+ * today; WS8's builder-based split once it exists) spread this and
+ * override only what they mean to change, so a field added to
+ * `FactTypeConfig` cannot be dropped by a hand-copied literal elsewhere
+ * (barwise-927). Both literals are typed `Complete<...>` so they cannot
+ * drop a field either: the next config field, on the fact type or on
+ * the role, is a compile error here until it is listed. WS1's sealed
+ * records make this redundant -- a spread of the record itself will do
+ * the same job.
  */
 export function toFactTypeConfig(ft: FactType): FactTypeConfig {
-  return {
+  const config: Complete<FactTypeConfig> = {
     name: ft.name,
     id: ft.id,
-    roles: ft.roles.map((r) => ({ name: r.name, id: r.id, playerId: r.playerId })),
+    roles: ft.roles.map((r) => {
+      const role: Complete<RoleConfig> = { name: r.name, id: r.id, playerId: r.playerId };
+      return role;
+    }),
     readings: ft.readings.map((r) => r.template),
     constraints: ft.constraints,
     definition: ft.definition,
     note: ft.note,
     derivation: ft.derivation,
   };
+  return config;
 }

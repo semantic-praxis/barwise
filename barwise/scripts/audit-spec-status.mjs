@@ -80,9 +80,13 @@ const BASELINE = resolve(REPO_ROOT, "barwise/spec-status-baseline.json");
  * against. That would mean inferring from "workstreams 1 and 2
  * implemented" which ones actually shipped, which no header can settle.
  * This is the identical claim -- nothing was built -- matched wherever
- * it sits.
+ * it sits. "No workstream implemented" is the same claim in the words
+ * two specs used on 2026-09-06, and both sat outside the gate for a
+ * whole workstream of commits until the first PR to land one noticed
+ * (#426, session review); the gate test plants that exact phrasing.
  */
-const CLAIMS_NOTHING_BUILT = /^\s*(draft|proposed|design only)\b|\bno implementation\b/i;
+const CLAIMS_NOTHING_BUILT =
+  /^\s*(draft|proposed|design only)\b|\bno (implementation|workstreams? implemented)\b/i;
 
 const CODE = /\.(ts|tsx|mjs|cjs|js|json|ya?ml|py|sh)$/;
 

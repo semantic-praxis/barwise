@@ -1,3 +1,4 @@
+import type { Complete } from "../util/complete.js";
 import { ModelElement } from "./ModelElement.js";
 
 /**
@@ -292,14 +293,17 @@ export class ObjectType extends ModelElement {
 
 /**
  * Project an ObjectType back to the config shape that constructed it,
- * listing every field once. Callers that rebuild an object type (merge,
- * split) spread this and override only what they mean to change, so a
- * field added to `ObjectTypeConfig` cannot be dropped by a hand-copied
- * literal elsewhere (barwise-927). WS1's sealed records make this
+ * listing every field once. Callers that rebuild an object type (the
+ * merge today; WS8's builder-based split once it exists) spread this
+ * and override only what they mean to change, so a field added to
+ * `ObjectTypeConfig` cannot be dropped by a hand-copied literal
+ * elsewhere (barwise-927). The literal is typed `Complete<...>` so it
+ * cannot drop the field either: the next config field is a compile
+ * error here until it is listed. WS1's sealed records make this
  * redundant -- a spread of the record itself will do the same job.
  */
 export function toObjectTypeConfig(ot: ObjectType): ObjectTypeConfig {
-  return {
+  const config: Complete<ObjectTypeConfig> = {
     name: ot.name,
     id: ot.id,
     kind: ot.kind,
@@ -314,4 +318,5 @@ export function toObjectTypeConfig(ot: ObjectType): ObjectTypeConfig {
     note: ot.note,
     cardinality: ot.cardinality,
   };
+  return config;
 }
