@@ -12,8 +12,8 @@
  * Returns a freshly constructed OrmModel (no mutation of inputs).
  */
 
-import type { FactTypeConfig } from "../model/FactType.js";
-import type { ObjectType } from "../model/ObjectType.js";
+import { type FactTypeConfig, toFactTypeConfig } from "../model/FactType.js";
+import { type ObjectType, toObjectTypeConfig } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
 import type { RoleConfig } from "../model/Role.js";
 import type { Diagnostic } from "../validation/Diagnostic.js";
@@ -59,34 +59,14 @@ export function mergeModels(
     if (delta.kind === "unchanged") {
       // Always keep.
       const ot = delta.existing!;
-      merged.addObjectType({
-        name: ot.name,
-        id: ot.id,
-        kind: ot.kind,
-        referenceMode: ot.referenceMode,
-        definition: ot.definition,
-        sourceContext: ot.sourceContext,
-        valueConstraint: ot.valueConstraint,
-        dataType: ot.dataType,
-        aliases: ot.aliases,
-      });
+      merged.addObjectType(toObjectTypeConfig(ot));
       if (delta.incoming) {
         incomingIdToMergedId.set(delta.incoming.id, ot.id);
       }
     } else if (delta.kind === "added") {
       if (isAccepted) {
         const ot = delta.incoming!;
-        merged.addObjectType({
-          name: ot.name,
-          id: ot.id,
-          kind: ot.kind,
-          referenceMode: ot.referenceMode,
-          definition: ot.definition,
-          sourceContext: ot.sourceContext,
-          valueConstraint: ot.valueConstraint,
-          dataType: ot.dataType,
-          aliases: ot.aliases,
-        });
+        merged.addObjectType(toObjectTypeConfig(ot));
         incomingIdToMergedId.set(ot.id, ot.id);
       }
       // If rejected: simply omit.
@@ -94,17 +74,7 @@ export function mergeModels(
       if (!isAccepted) {
         // Rejected removal -> keep the existing element.
         const ot = delta.existing!;
-        merged.addObjectType({
-          name: ot.name,
-          id: ot.id,
-          kind: ot.kind,
-          referenceMode: ot.referenceMode,
-          definition: ot.definition,
-          sourceContext: ot.sourceContext,
-          valueConstraint: ot.valueConstraint,
-          dataType: ot.dataType,
-          aliases: ot.aliases,
-        });
+        merged.addObjectType(toObjectTypeConfig(ot));
       }
       // If accepted: omit (remove).
     } else if (delta.kind === "modified") {
@@ -114,31 +84,15 @@ export function mergeModels(
         const existingOt = delta.existing!;
         const incomingOt = delta.incoming!;
         merged.addObjectType({
-          name: incomingOt.name,
+          ...toObjectTypeConfig(incomingOt),
           id: existingOt.id,
-          kind: incomingOt.kind,
-          referenceMode: incomingOt.referenceMode,
-          definition: incomingOt.definition,
-          sourceContext: incomingOt.sourceContext,
-          valueConstraint: incomingOt.valueConstraint,
-          dataType: incomingOt.dataType,
           aliases: unionAliases(existingOt, incomingOt),
         });
         incomingIdToMergedId.set(incomingOt.id, existingOt.id);
       } else {
         // Rejected: keep existing as-is.
         const ot = delta.existing!;
-        merged.addObjectType({
-          name: ot.name,
-          id: ot.id,
-          kind: ot.kind,
-          referenceMode: ot.referenceMode,
-          definition: ot.definition,
-          sourceContext: ot.sourceContext,
-          valueConstraint: ot.valueConstraint,
-          dataType: ot.dataType,
-          aliases: ot.aliases,
-        });
+        merged.addObjectType(toObjectTypeConfig(ot));
         if (delta.incoming) {
           incomingIdToMergedId.set(delta.incoming.id, ot.id);
         }
@@ -222,12 +176,10 @@ function addFactTypeToMerged(
   }));
 
   const config: FactTypeConfig = {
-    name: source.name,
+    ...toFactTypeConfig(source),
     id: overrideId ?? source.id,
     roles,
-    readings: source.readings.map((r) => r.template),
     constraints: remapConstraintIds(source.constraints, source, merged, incomingIdToMergedId),
-    definition: source.definition,
   };
 
   merged.addFactType(config);
