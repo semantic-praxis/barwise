@@ -3,14 +3,14 @@
  *
  * Orchestrates per-statement parsing through the cascade:
  * 1. sqlglot structural parsing (optional sidecar, applied by
- *    @barwise/formats before falling back here -- core stays pure)
+ *    @barwise/dbt before falling back here -- core stays pure)
  * 2. Regex-based pattern extraction (always available)
- * 3. LLM fallback (deferred to enrich() phase)
  *
  * When the sqlglot sidecar is unavailable the cascade degrades to
- * regex extraction, which handles common SQL patterns reliably. The
- * LLM fallback is not invoked here -- it is handled by the enrich()
- * method on the format importer.
+ * regex extraction, which handles common SQL patterns reliably. There
+ * is no LLM tier: semantic improvement of a parsed draft is the
+ * optional `ImportFormat.enrich` phase, owned by whichever connector
+ * has an LLM client, and it never reports back through `ParseLevel`.
  */
 
 import { extractSqlPatterns, splitSqlStatements } from "./SqlPatternExtractor.js";

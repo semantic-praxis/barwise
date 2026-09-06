@@ -80,14 +80,59 @@ export function updateManifest(
 /**
  * Hash an ORM model to detect staleness.
  *
- * The model is serialized to YAML and then hashed with SHA-256.
- * Returns the hex digest of the hash.
+ * The model is serialized to YAML, its ids are canonicalized, and the
+ * result is hashed with SHA-256. Returns the hex digest.
+ *
+ * Ids are canonicalized because they are not all authored: every
+ * constraint without an `id` in the source is minted a fresh UUID on
+ * load (`FactType`), so two loads of one file serialize differently on
+ * every such line and hashed differently -- and `barwise lineage
+ * status` reported every export stale on every run for any model with
+ * an id-less constraint (barwise-923). Each id string is replaced by
+ * its order of first appearance, and every reference to it follows
+ * because a reference is the same string. The cost is that renaming an
+ * explicit id, with nothing else changed, does not change the hash;
+ * lineage guards content, and ids are identity plumbing.
  */
 export function hashModel(model: OrmModel): string {
   const serializer = new OrmYamlSerializer();
-  const yamlContent = serializer.serialize(model);
+  const doc: unknown = YAML.parse(serializer.serialize(model));
 
   const hash = createHash("sha256");
-  hash.update(yamlContent);
+  hash.update(JSON.stringify(canonicalizeIds(doc)));
   return hash.digest("hex");
+}
+
+/**
+ * Replace every id value, and every string equal to one, with `#n`
+ * where n is the id's order of first appearance in document order.
+ * Pure over plain YAML data; key order is the serializer's, which is
+ * already deterministic.
+ */
+function canonicalizeIds(doc: unknown): unknown {
+  const ids = new Map<string, string>();
+  const collect = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      node.forEach(collect);
+    } else if (node !== null && typeof node === "object") {
+      for (const [key, value] of Object.entries(node)) {
+        if (key === "id" && typeof value === "string" && !ids.has(value)) {
+          ids.set(value, `#${ids.size + 1}`);
+        }
+        collect(value);
+      }
+    }
+  };
+  const rewrite = (node: unknown): unknown => {
+    if (typeof node === "string") return ids.get(node) ?? node;
+    if (Array.isArray(node)) return node.map(rewrite);
+    if (node !== null && typeof node === "object") {
+      return Object.fromEntries(
+        Object.entries(node).map(([key, value]) => [key, rewrite(value)]),
+      );
+    }
+    return node;
+  };
+  collect(doc);
+  return rewrite(doc);
 }

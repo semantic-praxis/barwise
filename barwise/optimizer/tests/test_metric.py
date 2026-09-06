@@ -318,3 +318,30 @@ def test_scored_excludes_runs_that_produced_no_tallies():
 
     assert log.summary()["evaluations"] == 3
     assert log.summary()["scored"] == 1
+
+
+def test_element_count_crosses_the_cli_boundary_and_reaches_the_summary():
+    # barwise-853: the scorer recorded elementCount as the denominator
+    # tripwire the eval spec names, and nothing on this side read it --
+    # from_json used explicit .get() lookups, so the field vanished
+    # silently rather than loudly.
+    case = CaseScore.from_json(
+        {
+            "caseId": "x",
+            "score": 0.5,
+            "rubricPassed": 3,
+            "rubricTotal": 6,
+            "elementCount": 40,
+        }
+    )
+    assert case.element_count == 40
+
+    log = MetricLog()
+    log.record(case)
+    log.record(CaseScore(case_id="y", score=0.7, rubric_passed=6, rubric_total=6, element_count=4))
+    # A run that produced nothing scorable produced no elements either;
+    # it must not drag the mean toward zero and read as restraint.
+    log.record_failure("z", "unparseable")
+
+    assert log.element_counts == [40, 4]
+    assert log.summary()["meanElementCount"] == 22.0

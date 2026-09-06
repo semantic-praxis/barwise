@@ -146,6 +146,12 @@ parameters, which the mocked-ELK unit tests and (across an ELK version
 bump) the exact goldens cannot. Independent of workstream 1; either order
 works, but both precede tuning.
 
+Implementation note (2026-09-06): the metrics are internal to that gate.
+`computeLayoutMetrics` was also exported from the package index with no
+consumer, which the unwired-capability audit flagged (barwise-857); the
+export is gone and the corpus test imports the module directly. Wiring a
+user-facing report is a separate ask with, so far, no requester.
+
 ### 3. Surface the placement parameters
 
 Move the inline literals into `layoutParams.ts` as named constants with

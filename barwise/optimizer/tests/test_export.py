@@ -447,3 +447,48 @@ def test_the_gating_command_names_the_candidate_not_the_shipped_prompts():
 
     assert "--artifacts out --artifact-version dspy-mipro-minimal-1" in body
     assert "--artifacts packages/llm/prompts" not in body
+
+
+def test_report_shows_the_denominator_each_arm_scored_against():
+    # barwise-853: a model inventing forty elements, half defective,
+    # scored like one inventing four with two defects, and the report
+    # had no column that could show it.
+    body = render_delta_report(
+        candidate_version="dspy-1",
+        shipped={"mean": 0.7},
+        baseline={"mean": 0.7, "meanElementCount": 12.0},
+        candidate={"mean": 0.9, "meanElementCount": 13.0},
+        samples_per_candidate=5,
+        resolvable=0.086,
+        artifact_path=Path("out/x.prompt.yaml"),
+    )
+    assert "mean element count" in body
+    assert "12.0" in body and "13.0" in body
+    assert "denominator" not in body
+
+
+def test_report_flags_a_denominator_that_rose_with_the_score():
+    body = render_delta_report(
+        candidate_version="dspy-1",
+        shipped={"mean": 0.7},
+        baseline={"mean": 0.7, "meanElementCount": 12.0},
+        candidate={"mean": 0.9, "meanElementCount": 30.0},
+        samples_per_candidate=5,
+        resolvable=0.086,
+        artifact_path=Path("out/x.prompt.yaml"),
+    )
+    assert "denominator" in body
+    assert "+150%" in body
+
+
+def test_report_survives_summaries_written_before_element_counts():
+    body = render_delta_report(
+        candidate_version="dspy-1",
+        shipped={"mean": 0.7},
+        baseline={"mean": 0.7},
+        candidate={"mean": 0.9},
+        samples_per_candidate=5,
+        resolvable=0.086,
+        artifact_path=Path("out/x.prompt.yaml"),
+    )
+    assert "mean element count" not in body
