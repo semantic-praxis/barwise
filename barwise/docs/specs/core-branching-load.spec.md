@@ -1,8 +1,9 @@
 # Core's branching load: half is the domain, and the other half goes with a sealed record metamodel
 
 Status: WS0 complete -- barwise-927..931 shipped (PRs #426, #428, #429,
-#432, #434) and closed out; barwise-932 is a WS4 gap, not a defect.
-WS1-WS8 not implemented.
+#432, #434) and closed out; barwise-932 is a WS4 gap, not a defect. WS5
+(ring types as algebra) shipped as barwise-935. WS1-WS4 and WS6-WS8 not
+implemented.
 Created: 2026-09-06
 Last-updated: 2026-09-06
 Tracking: barwise-924 (this review), barwise-x4z (the wider
@@ -531,6 +532,21 @@ vocabulary later is one row plus, at most, one new property.
 Independent of every other workstream and small enough to land first.
 Verbalization is deliberately not on the property axis (see "What
 removes a branch"); its ring fix is WS4's sentence table.
+
+**Shipped (barwise-935).** `RingProperty` and `RING_PROPERTIES` sit
+beside `RingType`; `population/ring.ts` holds one checker per property
+and words findings from a `Record<RingType, ...>` message table;
+`CounterexampleGenerator` holds a witness per property. Three claims
+this spec had argued from reading were checked first and all held:
+asymmetric's two arms are exactly irreflexive plus antisymmetric, their
+conditions are disjoint so the union reproduces the old else-if one
+finding for one, and every witness reproduces from the first-listed
+property. One consequence the draft did not name: findings for a
+population violating a constraint two ways now arrive grouped by
+property rather than interleaved by instance. No test or golden
+observes the order, and no diagnostic message changed. The load-bearing
+ordering is now guarded by a witness-shape test per ring type, watched
+red on a reversed asymmetric row.
 
 ### 6. Typed `RelationalSchema` (provisional: `formats` and `dbt` consumers of `Column` not yet enumerated)
 
