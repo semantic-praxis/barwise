@@ -293,29 +293,53 @@ export class RelationalMapper {
     const targetTable = entityTables.get(targetEntityId);
     if (!sourceTable || !targetTable) return;
 
-    const fkColName = targetTable.primaryKey.columnNames[0]!;
-    // FK column type should match the PK column type of the referenced table.
-    const pkCol = targetTable.columns.find((c) => c.name === fkColName);
-    const fkDataType = pkCol?.dataType ?? "TEXT";
-    // Avoid duplicate column names.
-    const existingNames = new Set(sourceTable.columns.map((c) => c.name));
-    const finalColName = existingNames.has(fkColName)
-      ? `fk_${fkColName}`
-      : fkColName;
-
-    sourceTable.columns.push({
-      name: finalColName,
-      dataType: fkDataType,
-      nullable: !isMandatory,
+    const colNames = this.appendForeignKeyColumns(
+      sourceTable.columns,
+      targetTable,
+      !isMandatory,
       sourceRoleId,
-    });
+      (pkColName) => `fk_${pkColName}`,
+    );
 
     sourceTable.foreignKeys.push({
-      columnNames: [finalColName],
+      columnNames: colNames,
       referencedTable: targetTable.name,
       referencedColumns: [...targetTable.primaryKey.columnNames],
       sourceConstraintId,
     });
+  }
+
+  /**
+   * Add one column per column of the target table's primary key to
+   * `sourceColumns`, disambiguated against its existing names, and
+   * return the new columns' names in the same order as the target's
+   * PK. A target with a composite PK (an objectified entity whose PK
+   * is the composite of its underlying fact type's role columns)
+   * yields one column per PK part, so the FK the caller builds from
+   * the returned names can reference every part instead of silently
+   * truncating to the first (barwise-931).
+   */
+  private appendForeignKeyColumns(
+    sourceColumns: Column[],
+    targetTable: MutableTable,
+    nullable: boolean,
+    sourceRoleId: string | undefined,
+    disambiguate: (pkColName: string) => string,
+  ): string[] {
+    const localNames: string[] = [];
+    for (const pkColName of targetTable.primaryKey.columnNames) {
+      const pkCol = targetTable.columns.find((c) => c.name === pkColName);
+      const existingNames = new Set(sourceColumns.map((c) => c.name));
+      const localName = existingNames.has(pkColName) ? disambiguate(pkColName) : pkColName;
+      sourceColumns.push({
+        name: localName,
+        dataType: pkCol?.dataType ?? "TEXT",
+        nullable,
+        sourceRoleId,
+      });
+      localNames.push(localName);
+    }
+    return localNames;
   }
 
   /**
@@ -338,27 +362,20 @@ export class RelationalMapper {
       const targetTable = entityTables.get(player.id);
       if (!targetTable) continue;
 
-      const refCol = targetTable.primaryKey.columnNames[0]!;
-      const pkCol = targetTable.columns.find((c) => c.name === refCol);
-      const colDataType = pkCol?.dataType ?? "TEXT";
       // Disambiguate if the same entity appears in multiple roles.
-      const usedNames = new Set(columns.map((c) => c.name));
-      const colName = usedNames.has(refCol)
-        ? `${toSnake(role.name)}_${refCol}`
-        : refCol;
-
-      columns.push({
-        name: colName,
-        dataType: colDataType,
-        nullable: false,
-        sourceRoleId: role.id,
-      });
-      pkColNames.push(colName);
+      const colNames = this.appendForeignKeyColumns(
+        columns,
+        targetTable,
+        false,
+        role.id,
+        (pkColName) => `${toSnake(role.name)}_${pkColName}`,
+      );
+      pkColNames.push(...colNames);
 
       foreignKeys.push({
-        columnNames: [colName],
+        columnNames: colNames,
         referencedTable: targetTable.name,
-        referencedColumns: [refCol],
+        referencedColumns: [...targetTable.primaryKey.columnNames],
       });
     }
 
@@ -387,36 +404,51 @@ export class RelationalMapper {
     const supertypeTable = entityTables.get(sf.supertypeId);
     if (!subtypeTable || !supertypeTable) return;
 
-    const supertypePkCol = supertypeTable.primaryKey.columnNames[0]!;
-    const subtypePkCol = subtypeTable.primaryKey.columnNames[0]!;
-
     if (sf.providesIdentification) {
-      // Shared PK pattern: the subtype's PK IS the FK to the supertype.
-      // The PK column already exists. Add a FK constraint on it.
+      // Shared PK pattern: the subtype's existing PK column is the
+      // first FK component, unchanged from before. A supertype with a
+      // composite PK (an objectified entity) needs the shared key to
+      // extend to the rest of that composite too, rather than
+      // truncating to the first column (barwise-931) -- one new
+      // column per additional supertype PK part, and the subtype's own
+      // PK grows to match so the shared key is actually shared.
+      const [firstSupertypeCol, ...restSupertypeCols] = supertypeTable.primaryKey.columnNames;
+      if (firstSupertypeCol === undefined) return;
+
+      const sharedCols = [subtypeTable.primaryKey.columnNames[0]!];
+      for (const supertypeCol of restSupertypeCols) {
+        const pkCol = supertypeTable.columns.find((c) => c.name === supertypeCol);
+        const existingNames = new Set(subtypeTable.columns.map((c) => c.name));
+        const localName = existingNames.has(supertypeCol) ? `fk_${supertypeCol}` : supertypeCol;
+        subtypeTable.columns.push({
+          name: localName,
+          dataType: pkCol?.dataType ?? "TEXT",
+          nullable: false,
+        });
+        sharedCols.push(localName);
+      }
+      subtypeTable.primaryKey = { columnNames: sharedCols };
+
       subtypeTable.foreignKeys.push({
-        columnNames: [subtypePkCol],
+        columnNames: sharedCols,
         referencedTable: supertypeTable.name,
-        referencedColumns: [supertypePkCol],
+        referencedColumns: [firstSupertypeCol, ...restSupertypeCols],
         sourceConstraintId: sf.id,
       });
     } else {
-      // Separate identification: add a nullable FK column to the supertype.
-      const existingNames = new Set(subtypeTable.columns.map((c) => c.name));
-      const fkColName = existingNames.has(supertypePkCol)
-        ? `fk_${supertypePkCol}`
-        : supertypePkCol;
-      const pkCol = supertypeTable.columns.find((c) => c.name === supertypePkCol);
-      const fkDataType = pkCol?.dataType ?? "TEXT";
-
-      subtypeTable.columns.push({
-        name: fkColName,
-        dataType: fkDataType,
-        nullable: false,
-      });
+      // Separate identification: add a nullable FK column per
+      // supertype PK column.
+      const colNames = this.appendForeignKeyColumns(
+        subtypeTable.columns,
+        supertypeTable,
+        false,
+        undefined,
+        (pkColName) => `fk_${pkColName}`,
+      );
       subtypeTable.foreignKeys.push({
-        columnNames: [fkColName],
+        columnNames: colNames,
         referencedTable: supertypeTable.name,
-        referencedColumns: [supertypePkCol],
+        referencedColumns: [...supertypeTable.primaryKey.columnNames],
         sourceConstraintId: sf.id,
       });
     }
@@ -445,29 +477,20 @@ export class RelationalMapper {
       const targetTable = entityTables.get(player.id);
       if (!targetTable) continue;
 
-      const refCol = targetTable.primaryKey.columnNames[0]!;
       // Disambiguate if the same entity appears in multiple roles.
-      const usedNames = new Set(entityTable.columns.map((c) => c.name));
-      const colName = usedNames.has(refCol)
-        ? `${toSnake(role.name)}_${refCol}`
-        : refCol;
-
-      const pkCol = targetTable.columns.find((c) => c.name === refCol);
-      const colDataType = pkCol?.dataType ?? "TEXT";
-
-      entityTable.columns.push({
-        name: colName,
-        dataType: colDataType,
-        nullable: false,
-        sourceRoleId: role.id,
-      });
-
-      fkColNames.push(colName);
+      const colNames = this.appendForeignKeyColumns(
+        entityTable.columns,
+        targetTable,
+        false,
+        role.id,
+        (pkColName) => `${toSnake(role.name)}_${pkColName}`,
+      );
+      fkColNames.push(...colNames);
 
       entityTable.foreignKeys.push({
-        columnNames: [colName],
+        columnNames: colNames,
         referencedTable: targetTable.name,
-        referencedColumns: [refCol],
+        referencedColumns: [...targetTable.primaryKey.columnNames],
         sourceConstraintId: factType.id,
       });
     }

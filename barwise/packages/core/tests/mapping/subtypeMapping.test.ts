@@ -106,6 +106,60 @@ describe("subtype relational mapping", () => {
     });
   });
 
+  describe("objectified entity with a composite PK used as a supertype (barwise-931)", () => {
+    /**
+     * "Employment" objectifies "Company employs Person", so its PK is the
+     * composite [company_id, person_id] (objectifiedMapping.test.ts's
+     * "sets PK to composite of FK columns"). "TemporaryEmployment" is then
+     * declared a subtype of "Employment". Before the fix, mapSubtypeFact
+     * read only primaryKey.columnNames[0], so the subtype's FK silently
+     * referenced company_id alone and dropped person_id -- a composite key
+     * truncated to its first column.
+     */
+    function buildCompositeSupertypeModel(providesIdentification: boolean) {
+      return new ModelBuilder("Test")
+        .withEntityType("Company", { referenceMode: "company_id" })
+        .withEntityType("Person", { referenceMode: "person_id" })
+        .withEntityType("Employment", { referenceMode: "employment_id" })
+        .withEntityType("TemporaryEmployment", { referenceMode: "temp_employment_id" })
+        .withBinaryFactType("Company employs Person", {
+          role1: { player: "Company", name: "employs" },
+          role2: { player: "Person", name: "works for" },
+        })
+        .withObjectifiedFactType("Company employs Person", "Employment")
+        .withSubtypeFact("TemporaryEmployment", "Employment", { providesIdentification })
+        .build();
+    }
+
+    it("shared PK: the subtype's FK to Employment covers both composite PK columns", () => {
+      const model = buildCompositeSupertypeModel(true);
+      const schema = mapper.map(model);
+      const employmentTable = schema.tables.find((t) => t.name === "employment")!;
+      expect(employmentTable.primaryKey.columnNames).toEqual(["company_id", "person_id"]);
+
+      const tempTable = schema.tables.find((t) => t.name === "temporary_employment")!;
+      const fk = tempTable.foreignKeys.find((f) => f.referencedTable === "employment")!;
+      expect(fk).toBeDefined();
+      expect(fk.referencedColumns).toEqual(["company_id", "person_id"]);
+      expect(fk.columnNames).toHaveLength(fk.referencedColumns.length);
+      // The subtype's own PK must extend to match, so the shared key is
+      // actually shared rather than half-dropped.
+      expect(tempTable.primaryKey.columnNames).toEqual(fk.columnNames);
+    });
+
+    it("separate identification: the subtype's FK to Employment covers both composite PK columns", () => {
+      const model = buildCompositeSupertypeModel(false);
+      const schema = mapper.map(model);
+
+      const tempTable = schema.tables.find((t) => t.name === "temporary_employment")!;
+      const fk = tempTable.foreignKeys.find((f) => f.referencedTable === "employment")!;
+      expect(fk).toBeDefined();
+      expect(fk.referencedColumns).toEqual(["company_id", "person_id"]);
+      expect(fk.columnNames).toHaveLength(2);
+      expect(new Set(fk.columnNames).size).toBe(2);
+    });
+  });
+
   describe("DDL rendering with subtype FK", () => {
     it("renders FK constraint for subtype relationship", () => {
       const model = new ModelBuilder("Test")
