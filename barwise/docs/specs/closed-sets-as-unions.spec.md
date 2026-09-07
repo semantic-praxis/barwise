@@ -1,8 +1,8 @@
 # Closed sets belong in the type system: rule ids and change descriptions as unions
 
-Status: WS1 and WS2 implemented (barwise-946 closed); WS3 not started
+Status: implemented (WS1, WS2 and WS3; barwise-946 closed)
 Created: 2026-09-07
-Last-updated: 2026-09-07 (WS1 shipped; WS2 scope revised and shipped)
+Last-updated: 2026-09-07 (WS1, WS2 and WS3 shipped)
 Tracking: barwise-947 (this spec); barwise-946 (breaking-change
 severity string-matches prose);
 the Evidenced-sites section of `core-branching-load.spec.md`, whose

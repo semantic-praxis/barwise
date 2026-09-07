@@ -1,4 +1,5 @@
 // Diff and merge.
+export { type ChangeDescription, describeChange, type RoleSummary } from "./changeDescription.js";
 export {
   type BreakingLevel,
   type DefinitionDelta,

@@ -1,84 +1,98 @@
 /**
- * Breaking-change classification: maps a delta's kind and change
- * descriptions to a safe / caution / breaking severity.
+ * Breaking-change classification: maps a delta's kind and its changes
+ * to a safe / caution / breaking severity.
+ *
+ * The table below is total, and the compiler says so: a variant added
+ * to `ChangeDescription` without a row here is a missing key in
+ * `Record<ChangeKind, BreakingLevel>` and does not build. That is what
+ * makes this module and `elementDiff.ts` unable to drift -- they used
+ * to be joined only by the exact spelling of a sentence, and had
+ * already drifted apart (barwise-946). There is no fallback: a change
+ * whose level nobody decided cannot exist, rather than silently
+ * reading `caution`.
+ *
+ * A table rather than a switch because it is also the catalogue --
+ * `CHANGE_KINDS` is derived from it rather than listed again, the same
+ * shape the validation rule registry uses next door.
  */
+import type { ChangeDescription, ChangeKind } from "./changeDescription.js";
 import type { BreakingLevel, DeltaKind } from "./deltas.js";
 
 /**
- * Classify one change description, or return undefined when the string
- * is not one this module knows.
+ * How risky each kind of change is for a downstream consumer.
  *
- * Separating "unrecognized" from "deliberately caution" is what makes
- * the drift between this module and `elementDiff.ts` testable at all:
- * both used to be the literal `"caution"`, so a description nobody had
- * classified was indistinguishable from one classified as caution on
- * purpose, and four of them were silently taking the fallback
- * (barwise-946). `classifyBreakingLevel` still applies caution as the
- * default, so behaviour is unchanged for any string that remains
- * unknown. Exported for the drift test; not re-exported from
- * `diff/index.ts`, so it stays internal to the package.
+ * Safe changes alter documentation or naming, not the shape anything
+ * binds to. Breaking changes alter that shape. Caution sits between:
+ * the shape survives, but which populations are legal -- or what a
+ * generated schema contains -- does not.
  */
-export function classifyKnownChange(change: string): BreakingLevel | undefined {
-  // Safe: definition, note, aliases, source context, readings, role names.
-  if (change === "definition changed") return "safe";
-  if (change === "note changed") return "safe";
-  if (change === "aliases changed") return "safe";
-  if (change.startsWith("source context:")) return "safe";
-  if (change === "readings changed") return "safe";
-  if (/^role \d+: name /.test(change)) return "safe";
-  // A standalone definition's text and its bounded context are the
-  // ubiquitous-language entries' equivalents of an object type's
-  // `definition` and `sourceContext`, which are safe above. They read
-  // `caution` until now only because the classifier knew the object
-  // type's spelling and not this one -- the drift barwise-946 names.
-  if (change === "definition text changed") return "safe";
-  if (change.startsWith("context:")) return "safe";
+const CHANGE_LEVEL = {
+  // Documentation, naming and aliasing. A standalone definition's text
+  // and context are the ubiquitous-language equivalents of an object
+  // type's `definition` and `sourceContext`, and read the same level as
+  // them -- the pairing barwise-946 found broken.
+  definition: "safe",
+  definitionText: "safe",
+  note: "safe",
+  aliases: "safe",
+  sourceContext: "safe",
+  context: "safe",
+  readings: "safe",
+  roleName: "safe",
 
-  // Breaking: kind change, arity change, role player change.
-  if (change.startsWith("kind:")) return "breaking";
-  if (change.startsWith("arity:")) return "breaking";
-  if (/^role \d+: player /.test(change)) return "breaking";
+  // The shape a consumer binds to.
+  kind: "breaking",
+  arity: "breaking",
+  rolePlayer: "breaking",
 
-  // Caution: data type, reference mode, value constraint, constraints.
-  if (
-    change.startsWith("data type:") || change.startsWith("data type added")
-    || change.startsWith("data type removed")
-  ) return "caution";
-  if (change.startsWith("reference mode:")) return "caution";
-  if (change === "value constraint changed") return "caution";
-  // Independence changes which populations are legal; a default value
-  // reaches generated schemas. Both land on caution explicitly rather than
-  // through the fallback below, so the intent is readable (barwise-934).
-  if (change.startsWith("independent:")) return "caution";
-  if (change.startsWith("default value:")) return "caution";
-  if (change.startsWith("constraints added")) return "caution";
-  if (change.startsWith("constraints removed")) return "caution";
-  // Both were reaching the caution fallback, so the verdict is
-  // unchanged and only the intent is new. A cardinality bound and a
-  // derivation rule each decide which populations are legal, which is
-  // the reason `value constraint changed` and `independent:` are
-  // caution rather than safe; a derivation additionally decides what a
-  // derived fact type's population contains, without changing the
-  // shape a consumer binds to, which is what would make it breaking.
-  if (change === "cardinality changed") return "caution";
-  if (change === "derivation changed") return "caution";
+  // Which populations are legal, or what a generated schema carries. A
+  // reference mode and a data type reach generated schemas; a value
+  // constraint, a cardinality bound, an independence flag and a
+  // derivation each decide which populations a model admits. A
+  // derivation additionally decides what a derived fact type's
+  // population contains, without changing the shape a consumer binds to
+  // -- which is what would make it breaking.
+  referenceMode: "caution",
+  valueConstraint: "caution",
+  cardinality: "caution",
+  independent: "caution",
+  defaultValue: "caution",
+  dataTypeChanged: "caution",
+  dataTypeAdded: "caution",
+  dataTypeRemoved: "caution",
+  constraintsAdded: "caution",
+  constraintsRemoved: "caution",
+  derivation: "caution",
+} as const satisfies Record<ChangeKind, BreakingLevel>;
 
-  return undefined;
+/**
+ * Every kind of change the diff can emit.
+ *
+ * Derived from the classification table rather than listed a second
+ * time, so the two cannot disagree about what exists.
+ */
+export const CHANGE_KINDS = Object.keys(CHANGE_LEVEL) as readonly ChangeKind[];
+
+/** How risky one change is for a downstream consumer. */
+export function classifyChange(change: ChangeDescription): BreakingLevel {
+  return CHANGE_LEVEL[change.change];
 }
 
 /**
  * Compute the breaking level for a delta based on its kind and changes.
  * The most severe level among all changes wins.
  */
-export function classifyBreakingLevel(kind: DeltaKind, changes: readonly string[]): BreakingLevel {
+export function classifyBreakingLevel(
+  kind: DeltaKind,
+  changes: readonly ChangeDescription[],
+): BreakingLevel {
   if (kind === "unchanged" || kind === "added") return "safe";
   if (kind === "removed") return "breaking";
 
   // Modified: classify each change and take the most severe.
   let level: BreakingLevel = "safe";
   for (const change of changes) {
-    // Unknown descriptions default to caution, as they always have.
-    const changeLevel = classifyKnownChange(change) ?? "caution";
+    const changeLevel = classifyChange(change);
     if (changeLevel === "breaking") return "breaking";
     if (changeLevel === "caution") level = "caution";
   }

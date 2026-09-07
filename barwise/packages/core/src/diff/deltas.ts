@@ -4,45 +4,64 @@
 import type { Definition } from "../model/Definition.js";
 import type { FactType } from "../model/FactType.js";
 import type { ObjectType } from "../model/ObjectType.js";
+import type { ChangeDescription } from "./changeDescription.js";
 
 export type DeltaKind = "added" | "removed" | "modified" | "unchanged";
 
 export type BreakingLevel = "safe" | "caution" | "breaking";
 
-export interface ObjectTypeDelta {
+/**
+ * What every delta carries regardless of which element it is about.
+ *
+ * Shared rather than restated three times: the three element deltas
+ * have to agree on these fields, and WS3 adding `changes` to all three
+ * is exactly the kind of edit where one of them gets missed.
+ */
+interface DeltaCommon {
   readonly kind: DeltaKind;
+  /**
+   * What changed, as data (empty for add/remove).
+   *
+   * This is the authority; `changeDescriptions` is rendered from it.
+   * Breaking-level classification reads these variants, so a change the
+   * diff can emit and nobody classified is a compile error rather than
+   * a silent `caution` (barwise-946).
+   */
+  readonly changes: readonly ChangeDescription[];
+  /**
+   * The same changes as the sentences every surface displays.
+   *
+   * Derived from `changes` once, at diff time, by `describeChange`.
+   * Kept because the CLI's output, the MCP tool's JSON and the VS Code
+   * summary all read it; making the structured form available is a
+   * separate decision from changing what any of them shows.
+   */
+  readonly changeDescriptions: readonly string[];
+  /** How risky this change is for downstream consumers. */
+  readonly breakingLevel: BreakingLevel;
+}
+
+export interface ObjectTypeDelta extends DeltaCommon {
   readonly elementType: "object_type";
   readonly name: string;
   /** Present for modified, removed, unchanged. */
   readonly existing?: ObjectType;
   /** Present for added, modified, unchanged. */
   readonly incoming?: ObjectType;
-  /** Human-readable descriptions of what changed (empty for add/remove). */
-  readonly changeDescriptions: readonly string[];
-  /** How risky this change is for downstream consumers. */
-  readonly breakingLevel: BreakingLevel;
 }
 
-export interface FactTypeDelta {
-  readonly kind: DeltaKind;
+export interface FactTypeDelta extends DeltaCommon {
   readonly elementType: "fact_type";
   readonly name: string;
   readonly existing?: FactType;
   readonly incoming?: FactType;
-  readonly changeDescriptions: readonly string[];
-  /** How risky this change is for downstream consumers. */
-  readonly breakingLevel: BreakingLevel;
 }
 
-export interface DefinitionDelta {
-  readonly kind: DeltaKind;
+export interface DefinitionDelta extends DeltaCommon {
   readonly elementType: "definition";
   readonly term: string;
   readonly existing?: Definition;
   readonly incoming?: Definition;
-  readonly changeDescriptions: readonly string[];
-  /** How risky this change is for downstream consumers. */
-  readonly breakingLevel: BreakingLevel;
 }
 
 export type ModelDelta = ObjectTypeDelta | FactTypeDelta | DefinitionDelta;
