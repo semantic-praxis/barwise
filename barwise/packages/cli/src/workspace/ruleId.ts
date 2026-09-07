@@ -17,10 +17,14 @@
  * The `Record` is the completeness idiom core uses, kept here so this
  * registry earns the same guarantee: the union is derived from it, and
  * a descriptor is required rather than optional, so an identifier
- * cannot be added without being described. Only the type is exported --
- * a runtime list and a lookup would have no consumer yet, and knip is
- * right to say so; they belong with whatever first needs them, most
- * likely the SARIF exporter (barwise-948).
+ * cannot be added without being described.
+ *
+ * The descriptor is read rather than merely declared: the emit site
+ * takes its severity from here instead of restating it, so the entry is
+ * load-bearing and the severity has one home. Two gates said so when it
+ * was not -- knip called the lookup an unused export, and eslint called
+ * the record a value used only as a type. A registry nothing reads is
+ * documentation in a `const`, and they were right.
  */
 
 import type { RuleDescriptor } from "@barwise/core";
@@ -35,3 +39,8 @@ const CLI_RULE_DESCRIPTORS = {
 
 /** Every rule identifier the CLI mints itself. */
 export type CliRuleId = keyof typeof CLI_RULE_DESCRIPTORS;
+
+/** The descriptor for a CLI-minted rule identifier. */
+export function cliRuleDescriptor(id: CliRuleId): RuleDescriptor {
+  return CLI_RULE_DESCRIPTORS[id];
+}
