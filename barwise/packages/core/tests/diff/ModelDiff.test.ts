@@ -1368,6 +1368,104 @@ describe("diffModels", () => {
     expect(delta!.changeDescriptions).toContain("cardinality changed");
   });
 
+  // barwise-934: the diff compared eight of an object type's fields and
+  // not these three, so a model whose only edit was one of them diffed as
+  // "unchanged". After barwise-927 taught the merge to carry the existing
+  // element forward, that made the incoming value unreachable through
+  // every surface: no delta to accept, so the edit could not be merged.
+  it("detects an object-type note change", () => {
+    const make = (note: string) => {
+      const m = new OrmModel({ name: "Test" });
+      m.addObjectType({ name: "Department", kind: "entity", referenceMode: "dept_id", note });
+      return m;
+    };
+    const result = diffModels(make("first"), make("second"));
+    const delta = result.deltas.find((d) => d.kind === "modified" && d.name === "Department");
+    expect(delta).toBeDefined();
+    expect(delta!.changeDescriptions).toContain("note changed");
+    // Free text about the model, not a change to what the model permits.
+    expect(delta!.breakingLevel).toBe("safe");
+  });
+
+  it("detects an object-type independence change", () => {
+    const make = (independent: boolean) => {
+      const m = new OrmModel({ name: "Test" });
+      m.addObjectType({
+        name: "Department",
+        kind: "entity",
+        referenceMode: "dept_id",
+        independent,
+      });
+      return m;
+    };
+    const result = diffModels(make(false), make(true));
+    const delta = result.deltas.find((d) => d.kind === "modified" && d.name === "Department");
+    expect(delta).toBeDefined();
+    expect(delta!.changeDescriptions).toContain("independent: false -> true");
+    // Changes which populations are legal, so a consumer should look.
+    expect(delta!.breakingLevel).toBe("caution");
+  });
+
+  it("detects an object-type default value change", () => {
+    const make = (defaultValue: string) => {
+      const m = new OrmModel({ name: "Test" });
+      m.addObjectType({ name: "Amount", kind: "value", dataType: { name: "money" }, defaultValue });
+      return m;
+    };
+    const result = diffModels(make("0"), make("1"));
+    const delta = result.deltas.find((d) => d.kind === "modified" && d.name === "Amount");
+    expect(delta).toBeDefined();
+    expect(delta!.changeDescriptions).toContain('default value: "0" -> "1"');
+    expect(delta!.breakingLevel).toBe("caution");
+  });
+
+  // Found while grounding barwise-934: the value-constraint comparison read
+  // `values` and never `ranges`, so a narrowed range was invisible for the
+  // same reason and with a worse consequence -- it changes what the model
+  // permits.
+  it("detects a value-constraint range change when the enumerated values match", () => {
+    const make = (max: string) => {
+      const m = new OrmModel({ name: "Test" });
+      m.addObjectType({
+        name: "Rating",
+        kind: "value",
+        dataType: { name: "integer" },
+        valueConstraint: { values: [], ranges: [{ min: "1", max }] },
+      });
+      return m;
+    };
+    const result = diffModels(make("10"), make("5"));
+    const delta = result.deltas.find((d) => d.kind === "modified" && d.name === "Rating");
+    expect(delta).toBeDefined();
+    expect(delta!.changeDescriptions).toContain("value constraint changed");
+  });
+
+  it("detects a fact-type note change", () => {
+    const make = (note: string) => {
+      const m = new OrmModel({ name: "Test" });
+      const order = m.addObjectType({ name: "Order", kind: "entity", referenceMode: "order_id" });
+      const total = m.addObjectType({ name: "TotalPrice", kind: "value" });
+      m.addFactType({
+        id: "ft-1",
+        name: "Order has TotalPrice",
+        roles: [
+          { name: "has", playerId: order.id, id: "r1" },
+          { name: "of", playerId: total.id, id: "r2" },
+        ],
+        readings: ["{0} has {1}"],
+        note,
+      });
+      return m;
+    };
+    const result = diffModels(make("first"), make("second"));
+    const delta = result.deltas.find((d) =>
+      d.kind === "modified" && d.name === "Order has TotalPrice"
+    );
+    expect(delta).toBeDefined();
+    expect(delta!.changeDescriptions).toContain("note changed");
+    expect(delta!.breakingLevel).toBe("safe");
+  });
+
   it("detects a fact-type derivation change", () => {
     const make = (expression: string) => {
       const m = new OrmModel({ name: "Test" });

@@ -6,7 +6,7 @@
 import type { Constraint, JoinOperand } from "../model/Constraint.js";
 import type { Definition } from "../model/Definition.js";
 import type { DerivationRule, FactType } from "../model/FactType.js";
-import type { DataTypeDef, ObjectType } from "../model/ObjectType.js";
+import type { DataTypeDef, ObjectType, ValueConstraintDef } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { Role } from "../model/Role.js";
 
@@ -35,9 +35,7 @@ export function diffObjectType(
     );
   }
 
-  const aVals = a.valueConstraint?.values.slice().sort().join(",") ?? "";
-  const bVals = b.valueConstraint?.values.slice().sort().join(",") ?? "";
-  if (aVals !== bVals) {
+  if (valueConstraintKey(a.valueConstraint) !== valueConstraintKey(b.valueConstraint)) {
     changes.push("value constraint changed");
   }
 
@@ -45,6 +43,18 @@ export function diffObjectType(
   const bCard = b.cardinality ? `${b.cardinality.min}..${b.cardinality.max}` : "";
   if (aCard !== bCard) {
     changes.push("cardinality changed");
+  }
+
+  if ((a.note ?? "") !== (b.note ?? "")) {
+    changes.push("note changed");
+  }
+  if (a.independent !== b.independent) {
+    changes.push(`independent: ${a.independent} -> ${b.independent}`);
+  }
+  if ((a.defaultValue ?? "") !== (b.defaultValue ?? "")) {
+    changes.push(
+      `default value: "${a.defaultValue ?? "(none)"}" -> "${b.defaultValue ?? "(none)"}"`,
+    );
   }
 
   // Aliases comparison (order-insensitive).
@@ -129,7 +139,32 @@ export function diffFactType(
     changes.push("derivation changed");
   }
 
+  if ((a.note ?? "") !== (b.note ?? "")) {
+    changes.push("note changed");
+  }
+
   return changes;
+}
+
+/**
+ * A stable key for a value constraint, order-insensitive on both halves.
+ *
+ * Both halves: the comparison read `values` alone until barwise-934, so a
+ * narrowed range between two models with the same enumerated values --
+ * `1..10` becoming `1..5` -- was invisible, which is the one omission here
+ * that changed what the model permits rather than what it documents.
+ */
+function valueConstraintKey(vc: ValueConstraintDef | undefined): string {
+  if (!vc) return "";
+  const values = vc.values.slice().sort().join(",");
+  const ranges = (vc.ranges ?? [])
+    .map((r) =>
+      `${r.minInclusive === false ? "(" : "["}${r.min ?? ""}..${r.max ?? ""}`
+      + `${r.maxInclusive === false ? ")" : "]"}`
+    )
+    .sort()
+    .join(",");
+  return `${values}|${ranges}`;
 }
 
 /** A stable key for a derivation rule, or "" when absent (asserted). */
