@@ -2,6 +2,7 @@
 export {
   type CardinalityConstraint,
   type Constraint,
+  CONSTRAINT_TYPES,
   type ConstraintBase,
   type ConstraintModality,
   type DisjunctiveMandatoryConstraint,
