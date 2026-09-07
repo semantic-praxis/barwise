@@ -77,6 +77,16 @@ In scope, stated as requirements:
   again, the system shall produce the same YAML text as the first
   serialization, and `hashModel` of the deserialized model shall equal
   `hashModel(m)`.
+- When a generated model is deserialized from its own serialization,
+  `toObjectTypeConfig` and `toFactTypeConfig` of every element shall
+  deep-equal the originals' projections, ids aside, after the
+  serializer's own normalisation (an empty `note`, `independent: false`,
+  `sample: false` and a derivation's default storage all read back as
+  absent). The hash alone cannot see this: `hashModel` hashes what the
+  serializer writes, so a config field the serializer forgets is
+  invisible to it. The projections are typed `Complete<Config>`, so the
+  compiler makes them enumerate every field, and this clause fails the
+  day a field is added to a config and not to its serializer.
 - When a generated model is diffed against itself, every delta shall
   have kind `unchanged`; and when it is merged with itself over those
   deltas with an empty accepted set, the merged model's `hashModel`
@@ -127,7 +137,8 @@ Out of scope, deliberately:
 | `core/tests/laws/sample.law.test.ts`                         | does not exist                                              | new (WS4)                                                 |
 | `core/tests/laws/mapper.law.test.ts`                         | does not exist                                              | new (WS5)                                                 |
 | `core/src/lineage/manifest.ts` (`hashModel`)                 | id-insensitive content hash                                 | untouched; the laws' equality                             |
-| `core/src/serialization/OrmYamlSerializer.ts`                | `serialize` / `deserialize`                                 | untouched                                                 |
+| `core/src/serialization/OrmYamlSerializer.ts`, `yaml/*.ts`   | `serialize` / `deserialize`; per-element field lists        | untouched; the projection clause is their drift guard     |
+| `core/src/model/ObjectType.ts`, `FactType.ts` (`to*Config`)  | `Complete<Config>` projections (barwise-927)                | untouched; the projection clause reads them               |
 | `core/src/counterexample/*`, `validation/rules/population/*` | pure over the model                                         | untouched                                                 |
 | `core/src/mapping/RelationalMapper.ts`                       | no throw sites; FK columns fixed in c185df6                 | untouched                                                 |
 | `core/tests/integration/roundTrip.test.ts`                   | fixture round trips                                         | stays: readable record of named cases                     |
@@ -220,8 +231,13 @@ every optional field, fact types of arity one to three with readings
 carrying the right placeholders, constraints of every kind the model
 admits, subtype facts, objectified fact types, populations both
 significant and sample, definitions and a diagram layout, all with
-small size bounds. Ship the serialization law with it so the generator
-is exercised by a law from its first commit.
+small size bounds. Ship the serialization law with it, both clauses (text idempotence
+and projection equality), so the generator is exercised by a law from
+its first commit. The projection clause needs a normaliser in the test
+that applies the serializer's own conflations to the original config
+before comparing; keep it beside the arbitrary, and keep it to the
+four conflations named under Scope, so a fifth one added to the
+serializer fails the law instead of being absorbed.
 
 Acceptance, in EARS form: when the generator runs for the fixed
 count, the system shall have produced at least one model with an
@@ -337,6 +353,12 @@ mutation check for this workstream reverts c185df6's
 - If a law fails on a case the reviewer judges correct behaviour, the
   law is wrong, not the code: rewrite the law and record why in this
   spec.
+- The serializer's field lists (`yaml/objectType.ts`, `yaml/factType.ts`,
+  `yaml/population.ts`) are copies of the config interfaces with no
+  parity entry and no test comparing them. The projection clause of the
+  serialization law is the drift guard this spec supplies; until WS1
+  lands, a field added to a config and missed by its serializer is
+  dropped on save with nothing failing.
 - The full existing suite stays green through every workstream;
   no fixture test is removed. Each workstream is one PR, followed by
   `npm run build` and `npm run test` from `barwise/`.
