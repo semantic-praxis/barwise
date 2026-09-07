@@ -39,7 +39,7 @@ checks:
       A structurally invalid model usually means a missing reference
       scheme: every entity type needs a way to be identified before any
       fact about it is well-formed.
-    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.5 (reference schemes)."
+    reading: "Halpin & Morgan 3rd ed. -- ch. 5, section 5.3 (reference schemes)."
   - kind: "forbids_population"
     factType: "Customer places Order"
     constraint: "internal_uniqueness"

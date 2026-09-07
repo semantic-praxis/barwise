@@ -198,6 +198,16 @@ jobs:
       # test:scripts (barwise-910).
       - run: npm run audit:specs -- --check
 
+      # Every citation of Halpin & Morgan resolves against the transcribed
+      # contents in docs/halpin-morgan-3e-contents.md: the section exists,
+      # a parenthetical gloss names its topic, a page span is the
+      # chapter's, and the edition is the 3rd. The deck, the gym, the
+      # tutorial and the reading guide all copy section numbers from it,
+      # and three of them had drifted before anything read them back
+      # (barwise-949). No docs-only skip: a citation edit IS a docs-only
+      # change.
+      - run: npm run check:book-citations
+
       # The gates' own tests. Every enumerating gate is proven to report
       # the same coverage from three different cwds (barwise-905: one of
       # them silently scanned 1426 of 1483 files under `npm run`), and

@@ -562,3 +562,91 @@ test("check-python-uv passes a compliant uv args array", () => {
   });
   assert.equal(r.status, 0, r.stderr);
 });
+
+// --- check-book-citations: every citation resolves against the transcript ---
+
+const CONTENTS = `# contents
+
+\`\`\`
+ 3  Conceptual Modeling: First Steps                                 59
+    3.3  CSDP Step 1: From Examples to Elementary Facts              63
+    3.5  CSDP Step 3: Trim Schema; Note Basic Derivations            97
+ 4  Uniqueness Constraints                                          111
+    4.4  External Uniqueness Constraints                            129
+ 5  Mandatory Roles                                                 159
+    5.3  Reference Schemes                                          173
+ORM Glossary                                                       1007
+\`\`\`
+`;
+
+/** A repo with the transcript and one citing card; the gate reads both. */
+function bookCitations(card) {
+  const dir = tempRepo();
+  stage(dir, "barwise/docs/halpin-morgan-3e-contents.md", CONTENTS);
+  stage(dir, "barwise/docs/anki/x.txt", `front\tback ${card}\n`);
+  try {
+    return gate("check-book-citations.mjs", dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("check-book-citations passes a citation that resolves, and reports its coverage", () => {
+  const r = bookCitations(
+    "Read more: Halpin & Morgan 3rd ed. -- ch. 5, section 5.3 (reference schemes).",
+  );
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /book citations OK: \d+ citations in 2 files/);
+});
+
+// One planted defect per rule. The first is the exact drift the gate was
+// written for: a section that exists, glossed with another section's topic.
+const BAD_CITATIONS = [
+  [
+    "a right number with the wrong topic",
+    "Halpin & Morgan 3rd ed. -- section 3.5 (reference schemes).",
+    /section 3\.5 is "CSDP Step 3: Trim Schema; Note Basic Derivations", but the gloss says \(reference schemes\)/,
+  ],
+  [
+    "a section the book does not have",
+    "Halpin & Morgan 3rd ed. -- section 9.9.",
+    /section 9\.9 is not in the 3rd ed\. contents/,
+  ],
+  [
+    "a chapter the book does not have",
+    "Halpin & Morgan 3rd ed. -- ch. 99 (nothing).",
+    /chapter 99 is not in the 3rd ed\. contents/,
+  ],
+  [
+    "a page span that is not the chapter's",
+    "Halpin & Morgan 3rd ed. -- ch. 3, pp. 59-111.",
+    /chapter 3 spans pp\. 59-110 in the contents, not pp\. 59-111/,
+  ],
+  [
+    "another edition",
+    "Halpin & Morgan, Information Modeling (2nd ed.), ch. 3.",
+    /cites the 2nd edition/,
+  ],
+];
+
+for (const [name, card, expected] of BAD_CITATIONS) {
+  test(`check-book-citations fails on ${name}`, () => {
+    const r = bookCitations(card);
+    assert.equal(r.status, 1, `expected red:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, expected);
+  });
+}
+
+test("check-book-citations leaves a barwise reference after the `;` alone", () => {
+  // 3.4 is not in the fixture transcript; after "barwise ARCHITECTURE.md" it is not a book citation.
+  const r = bookCitations(
+    "Halpin & Morgan 3rd ed. -- ch. 4 (uniqueness); barwise ARCHITECTURE.md sections 3.4-3.5.",
+  );
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test("check-book-citations is green on the current tree, from every cwd", () => {
+  const runs = CWDS.map((cwd) => ({ cwd, ...gate("check-book-citations.mjs", cwd) }));
+  for (const r of runs) assert.equal(r.status, 0, `failed in ${r.cwd}:\n${r.stdout}${r.stderr}`);
+  assert.equal(new Set(runs.map((r) => r.stdout.trim())).size, 1, "coverage depends on cwd");
+});

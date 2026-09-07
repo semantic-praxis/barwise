@@ -13,7 +13,10 @@ This is the edition `docs/adr/0001-metamodel-evolution-policy.md` pins
 the metamodel to (filter 4: design against the book, not against NORMA's
 tooling), and the source `docs/book-verification-checklist.md` verifies
 constructs against. It is also the target of the `docs/anki` deck's
-"Read more" pointers.
+"Read more" pointers, and the authority `npm run check:book-citations`
+resolves every book citation against (a section must exist here, a gloss
+must name its topic, a page span must be the chapter's). The reading
+order over these contents is `docs/halpin-morgan-3e-reading-guide.md`.
 
 Transcribed by hand from photographs of the printed contents pages, so
 treat a page number as approximate if it matters to the byte; the
@@ -227,7 +230,7 @@ future edition changes.
   4.4), 5.2 (mandatory roles), 6.3 (value constraints).
 - `06-constraints-phase2` -- 6.4 (subset, equality, exclusion), 7.2
   (frequency), 7.3 (ring), 5.2 (disjunctive mandatory).
-- `07-modeling-judgment` -- 3.3 (elementary facts), 3.5 and 7.4 (schema
+- `07-modeling-judgment` -- 3.3 (elementary facts), 3.5 and 7.5 (schema
   trimming and final checks), 10.5 (objectification).
 - `08-subtypes` -- 6.5-6.6 (subtyping, generalization), 10.8 (further
   constraints involving subtyping).
