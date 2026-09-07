@@ -391,10 +391,24 @@ mutation check for this workstream reverts c185df6's
   The law asserts it on the round-tripped populations instead, which
   keeps the fourth rule live rather than dead in the normaliser.
 - **A frequency constraint's `min` is lifted to 1, not dropped.** The
-  JSON Schema requires `minimum: 1`, so a generated zero fails
-  deserialization -- which the first run of the law reported, as
-  designed. The metamodel's `FrequencyConstraint` accepts zero and only
-  the schema refuses it; that divergence is not this spec's to settle.
+  first run of the law reported a generated zero failing
+  deserialization, as designed. The generator is not choosing between
+  two readings: every layer but the TypeScript type rejects zero. The
+  JSON Schema requires `minimum: 1`, `constraintConsistency` reports
+  `constraint/frequency-invalid-min` as an error, and barwise-830
+  settled the semantics already -- "at least 0" is no constraint at
+  all, because the population rule counts only the value-tuples that
+  appear and every such count is at least 1. A zero minimum does not
+  express an optional role; optionality is the absence of a mandatory
+  constraint, an orthogonal axis, and `0..1` and `1..1` are the same
+  frequency. So the generator emits valid models, which is its job.
+  The divergence is nonetheless a real defect -- a min-0 model
+  serializes and then fails to load, so barwise writes a file it
+  cannot read -- and per this spec's own non-goal it is filed rather
+  than fixed here: barwise-942, p3, since the validator and
+  conformance cover every production path. Whether the floor is
+  Halpin's rule or a tooling default this project carried is
+  barwise-q82, open, and it governs which side the fix moves.
 - **Re-grounding found an Inventory omission**, not a moved `main`:
   `tests/property/roundTrip.property.test.ts` already asserted the
   serialization round trip and the counterexample round trip over 100
