@@ -5,6 +5,7 @@ import type { FactType } from "../../../model/FactType.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Population } from "../../../model/Population.js";
 import type { Diagnostic } from "../../Diagnostic.js";
+import { reportAs, RULE_ID } from "../../ruleId.js";
 import { makeCompositeKey, severityForModality } from "./shared.js";
 
 /**
@@ -44,14 +45,18 @@ function uniquenessViolationsIn(
     const key = makeCompositeKey(inst, uc.roleIds);
     const firstId = seen.get(key);
     if (firstId) {
-      diagnostics.push({
-        severity: severityForModality(uc),
-        message: `Population "${pop.id}": instance "${inst.id}" violates `
-          + `internal uniqueness constraint on role(s) [${uc.roleIds.join(", ")}]. `
-          + `Duplicate of instance "${firstId}".`,
-        elementId: pop.id,
-        ruleId: "population/uniqueness-violation",
-      });
+      diagnostics.push(
+        reportAs(
+          severityForModality(uc),
+          RULE_ID.uniquenessViolation,
+          "default",
+          pop.id,
+          pop.id,
+          inst.id,
+          uc.roleIds.join(", "),
+          firstId,
+        ),
+      );
     } else {
       seen.set(key, inst.id);
     }
@@ -150,13 +155,17 @@ function externalUniquenessViolationsIn(
     const tuple = parts.join("\0");
     const first = seen.get(tuple);
     if (first !== undefined && first !== common) {
-      diagnostics.push({
-        severity: severityForModality(c),
-        message: `External uniqueness constraint is violated: "${common}" and `
-          + `"${first}" share the same combination [${parts.join(", ")}].`,
-        elementId: c.id ?? ft.id,
-        ruleId: "population/external-uniqueness-violation",
-      });
+      diagnostics.push(
+        reportAs(
+          severityForModality(c),
+          RULE_ID.externalUniquenessViolation,
+          "default",
+          c.id ?? ft.id,
+          common,
+          first,
+          parts.join(", "),
+        ),
+      );
     } else if (first === undefined) {
       seen.set(tuple, common);
     }

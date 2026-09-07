@@ -5,13 +5,14 @@
  * runs the validation engine, and prints diagnostics to stdout.
  */
 
-import { type Diagnostic, projectRules, ValidationEngine } from "@barwise/core";
+import { type Diagnostic, projectRules, type RuleId, ValidationEngine } from "@barwise/core";
 import { emitValidationRecord, summariseValidation } from "@barwise/llm";
 import type { Command } from "commander";
 import { callLogSink } from "../workspace/callLogSink.js";
 import { formatDiagnostics, formatDiagnosticsJson } from "../workspace/format.js";
 import { isProjectFile, loadModel } from "../workspace/io.js";
 import { loadProject } from "../workspace/projectLoader.js";
+import { cliReport, type CliRuleId } from "../workspace/ruleId.js";
 
 interface ValidateOptions {
   format: string;
@@ -54,18 +55,13 @@ export function registerValidateCommand(program: Command): void {
  * project rules. Domain diagnostics are prefixed with their context;
  * project-level diagnostics are prefixed with `[project]`.
  */
-function collectProjectDiagnostics(file: string): Diagnostic[] {
+function collectProjectDiagnostics(file: string): Diagnostic<RuleId | CliRuleId>[] {
   const { project, problems } = loadProject(file);
   const engine = new ValidationEngine();
-  const diagnostics: Diagnostic[] = [];
+  const diagnostics: Diagnostic<RuleId | CliRuleId>[] = [];
 
   for (const problem of problems) {
-    diagnostics.push({
-      severity: "error",
-      message: problem,
-      elementId: file,
-      ruleId: "project/file-unresolved",
-    });
+    diagnostics.push(cliReport("project/file-unresolved", "default", file, problem));
   }
 
   for (const domain of project.domains) {
@@ -82,7 +78,11 @@ function collectProjectDiagnostics(file: string): Diagnostic[] {
   return diagnostics;
 }
 
-function report(file: string, all: Diagnostic[], opts: ValidateOptions): void {
+function report<R extends string>(
+  file: string,
+  all: readonly Diagnostic<R>[],
+  opts: ValidateOptions,
+): void {
   const diagnostics = opts.warnings
     ? all
     : all.filter((d) => d.severity === "error");

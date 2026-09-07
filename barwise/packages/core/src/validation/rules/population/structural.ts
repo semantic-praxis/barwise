@@ -1,5 +1,6 @@
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
+import { report, RULE_ID } from "../../ruleId.js";
 
 /**
  * Every population must reference a fact type that exists in the model.
@@ -9,13 +10,7 @@ export function checkDanglingPopulationFactType(model: OrmModel): Diagnostic[] {
 
   for (const pop of model.populations) {
     if (!model.getFactType(pop.factTypeId)) {
-      diagnostics.push({
-        severity: "error",
-        message: `Population "${pop.id}" references fact type id "${pop.factTypeId}" `
-          + `which does not exist in the model.`,
-        elementId: pop.id,
-        ruleId: "population/dangling-fact-type",
-      });
+      diagnostics.push(report(RULE_ID.danglingFactType, "default", pop.id, pop.id, pop.factTypeId));
     }
   }
 
@@ -44,14 +39,9 @@ export function checkIncompleteInstances(model: OrmModel): Diagnostic[] {
         const names = missing
           .map((r) => model.getObjectType(r.playerId)?.name ?? r.id)
           .join(", ");
-        diagnostics.push({
-          severity: "error",
-          message: `Population instance "${inst.id}" of fact type "${ft.name}" `
-            + `has no value for role(s) played by: ${names}. Every instance `
-            + `must fill every role of its fact type.`,
-          elementId: inst.id,
-          ruleId: "population/incomplete-instance",
-        });
+        diagnostics.push(
+          report(RULE_ID.incompleteInstance, "default", inst.id, inst.id, ft.name, names),
+        );
       }
     }
   }

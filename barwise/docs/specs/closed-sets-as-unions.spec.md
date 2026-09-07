@@ -1,8 +1,8 @@
 # Closed sets belong in the type system: rule ids and change descriptions as unions
 
-Status: WS1 implemented (barwise-946 closed); WS2 and WS3 not started
+Status: WS1 and WS2 implemented (barwise-946 closed); WS3 not started
 Created: 2026-09-07
-Last-updated: 2026-09-07 (WS1 shipped)
+Last-updated: 2026-09-07 (WS1 shipped; WS2 scope revised and shipped)
 Tracking: barwise-947 (this spec); barwise-946 (breaking-change
 severity string-matches prose);
 the Evidenced-sites section of `core-branching-load.spec.md`, whose
@@ -213,7 +213,7 @@ fails; a hand-written list of expected strings would simply not mention
 the new one. Watched failing on a planted description before it was
 believed, and it names the offending string.
 
-### 2. `RuleId` as a closed union, with SARIF-shaped descriptors
+### 2. The rule registry owns id, severity and message
 
 Add `core/src/validation/ruleId.ts` holding a `Record<RuleId,
 RuleDescriptor>` rather than a `Record<RuleId, true>`, derive the union
@@ -247,6 +247,75 @@ core's 125 `Diagnostic[]` signatures compile unedited because the
 default type parameter absorbs them; the CLI fails on exactly the one
 out-of-set literal, named in the error; and all 12 packages build once
 the CLI declares its own set. The cost outside core is four lines.
+
+A rule's identity, its severity and its message text all live in the
+registry; an emit site names the rule and supplies only the occurrence:
+
+```ts
+diagnostics.push(report(RULE_ID.subtypeCycle, "default", nodeId));
+diagnostics.push(
+  report(RULE_ID.exclusionViolation, "spanning", ft.id, roles, value, count),
+);
+```
+
+`messages` is a dictionary keyed by message id, following SARIF's
+`reportingDescriptor.messageStrings`, because nine rules legitimately
+report more than one condition -- `population/exclusion-violation` fires
+both for roles within one fact type and for roles spanning several, and
+those are different sentences. Naming the message rather than splitting
+the rule is what SARIF does, and it keeps the distinction machine-
+readable: the message id maps onto a result's `message.id` on export.
+
+The message is a typed function rather than a `{0}`-placeholder string:
+
+```ts
+[RULE_ID.objectCardinalityViolation]: {
+  severity: "error",
+  description: "An object type's population size falls outside its declared bounds.",
+  messages: {
+    aboveMaximum: (typeName: string, count: number, max: number | "unbounded") =>
+      `Object type "${typeName}" has ${count} instance(s), above the maximum of ${max}.`,
+  },
+},
+```
+
+With `report<K extends RuleId, M extends MessageId<K>>(id: K, messageId:
+M, elementId: string, ...args: Parameters<...>)`, an unknown message id,
+a wrong argument type and a wrong arity are all compile errors --
+verified by spike before this was written. The cost is that a function
+cannot be exported as a SARIF `messageString` for localization, so a
+writer emits the rendered `message.text`, which the standard permits.
+barwise has no localization requirement and does have a defect history
+of hand-copied lists, so the typing wins.
+
+Two things stay at the emit site. Roughly twenty rules derive severity
+at runtime through `severityForModality` (a deontic constraint lowers a
+violation to a warning), so they override the descriptor's default. And
+a few messages are computed rather than templated, and pass the computed
+piece as an argument.
+
+**Shipped 2026-09-07.** The spike's numbers held:**Shipped 2026-09-07.** The spike's numbers held:**Shipped 2026-09-07.** The spike's numbers held: core's 125
+`Diagnostic[]` signatures compiled unedited, and the only downstream
+break was the CLI's one out-of-set literal, named in the error.
+
+Three things the workstream did not anticipate.
+
+The registry needed a _second_ drift direction guarded. The compiler
+rejects a rule emitting an unregistered id, but a registry listing an id
+no rule emits any more still compiles and still passes every other
+test -- which is how a catalogue quietly fills with rules that were
+deleted. The test scans both ways.
+
+`merge-error` is in the set and is not a validation rule: `mergeAndValidate`
+mints it when a merge throws. It is described as such rather than
+renamed, because the string reaches consumers today and renaming it
+would be a behaviour change this workstream has no reason to make.
+
+Writing the descriptions found one of its own: a test requiring a
+description longer than its identifier caught `"Two fact types share a
+name."`, which restates the id and explains nothing. Both duplicate-name
+rules now say why it matters. The threshold stayed; the descriptions
+improved.
 
 ### 3. Change descriptions as a discriminated union
 

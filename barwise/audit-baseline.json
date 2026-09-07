@@ -56,16 +56,6 @@
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"File path to .orm.yaml, .orm-project.yaml, or inline YAML content\" in packages/mcp/src/tools/describeDomain.ts, packages/mcp/src/tools/exportModel.ts, packages/mcp/src/tools/queryModel.ts, packages/mcp/src/tools/review.ts, packages/mcp/src/tools/validate.ts, packages/mcp/src/tools/verbalize.ts"
     },
-    "literal:37a6fdb45c78": {
-      "status": "accepted-benign",
-      "note": "one diagnostic family deliberately emitted by two population rule files",
-      "detail": "\"population/equality-violation\" in packages/core/src/validation/rules/population/setComparison.ts, packages/core/src/validation/rules/population/spanning.ts"
-    },
-    "literal:3a530b0bebb7": {
-      "status": "accepted-benign",
-      "note": "one diagnostic family deliberately emitted by two population rule files",
-      "detail": "\"population/exclusion-violation\" in packages/core/src/validation/rules/population/setComparison.ts, packages/core/src/validation/rules/population/spanning.ts"
-    },
     "literal:3c8ee4ddb504": {
       "status": "tracked:barwise-875",
       "note": "part of the duplicated analyze extractModel pair (audit C8)",
@@ -85,11 +75,6 @@
       "status": "accepted-benign",
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"Model override for the LLM provider\" in packages/cli/src/commands/import/transcript.ts, packages/cli/src/commands/prompt.ts, packages/cli/src/commands/review.ts"
-    },
-    "literal:51068e131699": {
-      "status": "accepted-benign",
-      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
-      "detail": "\"population/exclusive-or-violation\" in packages/core/src/validation/rules/population/setComparison.ts, packages/core/src/validation/rules/population/spanning.ts"
     },
     "literal:560138396b48": {
       "status": "accepted-benign",

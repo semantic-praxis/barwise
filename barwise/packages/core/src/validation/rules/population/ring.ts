@@ -4,6 +4,7 @@ import type { FactType } from "../../../model/FactType.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Population } from "../../../model/Population.js";
 import type { Diagnostic } from "../../Diagnostic.js";
+import { reportAs, RULE_ID } from "../../ruleId.js";
 import { severityForModality } from "./shared.js";
 
 /**
@@ -58,12 +59,15 @@ function ringViolationsIn(pop: Population, ft: FactType, rc: RingConstraint): Di
   const diagnostics: Diagnostic[] = [];
   for (const property of RING_PROPERTIES[rc.ringType]) {
     for (const finding of PROPERTY_CHECKS[property](relation)) {
-      diagnostics.push({
-        severity,
-        message: word(property, finding, pop.id),
-        elementId: pop.id,
-        ruleId: "population/ring-violation",
-      });
+      diagnostics.push(
+        reportAs(
+          severity,
+          RULE_ID.ringViolation,
+          "default",
+          pop.id,
+          word(property, finding, pop.id),
+        ),
+      );
     }
   }
   return diagnostics;

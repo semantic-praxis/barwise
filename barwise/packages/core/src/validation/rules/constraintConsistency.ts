@@ -1,6 +1,7 @@
 import type { OrmModel } from "../../model/OrmModel.js";
 import { assertNever } from "../../util/assertNever.js";
 import type { Diagnostic } from "../Diagnostic.js";
+import { report, reportAs, RULE_ID } from "../ruleId.js";
 
 /**
  * Constraint consistency rules.
@@ -17,13 +18,9 @@ export function constraintConsistencyRules(model: OrmModel): Diagnostic[] {
         case "internal_uniqueness": {
           for (const roleId of constraint.roleIds) {
             if (!ft.hasRole(roleId)) {
-              diagnostics.push({
-                severity: "error",
-                message: `Internal uniqueness constraint in fact type "${ft.name}" `
-                  + `references role id "${roleId}" which does not belong to this fact type.`,
-                elementId: ft.id,
-                ruleId: "constraint/internal-uniqueness-invalid-role",
-              });
+              diagnostics.push(
+                report(RULE_ID.internalUniquenessInvalidRole, "default", ft.id, ft.name, roleId),
+              );
             }
           }
 
@@ -35,40 +32,40 @@ export function constraintConsistencyRules(model: OrmModel): Diagnostic[] {
             // A spanning constraint on a binary is the standard
             // many-to-many shape (informational); on a ternary or wider
             // it usually signals a non-elementary fact type (warning).
-            diagnostics.push({
-              severity: ft.arity === 2 ? "info" : "warning",
-              message: `Internal uniqueness constraint in fact type "${ft.name}" `
-                + `spans all ${ft.arity} roles. This means each complete fact `
-                + `can only appear once, which is often redundant.`,
-              elementId: ft.id,
-              ruleId: "constraint/spanning-all-roles",
-            });
+            diagnostics.push(
+              reportAs(
+                ft.arity === 2 ? "info" : "warning",
+                RULE_ID.spanningAllRoles,
+                "default",
+                ft.id,
+                ft.name,
+                ft.arity,
+              ),
+            );
           }
           break;
         }
 
         case "mandatory": {
           if (!ft.hasRole(constraint.roleId)) {
-            diagnostics.push({
-              severity: "error",
-              message: `Mandatory constraint in fact type "${ft.name}" `
-                + `references role id "${constraint.roleId}" which does not belong to this fact type.`,
-              elementId: ft.id,
-              ruleId: "constraint/mandatory-invalid-role",
-            });
+            diagnostics.push(
+              report(RULE_ID.mandatoryInvalidRole, "default", ft.id, ft.name, constraint.roleId),
+            );
           }
           break;
         }
 
         case "value_constraint": {
           if (constraint.roleId && !ft.hasRole(constraint.roleId)) {
-            diagnostics.push({
-              severity: "error",
-              message: `Value constraint in fact type "${ft.name}" `
-                + `references role id "${constraint.roleId}" which does not belong to this fact type.`,
-              elementId: ft.id,
-              ruleId: "constraint/value-constraint-invalid-role",
-            });
+            diagnostics.push(
+              report(
+                RULE_ID.valueConstraintInvalidRole,
+                "default",
+                ft.id,
+                ft.name,
+                constraint.roleId,
+              ),
+            );
           }
           break;
         }
@@ -76,14 +73,7 @@ export function constraintConsistencyRules(model: OrmModel): Diagnostic[] {
         case "external_uniqueness": {
           const allLocal = constraint.roleIds.every((rid) => ft.hasRole(rid));
           if (allLocal) {
-            diagnostics.push({
-              severity: "warning",
-              message: `External uniqueness constraint in fact type "${ft.name}" `
-                + `references only roles within this fact type. `
-                + `Consider using internal uniqueness instead.`,
-              elementId: ft.id,
-              ruleId: "constraint/external-uniqueness-all-local",
-            });
+            diagnostics.push(report(RULE_ID.externalUniquenessAllLocal, "default", ft.id, ft.name));
           }
           break;
         }
@@ -92,195 +82,157 @@ export function constraintConsistencyRules(model: OrmModel): Diagnostic[] {
 
         case "disjunctive_mandatory": {
           if (constraint.roleIds.length < 2) {
-            diagnostics.push({
-              severity: "error",
-              message: `Disjunctive mandatory constraint in fact type "${ft.name}" `
-                + `must reference at least 2 roles.`,
-              elementId: ft.id,
-              ruleId: "constraint/disjunctive-mandatory-too-few-roles",
-            });
+            diagnostics.push(
+              report(RULE_ID.disjunctiveMandatoryTooFewRoles, "default", ft.id, ft.name),
+            );
           }
           break;
         }
 
         case "exclusion": {
           if (constraint.roleIds.length < 2) {
-            diagnostics.push({
-              severity: "error",
-              message: `Exclusion constraint in fact type "${ft.name}" `
-                + `must reference at least 2 roles.`,
-              elementId: ft.id,
-              ruleId: "constraint/exclusion-too-few-roles",
-            });
+            diagnostics.push(report(RULE_ID.exclusionTooFewRoles, "default", ft.id, ft.name));
           }
           break;
         }
 
         case "exclusive_or": {
           if (constraint.roleIds.length < 2) {
-            diagnostics.push({
-              severity: "error",
-              message: `Exclusive-or constraint in fact type "${ft.name}" `
-                + `must reference at least 2 roles.`,
-              elementId: ft.id,
-              ruleId: "constraint/exclusive-or-too-few-roles",
-            });
+            diagnostics.push(report(RULE_ID.exclusiveOrTooFewRoles, "default", ft.id, ft.name));
           }
           break;
         }
 
         case "subset": {
           if (constraint.subsetRoleIds.length !== constraint.supersetRoleIds.length) {
-            diagnostics.push({
-              severity: "error",
-              message: `Subset constraint in fact type "${ft.name}" `
-                + `has mismatched role sequence lengths: subset has ${constraint.subsetRoleIds.length} roles, `
-                + `superset has ${constraint.supersetRoleIds.length} roles.`,
-              elementId: ft.id,
-              ruleId: "constraint/subset-arity-mismatch",
-            });
+            diagnostics.push(
+              report(
+                RULE_ID.subsetArityMismatch,
+                "default",
+                ft.id,
+                ft.name,
+                constraint.subsetRoleIds.length,
+                constraint.supersetRoleIds.length,
+              ),
+            );
           }
           break;
         }
 
         case "equality": {
           if (constraint.roleIds1.length !== constraint.roleIds2.length) {
-            diagnostics.push({
-              severity: "error",
-              message: `Equality constraint in fact type "${ft.name}" `
-                + `has mismatched role sequence lengths: first has ${constraint.roleIds1.length} roles, `
-                + `second has ${constraint.roleIds2.length} roles.`,
-              elementId: ft.id,
-              ruleId: "constraint/equality-arity-mismatch",
-            });
+            diagnostics.push(
+              report(
+                RULE_ID.equalityArityMismatch,
+                "default",
+                ft.id,
+                ft.name,
+                constraint.roleIds1.length,
+                constraint.roleIds2.length,
+              ),
+            );
           }
           break;
         }
 
         case "ring": {
           if (!ft.hasRole(constraint.roleId1)) {
-            diagnostics.push({
-              severity: "error",
-              message: `Ring constraint in fact type "${ft.name}" `
-                + `references role id "${constraint.roleId1}" which does not belong to this fact type.`,
-              elementId: ft.id,
-              ruleId: "constraint/ring-invalid-role",
-            });
+            diagnostics.push(
+              report(RULE_ID.ringInvalidRole, "default", ft.id, ft.name, constraint.roleId1),
+            );
           }
           if (!ft.hasRole(constraint.roleId2)) {
-            diagnostics.push({
-              severity: "error",
-              message: `Ring constraint in fact type "${ft.name}" `
-                + `references role id "${constraint.roleId2}" which does not belong to this fact type.`,
-              elementId: ft.id,
-              ruleId: "constraint/ring-invalid-role",
-            });
+            diagnostics.push(
+              report(RULE_ID.ringInvalidRole, "default", ft.id, ft.name, constraint.roleId2),
+            );
           }
           const r1 = ft.getRoleById(constraint.roleId1);
           const r2 = ft.getRoleById(constraint.roleId2);
           if (r1 && r2 && r1.playerId !== r2.playerId) {
-            diagnostics.push({
-              severity: "error",
-              message: `Ring constraint in fact type "${ft.name}" `
-                + `requires both roles to be played by the same object type.`,
-              elementId: ft.id,
-              ruleId: "constraint/ring-different-players",
-            });
+            diagnostics.push(report(RULE_ID.ringDifferentPlayers, "default", ft.id, ft.name));
           }
           break;
         }
 
         case "frequency": {
           if (constraint.roleIds.length === 0) {
-            diagnostics.push({
-              severity: "error",
-              message: `Frequency constraint in fact type "${ft.name}" `
-                + `must reference at least one role.`,
-              elementId: ft.id,
-              ruleId: "constraint/frequency-empty-roles",
-            });
+            diagnostics.push(report(RULE_ID.frequencyEmptyRoles, "default", ft.id, ft.name));
           }
           for (const roleId of constraint.roleIds) {
             if (!ft.hasRole(roleId)) {
-              diagnostics.push({
-                severity: "error",
-                message: `Frequency constraint in fact type "${ft.name}" `
-                  + `references role id "${roleId}" which does not belong to this fact type.`,
-                elementId: ft.id,
-                ruleId: "constraint/frequency-invalid-role",
-              });
+              diagnostics.push(
+                report(RULE_ID.frequencyInvalidRole, "default", ft.id, ft.name, roleId),
+              );
             }
           }
           if (constraint.min < 1) {
-            diagnostics.push({
-              severity: "error",
-              message: `Frequency constraint in fact type "${ft.name}" `
-                + `has min ${constraint.min}, which must be at least 1.`,
-              elementId: ft.id,
-              ruleId: "constraint/frequency-invalid-min",
-            });
+            diagnostics.push(
+              report(RULE_ID.frequencyInvalidMin, "default", ft.id, ft.name, constraint.min),
+            );
           }
           if (constraint.max !== "unbounded" && constraint.max < constraint.min) {
-            diagnostics.push({
-              severity: "error",
-              message: `Frequency constraint in fact type "${ft.name}" `
-                + `has max (${constraint.max}) less than min (${constraint.min}).`,
-              elementId: ft.id,
-              ruleId: "constraint/frequency-max-less-than-min",
-            });
+            diagnostics.push(
+              report(
+                RULE_ID.frequencyMaxLessThanMin,
+                "default",
+                ft.id,
+                ft.name,
+                constraint.max,
+                constraint.min,
+              ),
+            );
           }
           break;
         }
 
         case "cardinality": {
           if (!ft.hasRole(constraint.roleId)) {
-            diagnostics.push({
-              severity: "error",
-              message: `Cardinality constraint in fact type "${ft.name}" `
-                + `references role id "${constraint.roleId}" which does not belong to this fact type.`,
-              elementId: ft.id,
-              ruleId: "constraint/cardinality-invalid-role",
-            });
+            diagnostics.push(
+              report(RULE_ID.cardinalityInvalidRole, "default", ft.id, ft.name, constraint.roleId),
+            );
           }
           if (ft.arity !== 1) {
-            diagnostics.push({
-              severity: "error",
-              message: `Cardinality constraint in fact type "${ft.name}" `
-                + `applies to a unary role, but the fact type has arity ${ft.arity}.`,
-              elementId: ft.id,
-              ruleId: "constraint/cardinality-non-unary",
-            });
+            diagnostics.push(
+              report(RULE_ID.cardinalityNonUnary, "default", ft.id, ft.name, ft.arity),
+            );
           }
           if (constraint.max !== "unbounded" && constraint.max < constraint.min) {
-            diagnostics.push({
-              severity: "error",
-              message: `Cardinality constraint in fact type "${ft.name}" `
-                + `has max (${constraint.max}) less than min (${constraint.min}).`,
-              elementId: ft.id,
-              ruleId: "constraint/cardinality-max-less-than-min",
-            });
+            diagnostics.push(
+              report(
+                RULE_ID.cardinalityMaxLessThanMin,
+                "default",
+                ft.id,
+                ft.name,
+                constraint.max,
+                constraint.min,
+              ),
+            );
           }
           break;
         }
 
         case "value_comparison": {
           if (!ft.hasRole(constraint.roleId1)) {
-            diagnostics.push({
-              severity: "error",
-              message: `Value comparison constraint in fact type "${ft.name}" `
-                + `references role id "${constraint.roleId1}" which does not belong to this fact type.`,
-              elementId: ft.id,
-              ruleId: "constraint/value-comparison-invalid-role",
-            });
+            diagnostics.push(
+              report(
+                RULE_ID.valueComparisonInvalidRole,
+                "default",
+                ft.id,
+                ft.name,
+                constraint.roleId1,
+              ),
+            );
           }
           if (!ft.hasRole(constraint.roleId2)) {
-            diagnostics.push({
-              severity: "error",
-              message: `Value comparison constraint in fact type "${ft.name}" `
-                + `references role id "${constraint.roleId2}" which does not belong to this fact type.`,
-              elementId: ft.id,
-              ruleId: "constraint/value-comparison-invalid-role",
-            });
+            diagnostics.push(
+              report(
+                RULE_ID.valueComparisonInvalidRole,
+                "default",
+                ft.id,
+                ft.name,
+                constraint.roleId2,
+              ),
+            );
           }
           break;
         }

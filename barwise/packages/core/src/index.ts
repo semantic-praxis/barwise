@@ -139,6 +139,13 @@ export {
   evaluateConstraintEnforcement,
 } from "./validation/constraintEnforcement.js";
 export { type Diagnostic, type DiagnosticSeverity } from "./validation/Diagnostic.js";
+export {
+  makeReporter,
+  RULE_IDS,
+  type RuleDescriptor,
+  ruleDescriptor,
+  type RuleId,
+} from "./validation/ruleId.js";
 export { completenessWarnings } from "./validation/rules/completenessWarnings.js";
 export { constraintConsistencyRules } from "./validation/rules/constraintConsistency.js";
 export { populationValidationRules } from "./validation/rules/populationValidation.js";

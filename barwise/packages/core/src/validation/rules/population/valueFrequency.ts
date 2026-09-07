@@ -3,6 +3,7 @@ import { isFrequency, isValueConstraint, type ValueRange } from "../../../model/
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Population } from "../../../model/Population.js";
 import type { Diagnostic } from "../../Diagnostic.js";
+import { reportAs, RULE_ID } from "../../ruleId.js";
 import { makeCompositeKey, severityForModality } from "./shared.js";
 
 /** Whether a string parses as a finite number. */
@@ -68,14 +69,20 @@ function valueConstraintViolationsIn(pop: Population, vc: ValueConstraint): Diag
     const allowed = allowedSet.has(val) || ranges.some((r) => valueInRange(val, r));
     if (!allowed) {
       const rangeNote = ranges.length > 0 ? " (or any permitted range)" : "";
-      diagnostics.push({
-        severity: severityForModality(vc),
-        message: `Population "${pop.id}": instance "${inst.id}" has value `
-          + `"${val}" for role "${vc.roleId}" which is not in the `
-          + `allowed set [${vc.values.join(", ")}]${rangeNote}.`,
-        elementId: pop.id,
-        ruleId: "population/value-constraint-violation",
-      });
+      diagnostics.push(
+        reportAs(
+          severityForModality(vc),
+          RULE_ID.valueConstraintViolation,
+          "default",
+          pop.id,
+          pop.id,
+          inst.id,
+          val,
+          vc.roleId,
+          vc.values.join(", "),
+          rangeNote,
+        ),
+      );
     }
   }
   return diagnostics;
@@ -139,22 +146,32 @@ function frequencyViolationsIn(pop: Population, fc: FrequencyConstraint): Diagno
       ? `value "${key}" in role "${roleLabel}"`
       : `combination "${key.split("\0").join(", ")}" in roles "${roleLabel}"`;
     if (count < fc.min) {
-      diagnostics.push({
-        severity: severityForModality(fc),
-        message: `Population "${pop.id}": ${subject} `
-          + `appears ${count} time(s) but the minimum is ${fc.min}.`,
-        elementId: pop.id,
-        ruleId: "population/frequency-violation",
-      });
+      diagnostics.push(
+        reportAs(
+          severityForModality(fc),
+          RULE_ID.frequencyViolation,
+          "aboveMaximum",
+          pop.id,
+          pop.id,
+          subject,
+          count,
+          fc.min,
+        ),
+      );
     }
     if (fc.max !== "unbounded" && count > fc.max) {
-      diagnostics.push({
-        severity: severityForModality(fc),
-        message: `Population "${pop.id}": ${subject} `
-          + `appears ${count} time(s) but the maximum is ${fc.max}.`,
-        elementId: pop.id,
-        ruleId: "population/frequency-violation",
-      });
+      diagnostics.push(
+        reportAs(
+          severityForModality(fc),
+          RULE_ID.frequencyViolation,
+          "belowMinimum",
+          pop.id,
+          pop.id,
+          subject,
+          count,
+          fc.max,
+        ),
+      );
     }
   }
   return diagnostics;

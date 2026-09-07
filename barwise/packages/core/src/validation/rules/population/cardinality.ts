@@ -1,6 +1,7 @@
 import { isCardinality } from "../../../model/Constraint.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
+import { report, reportAs, RULE_ID } from "../../ruleId.js";
 import { buildObjectUniverse, severityForModality, valuesPlayedInRole } from "./shared.js";
 
 /**
@@ -23,22 +24,14 @@ export function checkObjectCardinalityViolations(model: OrmModel): Diagnostic[] 
     const count = instances.size;
 
     if (count < card.min) {
-      diagnostics.push({
-        severity: "error",
-        message: `Object type "${ot.name}" has ${count} instance(s) in the `
-          + `population but its cardinality requires at least ${card.min}.`,
-        elementId: ot.id,
-        ruleId: "population/object-cardinality-violation",
-      });
+      diagnostics.push(
+        report(RULE_ID.objectCardinalityViolation, "aboveMaximum", ot.id, ot.name, count, card.min),
+      );
     }
     if (card.max !== "unbounded" && count > card.max) {
-      diagnostics.push({
-        severity: "error",
-        message: `Object type "${ot.name}" has ${count} instance(s) in the `
-          + `population but its cardinality allows at most ${card.max}.`,
-        elementId: ot.id,
-        ruleId: "population/object-cardinality-violation",
-      });
+      diagnostics.push(
+        report(RULE_ID.objectCardinalityViolation, "belowMinimum", ot.id, ot.name, count, card.max),
+      );
     }
   }
 
@@ -62,24 +55,32 @@ export function checkUnaryRoleCardinalityViolations(model: OrmModel): Diagnostic
       const count = values.size;
 
       if (count < c.min) {
-        diagnostics.push({
-          severity: severityForModality(c),
-          message: `Cardinality constraint on role "${c.roleId}" in fact type `
-            + `"${ft.name}" is played by ${count} instance(s) but requires at `
-            + `least ${c.min}.`,
-          elementId: c.id ?? ft.id,
-          ruleId: "population/unary-role-cardinality-violation",
-        });
+        diagnostics.push(
+          reportAs(
+            severityForModality(c),
+            RULE_ID.unaryRoleCardinalityViolation,
+            "aboveMaximum",
+            c.id ?? ft.id,
+            c.roleId,
+            ft.name,
+            count,
+            c.min,
+          ),
+        );
       }
       if (c.max !== "unbounded" && count > c.max) {
-        diagnostics.push({
-          severity: severityForModality(c),
-          message: `Cardinality constraint on role "${c.roleId}" in fact type `
-            + `"${ft.name}" is played by ${count} instance(s) but allows at `
-            + `most ${c.max}.`,
-          elementId: c.id ?? ft.id,
-          ruleId: "population/unary-role-cardinality-violation",
-        });
+        diagnostics.push(
+          reportAs(
+            severityForModality(c),
+            RULE_ID.unaryRoleCardinalityViolation,
+            "belowMinimum",
+            c.id ?? ft.id,
+            c.roleId,
+            ft.name,
+            count,
+            c.max,
+          ),
+        );
       }
     }
   }
