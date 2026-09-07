@@ -20,7 +20,9 @@ import {
   isSubset,
   isValueConstraint,
   type MandatoryRoleConstraint,
+  RING_PROPERTIES,
   type RingConstraint,
+  type RingProperty,
   type SubsetConstraint,
   type ValueConstraint,
 } from "../model/Constraint.js";
@@ -28,7 +30,6 @@ import type { FactType } from "../model/FactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
-import { assertNever } from "../util/assertNever.js";
 import { identificationSharingAncestry } from "../validation/rules/population/shared.js";
 import {
   kwSeg,
@@ -202,6 +203,26 @@ function forFrequency(
   return makeCounterexample(ft, fc, instances, reason, model);
 }
 
+/**
+ * The smallest population that violates each ring property, as directed
+ * pairs over three minted values. One row per property replaces the
+ * eight-arm switch that used to spell the same thing out per ring type;
+ * the grouped arms it replaced (`case "asymmetric": case "antisymmetric":
+ * case "acyclic":` sharing one body) were the algebra showing through.
+ */
+const RING_WITNESSES: Record<
+  RingProperty,
+  (a: string, b: string, c: string) => ReadonlyArray<readonly [string, string]>
+> = {
+  irreflexive: (a) => [[a, a]],
+  antisymmetric: (a, b) => [[a, b], [b, a]],
+  acyclic: (a, b) => [[a, b], [b, a]],
+  symmetric: (a, b) => [[a, b]],
+  purely_reflexive: (a, b) => [[a, b]],
+  transitive: (a, b, c) => [[a, b], [b, c]],
+  intransitive: (a, b, c) => [[a, b], [b, c], [a, c]],
+};
+
 function forRing(
   rc: RingConstraint,
   ft: FactType,
@@ -222,29 +243,12 @@ function forRing(
     return inst;
   };
 
-  let instances: RoleValues[];
-  switch (rc.ringType) {
-    case "irreflexive":
-      instances = [pair(a, a)];
-      break;
-    case "asymmetric":
-    case "antisymmetric":
-    case "acyclic":
-      instances = [pair(a, b), pair(b, a)];
-      break;
-    case "symmetric":
-    case "purely_reflexive":
-      instances = [pair(a, b)];
-      break;
-    case "transitive":
-      instances = [pair(a, b), pair(b, c)];
-      break;
-    case "intransitive":
-      instances = [pair(a, b), pair(b, c), pair(a, c)];
-      break;
-    default:
-      assertNever(rc.ringType);
-  }
+  // The witness comes from the ring type's FIRST property (barwise-935).
+  // Asymmetric lists antisymmetric first for exactly this reason: the
+  // reading ORM 2 gives it is the reverse pair, not the self-loop its
+  // other property would yield.
+  const instances = RING_WITNESSES[RING_PROPERTIES[rc.ringType][0]](a, b, c)
+    .map(([x, y]) => pair(x, y));
 
   const reason = `a ${rc.ringType.replace(/_/g, " ")} ring violation among `
     + `${playerName(r1, model)} instances`;

@@ -184,6 +184,58 @@ describe("counterexample generation", () => {
       expect(forbids(model, ce!, "population/ring-violation")).toBe(true);
     });
   }
+
+  // The shape of each witness, which the round-trip above cannot pin:
+  // a self-loop violates an asymmetric constraint too, so "the population
+  // rule rejects it" holds whichever property the generator drew from.
+  // What ORM 2 fixes is WHICH violation to show, and that comes from the
+  // first entry of RING_PROPERTIES -- so this is the test that makes that
+  // ordering load-bearing rather than incidental (barwise-935).
+  const witnessSize: Record<RingType, number> = {
+    irreflexive: 1,
+    asymmetric: 2,
+    antisymmetric: 2,
+    acyclic: 2,
+    symmetric: 1,
+    purely_reflexive: 1,
+    transitive: 2,
+    intransitive: 3,
+  };
+  for (const ringType of ringTypes) {
+    it(`shows the ORM 2 witness for a ${ringType} violation`, () => {
+      const model = new ModelBuilder()
+        .withEntityType("Person")
+        .withBinaryFactType("Person reports to Person", {
+          role1: { player: "Person", name: "reports to" },
+          role2: { player: "Person", name: "is reported to by" },
+        })
+        .build();
+      const ft = model.getFactTypeByName("Person reports to Person")!;
+      ft.addConstraint({
+        type: "ring",
+        roleId1: "Person reports to Person::role1",
+        roleId2: "Person reports to Person::role2",
+        ringType,
+      });
+      const rc = ft.constraints.find((c) => c.type === "ring")!;
+      const ce = generateCounterexampleForConstraint(rc, ft, model)!;
+
+      const forbidden = ce.forbidden[0]!;
+      expect(forbidden.instances).toHaveLength(witnessSize[ringType]);
+
+      // Asymmetric is the case the ordering exists for: two rows that are
+      // each other's reverse, not one row repeating a value in both roles.
+      if (ringType === "asymmetric") {
+        const rows = forbidden.instances.map((i) => [
+          i.roleValues["Person reports to Person::role1"],
+          i.roleValues["Person reports to Person::role2"],
+        ]);
+        expect(rows[0]![0]).not.toBe(rows[0]![1]);
+        expect(rows[1]![0]).toBe(rows[0]![1]);
+        expect(rows[1]![1]).toBe(rows[0]![0]);
+      }
+    });
+  }
 });
 
 describe("generateCounterexamples (model-wide)", () => {
