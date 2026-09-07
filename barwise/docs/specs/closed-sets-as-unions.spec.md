@@ -320,13 +320,22 @@ improved.
 ### 3. Change descriptions as a discriminated union
 
 Add a variant array to `ModelDelta`, render the prose from the variants
-for display, and make `classifyChange` exhaustive with a `never`
-default. Retire WS1's enumeration test, which the compiler now
-subsumes.
+for display, and make classification total. Retire WS1's enumeration
+test, which the compiler now subsumes.
 
-`changeDescriptions` stays, as a getter deriving today's exact strings
-from the variants, so the CLI's output, the MCP `executeDiff` JSON and
-every existing test are unaffected. That is deliberate: this workstream
+Classification is a `Record<ChangeKind, BreakingLevel>` rather than a
+switch with a `never` default. It guarantees the same thing in the
+missing direction and one more besides -- a level for a variant that no
+longer exists is an excess property, which a `never` default does not
+catch -- and it makes the table the catalogue, so `CHANGE_KINDS` derives
+from it instead of being listed a second time.
+
+`changeDescriptions` stays, deriving today's exact strings from the
+variants, so the CLI's output, the MCP `executeDiff` JSON and every
+existing test are unaffected. It is computed once at diff time rather
+than exposed as a getter: a getter is invisible to `Object.keys` and
+dropped by `structuredClone`, and a delta that travels the MCP path has
+to stay plain data. That is deliberate: this workstream
 makes the data available without changing what any surface emits.
 Exposing the structured variants through the MCP tool's JSON is a
 surface change with a capability-matrix row, and belongs to whoever
