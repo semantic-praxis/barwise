@@ -449,13 +449,34 @@ mutation check for this workstream reverts c185df6's
   exception exactly -- every residual delta is that one -- rather than
   being weakened to element sets alone. A second divergence appearing
   later fails the second clause.
-- **The fix surfaced a smaller defect it did not introduce the shape
-  of.** A population carried past an accepted fact-type modification
-  keeps the existing role ids while the merged fact type takes the
-  incoming ones, so its instances read as incomplete. Before the fix
-  the population vanished silently; now it survives and is wrong,
-  visibly. Filed as barwise-941, blocked on barwise-940, which is where
-  the remap belongs.
+- **The carry surfaced a second defect, which is now fixed here rather
+  than deferred.** A population carried past an accepted fact-type
+  modification kept the existing role ids while the merged fact type
+  took the incoming ones, so its instances read as incomplete. Filed as
+  barwise-941 and first deferred to barwise-940 on the belief that the
+  remap needed the typed diff; measuring it showed otherwise on both
+  counts. The trigger is not a role rename but ANY accepted
+  modification to a fact type carrying a population -- a definition-only
+  edit orphans every key -- and the resulting
+  `population/incomplete-instance` is an error, so the merged model
+  fails validation on a common re-extraction move. And the remap needs
+  nothing barwise-940 provides: phase 2 already holds both fact types
+  when it accepts the modification.
+
+  `mergeModels` now records a positional existing-to-merged role map
+  there, and `carryUnmodelledElements` rewrites each carried instance's
+  keys through it. Positional deliberately: it is the same pairing
+  `diffFactType` used to decide there was a modification, so matching by
+  name or player here would contradict the correspondence the accepted
+  delta was computed under. A role the incoming fact type dropped maps
+  to null and its values go with it; a role it added gets no value, so
+  the instance is short and the validator says so, which is a real
+  incompleteness rather than id churn.
+
+  The law cannot cover this and a law here would be vacuous: the
+  arbitrary assigns role ids positionally (`ft0r0`), so two generated
+  models share them and any remap is a no-op. Five fixture tests carry
+  it instead, four of which were watched failing first.
 - **The idempotence law found a performance defect and did not fix
   it.** `hashModel` constructs an `OrmYamlSerializer` per call, which
   compiles the JSON Schema with ajv in its constructor and never uses
