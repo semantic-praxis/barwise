@@ -2,8 +2,9 @@
 
 Status: WS0 complete -- barwise-927..931 shipped (PRs #426, #428, #429,
 #432, #434) and closed out; barwise-932 is a WS4 gap, not a defect. WS5
-(ring types as algebra) shipped as barwise-935. WS1-WS4 and WS6-WS8 not
-implemented.
+(ring types as algebra) shipped as barwise-935 and WS4 (exhaustiveness)
+as barwise-936, which found the sweep to be one gap rather than
+thirteen. WS1-WS3 and WS6-WS8 not implemented.
 Created: 2026-09-06
 Last-updated: 2026-09-06
 Tracking: barwise-924 (this review), barwise-x4z (the wider
@@ -491,6 +492,37 @@ explicit `return undefined` cases for the five kinds it does not
 handle. No behaviour change except the six ring sentences; the next
 union member fails to compile at every consumer. Deletes the
 phase2.ts:557 dead doc comment. Independent of WS1.
+
+**Shipped (barwise-936), and the scope was a third of what this
+workstream assumed.** The premise above -- that a sweep is needed to
+make the next union member fail to compile at every consumer -- is
+mostly already true, and the way to find out is a probe rather than a
+reading: add a member to the union, compile, and list which consumers
+fail. Under `strict`, a switch whose every case returns cannot fall off
+the end when the declared return type excludes `undefined`, so those
+consumers already reject a new member; `assertNever` would improve the
+error message and nothing else.
+
+| Probe                             | Failed at | Silent, and why                                                                |
+| --------------------------------- | --------: | ------------------------------------------------------------------------------ |
+| a 17th `Constraint` member        |         6 | `CounterexampleGenerator`: 11 `is*` guards over 16 kinds, ending in a fallback |
+| an extra `ConceptualDataTypeName` |         2 | `renderers/avro.ts`, `openapi.ts`: they switch a re-parsed SQL string (WS6)    |
+| an extra `DeltaKind`              |         1 | `breakingLevel.classifyBreakingLevel`: an unknown kind is treated as modified  |
+
+Only the first is this workstream's, and it is the one the draft
+already named: a guard chain ending in a fallback cannot fail, so the
+five kinds with no generator were indistinguishable from a guard that
+did not match. It is now a switch with those five named and
+`assertNever` closing the union, and the probe fails at seven sites
+where it failed at six. The second is WS6's by construction. **The
+third is WS4's remaining item**, left here rather than fixed because
+`breakingLevel.ts` is being edited concurrently by barwise-934 and a
+one-line exhaustiveness fix is not worth a merge conflict; take it with
+WS7, which reshapes that file anyway.
+
+Re-run the probe rather than trusting this table: it is three commands
+and it is the only thing that distinguishes a guarded consumer from one
+that merely looks guarded.
 
 ### 5. Ring types as algebra
 
