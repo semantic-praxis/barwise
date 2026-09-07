@@ -22,6 +22,7 @@
     "check:shell": "npm --prefix barwise run check:shell --",
     "check:python-uv": "npm --prefix barwise run check:python-uv --",
     "check:root-scripts": "npm --prefix barwise run check:root-scripts --",
+    "check:book-citations": "npm --prefix barwise run check:book-citations --",
     "test:scripts": "npm --prefix barwise run test:scripts --",
     "test:optimizer": "npm --prefix barwise run test:optimizer --",
     "audit:duplication": "npm --prefix barwise run audit:duplication --",

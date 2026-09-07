@@ -216,7 +216,7 @@ function renderClosing(tutorial: LoadedTutorial): string {
 
 The tutorial motivates and sequences; it does not replace the method's
 own text. Halpin & Morgan, *Information Modeling and Relational
-Databases* (2nd ed.), chapters 3-7, teach the CSDP in full.
+Databases* (3rd ed.), chapters 3-7, teach the CSDP in full.
 
 The three learning artifacts are one system: this tutorial motivates
 (why, and in what order), the Anki deck retains (\`docs/anki/\`), and

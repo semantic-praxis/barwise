@@ -163,7 +163,9 @@ Book references cite chapter and section numbers verified against the
   constraints), 7 (ring, frequency, and final checks), 10.5
   (objectification), and 11 (relational mapping). The full contents,
   with per-section page numbers and the card-to-section mapping, are in
-  `docs/halpin-morgan-3e-contents.md`.
+  `docs/halpin-morgan-3e-contents.md`; a reading order through them,
+  with what each chapter grounds in barwise, is
+  `docs/halpin-morgan-3e-reading-guide.md`.
 - **Halpin, _ORM 2 Constraint Verbalization_ (ORM2-02).** Tech report at
   `https://www.orm.net/pdf/ORM2_TechReport2.pdf` -- the FORML target
   forms the verbalizer follows; the primary source for the Tier 2 and
