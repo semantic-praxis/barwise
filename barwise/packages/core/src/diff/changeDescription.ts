@@ -11,11 +11,13 @@
  * conceptual change, because a producer spelled it one way and the
  * classifier knew another (barwise-946).
  *
- * A variant closes that class rather than guarding it. `classifyChange`
- * switches over this union with a `never` default, so a variant added
- * here without a classification does not compile -- which is what the
- * source-scanning drift test used to check at run time, and strictly
- * better, because a scanner can only find what its pattern matches.
+ * A variant closes that class rather than guarding it. Classification
+ * is a `Record<ChangeKind, BreakingLevel>`, so a variant added here
+ * without a level is a missing key and does not compile, and a level
+ * left behind for a variant that was deleted is an excess property and
+ * does not either. That is what the source-scanning drift test used to
+ * check at run time, and strictly better, because a scanner can only
+ * find what its pattern matches.
  *
  * Two rules govern what a variant carries, both from the spec's
  * resolved decision (`docs/specs/closed-sets-as-unions.spec.md`):

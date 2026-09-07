@@ -24,6 +24,7 @@ function objectTypeDelta(kind: ModelDelta["kind"], name: string): ModelDelta {
     kind,
     elementType: "object_type",
     name,
+    changes: [],
     changeDescriptions: [],
     breakingLevel: "safe",
   };
@@ -95,6 +96,7 @@ describe("formatAlternativeFramings (CLI)", () => {
           kind: "added",
           elementType: "definition",
           term: "Customer",
+          changes: [],
           changeDescriptions: [],
           breakingLevel: "safe",
         },

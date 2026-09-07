@@ -80,6 +80,20 @@ describe("the most severe change decides the delta", () => {
     expect(classifyBreakingLevel("modified", [safe, caution, breaking])).toBe("breaking");
   });
 
+  it("reads a change kind it has never heard of as caution, not safe", () => {
+    // Unreachable for anything this build produced -- the table is
+    // total. Reachable for a delta that crossed a version boundary as
+    // JSON, which is the path `changes` exists to serve. Without the
+    // fallback the lookup yields undefined, which the loop below reads
+    // as neither breaking nor caution and so reports as safe: the one
+    // direction this must not fail in.
+    const fromTheFuture = { change: "somethingLater", from: "a", to: "b" } as unknown as Parameters<
+      typeof classifyChange
+    >[0];
+    expect(classifyChange(fromTheFuture)).toBe("caution");
+    expect(classifyBreakingLevel("modified", [fromTheFuture])).toBe("caution");
+  });
+
   it("decides add, remove and unchanged from the kind alone", () => {
     const breaking = { change: "arity", from: 2, to: 3 } as const;
     expect(classifyBreakingLevel("added", [breaking])).toBe("safe");

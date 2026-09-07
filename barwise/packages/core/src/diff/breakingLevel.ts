@@ -73,9 +73,21 @@ const CHANGE_LEVEL = {
  */
 export const CHANGE_KINDS = Object.keys(CHANGE_LEVEL) as readonly ChangeKind[];
 
-/** How risky one change is for a downstream consumer. */
+/**
+ * How risky one change is for a downstream consumer.
+ *
+ * The table is total, so the fallback is unreachable for any change
+ * this build produced. It is there for one a build did not: a delta
+ * that crossed a version boundary as JSON can carry a kind this
+ * `CHANGE_LEVEL` has never heard of, and an unknown key would otherwise
+ * yield `undefined` -- which `classifyBreakingLevel` reads as neither
+ * breaking nor caution, and so reports as `safe`. Understating risk is
+ * the one direction this function must not fail in, and `caution` is
+ * what the string matcher returned for an unrecognised change before
+ * the union existed.
+ */
 export function classifyChange(change: ChangeDescription): BreakingLevel {
-  return CHANGE_LEVEL[change.change];
+  return CHANGE_LEVEL[change.change] ?? "caution";
 }
 
 /**
