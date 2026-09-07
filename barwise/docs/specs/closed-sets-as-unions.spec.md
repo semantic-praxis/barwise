@@ -215,6 +215,39 @@ Acceptance: when a variant is added to `ChangeDescription` without a
 rendered, the text shall be unchanged from today's for every existing
 variant, pinned by the existing diff tests.
 
+## Measured blast radius
+
+Spiked rather than estimated, 2026-09-07, by generating the union from
+the 76 literals, narrowing `Diagnostic.ruleId`, building core and
+type-checking all eleven downstream packages. The spike was reverted.
+
+| Package         | WS2 errors | What broke                                         |
+| --------------- | ---------- | -------------------------------------------------- |
+| `core`          | 0          | nothing: all 76 literals already satisfy the union |
+| `cli`           | 1          | `validate.ts:67`, the one non-core producer        |
+| everything else | 0          | a union is assignable to `string`                  |
+
+WS2 is therefore far smaller than its row count suggests. The 17 rule
+modules do not change at all -- narrowing a _produced_ value costs its
+producers nothing when their literals are already members, and the
+compiler simply starts checking them. The whole diff is one new file of
+76 rows, one narrowed field, one export, and one decision about
+`project/file-unresolved`.
+
+WS3 is the larger half, and it is concentrated in core:
+
+| Package                    | Sites | Kind                                       |
+| -------------------------- | ----- | ------------------------------------------ |
+| `core/src` (2 files)       | 12    | the real work: `deltas.ts`, `ModelDiff.ts` |
+| `core/src/elementDiff.ts`  | 20+   | the producers, rewritten to emit variants  |
+| `core/tests`               | 31    | fixtures, not type-checked (barwise-944)   |
+| `cli`, `vscode`, `mcp` src | 6     | all read-and-join, for display only        |
+
+Every downstream site iterates or joins the strings, so keeping
+`changeDescriptions` as a derived getter leaves all six untouched. That
+is the difference between WS3 as scoped here and a rewrite that changes
+what four packages display.
+
 ## API and migration impact
 
 - `Diagnostic.ruleId` narrows from `string` to `RuleId`. Narrowing a
