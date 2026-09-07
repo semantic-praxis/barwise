@@ -1,5 +1,6 @@
 import type { OrmProject } from "../../model/OrmProject.js";
 import type { Diagnostic } from "../Diagnostic.js";
+import { report, RULE_ID } from "../ruleId.js";
 
 /**
  * A project-level validation rule inspects an OrmProject and returns
@@ -37,22 +38,26 @@ function checkMappingContextsExist(project: OrmProject): Diagnostic[] {
 
   for (const mapping of project.mappings) {
     if (!domainContexts.has(mapping.sourceContext)) {
-      diagnostics.push({
-        severity: "error",
-        message: `Context mapping "${mapping.path}" references source context `
-          + `"${mapping.sourceContext}" which is not a domain in the project.`,
-        elementId: mapping.path,
-        ruleId: "project/mapping-source-context-missing",
-      });
+      diagnostics.push(
+        report(
+          RULE_ID.mappingSourceContextMissing,
+          "default",
+          mapping.path,
+          mapping.path,
+          mapping.sourceContext,
+        ),
+      );
     }
     if (!domainContexts.has(mapping.targetContext)) {
-      diagnostics.push({
-        severity: "error",
-        message: `Context mapping "${mapping.path}" references target context `
-          + `"${mapping.targetContext}" which is not a domain in the project.`,
-        elementId: mapping.path,
-        ruleId: "project/mapping-target-context-missing",
-      });
+      diagnostics.push(
+        report(
+          RULE_ID.mappingTargetContextMissing,
+          "default",
+          mapping.path,
+          mapping.path,
+          mapping.targetContext,
+        ),
+      );
     }
   }
 
@@ -78,14 +83,16 @@ function checkEntityMappingReferences(
         const sourceRef = em.sourceObjectType;
         const sourceOt = sourceDomain.model.getObjectTypeByName(sourceRef);
         if (!sourceOt) {
-          diagnostics.push({
-            severity: "error",
-            message: `Entity mapping in "${mapping.path}" references source `
-              + `object type "${sourceRef}" which does not exist in `
-              + `domain "${mapping.sourceContext}".`,
-            elementId: mapping.path,
-            ruleId: "project/entity-mapping-source-missing",
-          });
+          diagnostics.push(
+            report(
+              RULE_ID.entityMappingSourceMissing,
+              "default",
+              mapping.path,
+              mapping.path,
+              sourceRef,
+              mapping.sourceContext,
+            ),
+          );
         }
       }
 
@@ -94,14 +101,16 @@ function checkEntityMappingReferences(
         const targetRef = em.targetObjectType;
         const targetOt = targetDomain.model.getObjectTypeByName(targetRef);
         if (!targetOt) {
-          diagnostics.push({
-            severity: "error",
-            message: `Entity mapping in "${mapping.path}" references target `
-              + `object type "${targetRef}" which does not exist in `
-              + `domain "${mapping.targetContext}".`,
-            elementId: mapping.path,
-            ruleId: "project/entity-mapping-target-missing",
-          });
+          diagnostics.push(
+            report(
+              RULE_ID.entityMappingTargetMissing,
+              "default",
+              mapping.path,
+              mapping.path,
+              targetRef,
+              mapping.targetContext,
+            ),
+          );
         }
       }
     }
@@ -124,13 +133,15 @@ function checkProductDependencies(project: OrmProject): Diagnostic[] {
   for (const product of project.products) {
     for (const depDomain of product.dependsOnDomains) {
       if (!domainContexts.has(depDomain)) {
-        diagnostics.push({
-          severity: "error",
-          message: `Data product "${product.context}" depends on domain `
-            + `"${depDomain}" which is not in the project.`,
-          elementId: product.path,
-          ruleId: "project/product-domain-dependency-missing",
-        });
+        diagnostics.push(
+          report(
+            RULE_ID.productDomainDependencyMissing,
+            "default",
+            product.path,
+            product.context,
+            depDomain,
+          ),
+        );
       }
     }
 
@@ -140,13 +151,15 @@ function checkProductDependencies(project: OrmProject): Diagnostic[] {
         (p) => p === depMapping || p.includes(depMapping),
       );
       if (!found) {
-        diagnostics.push({
-          severity: "warning",
-          message: `Data product "${product.context}" depends on mapping `
-            + `"${depMapping}" which could not be matched to a mapping in the project.`,
-          elementId: product.path,
-          ruleId: "project/product-mapping-dependency-unresolved",
-        });
+        diagnostics.push(
+          report(
+            RULE_ID.productMappingDependencyUnresolved,
+            "default",
+            product.path,
+            product.context,
+            depMapping,
+          ),
+        );
       }
     }
   }

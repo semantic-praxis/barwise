@@ -6,16 +6,6 @@
       "note": "generated artifact with a drift test (builtins.test.ts)",
       "detail": "packages/llm/src/prompt/artifacts/builtins.generated.ts (guard test mentioning it: yes)"
     },
-    "literal:019e7e2edc08": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"project/entity-mapping-source-missing\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/projectRules.ts"
-    },
-    "literal:044cce5bb19d": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"structural/objectified-dangling-fact-type\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/structural.ts"
-    },
     "literal:04dabcc31485": {
       "status": "tracked:barwise-875",
       "note": "extraction tool-prompt fragment duplicated across providers; move to @barwise/llm",
@@ -25,11 +15,6 @@
       "status": "accepted-benign",
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"Output as JSON instead of human-readable text\" in packages/cli/src/commands/describe.ts, packages/cli/src/commands/query.ts"
-    },
-    "literal:0862b187f0aa": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"completeness/isolated-object-type\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/completenessWarnings.ts"
     },
     "literal:0f47c7c3ae64": {
       "status": "accepted-benign",
@@ -56,25 +41,10 @@
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"Path to .orm.yaml or .orm-project.yaml file\" in packages/cli/src/commands/describe.ts, packages/cli/src/commands/diagram.ts, packages/cli/src/commands/export.ts, packages/cli/src/commands/query.ts, packages/cli/src/commands/validate.ts, packages/cli/src/commands/verbalize.ts"
     },
-    "literal:17e611c0d6d8": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/spanning-all-roles\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
-    },
-    "literal:187d99670899": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"population/external-uniqueness-violation\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/population/uniqueness.ts"
-    },
     "literal:1da02d15746d": {
       "status": "accepted-benign",
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"Kotlin project (annotations, sealed classes, validations)\" in packages/code-analysis/src/formats/KotlinImportFormat.ts, packages/code-analysis/src/formats/registration.ts"
-    },
-    "literal:1df4f6c4019b": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/cardinality-max-less-than-min\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
     },
     "literal:1e84528eae54": {
       "status": "accepted-benign",
@@ -86,35 +56,10 @@
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"File path to .orm.yaml, .orm-project.yaml, or inline YAML content\" in packages/mcp/src/tools/describeDomain.ts, packages/mcp/src/tools/exportModel.ts, packages/mcp/src/tools/queryModel.ts, packages/mcp/src/tools/review.ts, packages/mcp/src/tools/validate.ts, packages/mcp/src/tools/verbalize.ts"
     },
-    "literal:2f498737c37c": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/mandatory-invalid-role\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
-    },
-    "literal:32b803dd0d4e": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"population/mandatory-violation\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/population/mandatory.ts"
-    },
-    "literal:35f3824fa191": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"population/value-constraint-violation\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/population/valueFrequency.ts"
-    },
-    "literal:364a91594dad": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/exclusion-too-few-roles\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
-    },
     "literal:37a6fdb45c78": {
       "status": "accepted-benign",
       "note": "one diagnostic family deliberately emitted by two population rule files",
       "detail": "\"population/equality-violation\" in packages/core/src/validation/rules/population/setComparison.ts, packages/core/src/validation/rules/population/spanning.ts"
-    },
-    "literal:38ec967f4fe5": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/equality-arity-mismatch\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
     },
     "literal:3a530b0bebb7": {
       "status": "accepted-benign",
@@ -125,11 +70,6 @@
       "status": "tracked:barwise-875",
       "note": "part of the duplicated analyze extractModel pair (audit C8)",
       "detail": "\"no deterministic import format detected for this repository \" in packages/cli/src/commands/analyze.ts, packages/mcp/src/tools/analyze.ts"
-    },
-    "literal:428245ccfeeb": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"structural/binary-missing-inverse-reading\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/structural.ts"
     },
     "literal:4352dacc84a1": {
       "status": "tracked:barwise-875",
@@ -146,50 +86,15 @@
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"Model override for the LLM provider\" in packages/cli/src/commands/import/transcript.ts, packages/cli/src/commands/prompt.ts, packages/cli/src/commands/review.ts"
     },
-    "literal:4ac3e2f0900b": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/exclusive-or-too-few-roles\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
-    },
-    "literal:51068e131699": {
-      "status": "accepted-benign",
-      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
-      "detail": "\"population/exclusive-or-violation\" in packages/core/src/validation/rules/population/setComparison.ts, packages/core/src/validation/rules/population/spanning.ts"
-    },
-    "literal:5440f4cb5ee3": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"population/join-exclusion-violation\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/population/joinPath.ts"
-    },
     "literal:560138396b48": {
       "status": "accepted-benign",
       "note": "the documented deliberate cli/mcp workspace mirror (mcp/src/workspace/resolve.ts header); cli/commands/diagram.ts's third unshared copy is tracked under the same audit finding",
       "detail": "\". Available: ${available || \" in packages/cli/src/workspace/domainModels.ts, packages/mcp/src/workspace/resolve.ts"
     },
-    "literal:59eda50cf5c2": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"population/join-equality-violation\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/population/joinPath.ts"
-    },
     "literal:5e8c47fe1a0d": {
       "status": "accepted-benign",
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"Write .orm.yaml to file instead of stdout\" in packages/cli/src/commands/import/code.ts, packages/cli/src/commands/import/dbt.ts, packages/cli/src/commands/import/model.ts, packages/cli/src/commands/import/norma.ts, packages/cli/src/commands/import/sql.ts, packages/cli/src/commands/import/transcript.ts"
-    },
-    "literal:5ff3bba8750b": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"structural/dangling-role-reference\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/structural.ts"
-    },
-    "literal:603f0935f321": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"population/unary-role-cardinality-violation\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/population/cardinality.ts"
-    },
-    "literal:61f1ac13f822": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"completeness/multiple-preferred-identifiers\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/completenessWarnings.ts"
     },
     "literal:64e47a4126f6": {
       "status": "accepted-benign",
@@ -200,11 +105,6 @@
       "status": "accepted-benign",
       "note": "shared option wording only -- the provider LIST it once carried is now derived from PROVIDER_NAMES (barwise-867); remaining repetition is help-text phrasing, not a decision",
       "detail": "\"LLM model override (e.g. 'gpt-4o', 'claude-sonnet-4-5-20250929')\" in packages/mcp/src/tools/import.ts, packages/mcp/src/tools/review.ts"
-    },
-    "literal:6d6bf320d83b": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/internal-uniqueness-invalid-role\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
     },
     "literal:6f8d60c49e53": {
       "status": "accepted-benign",
@@ -221,16 +121,6 @@
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"Java project (annotations, types, validations)\" in packages/code-analysis/src/formats/JavaImportFormat.ts, packages/code-analysis/src/formats/registration.ts"
     },
-    "literal:77e76ba43875": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/value-constraint-invalid-role\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
-    },
-    "literal:7a71af7e0fdc": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"structural/duplicate-object-type-name\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/structural.ts"
-    },
     "literal:7c9ed77763f0": {
       "status": "accepted-benign",
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
@@ -246,50 +136,15 @@
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"File path or inline YAML for the base model\" in packages/mcp/src/tools/diff.ts, packages/mcp/src/tools/merge.ts"
     },
-    "literal:853b4226340e": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"completeness/fact-type-without-uniqueness\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/completenessWarnings.ts"
-    },
-    "literal:8638eae84de0": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"population/object-cardinality-violation\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/population/cardinality.ts"
-    },
-    "literal:8c01aee695f5": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/external-uniqueness-all-local\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
-    },
     "literal:8f95b7c3b80b": {
       "status": "tracked:barwise-875",
       "note": "counterexample renderer twin between cli and mcp (audit C12)",
       "detail": "\"Counterexamples (what the constraints rule out):\" in packages/cli/src/workspace/format.ts, packages/mcp/src/tools/verbalize.ts"
     },
-    "literal:91b167556aaf": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"derivation/derived-with-population\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/derivationRules.ts"
-    },
-    "literal:92944b5eaece": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"structural/subtype-dangling-subtype\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/structural.ts"
-    },
     "literal:930fc90869d0": {
       "status": "accepted-benign",
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"Name for the imported Barwise model\" in packages/vscode/src/commands/ImportCodeCommand.ts, packages/vscode/src/commands/ImportDbtCommand.ts"
-    },
-    "literal:94ce24cc7edf": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/cardinality-invalid-role\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
-    },
-    "literal:952aad32a53f": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"completeness/missing-object-type-definition\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/completenessWarnings.ts"
     },
     "literal:95f7bf50feb3": {
       "status": "accepted-benign",
@@ -301,40 +156,10 @@
       "note": "part of the duplicated analyze extractModel pair (audit C8)",
       "detail": "\"Branch, tag, or commit to analyze\" in packages/cli/src/commands/analyze.ts, packages/mcp/src/tools/analyze.ts"
     },
-    "literal:9aba2efebff7": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"structural/subtype-not-entity\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/structural.ts"
-    },
-    "literal:9b9e031a6dbc": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"population/join-subset-violation\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/population/joinPath.ts"
-    },
-    "literal:9bbebb629e1f": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"population/disjunctive-mandatory-violation\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/population/mandatory.ts"
-    },
     "literal:9cf1e480a40f": {
       "status": "accepted-benign",
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\" produces `# TODO(barwise):`, \" in packages/core/src/annotation/ExportAnnotationCollector.ts, packages/core/src/annotation/helpers.ts"
-    },
-    "literal:9e59b8f995cc": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"project/product-domain-dependency-missing\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/projectRules.ts"
-    },
-    "literal:9f882fc8f2a6": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"project/entity-mapping-target-missing\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/projectRules.ts"
-    },
-    "literal:a092ab76be56": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"structural/duplicate-objectification\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/structural.ts"
     },
     "literal:a3312c7106f0": {
       "status": "accepted-benign",
@@ -351,135 +176,20 @@
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"Output format (text or json)\" in packages/cli/src/commands/analyze.ts, packages/cli/src/commands/diff.ts, packages/cli/src/commands/gym.ts, packages/cli/src/commands/lineage.ts, packages/cli/src/commands/llmUsage.ts, packages/cli/src/commands/prompt.ts, packages/cli/src/commands/review.ts, packages/cli/src/commands/validate.ts, packages/cli/src/commands/verbalize.ts"
     },
-    "literal:ae8161af1ce8": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"population/dangling-fact-type\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/population/structural.ts"
-    },
-    "literal:b2c090b76301": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"population/uniqueness-violation\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/population/uniqueness.ts"
-    },
     "literal:b45e4fc13e0b": {
       "status": "accepted-benign",
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"Apache Avro schema definitions (.avsc)\" in packages/formats/src/avro/AvroExportFormat.ts, packages/formats/src/registration.ts"
-    },
-    "literal:b7a91ec2a05e": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/join-too-few-operands\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/joinConstraintRules.ts"
-    },
-    "literal:b8d5d43fa091": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"project/mapping-target-context-missing\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/projectRules.ts"
-    },
-    "literal:bc4d4728819f": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/join-discontiguous\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/joinConstraintRules.ts"
-    },
-    "literal:bd5c97d14406": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"structural/objectified-not-entity\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/structural.ts"
     },
     "literal:bf5e6f822f5a": {
       "status": "accepted-benign",
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"Path to incoming .orm.yaml file\" in packages/cli/src/commands/diff.ts, packages/cli/src/commands/merge.ts"
     },
-    "literal:c3ece3cfc92f": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/frequency-invalid-min\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
-    },
-    "literal:c71861f69ef6": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"completeness/missing-preferred-identifier\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/completenessWarnings.ts"
-    },
-    "literal:c7445091d3ee": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/join-bad-projection\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/joinConstraintRules.ts"
-    },
-    "literal:c754cd2dd7ee": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"structural/duplicate-objectification-target\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/structural.ts"
-    },
-    "literal:c9142d79c0f3": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"structural/subtype-dangling-supertype\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/structural.ts"
-    },
-    "literal:cb0083ebbc9d": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"structural/duplicate-fact-type-name\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/structural.ts"
-    },
-    "literal:cedb1e81059b": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/join-arity-mismatch\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/joinConstraintRules.ts"
-    },
-    "literal:d236dd0d5d12": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/disjunctive-mandatory-too-few-roles\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
-    },
-    "literal:d87d98cfbbf5": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/cardinality-non-unary\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
-    },
-    "literal:d8926cd9e21b": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"population/value-comparison-violation\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/population/valueComparison.ts"
-    },
-    "literal:dc3b6d44cebd": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/subset-arity-mismatch\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
-    },
-    "literal:e016c0ab71a6": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"project/product-mapping-dependency-unresolved\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/projectRules.ts"
-    },
-    "literal:e03e49c181dc": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/frequency-empty-roles\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
-    },
-    "literal:e16a2e7201a4": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"project/mapping-source-context-missing\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/projectRules.ts"
-    },
-    "literal:e3367c7d3e19": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"completeness/fact-type-without-constraints\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/completenessWarnings.ts"
-    },
-    "literal:e63dcb6a696d": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"population/incomplete-instance\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/population/structural.ts"
-    },
     "literal:ed82f35862b1": {
       "status": "accepted-benign",
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"Ollama server URL (only for ollama provider)\" in packages/cli/src/commands/import/batch.ts, packages/cli/src/commands/import/transcript.ts, packages/cli/src/commands/prompt.ts, packages/cli/src/commands/review.ts"
-    },
-    "literal:f03041dc7b1b": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/frequency-invalid-role\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
     },
     "literal:f050ba536362": {
       "status": "accepted-benign",
@@ -491,60 +201,10 @@
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"File path or inline YAML for the incoming model\" in packages/mcp/src/tools/diff.ts, packages/mcp/src/tools/merge.ts"
     },
-    "literal:f2d03091d291": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/ring-different-players\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
-    },
     "literal:f356330501a4": {
       "status": "accepted-benign",
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"File path to .orm.yaml or inline YAML content\" in packages/mcp/src/tools/diagram.ts, packages/mcp/src/tools/schema.ts"
-    },
-    "literal:f40781f31564": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"structural/objectified-dangling-object-type\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/structural.ts"
-    },
-    "literal:f4fbb2f1cbc1": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/join-column-type-mismatch\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/joinConstraintRules.ts"
-    },
-    "literal:f521293da967": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"completeness/missing-value-type-data-type\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/completenessWarnings.ts"
-    },
-    "literal:f5442d3406ac": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/ring-invalid-role\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
-    },
-    "literal:f5568d265e84": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/frequency-max-less-than-min\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
-    },
-    "literal:f9a280dfe624": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/join-empty-projection\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/joinConstraintRules.ts"
-    },
-    "literal:fa7afd3d37ea": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/join-unknown-root\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/joinConstraintRules.ts"
-    },
-    "literal:fe0a3d6ef181": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"constraint/value-comparison-invalid-role\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/constraintConsistency.ts"
-    },
-    "literal:fe51e9d5177e": {
-      "status": "accepted-benign",
-      "note": "rule id declared in the registry and emitted by its rule; the pair is compiler-enforced (the RuleId union rejects an id no row declares) and drift-tested both ways (tests/validation/ruleId.test.ts fails on a row no rule emits). A declaration and its use, not two maintained copies.",
-      "detail": "\"population/frequency-violation\" in packages/core/src/validation/ruleId.ts, packages/core/src/validation/rules/population/valueFrequency.ts"
     },
     "prose:3ab05c3cbd94": {
       "status": "accepted-benign",

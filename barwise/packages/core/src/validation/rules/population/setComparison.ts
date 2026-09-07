@@ -1,6 +1,7 @@
 import { isEquality, isExclusion, isExclusiveOr, isSubset } from "../../../model/Constraint.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
+import { reportAs, RULE_ID } from "../../ruleId.js";
 import { makeCompositeKey, severityForModality } from "./shared.js";
 
 /**
@@ -39,13 +40,18 @@ export function checkExclusionViolations(model: OrmModel): Diagnostic[] {
 
         for (const [val, roles] of valuesInRoles) {
           if (roles.length > 1) {
-            diagnostics.push({
-              severity: severityForModality(ec),
-              message: `Population "${pop.id}": instance "${inst.id}" has value `
-                + `"${val}" in multiple excluded roles [${roles.join(", ")}].`,
-              elementId: pop.id,
-              ruleId: "population/exclusion-violation",
-            });
+            diagnostics.push(
+              reportAs(
+                severityForModality(ec),
+                RULE_ID.exclusionViolation,
+                "spanning",
+                pop.id,
+                pop.id,
+                inst.id,
+                val,
+                roles.join(", "),
+              ),
+            );
           }
         }
       }
@@ -83,22 +89,30 @@ export function checkExclusiveOrViolations(model: OrmModel): Diagnostic[] {
         }
 
         if (playedRoles.length === 0) {
-          diagnostics.push({
-            severity: severityForModality(xor),
-            message: `Population "${pop.id}": instance "${inst.id}" does not play `
-              + `any of the exclusive-or roles [${localRoleIds.join(", ")}].`,
-            elementId: pop.id,
-            ruleId: "population/exclusive-or-violation",
-          });
+          diagnostics.push(
+            reportAs(
+              severityForModality(xor),
+              RULE_ID.exclusiveOrViolation,
+              "spanning",
+              pop.id,
+              pop.id,
+              inst.id,
+              localRoleIds.join(", "),
+            ),
+          );
         } else if (playedRoles.length > 1) {
-          diagnostics.push({
-            severity: severityForModality(xor),
-            message: `Population "${pop.id}": instance "${inst.id}" plays `
-              + `${playedRoles.length} of the exclusive-or roles `
-              + `[${playedRoles.join(", ")}] but must play exactly one.`,
-            elementId: pop.id,
-            ruleId: "population/exclusive-or-violation",
-          });
+          diagnostics.push(
+            reportAs(
+              severityForModality(xor),
+              RULE_ID.exclusiveOrViolation,
+              "localNone",
+              pop.id,
+              pop.id,
+              inst.id,
+              playedRoles.length,
+              playedRoles.join(", "),
+            ),
+          );
         }
       }
     }
@@ -136,15 +150,19 @@ export function checkSubsetViolations(model: OrmModel): Diagnostic[] {
       for (const inst of pop.instances) {
         const subsetKey = makeCompositeKey(inst, sc.subsetRoleIds);
         if (!supersetTuples.has(subsetKey)) {
-          diagnostics.push({
-            severity: severityForModality(sc),
-            message: `Population "${pop.id}": instance "${inst.id}" has subset `
-              + `tuple [${subsetKey}] for roles [${sc.subsetRoleIds.join(", ")}] `
-              + `with no matching superset tuple in roles `
-              + `[${sc.supersetRoleIds.join(", ")}].`,
-            elementId: pop.id,
-            ruleId: "population/subset-violation",
-          });
+          diagnostics.push(
+            reportAs(
+              severityForModality(sc),
+              RULE_ID.subsetViolation,
+              "spanning",
+              pop.id,
+              pop.id,
+              inst.id,
+              subsetKey,
+              sc.subsetRoleIds.join(", "),
+              sc.supersetRoleIds.join(", "),
+            ),
+          );
         }
       }
     }
@@ -184,14 +202,19 @@ export function checkEqualityViolations(model: OrmModel): Diagnostic[] {
       for (const inst of pop.instances) {
         const key1 = makeCompositeKey(inst, eq.roleIds1);
         if (!tuples2.has(key1)) {
-          diagnostics.push({
-            severity: severityForModality(eq),
-            message: `Population "${pop.id}": instance "${inst.id}" has tuple `
-              + `[${key1}] in roles [${eq.roleIds1.join(", ")}] with no `
-              + `matching tuple in roles [${eq.roleIds2.join(", ")}].`,
-            elementId: pop.id,
-            ruleId: "population/equality-violation",
-          });
+          diagnostics.push(
+            reportAs(
+              severityForModality(eq),
+              RULE_ID.equalityViolation,
+              "spanning",
+              pop.id,
+              pop.id,
+              inst.id,
+              key1,
+              eq.roleIds1.join(", "),
+              eq.roleIds2.join(", "),
+            ),
+          );
         }
       }
 
@@ -199,14 +222,19 @@ export function checkEqualityViolations(model: OrmModel): Diagnostic[] {
       for (const inst of pop.instances) {
         const key2 = makeCompositeKey(inst, eq.roleIds2);
         if (!tuples1.has(key2)) {
-          diagnostics.push({
-            severity: severityForModality(eq),
-            message: `Population "${pop.id}": instance "${inst.id}" has tuple `
-              + `[${key2}] in roles [${eq.roleIds2.join(", ")}] with no `
-              + `matching tuple in roles [${eq.roleIds1.join(", ")}].`,
-            elementId: pop.id,
-            ruleId: "population/equality-violation",
-          });
+          diagnostics.push(
+            reportAs(
+              severityForModality(eq),
+              RULE_ID.equalityViolation,
+              "spanningReverse",
+              pop.id,
+              pop.id,
+              inst.id,
+              key2,
+              eq.roleIds2.join(", "),
+              eq.roleIds1.join(", "),
+            ),
+          );
         }
       }
     }

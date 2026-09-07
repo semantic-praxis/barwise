@@ -1,6 +1,7 @@
 import { isValueComparison, type ValueComparisonOperator } from "../../../model/Constraint.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
+import { reportAs, RULE_ID } from "../../ruleId.js";
 import { severityForModality } from "./shared.js";
 
 /** Whether a string parses as a finite number. */
@@ -53,13 +54,19 @@ export function checkValueComparisonViolations(model: OrmModel): Diagnostic[] {
         const b = inst.roleValues[vc.roleId2];
         if (a === undefined || b === undefined) continue;
         if (!comparisonHolds(a, vc.operator, b)) {
-          diagnostics.push({
-            severity: severityForModality(vc),
-            message: `Population "${pop.id}": instance "${inst.id}" violates the `
-              + `value-comparison constraint -- "${a}" ${vc.operator} "${b}" is false.`,
-            elementId: pop.id,
-            ruleId: "population/value-comparison-violation",
-          });
+          diagnostics.push(
+            reportAs(
+              severityForModality(vc),
+              RULE_ID.valueComparisonViolation,
+              "default",
+              pop.id,
+              pop.id,
+              inst.id,
+              a,
+              vc.operator,
+              b,
+            ),
+          );
         }
       }
     }

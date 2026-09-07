@@ -3,6 +3,7 @@ import { isDisjunctiveMandatory, isMandatoryRole } from "../../../model/Constrai
 import type { FactType } from "../../../model/FactType.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
+import { reportAs, RULE_ID } from "../../ruleId.js";
 import { buildObjectUniverse, severityForModality, valuesPlayedInRole } from "./shared.js";
 
 /**
@@ -44,14 +45,17 @@ function mandatoryViolationsIn(
   const played = valuesPlayedInRole(model, c.roleId);
   for (const value of required) {
     if (!played.has(value)) {
-      diagnostics.push({
-        severity: severityForModality(c),
-        message: `Mandatory constraint on role "${c.roleId}" in fact type `
-          + `"${ft.name}" is violated: "${value}" appears in the model but `
-          + `does not play this mandatory role.`,
-        elementId: c.id ?? ft.id,
-        ruleId: "population/mandatory-violation",
-      });
+      diagnostics.push(
+        reportAs(
+          severityForModality(c),
+          RULE_ID.mandatoryViolation,
+          "default",
+          c.id ?? ft.id,
+          c.roleId,
+          ft.name,
+          value,
+        ),
+      );
     }
   }
   return diagnostics;
@@ -122,14 +126,16 @@ function disjunctiveMandatoryViolationsIn(
 
   for (const value of required) {
     if (!playedSomewhere.has(value)) {
-      diagnostics.push({
-        severity: severityForModality(c),
-        message: `Disjunctive mandatory constraint on roles `
-          + `[${c.roleIds.join(", ")}] is violated: "${value}" plays none `
-          + `of them.`,
-        elementId: c.id ?? ft.id,
-        ruleId: "population/disjunctive-mandatory-violation",
-      });
+      diagnostics.push(
+        reportAs(
+          severityForModality(c),
+          RULE_ID.disjunctiveMandatoryViolation,
+          "default",
+          c.id ?? ft.id,
+          c.roleIds.join(", "),
+          value,
+        ),
+      );
     }
   }
   return diagnostics;

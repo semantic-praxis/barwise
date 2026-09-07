@@ -1,6 +1,7 @@
 import { isEquality, isExclusion, isExclusiveOr, isSubset } from "../../../model/Constraint.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
+import { reportAs, RULE_ID } from "../../ruleId.js";
 import {
   buildObjectUniverse,
   rolePlayerMap,
@@ -29,13 +30,17 @@ export function checkSpanningExclusionViolations(model: OrmModel): Diagnostic[] 
       for (const value of all) {
         const count = valuesByRole.filter((set) => set.has(value)).length;
         if (count > 1) {
-          diagnostics.push({
-            severity: severityForModality(c),
-            message: `Exclusion constraint on roles [${c.roleIds.join(", ")}] is `
-              + `violated: "${value}" plays ${count} of the excluded roles.`,
-            elementId: c.id ?? ft.id,
-            ruleId: "population/exclusion-violation",
-          });
+          diagnostics.push(
+            reportAs(
+              severityForModality(c),
+              RULE_ID.exclusionViolation,
+              "local",
+              c.id ?? ft.id,
+              c.roleIds.join(", "),
+              value,
+              count,
+            ),
+          );
         }
       }
     }
@@ -69,13 +74,17 @@ export function checkSpanningExclusiveOrViolations(model: OrmModel): Diagnostic[
       for (const value of required) {
         const count = valuesByRole.filter((set) => set.has(value)).length;
         if (count !== 1) {
-          diagnostics.push({
-            severity: severityForModality(c),
-            message: `Exclusive-or constraint on roles [${c.roleIds.join(", ")}] `
-              + `is violated: "${value}" plays ${count} of them (must be exactly one).`,
-            elementId: c.id ?? ft.id,
-            ruleId: "population/exclusive-or-violation",
-          });
+          diagnostics.push(
+            reportAs(
+              severityForModality(c),
+              RULE_ID.exclusiveOrViolation,
+              "localMultiple",
+              c.id ?? ft.id,
+              c.roleIds.join(", "),
+              value,
+              count,
+            ),
+          );
         }
       }
     }
@@ -100,14 +109,17 @@ export function checkSpanningSubsetViolations(model: OrmModel): Diagnostic[] {
       const supersetTuples = tuplesForRoleSeq(model, c.supersetRoleIds);
       for (const tuple of subsetTuples) {
         if (!supersetTuples.has(tuple)) {
-          diagnostics.push({
-            severity: severityForModality(c),
-            message: `Subset constraint is violated: tuple [${tuple}] in roles `
-              + `[${c.subsetRoleIds.join(", ")}] has no match in roles `
-              + `[${c.supersetRoleIds.join(", ")}].`,
-            elementId: c.id ?? ft.id,
-            ruleId: "population/subset-violation",
-          });
+          diagnostics.push(
+            reportAs(
+              severityForModality(c),
+              RULE_ID.subsetViolation,
+              "local",
+              c.id ?? ft.id,
+              tuple,
+              c.subsetRoleIds.join(", "),
+              c.supersetRoleIds.join(", "),
+            ),
+          );
         }
       }
     }
@@ -132,26 +144,32 @@ export function checkSpanningEqualityViolations(model: OrmModel): Diagnostic[] {
       const tuples2 = tuplesForRoleSeq(model, c.roleIds2);
       for (const tuple of tuples1) {
         if (!tuples2.has(tuple)) {
-          diagnostics.push({
-            severity: severityForModality(c),
-            message: `Equality constraint is violated: tuple [${tuple}] in roles `
-              + `[${c.roleIds1.join(", ")}] has no match in roles `
-              + `[${c.roleIds2.join(", ")}].`,
-            elementId: c.id ?? ft.id,
-            ruleId: "population/equality-violation",
-          });
+          diagnostics.push(
+            reportAs(
+              severityForModality(c),
+              RULE_ID.equalityViolation,
+              "local",
+              c.id ?? ft.id,
+              tuple,
+              c.roleIds1.join(", "),
+              c.roleIds2.join(", "),
+            ),
+          );
         }
       }
       for (const tuple of tuples2) {
         if (!tuples1.has(tuple)) {
-          diagnostics.push({
-            severity: severityForModality(c),
-            message: `Equality constraint is violated: tuple [${tuple}] in roles `
-              + `[${c.roleIds2.join(", ")}] has no match in roles `
-              + `[${c.roleIds1.join(", ")}].`,
-            elementId: c.id ?? ft.id,
-            ruleId: "population/equality-violation",
-          });
+          diagnostics.push(
+            reportAs(
+              severityForModality(c),
+              RULE_ID.equalityViolation,
+              "localReverse",
+              c.id ?? ft.id,
+              tuple,
+              c.roleIds2.join(", "),
+              c.roleIds1.join(", "),
+            ),
+          );
         }
       }
     }

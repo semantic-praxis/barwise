@@ -248,80 +248,53 @@ default type parameter absorbs them; the CLI fails on exactly the one
 out-of-set literal, named in the error; and all 12 packages build once
 the CLI declares its own set. The cost outside core is four lines.
 
-**Scope revised 2026-09-07, mid-workstream, after review.** The first
-implementation declared the registry and then re-listed its keys at
-every emit site: 76 literals restated, which the duplication ratchet
-flagged as 67 new candidates and which authoring rule 1 of the
-`duplication-audit` skill forbids outright -- _before restating, look
-for the authority_. The registry was the authority and the same commit
-that created it copied out of it.
-
-The reviewer's question went further than the id. An emit site copies
-three things, and two of them belong to the rule:
+A rule's identity, its severity and its message text all live in the
+registry; an emit site names the rule and supplies only the occurrence:
 
 ```ts
-diagnostics.push({
-  severity: "error", // the registry declares this
-  message: "The subtype hierarchy contains a cycle.", // the occurrence
-  elementId: nodeId, // the occurrence
-  ruleId: "structural/subtype-cycle", // the registry's key
-});
-```
-
-**Settled: the registry owns the id and the severity.** `RULE_ID`
-carries the strings, the descriptors key off it, and a `report` helper
-reads the severity, so neither is ever restated:
-
-```ts
+diagnostics.push(report(RULE_ID.subtypeCycle, "default", nodeId));
 diagnostics.push(
-  report(
-    RULE_ID.subtypeCycle,
-    nodeId,
-    "The subtype hierarchy contains a cycle.",
-  ),
+  report(RULE_ID.exclusionViolation, "spanning", ft.id, roles, value, count),
 );
 ```
 
-**Open: whether the registry also owns the message.** The reviewer
-proposed it, and a typed message function makes the arguments checkable
-per rule -- verified by spike, where too few arguments, too many, and a
-`string` where a `number` belongs are all compile errors:
+`messages` is a dictionary keyed by message id, following SARIF's
+`reportingDescriptor.messageStrings`, because nine rules legitimately
+report more than one condition -- `population/exclusion-violation` fires
+both for roles within one fact type and for roles spanning several, and
+those are different sentences. Naming the message rather than splitting
+the rule is what SARIF does, and it keeps the distinction machine-
+readable: the message id maps onto a result's `message.id` on export.
+
+The message is a typed function rather than a `{0}`-placeholder string:
 
 ```ts
-message: (typeName: string, count: number, max: number) =>
-  `Object type "${typeName}" has ${count} instance(s), above the maximum of ${max}.`,
+[RULE_ID.objectCardinalityViolation]: {
+  severity: "error",
+  description: "An object type's population size falls outside its declared bounds.",
+  messages: {
+    aboveMaximum: (typeName: string, count: number, max: number | "unbounded") =>
+      `Object type "${typeName}" has ${count} instance(s), above the maximum of ${max}.`,
+  },
+},
 ```
 
-Extracting every emit site before writing that, though, found the
-premise does not hold. **There are 85 emit sites for 71 rule ids**, and
-11 ids carry messages that do not unify:
+With `report<K extends RuleId, M extends MessageId<K>>(id: K, messageId:
+M, elementId: string, ...args: Parameters<...>)`, an unknown message id,
+a wrong argument type and a wrong arity are all compile errors --
+verified by spike before this was written. The cost is that a function
+cannot be exported as a SARIF `messageString` for localization, so a
+writer emits the rendered `message.text`, which the standard permits.
+barwise has no localization requirement and does have a defect history
+of hand-copied lists, so the typing wins.
 
-| Rule                                | Distinct templates                                 |
-| ----------------------------------- | -------------------------------------------------- |
-| `population/equality-violation`     | 4                                                  |
-| `population/exclusive-or-violation` | 3                                                  |
-| `population/exclusion-violation`    | 2, structurally unrelated, from different modules  |
-| `derivation/missing-rule`           | 2 ("derivation rule text" vs "defining rule text") |
-| seven others                        | 2 each, unifying on one argument                   |
+Two things stay at the emit site. Roughly twenty rules derive severity
+at runtime through `severityForModality` (a deontic constraint lowers a
+violation to a warning), so they override the descriptor's default. And
+a few messages are computed rather than templated, and pass the computed
+piece as an argument.
 
-So one message per rule is false for 15% of them, and forcing it needs
-a discriminator argument, an emit-site override, or splitting those ids
--- the last of which changes the public rule vocabulary.
-
-The recommendation is to leave the message at the emit site, because
-the split is real rather than merely convenient: SARIF draws the same
-line, between a `reportingDescriptor.shortDescription` that says what
-the rule _is_ (one per rule, which is this registry's `description`)
-and a `result.message` that says what _happened_ (per occurrence). Four
-sentences for `equality-violation` is the model saying the message
-belongs to the occurrence. The message was never the duplication the
-review objected to; the id and the severity were.
-
-Rejected explicitly: message functions in the registry with an override
-for the 11. It makes "where is this message defined" a two-place
-question, which is worse than either pure answer.
-
-**Shipped 2026-09-07.** The spike's numbers held:**Shipped 2026-09-07.** The spike's numbers held: core's 125
+**Shipped 2026-09-07.** The spike's numbers held:**Shipped 2026-09-07.** The spike's numbers held:**Shipped 2026-09-07.** The spike's numbers held: core's 125
 `Diagnostic[]` signatures compiled unedited, and the only downstream
 break was the CLI's one out-of-set literal, named in the error.
 

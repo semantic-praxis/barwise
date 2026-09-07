@@ -20,11 +20,20 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { RULE_IDS, ruleDescriptor } from "../../src/validation/ruleId.js";
+import { RULE_ID, RULE_IDS, ruleDescriptor } from "../../src/validation/ruleId.js";
 
 const SRC = fileURLToPath(new URL("../../src", import.meta.url));
 
-/** Every `ruleId: "..."` literal in core's source. */
+/**
+ * Every `RULE_ID.<name>` referenced anywhere in core's source.
+ *
+ * Emit sites name the rule through the constant rather than repeating
+ * its string, so this scans for the reference. The compiler already
+ * rejects a name that does not exist; what it cannot see is the other
+ * direction -- a rule left in the registry that nothing emits any more,
+ * which still compiles and still passes every other test. That is how a
+ * catalogue fills up with rules that were deleted.
+ */
 function emittedRuleIds(): Set<string> {
   const found = new Set<string>();
   const walk = (dir: string): void => {
@@ -33,7 +42,7 @@ function emittedRuleIds(): Set<string> {
       if (statSync(path).isDirectory()) {
         walk(path);
       } else if (entry.endsWith(".ts") && entry !== "ruleId.ts") {
-        for (const match of readFileSync(path, "utf8").matchAll(/ruleId: "([^"]+)"/g)) {
+        for (const match of readFileSync(path, "utf8").matchAll(/RULE_ID\.(\w+)/g)) {
           found.add(match[1]!);
         }
       }
@@ -60,23 +69,15 @@ describe("the rule registry", () => {
     expect(tooShort).toEqual([]);
   });
 
-  it("lists every identifier the rules actually emit", () => {
-    // The compiler already rejects an emitted id that is absent here;
-    // this asserts the same thing at runtime so the failure names the
-    // id rather than appearing as a type error in an unrelated file.
-    const missing = [...emittedRuleIds()].filter((id) => !(RULE_IDS as string[]).includes(id));
-    expect(missing).toEqual([]);
-  });
-
-  it("lists no identifier the rules have stopped emitting", () => {
-    const emitted = emittedRuleIds();
-    const stale = RULE_IDS.filter((id) => !emitted.has(id));
+  it("lists no rule that nothing emits any more", () => {
+    const referenced = emittedRuleIds();
+    const stale = Object.keys(RULE_ID).filter((name) => !referenced.has(name));
     expect(stale).toEqual([]);
   });
 
-  it("found identifiers to check against", () => {
-    // Guards the two scans above from passing vacuously if the walk or
-    // the pattern ever stops matching.
+  it("found references to check against", () => {
+    // Guards the scan above from passing vacuously if the walk or the
+    // pattern ever stops matching.
     expect(emittedRuleIds().size).toBeGreaterThanOrEqual(70);
   });
 });

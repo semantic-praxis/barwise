@@ -21,6 +21,7 @@ import { OrmModel } from "../model/OrmModel.js";
 import { type PopulationConfig, toPopulationConfig } from "../model/Population.js";
 import { toSubtypeFactConfig } from "../model/SubtypeFact.js";
 import type { Diagnostic } from "../validation/Diagnostic.js";
+import { report, RULE_ID } from "../validation/ruleId.js";
 import { structuralRules } from "../validation/rules/structural.js";
 import type { DefinitionDelta, FactTypeDelta, ModelDelta, ObjectTypeDelta } from "./ModelDiff.js";
 
@@ -479,12 +480,7 @@ export function mergeAndValidate(
     return {
       model: null,
       diagnostics: [
-        {
-          severity: "error",
-          message: `Merge failed: ${message}`,
-          elementId: "",
-          ruleId: "merge-error",
-        },
+        report(RULE_ID.mergeError, "default", "", message),
       ],
       isValid: false,
     };

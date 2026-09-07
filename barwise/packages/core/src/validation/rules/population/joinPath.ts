@@ -7,6 +7,7 @@ import {
 import type { FactType } from "../../../model/FactType.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
+import { reportAs, RULE_ID } from "../../ruleId.js";
 import { buildObjectUniverse, severityForModality } from "./shared.js";
 
 /**
@@ -34,26 +35,18 @@ export function checkJoinPathViolations(model: OrmModel): Diagnostic[] {
         const sup = projectedTuples(model, c.superset);
         const missing = [...sub].find((t) => !sup.has(t));
         if (missing !== undefined) {
-          diagnostics.push({
-            severity,
-            message: `Join subset constraint in fact type "${ft.name}" is violated: the `
-              + `subset tuple [${missing}] is not in the superset operand.`,
-            elementId,
-            ruleId: "population/join-subset-violation",
-          });
+          diagnostics.push(
+            reportAs(severity, RULE_ID.joinSubsetViolation, "default", elementId, ft.name, missing),
+          );
         }
       } else if (isJoinEquality(c)) {
         const sets = c.operands.map((o) => projectedTuples(model, o));
         const all = new Set<string>(sets.flatMap((s) => [...s]));
         const bad = [...all].find((t) => sets.some((s) => !s.has(t)));
         if (bad !== undefined) {
-          diagnostics.push({
-            severity,
-            message: `Join equality constraint in fact type "${ft.name}" is violated: the `
-              + `tuple [${bad}] is not projected by every operand.`,
-            elementId,
-            ruleId: "population/join-equality-violation",
-          });
+          diagnostics.push(
+            reportAs(severity, RULE_ID.joinEqualityViolation, "default", elementId, ft.name, bad),
+          );
         }
       } else if (isJoinExclusion(c)) {
         const sets = c.operands.map((o) => projectedTuples(model, o));
@@ -63,13 +56,16 @@ export function checkJoinPathViolations(model: OrmModel): Diagnostic[] {
         }
         const shared = [...counts].find(([, n]) => n > 1)?.[0];
         if (shared !== undefined) {
-          diagnostics.push({
-            severity,
-            message: `Join exclusion constraint in fact type "${ft.name}" is violated: the `
-              + `tuple [${shared}] is projected by more than one operand.`,
-            elementId,
-            ruleId: "population/join-exclusion-violation",
-          });
+          diagnostics.push(
+            reportAs(
+              severity,
+              RULE_ID.joinExclusionViolation,
+              "default",
+              elementId,
+              ft.name,
+              shared,
+            ),
+          );
         }
       }
     }

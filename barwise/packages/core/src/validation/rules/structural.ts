@@ -1,5 +1,6 @@
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { Diagnostic } from "../Diagnostic.js";
+import { report, RULE_ID } from "../ruleId.js";
 
 /**
  * Structural validation rules.
@@ -38,13 +39,16 @@ function checkDanglingRoleReferences(model: OrmModel): Diagnostic[] {
   for (const ft of model.factTypes) {
     for (const role of ft.roles) {
       if (!model.getObjectType(role.playerId)) {
-        diagnostics.push({
-          severity: "error",
-          message: `Role "${role.name}" in fact type "${ft.name}" references `
-            + `object type id "${role.playerId}" which does not exist in the model.`,
-          elementId: ft.id,
-          ruleId: "structural/dangling-role-reference",
-        });
+        diagnostics.push(
+          report(
+            RULE_ID.danglingRoleReference,
+            "default",
+            ft.id,
+            role.name,
+            ft.name,
+            role.playerId,
+          ),
+        );
       }
     }
   }
@@ -65,13 +69,9 @@ function checkDuplicateObjectTypeNames(model: OrmModel): Diagnostic[] {
   for (const ot of model.objectTypes) {
     const existing = seen.get(ot.name);
     if (existing) {
-      diagnostics.push({
-        severity: "error",
-        message: `Duplicate object type name "${ot.name}". `
-          + `Another object type with this name already exists (id: ${existing}).`,
-        elementId: ot.id,
-        ruleId: "structural/duplicate-object-type-name",
-      });
+      diagnostics.push(
+        report(RULE_ID.duplicateObjectTypeName, "default", ot.id, ot.name, existing),
+      );
     } else {
       seen.set(ot.name, ot.id);
     }
@@ -90,13 +90,7 @@ function checkDuplicateFactTypeNames(model: OrmModel): Diagnostic[] {
   for (const ft of model.factTypes) {
     const existing = seen.get(ft.name);
     if (existing) {
-      diagnostics.push({
-        severity: "error",
-        message: `Duplicate fact type name "${ft.name}". `
-          + `Another fact type with this name already exists (id: ${existing}).`,
-        elementId: ft.id,
-        ruleId: "structural/duplicate-fact-type-name",
-      });
+      diagnostics.push(report(RULE_ID.duplicateFactTypeName, "default", ft.id, ft.name, existing));
     } else {
       seen.set(ft.name, ft.id);
     }
@@ -115,13 +109,9 @@ function checkBinaryFactTypeReadings(model: OrmModel): Diagnostic[] {
 
   for (const ft of model.factTypes) {
     if (ft.arity === 2 && ft.readings.length < 2) {
-      diagnostics.push({
-        severity: "warning",
-        message: `Binary fact type "${ft.name}" has only ${ft.readings.length} reading. `
-          + `Binary fact types typically have both a forward and inverse reading.`,
-        elementId: ft.id,
-        ruleId: "structural/binary-missing-inverse-reading",
-      });
+      diagnostics.push(
+        report(RULE_ID.binaryMissingInverseReading, "default", ft.id, ft.name, ft.readings.length),
+      );
     }
   }
 
@@ -138,40 +128,20 @@ function checkSubtypeFactReferences(model: OrmModel): Diagnostic[] {
   for (const sf of model.subtypeFacts) {
     const subtype = model.getObjectType(sf.subtypeId);
     if (!subtype) {
-      diagnostics.push({
-        severity: "error",
-        message: `Subtype fact references subtype id "${sf.subtypeId}" `
-          + `which does not exist in the model.`,
-        elementId: sf.id,
-        ruleId: "structural/subtype-dangling-subtype",
-      });
+      diagnostics.push(report(RULE_ID.subtypeDanglingSubtype, "default", sf.id, sf.subtypeId));
     } else if (subtype.kind !== "entity") {
-      diagnostics.push({
-        severity: "error",
-        message: `Subtype fact references "${subtype.name}" as subtype, `
-          + `but it is a ${subtype.kind} type. Only entity types can participate in subtype relationships.`,
-        elementId: sf.id,
-        ruleId: "structural/subtype-not-entity",
-      });
+      diagnostics.push(
+        report(RULE_ID.subtypeNotEntity, "subtypeSide", sf.id, subtype.name, subtype.kind),
+      );
     }
 
     const supertype = model.getObjectType(sf.supertypeId);
     if (!supertype) {
-      diagnostics.push({
-        severity: "error",
-        message: `Subtype fact references supertype id "${sf.supertypeId}" `
-          + `which does not exist in the model.`,
-        elementId: sf.id,
-        ruleId: "structural/subtype-dangling-supertype",
-      });
+      diagnostics.push(report(RULE_ID.subtypeDanglingSupertype, "default", sf.id, sf.supertypeId));
     } else if (supertype.kind !== "entity") {
-      diagnostics.push({
-        severity: "error",
-        message: `Subtype fact references "${supertype.name}" as supertype, `
-          + `but it is a ${supertype.kind} type. Only entity types can participate in subtype relationships.`,
-        elementId: sf.id,
-        ruleId: "structural/subtype-not-entity",
-      });
+      diagnostics.push(
+        report(RULE_ID.subtypeNotEntity, "supertypeSide", sf.id, supertype.name, supertype.kind),
+      );
     }
   }
 
@@ -218,12 +188,7 @@ function checkSubtypeCycles(model: OrmModel): Diagnostic[] {
 
   for (const nodeId of edges.keys()) {
     if (!visited.has(nodeId) && dfs(nodeId)) {
-      diagnostics.push({
-        severity: "error",
-        message: "The subtype hierarchy contains a cycle.",
-        elementId: nodeId,
-        ruleId: "structural/subtype-cycle",
-      });
+      diagnostics.push(report(RULE_ID.subtypeCycle, "default", nodeId));
       break; // Report once, not per node.
     }
   }
@@ -245,55 +210,34 @@ function checkObjectifiedFactTypeReferences(model: OrmModel): Diagnostic[] {
     // Check that the fact type exists.
     const factType = model.getFactType(oft.factTypeId);
     if (!factType) {
-      diagnostics.push({
-        severity: "error",
-        message: `Objectified fact type references fact type id "${oft.factTypeId}" `
-          + `which does not exist in the model.`,
-        elementId: oft.id,
-        ruleId: "structural/objectified-dangling-fact-type",
-      });
+      diagnostics.push(
+        report(RULE_ID.objectifiedDanglingFactType, "default", oft.id, oft.factTypeId),
+      );
     }
 
     // Check that the object type exists and is an entity type.
     const objectType = model.getObjectType(oft.objectTypeId);
     if (!objectType) {
-      diagnostics.push({
-        severity: "error",
-        message: `Objectified fact type references object type id "${oft.objectTypeId}" `
-          + `which does not exist in the model.`,
-        elementId: oft.id,
-        ruleId: "structural/objectified-dangling-object-type",
-      });
+      diagnostics.push(
+        report(RULE_ID.objectifiedDanglingObjectType, "default", oft.id, oft.objectTypeId),
+      );
     } else if (objectType.kind !== "entity") {
-      diagnostics.push({
-        severity: "error",
-        message: `Objectified fact type references "${objectType.name}" as the entity type, `
-          + `but it is a ${objectType.kind} type. Only entity types can be objectifications.`,
-        elementId: oft.id,
-        ruleId: "structural/objectified-not-entity",
-      });
+      diagnostics.push(
+        report(RULE_ID.objectifiedNotEntity, "default", oft.id, objectType.name, objectType.kind),
+      );
     }
 
     // Check for duplicate objectification of the same fact type.
     if (seenFactTypes.has(oft.factTypeId)) {
-      diagnostics.push({
-        severity: "error",
-        message: `Fact type id "${oft.factTypeId}" is objectified more than once.`,
-        elementId: oft.id,
-        ruleId: "structural/duplicate-objectification",
-      });
+      diagnostics.push(report(RULE_ID.duplicateObjectification, "default", oft.id, oft.factTypeId));
     }
     seenFactTypes.add(oft.factTypeId);
 
     // Check for duplicate use of the same object type as objectification.
     if (seenObjectTypes.has(oft.objectTypeId)) {
-      diagnostics.push({
-        severity: "error",
-        message:
-          `Object type id "${oft.objectTypeId}" is used as an objectification target more than once.`,
-        elementId: oft.id,
-        ruleId: "structural/duplicate-objectification-target",
-      });
+      diagnostics.push(
+        report(RULE_ID.duplicateObjectificationTarget, "default", oft.id, oft.objectTypeId),
+      );
     }
     seenObjectTypes.add(oft.objectTypeId);
   }

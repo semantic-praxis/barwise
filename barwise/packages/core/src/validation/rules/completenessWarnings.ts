@@ -1,5 +1,6 @@
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { Diagnostic } from "../Diagnostic.js";
+import { report, RULE_ID } from "../ruleId.js";
 
 /**
  * Completeness warning rules.
@@ -36,12 +37,7 @@ function checkMissingObjectTypeDefinitions(model: OrmModel): Diagnostic[] {
 
   for (const ot of model.objectTypes) {
     if (!ot.definition) {
-      diagnostics.push({
-        severity: "info",
-        message: `Object type "${ot.name}" has no definition.`,
-        elementId: ot.id,
-        ruleId: "completeness/missing-object-type-definition",
-      });
+      diagnostics.push(report(RULE_ID.missingObjectTypeDefinition, "default", ot.id, ot.name));
     }
   }
 
@@ -57,13 +53,7 @@ function checkFactTypesWithoutConstraints(model: OrmModel): Diagnostic[] {
 
   for (const ft of model.factTypes) {
     if (ft.constraints.length === 0) {
-      diagnostics.push({
-        severity: "warning",
-        message: `Fact type "${ft.name}" has no constraints. `
-          + `Most fact types need at least a uniqueness constraint.`,
-        elementId: ft.id,
-        ruleId: "completeness/fact-type-without-constraints",
-      });
+      diagnostics.push(report(RULE_ID.factTypeWithoutConstraints, "default", ft.id, ft.name));
     }
   }
 
@@ -84,12 +74,7 @@ function checkIsolatedObjectTypes(model: OrmModel): Diagnostic[] {
     if (ot.independent) continue;
     const participations = model.factTypesForObjectType(ot.id);
     if (participations.length === 0) {
-      diagnostics.push({
-        severity: "info",
-        message: `Object type "${ot.name}" does not participate in any fact type.`,
-        elementId: ot.id,
-        ruleId: "completeness/isolated-object-type",
-      });
+      diagnostics.push(report(RULE_ID.isolatedObjectType, "default", ot.id, ot.name));
     }
   }
 
@@ -105,13 +90,7 @@ function checkMissingValueTypeDataType(model: OrmModel): Diagnostic[] {
 
   for (const ot of model.objectTypes) {
     if (ot.kind === "value" && !ot.dataType) {
-      diagnostics.push({
-        severity: "info",
-        message: `Value type "${ot.name}" has no data type. `
-          + `The relational mapper will default to TEXT.`,
-        elementId: ot.id,
-        ruleId: "completeness/missing-value-type-data-type",
-      });
+      diagnostics.push(report(RULE_ID.missingValueTypeDataType, "default", ot.id, ot.name));
     }
   }
 
@@ -135,14 +114,7 @@ function checkFactTypesWithoutUniqueness(model: OrmModel): Diagnostic[] {
       (c) => c.type === "internal_uniqueness",
     );
     if (!hasUniqueness) {
-      diagnostics.push({
-        severity: "warning",
-        message: `Fact type "${ft.name}" has constraints but no internal `
-          + `uniqueness constraint. Without one, any combination of role values `
-          + `can repeat freely -- state the intended cardinality.`,
-        elementId: ft.id,
-        ruleId: "completeness/fact-type-without-uniqueness",
-      });
+      diagnostics.push(report(RULE_ID.factTypeWithoutUniqueness, "default", ft.id, ft.name));
     }
   }
 
@@ -191,21 +163,11 @@ function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
     const preferredCount = preferredCounts.get(ot.id) ?? 0;
 
     if (preferredCount === 0 && !isIdentified(ot.id, new Set())) {
-      diagnostics.push({
-        severity: "info",
-        message: `Entity type "${ot.name}" has no preferred identifier. `
-          + `The relational mapper will use a heuristic to determine the primary key.`,
-        elementId: ot.id,
-        ruleId: "completeness/missing-preferred-identifier",
-      });
+      diagnostics.push(report(RULE_ID.missingPreferredIdentifier, "default", ot.id, ot.name));
     } else if (preferredCount > 1) {
-      diagnostics.push({
-        severity: "warning",
-        message: `Entity type "${ot.name}" has ${preferredCount} preferred identifiers. `
-          + `Each entity should have exactly one.`,
-        elementId: ot.id,
-        ruleId: "completeness/multiple-preferred-identifiers",
-      });
+      diagnostics.push(
+        report(RULE_ID.multiplePreferredIdentifiers, "default", ot.id, ot.name, preferredCount),
+      );
     }
   }
 

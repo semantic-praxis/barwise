@@ -1,5 +1,6 @@
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { Diagnostic } from "../Diagnostic.js";
+import { report, RULE_ID } from "../ruleId.js";
 
 /**
  * Derivation consistency rules.
@@ -23,13 +24,7 @@ export function derivationRules(model: OrmModel): Diagnostic[] {
     if (!d) continue;
 
     if (d.expression.trim() === "") {
-      diagnostics.push({
-        severity: "warning",
-        message: `Fact type "${ft.name}" is marked ${d.kind} but has no `
-          + `derivation rule text.`,
-        elementId: ft.id,
-        ruleId: "derivation/missing-rule",
-      });
+      diagnostics.push(report(RULE_ID.missingRule, "factType", ft.id, ft.name, d.kind));
     }
 
     const onRequest = (d.storage ?? "derive_on_request") === "derive_on_request";
@@ -38,14 +33,7 @@ export function derivationRules(model: OrmModel): Diagnostic[] {
         (p) => p.factTypeId === ft.id && p.instances.length > 0,
       );
       if (populated) {
-        diagnostics.push({
-          severity: "warning",
-          message: `Fact type "${ft.name}" is purely derived (computed on `
-            + `request) but carries a sample population; its facts are not `
-            + `asserted.`,
-          elementId: ft.id,
-          ruleId: "derivation/derived-with-population",
-        });
+        diagnostics.push(report(RULE_ID.derivedWithPopulation, "default", ft.id, ft.name));
       }
     }
   }
@@ -55,13 +43,9 @@ export function derivationRules(model: OrmModel): Diagnostic[] {
     if (!d) continue;
     if (d.expression.trim() === "") {
       const subtype = model.getObjectType(sf.subtypeId);
-      diagnostics.push({
-        severity: "warning",
-        message: `Subtype "${subtype?.name ?? sf.subtypeId}" is marked ${d.kind} `
-          + `but has no defining rule text.`,
-        elementId: sf.id,
-        ruleId: "derivation/missing-rule",
-      });
+      diagnostics.push(
+        report(RULE_ID.missingRule, "subtype", sf.id, subtype?.name ?? sf.subtypeId, d.kind),
+      );
     }
   }
 
