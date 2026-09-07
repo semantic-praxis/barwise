@@ -2,7 +2,7 @@
 
 Status: Draft -- no workstream implemented
 Created: 2026-09-07
-Last-updated: 2026-09-07
+Last-updated: 2026-09-07 (decisions 1 and 3 resolved)
 Tracking: barwise-947 (this spec); barwise-946 (breaking-change
 severity string-matches prose);
 the Evidenced-sites section of `core-branching-load.spec.md`, whose
@@ -189,17 +189,40 @@ description, the test shall find it explicitly classified.
 This ships first because it is a live, user-visible wrong answer and it
 does not depend on either union.
 
-### 2. `RuleId` as a closed union
+### 2. `RuleId` as a closed union, with SARIF-shaped descriptors
 
-Add `core/src/validation/ruleId.ts` with the `Record`-derived union and
-runtime list, export both from core's root, and narrow
-`Diagnostic.ruleId`. The 76 literals in the rule modules do not change
-text; they become checked. Resolve the one non-core producer per the
-first open decision.
+Add `core/src/validation/ruleId.ts` holding a `Record<RuleId,
+RuleDescriptor>` rather than a `Record<RuleId, true>`, derive the union
+and the runtime list from it, export all three from core's root, and
+make `Diagnostic` generic as `Diagnostic<R extends string = RuleId>`.
+The 76 literals in the rule modules do not change text; they become
+checked.
 
-Acceptance: when a rule module emits a `ruleId` that is not a member of
-`RuleId`, the build shall fail; and when a consumer needs the ids as
-data, `RULE_IDS` shall provide them.
+The descriptor is deliberately a subset of SARIF's
+`reportingDescriptor` -- a short description, a default level, and room
+for a help URI -- so the registry is the data a SARIF exporter needs
+rather than a second thing to maintain beside it. That is what makes
+the 76 rows worth writing: a bare `true` is ceremony, while a
+descriptor means a rule cannot be registered without being described,
+and `barwise` gains a documented rule catalogue it does not have today.
+
+Each surface that mints its own ids gets its own registry of the same
+shape, scoped to what that surface owns. The composition is explicit
+and local: the one such site today types its diagnostics
+`Diagnostic<RuleId | CliRuleId>`. Core never learns a surface's ids;
+`mcp` never sees `cli`'s.
+
+Acceptance, in EARS form: when a rule module emits a `ruleId` that is
+not a member of `RuleId`, the build shall fail; when a rule id is added
+to the registry without a description and a default level, the build
+shall fail; and when a surface mints an id of its own, it shall do so
+from its own registry, with core unchanged.
+
+Verified by spike before this was written, on the real 76-member union:
+core's 125 `Diagnostic[]` signatures compile unedited because the
+default type parameter absorbs them; the CLI fails on exactly the one
+out-of-set literal, named in the error; and all 12 packages build once
+the CLI declares its own set. The cost outside core is four lines.
 
 ### 3. Change descriptions as a discriminated union
 
@@ -264,18 +287,27 @@ what four packages display.
 
 ## Open decisions (for review)
 
-- **Where the one non-core rule id lives.** `cli/src/commands/
-  validate.ts` mints `project/file-unresolved`, and core cannot know
-  about ids its own rules do not emit. Option A: move that id into
-  core's project rule set, since it is a project-level diagnostic and
-  core already has `projectRules.ts`. Option B: export a documented
-  `HostRuleId` escape (a template type such as `` `host/${string}` ``)
-  so a surface can mint its own without weakening core's set. Option C:
-  leave `Diagnostic.ruleId` as `string` and apply `RuleId` only inside
-  core's rule modules, which keeps the guarantee where the literals are
-  and gives consumers nothing. Recommend A: one id, it belongs in core
-  by kind, and it keeps the union closed. B is the right answer only if
-  more surfaces start minting ids, which none do today.
+- **Where the one non-core rule id lives. (resolved: each surface owns
+  its own registry.)** Core exports `Diagnostic<R extends string =
+  RuleId>` and its own registry; a surface declares a registry of its
+  own and composes explicitly at the sites that handle both. Core knows
+  that surfaces _may_ extend -- that is what the type parameter says --
+  without knowing which do. The rejected alternatives are worth
+  recording. Moving the id into core makes core name a CLI concern and
+  breaks the dependency rule. A `` `host/${string}` `` template leaves
+  the escape half unchecked. The TypeScript ecosystem's standard answer,
+  a declaration-merging registry (`interface RuleIdRegistry {}` plus
+  `keyof`, as React uses for `ReactNode`), is the closest call: it
+  removes the need to touch any consumer, because `RuleId` widens
+  globally. It loses on two counts -- the widening is global and
+  unconditional, so `mcp` would carry `cli`'s ids without depending on
+  cli, which is the coupling this decision exists to avoid; and it
+  destroys exhaustiveness, since a `switch` over `RuleId` stops being
+  total the moment any surface augments. SARIF reached the same
+  decomposition independently: `tool.driver.rules[]` for the core
+  component and `tool.extensions[].rules[]` per contributor, with each
+  result's id scoped to its component.
+
 - **How far WS3's variants decompose.** A change can be a bare field
   marker (`{field: "definition"}`) or carry its values
   (`{field: "arity", from, to}`). Carrying values makes the prose
@@ -284,14 +316,16 @@ what four packages display.
   `elementDiff.ts` already interpolates them into the prose, and bare
   markers where it does not, so no information is invented and none is
   discarded.
-- **Whether WS2 is worth its diff on its own.** 76 rows of a `Record`
-  plus one narrowed field is a wide, dull change whose only immediate
-  payoff is that a typo becomes a compile error -- no current defect
-  traces to a mistyped rule id. Recommend doing it anyway and saying so
-  plainly: it is the enabling step for any consumer that wants to
-  switch on a rule id exhaustively, and the cost is one hand-edit per
-  new rule thereafter. A reviewer who disagrees should say so, and WS1
-  and WS3 stand without it.
+- **Whether WS2 is worth its diff on its own. (resolved: yes, once the
+  rows carry descriptors.)** As originally drafted -- 76 rows of
+  `Record<RuleId, true>` -- it was a wide, dull change whose only payoff
+  was a typo guard no current defect traces to, and the honest
+  recommendation was "do it anyway". Shaping the rows as SARIF
+  descriptors changes that: the same diff also produces a rule
+  catalogue with a description and a default level per rule, which
+  barwise has never had, and it is the prerequisite for emitting SARIF
+  at all. The row stops being ceremony and starts carrying the
+  documentation a new rule would otherwise ship without.
 
 ## Risks and testing
 
@@ -312,6 +346,18 @@ what four packages display.
 - A 76-member union produces long error messages when a mismatch
   occurs. Tolerable, and the message names the offending literal.
 - Each workstream keeps the full suite green and is one PR.
+
+## The SARIF exporter is a follow-up, not part of this
+
+Aligning the registry with SARIF's `reportingDescriptor` is in scope
+because it decides the shape of a table this spec is writing anyway.
+Emitting SARIF is not: `barwise validate --format sarif` needs a
+component assembly, a mapping from `elementId` to a real source
+location (the VS Code server already has `YamlSourceMap`, which core
+does not), a severity-to-level mapping, and a row in the capability
+matrix. That is its own spec and its own PR, and it is the reason the
+descriptors are worth shaping correctly now rather than being
+retrofitted. Filed as barwise-948.
 
 ## Non-goals
 
