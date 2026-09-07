@@ -1,6 +1,7 @@
 # Laws over a generated model: property-based tests for core
 
-Status: Draft -- no workstream implemented
+Status: WS1 implemented (the arbitrary and the serialization law; see
+Implementation notes). WS2-WS5 not implemented.
 Created: 2026-09-07
 Last-updated: 2026-09-07
 Tracking: barwise-938 (this spec); barwise-937 (the merge defect its
@@ -125,24 +126,26 @@ Out of scope, deliberately:
 
 ## Inventory
 
-| Module                                                       | Current state                                               | Verdict                                                   |
-| ------------------------------------------------------------ | ----------------------------------------------------------- | --------------------------------------------------------- |
-| `core/package.json`                                          | devDependencies: vitest, coverage                           | adds `fast-check` (WS1)                                   |
-| `core/tests/arbitraries/model.ts`                            | does not exist                                              | new: `arbOrmModel` and its parts (WS1)                    |
-| `core/tests/laws/serialization.law.test.ts`                  | does not exist                                              | new (WS1)                                                 |
-| `core/tests/laws/merge.law.test.ts`                          | does not exist                                              | new, red until barwise-937 is fixed (WS2)                 |
-| `core/src/diff/ModelMerge.ts`, `ModelDiff.ts`                | three element kinds; drops the rest                         | fixed per the open decision (WS2)                         |
-| `core/tests/laws/counterexample.law.test.ts`                 | does not exist                                              | new (WS3)                                                 |
-| `core/tests/counterexample/CounterexampleGenerator.test.ts`  | one hand-built model-wide round trip; `RULE_BY_TYPE` at 486 | stays; `RULE_BY_TYPE` moves to a shared test helper (WS3) |
-| `core/tests/laws/sample.law.test.ts`                         | does not exist                                              | new (WS4)                                                 |
-| `core/tests/laws/mapper.law.test.ts`                         | does not exist                                              | new (WS5)                                                 |
-| `core/src/lineage/manifest.ts` (`hashModel`)                 | id-insensitive content hash                                 | untouched; the laws' equality                             |
-| `core/src/serialization/OrmYamlSerializer.ts`, `yaml/*.ts`   | `serialize` / `deserialize`; per-element field lists        | untouched; the projection clause is their drift guard     |
-| `core/src/model/ObjectType.ts`, `FactType.ts` (`to*Config`)  | `Complete<Config>` projections (barwise-927)                | untouched; the projection clause reads them               |
-| `core/src/counterexample/*`, `validation/rules/population/*` | pure over the model                                         | untouched                                                 |
-| `core/src/mapping/RelationalMapper.ts`                       | no throw sites; FK columns fixed in c185df6                 | untouched                                                 |
-| `core/tests/integration/roundTrip.test.ts`                   | fixture round trips                                         | stays: readable record of named cases                     |
-| `core/vitest.config.ts`                                      | `tests/**/*.test.ts`, 30s timeout                           | untouched; `.law.test.ts` matches the glob                |
+| Module                                                       | Current state                                                          | Verdict                                                   |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------- | --------------------------------------------------------- |
+| `core/package.json`                                          | devDependencies: vitest, coverage                                      | adds `fast-check` (WS1)                                   |
+| `core/tests/arbitraries/model.ts`                            | does not exist                                                         | new: `arbOrmModel` and its parts (WS1)                    |
+| `core/tests/laws/serialization.law.test.ts`                  | does not exist                                                         | new (WS1)                                                 |
+| `core/tests/laws/merge.law.test.ts`                          | does not exist                                                         | new, red until barwise-937 is fixed (WS2)                 |
+| `core/src/diff/ModelMerge.ts`, `ModelDiff.ts`                | three element kinds; drops the rest                                    | fixed per the open decision (WS2)                         |
+| `core/tests/laws/counterexample.law.test.ts`                 | does not exist                                                         | new (WS3)                                                 |
+| `core/tests/counterexample/CounterexampleGenerator.test.ts`  | one hand-built model-wide round trip; `RULE_BY_TYPE` at 486            | stays; `RULE_BY_TYPE` moves to a shared test helper (WS3) |
+| `core/tests/laws/sample.law.test.ts`                         | does not exist                                                         | new (WS4)                                                 |
+| `core/tests/laws/mapper.law.test.ts`                         | does not exist                                                         | new (WS5)                                                 |
+| `core/src/lineage/manifest.ts` (`hashModel`)                 | id-insensitive content hash                                            | untouched; the laws' equality                             |
+| `core/src/serialization/OrmYamlSerializer.ts`, `yaml/*.ts`   | `serialize` / `deserialize`; per-element field lists                   | untouched; the projection clause is their drift guard     |
+| `core/src/model/ObjectType.ts`, `FactType.ts` (`to*Config`)  | `Complete<Config>` projections (barwise-927)                           | untouched; the projection clause reads them               |
+| `core/src/counterexample/*`, `validation/rules/population/*` | pure over the model                                                    | untouched                                                 |
+| `core/src/mapping/RelationalMapper.ts`                       | no throw sites; FK columns fixed in c185df6                            | untouched                                                 |
+| `core/tests/integration/roundTrip.test.ts`                   | fixture round trips                                                    | stays: readable record of named cases                     |
+| `core/tests/property/roundTrip.property.test.ts`             | 100 seeded models from a hand-rolled PRNG; a third `RULE_BY_TYPE` copy | both halves are subsumed; retires in WS3 (see below)      |
+| `core/tests/helpers/randomModel.ts`                          | mulberry32 generator: binaries only, no populations, no subtypes       | retires with the test above (WS3)                         |
+| `core/vitest.config.ts`                                      | `tests/**/*.test.ts`, 30s timeout                                      | untouched; `.law.test.ts` matches the glob                |
 
 Nothing outside core changes. The `llm` package's own property spec
 stays independent; `cli`, `mcp` and `vscode` call `mergeAndValidate`
@@ -248,6 +251,10 @@ defects lived in has proved nothing. Record the counts in the test as
 assertions, not as a comment. The mutation checks (revert a recorded
 fix locally, expect the law to go red) belong to the workstreams whose
 laws they exercise: WS2 for barwise-927, WS5 for barwise-931.
+
+The workstream ships `arbModelPlan` (generation) and `buildModel`
+(construction) as separate exports, so retargeting the sealed-record
+builder touches one function.
 
 ### 2. The merge law, red first, and the barwise-937 fix
 
@@ -362,6 +369,52 @@ mutation check for this workstream reverts c185df6's
 - The full existing suite stays green through every workstream;
   no fixture test is removed. Each workstream is one PR, followed by
   `npm run build` and `npm run test` from `barwise/`.
+
+## Implementation notes
+
+### WS1 (2026-09-07)
+
+- **The generator avoids unnamed conflations rather than normalising
+  them.** The serializer collapses more defaults to absence than the
+  four Scope names: `isPreferred: false`, `modality: "alethic"`,
+  `isFormal: false`, an empty `ranges` array, and `minInclusive: true`
+  all read back as absent. Normalising those too would have made the
+  law blind to five more places a field can be dropped, so the
+  generator emits only the non-default half of each, and the four the
+  spec names are the only ones `normalise.ts` knows about. A fifth
+  conflation added to the serializer fails the law.
+- **The `sample: false` conflation is asserted directly.** It lives on
+  `Population`, which neither `toObjectTypeConfig` nor
+  `toFactTypeConfig` reaches, so the projection clause cannot see it.
+  The law asserts it on the round-tripped populations instead, which
+  keeps the fourth rule live rather than dead in the normaliser.
+- **A frequency constraint's `min` is lifted to 1, not dropped.** The
+  JSON Schema requires `minimum: 1`, so a generated zero fails
+  deserialization -- which the first run of the law reported, as
+  designed. The metamodel's `FrequencyConstraint` accepts zero and only
+  the schema refuses it; that divergence is not this spec's to settle.
+- **Re-grounding found an Inventory omission**, not a moved `main`:
+  `tests/property/roundTrip.property.test.ts` already asserted the
+  serialization round trip and the counterexample round trip over 100
+  models from a hand-rolled mulberry32 generator
+  (`tests/helpers/randomModel.ts`). Both halves are subsumed -- the
+  serialization half by WS1, the counterexample half by WS3 -- and both
+  are left standing until WS3 retires them together with the third
+  `RULE_BY_TYPE` copy they carry. WS1 therefore lands a duplicate
+  round-trip assertion on purpose, over a strictly stronger generator.
+- **The idempotence law found a performance defect and did not fix
+  it.** `hashModel` constructs an `OrmYamlSerializer` per call, which
+  compiles the JSON Schema with ajv in its constructor and never uses
+  it, at about 34ms a hash. Two hashes per generated model made the law
+  take 25s under coverage instrumentation and time out at the 30s
+  default under a parallel twelve-package run. Filed as barwise-939;
+  the laws carry an explicit 120s timeout naming it, per this spec's
+  non-goal that a law which finds a defect files an issue rather than
+  widening its own workstream.
+- **`core-branching-load.spec.md`'s builder and field-table
+  workstreams have not landed** (that spec's own header: WS1-WS3 and
+  WS6-WS8 not implemented), so the arbitrary targets `OrmModel.add*`
+  as drafted.
 
 ## Non-goals
 

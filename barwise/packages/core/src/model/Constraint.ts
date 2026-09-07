@@ -424,6 +424,43 @@ export type Constraint =
   | JoinEqualityConstraint
   | JoinExclusionConstraint;
 
+/**
+ * Every member of the `Constraint` union, keyed for compile-checked
+ * completeness.
+ *
+ * The `RING_TYPE_MEMBERS` idiom one level up (barwise-869): a constraint
+ * kind added to the union without a row here is a compile error, where a
+ * hand-written array annotated `readonly Constraint["type"][]` checks
+ * membership and never completeness. What made this worth exporting is
+ * that consumers had begun re-listing the sixteen kinds -- a generator
+ * that must reach every kind, a coverage assertion that must name every
+ * kind -- and each such list is a copy that drifts the day a kind is
+ * added.
+ */
+const CONSTRAINT_TYPE_MEMBERS: Record<Constraint["type"], true> = {
+  internal_uniqueness: true,
+  mandatory: true,
+  external_uniqueness: true,
+  value_constraint: true,
+  disjunctive_mandatory: true,
+  exclusion: true,
+  exclusive_or: true,
+  subset: true,
+  equality: true,
+  ring: true,
+  frequency: true,
+  value_comparison: true,
+  cardinality: true,
+  join_subset: true,
+  join_equality: true,
+  join_exclusion: true,
+};
+
+/** Every constraint type discriminator, in declaration order. */
+export const CONSTRAINT_TYPES = Object.keys(
+  CONSTRAINT_TYPE_MEMBERS,
+) as readonly Constraint["type"][];
+
 // ---------------------------------------------------------------------------
 // Type guard helpers
 // ---------------------------------------------------------------------------
