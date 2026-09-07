@@ -5,7 +5,7 @@ fixes landed together in one PR (the guide is a must-agree copy, and the
 copy and its guard land in the same commit)
 Created: 2026-09-07
 Last-updated: 2026-09-07
-Tracking: barwise-949
+Tracking: barwise-949 (closed after merge)
 
 ## Principle
 
@@ -189,6 +189,25 @@ regenerated in the same commit.
   forwarder; the forwarder is regenerated, not hand-written.
 - A future transcript edit that renumbers a section will fail the check
   at every stale citer, which is the intended blast radius.
+
+## Implementation notes (what the spec did not anticipate)
+
+- **The gate's first green runs on the guide were vacuous.** The scan
+  enumerates tracked files, and the guide was written but not yet added,
+  so four "588 citations OK" runs never read it; its one wrong gloss
+  ("3.2 (the CSDP)", where the title has no such word) surfaced only
+  from `ci:local` after the commit. Landed in the gate itself: a
+  book-scoped file that exists on disk and is untracked is now a
+  failure, with its own planted-defect test. The blind spot is the one
+  barwise-906 names.
+- **The tracking id collided.** `barwise-940` was allocated by this
+  branch and by `main` concurrently; re-filed as `barwise-949` per the
+  steward skill's rule and the beads spec.
+- **Two gloss rules needed a second cut before they held.** A four-letter
+  prefix let "schemes" match "schema", which is the exact defect the gate
+  was written for; and the section regex rejected a citation at the end
+  of a sentence ("section 5.3."). Both were found by planting the defect
+  first, and both are pinned in `scripts/tests/gates.test.mjs`.
 
 ## Non-goals
 

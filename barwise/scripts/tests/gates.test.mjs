@@ -645,6 +645,25 @@ test("check-book-citations leaves a barwise reference after the `;` alone", () =
   assert.equal(r.status, 0, r.stderr);
 });
 
+test("check-book-citations fails on a book-scoped file that exists but is untracked", () => {
+  // The blind spot barwise-906 names, met again while writing the guide:
+  // four green runs never read it, because the scan enumerates tracked
+  // files and the guide had not been added. Written to disk only, on purpose.
+  const dir = tempRepo();
+  stage(dir, "barwise/docs/halpin-morgan-3e-contents.md", CONTENTS);
+  const guide = join(dir, "barwise/docs/halpin-morgan-3e-reading-guide.md");
+  mkdirSync(dirname(guide), { recursive: true });
+  writeFileSync(guide, "section 9.9 (nowhere)\n");
+  try {
+    const r = gate("check-book-citations.mjs", dir);
+    assert.equal(r.status, 1, `expected red:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /reading-guide\.md:0  exists but is not tracked/);
+    assert.doesNotMatch(r.stderr, /9\.9/, "an untracked file must not be read either");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("check-book-citations is green on the current tree, from every cwd", () => {
   const runs = CWDS.map((cwd) => ({ cwd, ...gate("check-book-citations.mjs", cwd) }));
   for (const r of runs) assert.equal(r.status, 0, `failed in ${r.cwd}:\n${r.stdout}${r.stderr}`);

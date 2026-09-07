@@ -41,7 +41,7 @@
  * ...), so "ch. 11; barwise ARCHITECTURE.md sections 3.4-3.5" checks 11
  * and leaves 3.4 alone. Put barwise references after a `;`.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
 
@@ -346,6 +346,23 @@ const auth = authority(readFileSync(resolve(REPO_ROOT, AUTHORITY), "utf8"));
 const findings = [];
 const scannedFiles = new Set(trackedFiles().filter(scanned));
 let citations = 0;
+
+// The scan enumerates tracked files (scripts/lib/tracked.mjs), so a file
+// written but not yet added is invisible to it. The reading guide was
+// exactly that for its first four "green" runs: 588 citations OK, none
+// of them its own, and the gloss it got wrong surfaced only after the
+// commit (the barwise-906 blind spot, met again). A book-scoped file
+// that is on disk and not tracked is therefore a failure, not a skip.
+for (const file of BOOK_SCOPED_FILES) {
+  if (!scannedFiles.has(file) && existsSync(resolve(REPO_ROOT, file))) {
+    findings.push({
+      file,
+      line: 0,
+      what: "exists but is not tracked, so nothing in it was checked; git add it and rerun",
+      raw: "",
+    });
+  }
+}
 
 for (const file of scannedFiles) {
   const text = readFileSync(resolve(REPO_ROOT, file), "utf8");

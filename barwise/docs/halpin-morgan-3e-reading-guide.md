@@ -77,9 +77,9 @@ the chapter's, from the contents transcript.
 
 ### Stop 1: chapter 3, Conceptual Modeling: First Steps (pp. 59-110)
 
-Read all of it: 3.1 (language criteria), 3.2 (the CSDP), 3.3 (from examples to
-elementary facts), 3.4 (draw fact types and populate), 3.5 (trim the schema,
-note derivations).
+Read all of it: 3.1 (language criteria), 3.2 (the conceptual schema design
+procedure, CSDP), 3.3 (from examples to elementary facts), 3.4 (draw fact
+types and populate), 3.5 (trim the schema, note derivations).
 
 CSDP steps 1 to 3. The method starts from concrete examples rather than from a
 list of entities, and the discipline of splitting a sentence into elementary
