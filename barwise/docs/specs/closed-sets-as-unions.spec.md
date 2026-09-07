@@ -1,8 +1,8 @@
 # Closed sets belong in the type system: rule ids and change descriptions as unions
 
-Status: Draft -- no workstream implemented
+Status: Reviewed -- all open decisions resolved; no workstream implemented
 Created: 2026-09-07
-Last-updated: 2026-09-07 (decisions 1 and 3 resolved)
+Last-updated: 2026-09-07 (all three open decisions resolved)
 Tracking: barwise-947 (this spec); barwise-946 (breaking-change
 severity string-matches prose);
 the Evidenced-sites section of `core-branching-load.spec.md`, whose
@@ -226,12 +226,25 @@ the CLI declares its own set. The cost outside core is four lines.
 
 ### 3. Change descriptions as a discriminated union
 
-Replace `changeDescriptions: readonly string[]` with a variant array,
-render the prose from the variant for display, and make
-`classifyChange` exhaustive with a `never` default. Retire WS1's
-enumeration test, which the compiler now subsumes. Keep a
-`changeDescriptions` getter deriving the strings, so CLI and MCP output
-and their tests are unaffected.
+Add a variant array to `ModelDelta`, render the prose from the variants
+for display, and make `classifyChange` exhaustive with a `never`
+default. Retire WS1's enumeration test, which the compiler now
+subsumes.
+
+`changeDescriptions` stays, as a getter deriving today's exact strings
+from the variants, so the CLI's output, the MCP `executeDiff` JSON and
+every existing test are unaffected. That is deliberate: this workstream
+makes the data available without changing what any surface emits.
+Exposing the structured variants through the MCP tool's JSON is a
+surface change with a capability-matrix row, and belongs to whoever
+wants it, not here.
+
+Per the resolved decision above, variants carry copied plain data --
+never a model instance, never a live reference -- so a delta stays
+JSON-serializable and stable against later mutation of the models it
+came from. `constraints added` carries the constraints, not a list of
+their type names, which is the largest single recovery of information
+in this workstream.
 
 Acceptance: when a variant is added to `ChangeDescription` without a
 `classifyChange` arm, the build shall fail; and when the diff output is
@@ -308,14 +321,47 @@ what four packages display.
   component and `tool.extensions[].rules[]` per contributor, with each
   result's id scoped to its component.
 
-- **How far WS3's variants decompose.** A change can be a bare field
-  marker (`{field: "definition"}`) or carry its values
-  (`{field: "arity", from, to}`). Carrying values makes the prose
-  derivable and lets a consumer program against the change; bare
-  markers are a smaller diff. Recommend carrying values where
-  `elementDiff.ts` already interpolates them into the prose, and bare
-  markers where it does not, so no information is invented and none is
-  discarded.
+- **How far WS3's variants decompose. (resolved: carry the values, as
+  plain copied data.)** Today's prose splits, and splits the wrong way:
+  it keeps the values for scalars (`kind: entity -> value`, `arity: 2
+  -> 3`, `role 0: player Customer -> Client`) and discards them for
+  every structured one (`value constraint changed`, `cardinality
+  changed`, `aliases changed`, `readings changed`, `derivation
+  changed`), while `constraints added: internal_uniqueness` collapses
+  the actual constraint objects to a deduplicated list of type names.
+  The richest data is exactly what is lost, so a variant set that
+  carried only what the prose carries would preserve that loss in a new
+  shape.
+
+  Three consequences follow, and they are the substance of this
+  decision rather than the headline.
+
+  **Copies, not references.** A variant holding a live reference into a
+  model can be corrupted by a later mutation of that model -- the same
+  aliasing shape as the merge carrying diagram layouts by reference,
+  found on 2026-09-07. The values here are small (a value constraint is
+  a few strings; readings are a few templates), so copying costs
+  nothing and makes the delta stable.
+
+  **Plain data, never model instances.** A variant carries
+  `{id, name, playerId, playerName}` for a role, not a `Role`. This
+  keeps a delta JSON-serializable, which is what the MCP path needs and
+  what makes the copy trivially correct; `structuredClone` (Node core,
+  no dependency) handles plain data and would lose a class prototype.
+
+  **Both id and name where the prose resolved a name.** `role 0: player
+  Customer -> Client` reads names resolved against two _different_
+  models, so a consumer holding only the delta cannot re-derive them.
+  The variant carries the id for identity and the name for rendering.
+
+  The objection a reviewer will raise: `ModelDelta` already holds
+  `existing` and `incoming`, so the values are reachable and this
+  duplicates them. The answer is that a variant is a derivation
+  computed once at diff time from those same inputs and never mutated
+  afterwards -- memoized, not a second maintained copy -- so it cannot
+  drift within a delta. It is not the must-agree case
+  `duplication-drift-guards.spec.md` governs.
+
 - **Whether WS2 is worth its diff on its own. (resolved: yes, once the
   rows carry descriptors.)** As originally drafted -- 76 rows of
   `Record<RuleId, true>` -- it was a wide, dull change whose only payoff
