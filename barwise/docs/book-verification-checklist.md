@@ -191,7 +191,31 @@ rule is a book constraint or a tooling default we carried. Risk: the `min`
 floor and the single-vs-sequence treatment were aligned to the existing
 barwise/NORMA frequency code. Current: `FrequencyConstraint.roleIds`
 (length 1 = single role); per-tuple counting; `min >= 1` enforced. Source:
-Halpin & Morgan (frequency constraints). Status: unverified.
+Halpin & Morgan (frequency constraints). Status: **min floor verified
+(2026-09-07); role-sequence half still unverified.**
+
+The floor is the book's, not a NORMA habit we carried, and the reason is
+the counting semantics rather than a bound someone chose: a frequency
+constraint applies only to the instances that _do_ play the role, so an
+instance counted at all has already occurred once and a minimum below 1
+excludes nothing. Halpin says so in _Logical Data Modeling_ Part 13 -- the
+lowest possible minimum frequency is 1, not zero -- and pairs it with the
+orthogonality argument that zero participation is expressed by the absence
+of a mandatory role constraint, never by a frequency minimum. So the
+schema's `minimum: 1` and `constraintConsistency`'s error both stand, and
+barwise-942 narrows the TypeScript type toward them rather than the
+reverse. Two consequences fell out: a zero minimum does not mean
+"optional" (an orthogonal axis), and `>= 1` with no maximum is the same
+tautology the floor exists to exclude, which barwise accepts silently
+(barwise-943).
+
+Evidence quality is below this checklist's own standard and the item is
+left open rather than resolved for that reason: orm.net and
+brcommunity.com are blocked by the egress policy of the session that
+checked, and p. 274 was not read. The finding rests on two independent
+search retrievals over Part 13 agreeing with each other, with the code,
+and with barwise-830's independently-reached reasoning. Confirm against
+the book when it is to hand; the answer is recorded on barwise-q82.
 
 ## Tier 3
 

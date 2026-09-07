@@ -1,3 +1,4 @@
+import type { Complete } from "../util/complete.js";
 import { ModelElement } from "./ModelElement.js";
 
 /**
@@ -46,4 +47,16 @@ export class ObjectifiedFactType extends ModelElement {
       );
     }
   }
+}
+
+/** See {@link toSubtypeFactConfig}: the same projection, one kind over. */
+export function toObjectifiedFactTypeConfig(
+  oft: ObjectifiedFactType,
+): ObjectifiedFactTypeConfig {
+  const config: Complete<ObjectifiedFactTypeConfig> = {
+    id: oft.id,
+    factTypeId: oft.factTypeId,
+    objectTypeId: oft.objectTypeId,
+  };
+  return config;
 }

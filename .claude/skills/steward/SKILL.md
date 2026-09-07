@@ -77,6 +77,29 @@ A PR touching only Markdown and `.beads/` takes CI's docs-only path
 (formatting and tracker checks only), so tracker-only and docs-only
 pushes are cheap. The required status check is `ci (22)`.
 
+## 4a. A stacked PR gets no CI, and merging its parent does not start one
+
+`ci.yml` triggers on `pull_request: branches: [main]`, so a PR based on
+another branch gets **zero** check runs -- not pending ones, none at
+all. That much is visible. The part that is not: when the parent merges
+and GitHub retargets the child to `main`, the retarget fires
+`pull_request.edited`, which is outside the workflow's default activity
+types (`opened`, `synchronize`, `reopened`). So the retargeted PR still
+has no CI, now looks like an ordinary PR against `main`, and sits
+waiting on a required check that nothing will ever report.
+
+Push a merge of `main` into the branch once the parent has merged. That
+is a `synchronize`, it starts the run, and it is a real commit rather
+than the forbidden empty one -- `main` has moved by at least the
+parent's merge commit, and the merge records that these commits were
+validated against the `main` they will land on. Do it as soon as the
+parent merges, not at review time.
+
+The cheaper option is to avoid the stack: a workstream whose PR does not
+need its predecessor's code in the diff is better cut against `main`
+directly. Stack only when the later work genuinely will not compile or
+test without the earlier, and then expect this step.
+
 ## 5. After the PR merges
 
 Close the issues it resolved via

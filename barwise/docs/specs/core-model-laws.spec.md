@@ -1,13 +1,15 @@
 # Laws over a generated model: property-based tests for core
 
-Status: WS1 implemented (the arbitrary and the serialization law; see
-Implementation notes). WS2-WS5 not implemented.
+Status: WS1 and WS2 implemented (the arbitrary, the serialization law,
+the merge law and the barwise-937 fix; see Implementation notes).
+WS3-WS5 not implemented.
 Created: 2026-09-07
 Last-updated: 2026-09-07
 Tracking: barwise-938 (this spec); barwise-937 (the merge defect its
-grounding found); REPO_REVIEW-2026-06.md T4; the deferral recorded in
-`conformance-property.spec.md` ("the core arbitrary question stays
-open until someone brings a property that earns it")
+grounding found); follow-ups barwise-939, -940, -941 (found while
+implementing WS1 and WS2); REPO_REVIEW-2026-06.md T4; the deferral
+recorded in `conformance-property.spec.md` ("the core arbitrary
+question stays open until someone brings a property that earns it")
 
 In one sentence: add fast-check to core, generate structurally valid
 `OrmModel`s from a seeded arbitrary, and assert five laws the existing
@@ -389,10 +391,24 @@ mutation check for this workstream reverts c185df6's
   The law asserts it on the round-tripped populations instead, which
   keeps the fourth rule live rather than dead in the normaliser.
 - **A frequency constraint's `min` is lifted to 1, not dropped.** The
-  JSON Schema requires `minimum: 1`, so a generated zero fails
-  deserialization -- which the first run of the law reported, as
-  designed. The metamodel's `FrequencyConstraint` accepts zero and only
-  the schema refuses it; that divergence is not this spec's to settle.
+  first run of the law reported a generated zero failing
+  deserialization, as designed. The generator is not choosing between
+  two readings: every layer but the TypeScript type rejects zero. The
+  JSON Schema requires `minimum: 1`, `constraintConsistency` reports
+  `constraint/frequency-invalid-min` as an error, and barwise-830
+  settled the semantics already -- "at least 0" is no constraint at
+  all, because the population rule counts only the value-tuples that
+  appear and every such count is at least 1. A zero minimum does not
+  express an optional role; optionality is the absence of a mandatory
+  constraint, an orthogonal axis, and `0..1` and `1..1` are the same
+  frequency. So the generator emits valid models, which is its job.
+  The divergence is nonetheless a real defect -- a min-0 model
+  serializes and then fails to load, so barwise writes a file it
+  cannot read -- and per this spec's own non-goal it is filed rather
+  than fixed here: barwise-942, p3, since the validator and
+  conformance cover every production path. Whether the floor is
+  Halpin's rule or a tooling default this project carried is
+  barwise-q82, open, and it governs which side the fix moves.
 - **Re-grounding found an Inventory omission**, not a moved `main`:
   `tests/property/roundTrip.property.test.ts` already asserted the
   serialization round trip and the counterexample round trip over 100
@@ -402,6 +418,65 @@ mutation check for this workstream reverts c185df6's
   are left standing until WS3 retires them together with the third
   `RULE_BY_TYPE` copy they carry. WS1 therefore lands a duplicate
   round-trip assertion on purpose, over a strictly stronger generator.
+
+### WS2 (2026-09-07)
+
+- **Option A, as recommended.** `mergeModels` carries subtype facts,
+  objectified fact types, populations and diagram layouts through from
+  the existing model; `diffModels` still emits three element kinds.
+  Option B is filed as barwise-940 and inherits the merge law rather
+  than a fixture.
+- **The model-level `note` was dropped too.** The defect was recorded
+  as four missing element kinds; it was four kinds and a field, because
+  `mergeModels` constructs its result with a literal naming `name` and
+  `domainContext` only. The identity law caught it on the first
+  generated model that carried a note, which is the same omission shape
+  one level down from barwise-927.
+- **Carrying is not unconditional.** An element whose referent the
+  merge removed is dropped: `OrmModel` throws on a subtype fact naming
+  an absent entity, and a throw inside `mergeModels` loses the whole
+  merge, since `mergeAndValidate` catches it and returns a null model.
+  An accepted removal is a decision to remove, so dropping what
+  depended on it is the merge obeying the user. An accepted
+  modification that turns an entity type into a value type has the same
+  effect on a subtype fact naming it.
+- **The accept-all law is false as drafted, and ships in the spec's own
+  fallback shape.** Measured over 60 generated model pairs, accepting
+  every delta left a residual delta in 50 of them, always `modified
+  object_type ["aliases changed"]` and never anything else; the element
+  sets matched in all 60. The cause is `unionAliases`, which is
+  deliberate. So the law asserts the element sets and then states the
+  exception exactly -- every residual delta is that one -- rather than
+  being weakened to element sets alone. A second divergence appearing
+  later fails the second clause.
+- **The carry surfaced a second defect, which is now fixed here rather
+  than deferred.** A population carried past an accepted fact-type
+  modification kept the existing role ids while the merged fact type
+  took the incoming ones, so its instances read as incomplete. Filed as
+  barwise-941 and first deferred to barwise-940 on the belief that the
+  remap needed the typed diff; measuring it showed otherwise on both
+  counts. The trigger is not a role rename but ANY accepted
+  modification to a fact type carrying a population -- a definition-only
+  edit orphans every key -- and the resulting
+  `population/incomplete-instance` is an error, so the merged model
+  fails validation on a common re-extraction move. And the remap needs
+  nothing barwise-940 provides: phase 2 already holds both fact types
+  when it accepts the modification.
+
+  `mergeModels` now records a positional existing-to-merged role map
+  there, and `carryUnmodelledElements` rewrites each carried instance's
+  keys through it. Positional deliberately: it is the same pairing
+  `diffFactType` used to decide there was a modification, so matching by
+  name or player here would contradict the correspondence the accepted
+  delta was computed under. A role the incoming fact type dropped maps
+  to null and its values go with it; a role it added gets no value, so
+  the instance is short and the validator says so, which is a real
+  incompleteness rather than id churn.
+
+  The law cannot cover this and a law here would be vacuous: the
+  arbitrary assigns role ids positionally (`ft0r0`), so two generated
+  models share them and any remap is a no-op. Five fixture tests carry
+  it instead, four of which were watched failing first.
 - **The idempotence law found a performance defect and did not fix
   it.** `hashModel` constructs an `OrmYamlSerializer` per call, which
   compiles the JSON Schema with ajv in its constructor and never uses

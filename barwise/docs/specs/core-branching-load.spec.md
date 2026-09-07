@@ -13,6 +13,58 @@ functional/type analysis this partly answers), barwise-e8m (the
 functional-core commitment), barwise-923 (the hashModel bug the same
 remediation found); follow-ups barwise-927, -928, -929, -930, -931, -932
 
+## Evidenced sites (added 2026-09-07)
+
+Four concrete instances of this spec's thesis, each measured rather
+than asserted, found while auditing where a generic type stands in for
+a knowable domain. They are recorded here so the unimplemented
+workstreams have grounded targets instead of a general argument.
+
+- **A population tuple is unconstrained on both axes** (barwise-945).
+  `FactInstance.roleValues` is `Record<string, string>`. The key domain
+  is exactly the fact type's role ids and the value domain is the
+  player's declared domain, and neither is enforced: a value outside an
+  enumerated `valueConstraint`, a value of the wrong `dataType`, an
+  extra key that is no role at all, and a key belonging to another role
+  entirely all validate clean, five cases for five. So the generic type
+  is an accurate description of the behaviour; both diverge from the
+  model's intent. `RelationalMapper` already derives the harder half of
+  that domain for export -- an entity role becomes a foreign key onto
+  the identifying table's primary key -- and the validator never asks
+  it the same question.
+
+- **Breaking-change severity string-matches prose the diff generated**
+  (barwise-946). `breakingLevel.ts` classifies by equality and regex
+  against strings `elementDiff.ts` writes, and the two have already
+  drifted: an object type's definition change reads `safe` and a
+  standalone definition's text change reads `caution`, because a third
+  producer spelled it `definition text changed` and the classifier
+  knows only `definition changed`. The `unknown -> caution` fallback
+  means any added description is silently misclassified, and no
+  exhaustiveness check over free strings is possible.
+
+- **`Diagnostic.ruleId` is `string` over a closed set of 76 values.**
+  A typo is undetectable and no consumer can be checked for
+  exhaustiveness. This is also why `core-model-laws.spec.md`'s WS4 has
+  an open decision at all: its absent-data rule set is a hand-listed
+  group of rule ids needing a `parity.manifest.json` row precisely
+  because the ids are strings. A union makes that set compile-checked
+  and the open decision disappears.
+
+- **A fallback for a state the constructor forbids.**
+  `RelationalMapper.map` computes `ot.referenceMode ?? toSnake(ot.name)
+  - "_id"`inside`if (ot.kind === "entity")`, and `ObjectType`'s
+    constructor throws for an entity without a reference mode -- so the
+    right-hand side is unreachable. The runtime narrowing does not tell
+    the type system what it implies, so a defensive branch was written
+    for an impossible case and no reader can tell it is dead. A
+    discriminated `ObjectType`makes the`??` a compile error rather
+    than a puzzle.
+
+The first two are the sharpest arguments for the sealed-record and
+typed-diff workstreams respectively, because each has a demonstrated
+wrong answer rather than a latent risk.
+
 ## Principle
 
 Core is meant to be a functional core passing rich types around. A
