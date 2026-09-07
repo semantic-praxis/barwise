@@ -33,7 +33,6 @@
  * of this shape; core does not learn about it. See `Diagnostic`.
  */
 
-import type { Diagnostic } from "./Diagnostic.js";
 import type { DiagnosticSeverity } from "./severity.js";
 
 /** Every rule identifier, by name, so no emit site repeats the string. */
@@ -860,9 +859,6 @@ const RULE_DESCRIPTORS = {
 /** Every rule identifier core's validation can emit. */
 export type RuleId = (typeof RULE_ID)[keyof typeof RULE_ID];
 
-/** The message ids a given rule declares. */
-export type MessageId<K extends RuleId> = keyof (typeof RULE_DESCRIPTORS)[K]["messages"];
-
 /** Every rule identifier, in declaration order. */
 export const RULE_IDS = Object.keys(RULE_DESCRIPTORS) as readonly RuleId[];
 
@@ -892,7 +888,7 @@ export function makeReporter<D extends Record<string, RuleDescriptor>>(descripto
     messageId: M,
     elementId: string,
     ...args: Args<K, M>
-  ): Diagnostic<Id> {
+  ) {
     const descriptor: RuleDescriptor = descriptors[id]!;
     const message = descriptor.messages[messageId] as (...a: unknown[]) => string;
     return { severity: descriptor.severity, message: message(...args), elementId, ruleId: id };
@@ -905,7 +901,7 @@ export function makeReporter<D extends Record<string, RuleDescriptor>>(descripto
     messageId: M,
     elementId: string,
     ...args: Args<K, M>
-  ): Diagnostic<Id> {
+  ) {
     return { ...report(id, messageId, elementId, ...args), severity };
   }
 
