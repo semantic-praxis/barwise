@@ -6,7 +6,7 @@ Barwise is an [ORM 2](https://en.wikipedia.org/wiki/Object-role_modeling) modeli
 
 ## Learning ORM
 
-Barwise assumes familiarity with Object-Role Modeling. The definitive reference is Terry Halpin and Tony Morgan's _Information Modeling and Relational Databases_ (3rd ed., Morgan Kaufmann / Elsevier, 2024; ISBN 9780443237904) -- the text this project's metamodel is designed against. If you work with ORM, buy Dr. Halpin's book; it is the standard reference for the method, and no tool is a substitute for it. A spaced-repetition Anki deck that drills the concepts, with per-card pointers into the book, lives in [`barwise/docs/anki`](barwise/docs/anki); a transcript of the book's table of contents is in [`barwise/docs/halpin-morgan-3e-contents.md`](barwise/docs/halpin-morgan-3e-contents.md).
+Barwise assumes familiarity with Object-Role Modeling. The definitive reference is Terry Halpin and Tony Morgan's _Information Modeling and Relational Databases_ (3rd ed., Morgan Kaufmann / Elsevier, 2024; ISBN 9780443237904) -- the text this project's metamodel is designed against. If you work with ORM, buy Dr. Halpin's book; it is the standard reference for the method, and no tool is a substitute for it. A spaced-repetition Anki deck that drills the concepts, with per-card pointers into the book, lives in [`barwise/docs/anki`](barwise/docs/anki); a transcript of the book's table of contents is in [`barwise/docs/halpin-morgan-3e-contents.md`](barwise/docs/halpin-morgan-3e-contents.md); and a reading guide that says which chapters to read in what order, and what each grounds in the tool, is [`barwise/docs/halpin-morgan-3e-reading-guide.md`](barwise/docs/halpin-morgan-3e-reading-guide.md).
 
 ## Prerequisites
 
