@@ -872,36 +872,45 @@ export function ruleDescriptor(id: RuleId): RuleDescriptor {
 }
 
 /**
- * Build a diagnostic from its rule, so no emit site restates the rule's
- * identity, severity or wording. `severity` overrides the descriptor's
- * default for the rules whose modality or arity decides it.
+ * Build the `report` pair for a registry.
+ *
+ * Core calls this for its own rules and exports it so a surface can call
+ * it for theirs, rather than copying the two functions. Both halves stay
+ * typed against whichever registry they were built from, so a surface
+ * cannot name a core rule through its own reporter or vice versa.
  */
-export function report<K extends RuleId, M extends MessageId<K>>(
-  id: K,
-  messageId: M,
-  elementId: string,
-  ...args: Parameters<
-    (typeof RULE_DESCRIPTORS)[K]["messages"][M] extends (...a: infer A) => string
-      ? (...a: A) => string
-      : never
-  >
-): Diagnostic<RuleId> {
-  const descriptor: RuleDescriptor = RULE_DESCRIPTORS[id];
-  const message = descriptor.messages[messageId as string] as (...a: unknown[]) => string;
-  return { severity: descriptor.severity, message: message(...args), elementId, ruleId: id };
+export function makeReporter<D extends Record<string, RuleDescriptor>>(descriptors: D) {
+  type Id = keyof D & string;
+  type Msg<K extends Id> = keyof D[K]["messages"] & string;
+  type Args<K extends Id, M extends Msg<K>> = Parameters<
+    D[K]["messages"][M] extends (...a: infer A) => string ? (...a: A) => string : never
+  >;
+
+  /** A diagnostic carrying the rule's own severity and wording. */
+  function report<K extends Id, M extends Msg<K>>(
+    id: K,
+    messageId: M,
+    elementId: string,
+    ...args: Args<K, M>
+  ): Diagnostic<Id> {
+    const descriptor: RuleDescriptor = descriptors[id]!;
+    const message = descriptor.messages[messageId] as (...a: unknown[]) => string;
+    return { severity: descriptor.severity, message: message(...args), elementId, ruleId: id };
+  }
+
+  /** As `report`, with the severity the caller computed. */
+  function reportAs<K extends Id, M extends Msg<K>>(
+    severity: DiagnosticSeverity,
+    id: K,
+    messageId: M,
+    elementId: string,
+    ...args: Args<K, M>
+  ): Diagnostic<Id> {
+    return { ...report(id, messageId, elementId, ...args), severity };
+  }
+
+  return { report, reportAs };
 }
 
-/** As {@link report}, with the severity the caller computed. */
-export function reportAs<K extends RuleId, M extends MessageId<K>>(
-  severity: DiagnosticSeverity,
-  id: K,
-  messageId: M,
-  elementId: string,
-  ...args: Parameters<
-    (typeof RULE_DESCRIPTORS)[K]["messages"][M] extends (...a: infer A) => string
-      ? (...a: A) => string
-      : never
-  >
-): Diagnostic<RuleId> {
-  return { ...report(id, messageId, elementId, ...args), severity };
-}
+/** Core's own reporters, over the registry above. */
+export const { report, reportAs } = makeReporter(RULE_DESCRIPTORS);

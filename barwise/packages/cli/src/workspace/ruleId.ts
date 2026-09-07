@@ -19,28 +19,27 @@
  * a descriptor is required rather than optional, so an identifier
  * cannot be added without being described.
  *
- * The descriptor is read rather than merely declared: the emit site
- * takes its severity from here instead of restating it, so the entry is
- * load-bearing and the severity has one home. Two gates said so when it
- * was not -- knip called the lookup an unused export, and eslint called
- * the record a value used only as a type. A registry nothing reads is
- * documentation in a `const`, and they were right.
+ * The reporters come from core's `makeReporter` rather than being
+ * written again here, so the two registries share one implementation and
+ * each stays typed to its own rules: this surface cannot name a core rule
+ * through `cliReport`, nor core one of these.
  */
 
-import type { RuleDescriptor } from "@barwise/core";
+import { makeReporter, type RuleDescriptor } from "@barwise/core";
 
 const CLI_RULE_DESCRIPTORS = {
   "project/file-unresolved": {
     severity: "error",
     description:
       "A project file could not be resolved to a model, so its domain was skipped rather than validated.",
+    messages: {
+      default: (problem: string): string => problem,
+    },
   },
 } as const satisfies Record<string, RuleDescriptor>;
 
 /** Every rule identifier the CLI mints itself. */
 export type CliRuleId = keyof typeof CLI_RULE_DESCRIPTORS;
 
-/** The descriptor for a CLI-minted rule identifier. */
-export function cliRuleDescriptor(id: CliRuleId): RuleDescriptor {
-  return CLI_RULE_DESCRIPTORS[id];
-}
+/** This surface's reporters, built over its own registry by core's factory. */
+export const { report: cliReport } = makeReporter(CLI_RULE_DESCRIPTORS);

@@ -12,7 +12,7 @@ import { callLogSink } from "../workspace/callLogSink.js";
 import { formatDiagnostics, formatDiagnosticsJson } from "../workspace/format.js";
 import { isProjectFile, loadModel } from "../workspace/io.js";
 import { loadProject } from "../workspace/projectLoader.js";
-import { cliRuleDescriptor, type CliRuleId } from "../workspace/ruleId.js";
+import { cliReport, type CliRuleId } from "../workspace/ruleId.js";
 
 interface ValidateOptions {
   format: string;
@@ -61,12 +61,7 @@ function collectProjectDiagnostics(file: string): Diagnostic<RuleId | CliRuleId>
   const diagnostics: Diagnostic<RuleId | CliRuleId>[] = [];
 
   for (const problem of problems) {
-    diagnostics.push({
-      severity: cliRuleDescriptor("project/file-unresolved").severity,
-      message: problem,
-      elementId: file,
-      ruleId: "project/file-unresolved",
-    });
+    diagnostics.push(cliReport("project/file-unresolved", "default", file, problem));
   }
 
   for (const domain of project.domains) {
