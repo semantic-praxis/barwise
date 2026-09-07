@@ -1,8 +1,8 @@
 # Closed sets belong in the type system: rule ids and change descriptions as unions
 
-Status: WS1 implemented (barwise-946 closed); WS2 and WS3 not started
+Status: WS1 and WS2 implemented (barwise-946 closed); WS3 not started
 Created: 2026-09-07
-Last-updated: 2026-09-07 (WS1 shipped)
+Last-updated: 2026-09-07 (WS1 and WS2 shipped)
 Tracking: barwise-947 (this spec); barwise-946 (breaking-change
 severity string-matches prose);
 the Evidenced-sites section of `core-branching-load.spec.md`, whose
@@ -247,6 +247,29 @@ core's 125 `Diagnostic[]` signatures compile unedited because the
 default type parameter absorbs them; the CLI fails on exactly the one
 out-of-set literal, named in the error; and all 12 packages build once
 the CLI declares its own set. The cost outside core is four lines.
+
+**Shipped 2026-09-07.** The spike's numbers held: core's 125
+`Diagnostic[]` signatures compiled unedited, and the only downstream
+break was the CLI's one out-of-set literal, named in the error.
+
+Three things the workstream did not anticipate.
+
+The registry needed a _second_ drift direction guarded. The compiler
+rejects a rule emitting an unregistered id, but a registry listing an id
+no rule emits any more still compiles and still passes every other
+test -- which is how a catalogue quietly fills with rules that were
+deleted. The test scans both ways.
+
+`merge-error` is in the set and is not a validation rule: `mergeAndValidate`
+mints it when a merge throws. It is described as such rather than
+renamed, because the string reaches consumers today and renaming it
+would be a behaviour change this workstream has no reason to make.
+
+Writing the descriptions found one of its own: a test requiring a
+description longer than its identifier caught `"Two fact types share a
+name."`, which restates the id and explains nothing. Both duplicate-name
+rules now say why it matters. The threshold stayed; the descriptions
+improved.
 
 ### 3. Change descriptions as a discriminated union
 

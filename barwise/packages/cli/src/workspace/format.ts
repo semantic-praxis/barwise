@@ -2,14 +2,16 @@
  * Output formatting helpers for the CLI.
  */
 
-import type { Diagnostic } from "@barwise/core";
+import type { Diagnostic, DiagnosticSeverity } from "@barwise/core";
 import type { Counterexample } from "@barwise/core/counterexample";
 import type { Verbalization } from "@barwise/core/verbalization";
 
 /**
  * Format diagnostics as human-readable text.
  */
-export function formatDiagnostics(diagnostics: readonly Diagnostic[]): string {
+export function formatDiagnostics(
+  diagnostics: readonly { severity: DiagnosticSeverity; message: string; }[],
+): string {
   if (diagnostics.length === 0) return "";
 
   return diagnostics
@@ -23,7 +25,9 @@ export function formatDiagnostics(diagnostics: readonly Diagnostic[]): string {
 /**
  * Format diagnostics as JSON.
  */
-export function formatDiagnosticsJson(diagnostics: readonly Diagnostic[]): string {
+export function formatDiagnosticsJson<R extends string>(
+  diagnostics: readonly Diagnostic<R>[],
+): string {
   return JSON.stringify(
     diagnostics.map((d) => ({
       severity: d.severity,
