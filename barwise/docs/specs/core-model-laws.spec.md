@@ -1,13 +1,15 @@
 # Laws over a generated model: property-based tests for core
 
-Status: WS1 implemented (the arbitrary and the serialization law; see
-Implementation notes). WS2-WS5 not implemented.
+Status: WS1 and WS2 implemented (the arbitrary, the serialization law,
+the merge law and the barwise-937 fix; see Implementation notes).
+WS3-WS5 not implemented.
 Created: 2026-09-07
 Last-updated: 2026-09-07
 Tracking: barwise-938 (this spec); barwise-937 (the merge defect its
-grounding found); REPO_REVIEW-2026-06.md T4; the deferral recorded in
-`conformance-property.spec.md` ("the core arbitrary question stays
-open until someone brings a property that earns it")
+grounding found); follow-ups barwise-939, -940, -941 (found while
+implementing WS1 and WS2); REPO_REVIEW-2026-06.md T4; the deferral
+recorded in `conformance-property.spec.md` ("the core arbitrary
+question stays open until someone brings a property that earns it")
 
 In one sentence: add fast-check to core, generate structurally valid
 `OrmModel`s from a seeded arbitrary, and assert five laws the existing
@@ -402,6 +404,44 @@ mutation check for this workstream reverts c185df6's
   are left standing until WS3 retires them together with the third
   `RULE_BY_TYPE` copy they carry. WS1 therefore lands a duplicate
   round-trip assertion on purpose, over a strictly stronger generator.
+
+### WS2 (2026-09-07)
+
+- **Option A, as recommended.** `mergeModels` carries subtype facts,
+  objectified fact types, populations and diagram layouts through from
+  the existing model; `diffModels` still emits three element kinds.
+  Option B is filed as barwise-940 and inherits the merge law rather
+  than a fixture.
+- **The model-level `note` was dropped too.** The defect was recorded
+  as four missing element kinds; it was four kinds and a field, because
+  `mergeModels` constructs its result with a literal naming `name` and
+  `domainContext` only. The identity law caught it on the first
+  generated model that carried a note, which is the same omission shape
+  one level down from barwise-927.
+- **Carrying is not unconditional.** An element whose referent the
+  merge removed is dropped: `OrmModel` throws on a subtype fact naming
+  an absent entity, and a throw inside `mergeModels` loses the whole
+  merge, since `mergeAndValidate` catches it and returns a null model.
+  An accepted removal is a decision to remove, so dropping what
+  depended on it is the merge obeying the user. An accepted
+  modification that turns an entity type into a value type has the same
+  effect on a subtype fact naming it.
+- **The accept-all law is false as drafted, and ships in the spec's own
+  fallback shape.** Measured over 60 generated model pairs, accepting
+  every delta left a residual delta in 50 of them, always `modified
+  object_type ["aliases changed"]` and never anything else; the element
+  sets matched in all 60. The cause is `unionAliases`, which is
+  deliberate. So the law asserts the element sets and then states the
+  exception exactly -- every residual delta is that one -- rather than
+  being weakened to element sets alone. A second divergence appearing
+  later fails the second clause.
+- **The fix surfaced a smaller defect it did not introduce the shape
+  of.** A population carried past an accepted fact-type modification
+  keeps the existing role ids while the merged fact type takes the
+  incoming ones, so its instances read as incomplete. Before the fix
+  the population vanished silently; now it survives and is wrong,
+  visibly. Filed as barwise-941, blocked on barwise-940, which is where
+  the remap belongs.
 - **The idempotence law found a performance defect and did not fix
   it.** `hashModel` constructs an `OrmYamlSerializer` per call, which
   compiles the JSON Schema with ajv in its constructor and never uses

@@ -5,6 +5,7 @@
  * concrete data for that role. For example, in "Customer places Order",
  * an instance might be { "role-customer": "C001", "role-order": "O123" }.
  */
+import type { Complete } from "../util/complete.js";
 import { generateId } from "./id.js";
 export interface FactInstance {
   /** Unique identifier for this instance. */
@@ -142,4 +143,26 @@ function createInstance(config: FactInstanceConfig): FactInstance {
     id: config.id ?? generateId(),
     roleValues: { ...config.roleValues },
   };
+}
+
+/**
+ * Project a Population, instances included, back to the config shape
+ * that constructed it. See {@link toSubtypeFactConfig} for why these
+ * projections exist rather than a hand-copied literal at each caller.
+ */
+export function toPopulationConfig(pop: Population): PopulationConfig {
+  const config: Complete<PopulationConfig> = {
+    id: pop.id,
+    factTypeId: pop.factTypeId,
+    description: pop.description,
+    sample: pop.sample,
+    instances: pop.instances.map((inst) => {
+      const instance: Complete<FactInstanceConfig> = {
+        id: inst.id,
+        roleValues: { ...inst.roleValues },
+      };
+      return instance;
+    }),
+  };
+  return config;
 }
