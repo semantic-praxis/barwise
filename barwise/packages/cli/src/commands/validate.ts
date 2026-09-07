@@ -12,7 +12,7 @@ import { callLogSink } from "../workspace/callLogSink.js";
 import { formatDiagnostics, formatDiagnosticsJson } from "../workspace/format.js";
 import { isProjectFile, loadModel } from "../workspace/io.js";
 import { loadProject } from "../workspace/projectLoader.js";
-import { type CliRuleId, cliRuleDescriptor } from "../workspace/ruleId.js";
+import { cliRuleDescriptor, type CliRuleId } from "../workspace/ruleId.js";
 
 interface ValidateOptions {
   format: string;
