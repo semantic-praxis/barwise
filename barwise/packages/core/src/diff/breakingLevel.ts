@@ -5,10 +5,20 @@
 import type { BreakingLevel, DeltaKind } from "./deltas.js";
 
 /**
- * Classify the breaking level of a change string from a modification delta.
- * Returns the severity level for a single change description.
+ * Classify one change description, or return undefined when the string
+ * is not one this module knows.
+ *
+ * Separating "unrecognized" from "deliberately caution" is what makes
+ * the drift between this module and `elementDiff.ts` testable at all:
+ * both used to be the literal `"caution"`, so a description nobody had
+ * classified was indistinguishable from one classified as caution on
+ * purpose, and four of them were silently taking the fallback
+ * (barwise-946). `classifyBreakingLevel` still applies caution as the
+ * default, so behaviour is unchanged for any string that remains
+ * unknown. Exported for the drift test; not re-exported from
+ * `diff/index.ts`, so it stays internal to the package.
  */
-function classifyChange(change: string): BreakingLevel {
+export function classifyKnownChange(change: string): BreakingLevel | undefined {
   // Safe: definition, note, aliases, source context, readings, role names.
   if (change === "definition changed") return "safe";
   if (change === "note changed") return "safe";
@@ -16,6 +26,13 @@ function classifyChange(change: string): BreakingLevel {
   if (change.startsWith("source context:")) return "safe";
   if (change === "readings changed") return "safe";
   if (/^role \d+: name /.test(change)) return "safe";
+  // A standalone definition's text and its bounded context are the
+  // ubiquitous-language entries' equivalents of an object type's
+  // `definition` and `sourceContext`, which are safe above. They read
+  // `caution` until now only because the classifier knew the object
+  // type's spelling and not this one -- the drift barwise-946 names.
+  if (change === "definition text changed") return "safe";
+  if (change.startsWith("context:")) return "safe";
 
   // Breaking: kind change, arity change, role player change.
   if (change.startsWith("kind:")) return "breaking";
@@ -36,9 +53,17 @@ function classifyChange(change: string): BreakingLevel {
   if (change.startsWith("default value:")) return "caution";
   if (change.startsWith("constraints added")) return "caution";
   if (change.startsWith("constraints removed")) return "caution";
+  // Both were reaching the caution fallback, so the verdict is
+  // unchanged and only the intent is new. A cardinality bound and a
+  // derivation rule each decide which populations are legal, which is
+  // the reason `value constraint changed` and `independent:` are
+  // caution rather than safe; a derivation additionally decides what a
+  // derived fact type's population contains, without changing the
+  // shape a consumer binds to, which is what would make it breaking.
+  if (change === "cardinality changed") return "caution";
+  if (change === "derivation changed") return "caution";
 
-  // Unknown changes default to caution.
-  return "caution";
+  return undefined;
 }
 
 /**
@@ -52,7 +77,8 @@ export function classifyBreakingLevel(kind: DeltaKind, changes: readonly string[
   // Modified: classify each change and take the most severe.
   let level: BreakingLevel = "safe";
   for (const change of changes) {
-    const changeLevel = classifyChange(change);
+    // Unknown descriptions default to caution, as they always have.
+    const changeLevel = classifyKnownChange(change) ?? "caution";
     if (changeLevel === "breaking") return "breaking";
     if (changeLevel === "caution") level = "caution";
   }

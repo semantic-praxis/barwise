@@ -1,8 +1,8 @@
 # Closed sets belong in the type system: rule ids and change descriptions as unions
 
-Status: Reviewed -- all open decisions resolved; no workstream implemented
+Status: WS1 implemented (barwise-946 closed); WS2 and WS3 not started
 Created: 2026-09-07
-Last-updated: 2026-09-07 (all three open decisions resolved)
+Last-updated: 2026-09-07 (WS1 shipped)
 Tracking: barwise-947 (this spec); barwise-946 (breaking-change
 severity string-matches prose);
 the Evidenced-sites section of `core-branching-load.spec.md`, whose
@@ -188,6 +188,30 @@ description, the test shall find it explicitly classified.
 
 This ships first because it is a live, user-visible wrong answer and it
 does not depend on either union.
+
+**Shipped 2026-09-07, and it found more than the issue recorded.**
+barwise-946 named one unclassified description; the scanner found
+four -- `cardinality changed`, `derivation changed`, `definition text
+changed` and `context: ... -> ...` -- all silently taking the caution
+fallback. Two are now `safe` (the standalone definition's text and its
+bounded context, matching how an object type's `definition` and
+`sourceContext` are already treated, which is the drift the issue
+named); two stay `caution` with the verdict unchanged and only the
+intent new.
+
+Making the drift testable needed one refactor the workstream did not
+anticipate: `classifyChange` returned the literal `"caution"` both for
+a deliberate caution and for an unrecognized string, so the two were
+indistinguishable and no test could tell them apart. It now returns
+`BreakingLevel | undefined` as `classifyKnownChange`, with
+`classifyBreakingLevel` applying the caution default, so behaviour is
+unchanged for anything still unknown.
+
+The guard derives the producer's side from the producer's source rather
+than restating it, so a description added without a classification
+fails; a hand-written list of expected strings would simply not mention
+the new one. Watched failing on a planted description before it was
+believed, and it names the offending string.
 
 ### 2. `RuleId` as a closed union, with SARIF-shaped descriptors
 
