@@ -15,9 +15,15 @@ merging nothing changes nothing, every counterexample trips its rule,
 a sample population never creates an obligation, and the mapper's
 foreign keys close over its own tables.
 
+Two terms, used throughout. A _law_ is a statement that must hold for
+every model, not for the one a test author built; the test checks it
+against hundreds of generated models and reports the smallest one that
+breaks it. An _arbitrary_ is fast-check's name for a generator of such
+models: seeded, so the same seed yields the same models every run.
+
 ## Principle
 
-Determinism in core is the precondition, and this is the payoff. Every
+Property-based testing is the payoff of determinism in core. Every
 function the laws cover is pure: same model in, same output out, no
 clock, no I/O, one `randomUUID()` for identity plumbing that
 `hashModel` canonicalises away. Property-based testing needs exactly
@@ -26,38 +32,45 @@ argument for one pipeline in `llm` and deferred the core question until
 a property earned it.
 
 The property that earns it arrived while grounding this spec. Merging
-a model with itself and accepting nothing drops every subtype fact and
-population it carries (barwise-937). Nothing in the suite sees this,
-for the same reason nothing saw barwise-927 (merge dropped six fields)
-or barwise-934 (diff compared four fields short) or barwise-931 (the
-mapper truncated composite keys to one column): each test asserts what
-its author put in the fixture, and each defect is an omission. A law
-over a generated model asserts what must hold of every model, so an
-omission fails on the first model that exercises it. Four
-silently-incomplete-copy defects in this zone in two days (all four
-fixes dated 2026-09-06), one still open, is the evidence trail.
+a model with itself and accepting nothing is the one merge where
+nothing may change, so any change is loss; today it drops every
+subtype fact and population the model carries (barwise-937). Nothing
+in the suite sees this, for the same reason nothing saw barwise-927
+(merge dropped six fields), barwise-934 (diff compared four fields
+short) or barwise-931 (the mapper truncated composite keys to one
+column). Each test asserts what its author put in the fixture, and
+each defect is an omission: code that copies a model field by field or
+kind by kind and misses some. A law over a generated model asserts
+what must hold of every model, so an omission fails on the first model
+that exercises it. Four such defects in this zone in two days (all
+four fixes dated 2026-09-06), one still open, is the evidence trail.
 
-This is also the formal-methods answer for this project, sized
-honestly. TLA+ and model checking exist for concurrent state machines
-and core has none. Alloy would fit the validator as an oracle and is
-deferred (see Alternatives). Hillel Wayne's own recommendation for most
-teams -- property-based testing, then stop -- is the one that fits.
+This is also the formal-methods answer for this project: the
+smallest method that reaches the defect class this repository actually
+has. TLA+ and model checking exist for concurrent state machines and
+core has none. Alloy would fit the validator as an oracle and is
+deferred (see Alternatives). The recommendation Hillel Wayne (formal
+methods consultant, on The Pragmatic Engineer podcast, 2026-07-29)
+gives most teams -- property-based testing, then stop -- is the one
+that fits.
 
 ## Should the laws wait for the sealed-record refactor? (resolved: no)
 
 `core-branching-load.spec.md` proposes a builder, field tables, and a
-typed diff (WS1, WS2, WS7). Those refactors need acceptance tests that
-say what must not change, and fixtures cannot say it. The laws are
-those tests: land them first against today's `OrmModel`, and each
-refactor workstream keeps them green. If the builder lands first, the
-arbitrary retargets it (Risks and testing); the laws do not move.
+typed diff. Those refactors need acceptance tests that say what must
+not change, and fixtures cannot say it. The laws are those tests: land
+them first against today's `OrmModel`, and each refactor keeps them
+green. If the builder lands first, the arbitrary retargets it (Risks
+and testing); the laws do not move. That spec's workstreams are
+referred to by name here, never by number, because this spec numbers
+its own.
 
 ## Scope
 
 In scope, stated as requirements:
 
-- When the suite runs, the system shall generate structurally valid
-  `OrmModel`s from a seeded fast-check arbitrary under
+- When the suite runs, the system shall generate `OrmModel`s carrying
+  no `structural/*` diagnostic from a seeded fast-check arbitrary under
   `packages/core/tests/arbitraries/`, with a fixed seed and run count
   so the verdict is the same on every run.
 - When a generated model `m` is serialized, deserialized and serialized
@@ -73,8 +86,12 @@ In scope, stated as requirements:
   shall produce a diagnostic with the rule id mapped from the
   counterexample's constraint type.
 - When a sample population is added to a generated model, the set of
-  diagnostics whose rule reaches existence through
-  `buildObjectUniverse` shall not grow.
+  diagnostics from the absent-data rules shall not grow. A sample is
+  positive evidence only: it can satisfy a constraint but never creates
+  the obligation that one be satisfied. The absent-data rules are the
+  ones that create obligations, which in code means the rules that read
+  `buildObjectUniverse` (mandatory, disjunctive mandatory, cardinality,
+  the spanning set-comparison rules, join paths).
 - When `RelationalMapper.map` runs over a generated model, it shall
   not throw, and every foreign key shall name an existing table whose
   primary key columns equal the key's referenced columns, in order and
@@ -212,19 +229,21 @@ objectified supertype, one with an `independent` object type, one with
 a ternary fact type, and one with a sample population. This is the
 coverage guard: a generator that never reaches the shapes the recorded
 defects lived in has proved nothing. Record the counts in the test as
-assertions, not as a comment. The revert-and-expect-red checks belong
-to the workstreams whose laws they exercise (WS2 for barwise-927, WS5
-for barwise-931).
+assertions, not as a comment. The mutation checks (revert a recorded
+fix locally, expect the law to go red) belong to the workstreams whose
+laws they exercise: WS2 for barwise-927, WS5 for barwise-931.
 
 ### 2. The merge law, red first, and the barwise-937 fix
 
 Land the merge law failing, then the fix in the same PR. The law
 states the whole requirement: merging nothing changes nothing. The fix
-shape is the first open decision. Acceptance: when the
+shape is the first open decision. Acceptance is a mutation check, run
+once by hand and recorded in the PR body, never committed: when the
 `toObjectTypeConfig` projection is locally reverted to the
 pre-barwise-927 hand-copied literal, the merge law shall fail within
-the fixed run count. Add the accept-all law only if it
-holds after the fix; it is drafted below as provisional.
+the fixed run count (the assertion-audit skill's "mutation kill").
+Add the accept-all law only if it holds after the fix; it is drafted
+below as provisional.
 
 Provisional: when every `added` and `modified` delta is accepted and
 every `removed` delta is accepted, `diffModels(merged, incoming)` shall
@@ -244,11 +263,10 @@ the law asserts the same thing over every model the generator reaches.
 
 For a generated model and a generated sample population over one of
 its fact types: the diagnostics whose rule ids are in the absent-data
-set must not grow. The set is the rules that reach existence through
-`buildObjectUniverse` (today: mandatory, disjunctive mandatory,
-cardinality, spanning, join path). It is a copy that must agree with
-code, so it is guarded per the second open decision, in this
-workstream.
+set (defined under Scope) must not grow. The set as written in the
+test is a copy that must agree with which rules read
+`buildObjectUniverse`, so it is guarded per the second open decision,
+in this workstream.
 
 ### 5. The mapper laws
 
@@ -258,8 +276,8 @@ schema, its `referencedColumns` equal that table's primary key
 `columnNames` in order, and its `columnNames` has the same length.
 Column names are unique within each table. The composite-key defect
 barwise-931 fixed is a one-line violation of the second clause; the
-acceptance test reverts c185df6's `appendForeignKeyColumns` locally
-and expects the law to fail.
+mutation check for this workstream reverts c185df6's
+`appendForeignKeyColumns` locally, once, and expects the law to fail.
 
 ## API and migration impact
 
@@ -281,9 +299,10 @@ and expects the law to fail.
   incoming model's new subtype facts still never merge in; that gap
   is filed as a follow-up. Option B: `diffModels` emits deltas for all
   seven kinds and `mergeModels` applies them, which is the typed diff
-  `core-branching-load` WS7 wants and a much larger change. Recommend
-  A now, with the follow-up issue naming B, so the merge law goes
-  green in one PR and WS7 inherits a law instead of a fixture.
+  `core-branching-load.spec.md` proposes and a much larger change.
+  Recommend A now, with the follow-up issue naming B, so the merge law
+  goes green in one PR and the typed diff inherits a law instead of a
+  fixture.
 - **Guarding the absent-data rule set (WS4).** The set of rules that
   call `buildObjectUniverse` is restated in the test. Option A: derive
   it, by having each rule module export a marker the test reads.
@@ -302,8 +321,8 @@ and expects the law to fail.
 ## Risks and testing
 
 - A generator that is too tame passes every law and proves nothing.
-  WS1's coverage assertions and the two revert-and-expect-red
-  acceptance tests (WS2 for 927, WS5 for 931) are the guard; the
+  WS1's coverage assertions and the two manual mutation checks (WS2
+  for 927, WS5 for 931) are the guard; the
   generator earns trust on recorded defects before it is trusted on
   unknown ones.
 - Shrinking a large model on failure can stall CI. Every collection
@@ -312,9 +331,9 @@ and expects the law to fail.
 - The merge law is red on its first run against today's `mergeModels`
   (barwise-937). WS2 lands the law and the fix together so main never
   carries a red law.
-- If `core-branching-load` WS1 (the builder) lands before this spec's
-  WS1, the arbitrary targets the builder instead of `OrmModel.add*`;
-  the laws are unchanged.
+- If the sealed-record builder from `core-branching-load.spec.md`
+  lands before this spec's WS1, the arbitrary targets the builder
+  instead of `OrmModel.add*`; the laws are unchanged.
 - If a law fails on a case the reviewer judges correct behaviour, the
   law is wrong, not the code: rewrite the law and record why in this
   spec.
