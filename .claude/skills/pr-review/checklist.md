@@ -54,6 +54,41 @@ output specification for the PR body (spec:
 - A metamodel or serialization change bumps or handles
   `schemaVersion`.
 
+## When a type was introduced, or a field's type chosen
+
+The question this group asks is whether a type states what the code
+already knows. Every item below is a defect that has actually occurred
+here, and none of them fails a build today.
+
+- **A closed set is a union, not `string`.** If any code compares the
+  value against string literals, its type should be the union of those
+  literals. `Diagnostic.ruleId` was `string` over 76 known values, and
+  the breaking-level classifier string-matched prose the diff wrote
+  until the two silently diverged. Authority:
+  `docs/specs/closed-sets-as-unions.spec.md`; barwise-946.
+- **A generic container names its domains, or says why it cannot.**
+  `Record<string, string>` where both the keys and the values have
+  knowable domains is the population-tuple defect: a fact instance
+  accepts a key that is no role of its fact type and a value outside
+  its player's declared type, and nothing reports either. Where the
+  domain is runtime data a type genuinely cannot carry it, and the
+  enforcement belongs in the constructor instead -- say which case this
+  is. Authority: barwise-945.
+- **An optional field the constructor guarantees is not optional, and a
+  fallback for a state the constructor forbids is dead code.**
+  `Constraint.id` is optional though `FactType` mints one for every
+  constraint, so the serializer branches on a case that cannot occur;
+  `RelationalMapper` computes a reference-mode fallback inside a branch
+  where an entity always has one. Authority:
+  `docs/specs/core-branching-load.spec.md`, Evidenced sites.
+- **A consumer's parameter names what it consumes, not what its caller
+  holds.** Widening a parameter to `Diagnostic<string>` to admit a
+  caller is the wrong direction; a formatter that reads `severity` and
+  `message` should ask for those two fields. Authority:
+  `docs/specs/closed-sets-as-unions.spec.md`, WS2.
+- **A surface extending a core set declares its own registry**, and
+  core does not learn the surface's identifiers. Authority: same, WS2.
+
 ## When a copy was added or a copy was edited
 
 - A must-agree pair carries a mechanical check in the same commit: a
