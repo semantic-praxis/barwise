@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { getStructuralErrors, mergeAndValidate, mergeModels } from "../../src/diff/ModelMerge.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
+import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 function baseModel() {
@@ -1023,5 +1024,159 @@ describe("mergeAndValidate", () => {
     // Should not throw -- diagnostics are captured in the result.
     expect(result.isValid).toBe(false);
     expect(result.diagnostics.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * A carried population keys its instances by role id, and an accepted
+ * fact-type modification gives the merged fact type the INCOMING role
+ * ids. Before barwise-941 the population came through untouched and its
+ * keys pointed at ids no role answered to, so every instance read as
+ * incomplete -- a hard validation error on a merged model, triggered by
+ * any accepted edit to a fact type carrying sample data, including a
+ * definition-only one that touches no role.
+ *
+ * Fresh role ids matter to these fixtures: a re-extraction mints new
+ * ones, and that is the whole defect. The generated models in
+ * `tests/laws/merge.law.test.ts` cannot cover this -- the arbitrary
+ * assigns role ids positionally (`ft0r0`), so two generated models share
+ * them and the remap is a no-op. A law there would pass vacuously,
+ * which is why this is a fixture test.
+ */
+describe("mergeModels: a carried population follows its fact type's roles", () => {
+  function model(
+    rolePrefix: string,
+    options: { definition?: string; arity?: 2 | 3; } = {},
+  ) {
+    const arity = options.arity ?? 2;
+    const m = new OrmModel({ name: "M" });
+    const cust = m.addObjectType({
+      name: "Customer",
+      kind: "entity",
+      referenceMode: "customer_id",
+    });
+    const order = m.addObjectType({
+      name: "Order",
+      kind: "entity",
+      referenceMode: "order_number",
+    });
+    const day = m.addObjectType({ name: "Day", kind: "value" });
+
+    const roles = [
+      { name: "places", playerId: cust.id, id: `${rolePrefix}0` },
+      { name: "is placed by", playerId: order.id, id: `${rolePrefix}1` },
+    ];
+    const readings = ["{0} places {1}", "{1} is placed by {0}"];
+    if (arity === 3) {
+      roles.push({ name: "on", playerId: day.id, id: `${rolePrefix}2` });
+      readings.length = 0;
+      readings.push("{0} places {1} on {2}");
+    }
+
+    const ft = m.addFactType({
+      name: "Customer places Order",
+      definition: options.definition,
+      roles,
+      readings,
+    });
+    const pop = m.addPopulation({ factTypeId: ft.id });
+    const roleValues: Record<string, string> = {
+      [`${rolePrefix}0`]: "C1",
+      [`${rolePrefix}1`]: "O1",
+    };
+    if (arity === 3) roleValues[`${rolePrefix}2`] = "Monday";
+    pop.addInstance({ roleValues });
+    return m;
+  }
+
+  /** Merge with every non-unchanged delta accepted. */
+  function mergeAccepting(existing: OrmModel, incoming: OrmModel) {
+    const { deltas } = diffModels(existing, incoming);
+    const accepted = new Set(
+      deltas.map((_, i) => i).filter((i) => deltas[i]!.kind !== "unchanged"),
+    );
+    return mergeModels(existing, incoming, deltas, accepted);
+  }
+
+  /** The role ids the merged model's only fact type actually declares. */
+  function roleIdsOf(m: OrmModel): string[] {
+    return m.factTypes[0]!.roles.map((r) => r.id).sort();
+  }
+
+  function instanceKeys(m: OrmModel): string[] {
+    return Object.keys(m.populations[0]!.instances[0]!.roleValues).sort();
+  }
+
+  it("remaps instance keys when an accepted modification swaps the roles in", () => {
+    const merged = mergeAccepting(
+      model("r", {}),
+      model("s", { definition: "A customer places an order." }),
+    );
+
+    expect(merged.populations).toHaveLength(1);
+    expect(instanceKeys(merged)).toEqual(roleIdsOf(merged));
+    expect(merged.populations[0]!.instances[0]!.roleValues).toEqual({
+      s0: "C1",
+      s1: "O1",
+    });
+  });
+
+  it("leaves the merged model free of the incomplete-instance error", () => {
+    const merged = mergeAccepting(
+      model("r", {}),
+      model("s", { definition: "A customer places an order." }),
+    );
+
+    const errors = new ValidationEngine()
+      .validate(merged)
+      .filter((d) => d.ruleId === "population/incomplete-instance");
+    expect(errors).toEqual([]);
+  });
+
+  it("drops the values of a role the incoming fact type no longer has", () => {
+    // Existing is ternary, incoming binary: the third role is gone, so
+    // its value has nowhere to live and must not linger under a dead id.
+    const merged = mergeAccepting(
+      model("r", { arity: 3 }),
+      model("s", { arity: 2 }),
+    );
+
+    expect(instanceKeys(merged)).toEqual(roleIdsOf(merged));
+    expect(merged.populations[0]!.instances[0]!.roleValues).toEqual({
+      s0: "C1",
+      s1: "O1",
+    });
+  });
+
+  it("reports a role the incoming fact type added as genuinely unfilled", () => {
+    // Existing binary, incoming ternary: the two carried values follow
+    // their roles and the new role has none, which is a real
+    // incompleteness rather than an artefact of id churn.
+    const merged = mergeAccepting(
+      model("r", { arity: 2 }),
+      model("s", { arity: 3 }),
+    );
+
+    expect(merged.populations[0]!.instances[0]!.roleValues).toEqual({
+      s0: "C1",
+      s1: "O1",
+    });
+    const errors = new ValidationEngine()
+      .validate(merged)
+      .filter((d) => d.ruleId === "population/incomplete-instance");
+    expect(errors).toHaveLength(1);
+  });
+
+  it("leaves the population alone when the modification is rejected", () => {
+    const existing = model("r", {});
+    const incoming = model("s", { definition: "A customer places an order." });
+    const { deltas } = diffModels(existing, incoming);
+    const merged = mergeModels(existing, incoming, deltas, new Set());
+
+    expect(instanceKeys(merged)).toEqual(roleIdsOf(merged));
+    expect(merged.populations[0]!.instances[0]!.roleValues).toEqual({
+      r0: "C1",
+      r1: "O1",
+    });
   });
 });

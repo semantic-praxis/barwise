@@ -1,3 +1,4 @@
+import type { Complete } from "../util/complete.js";
 import type { DerivationRule } from "./FactType.js";
 import { ModelElement } from "./ModelElement.js";
 
@@ -88,4 +89,26 @@ export class SubtypeFact extends ModelElement {
       );
     }
   }
+}
+
+/**
+ * Project a SubtypeFact back to the config shape that constructed it,
+ * listing every field once -- the `toObjectTypeConfig` convention
+ * (barwise-927) applied to the element kinds the merge started carrying
+ * through in barwise-937. A caller that rebuilds a subtype fact spreads
+ * this instead of hand-copying its fields, and the `Complete<...>`
+ * annotation makes the next field added to `SubtypeFactConfig` a
+ * compile error here until it is listed.
+ */
+export function toSubtypeFactConfig(sf: SubtypeFact): SubtypeFactConfig {
+  const config: Complete<SubtypeFactConfig> = {
+    id: sf.id,
+    subtypeId: sf.subtypeId,
+    supertypeId: sf.supertypeId,
+    providesIdentification: sf.providesIdentification,
+    isExclusive: sf.isExclusive,
+    isExhaustive: sf.isExhaustive,
+    definingRule: sf.definingRule,
+  };
+  return config;
 }

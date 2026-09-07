@@ -8,13 +8,18 @@
  * - Accepted "removed" elements are omitted from the output.
  * - Rejected deltas leave the existing element unchanged.
  * - "unchanged" deltas always keep the existing element.
+ * - Element kinds the diff does not model are carried through from the
+ *   existing model, minus any whose referent the merge removed.
  *
  * Returns a freshly constructed OrmModel (no mutation of inputs).
  */
 
 import { type FactTypeConfig, toFactTypeConfig } from "../model/FactType.js";
+import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
 import { type ObjectType, toObjectTypeConfig } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
+import { type PopulationConfig, toPopulationConfig } from "../model/Population.js";
+import { toSubtypeFactConfig } from "../model/SubtypeFact.js";
 import type { Diagnostic } from "../validation/Diagnostic.js";
 import { structuralRules } from "../validation/rules/structural.js";
 import type { DefinitionDelta, FactTypeDelta, ModelDelta, ObjectTypeDelta } from "./ModelDiff.js";
@@ -37,6 +42,10 @@ export function mergeModels(
   const merged = new OrmModel({
     name: existing.name,
     domainContext: existing.domainContext,
+    // The note was dropped for as long as this function has existed:
+    // the merge names the fields it carries, so a field nobody listed
+    // is a field nobody keeps (barwise-937).
+    note: existing.note,
   });
 
   // We need to build a mapping from incoming object type ids to the ids
@@ -46,6 +55,14 @@ export function mergeModels(
   // canonical one. When we keep an existing object type (unchanged or
   // rejected modification), its id is the canonical one.
   const incomingIdToMergedId = new Map<string, string>();
+
+  // Role ids the merge rewrote, existing -> merged, or -> null where the
+  // role is gone. Populations are carried from `existing` and key their
+  // instances by role id, so a fact type that took the incoming model's
+  // roles leaves its population pointing at ids nothing answers to
+  // (barwise-941). Only an accepted modification rewrites roles; every
+  // other outcome keeps the existing fact type and needs no entry.
+  const roleIdMap = new Map<string, string | null>();
 
   // Phase 1: object types (must be added before fact types).
   const otDeltas = deltas
@@ -126,6 +143,7 @@ export function mergeModels(
           delta.existing!.id,
           incomingIdToMergedId,
         );
+        recordRoleRemap(roleIdMap, delta.existing!, delta.incoming!);
       } else {
         addFactTypeToMerged(merged, delta.existing!, null, incomingIdToMergedId);
       }
@@ -151,7 +169,131 @@ export function mergeModels(
     }
   }
 
+  // Phase 4: the element kinds the diff does not model.
+  carryUnmodelledElements(merged, existing, roleIdMap);
+
   return merged;
+}
+
+/**
+ * Carry subtype facts, objectified fact types, populations and diagram
+ * layouts from the existing model into the merged one.
+ *
+ * `diffModels` emits deltas for three element kinds -- object types,
+ * fact types, definitions -- and `mergeModels` builds a fresh
+ * `OrmModel` from those deltas alone, so every other kind used to be
+ * absent from the result of every merge. A model with one subtype fact
+ * and one population, diffed against itself and merged with nothing
+ * accepted, came back with neither, and every caller of
+ * `mergeAndValidate` wrote that loss to disk: `barwise merge`, `barwise
+ * import transcript`, the MCP merge tool and the VS Code import command
+ * (barwise-937).
+ *
+ * Carried means carried: these elements are not diffed, so an incoming
+ * model's new subtype facts still never merge in. Extending the diff to
+ * all seven kinds is barwise-940, and this function is what that change
+ * replaces.
+ *
+ * The one thing not carried is an element the merged model cannot
+ * hold -- a subtype fact whose entity type was removed, a population
+ * whose fact type was removed. Re-adding those would throw inside
+ * `OrmModel`, and a throw here loses the whole merge rather than one
+ * element: `mergeAndValidate` catches it and returns a null model. An
+ * accepted removal is a decision to remove, so dropping what depended
+ * on it is the merge doing what the user asked.
+ */
+function carryUnmodelledElements(
+  merged: OrmModel,
+  existing: OrmModel,
+  roleIdMap: ReadonlyMap<string, string | null>,
+): void {
+  for (const sf of existing.subtypeFacts) {
+    const subtype = merged.getObjectType(sf.subtypeId);
+    const supertype = merged.getObjectType(sf.supertypeId);
+    // Both sides must still exist and still be entity types; an
+    // accepted modification can turn an entity into a value type,
+    // which addSubtypeFact rejects.
+    if (subtype?.kind !== "entity" || supertype?.kind !== "entity") continue;
+    merged.addSubtypeFact(toSubtypeFactConfig(sf));
+  }
+
+  for (const oft of existing.objectifiedFactTypes) {
+    const objectType = merged.getObjectType(oft.objectTypeId);
+    if (!merged.getFactType(oft.factTypeId) || objectType?.kind !== "entity") continue;
+    merged.addObjectifiedFactType(toObjectifiedFactTypeConfig(oft));
+  }
+
+  for (const pop of existing.populations) {
+    if (!merged.getFactType(pop.factTypeId)) continue;
+    merged.addPopulation(remapPopulationRoles(toPopulationConfig(pop), roleIdMap));
+  }
+
+  // A layout references object and fact types by name rather than by
+  // id, and already tolerates naming an element that is not present, so
+  // it carries through whole.
+  for (const layout of existing.diagramLayouts) {
+    merged.addDiagramLayout(layout);
+  }
+}
+
+/**
+ * Record how an accepted fact-type modification moved its roles, so a
+ * carried population can follow them.
+ *
+ * The pairing is positional, and deliberately the same pairing
+ * `diffFactType` used to decide there was a modification at all: it
+ * compares roles by index and reports "role 2: player X -> Y", which is
+ * a statement that incoming role 2 corresponds to existing role 2.
+ * Matching any other way here (by name, by player) would contradict the
+ * correspondence the delta the user just accepted was computed under.
+ *
+ * A role with no counterpart -- the incoming fact type has lower arity
+ * -- maps to null, and its values are dropped rather than left pointing
+ * at an id no role answers to. The reverse case needs no entry: a role
+ * the incoming model added has no existing values, so instances come
+ * out short and the validator says so, which is honest. That is a
+ * genuine incompleteness in the data, not an artefact of id churn.
+ */
+function recordRoleRemap(
+  roleIdMap: Map<string, string | null>,
+  existingFt: import("../model/FactType.js").FactType,
+  incomingFt: import("../model/FactType.js").FactType,
+): void {
+  for (let i = 0; i < existingFt.roles.length; i++) {
+    const from = existingFt.roles[i]!.id;
+    const to = incomingFt.roles[i]?.id ?? null;
+    if (from !== to) roleIdMap.set(from, to);
+  }
+}
+
+/**
+ * Rewrite a carried population's instance keys through the role remap.
+ * An unmapped key belongs to a fact type the merge did not rewrite and
+ * passes through; a key mapped to null lost its role and is dropped.
+ */
+function remapPopulationRoles(
+  config: PopulationConfig,
+  roleIdMap: ReadonlyMap<string, string | null>,
+): PopulationConfig {
+  if (roleIdMap.size === 0 || !config.instances) return config;
+  return {
+    ...config,
+    instances: config.instances.map((inst) => ({
+      ...inst,
+      roleValues: Object.fromEntries(
+        Object.entries(inst.roleValues)
+          .map(([roleId, value]) => {
+            // Three cases, and `??` cannot tell the first two apart --
+            // `null ?? roleId` is `roleId`, which silently kept a
+            // dropped role's value under its dead id.
+            const mapped = roleIdMap.get(roleId);
+            const key = mapped === undefined ? roleId : mapped;
+            return [key, value] as const;
+          })
+          .filter((entry): entry is readonly [string, string] => entry[0] !== null),
+      ),
+    })),
+  };
 }
 
 // ---------------------------------------------------------------------------
