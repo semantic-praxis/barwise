@@ -80,7 +80,14 @@ function makeDraftResult(overrides: Partial<DraftModelResult> = {}): DraftModelR
 }
 
 function objectTypeDelta(kind: ModelDelta["kind"], name: string): ModelDelta {
-  return { kind, elementType: "object_type", name, changeDescriptions: [], breakingLevel: "safe" };
+  return {
+    kind,
+    elementType: "object_type",
+    name,
+    changes: [],
+    changeDescriptions: [],
+    breakingLevel: "safe",
+  };
 }
 
 let dir: string;

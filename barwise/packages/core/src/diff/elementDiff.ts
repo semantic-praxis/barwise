@@ -1,67 +1,72 @@
 /**
  * Element-level comparison helpers for the model diff: object types,
  * fact types (roles, readings, constraints), and definitions. Each
- * returns a list of human-readable change descriptions.
+ * returns a list of `ChangeDescription` variants; the prose a surface
+ * displays is rendered from them by `describeChange`.
+ *
+ * Values that come out of a model are copied on the way into a variant
+ * (`structuredClone`), so a delta cannot be corrupted by a later
+ * mutation of the model it was computed from. See the module comment on
+ * `changeDescription.ts` for why.
  */
 import type { Constraint, JoinOperand } from "../model/Constraint.js";
 import type { Definition } from "../model/Definition.js";
 import type { DerivationRule, FactType } from "../model/FactType.js";
-import type { DataTypeDef, ObjectType, ValueConstraintDef } from "../model/ObjectType.js";
+import type { ObjectType, ValueConstraintDef } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { Role } from "../model/Role.js";
+import type { ChangeDescription, RoleSummary } from "./changeDescription.js";
 
 export function diffObjectType(
   a: ObjectType,
   b: ObjectType,
   _existingModel: OrmModel,
   _incomingModel: OrmModel,
-): string[] {
-  const changes: string[] = [];
+): ChangeDescription[] {
+  const changes: ChangeDescription[] = [];
 
   if (a.kind !== b.kind) {
-    changes.push(`kind: ${a.kind} -> ${b.kind}`);
+    changes.push({ change: "kind", from: a.kind, to: b.kind });
   }
   if ((a.referenceMode ?? "") !== (b.referenceMode ?? "")) {
-    changes.push(
-      `reference mode: "${a.referenceMode ?? "(none)"}" -> "${b.referenceMode ?? "(none)"}"`,
-    );
+    changes.push({ change: "referenceMode", from: a.referenceMode, to: b.referenceMode });
   }
   if ((a.definition ?? "") !== (b.definition ?? "")) {
-    changes.push("definition changed");
+    changes.push({ change: "definition", from: a.definition, to: b.definition });
   }
   if ((a.sourceContext ?? "") !== (b.sourceContext ?? "")) {
-    changes.push(
-      `source context: "${a.sourceContext ?? "(none)"}" -> "${b.sourceContext ?? "(none)"}"`,
-    );
+    changes.push({ change: "sourceContext", from: a.sourceContext, to: b.sourceContext });
   }
 
   if (valueConstraintKey(a.valueConstraint) !== valueConstraintKey(b.valueConstraint)) {
-    changes.push("value constraint changed");
+    changes.push({
+      change: "valueConstraint",
+      from: copy(a.valueConstraint),
+      to: copy(b.valueConstraint),
+    });
   }
 
   const aCard = a.cardinality ? `${a.cardinality.min}..${a.cardinality.max}` : "";
   const bCard = b.cardinality ? `${b.cardinality.min}..${b.cardinality.max}` : "";
   if (aCard !== bCard) {
-    changes.push("cardinality changed");
+    changes.push({ change: "cardinality", from: copy(a.cardinality), to: copy(b.cardinality) });
   }
 
   if ((a.note ?? "") !== (b.note ?? "")) {
-    changes.push("note changed");
+    changes.push({ change: "note", from: a.note, to: b.note });
   }
   if (a.independent !== b.independent) {
-    changes.push(`independent: ${a.independent} -> ${b.independent}`);
+    changes.push({ change: "independent", from: a.independent, to: b.independent });
   }
   if ((a.defaultValue ?? "") !== (b.defaultValue ?? "")) {
-    changes.push(
-      `default value: "${a.defaultValue ?? "(none)"}" -> "${b.defaultValue ?? "(none)"}"`,
-    );
+    changes.push({ change: "defaultValue", from: a.defaultValue, to: b.defaultValue });
   }
 
   // Aliases comparison (order-insensitive).
   const aAliases = (a.aliases ?? []).slice().sort().join(",");
   const bAliases = (b.aliases ?? []).slice().sort().join(",");
   if (aAliases !== bAliases) {
-    changes.push("aliases changed");
+    changes.push({ change: "aliases", from: [...a.aliases ?? []], to: [...b.aliases ?? []] });
   }
 
   // Data type comparison.
@@ -69,12 +74,12 @@ export function diffObjectType(
   const bDt = b.dataType;
   if (aDt && bDt) {
     if (aDt.name !== bDt.name || aDt.length !== bDt.length || aDt.scale !== bDt.scale) {
-      changes.push(`data type: ${formatDataType(aDt)} -> ${formatDataType(bDt)}`);
+      changes.push({ change: "dataTypeChanged", from: copy(aDt), to: copy(bDt) });
     }
   } else if (aDt && !bDt) {
-    changes.push(`data type removed (was ${formatDataType(aDt)})`);
+    changes.push({ change: "dataTypeRemoved", from: copy(aDt) });
   } else if (!aDt && bDt) {
-    changes.push(`data type added: ${formatDataType(bDt)}`);
+    changes.push({ change: "dataTypeAdded", to: copy(bDt) });
   }
 
   return changes;
@@ -93,32 +98,32 @@ export function diffFactType(
   b: FactType,
   existingModel: OrmModel,
   incomingModel: OrmModel,
-): string[] {
-  const changes: string[] = [];
+): ChangeDescription[] {
+  const changes: ChangeDescription[] = [];
 
   // Compare roles by position: player name and role name.
   if (a.arity !== b.arity) {
-    changes.push(`arity: ${a.arity} -> ${b.arity}`);
+    changes.push({ change: "arity", from: a.arity, to: b.arity });
   } else {
     for (let i = 0; i < a.arity; i++) {
       const ra = a.roles[i]!;
       const rb = b.roles[i]!;
-      const nameA = playerName(existingModel, ra.playerId);
-      const nameB = playerName(incomingModel, rb.playerId);
-      if (nameA !== nameB) {
-        changes.push(`role ${i}: player ${nameA} -> ${nameB}`);
+      const summaryA = roleSummary(ra, existingModel);
+      const summaryB = roleSummary(rb, incomingModel);
+      if (summaryA.playerName !== summaryB.playerName) {
+        changes.push({ change: "rolePlayer", index: i, from: summaryA, to: summaryB });
       }
       if (ra.name !== rb.name) {
-        changes.push(`role ${i}: name "${ra.name}" -> "${rb.name}"`);
+        changes.push({ change: "roleName", index: i, from: summaryA, to: summaryB });
       }
     }
   }
 
   // Readings.
-  const readingsA = a.readings.map((r) => r.template).join(" | ");
-  const readingsB = b.readings.map((r) => r.template).join(" | ");
-  if (readingsA !== readingsB) {
-    changes.push("readings changed");
+  const readingsA = a.readings.map((r) => r.template);
+  const readingsB = b.readings.map((r) => r.template);
+  if (readingsA.join(" | ") !== readingsB.join(" | ")) {
+    changes.push({ change: "readings", from: readingsA, to: readingsB });
   }
 
   // Constraints -- pass both role arrays so constraintKey can resolve
@@ -132,18 +137,48 @@ export function diffFactType(
   changes.push(...constraintDiff);
 
   if ((a.definition ?? "") !== (b.definition ?? "")) {
-    changes.push("definition changed");
+    changes.push({ change: "definition", from: a.definition, to: b.definition });
   }
 
   if (derivationKey(a.derivation) !== derivationKey(b.derivation)) {
-    changes.push("derivation changed");
+    changes.push({ change: "derivation", from: copy(a.derivation), to: copy(b.derivation) });
   }
 
   if ((a.note ?? "") !== (b.note ?? "")) {
-    changes.push("note changed");
+    changes.push({ change: "note", from: a.note, to: b.note });
   }
 
   return changes;
+}
+
+/**
+ * A role as plain data, with its player resolved against the model the
+ * role came from.
+ *
+ * Both sides of a role change are resolved against _different_ models,
+ * which is why the name is carried rather than left for a consumer to
+ * look up: given only the delta, there is no model in which both names
+ * resolve.
+ */
+function roleSummary(role: Role, model: OrmModel): RoleSummary {
+  return {
+    id: role.id,
+    name: role.name,
+    playerId: role.playerId,
+    playerName: playerName(model, role.playerId),
+  };
+}
+
+/**
+ * A defensive copy of a plain-data value reachable from a model.
+ *
+ * `structuredClone` is Node core and handles the plain interfaces these
+ * variants carry (constraints, value constraints, data types,
+ * derivations). It would lose a class prototype, which is the reason a
+ * variant never carries a model instance.
+ */
+function copy<T>(value: T): T {
+  return value === undefined ? value : (structuredClone(value) as T);
 }
 
 /**
@@ -291,8 +326,8 @@ function diffConstraints(
   b: readonly Constraint[],
   rolesA: readonly Role[],
   rolesB: readonly Role[],
-): string[] {
-  const changes: string[] = [];
+): ChangeDescription[] {
+  const changes: ChangeDescription[] = [];
 
   const idxMapA = roleIndexMap(rolesA);
   const idxMapB = roleIndexMap(rolesB);
@@ -303,36 +338,26 @@ function diffConstraints(
   const added = b.filter((c) => !keysA.has(constraintKey(c, idxMapB)));
   const removed = a.filter((c) => !keysB.has(constraintKey(c, idxMapA)));
 
+  // The constraints themselves, copied: the prose renders only their
+  // deduplicated type names, and that was the whole of what a consumer
+  // could learn about a constraint change until now.
   if (added.length > 0) {
-    const types = [...new Set(added.map((c) => c.type))].join(", ");
-    changes.push(`constraints added: ${types}`);
+    changes.push({ change: "constraintsAdded", constraints: added.map(copy) });
   }
   if (removed.length > 0) {
-    const types = [...new Set(removed.map((c) => c.type))].join(", ");
-    changes.push(`constraints removed: ${types}`);
+    changes.push({ change: "constraintsRemoved", constraints: removed.map(copy) });
   }
 
   return changes;
 }
 
-/** Format a DataTypeDef for human-readable diff output. */
-function formatDataType(dt: DataTypeDef): string {
-  let s = dt.name;
-  if (dt.length !== undefined) s += `(${dt.length}`;
-  if (dt.length !== undefined && dt.scale !== undefined) s += `,${dt.scale}`;
-  if (dt.length !== undefined) s += ")";
-  return s;
-}
-
-export function diffDefinition(a: Definition, b: Definition): string[] {
-  const changes: string[] = [];
+export function diffDefinition(a: Definition, b: Definition): ChangeDescription[] {
+  const changes: ChangeDescription[] = [];
   if (a.definition !== b.definition) {
-    changes.push("definition text changed");
+    changes.push({ change: "definitionText", from: a.definition, to: b.definition });
   }
   if ((a.context ?? "") !== (b.context ?? "")) {
-    changes.push(
-      `context: "${a.context ?? "(none)"}" -> "${b.context ?? "(none)"}"`,
-    );
+    changes.push({ change: "context", from: a.context, to: b.context });
   }
   return changes;
 }

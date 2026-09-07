@@ -10,10 +10,12 @@
  */
 import type { OrmModel } from "../model/OrmModel.js";
 import { classifyBreakingLevel } from "./breakingLevel.js";
+import { describeChange } from "./changeDescription.js";
 import type { DeltaKind, ModelDelta, ModelDiffResult } from "./deltas.js";
 import { diffDefinition, diffFactType, diffObjectType } from "./elementDiff.js";
 import { detectSynonymCandidates } from "./synonyms.js";
 
+export { type ChangeDescription, describeChange, type RoleSummary } from "./changeDescription.js";
 export type {
   BreakingLevel,
   DefinitionDelta,
@@ -50,6 +52,7 @@ export function diffModels(
         elementType: "object_type",
         name,
         existing: ot,
+        changes: [],
         changeDescriptions: [],
         breakingLevel: classifyBreakingLevel("removed", []),
       });
@@ -62,7 +65,8 @@ export function diffModels(
         name,
         existing: ot,
         incoming: match,
-        changeDescriptions: changes,
+        changes,
+        changeDescriptions: changes.map(describeChange),
         breakingLevel: classifyBreakingLevel(kind, changes),
       });
     }
@@ -75,6 +79,7 @@ export function diffModels(
         elementType: "object_type",
         name,
         incoming: ot,
+        changes: [],
         changeDescriptions: [],
         breakingLevel: classifyBreakingLevel("added", []),
       });
@@ -93,6 +98,7 @@ export function diffModels(
         elementType: "fact_type",
         name,
         existing: ft,
+        changes: [],
         changeDescriptions: [],
         breakingLevel: classifyBreakingLevel("removed", []),
       });
@@ -105,7 +111,8 @@ export function diffModels(
         name,
         existing: ft,
         incoming: match,
-        changeDescriptions: changes,
+        changes,
+        changeDescriptions: changes.map(describeChange),
         breakingLevel: classifyBreakingLevel(kind, changes),
       });
     }
@@ -118,6 +125,7 @@ export function diffModels(
         elementType: "fact_type",
         name,
         incoming: ft,
+        changes: [],
         changeDescriptions: [],
         breakingLevel: classifyBreakingLevel("added", []),
       });
@@ -140,6 +148,7 @@ export function diffModels(
         elementType: "definition",
         term,
         existing: def,
+        changes: [],
         changeDescriptions: [],
         breakingLevel: classifyBreakingLevel("removed", []),
       });
@@ -152,7 +161,8 @@ export function diffModels(
         term,
         existing: def,
         incoming: match,
-        changeDescriptions: changes,
+        changes,
+        changeDescriptions: changes.map(describeChange),
         breakingLevel: classifyBreakingLevel(kind, changes),
       });
     }
@@ -165,6 +175,7 @@ export function diffModels(
         elementType: "definition",
         term,
         incoming: def,
+        changes: [],
         changeDescriptions: [],
         breakingLevel: classifyBreakingLevel("added", []),
       });
