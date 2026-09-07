@@ -8,17 +8,6 @@ import {
   type ExternalUniquenessConstraint,
   type FrequencyConstraint,
   type InternalUniquenessConstraint,
-  isDisjunctiveMandatory,
-  isEquality,
-  isExclusion,
-  isExclusiveOr,
-  isExternalUniqueness,
-  isFrequency,
-  isInternalUniqueness,
-  isMandatoryRole,
-  isRing,
-  isSubset,
-  isValueConstraint,
   type MandatoryRoleConstraint,
   RING_PROPERTIES,
   type RingConstraint,
@@ -30,6 +19,7 @@ import type { FactType } from "../model/FactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
+import { assertNever } from "../util/assertNever.js";
 import { identificationSharingAncestry } from "../validation/rules/population/shared.js";
 import {
   kwSeg,
@@ -66,46 +56,67 @@ export function generateCounterexamples(model: OrmModel): Counterexample[] {
   return result;
 }
 
-/** Generate the counterexample for a single constraint, if one exists. */
+/**
+ * Generate the counterexample for a single constraint, if one exists.
+ *
+ * A switch rather than the chain of `is*` guards this used to be: eleven
+ * guards covered eleven of the sixteen constraint kinds and the five
+ * without one fell through to the same `return undefined` a guard that
+ * simply failed to match produces, so a kind added to the union got no
+ * counterexample and nothing said so. The five are listed by name below
+ * and `assertNever` closes the union, which makes the next kind a compile
+ * error here rather than a silent gap (barwise-936).
+ *
+ * A probe confirmed the gap and its shape before this changed: adding a
+ * seventeenth member to `Constraint` failed to compile at six consumers
+ * and NOT here, because a guard chain ending in a fallback cannot fail.
+ */
 export function generateCounterexampleForConstraint(
   constraint: Constraint,
   factType: FactType,
   model: OrmModel,
 ): Counterexample | undefined {
-  if (isInternalUniqueness(constraint)) {
-    return forUniqueness(constraint, factType, model);
+  switch (constraint.type) {
+    case "internal_uniqueness":
+      return forUniqueness(constraint, factType, model);
+    case "value_constraint":
+      return forValue(constraint, factType, model);
+    case "frequency":
+      return forFrequency(constraint, factType, model);
+    case "ring":
+      return forRing(constraint, factType, model);
+    case "mandatory":
+      return forMandatory(constraint, factType, model);
+    case "disjunctive_mandatory":
+      return forDisjunctive(constraint, factType, model);
+    case "exclusion":
+      return forExclusion(constraint, factType, model);
+    case "exclusive_or":
+      return forExclusiveOr(constraint, factType, model);
+    case "subset":
+      return forSubset(constraint, factType, model);
+    case "equality":
+      return forEquality(constraint, factType, model);
+    case "external_uniqueness":
+      return forExternalUniqueness(constraint, factType, model);
+
+    // No generator, deliberately and for two different reasons. A
+    // value-comparison or cardinality violation needs values chosen to
+    // break an ordering or a count, which the minting helpers here do not
+    // do; the three join kinds span fact types along a role path, which
+    // this module's one-fact-type population shape cannot express. Listed
+    // rather than omitted so the distinction between "no generator yet"
+    // and "nobody noticed" is in the code.
+    case "value_comparison":
+    case "cardinality":
+    case "join_subset":
+    case "join_equality":
+    case "join_exclusion":
+      return undefined;
+
+    default:
+      return assertNever(constraint);
   }
-  if (isValueConstraint(constraint)) {
-    return forValue(constraint, factType, model);
-  }
-  if (isFrequency(constraint)) {
-    return forFrequency(constraint, factType, model);
-  }
-  if (isRing(constraint)) {
-    return forRing(constraint, factType, model);
-  }
-  if (isMandatoryRole(constraint)) {
-    return forMandatory(constraint, factType, model);
-  }
-  if (isDisjunctiveMandatory(constraint)) {
-    return forDisjunctive(constraint, factType, model);
-  }
-  if (isExclusion(constraint)) {
-    return forExclusion(constraint, factType, model);
-  }
-  if (isExclusiveOr(constraint)) {
-    return forExclusiveOr(constraint, factType, model);
-  }
-  if (isSubset(constraint)) {
-    return forSubset(constraint, factType, model);
-  }
-  if (isEquality(constraint)) {
-    return forEquality(constraint, factType, model);
-  }
-  if (isExternalUniqueness(constraint)) {
-    return forExternalUniqueness(constraint, factType, model);
-  }
-  return undefined;
 }
 
 // ---------------------------------------------------------------------------
