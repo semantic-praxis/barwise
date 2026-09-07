@@ -1,8 +1,8 @@
 import type { RuleId } from "./ruleId.js";
-/**
- * Severity level for a validation diagnostic.
- */
-export type DiagnosticSeverity = "error" | "warning" | "info";
+import type { DiagnosticSeverity } from "./severity.js";
+// Re-exported so `DiagnosticSeverity` stays importable from here, which
+// is where every consumer already looks for it.
+export type { DiagnosticSeverity } from "./severity.js";
 
 /**
  * A diagnostic produced by the validation engine.

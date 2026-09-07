@@ -31,7 +31,7 @@
  * about it. See `Diagnostic`'s type parameter.
  */
 
-import type { DiagnosticSeverity } from "./Diagnostic.js";
+import type { DiagnosticSeverity } from "./severity.js";
 
 /** What a rule reports, and how loudly, before modality is applied. */
 export interface RuleDescriptor {

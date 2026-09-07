@@ -17,7 +17,10 @@
  * The `Record` is the completeness idiom core uses, kept here so this
  * registry earns the same guarantee: the union is derived from it, and
  * a descriptor is required rather than optional, so an identifier
- * cannot be added without being described.
+ * cannot be added without being described. Only the type is exported --
+ * a runtime list and a lookup would have no consumer yet, and knip is
+ * right to say so; they belong with whatever first needs them, most
+ * likely the SARIF exporter (barwise-948).
  */
 
 import type { RuleDescriptor } from "@barwise/core";
@@ -32,11 +35,3 @@ const CLI_RULE_DESCRIPTORS = {
 
 /** Every rule identifier the CLI mints itself. */
 export type CliRuleId = keyof typeof CLI_RULE_DESCRIPTORS;
-
-/** Every CLI-minted rule identifier, in declaration order. */
-export const CLI_RULE_IDS = Object.keys(CLI_RULE_DESCRIPTORS) as readonly CliRuleId[];
-
-/** The descriptor for a CLI-minted rule identifier. */
-export function cliRuleDescriptor(id: CliRuleId): RuleDescriptor {
-  return CLI_RULE_DESCRIPTORS[id];
-}
