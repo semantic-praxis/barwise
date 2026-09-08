@@ -5,20 +5,31 @@ Status: WS0 complete -- barwise-927..931 shipped (PRs #426, #428, #429,
 (ring types as algebra) shipped as barwise-935 and WS4 (exhaustiveness)
 as barwise-936, which found the sweep to be one gap rather than
 thirteen. The diff half of the 927 symptom shipped separately as
-barwise-934 (PR #438). WS1-WS3 and WS6-WS8 not implemented.
+barwise-934 (PR #438). WS1-WS3 and WS6-WS8 not implemented. WS1
+regrounded 2026-09-08 against main 96369f8 (barwise-973); its radius
+was understated and two Evidenced sites have since closed -- see
+Regrounding below.
 Created: 2026-09-06
-Last-updated: 2026-09-07
-Tracking: barwise-924 (this review), barwise-x4z (the wider
+Last-updated: 2026-09-08
+Tracking: barwise-924 (this review), barwise-973 (WS1), barwise-x4z (the wider
 functional/type analysis this partly answers), barwise-e8m (the
 functional-core commitment), barwise-923 (the hashModel bug the same
 remediation found); follow-ups barwise-927, -928, -929, -930, -931, -932
 
-## Evidenced sites (added 2026-09-07)
+## Evidenced sites (added 2026-09-07; two closed 2026-09-08)
 
 Four concrete instances of this spec's thesis, each measured rather
 than asserted, found while auditing where a generic type stands in for
 a knowable domain. They are recorded here so the unimplemented
 workstreams have grounded targets instead of a general argument.
+
+**Two of the four have since been fixed**, both by barwise-946
+(`closed-sets-as-unions.spec.md`), and they are the two this section
+called the sharpest arguments. The case for WS1 and WS7 now rests on
+the other two, which are still live. Marked inline rather than deleted:
+a resolved argument is evidence the thesis was right, and a reader
+comparing this list against the code should not have to wonder whether
+it was ever true.
 
 - **A population tuple is unconstrained on both axes** (barwise-945).
   `FactInstance.roleValues` is `Record<string, string>`. The key domain
@@ -33,8 +44,13 @@ workstreams have grounded targets instead of a general argument.
   the identifying table's primary key -- and the validator never asks
   it the same question.
 
-- **Breaking-change severity string-matches prose the diff generated**
-  (barwise-946). `breakingLevel.ts` classifies by equality and regex
+- **CLOSED 2026-09-08. Breaking-change severity string-matches prose the
+  diff generated** (barwise-946). `breakingLevel.ts` now classifies
+  through `CHANGE_LEVEL`, a total `Record<ChangeKind, BreakingLevel>`
+  with no fallback arm, so a variant added to `ChangeDescription`
+  without a row does not build; `CHANGE_KINDS` is derived from that
+  table rather than listed again. The description below is what it was.
+  `breakingLevel.ts` classified by equality and regex
   against strings `elementDiff.ts` writes, and the two have already
   drifted: an object type's definition change reads `safe` and a
   standalone definition's text change reads `caution`, because a third
@@ -43,13 +59,21 @@ workstreams have grounded targets instead of a general argument.
   means any added description is silently misclassified, and no
   exhaustiveness check over free strings is possible.
 
-- **`Diagnostic.ruleId` is `string` over a closed set of 76 values.**
-  A typo is undetectable and no consumer can be checked for
-  exhaustiveness. This is also why `core-model-laws.spec.md`'s WS4 has
-  an open decision at all: its absent-data rule set is a hand-listed
-  group of rule ids needing a `parity.manifest.json` row precisely
-  because the ids are strings. A union makes that set compile-checked
-  and the open decision disappears.
+- **CLOSED 2026-09-08. `Diagnostic.ruleId` is `string` over a closed set
+  of 76 values.** It is now `RuleId`, a union derived from the `RULE_ID`
+  registry (barwise-946), and `Diagnostic` is generic over it. A typo
+  was undetectable and no consumer could be checked for exhaustiveness.
+
+  The second half of this bullet turned out to be wrong, and is worth
+  keeping for that reason: it predicted that typing the ids would make
+  `core-model-laws.spec.md`'s WS4 open decision disappear. WS4 was
+  resolved on 2026-09-08 and not that way -- the object universe became
+  a parameter, so the absent-data set is a typed table of RULE
+  FUNCTIONS, and no set of ids appears anywhere
+  (`object-universe-as-a-parameter.spec.md`). Typed ids would have
+  guarded a list that no longer exists. A prediction about which
+  downstream decision a type change will settle is a claim like any
+  other, and this one did not hold.
 
 - **A fallback for a state the constructor forbids.**
   `RelationalMapper.map` computes `ot.referenceMode ?? toSnake(ot.name)
@@ -61,24 +85,30 @@ workstreams have grounded targets instead of a general argument.
     discriminated `ObjectType`makes the`??` a compile error rather
     than a puzzle.
 
-The first two are the sharpest arguments for the sealed-record and
-typed-diff workstreams respectively, because each has a demonstrated
-wrong answer rather than a latent risk.
+The first two were the sharpest arguments for the sealed-record and
+typed-diff workstreams respectively, because each had a demonstrated
+wrong answer rather than a latent risk. The typed-diff one is now
+fixed, so WS1's demonstrated-wrong-answer evidence is barwise-945
+alone, with the dead fallback as a legibility argument rather than a
+correctness one. That is a weaker case than the section originally
+made, and stating so is the point of regrounding it.
 
 ## Principle
 
 Core is meant to be a functional core passing rich types around. A
 rich type is one whose values are all legal, so a consumer switches on
 what the value is rather than checking whether it could be something
-else. The vitest 4 coverage engine showed core carrying 3,195 branches
-across 127 files, and the question barwise-924 asks is whether those
+else. The vitest 4 coverage engine showed core carrying 3,479 branches
+across 133 files (re-derived 2026-09-08; it was 3,195 across 127 when
+this was written, and core has grown 18% since), and the question
+barwise-924 asks is whether those
 branches encode ORM 2 -- which genuinely has cases: arity, modality,
 eight ring types, sixteen constraint kinds, open-world population
 semantics -- or whether they are consumers re-checking what the types
 should already guarantee.
 
 The answer, from reading the eight densest clusters (2,739 of the 3,195
-branches): **about half is the domain and should stay; the other half is
+branches, as counted then): **about half is the domain and should stay; the other half is
 representation-driven, and nearly all of it traces to one looseness
 stated three ways.** References are held as unchecked bare-string ids
 (constraints to roles, roles to players, populations to fact types);
@@ -239,30 +269,30 @@ language, which was a thought experiment in review and not a proposal.
 The clusters, the type looseness each one pays for, and the verdict.
 Line references are to `packages/core/src` at `main` 664b9fe.
 
-| Area / file                                                                                 | Loose type it pays for                                                                                           | Verdict                                                                                   |
-| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `model/ObjectType.ts` (11 optional config fields)                                           | entity and value are one class; four fields are required-or-forbidden by `kind`, enforced by throws              | `EntityType \| ValueType` sealed records (WS1)                                            |
-| `model/FactType.ts`, `Role.ts`, `SubtypeFact.ts`, `ObjectifiedFactType.ts`, `Population.ts` | mutable classes with `id?` configs, bare-string references, setters on `ModelElement`                            | sealed records; references resolved in the builder (WS1)                                  |
-| `model/Constraint.ts` (`id?`, `modality?`)                                                  | optional in memory though `FactType` always fills `id`; modality defaults at every reader                        | `id: string`, `modality: ConstraintModality` on the record; optional on the config (WS1)  |
-| `model/OrmModel.ts` (`findRole` scan; `skipPlayerValidation`)                               | id-keyed maps with no adjacency; one boolean makes fragment and whole model the same type                        | model as a value; `ModelBuilder` and `ModelFragment` (WS1); adjacency in the graph (WS3)  |
-| `model/roleGraph.ts` (`hopsFrom`)                                                           | recomputes adjacency by filtering on every call                                                                  | a graph accessor (WS3)                                                                    |
-| `validation/rules/**` (13 prologues, 29 lookups)                                            | `Population.factTypeId`, `Constraint.roleIds: string[]`, partial tuples                                          | rules take `ModelGraph` (WS3)                                                             |
-| `validation/rules/structural.ts`, `population/structural.ts`                                | 12 rule ids re-check what construction could have refused                                                        | the referential rules move into the builder's diagnostics, same ids (WS1)                 |
-| `validation/rules/constraintConsistency.ts`                                                 | no `assertNever`; `value_comparison` absent                                                                      | defect barwise-929 (WS0), then exhaustive (WS4)                                           |
-| `validation/rules/population/cardinality.ts:27,36`                                          | `ObjectType.cardinality` has no modality                                                                         | gap barwise-932; keep the branch until the field exists                                   |
-| `verbalization/constraints/phase1.ts`, `phase2.ts`                                          | role ids; `ringType: string`; `operator: string`; `JoinOperand[]`                                                | `ResolvedConstraint` from the graph (WS3); narrow signatures (WS1)                        |
-| `verbalization/constraints/phase2.ts:226`                                                   | six ring types on a default arm                                                                                  | defect barwise-930 (WS0); eight-row sentence table (WS4)                                  |
-| `validation/rules/population/ring.ts:87`, `counterexample/CounterexampleGenerator.ts:226`   | eight ring types spelled out per consumer; the algebra they share is implicit                                    | property table beside `RingType`, one handler per property (WS5)                          |
-| `serialization/OrmYamlSerializer.ts`, `yaml/*.ts`                                           | per-field omit-empty in two directions; `OrmYamlConstraint` lacks `id`                                           | field table + root `compact()` (WS2); `fromDocument` feeds the builder (WS1)              |
-| `serialization/yaml/constraint.ts`                                                          | 16-case rename switch spelled twice (four times repo-wide)                                                       | codec table (WS2)                                                                         |
-| `project/splitModel.ts`                                                                     | `Raw*` re-parse of a schema-validated document; both round-trips                                                 | filter the value's tables, rebuild through the builder (WS8); defect barwise-928 (WS0)    |
-| `diff/elementDiff.ts`, `breakingLevel.ts`                                                   | hand compares; classification by string prefix                                                                   | `ElementChange` union from the field table (WS7)                                          |
-| `diff/ModelMerge.ts`                                                                        | was five copied literals dropping six fields; now one `Complete<Config>`-typed projection per kind (barwise-927) | the projection goes when the record spreads (WS1); the diff's half shipped as barwise-934 |
-| `diff/synonyms.ts:61-78`                                                                    | `ModelDelta` optional `existing`/`incoming` forcing `!` and `as`                                                 | `ModelDelta` discriminated on `kind` (WS7)                                                |
-| `mapping/RelationalMapper.ts`                                                               | `PrimaryKey.columnNames`; `Column.dataType: string`; boolean triple                                              | typed `RelationalSchema` (WS6); `BinaryPattern` union; defect barwise-931                 |
-| `mapping/renderers/openapi.ts`, `avro.ts`                                                   | re-parse `Column.dataType`; case lists disagree; unregistered pair                                               | falls out of WS6                                                                          |
-| `counterexample/CounterexampleGenerator.ts:74-107`                                          | 11 `is*` guards, five kinds fall through silently                                                                | `switch` + `assertNever` (WS4)                                                            |
-| `query/evaluate.ts`                                                                         | name-based `not-found` (inherent); `?? id` player fallbacks                                                      | keep the first; the second goes with the graph (WS3)                                      |
+| Area / file                                                                                 | Loose type it pays for                                                                                                                                 | Verdict                                                                                          |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `model/ObjectType.ts` (11 optional config fields)                                           | entity and value are one class; four fields are required-or-forbidden by `kind`, enforced by throws                                                    | `EntityType \| ValueType` sealed records (WS1)                                                   |
+| `model/FactType.ts`, `Role.ts`, `SubtypeFact.ts`, `ObjectifiedFactType.ts`, `Population.ts` | mutable classes with `id?` configs, bare-string references, setters on `ModelElement`                                                                  | sealed records; references resolved in the builder (WS1)                                         |
+| `model/Constraint.ts` (`id?`, `modality?`)                                                  | optional in memory though `FactType` always fills `id`; modality defaults at every reader                                                              | `id: string`, `modality: ConstraintModality` on the record; optional on the config (WS1)         |
+| `model/OrmModel.ts` (`findRole` scan; `skipPlayerValidation`)                               | id-keyed maps with no adjacency; one boolean makes fragment and whole model the same type                                                              | model as a value; `ModelBuilder` and `ModelFragment` (WS1); adjacency in the graph (WS3)         |
+| `model/roleGraph.ts` (`hopsFrom`)                                                           | recomputes adjacency by filtering on every call                                                                                                        | a graph accessor (WS3)                                                                           |
+| `validation/rules/**` (13 prologues, 29 lookups)                                            | `Population.factTypeId`, `Constraint.roleIds: string[]`, partial tuples                                                                                | rules take `ModelGraph` (WS3)                                                                    |
+| `validation/rules/structural.ts`, `population/structural.ts`                                | 14 rule ids re-check what construction could have refused (12 when written; identification-cycle added by barwise-966)                                 | the referential rules move into the builder's diagnostics, same ids (WS1)                        |
+| `validation/rules/constraintConsistency.ts`                                                 | no `assertNever`; `value_comparison` absent                                                                                                            | defect barwise-929 (WS0), then exhaustive (WS4)                                                  |
+| `validation/rules/population/cardinality.ts:27,36`                                          | `ObjectType.cardinality` has no modality                                                                                                               | gap barwise-932; keep the branch until the field exists                                          |
+| `verbalization/constraints/phase1.ts`, `phase2.ts`                                          | role ids; `ringType: string`; `operator: string`; `JoinOperand[]`                                                                                      | `ResolvedConstraint` from the graph (WS3); narrow signatures (WS1)                               |
+| `verbalization/constraints/phase2.ts:226`                                                   | six ring types on a default arm                                                                                                                        | defect barwise-930 (WS0); eight-row sentence table (WS4)                                         |
+| `validation/rules/population/ring.ts:87`, `counterexample/CounterexampleGenerator.ts:226`   | eight ring types spelled out per consumer; the algebra they share is implicit                                                                          | property table beside `RingType`, one handler per property (WS5)                                 |
+| `serialization/OrmYamlSerializer.ts`, `yaml/*.ts`                                           | per-field omit-empty in two directions; `OrmYamlConstraint` lacks `id`                                                                                 | field table + root `compact()` (WS2); `fromDocument` feeds the builder (WS1)                     |
+| `serialization/yaml/constraint.ts`                                                          | 16-case rename switch spelled twice (four times repo-wide)                                                                                             | codec table (WS2)                                                                                |
+| `project/splitModel.ts`                                                                     | `Raw*` re-parse of a schema-validated document; both round-trips                                                                                       | filter the value's tables, rebuild through the builder (WS8); defect barwise-928 (WS0)           |
+| `diff/elementDiff.ts`, `breakingLevel.ts`                                                   | hand compares; classification by string prefix                                                                                                         | `ElementChange` union from the field table (WS7)                                                 |
+| `diff/ModelMerge.ts`                                                                        | `Complete<Config>` is gone (barwise-937, 2026-09-08): merge round-trips through `toObjectTypeConfig`/`toFactTypeConfig` plus `carryUnmodelledElements` | the config round-trip goes when the record spreads (WS1); the diff's half shipped as barwise-934 |
+| `diff/synonyms.ts:61-78`                                                                    | `ModelDelta` optional `existing`/`incoming` forcing `!` and `as`                                                                                       | `ModelDelta` discriminated on `kind` (WS7)                                                       |
+| `mapping/RelationalMapper.ts`                                                               | `PrimaryKey.columnNames`; `Column.dataType: string`; boolean triple                                                                                    | typed `RelationalSchema` (WS6); `BinaryPattern` union; defect barwise-931                        |
+| `mapping/renderers/openapi.ts`, `avro.ts`                                                   | re-parse `Column.dataType`; case lists disagree; unregistered pair                                                                                     | falls out of WS6                                                                                 |
+| `counterexample/CounterexampleGenerator.ts:74-107`                                          | 11 `is*` guards, five kinds fall through silently                                                                                                      | `switch` + `assertNever` (WS4)                                                                   |
+| `query/evaluate.ts`                                                                         | name-based `not-found` (inherent); `?? id` player fallbacks                                                                                            | keep the first; the second goes with the graph (WS3)                                             |
 
 Not affected and worth saying: `Constraint` is already a sealed union
 of records with a discriminant, and `elementDiff.constraintTypeKey`,
@@ -270,14 +300,40 @@ of records with a discriminant, and `elementDiff.constraintTypeKey`,
 package's best pattern. WS1 makes the other element kinds look like
 `Constraint`; it does not introduce a second style.
 
-Construction outside core, measured because it is WS1's radius: 58
-`model.add*(...)` call sites in `formats` (29), `llm` (12),
-`code-analysis` (11), `dbt` (4) and `learn` (2), plus 16 direct
-`new ObjectType(...)`-style constructions. Every one is an importer or
-parser building a model from nothing. `vscode` has none: its 13 files
-that touch a model deserialize document text and never construct or
-mutate one. Nothing outside core edits an element after construction;
-the one setter call is `model.name = ...` in `NormaImportFormat.ts:33`.
+Construction and mutation outside core, measured because it is WS1's
+radius. Re-measured on main 96369f8 (2026-09-08); the earlier figures
+are corrected rather than adjusted, because one of them was wrong in
+kind and not only in magnitude.
+
+- **48 model-level mutation sites** -- calls to `OrmModel`'s own
+  `add*`/`update*`/`remove*` methods: `formats` 20, `code-analysis` 11,
+  `vscode` 7, `llm` 5, `dbt` 4, `learn` 1.
+- **19 element-level adds** (`addConstraint`, `addInstance`): `formats`
+  10, `llm` 8, `dbt` 1. These go too when elements become records.
+- **16 direct constructions, every one `new OrmModel(`**: `formats` 10,
+  `dbt` 3, `code-analysis` 2, `llm` 1. This spec previously called them
+  "`new ObjectType(...)`-style"; not one is an element construction, so
+  the migration here is builder-for-model, not builder-for-element.
+- **One property setter**, as before: `model.name = options.modelName`
+  at `formats/src/norma/NormaImportFormat.ts:33`. Verified still the
+  only one.
+
+84 sites, every one compiler-found.
+
+**`vscode` is in the radius, and this spec said it was not.** The
+earlier text read "`vscode` has none: its 13 files that touch a model
+deserialize document text and never construct or mutate one", and the
+WS1 section still says vscode changes "the `deserialize` result type
+only". Both are false, and were false at 664b9fe too -- the count is
+identical at both commits, so this is an error in the measurement
+rather than drift. `vscode` has seven model-level mutation sites:
+`addDiagramLayout` at `diagram/DiagramPanel.ts:309` and `:342` and
+`client/extension.ts:266`, with `updateDiagramLayout` beside the first
+two. `DiagramPanel.saveLayout` deserializes a model, mutates it and
+re-serializes -- which is exactly the edit path `ModelBuilder.from(model)`
+replaces, so vscode migrates as an editor and not only as a reader. The
+file count is 15, not 13.
+
 `ModelMerge` is the single in-core editor, and it already builds a new
 model rather than mutating the base.
 
@@ -464,6 +520,10 @@ redundant. Split (928) replaces the eight-key walk with an exhaustive
 
 ### 1. The sealed record metamodel, the builder, and the fragment type
 
+Tracked as barwise-973. Regrounded 2026-09-08; the radius below is
+measured, and one decision the original text did not cover is stated at
+the end of this section.
+
 The types in Target architecture; classes and `ModelElement` deleted;
 setters deleted; `ModelBuilder` with today's `add*` names; `build()`
 returning `BuildResult`; `buildFragment()` returning `ModelFragment`
@@ -483,14 +543,32 @@ report one pass wide (Decisions). The builder freezes what it returns
 and `ModelBuilder.from(model)` copies the arrays it inherits rather
 than mutating frozen ones.
 
-Radius: every package. The 58 importer sites change their receiver from
-a model to a builder and read `build()`; the 16 direct constructions
-become builder calls; `vscode`'s 13 deserializing files change the
-`deserialize` result type only. Every site is found by the compiler.
+Radius: every package, 84 sites, every one found by the compiler --
+see Inventory for the measured breakdown. The importer sites change
+their receiver from a model to a builder and read `build()`; the 16
+`new OrmModel(` constructions become builder calls; `vscode`'s
+deserializing files change the `deserialize` result type, AND its seven
+mutation sites take `ModelBuilder.from(model)` -- `DiagramPanel`
+deserializes, mutates and re-serializes, which is the edit path this
+workstream replaces.
 Golden bytes and the round-trip corpus do not change: this workstream
 rewrites how a model is held, not what it serializes to. Tests of the
 constructor throws move to the builder's diagnostics; tests that pin
 `skipPlayerValidation` become fragment tests or go.
+
+**The builder runs two whole-graph passes, not only per-element
+checks** (added 2026-09-08). `structural.ts` now emits 14 rule ids and
+two of them are cycle rules: `structural/subtype-cycle`, and
+`structural/identification-cycle`, which barwise-966 added after this
+spec was written. A cycle is not detectable when an element is added --
+only over the finished set -- so the builder cannot be a stream of
+per-add refusals. `build()` collecting every diagnostic before it
+returns already allows this, and the Decisions section already chose
+it for a different reason (a one-pass report); this records that the
+choice is now load-bearing rather than merely preferable. The two
+cycle checks are `identificationOrder` and the subtype walk, both
+already pure functions over a model in `model/identification.ts`, so
+the builder calls them rather than reimplementing them.
 
 ### 2. One field table per element kind
 
@@ -853,3 +931,55 @@ union, WS1).
   compared) shipped as barwise-934 rather than waiting for WS7. The 927 merge also showed
   that the spec audit did not match this spec's own "no workstream
   implemented"; the closeout widens the regex with a gate test.
+
+## Regrounding (2026-09-08, before WS1)
+
+Re-measured against main `96369f8`, two days and 48 core-source files
+after the spec was written at `664b9fe`. Every number carries the way
+it was produced, so the next reader can re-derive it rather than trust
+it -- which is the discipline that found the two errors below.
+
+**What core did in between.** 128 to 134 files under
+`packages/core/src`, 18,759 to 22,146 lines, 48 files changed
+(+4787/-1400). An 18% growth, from `mapper-key-settlement`,
+`closed-sets-as-unions`, `typed-diff-all-element-kinds`,
+`core-model-laws` WS1-WS5, and the six items merged on 2026-09-08.
+
+| Claim                              | When written          | Now                     | Method                                                        |
+| ---------------------------------- | --------------------- | ----------------------- | ------------------------------------------------------------- |
+| core's branches / files            | 3,195 / 127           | 3,479 / 133             | count `branchMap` entries in `coverage-final.json`            |
+| `ObjectTypeConfig` optionals       | 11                    | 11 (unchanged)          | optional `readonly` fields within that interface              |
+| `structural.ts` rule ids           | 12                    | 14                      | distinct `RULE_ID.*` in the file                              |
+| model-level mutation sites         | 58 "`model.add*`"     | 48                      | calls to `OrmModel`'s own `add*`/`update*`/`remove*`          |
+| element-level adds                 | (folded into 58)      | 19                      | `addConstraint`, `addInstance`                                |
+| direct constructions               | 16 "`new ObjectType`" | 16, all `new OrmModel(` | `new <ElementOrModel>(` outside `packages/core`               |
+| property setters outside core      | 1                     | 1 (unchanged, verified) | assignment to a model or element property                     |
+| `vscode` mutation sites            | 0                     | 7                       | the same model-level count, run against `packages/vscode/src` |
+| `vscode` files touching a model    | 13                    | 15                      | files matching `OrmModel` or `deserialize(`                   |
+| `lenient` / `skipPlayerValidation` | present               | present (11 references) | grep                                                          |
+| `Constraint.id?` / `modality?`     | optional              | optional (unchanged)    | read the interface                                            |
+
+**Two errors, not two drifts.** The `vscode` row and the
+`new ObjectType(...)` row were wrong when written: the counts are
+identical at `664b9fe` and at `96369f8`, so nothing changed underneath
+them. That distinction matters for how much of the rest to trust --
+a spec whose numbers went stale is a spec that was right once, and one
+whose numbers were mismeasured is a different problem. Both were found
+by re-running a count rather than by reading the prose, which is the
+argument for re-running every count.
+
+**What this does to the case for WS1.** Weakens it, honestly. Two of
+the four Evidenced sites are closed, and they were the two with a
+demonstrated wrong answer. What remains is barwise-945 -- a population
+tuple constrained on neither axis, five wrong answers for five cases --
+plus a dead fallback that is a legibility cost rather than a defect.
+The structural argument (references as bare strings, optional fields
+standing in for invariants, typed intermediates erased to strings) is
+unchanged and is what the workstream is really for; the "here is a bug
+it would have prevented" evidence is now one bug rather than two.
+
+**What it does to the plan.** One addition, no reversals: `vscode` is
+an editor in WS1's radius rather than a reader, so `DiagramPanel` and
+`extension.ts` take `ModelBuilder.from(model)` alongside the importer
+migration. The builder also has to run two whole-graph passes for the
+cycle rules, recorded in WS1 above.
