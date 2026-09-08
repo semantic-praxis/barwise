@@ -130,9 +130,8 @@ export class RelationalMapper {
     const table = entityTables.get(role.playerId);
     if (!table) return;
 
-    const colName = toSnake(ft.name);
-    table.columns.push({
-      name: colName,
+    pushColumn(table.columns, {
+      name: toSnake(ft.name),
       dataType: "BOOLEAN",
       nullable: true,
       sourceRoleId: role.id,
@@ -267,14 +266,18 @@ export class RelationalMapper {
     const table = entityTables.get(entityRole.playerId);
     if (!table) return;
 
-    const colName = toSnake(valuePlayer.name);
-    table.columns.push({
-      name: colName,
+    pushColumn(table.columns, {
+      name: toSnake(valuePlayer.name),
       dataType: conceptualTypeToSql(valuePlayer.dataType),
       nullable: !isMandatory,
       sourceRoleId: entityRole.id,
       defaultValue: valuePlayer.defaultValue,
-    });
+      // The entity-side role name, so "Patient has MedicalRecordNumber"
+      // over an entity already keyed on medical_record_number gives
+      // has_medical_record_number rather than a doubled mouthful. Two
+      // fact types can share a role name, and the numeric tail in
+      // pushColumn covers that.
+    }, `${toSnake(entityRole.name)}_${toSnake(valuePlayer.name)}`);
   }
 
   /**
@@ -329,15 +332,12 @@ export class RelationalMapper {
     const localNames: string[] = [];
     for (const pkColName of targetTable.primaryKey.columnNames) {
       const pkCol = targetTable.columns.find((c) => c.name === pkColName);
-      const existingNames = new Set(sourceColumns.map((c) => c.name));
-      const localName = existingNames.has(pkColName) ? disambiguate(pkColName) : pkColName;
-      sourceColumns.push({
-        name: localName,
+      localNames.push(pushColumn(sourceColumns, {
+        name: pkColName,
         dataType: pkCol?.dataType ?? "TEXT",
         nullable,
         sourceRoleId,
-      });
-      localNames.push(localName);
+      }, disambiguate(pkColName)));
     }
     return localNames;
   }
@@ -418,14 +418,11 @@ export class RelationalMapper {
       const sharedCols = [subtypeTable.primaryKey.columnNames[0]!];
       for (const supertypeCol of restSupertypeCols) {
         const pkCol = supertypeTable.columns.find((c) => c.name === supertypeCol);
-        const existingNames = new Set(subtypeTable.columns.map((c) => c.name));
-        const localName = existingNames.has(supertypeCol) ? `fk_${supertypeCol}` : supertypeCol;
-        subtypeTable.columns.push({
-          name: localName,
+        sharedCols.push(pushColumn(subtypeTable.columns, {
+          name: supertypeCol,
           dataType: pkCol?.dataType ?? "TEXT",
           nullable: false,
-        });
-        sharedCols.push(localName);
+        }, `fk_${supertypeCol}`));
       }
       subtypeTable.primaryKey = { columnNames: sharedCols };
 
@@ -579,6 +576,32 @@ function freezeTable(t: MutableTable): Table {
     foreignKeys: t.foreignKeys,
     sourceElementId: t.sourceElementId,
   };
+}
+
+/**
+ * Append a column under a name no other column in the table already has,
+ * and return the name it got.
+ *
+ * Four sites used to do this by hand and three of them got it wrong in
+ * the same way: two pushed a derived name with no check at all (a second
+ * fact type between the same entity and value type produced a second
+ * column of the same name, and the table could not be created), and the
+ * two that did check fell back to a single alternative that could itself
+ * be taken. The numeric tail is unbounded so the function is total. A
+ * name that is free is returned unchanged, and an `alternative` that is
+ * free is preferred over a suffix, so a schema with no collision maps
+ * exactly as it did before (barwise-961).
+ */
+function pushColumn(columns: Column[], column: Column, alternative?: string): string {
+  const taken = new Set(columns.map((c) => c.name));
+  let name = column.name;
+  if (taken.has(name)) {
+    const stem = alternative ?? name;
+    name = stem;
+    for (let i = 2; taken.has(name); i += 1) name = `${stem}_${i}`;
+  }
+  columns.push({ ...column, name });
+  return name;
 }
 
 function toSnake(name: string): string {

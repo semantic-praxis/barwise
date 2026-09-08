@@ -1195,3 +1195,44 @@ describe("RelationalMapper", () => {
     });
   });
 });
+
+describe("well-formedness the mapper law generalises", () => {
+  /**
+   * barwise-961. Two fact types between the same entity and value type
+   * both derived a column name from the value type, and neither checked
+   * whether the other had taken it: table t1 came out with columns
+   * t1_id, t0, t0, which CREATE TABLE rejects. Neither fact type needs
+   * a uniqueness constraint for this, and barwise reports a fact type
+   * without uniqueness as a warning, so the model reaching it is one
+   * the validator accepts.
+   */
+  it("gives two fact types over the same value type distinct column names", () => {
+    const model = new OrmModel({ name: "Collide" });
+    const grade = model.addObjectType({ name: "Grade", kind: "value" });
+    const student = model.addObjectType({
+      name: "Student",
+      kind: "entity",
+      referenceMode: "student_id",
+    });
+    for (
+      const [name, verb] of [["Student earns Grade", "earns"], [
+        "Student predicts Grade",
+        "predicts",
+      ]]
+    ) {
+      model.addFactType({
+        name: name!,
+        roles: [
+          { id: `${name}::r1`, name: verb!, playerId: student.id },
+          { id: `${name}::r2`, name: "is of", playerId: grade.id },
+        ],
+        readings: [`{0} ${verb} {1}`, `{1} is of {0}`],
+      });
+    }
+
+    const table = new RelationalMapper().map(model).tables.find((t) => t.name === "student")!;
+    const names = table.columns.map((c) => c.name);
+    expect(new Set(names).size).toBe(names.length);
+    expect(names).toEqual(["student_id", "grade", "predicts_grade"]);
+  });
+});
