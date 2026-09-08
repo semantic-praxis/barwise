@@ -1,4 +1,17 @@
+import type { FactType } from "./FactType.js";
+import type { ObjectType } from "./ObjectType.js";
 import type { OrmModel } from "./OrmModel.js";
+import type { Role } from "./Role.js";
+
+/**
+ * What actually identifies an entity type: the binary fact type, the
+ * role the entity plays in it, and the value type on the other side.
+ */
+export interface PreferredIdentifyingBinary {
+  readonly factType: FactType;
+  readonly entityRole: Role;
+  readonly valuePlayer: ObjectType;
+}
 
 /**
  * Which entity types an entity type's identification depends on.
@@ -99,4 +112,59 @@ export function identificationOrder(
   }
 
   return { order };
+}
+
+/**
+ * The binary fact type that identifies an entity type, when it has one.
+ *
+ * A reference mode is shorthand for exactly this: an identifying binary
+ * between an entity and a value type. A model may state both, and then
+ * the reference mode is the redundant half -- `completenessWarnings`
+ * calls the preferred identifier the authority and the mapper's own
+ * fallback path calls the reference mode "the heuristic".
+ *
+ * Returning the fact type, rather than something derived from it, is
+ * the point. `resolveEntityPkType` used to ask a narrower question --
+ * what SQL type -- and discard the fact type it found the answer on, so
+ * nothing downstream could know the fact type had already been spent on
+ * the primary key. It was then mapped a second time as an ordinary
+ * value column: one identification, two columns, on 109 entities across
+ * 15 shipped models (barwise-967).
+ *
+ * The rule is the mapper's existing pass 1, unchanged, so no model's
+ * primary-key type moves: a binary carrying any preferred internal
+ * uniqueness constraint, in which this entity plays a role and the
+ * other player is a value type, first in model order. Four other
+ * modules compute "the preferred identifier" with four subtly different
+ * rules; converging them changes diagnostics on shipped models and is
+ * tracked separately.
+ */
+export function preferredIdentifyingBinary(
+  model: OrmModel,
+  entity: ObjectType,
+): PreferredIdentifyingBinary | undefined {
+  for (const factType of model.factTypes) {
+    if (factType.arity !== 2) continue;
+    const preferred = factType.constraints.some(
+      (c) => c.type === "internal_uniqueness" && c.isPreferred,
+    );
+    if (!preferred) continue;
+
+    const [role1, role2] = factType.roles;
+    if (!role1 || !role2) continue;
+
+    const entityRole = role1.playerId === entity.id
+      ? role1
+      : role2.playerId === entity.id
+      ? role2
+      : undefined;
+    if (!entityRole) continue;
+
+    const otherRole = entityRole === role1 ? role2 : role1;
+    const valuePlayer = model.getObjectType(otherRole.playerId);
+    if (valuePlayer?.kind !== "value") continue;
+
+    return { factType, entityRole, valuePlayer };
+  }
+  return undefined;
 }

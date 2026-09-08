@@ -22,7 +22,7 @@
  */
 
 import type { FactType } from "../model/FactType.js";
-import { identificationOrder } from "../model/identification.js";
+import { identificationOrder, preferredIdentifyingBinary } from "../model/identification.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import type { DataTypeDef, ObjectType } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
@@ -75,7 +75,14 @@ export class RelationalMapper {
       ? settlement.order
       : model.objectTypes.filter((ot) => ot.kind === "entity").map((ot) => ot.id);
 
-    // Phase 0: one table per entity type, carrying its reference-mode key
+    // A fact type that has become somebody's primary key in phase 0.
+    // Phase 2 must not map it again: that is the second column
+    // barwise-967 was about, and the mechanism is the one
+    // `objectifiedFactTypeIds` already uses for a fact type an
+    // objectification consumed.
+    const identifyingFactTypeIds = new Set<string>();
+
+    // Phase 0: one table per entity type, carrying its identifying key
     // unless phase 1 is going to replace that key anyway.
     for (const ot of model.objectTypes) {
       if (ot.kind !== "entity") continue;
@@ -87,11 +94,32 @@ export class RelationalMapper {
       // fact type over value types alone absorbs nothing -- because a
       // table with no key at all is worse than a redundant column.
       const absorbing = settleable && this.absorbsAKey(objectifiedByType.get(ot.id), model);
-      const pkColName = ot.referenceMode ?? `${toSnake(ot.name)}_id`;
-      const pkDataType = resolveEntityPkType(ot, model, fallbackPkType);
+
+      // The preferred identifying binary IS the identification; a
+      // reference mode is shorthand for one. Where a model states both,
+      // the preferred identifier is the authority and the reference mode
+      // is the guess `completenessWarnings` exists to prevent, so the
+      // key is named and typed from the value type that identifies the
+      // entity. An entity that absorbs an objectification takes no
+      // phase-0 column at all, so its binary is not spent and phase 2
+      // maps it as an ordinary column.
+      const preferred = preferredIdentifyingBinary(model, ot);
+      const pkColName = preferred
+        ? toSnake(preferred.valuePlayer.name)
+        : ot.referenceMode ?? `${toSnake(ot.name)}_id`;
+      const pkDataType = preferred
+        ? conceptualTypeToSql(preferred.valuePlayer.dataType)
+        : referenceModePkType(ot, model, fallbackPkType);
+      if (preferred && !absorbing) identifyingFactTypeIds.add(preferred.factType.id);
+
       settling.set(ot.id, {
         name: toSnake(ot.name),
-        columns: absorbing ? [] : [{ name: pkColName, dataType: pkDataType, nullable: false }],
+        columns: absorbing ? [] : [{
+          name: pkColName,
+          dataType: pkDataType,
+          nullable: false,
+          sourceRoleId: preferred?.entityRole.id,
+        }],
         primaryKey: { columnNames: absorbing ? [] : [pkColName] },
         foreignKeys: [],
         sourceElementId: ot.id,
@@ -138,6 +166,7 @@ export class RelationalMapper {
 
     for (const ft of model.factTypes) {
       if (objectifiedFactTypeIds.has(ft.id)) continue;
+      if (identifyingFactTypeIds.has(ft.id)) continue;
 
       if (ft.arity === 1) {
         this.mapUnaryFactType(ft, model, entityTables);
@@ -768,30 +797,21 @@ function strategyToSqlType(strategy: PreferredIdentifierStrategy | undefined): s
 /**
  * Resolve the SQL type for an entity type's primary key column.
  *
+ * Only for an entity with NO preferred identifying binary. The
+ * preferred case is answered by `preferredIdentifyingBinary`, which
+ * returns the fact type rather than just its type -- this used to have
+ * a first pass that found the same fact type, took its data type, and
+ * discarded the fact type, which is how the same identification got
+ * mapped twice (barwise-967).
+ *
  * Strategy:
- * 1. If any fact type has an internal uniqueness constraint with
- *    isPreferred: true that references a role played by this entity,
- *    use the value type from that fact type.
- * 2. Otherwise fall back to the first binary fact type linking this
- *    entity to a value type (the reference-mode heuristic).
- * 3. Falls back to the configured fallbackPkType (derived from the
+ * 1. The first binary fact type linking this entity to a value type
+ *    (the reference-mode heuristic).
+ * 2. Otherwise the configured fallbackPkType (derived from the
  *    project's preferredIdentifierStrategy, or "TEXT" when unset).
  */
-function resolveEntityPkType(ot: ObjectType, model: OrmModel, fallbackPkType: string): string {
-  // Pass 1: look for fact type with isPreferred uniqueness constraint.
-  for (const ft of model.factTypes) {
-    if (ft.arity !== 2) continue;
-
-    const hasPreferred = ft.constraints.some(
-      (c) => c.type === "internal_uniqueness" && c.isPreferred,
-    );
-    if (!hasPreferred) continue;
-
-    const vp = findValuePlayer(ft, ot, model);
-    if (vp) return conceptualTypeToSql(vp.dataType);
-  }
-
-  // Pass 2: heuristic -- first binary fact type with a value type.
+function referenceModePkType(ot: ObjectType, model: OrmModel, fallbackPkType: string): string {
+  // Heuristic: first binary fact type with a value type.
   for (const ft of model.factTypes) {
     if (ft.arity !== 2) continue;
     const vp = findValuePlayer(ft, ot, model);
