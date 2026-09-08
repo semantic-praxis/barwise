@@ -4,16 +4,20 @@ import type { FactType } from "../../../model/FactType.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
 import { reportAs, RULE_ID } from "../../ruleId.js";
-import { buildObjectUniverse, severityForModality, valuesPlayedInRole } from "./shared.js";
+import {
+  buildObjectUniverse,
+  type ObjectUniverse,
+  severityForModality,
+  valuesPlayedInRole,
+} from "./shared.js";
 
 /**
  * Mandatory constraints require every instance of the role's player type
  * to play that role. An instance "exists" if it appears in any role across
  * the model's populations (the object universe).
  */
-export function checkMandatoryViolations(model: OrmModel): Diagnostic[] {
+export function checkMandatoryViolations(model: OrmModel, universe: ObjectUniverse): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const universe = buildObjectUniverse(model);
   if (universe.size === 0) return diagnostics;
 
   for (const ft of model.factTypes) {
@@ -33,7 +37,7 @@ function mandatoryViolationsIn(
   model: OrmModel,
   ft: FactType,
   c: Constraint,
-  universe: ReturnType<typeof buildObjectUniverse>,
+  universe: ObjectUniverse,
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   if (!isMandatoryRole(c)) return diagnostics;
@@ -77,9 +81,11 @@ export function mandatoryViolationsFor(
  * player type to play at least one of the specified roles (which may span
  * fact types).
  */
-export function checkDisjunctiveMandatoryViolations(model: OrmModel): Diagnostic[] {
+export function checkDisjunctiveMandatoryViolations(
+  model: OrmModel,
+  universe: ObjectUniverse,
+): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const universe = buildObjectUniverse(model);
   if (universe.size === 0) return diagnostics;
 
   const rolePlayer = new Map<string, string>();
@@ -105,7 +111,7 @@ function disjunctiveMandatoryViolationsIn(
   model: OrmModel,
   ft: FactType,
   c: Constraint,
-  universe: ReturnType<typeof buildObjectUniverse>,
+  universe: ObjectUniverse,
   rolePlayer: Map<string, string>,
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];

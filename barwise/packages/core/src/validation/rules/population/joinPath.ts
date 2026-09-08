@@ -8,7 +8,7 @@ import type { FactType } from "../../../model/FactType.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
 import { reportAs, RULE_ID } from "../../ruleId.js";
-import { buildObjectUniverse, severityForModality } from "./shared.js";
+import { type ObjectUniverse, severityForModality } from "./shared.js";
 
 /**
  * Join-constraint population satisfaction.
@@ -22,7 +22,7 @@ import { buildObjectUniverse, severityForModality } from "./shared.js";
  * Pure over the population. Malformed paths (flagged structurally elsewhere)
  * yield empty tuple sets and are skipped.
  */
-export function checkJoinPathViolations(model: OrmModel): Diagnostic[] {
+export function checkJoinPathViolations(model: OrmModel, universe: ObjectUniverse): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   for (const ft of model.factTypes) {
@@ -31,8 +31,8 @@ export function checkJoinPathViolations(model: OrmModel): Diagnostic[] {
       const severity = severityForModality(c);
 
       if (isJoinSubset(c)) {
-        const sub = projectedTuples(model, c.subset);
-        const sup = projectedTuples(model, c.superset);
+        const sub = projectedTuples(model, universe, c.subset);
+        const sup = projectedTuples(model, universe, c.superset);
         const missing = [...sub].find((t) => !sup.has(t));
         if (missing !== undefined) {
           diagnostics.push(
@@ -40,7 +40,7 @@ export function checkJoinPathViolations(model: OrmModel): Diagnostic[] {
           );
         }
       } else if (isJoinEquality(c)) {
-        const sets = c.operands.map((o) => projectedTuples(model, o));
+        const sets = c.operands.map((o) => projectedTuples(model, universe, o));
         const all = new Set<string>(sets.flatMap((s) => [...s]));
         const bad = [...all].find((t) => sets.some((s) => !s.has(t)));
         if (bad !== undefined) {
@@ -49,7 +49,7 @@ export function checkJoinPathViolations(model: OrmModel): Diagnostic[] {
           );
         }
       } else if (isJoinExclusion(c)) {
-        const sets = c.operands.map((o) => projectedTuples(model, o));
+        const sets = c.operands.map((o) => projectedTuples(model, universe, o));
         const counts = new Map<string, number>();
         for (const s of sets) {
           for (const t of s) counts.set(t, (counts.get(t) ?? 0) + 1);
@@ -90,11 +90,15 @@ function factTypeOfRole(model: OrmModel, roleId: string): FactType | undefined {
  * returned set is the operand's projected tuple set. An unresolvable step
  * yields the empty set (malformed path).
  */
-function projectedTuples(model: OrmModel, operand: JoinOperand): Set<string> {
+function projectedTuples(
+  model: OrmModel,
+  universe: ObjectUniverse,
+  operand: JoinOperand,
+): Set<string> {
   const { path, projection } = operand;
 
   let bindings: string[][] = [];
-  for (const v of buildObjectUniverse(model).get(path.root) ?? EMPTY) {
+  for (const v of universe.get(path.root) ?? EMPTY) {
     bindings.push([v]);
   }
 

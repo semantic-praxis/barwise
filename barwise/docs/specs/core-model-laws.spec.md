@@ -3,10 +3,13 @@
 Status: WS1, WS2, WS3 and WS5 implemented (the arbitrary, the
 serialization law, the merge law and the barwise-937 fix, the
 counterexample law and the barwise-958 fix, the mapper laws and the
-barwise-961 and -962 fixes; see Implementation notes). WS4 not
-implemented; it carries this spec's last open decision.
+barwise-961 and -962 fixes; see Implementation notes). WS4 implemented
+by `object-universe-as-a-parameter.spec.md`, which resolves this
+spec's last open decision with a fourth option: the object universe
+becomes a parameter, so the absent-data set is a typed table in
+production rather than a copy in the test.
 Created: 2026-09-07
-Last-updated: 2026-09-08
+Last-updated: 2026-09-08 (WS4 resolved and implemented elsewhere)
 Tracking: barwise-938 (this spec); barwise-937 (the merge defect its
 grounding found); follow-ups barwise-939, -940, -941 (found while
 implementing WS1 and WS2), barwise-958 and -959 (WS3), barwise-961,
@@ -304,11 +307,12 @@ them is what makes the shared table one copy rather than two.
 ### 4. The sample-population law
 
 For a generated model and a generated sample population over one of
-its fact types: the diagnostics whose rule ids are in the absent-data
-set (defined under Scope) must not grow. The set as written in the
-test is a copy that must agree with which rules read
-`buildObjectUniverse`, so it is guarded per the second open decision,
-in this workstream.
+its fact types: no diagnostic produced by the absent-data rules after
+the sample was absent before it. Implemented in
+`object-universe-as-a-parameter.spec.md`, which makes the absent-data
+set `ABSENT_DATA_RULES` in production instead of a copy in the test --
+and which found, by running the law, that reading the universe and
+judging by absence are different properties.
 
 ### 5. The mapper laws
 
@@ -355,16 +359,16 @@ wrong output and goes red when the defect is fixed.
   Recommend A now, with the follow-up issue naming B, so the merge law
   goes green in one PR and the typed diff inherits a law instead of a
   fixture.
-- **Guarding the absent-data rule set (WS4).** The set of rules that
-  call `buildObjectUniverse` is restated in the test. Option A: derive
-  it, by having each rule module export a marker the test reads.
-  Option B: enumerate it in the test and register the pair in
-  `parity.manifest.json`. Option C: assert the stronger law instead,
-  that adding a sample population adds no diagnostic at all, and
-  generate sample tuples that satisfy every present-data constraint,
-  which is expensive. Recommend B: one manifest row, no production
-  marker, and the parity check fails when a rule starts or stops
-  reading the universe.
+- **Guarding the absent-data rule set (WS4).** RESOLVED with a fourth
+  option, in `object-universe-as-a-parameter.spec.md`: the universe
+  becomes a parameter the dispatcher passes, so the rules that read it
+  are a typed list in production and the law calls that list. The copy
+  is removed rather than guarded, and no `parity.manifest.json` row is
+  needed. Option B (enumerate and register) turned out not to be
+  implementable as stated, for a reason the resolution documents: one
+  rule id straddles the absent-data boundary, and so does one rule.
+  Options A (a marker per rule module) and C (a stronger law needing
+  no set) are recorded there as rejected.
 - **Seed and run count.** Adopt the conformance spec's resolved
   policy: fixed seed, 250 runs, both named constants, lowered only on
   a measured CI regression. Listed here so the reviewer can object,

@@ -3,7 +3,7 @@ import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
 import { reportAs, RULE_ID } from "../../ruleId.js";
 import {
-  buildObjectUniverse,
+  type ObjectUniverse,
   rolePlayerMap,
   severityForModality,
   tuplesForRoleSeq,
@@ -52,9 +52,11 @@ export function checkSpanningExclusionViolations(model: OrmModel): Diagnostic[] 
  * Exclusive-or constraints whose roles span fact types: every instance of
  * the common player type must play exactly one of the roles.
  */
-export function checkSpanningExclusiveOrViolations(model: OrmModel): Diagnostic[] {
+export function checkSpanningExclusiveOrViolations(
+  model: OrmModel,
+  universe: ObjectUniverse,
+): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const universe = buildObjectUniverse(model);
   if (universe.size === 0) return diagnostics;
   const rolePlayer = rolePlayerMap(model);
 

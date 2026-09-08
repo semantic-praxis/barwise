@@ -49,7 +49,18 @@ export function severityForModality(
  * population and is not attempted
  * (docs/specs/mandatory-existence-witness.spec.md).
  */
-export function buildObjectUniverse(model: OrmModel): Map<string, Set<string>> {
+/**
+ * Every value that appears in a NON-sample population, by object type
+ * id. The closed-world reading of the data a model was shown: a value
+ * in here exists, and a value absent from it does not, which is what
+ * makes the rules that read it judge by ABSENCE.
+ *
+ * Read-only because it is built once per validation and passed to
+ * every rule that needs it (docs/specs/object-universe-as-a-parameter.spec.md).
+ */
+export type ObjectUniverse = ReadonlyMap<string, ReadonlySet<string>>;
+
+export function buildObjectUniverse(model: OrmModel): ObjectUniverse {
   const universe = new Map<string, Set<string>>();
   const credit = (typeId: string, value: string): void => {
     let values = universe.get(typeId);
