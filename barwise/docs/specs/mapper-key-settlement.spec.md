@@ -1,9 +1,8 @@
 # Settle every primary key before anything reads one
 
-Status: WS1 implemented (the identification-cycle rule, the shared
-identification graph, the arbitrary's cycle discipline, and the two
-spurious objectifications deleted from the taxonomy example). WS2 not
-implemented.
+Status: Implemented (WS1: the identification-cycle rule and the shared
+identification graph; WS2: the two phases, the barwise-965 fix and the
+mapper-law clause WS5 deferred).
 Created: 2026-09-08
 Last-updated: 2026-09-08
 Tracking: barwise-966 (this spec); barwise-963 (a foreign key keeps a
@@ -368,6 +367,40 @@ That change is barwise-967 and is out of scope here.
   totality law stays green through both workstreams.
 - Each workstream is one PR, followed by `npm run build` and
   `npm run ci:local` from `barwise/`.
+
+## Implementation notes
+
+### WS2 (2026-09-08)
+
+- **barwise-965's cause was misdiagnosed in this spec.** It was written
+  as a shared-key arithmetic bug -- `mapSubtypeFact` taking only the
+  first column of the subtype's own key. Grounding found the arithmetic
+  is correct whenever that key is single-column, and a chain of
+  identified subtypes over an objectified supertype maps correctly on
+  `main` today. The subtype's own key is composite only when the type
+  ALSO objectifies a fact type, so barwise-965 is the dual-identification
+  case and nothing else. Resolving that -- the objectification wins --
+  fixes it, and the arithmetic is left alone behind a guard that returns
+  rather than truncating.
+- **Dual identification needed a rule this spec did not scope.** An
+  object type may declare both an objectification and an identifying
+  subtype fact, which is two preferred identifiers. It is not a cycle,
+  so WS1's rule does not see it. The mapper resolves it in favour of the
+  objectification; whether the model should also be REPORTED is
+  barwise-969, filed rather than taken.
+- **A mutation check found a fixture that guarded nothing.** The first
+  barwise-963 fixture passed with the settlement order replaced by
+  declaration order, because its two entities happened to be declared in
+  dependency order already. The fixture that kills it is a chain --
+  A's key depends on B's, B's on C's and D's, declaration order running
+  A first -- and it was written only because the mutation check refused
+  to die.
+- **The phase split needed almost no change in phase 2.** Once phase 1
+  is the only thing that sets a key, `addForeignKey`,
+  `createAssociativeTable` and the non-identifying subtype arm read a
+  settled key without knowing it. The change is the order plus
+  `MutableTable.primaryKey` becoming readonly; the two sites that
+  assigned it were the two the compiler then named.
 
 ## Non-goals
 
