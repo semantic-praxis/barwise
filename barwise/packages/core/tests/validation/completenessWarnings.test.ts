@@ -573,4 +573,164 @@ describe("completenessWarnings", () => {
       expect(valuePrefWarning).toHaveLength(0);
     });
   });
+
+  describe("an identity declared more than one way", () => {
+    /**
+     * `multiple-preferred-identifiers` covers more than one source of
+     * ONE kind; this covers a type that INHERITS its identity through an
+     * identifying subtype fact and also declares one. It is not an
+     * identification cycle, so the structural rule does not fire either.
+     * Zero object types in the repository carry the shape, so every
+     * fixture here is hand-built.
+     *
+     * The preferred-plus-objectification pair is the case that is NOT a
+     * conflict, and it has its own test below: ORM lets an objectified
+     * fact type carry its own reference scheme, and 13 of the 115
+     * recorded eval payloads do exactly that.
+     */
+    function conflicting(
+      kind: "objectification+subtype" | "preferred+objectification" | "preferred+subtype",
+    ) {
+      const model = new OrmModel({ name: "Test" });
+      const person = model.addObjectType({
+        name: "Person",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      const org = model.addObjectType({
+        name: "Organization",
+        kind: "entity",
+        referenceMode: "org_id",
+      });
+      const employee = model.addObjectType({
+        name: "Employee",
+        kind: "entity",
+        referenceMode: "employee_id",
+      });
+      const badge = model.addObjectType({
+        name: "BadgeNumber",
+        kind: "value",
+        dataType: { name: "text" },
+      });
+
+      const employment = model.addFactType({
+        name: "Person works for Organization",
+        roles: [
+          { id: "e1", name: "works for", playerId: person.id },
+          { id: "e2", name: "employs", playerId: org.id },
+        ],
+        readings: ["{0} works for {1}", "{1} employs {0}"],
+        constraints: [],
+      });
+
+      if (kind !== "preferred+subtype") {
+        model.addObjectifiedFactType({ factTypeId: employment.id, objectTypeId: employee.id });
+      }
+      if (kind !== "preferred+objectification") {
+        model.addSubtypeFact({
+          subtypeId: employee.id,
+          supertypeId: person.id,
+          providesIdentification: true,
+        });
+      }
+      if (kind !== "objectification+subtype") {
+        model.addFactType({
+          name: "Employee has BadgeNumber",
+          roles: [
+            { id: "b1", name: "has", playerId: employee.id },
+            { id: "b2", name: "is of", playerId: badge.id },
+          ],
+          readings: ["{0} has {1}", "{1} is of {0}"],
+          constraints: [{ type: "internal_uniqueness", roleIds: ["b1"], isPreferred: true }],
+        });
+      }
+      return model;
+    }
+
+    const conflicts = (model: OrmModel) =>
+      completenessWarnings(model).filter(
+        (d) => d.ruleId === "completeness/conflicting-identification",
+      );
+
+    it("reports an objectification and an identifying subtype fact on one type", () => {
+      // barwise-965's actual cause: the only way the subtype arm's key
+      // could be composite by the time it ran.
+      const found = conflicts(conflicting("objectification+subtype"));
+      expect(found).toHaveLength(1);
+      expect(found[0]!.message).toContain("Employee");
+      expect(found[0]!.message).toContain("inherits its identity from a supertype");
+      expect(found[0]!.message).toContain("an objectification");
+    });
+
+    it("says nothing about an objectified type with its own reference scheme", () => {
+      // Ordinary ORM, not a contradiction: an objectified fact type may
+      // carry a simple reference scheme -- "Review has ReviewId" on a
+      // Review that objectifies "Reviewer reviews Paper". A first draft
+      // of this rule charged for it, and 13 of the 115 recorded eval
+      // payloads across four model arms have the shape, so it would have
+      // moved six of eight arms' scores for good modelling.
+      expect(conflicts(conflicting("preferred+objectification"))).toHaveLength(0);
+    });
+
+    it("reports a preferred uniqueness constraint against an identifying subtype fact", () => {
+      // `providesIdentification` says the subtype is identified by its
+      // supertype's identifier; its own preferred identifier says
+      // otherwise.
+      const found = conflicts(conflicting("preferred+subtype"));
+      expect(found).toHaveLength(1);
+      expect(found[0]!.message).toContain("Employee");
+      expect(found[0]!.message).toContain("a preferred uniqueness constraint");
+    });
+
+    it("says nothing about a type identified exactly one way", () => {
+      const model = new OrmModel({ name: "Test" });
+      const person = model.addObjectType({
+        name: "Person",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      const name = model.addObjectType({ name: "Name", kind: "value", dataType: { name: "text" } });
+      model.addFactType({
+        name: "Person has Name",
+        roles: [
+          { id: "r1", name: "has", playerId: person.id },
+          { id: "r2", name: "is of", playerId: name.id },
+        ],
+        readings: ["{0} has {1}", "{1} is of {0}"],
+        constraints: [{ type: "internal_uniqueness", roleIds: ["r1"], isPreferred: true }],
+      });
+
+      expect(conflicts(model)).toHaveLength(0);
+    });
+
+    it("leaves two preferred uniqueness constraints to the rule that owns them", () => {
+      // One kind, twice: `multiple-preferred-identifiers` reports it and
+      // this rule must not, or a reader sees one problem described twice.
+      const model = new OrmModel({ name: "Test" });
+      const person = model.addObjectType({
+        name: "Person",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      const name = model.addObjectType({ name: "Name", kind: "value", dataType: { name: "text" } });
+      const ssn = model.addObjectType({ name: "Ssn", kind: "value", dataType: { name: "text" } });
+      for (const [i, value] of [name, ssn].entries()) {
+        model.addFactType({
+          name: `Person has ${value.name}`,
+          roles: [
+            { id: `p${i}`, name: "has", playerId: person.id },
+            { id: `v${i}`, name: "is of", playerId: value.id },
+          ],
+          readings: ["{0} has {1}", "{1} is of {0}"],
+          constraints: [{ type: "internal_uniqueness", roleIds: [`p${i}`], isPreferred: true }],
+        });
+      }
+
+      const diagnostics = completenessWarnings(model);
+      expect(conflicts(model)).toHaveLength(0);
+      expect(
+        diagnostics.filter((d) => d.ruleId === "completeness/multiple-preferred-identifiers"),
+      ).toHaveLength(1);
+    });
+  });
 });
