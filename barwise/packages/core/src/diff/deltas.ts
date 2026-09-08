@@ -218,9 +218,34 @@ export function elementName(delta: ModelDelta): string {
  * (i.e. the same concept under a different name). Flagged for human
  * resolution -- never auto-linked.
  */
+/**
+ * The element kinds that carry a name of their own, and so can be
+ * renamed.
+ *
+ * Derived from the delta interfaces rather than restated as literals,
+ * because a subset of a closed set is still a closed set: writing
+ * `"object_type" | "fact_type"` by hand puts a second authority beside
+ * `ElementType` with nothing keeping them honest, which is the defect
+ * this whole spec is about, one level down
+ * (`docs/specs/typed-diff-all-element-kinds.spec.md`).
+ *
+ * The subset has a REASON, and naming it is the point: a definition is
+ * identified by a term rather than a name, and a subtype fact and an
+ * objectification have no name at all -- they are identified by the
+ * pair of elements they relate. Only these two can be renamed, which is
+ * what synonym detection is about.
+ *
+ * Deliberately NOT shared with `annotation/OrmYamlAnnotator.ts`, whose
+ * set includes `"model"` and answers a different question, nor with the
+ * NORMA reader and writer in `@barwise/formats`, whose identical-looking
+ * literals are a foreign file format's vocabulary and must stay free to
+ * diverge from ours.
+ */
+export type NamedElementType = ObjectTypeDelta["elementType"] | FactTypeDelta["elementType"];
+
 export interface SynonymCandidate {
   /** The element type being compared. */
-  readonly elementType: "object_type" | "fact_type";
+  readonly elementType: NamedElementType;
   /** Name of the removed element. */
   readonly removedName: string;
   /** Name of the added element. */

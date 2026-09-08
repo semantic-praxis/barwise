@@ -40,6 +40,7 @@ export type {
   FactTypeDelta,
   ModelDelta,
   ModelDiffResult,
+  NamedElementType,
   ObjectifiedFactTypeDelta,
   ObjectTypeDelta,
   SubtypeFactDelta,

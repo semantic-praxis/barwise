@@ -17,12 +17,12 @@
  * run's actual output, never a synthesis.
  */
 import type { OrmModel } from "@barwise/core";
-import { diffModels } from "@barwise/core/diff";
+import { diffModels, type NamedElementType } from "@barwise/core/diff";
 import type { Ambiguity } from "./ExtractionTypes.js";
 
 /** One element the samples do not agree on. */
 export interface SampleDisagreement {
-  readonly elementType: "object_type" | "fact_type";
+  readonly elementType: NamedElementType;
   readonly name: string;
   /**
    * "presence": the element is missing from some samples.
@@ -49,7 +49,7 @@ export interface SampleAgreement {
 }
 
 interface ElementTally {
-  readonly elementType: "object_type" | "fact_type";
+  readonly elementType: NamedElementType;
   readonly name: string;
   count: number;
 }
@@ -94,7 +94,7 @@ export function computeSampleAgreement(models: readonly OrmModel[]): SampleAgree
   // Presence: how many samples carry each element, keyed by kind+name
   // (name is the diff's own correspondence key).
   const presence = new Map<string, ElementTally>();
-  const tally = (elementType: "object_type" | "fact_type", name: string): void => {
+  const tally = (elementType: NamedElementType, name: string): void => {
     const key = keyOf(elementType, name);
     const entry = presence.get(key) ?? { elementType, name, count: 0 };
     entry.count += 1;
