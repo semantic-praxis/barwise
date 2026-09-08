@@ -52,12 +52,12 @@ function licenceSetFor(name: string, licence: NameLicence): readonly string[] | 
 /** The four pre-licence tiers: exact name, exact alias, normalized name, normalized alias. */
 function resolveDirect(model: OrmModel, name: string): ObjectType | undefined {
   const exact = model.getObjectTypeByName(name)
-    ?? model.objectTypes.find((ot) => ot.aliases?.includes(name));
+    ?? model.objectTypes.find((ot) => ot.aliases.includes(name));
   if (exact) return exact;
 
   const target = normalizeForMatch(name);
   return model.objectTypes.find((ot) => normalizeForMatch(ot.name) === target)
-    ?? model.objectTypes.find((ot) => ot.aliases?.some((a) => normalizeForMatch(a) === target));
+    ?? model.objectTypes.find((ot) => ot.aliases.some((a) => normalizeForMatch(a) === target));
 }
 
 /**
@@ -105,7 +105,7 @@ export function nameInVocabulary(
   licence?: NameLicence,
 ): string {
   if (vocabulary.has(ot.name)) return ot.name;
-  const alias = ot.aliases?.find((a) => vocabulary.has(a));
+  const alias = ot.aliases.find((a) => vocabulary.has(a));
   if (alias !== undefined) return alias;
 
   // Fall back to a normalized lookup, returning the vocabulary's own

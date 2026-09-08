@@ -12,12 +12,13 @@ import {
 import { OrmModel } from "../../src/model/OrmModel.js";
 
 /** An entity with no definition: guaranteed table-level "todo". */
-function modelWithGap(): OrmModel {
+function modelWithGap(customerDefinition?: string): OrmModel {
   const model = new OrmModel({ name: "Gaps" });
   const customer = model.addObjectType({
     name: "Customer",
     kind: "entity",
     referenceMode: "customer_id",
+    ...(customerDefinition !== undefined ? { definition: customerDefinition } : {}),
   });
   const name = model.addObjectType({ name: "CustomerName", kind: "value" });
   model.addFactType({
@@ -54,11 +55,11 @@ describe("collectAnnotationMap", () => {
   });
 
   it("excludes note-severity annotations", () => {
-    const model = modelWithGap();
     // Give the entity a definition: the description gap flips from a
     // table-level todo to an informational note, which must not mark
-    // the node.
-    model.getObjectTypeByName("Customer")!.definition = "A buyer of goods.";
+    // the node. Built with the definition rather than assigned onto a
+    // built object type, which the record refuses.
+    const model = modelWithGap("A buyer of goods.");
 
     const map = collectAnnotationMap(model);
     for (const messages of map.values()) {

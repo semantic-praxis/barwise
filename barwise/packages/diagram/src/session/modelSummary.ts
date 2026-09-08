@@ -9,7 +9,7 @@
  * display-ready readings and constraint labels, and subtype links.
  * Pure and deterministic; order follows model declaration order.
  */
-import type { OrmModel } from "@barwise/core";
+import { dataTypeOf, type OrmModel, referenceModeOf } from "@barwise/core";
 
 export interface SummaryRole {
   readonly id: string;
@@ -63,8 +63,9 @@ export interface ModelSummary {
 
 function dataTypeLabel(model: OrmModel, objectTypeId: string): string | undefined {
   const ot = model.getObjectType(objectTypeId);
-  if (!ot?.dataType) return undefined;
-  const { name, length, scale } = ot.dataType;
+  const dt = ot ? dataTypeOf(ot) : undefined;
+  if (!dt) return undefined;
+  const { name, length, scale } = dt;
   if (length !== undefined && scale !== undefined) return `${name}(${length},${scale})`;
   if (length !== undefined) return `${name}(${length})`;
   return name;
@@ -95,9 +96,9 @@ export function buildModelSummary(model: OrmModel): ModelSummary {
     id: ot.id,
     name: ot.name,
     kind: ot.kind,
-    ...(ot.referenceMode !== undefined && { referenceMode: ot.referenceMode }),
+    ...(referenceModeOf(ot) !== undefined && { referenceMode: referenceModeOf(ot) }),
     ...(dataTypeLabel(model, ot.id) !== undefined && { dataType: dataTypeLabel(model, ot.id) }),
-    ...(ot.aliases !== undefined && ot.aliases.length > 0 && { aliases: ot.aliases }),
+    ...(ot.aliases.length > 0 && { aliases: ot.aliases }),
     factTypeIds: playedIn.get(ot.id) ?? [],
   }));
 

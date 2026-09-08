@@ -3,7 +3,7 @@
  * derived from them.
  */
 import type { FactType } from "../model/FactType.js";
-import type { ObjectType } from "../model/ObjectType.js";
+import { type ObjectType, referenceModeOf } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { Population } from "../model/Population.js";
 import { Verbalizer } from "../verbalization/Verbalizer.js";
@@ -23,7 +23,7 @@ export function summarizeEntity(entity: ObjectType): EntitySummary {
     name: entity.name,
     definition: entity.definition,
     kind: entity.kind,
-    referenceMode: entity.referenceMode,
+    referenceMode: referenceModeOf(entity),
   };
 }
 
@@ -139,8 +139,9 @@ export function buildEntityFocusSummary(
     parts.push(`Definition: ${entity.definition}`);
   }
   parts.push(`Kind: ${entity.kind}`);
-  if (entity.referenceMode) {
-    parts.push(`Reference Mode: ${entity.referenceMode}`);
+  const referenceMode = referenceModeOf(entity);
+  if (referenceMode) {
+    parts.push(`Reference Mode: ${referenceMode}`);
   }
 
   parts.push(`\nRelated Fact Types: ${factTypes.length}`);

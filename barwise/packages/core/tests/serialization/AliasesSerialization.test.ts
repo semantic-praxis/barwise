@@ -55,7 +55,10 @@ describe("Aliases serialization", () => {
     expect(yaml).not.toContain("aliases");
 
     const restored = serializer.deserialize(yaml);
-    expect(restored.getObjectTypeByName("Customer")!.aliases).toBeUndefined();
+    // `[]`, not `undefined`: the record applies the default. The
+    // assertion that matters is the one above -- the key is absent from
+    // the file.
+    expect(restored.getObjectTypeByName("Customer")!.aliases).toEqual([]);
   });
 
   it("round-trips mixed model with some OTs having aliases and some not", () => {
@@ -82,7 +85,7 @@ describe("Aliases serialization", () => {
     const restored = serializer.deserialize(yaml);
 
     expect(restored.getObjectTypeByName("Customer")!.aliases).toEqual(["Client"]);
-    expect(restored.getObjectTypeByName("Order")!.aliases).toBeUndefined();
+    expect(restored.getObjectTypeByName("Order")!.aliases).toEqual([]);
     expect(restored.getObjectTypeByName("Name")!.aliases).toEqual(["FullName", "DisplayName"]);
   });
 

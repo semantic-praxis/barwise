@@ -16,7 +16,7 @@
 
 import { type FactTypeConfig, toFactTypeConfig } from "../model/FactType.js";
 import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
-import { type ObjectType, toObjectTypeConfig } from "../model/ObjectType.js";
+import type { ObjectType } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { type PopulationConfig, toPopulationConfig } from "../model/Population.js";
 import { toSubtypeFactConfig } from "../model/SubtypeFact.js";
@@ -97,14 +97,14 @@ export function mergeModels(
     if (delta.kind === "unchanged") {
       // Always keep.
       const ot = delta.existing!;
-      merged.addObjectType(toObjectTypeConfig(ot));
+      merged.addObjectType(ot);
       if (delta.incoming) {
         incomingIdToMergedId.set(delta.incoming.id, ot.id);
       }
     } else if (delta.kind === "added") {
       if (isAccepted) {
         const ot = delta.incoming!;
-        merged.addObjectType(toObjectTypeConfig(ot));
+        merged.addObjectType(ot);
         incomingIdToMergedId.set(ot.id, ot.id);
       }
       // If rejected: simply omit.
@@ -112,7 +112,7 @@ export function mergeModels(
       if (!isAccepted) {
         // Rejected removal -> keep the existing element.
         const ot = delta.existing!;
-        merged.addObjectType(toObjectTypeConfig(ot));
+        merged.addObjectType(ot);
       }
       // If accepted: omit (remove).
     } else if (delta.kind === "modified") {
@@ -122,7 +122,7 @@ export function mergeModels(
         const existingOt = delta.existing!;
         const incomingOt = delta.incoming!;
         merged.addObjectType({
-          ...toObjectTypeConfig(incomingOt),
+          ...incomingOt,
           id: existingOt.id,
           aliases: unionAliases(existingOt, incomingOt),
         });
@@ -130,7 +130,7 @@ export function mergeModels(
       } else {
         // Rejected: keep existing as-is.
         const ot = delta.existing!;
-        merged.addObjectType(toObjectTypeConfig(ot));
+        merged.addObjectType(ot);
         if (delta.incoming) {
           incomingIdToMergedId.set(delta.incoming.id, ot.id);
         }

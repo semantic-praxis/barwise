@@ -11,7 +11,7 @@
  */
 
 import type { RelationalSchema } from "../mapping/RelationalSchema.js";
-import type { ObjectType } from "../model/ObjectType.js";
+import { isValueType, type ValueType } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { truncate } from "./helpers.js";
 
@@ -58,8 +58,11 @@ export function collectExportAnnotations(
   const entityById = new Map(
     model.objectTypes.filter((ot) => ot.kind === "entity").map((e) => [e.id, e]),
   );
+  // `isValueType` rather than a `kind` comparison so the map is typed
+  // `Map<string, ValueType>`: everything downstream reads `dataType` and
+  // `valueConstraint` off it, and those live on the variant.
   const valueById = new Map(
-    model.objectTypes.filter((ot) => ot.kind === "value").map((v) => [v.id, v]),
+    model.objectTypes.filter(isValueType).map((v) => [v.id, v]),
   );
 
   for (const table of schema.tables) {
@@ -159,8 +162,8 @@ export function collectExportAnnotations(
 function findValueTypeForRole(
   roleId: string,
   model: OrmModel,
-  valueById: Map<string, ObjectType>,
-): ObjectType | undefined {
+  valueById: Map<string, ValueType>,
+): ValueType | undefined {
   for (const ft of model.factTypes) {
     const matchIdx = ft.roles.findIndex((r) => r.id === roleId);
     if (matchIdx === -1) continue;

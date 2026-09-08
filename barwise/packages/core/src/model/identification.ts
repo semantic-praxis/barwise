@@ -1,5 +1,5 @@
 import type { FactType } from "./FactType.js";
-import type { ObjectType } from "./ObjectType.js";
+import type { ObjectType, ValueType } from "./ObjectType.js";
 import type { OrmModel } from "./OrmModel.js";
 import type { Role } from "./Role.js";
 
@@ -10,7 +10,7 @@ import type { Role } from "./Role.js";
 export interface PreferredIdentifyingBinary {
   readonly factType: FactType;
   readonly entityRole: Role;
-  readonly valuePlayer: ObjectType;
+  readonly valuePlayer: ValueType;
 }
 
 /**

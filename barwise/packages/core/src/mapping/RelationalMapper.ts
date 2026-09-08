@@ -24,7 +24,12 @@
 import type { FactType } from "../model/FactType.js";
 import { identificationOrder, preferredIdentifyingBinary } from "../model/identification.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
-import type { DataTypeDef, ObjectType } from "../model/ObjectType.js";
+import {
+  type DataTypeDef,
+  isEntityType,
+  type ObjectType,
+  type ValueType,
+} from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { PreferredIdentifierStrategy } from "../model/OrmProject.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
@@ -85,7 +90,7 @@ export class RelationalMapper {
     // Phase 0: one table per entity type, carrying its identifying key
     // unless phase 1 is going to replace that key anyway.
     for (const ot of model.objectTypes) {
-      if (ot.kind !== "entity") continue;
+      if (!isEntityType(ot)) continue;
 
       // An objectified entity is identified by the fact type it
       // objectifies, so a reference-mode column would end up neither key
@@ -104,9 +109,14 @@ export class RelationalMapper {
       // phase-0 column at all, so its binary is not spent and phase 2
       // maps it as an ordinary column.
       const preferred = preferredIdentifyingBinary(model, ot);
-      const pkColName = preferred
-        ? toSnake(preferred.valuePlayer.name)
-        : ot.referenceMode ?? `${toSnake(ot.name)}_id`;
+      // No fallback behind `ot.referenceMode`. There used to be one -- a
+      // snake-cased "<name>_id" default for an entity type with no
+      // reference mode -- for a state the constructor already refused, so
+      // it was unreachable and no reader could tell. It is the fourth
+      // evidenced site in core-branching-load.spec.md, and what makes it
+      // provably gone is the narrowing above: `ot` is an `EntityType`
+      // here, whose `referenceMode` is a `string`.
+      const pkColName = preferred ? toSnake(preferred.valuePlayer.name) : ot.referenceMode;
       const pkDataType = preferred
         ? conceptualTypeToSql(preferred.valuePlayer.dataType)
         : referenceModePkType(ot, model, fallbackPkType);
@@ -829,7 +839,7 @@ function findValuePlayer(
   ft: { roles: readonly { playerId: string; }[]; },
   ot: ObjectType,
   model: OrmModel,
-): ObjectType | undefined {
+): ValueType | undefined {
   const role1 = ft.roles[0]!;
   const role2 = ft.roles[1]!;
 

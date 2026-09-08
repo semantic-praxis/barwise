@@ -1,7 +1,9 @@
-import type {
-  ConceptualDataTypeName,
-  ObjectType,
-  ObjectTypeConfig,
+import {
+  type ConceptualDataTypeName,
+  isEntityType,
+  isValueType,
+  type ObjectType,
+  type ObjectTypeConfig,
 } from "../../model/ObjectType.js";
 import {
   deserializeValueConstraintBody,
@@ -32,7 +34,14 @@ export function serializeObjectType(ot: ObjectType): OrmYamlObjectType {
     kind: ot.kind,
   };
 
-  if (ot.referenceMode) {
+  // Narrowed field by field rather than by grouping the variants, because
+  // key INSERTION ORDER is what the golden bytes record: a value type's
+  // `value_constraint` and `data_type` sit between `source_context` and
+  // `aliases`, and moving them into a `kind` block would reorder every
+  // serialized value type.
+  const value = isValueType(ot) ? ot : undefined;
+
+  if (isEntityType(ot)) {
     result.reference_mode = ot.referenceMode;
   }
   if (ot.definition) {
@@ -41,26 +50,26 @@ export function serializeObjectType(ot: ObjectType): OrmYamlObjectType {
   if (ot.sourceContext) {
     result.source_context = ot.sourceContext;
   }
-  if (ot.valueConstraint) {
+  if (value?.valueConstraint) {
     result.value_constraint = serializeValueConstraintBody(
-      ot.valueConstraint.values,
-      ot.valueConstraint.ranges,
+      value.valueConstraint.values,
+      value.valueConstraint.ranges,
     );
   }
-  if (ot.dataType) {
-    const dt: { name: string; length?: number; scale?: number; } = { name: ot.dataType.name };
-    if (ot.dataType.length !== undefined) dt.length = ot.dataType.length;
-    if (ot.dataType.scale !== undefined) dt.scale = ot.dataType.scale;
+  if (value?.dataType) {
+    const dt: { name: string; length?: number; scale?: number; } = { name: value.dataType.name };
+    if (value.dataType.length !== undefined) dt.length = value.dataType.length;
+    if (value.dataType.scale !== undefined) dt.scale = value.dataType.scale;
     result.data_type = dt;
   }
-  if (ot.aliases && ot.aliases.length > 0) {
+  if (ot.aliases.length > 0) {
     result.aliases = [...ot.aliases];
   }
   if (ot.independent) {
     result.independent = true;
   }
-  if (ot.defaultValue !== undefined) {
-    result.default_value = ot.defaultValue;
+  if (value?.defaultValue !== undefined) {
+    result.default_value = value.defaultValue;
   }
   if (ot.note) {
     result.note = ot.note;

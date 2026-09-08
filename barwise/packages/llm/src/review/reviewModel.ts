@@ -7,7 +7,7 @@
  * descriptions, edge cases worth testing with populations.
  */
 
-import type { OrmModel } from "@barwise/core";
+import { isEntityType, isValueType, type OrmModel } from "@barwise/core";
 import type { LlmClient } from "../LlmClient.js";
 import type { PromptArtifact } from "../prompt/artifacts/PromptArtifact.js";
 import { buildReviewSystemPrompt } from "../prompt/reviewPrompt.js";
@@ -105,18 +105,22 @@ function serializeModelForReview(model: OrmModel, focus?: string): string {
       } else {
         lines.push(`  Definition: (none)`);
       }
-      if (ot.kind === "entity" && ot.referenceMode) {
+      // The `&& ot.referenceMode` this used to carry is gone with the
+      // sealed union: an entity type cannot have an absent one.
+      if (isEntityType(ot)) {
         lines.push(`  Reference mode: ${ot.referenceMode}`);
       }
-      if (ot.dataType) {
-        lines.push(
-          `  Data type: ${ot.dataType.name}${
-            ot.dataType.length ? ` (length: ${ot.dataType.length})` : ""
-          }`,
-        );
-      }
-      if (ot.valueConstraint) {
-        lines.push(`  Value constraint: ${ot.valueConstraint.values.join(", ")}`);
+      if (isValueType(ot)) {
+        if (ot.dataType) {
+          lines.push(
+            `  Data type: ${ot.dataType.name}${
+              ot.dataType.length ? ` (length: ${ot.dataType.length})` : ""
+            }`,
+          );
+        }
+        if (ot.valueConstraint) {
+          lines.push(`  Value constraint: ${ot.valueConstraint.values.join(", ")}`);
+        }
       }
     }
     lines.push("");
