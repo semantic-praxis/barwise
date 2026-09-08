@@ -3,7 +3,9 @@
  */
 import type { Definition } from "../model/Definition.js";
 import type { FactType } from "../model/FactType.js";
+import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import type { ObjectType } from "../model/ObjectType.js";
+import type { SubtypeFact } from "../model/SubtypeFact.js";
 import type { ChangeDescription } from "./changeDescription.js";
 
 export type DeltaKind = "added" | "removed" | "modified" | "unchanged";
@@ -64,7 +66,60 @@ export interface DefinitionDelta extends DeltaCommon {
   readonly incoming?: Definition;
 }
 
-export type ModelDelta = ObjectTypeDelta | FactTypeDelta | DefinitionDelta;
+/**
+ * An element a delta references, as plain data.
+ *
+ * Both the id and the name, for the reason `RoleSummary` carries both:
+ * the two sides of a delta resolve against two DIFFERENT models, so a
+ * consumer holding only the delta has no model in which to look the
+ * name up. The id is identity; the name is what a person reads.
+ */
+export interface ElementRef {
+  readonly id: string;
+  readonly name: string;
+}
+
+/**
+ * A subtype fact: this entity type is a subtype of that one.
+ *
+ * It has no name of its own, so its identity is the resolved pair --
+ * which is also how `diffModels` matches one across two models, since
+ * re-extraction mints fresh ids and only names survive.
+ */
+export interface SubtypeFactDelta extends DeltaCommon {
+  readonly elementType: "subtype_fact";
+  readonly subtype: ElementRef;
+  readonly supertype: ElementRef;
+  readonly existing?: SubtypeFact;
+  readonly incoming?: SubtypeFact;
+}
+
+/**
+ * An objectified fact type: this entity type IS that relationship.
+ *
+ * `ObjectifiedFactType` carries nothing beyond its two references, so
+ * there is no content that could differ between two of them that match.
+ * The type says so rather than leaving it to a comment: `kind` excludes
+ * `"modified"` and `changes` is the empty tuple, so a `modified`
+ * objectification cannot be constructed and a non-empty change list
+ * cannot be attached to one.
+ */
+export interface ObjectifiedFactTypeDelta extends Omit<DeltaCommon, "kind" | "changes"> {
+  readonly elementType: "objectified_fact_type";
+  readonly kind: Exclude<DeltaKind, "modified">;
+  readonly changes: readonly [];
+  readonly objectType: ElementRef;
+  readonly factType: ElementRef;
+  readonly existing?: ObjectifiedFactType;
+  readonly incoming?: ObjectifiedFactType;
+}
+
+export type ModelDelta =
+  | ObjectTypeDelta
+  | FactTypeDelta
+  | DefinitionDelta
+  | SubtypeFactDelta
+  | ObjectifiedFactTypeDelta;
 
 /**
  * Which kind of element a delta is about.
@@ -97,6 +152,8 @@ const ELEMENT_LABEL = {
   object_type: "Object type",
   fact_type: "Fact type",
   definition: "Definition",
+  subtype_fact: "Subtype fact",
+  objectified_fact_type: "Objectification",
 } as const satisfies Record<ElementType, string>;
 
 /** Every element kind a delta can be about. Derived from the label table. */
@@ -143,6 +200,16 @@ export function elementName(delta: ModelDelta): string {
     case "object_type":
     case "fact_type":
       return delta.name;
+    // A subtype fact borrows the verbalizer's own words ("X is a subtype
+    // of Y"), so the diff names it the way the rest of the product does.
+    // An objectification cannot: the verbalizer renders it as "X is
+    // where <the fact type's primary reading>", and a delta has the fact
+    // type's NAME rather than a reading, so "objectifies" is this
+    // module's own word for it.
+    case "subtype_fact":
+      return `${delta.subtype.name} is a subtype of ${delta.supertype.name}`;
+    case "objectified_fact_type":
+      return `${delta.objectType.name} objectifies ${delta.factType.name}`;
   }
 }
 
@@ -151,9 +218,34 @@ export function elementName(delta: ModelDelta): string {
  * (i.e. the same concept under a different name). Flagged for human
  * resolution -- never auto-linked.
  */
+/**
+ * The element kinds that carry a name of their own, and so can be
+ * renamed.
+ *
+ * Derived from the delta interfaces rather than restated as literals,
+ * because a subset of a closed set is still a closed set: writing
+ * `"object_type" | "fact_type"` by hand puts a second authority beside
+ * `ElementType` with nothing keeping them honest, which is the defect
+ * this whole spec is about, one level down
+ * (`docs/specs/typed-diff-all-element-kinds.spec.md`).
+ *
+ * The subset has a REASON, and naming it is the point: a definition is
+ * identified by a term rather than a name, and a subtype fact and an
+ * objectification have no name at all -- they are identified by the
+ * pair of elements they relate. Only these two can be renamed, which is
+ * what synonym detection is about.
+ *
+ * Deliberately NOT shared with `annotation/OrmYamlAnnotator.ts`, whose
+ * set includes `"model"` and answers a different question, nor with the
+ * NORMA reader and writer in `@barwise/formats`, whose identical-looking
+ * literals are a foreign file format's vocabulary and must stay free to
+ * diverge from ours.
+ */
+export type NamedElementType = ObjectTypeDelta["elementType"] | FactTypeDelta["elementType"];
+
 export interface SynonymCandidate {
   /** The element type being compared. */
-  readonly elementType: "object_type" | "fact_type";
+  readonly elementType: NamedElementType;
   /** Name of the removed element. */
   readonly removedName: string;
   /** Name of the added element. */

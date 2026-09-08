@@ -122,6 +122,24 @@ export type ChangeDescription =
   // --- Shared by object types and fact types ---
   | { readonly change: "definition"; readonly from?: string; readonly to?: string; }
   | { readonly change: "note"; readonly from?: string; readonly to?: string; }
+  // --- Subtype facts ---
+  //
+  // The four fields a subtype fact carries beyond its two references.
+  // An objectified fact type has no equivalent block: it carries
+  // nothing beyond ITS two references, which is why its delta type
+  // forbids `modified` outright.
+  | {
+    readonly change: "providesIdentification";
+    readonly from: boolean;
+    readonly to: boolean;
+  }
+  | { readonly change: "subtypeExclusive"; readonly from: boolean; readonly to: boolean; }
+  | { readonly change: "subtypeExhaustive"; readonly from: boolean; readonly to: boolean; }
+  | {
+    readonly change: "definingRule";
+    readonly from?: DerivationRule;
+    readonly to?: DerivationRule;
+  }
   // --- Definitions (the ubiquitous-language entries) ---
   //
   // `definitionText` and `context` are a standalone definition's
@@ -197,6 +215,14 @@ export function describeChange(change: ChangeDescription): string {
       return "definition text changed";
     case "context":
       return `context: "${change.from ?? NONE}" -> "${change.to ?? NONE}"`;
+    case "providesIdentification":
+      return `provides identification: ${change.from} -> ${change.to}`;
+    case "subtypeExclusive":
+      return `exclusive: ${change.from} -> ${change.to}`;
+    case "subtypeExhaustive":
+      return `exhaustive: ${change.from} -> ${change.to}`;
+    case "definingRule":
+      return "defining rule changed";
   }
 }
 

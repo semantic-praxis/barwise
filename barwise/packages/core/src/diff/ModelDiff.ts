@@ -8,11 +8,20 @@
  * comparisons, breaking-level classification, and synonym detection live
  * in sibling modules.
  */
+import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
+import type { SubtypeFact } from "../model/SubtypeFact.js";
 import { classifyBreakingLevel } from "./breakingLevel.js";
 import { describeChange } from "./changeDescription.js";
 import type { DeltaKind, ModelDelta, ModelDiffResult } from "./deltas.js";
-import { diffDefinition, diffFactType, diffObjectType } from "./elementDiff.js";
+import {
+  diffDefinition,
+  diffFactType,
+  diffObjectType,
+  diffSubtypeFact,
+  factTypeName,
+  playerName,
+} from "./elementDiff.js";
 import { detectSynonymCandidates } from "./synonyms.js";
 
 export { type ChangeDescription, describeChange, type RoleSummary } from "./changeDescription.js";
@@ -27,10 +36,14 @@ export type {
   BreakingLevel,
   DefinitionDelta,
   DeltaKind,
+  ElementRef,
   FactTypeDelta,
   ModelDelta,
   ModelDiffResult,
+  NamedElementType,
+  ObjectifiedFactTypeDelta,
   ObjectTypeDelta,
+  SubtypeFactDelta,
   SynonymCandidate,
 } from "./deltas.js";
 
@@ -182,6 +195,126 @@ export function diffModels(
         elementType: "definition",
         term,
         incoming: def,
+        changes: [],
+        changeDescriptions: [],
+        breakingLevel: classifyBreakingLevel("added", []),
+      });
+    }
+  }
+
+  // --- Subtype facts ---
+  //
+  // No name, so the identity is the pair it relates, resolved to names
+  // against the model it came from -- the same reason the kinds above
+  // match by name rather than by id: re-extraction mints fresh ids and
+  // only names survive. A renamed subtype therefore reads as
+  // removed-plus-added, exactly as a renamed object type does.
+  const sfKey = (sf: SubtypeFact, model: OrmModel): string =>
+    `${playerName(model, sf.subtypeId)}\u0000${playerName(model, sf.supertypeId)}`;
+  const sfRefs = (sf: SubtypeFact, model: OrmModel) => ({
+    subtype: { id: sf.subtypeId, name: playerName(model, sf.subtypeId) },
+    supertype: { id: sf.supertypeId, name: playerName(model, sf.supertypeId) },
+  });
+
+  const existingSfs = new Map(existing.subtypeFacts.map((sf) => [sfKey(sf, existing), sf]));
+  const incomingSfs = new Map(incoming.subtypeFacts.map((sf) => [sfKey(sf, incoming), sf]));
+
+  for (const [key, sf] of existingSfs) {
+    const match = incomingSfs.get(key);
+    if (!match) {
+      deltas.push({
+        kind: "removed",
+        elementType: "subtype_fact",
+        ...sfRefs(sf, existing),
+        existing: sf,
+        changes: [],
+        changeDescriptions: [],
+        breakingLevel: classifyBreakingLevel("removed", []),
+      });
+    } else {
+      const changes = diffSubtypeFact(sf, match);
+      const kind: DeltaKind = changes.length > 0 ? "modified" : "unchanged";
+      deltas.push({
+        kind,
+        elementType: "subtype_fact",
+        ...sfRefs(sf, existing),
+        existing: sf,
+        incoming: match,
+        changes,
+        changeDescriptions: changes.map(describeChange),
+        breakingLevel: classifyBreakingLevel(kind, changes),
+      });
+    }
+  }
+
+  for (const [key, sf] of incomingSfs) {
+    if (!existingSfs.has(key)) {
+      deltas.push({
+        kind: "added",
+        elementType: "subtype_fact",
+        ...sfRefs(sf, incoming),
+        incoming: sf,
+        changes: [],
+        changeDescriptions: [],
+        breakingLevel: classifyBreakingLevel("added", []),
+      });
+    }
+  }
+
+  // --- Objectified fact types ---
+  //
+  // Same pair-matching, and no comparer: an objectified fact type
+  // carries nothing beyond the two references that made it match, so
+  // two that match are equal by construction. Its delta type says so --
+  // `kind` excludes "modified" -- and that is why this loop has no
+  // `modified` branch to write.
+  const oftKey = (oft: ObjectifiedFactType, model: OrmModel): string =>
+    `${playerName(model, oft.objectTypeId)}\u0000${factTypeName(model, oft.factTypeId)}`;
+  const oftRefs = (oft: ObjectifiedFactType, model: OrmModel) => ({
+    objectType: { id: oft.objectTypeId, name: playerName(model, oft.objectTypeId) },
+    factType: { id: oft.factTypeId, name: factTypeName(model, oft.factTypeId) },
+  });
+
+  const existingOfts = new Map(
+    existing.objectifiedFactTypes.map((oft) => [oftKey(oft, existing), oft]),
+  );
+  const incomingOfts = new Map(
+    incoming.objectifiedFactTypes.map((oft) => [oftKey(oft, incoming), oft]),
+  );
+
+  for (const [key, oft] of existingOfts) {
+    const match = incomingOfts.get(key);
+    deltas.push(
+      match
+        ? {
+          kind: "unchanged",
+          elementType: "objectified_fact_type",
+          ...oftRefs(oft, existing),
+          existing: oft,
+          incoming: match,
+          changes: [],
+          changeDescriptions: [],
+          breakingLevel: classifyBreakingLevel("unchanged", []),
+        }
+        : {
+          kind: "removed",
+          elementType: "objectified_fact_type",
+          ...oftRefs(oft, existing),
+          existing: oft,
+          changes: [],
+          changeDescriptions: [],
+          breakingLevel: classifyBreakingLevel("removed", []),
+        },
+    );
+  }
+
+  for (const [key, oft] of incomingOfts) {
+    if (!existingOfts.has(key)) {
+      deltas.push({
+        kind: "added",
+        elementType: "objectified_fact_type",
+        ...oftRefs(oft, incoming),
+        incoming: oft,
         changes: [],
         changeDescriptions: [],
         breakingLevel: classifyBreakingLevel("added", []),

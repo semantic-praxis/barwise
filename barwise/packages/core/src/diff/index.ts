@@ -9,11 +9,15 @@ export {
   ELEMENT_TYPES,
   elementLabel,
   elementName,
+  type ElementRef,
   type ElementType,
   type FactTypeDelta,
   type ModelDelta,
   type ModelDiffResult,
+  type NamedElementType,
+  type ObjectifiedFactTypeDelta,
   type ObjectTypeDelta,
+  type SubtypeFactDelta,
   type SynonymCandidate,
 } from "./ModelDiff.js";
 export {

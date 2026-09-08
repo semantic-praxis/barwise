@@ -1,10 +1,10 @@
 # The diff should cover the model, not three sevenths of it
 
-Status: WS1 implemented (the element-label table and `elementName`);
-WS2 and WS3 not started
+Status: WS1 and WS2 implemented (the element-label table; subtype facts
+and objectified fact types diffed and merged); WS3 (populations) not
+started
 Created: 2026-09-07
-Last-updated: 2026-09-07 (WS1 shipped; both open decisions revised against
-measured evidence)
+Last-updated: 2026-09-08 (WS2 shipped)
 Tracking: barwise-940 (this spec); barwise-937 (the merge defect that
 exposed it, fixed by carrying the four kinds through unchanged);
 `core-model-laws.spec.md`'s open decision "Shape of the barwise-937 fix",
@@ -209,7 +209,7 @@ Acceptance: when a member is added to `ElementType` without a row in
 and the VS Code review panel shall print the labels they print today,
 pinned by their existing tests.
 
-### 2. The two name-derivable kinds (provisional: not yet grounded)
+### 2. The two name-derivable kinds (implemented)
 
 Subtype facts and objectified fact types: delta types,
 comparers, `ChangeDescription` variants, matched loops in `diffModels`,
