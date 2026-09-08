@@ -63,7 +63,22 @@ function versionErrorMessage(
  * before constructing the model.
  */
 export class OrmYamlSerializer {
-  private readonly validator = new SchemaValidator();
+  /**
+   * Compiled on first use, not in the constructor.
+   *
+   * Only `deserialize` validates, and `new Ajv().compile(ormModelSchema)`
+   * costs about 34ms -- so every caller that constructs a serializer to
+   * SERIALIZE paid for a validator it never touched. `hashModel` builds
+   * one per call, which made the laws that hash a model twice per
+   * generated case take 25s under coverage instrumentation and time out
+   * at 120s under a parallel twelve-package run (barwise-939).
+   */
+  private validatorInstance?: SchemaValidator;
+
+  private get validator(): SchemaValidator {
+    this.validatorInstance ??= new SchemaValidator();
+    return this.validatorInstance;
+  }
 
   /**
    * Serialize an OrmModel to a YAML string.

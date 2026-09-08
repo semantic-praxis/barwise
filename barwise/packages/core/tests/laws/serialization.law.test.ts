@@ -12,17 +12,23 @@
  *
  * A failure prints the seed and the shrunk model, so one recorded value
  * reproduces it.
- *
- * Each property carries an explicit timeout. The 30s default in
- * `vitest.config.ts` is sized for a fixture test; a property runs its
- * body 250 times, and the idempotence law calls `hashModel` twice per
- * run -- which compiles the JSON Schema with ajv on every call and does
- * nothing with it (barwise-939). That alone is 25s under coverage
- * instrumentation, and it timed out under a parallel twelve-package CI
- * run. Remove these timeouts when barwise-939 is fixed.
  */
 
-/** See the module comment: 250 runs is not a fixture test. */
+/**
+ * 250 runs is not a fixture test, and this file's properties hash a
+ * generated model twice per run. Standalone they finish in seconds;
+ * under `turbo run test:coverage`, where twelve packages instrument and
+ * run at once, the slowest was measured at 46s. The 30s vitest default
+ * is sized for a fixture.
+ *
+ * These were 120s because `hashModel` compiled a JSON Schema it never
+ * used on every call, at 34ms a hash (barwise-939, now fixed: the
+ * serializer's validator is lazy). That took the same law from 126s to
+ * 46s. The timeout stays because the remaining cost is the property
+ * itself, and removing it on the strength of that fix was tried and
+ * failed under the parallel run -- which is the note this comment exists
+ * to leave.
+ */
 const LAW_TIMEOUT_MS = 120_000;
 
 import fc from "fast-check";
@@ -101,18 +107,20 @@ describe("law: serialization is lossless", () => {
    * population stays significant. Getting this wrong would silently
    * re-close the open world the sample-population semantics opened.
    */
-  it("every population keeps its sample flag and its instances", {
-    timeout: LAW_TIMEOUT_MS,
-  }, () => {
-    fc.assert(
-      fc.property(arbOrmModel(), (model) => {
-        const restored = serializer.deserialize(serializer.serialize(model));
+  it(
+    "every population keeps its sample flag and its instances",
+    { timeout: LAW_TIMEOUT_MS },
+    () => {
+      fc.assert(
+        fc.property(arbOrmModel(), (model) => {
+          const restored = serializer.deserialize(serializer.serialize(model));
 
-        expect(populationShapes(restored)).toEqual(populationShapes(model));
-      }),
-      { seed: SEED, numRuns: RUNS },
-    );
-  });
+          expect(populationShapes(restored)).toEqual(populationShapes(model));
+        }),
+        { seed: SEED, numRuns: RUNS },
+      );
+    },
+  );
 });
 
 describe("coverage: the generator reaches the shapes the recorded defects lived in", () => {

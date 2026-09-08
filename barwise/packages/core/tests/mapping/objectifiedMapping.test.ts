@@ -33,10 +33,11 @@ describe("objectified fact type relational mapping", () => {
       const schema = mapper.map(model);
       const empTable = schema.tables.find((t) => t.name === "employment")!;
 
-      // Should have: reference mode column + 2 FK columns.
-      expect(empTable.columns).toHaveLength(3);
-      expect(empTable.columns.map((c) => c.name)).toContain("company_id");
-      expect(empTable.columns.map((c) => c.name)).toContain("person_id");
+      // The two absorbed FK columns and nothing else. Employment's
+      // reference mode is not mapped: an objectified entity is identified
+      // by the fact type it objectifies, so employment_id would be
+      // neither key nor reference (mapper-key-settlement.spec.md).
+      expect(empTable.columns.map((c) => c.name)).toEqual(["company_id", "person_id"]);
     });
 
     it("sets PK to composite of FK columns", () => {
