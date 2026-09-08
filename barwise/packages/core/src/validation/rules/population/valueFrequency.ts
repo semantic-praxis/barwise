@@ -1,38 +1,11 @@
 import type { FrequencyConstraint, ValueConstraint } from "../../../model/Constraint.js";
-import { isFrequency, isValueConstraint, type ValueRange } from "../../../model/Constraint.js";
+import { isFrequency, isValueConstraint } from "../../../model/Constraint.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Population } from "../../../model/Population.js";
+import { valueDomainPredicate } from "../../../model/valueDomain.js";
 import type { Diagnostic } from "../../Diagnostic.js";
 import { reportAs, RULE_ID } from "../../ruleId.js";
 import { makeCompositeKey, severityForModality } from "./shared.js";
-
-/** Whether a string parses as a finite number. */
-function isFiniteNumber(s: string): boolean {
-  return s.trim() !== "" && Number.isFinite(Number(s));
-}
-
-/**
- * Whether a value falls within a range. Compares numerically when the value
- * and both present bounds parse as numbers, otherwise lexically. A missing
- * bound is open-ended; bounds are inclusive unless flagged otherwise.
- */
-function valueInRange(val: string, r: ValueRange): boolean {
-  const minIncl = r.minInclusive !== false;
-  const maxIncl = r.maxInclusive !== false;
-  const numeric = isFiniteNumber(val)
-    && (r.min === undefined || isFiniteNumber(r.min))
-    && (r.max === undefined || isFiniteNumber(r.max));
-
-  if (numeric) {
-    const v = Number(val);
-    if (r.min !== undefined && (minIncl ? v < Number(r.min) : v <= Number(r.min))) return false;
-    if (r.max !== undefined && (maxIncl ? v > Number(r.max) : v >= Number(r.max))) return false;
-    return true;
-  }
-  if (r.min !== undefined && (minIncl ? val < r.min : val <= r.min)) return false;
-  if (r.max !== undefined && (maxIncl ? val > r.max : val >= r.max)) return false;
-  return true;
-}
 
 /**
  * Value constraints restrict what values a role may hold.
@@ -60,14 +33,13 @@ export function checkValueConstraintViolations(model: OrmModel): Diagnostic[] {
 function valueConstraintViolationsIn(pop: Population, vc: ValueConstraint): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   if (!vc.roleId) return diagnostics; // Type-level value constraints (no specific role)
-  const allowedSet = new Set(vc.values);
   const ranges = vc.ranges ?? [];
+  const allowed = valueDomainPredicate(vc);
 
   for (const inst of pop.instances) {
     const val = inst.roleValues[vc.roleId];
     if (val === undefined) continue;
-    const allowed = allowedSet.has(val) || ranges.some((r) => valueInRange(val, r));
-    if (!allowed) {
+    if (!allowed(val)) {
       const rangeNote = ranges.length > 0 ? " (or any permitted range)" : "";
       diagnostics.push(
         reportAs(

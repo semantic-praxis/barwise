@@ -7,6 +7,7 @@ import {
 import type { RingType } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
+import { counterexampleRoundTripFailure } from "../helpers/counterexampleRules.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 /**
@@ -483,20 +484,6 @@ describe("cross-fact-type counterexamples", () => {
   });
 });
 
-const RULE_BY_TYPE: Record<string, string> = {
-  internal_uniqueness: "population/uniqueness-violation",
-  value_constraint: "population/value-constraint-violation",
-  frequency: "population/frequency-violation",
-  ring: "population/ring-violation",
-  mandatory: "population/mandatory-violation",
-  disjunctive_mandatory: "population/disjunctive-mandatory-violation",
-  exclusion: "population/exclusion-violation",
-  exclusive_or: "population/exclusive-or-violation",
-  subset: "population/subset-violation",
-  equality: "population/equality-violation",
-  external_uniqueness: "population/external-uniqueness-violation",
-};
-
 interface RoleInit {
   readonly player: string;
   readonly role: string;
@@ -643,35 +630,106 @@ function buildConstraintRichModel(): OrmModel {
 describe("model-wide round-trip completeness", () => {
   it("every generated counterexample trips its own rule", () => {
     const model = buildConstraintRichModel();
-    const ces = generateCounterexamples(model);
 
     // A real spread of constraint types, so the guard fails loudly if a
-    // generator stops emitting.
-    const types = new Set(ces.map((c) => c.constraintType));
+    // generator stops emitting. Read before the round-trip check, which
+    // empties the model's populations.
+    const types = new Set(generateCounterexamples(model).map((c) => c.constraintType));
     expect(types.size).toBeGreaterThanOrEqual(8);
 
-    for (const ce of ces) {
-      const expected = RULE_BY_TYPE[ce.constraintType];
-      expect(expected, `no rule mapped for ${ce.constraintType}`).toBeTruthy();
+    // The dance itself lives in the helper, shared with the law over
+    // generated models (tests/laws/counterexample.law.test.ts): this model
+    // is the readable record of the cases someone thought of, the law is
+    // the guard against the ones nobody did.
+    expect(counterexampleRoundTripFailure(model)).toBeUndefined();
+  });
 
-      // Add this counterexample's forbidden populations, validate, then
-      // remove them, so each counterexample is checked in isolation.
-      const added: string[] = [];
-      for (const forbidden of ce.forbidden) {
-        const pop = model.addPopulation({ factTypeId: forbidden.factTypeId });
-        for (const inst of forbidden.instances) {
-          pop.addInstance({ roleValues: { ...inst.roleValues } });
-        }
-        added.push(pop.id);
-      }
-      const ruleIds = populationValidationRules(model).map((d) => d.ruleId);
-      for (const id of added) model.removePopulation(id);
+  /**
+   * barwise-958, found by the law on its first run and shrunk to this:
+   * a value constraint carrying both an enumeration and a range admits
+   * values the enumeration does not list, and the generator used to mint
+   * against the enumeration alone. The result was a probe telling a
+   * modeler the model ruled out a value it accepted. Kept as a fixture
+   * because the law reaches it only through a 250-run sample.
+   */
+  it("mints past a range, not just past the enumerated values", () => {
+    const model = new OrmModel({ name: "Ranged" });
+    const grade = model.addObjectType({ name: "Grade", kind: "value" });
+    const ft = model.addFactType({
+      name: "Grade is awarded",
+      roles: [{ name: "is awarded", playerId: grade.id, id: "r0" }],
+      readings: ["{0} is awarded"],
+    });
+    ft.addConstraint({
+      type: "value_constraint",
+      id: "vc0",
+      roleId: "r0",
+      values: ["A"],
+      // Open above: every player-named token the generator used to mint
+      // sorts after "1", so the enumeration-only mint landed inside the
+      // range and the model accepted the "forbidden" value.
+      ranges: [{ min: "1" }],
+    });
 
-      expect(
-        ruleIds,
-        `${ce.constraintType} counterexample did not trip ${expected}`,
-      ).toContain(expected);
-    }
+    expect(counterexampleRoundTripFailure(model)).toBeUndefined();
+  });
+
+  /**
+   * The suffix family is exhaustive against an enumeration alone: one
+   * more candidate than the enumeration has entries, all distinct, so
+   * one must escape. This pins that, because the range arm below it is
+   * a fixed list and it would be easy to make the whole function a
+   * fixed list by accident -- which it briefly was.
+   */
+  it("always finds a value outside an enumeration, however it is populated", () => {
+    const model = new OrmModel({ name: "Adversarial" });
+    const token = model.addObjectType({ name: "Token", kind: "value" });
+    const ft = model.addFactType({
+      name: "Token is held",
+      roles: [{ name: "is held", playerId: token.id, id: "r0" }],
+      readings: ["{0} is held"],
+    });
+    // Every candidate the range arm can offer, plus a suffix run long
+    // enough that a fixed-length family would exhaust: only an
+    // enumeration-sized search escapes this.
+    const base = "Token#invalid";
+    ft.addConstraint({
+      type: "value_constraint",
+      id: "vc0",
+      roleId: "r0",
+      values: [
+        base,
+        ...Array.from({ length: 12 }, (_, i) => `${base}-${i + 1}`),
+        `!${base}`,
+        `~${base}`,
+        "-1e308",
+        "1e308",
+      ],
+    });
+
+    const ces = generateCounterexamples(model);
+    expect(ces).toHaveLength(1);
+    expect(counterexampleRoundTripFailure(model)).toBeUndefined();
+  });
+
+  /** An unbounded range forbids nothing, so there is nothing to probe. */
+  it("emits no counterexample for a value constraint that admits everything", () => {
+    const model = new OrmModel({ name: "Unbounded" });
+    const anything = model.addObjectType({ name: "Anything", kind: "value" });
+    const ft = model.addFactType({
+      name: "Anything is recorded",
+      roles: [{ name: "is recorded", playerId: anything.id, id: "r0" }],
+      readings: ["{0} is recorded"],
+    });
+    ft.addConstraint({
+      type: "value_constraint",
+      id: "vc0",
+      roleId: "r0",
+      values: [],
+      ranges: [{}],
+    });
+
+    expect(generateCounterexamples(model)).toEqual([]);
   });
 });
 
