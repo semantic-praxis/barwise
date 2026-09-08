@@ -9,7 +9,7 @@
  */
 
 import { type OrmModel, OrmYamlSerializer } from "@barwise/core";
-import { diffModels, type ModelDelta } from "@barwise/core/diff";
+import { deltaLabel, diffModels } from "@barwise/core/diff";
 import type { Command } from "commander";
 import { execFileSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
@@ -183,14 +183,6 @@ function renderDeltas(older: OrmModel, newer: OrmModel): string {
 function summarize(model: OrmModel): string {
   return `initial: ${model.objectTypes.length} object type(s), `
     + `${model.factTypes.length} fact type(s)`;
-}
-
-function deltaLabel(delta: ModelDelta): string {
-  if (delta.elementType === "definition") {
-    return `Definition: ${delta.term}`;
-  }
-  const typeLabel = delta.elementType === "object_type" ? "Object type" : "Fact type";
-  return `${typeLabel}: ${delta.name}`;
 }
 
 /** Run git in `cwd`; a missing repo or bad revision throws with git's message. */

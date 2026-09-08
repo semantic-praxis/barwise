@@ -1,8 +1,10 @@
 # The diff should cover the model, not three sevenths of it
 
-Status: Draft -- no workstream implemented
+Status: WS1 implemented (the element-label table and `elementName`);
+WS2 and WS3 not started
 Created: 2026-09-07
-Last-updated: 2026-09-07
+Last-updated: 2026-09-07 (WS1 shipped; both open decisions revised against
+measured evidence)
 Tracking: barwise-940 (this spec); barwise-937 (the merge defect that
 exposed it, fixed by carrying the four kinds through unchanged);
 `core-model-laws.spec.md`'s open decision "Shape of the barwise-937 fix",
@@ -76,15 +78,17 @@ always-empty `changes` array.
 In scope:
 
 - When the incoming model contains a subtype fact, objectified fact
-  type, population or diagram layout that the existing model does not,
+  type or population that the existing model does not,
   `diffModels` shall emit an `added` delta for it.
 - When both models contain the same element by the identity above and
   its content differs, `diffModels` shall emit a `modified` delta
   carrying `ChangeDescription` variants for what differs.
 - When a delta for one of these kinds is accepted, `mergeModels` shall
   apply it; when rejected, the existing element shall survive unchanged.
-- When `mergeModels` builds its result, it shall do so from deltas
-  alone: `carryUnmodelledElements` shall be deleted.
+- When `mergeModels` builds its result, every element kind except
+  diagram layouts shall come from a delta; `carryUnmodelledElements`
+  shall shrink to carrying layouts alone, per the resolved decision
+  below.
 - When a surface labels a delta by its element kind, it shall read that
   label from one table in core, so that adding a kind without a label
   is a compile error.
@@ -114,7 +118,7 @@ Out of scope:
 | `core/src/diff/elementDiff.ts`                   | `diffObjectType`, `diffFactType`, `diffDefinition` return `ChangeDescription[]` | Three comparers added                               |
 | `core/src/diff/changeDescription.ts`             | 22 variants                                                                     | Variants added for the new kinds' fields            |
 | `core/src/diff/breakingLevel.ts`                 | `CHANGE_LEVEL` is `Record<ChangeKind, BreakingLevel>`                           | Rows added; the Record makes omission a build error |
-| `core/src/diff/ModelMerge.ts`                    | Three delta phases plus `carryUnmodelledElements` (barwise-937)                 | Four phases added; the carry function deleted       |
+| `core/src/diff/ModelMerge.ts`                    | Three delta phases plus `carryUnmodelledElements` (barwise-937)                 | Three phases added; the carry shrinks to layouts    |
 | `cli/src/commands/diff.ts`, `history.ts`         | `elementType === "object_type" ? "Object type" : "Fact type"`                   | Read the label table instead                        |
 | `vscode/src/commands/ImportTranscriptCommand.ts` | The same ternary                                                                | Read the label table instead                        |
 | `llm/src/sampleAgreement.ts`                     | Narrows `elementType` to `"object_type" \| "fact_type"` in its own types        | Skips the new kinds explicitly; behaviour unchanged |
@@ -151,8 +155,8 @@ ModelMerge.ts
   phase 4  subtype facts        (needs object types: after phase 1)
   phase 5  objectified fact types (needs both: after phase 2)
   phase 6  populations           (needs fact types, and the role remap)
-  phase 7  diagram layouts       (references by name; last)
-  carryUnmodelledElements: deleted
+  diagram layouts: carried, never diffed (resolved decision)
+  carryUnmodelledElements: layouts only (see the resolved decision)
 ```
 
 `elementName` is the piece the MCP tool and the CLI both need and
@@ -187,7 +191,7 @@ compiler counts.
 
 ## Workstreams (each independently shippable)
 
-### 1. One label table, and `elementName`
+### 1. One label table, and `elementName` (implemented)
 
 Add `ElementType`, `ELEMENT_LABEL`, `elementLabel` and `elementName` to
 core; replace the four ternaries in `cli` and `vscode` and the
@@ -205,12 +209,13 @@ Acceptance: when a member is added to `ElementType` without a row in
 and the VS Code review panel shall print the labels they print today,
 pinned by their existing tests.
 
-### 2. The three name-derivable kinds (provisional: not yet grounded)
+### 2. The two name-derivable kinds (provisional: not yet grounded)
 
-Subtype facts, objectified fact types and diagram layouts: delta types,
+Subtype facts and objectified fact types: delta types,
 comparers, `ChangeDescription` variants, matched loops in `diffModels`,
-and merge phases. `carryUnmodelledElements` loses these three and keeps
-populations.
+and merge phases. Layouts are NOT among them, per the resolved decision:
+`carryUnmodelledElements` loses subtype facts and objectified fact types
+and keeps populations and layouts.
 
 Acceptance: when the incoming model adds a subtype fact and its delta is
 accepted, the merged model shall contain it; when the delta is rejected,
@@ -220,7 +225,7 @@ not the incoming one's. The identity law stays green.
 ### 3. Populations, and the end of the carry (provisional: not yet grounded)
 
 Populations, under whichever identity the open decision settles, plus
-the deletion of `carryUnmodelledElements` and the role-remap logic it
+the deletion of `carryUnmodelledElements`'s population arm and the role-remap logic it
 owns -- `recordRoleRemap` and `remapPopulationRoles` move into the
 population phase, since an accepted fact-type modification still moves
 roles out from under a population the merge keeps.
@@ -229,7 +234,8 @@ Ships last because it carries the one unresolved identity question and
 the one piece of subtle existing logic (barwise-941's `null` sentinel).
 
 Acceptance: the accept-all law, strengthened to assert all seven kinds,
-shall be green; and `carryUnmodelledElements` shall not exist.
+shall be green for the six diffed kinds; and `carryUnmodelledElements`
+shall carry diagram layouts and nothing else.
 
 ## API and migration impact
 
@@ -249,34 +255,54 @@ shall be green; and `carryUnmodelledElements` shall not exist.
 
 ## Open decisions (for review)
 
-- **How a population is identified.** Nothing enforces one population
+- **How a population is identified. (resolved: `(factTypeName, sample)`.)**
+  Nothing enforces one population
   per fact type -- `addPopulation` keys by the population's own id and
-  accepts many. Option A: key by fact type name, and treat more than one
-  population on a fact type as unmatched (added/removed rather than
-  modified). Simple, and correct for every model the repository's
-  examples and fixtures contain. Option B: key by
-  `(factTypeName, description ?? "")`, which distinguishes the case a
-  modeller actually uses to tell two populations apart. Option C: key by
-  `(factTypeName, sample)`, since `sample` is the semantically load-bearing
-  flag (`sample-populations.spec.md`) and a fact type plausibly has one
-  significant population and one illustrative one. **Recommend B**: it
-  uses the field a human writes to distinguish them, degrades to A when
-  descriptions are absent, and does not invent a rule the metamodel does
-  not have. Whichever is chosen, the identity belongs in a named function
-  with the reasoning attached, because it is the assumption most likely
-  to be wrong.
+  accepts many. Measured across every tracked `.orm.yaml`: 28
+  populations in 11 models, **all 28 carrying a description**, and **no
+  model with more than one population on a single fact type**. So all
+  three options behave identically on every model that exists, and the
+  choice is only about which failure mode to prefer for models that do
+  not yet.
 
-- **Whether a diagram layout is worth diffing at all.** It is
-  presentation, not semantics: positions and orientations. Option A:
-  diff it like the rest, so an incoming layout can be accepted. Option
-  B: keep carrying it from the existing model, since a re-extracted
-  model's layout is generated rather than authored and accepting it
-  would discard a human's arrangement. **Recommend B**, which means
-  `carryUnmodelledElements` shrinks to one kind rather than
-  disappearing -- and that contradicts barwise-940's acceptance
-  criteria, which is why it is a decision rather than a detail. If B
-  wins, the function keeps its name and its comment changes to say what
-  it now deliberately owns.
+  Option A: key by fact type name. Simple; cannot represent a fact type
+  carrying both a significant and a sample population. Option B: key by
+  `(factTypeName, description ?? "")`. Option C: key by
+  `(factTypeName, sample)`.
+
+  **C**, revised from B once the measurement was in, and confirmed by the
+  reviewer.
+  `description` is prose, which makes it a non-key attribute, and putting
+  a non-key attribute in the key turns an update to it into a delete plus
+  an insert: rewording a population's description would report the
+  population removed and a different one added, its instances appearing
+  to vanish and reappear. Rewording is the edit that actually happens.
+  `sample` is stable under it, is the flag the metamodel already treats
+  as load-bearing (`sample-populations.spec.md`), and discriminates the
+  one realistic two-population case; flipping it reads as
+  remove-plus-add, which is right, because it is a change of kind rather
+  than of content. Whichever is chosen, the identity belongs in a named
+  function with the reasoning attached, because it is the assumption most
+  likely to be wrong.
+
+- **Whether a diagram layout is worth diffing at all. (resolved: no --
+  layouts stay carried.)** The reviewer's call, and the evidence is
+  stronger than the argument this draft first made. A layout is only ever
+  written by a human: the VS Code diagram panel saves one when someone
+  arranges nodes (`DiagramPanel.ts`), `extension.ts` creates a named
+  view, and the NORMA importer brings one in. `packages/llm/src` contains
+  no reference to `DiagramLayout` at all, so a re-extracted incoming
+  model has **none**. Diffing layouts would therefore emit a `removed`
+  delta for every existing layout on every import, and a reviewer
+  accepting all deltas would delete their whole arrangement. That is a
+  concrete harm, not a preference.
+
+  So `carryUnmodelledElements` survives, owning exactly one kind, and its
+  comment says why that one is deliberate rather than pending. This
+  contradicts barwise-940's acceptance criteria
+  ("`carryUnmodelledElements` is deleted"), which were written before
+  anyone asked what a layout delta would mean; the issue is updated
+  rather than the design bent to fit it.
 
 - **What breaking level each new change reads as.** A removed subtype
   fact changes what the model asserts about identity and is plausibly

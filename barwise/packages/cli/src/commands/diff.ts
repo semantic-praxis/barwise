@@ -4,7 +4,13 @@
  * Computes the diff between two ORM models and prints the deltas.
  */
 
-import { diffModels, type ModelDelta, type SynonymCandidate } from "@barwise/core/diff";
+import {
+  deltaLabel,
+  diffModels,
+  elementName,
+  type ModelDelta,
+  type SynonymCandidate,
+} from "@barwise/core/diff";
 import type { Command } from "commander";
 import { loadModel } from "../workspace/io.js";
 
@@ -37,7 +43,7 @@ export function registerDiffCommand(program: Command): void {
                     .map((d) => ({
                       kind: d.kind,
                       elementType: d.elementType,
-                      name: d.elementType === "definition" ? d.term : d.name,
+                      name: elementName(d),
                       breakingLevel: d.breakingLevel,
                       changeDescriptions: d.changeDescriptions,
                     })),
@@ -90,14 +96,6 @@ export function registerDiffCommand(program: Command): void {
         }
       },
     );
-}
-
-function deltaLabel(delta: ModelDelta): string {
-  if (delta.elementType === "definition") {
-    return `Definition: ${delta.term}`;
-  }
-  const typeLabel = delta.elementType === "object_type" ? "Object type" : "Fact type";
-  return `${typeLabel}: ${delta.name}`;
 }
 
 function buildSynonymLookup(
