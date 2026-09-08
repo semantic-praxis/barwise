@@ -1262,4 +1262,61 @@ describe("well-formedness the mapper law generalises", () => {
     expect(table.primaryKey.columnNames).toEqual(["event_id"]);
     expect(table.foreignKeys).toEqual([]);
   });
+
+  /**
+   * KNOWN DEFECT, barwise-963: this pins output that is wrong.
+   *
+   * Step 2 builds a foreign key from the target table's primary key as
+   * it stands; step 2b then absorbs an objectified fact type's roles
+   * into the objectifying entity's table and REPLACES that primary key.
+   * The associative table below still references event(event_id) while
+   * event's key has become the absorbed column. The reference is not
+   * dangling -- event_id is still a column -- so the mapper law's
+   * "referenced columns exist" clause holds and the "equals the target's
+   * primary key" clause WS5 specified does not, which is why that clause
+   * is deferred.
+   *
+   * The assertion is deliberately exact rather than lenient: fixing
+   * barwise-963 breaks it, which is the point. Delete this test in the
+   * commit that fixes it and restore the clause in mapper.law.test.ts.
+   */
+  it("known defect barwise-963: a foreign key keeps a key the objectification replaced", () => {
+    const model = new OrmModel({ name: "StalePk" });
+    const event = model.addObjectType({
+      name: "Event",
+      kind: "entity",
+      referenceMode: "event_id",
+    });
+    const venue = model.addObjectType({
+      name: "Venue",
+      kind: "entity",
+      referenceMode: "venue_id",
+    });
+    const cancelled = model.addFactType({
+      name: "Venue is closed",
+      roles: [{ id: "c0", name: "is closed", playerId: venue.id }],
+      readings: ["{0} is closed"],
+    });
+    model.addObjectifiedFactType({ factTypeId: cancelled.id, objectTypeId: event.id });
+    model.addFactType({
+      name: "Event overlaps Event at Event",
+      roles: [
+        { id: "o0", name: "overlaps", playerId: event.id },
+        { id: "o1", name: "is overlapped by", playerId: event.id },
+        { id: "o2", name: "at", playerId: event.id },
+      ],
+      readings: ["{0} overlaps {1} at {2}"],
+    });
+
+    const schema = new RelationalMapper().map(model);
+    const eventTable = schema.tables.find((t) => t.name === "event")!;
+    const associative = schema.tables.find((t) => t.name === "event_overlaps_event_at_event")!;
+
+    // The objectification moved event's key off event_id ...
+    expect(eventTable.primaryKey.columnNames).toEqual(["venue_id"]);
+    // ... and the associative table's keys, built first, did not follow.
+    for (const fk of associative.foreignKeys) {
+      expect(fk.referencedColumns).toEqual(["event_id"]);
+    }
+  });
 });

@@ -1,0 +1,157 @@
+/**
+ * Laws over a generated model: the relational mapper produces a schema
+ * that could actually be created.
+ *
+ * The mapper is a per-kind walk that builds tables, columns and keys by
+ * appending to mutable structures, which is the shape that produces
+ * omission defects: barwise-931 truncated a composite key to one column
+ * for a year with every fixture green. These state what must hold of
+ * the schema for any model, so an omission fails on the first generated
+ * model that reaches it. Spec: docs/specs/core-model-laws.spec.md, WS5.
+ *
+ * A failure prints the seed and the shrunk model, so one recorded value
+ * reproduces it.
+ */
+
+/** See `serialization.law.test.ts`: 250 runs is not a fixture test. */
+const LAW_TIMEOUT_MS = 120_000;
+
+import fc from "fast-check";
+import { describe, expect, it } from "vitest";
+import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
+import type { RelationalSchema } from "../../src/mapping/RelationalSchema.js";
+import { arbOrmModel, RUNS, SEED } from "../arbitraries/model.js";
+
+const mapper = new RelationalMapper();
+
+describe("law: the mapper is total", () => {
+  /**
+   * `RelationalMapper` has no `throw` anywhere in it, so this is not
+   * about a declared error path: it is about the undeclared ones, the
+   * `!` assertions and the lookups that assume a table exists. Those
+   * are what a generated model reaches and a fixture does not.
+   */
+  it("map does not throw on any generated model", { timeout: LAW_TIMEOUT_MS }, () => {
+    fc.assert(
+      fc.property(arbOrmModel(), (model) => {
+        expect(() => mapper.map(model)).not.toThrow();
+      }),
+      { seed: SEED, numRuns: RUNS },
+    );
+  });
+});
+
+describe("law: every schema the mapper produces is well formed", () => {
+  /**
+   * The clauses a `CREATE TABLE` run would enforce, in the order it
+   * would hit them. Stated as one property rather than five so a
+   * failure reports the whole schema it happened in.
+   */
+  it("names, keys and references all resolve", { timeout: LAW_TIMEOUT_MS }, () => {
+    fc.assert(
+      fc.property(arbOrmModel(), (model) => {
+        expectWellFormed(mapper.map(model));
+      }),
+      { seed: SEED, numRuns: RUNS },
+    );
+  });
+});
+
+describe("coverage: the generator reaches the shapes the mapper branches on", () => {
+  /**
+   * A mapper law over models with no objectified fact type and no
+   * subtype never enters the two steps that rewrite a primary key
+   * after it was built, which is where barwise-931 and barwise-963
+   * live. Counted, so a generator change that stops reaching them
+   * fails here rather than passing the laws vacuously.
+   */
+  const schemas = fc.sample(arbOrmModel(), { seed: SEED, numRuns: RUNS })
+    .map((model) => ({ model, schema: mapper.map(model) }));
+
+  it("produces a table with a composite primary key", () => {
+    const count =
+      schemas.filter(({ schema }) => schema.tables.some((t) => t.primaryKey.columnNames.length > 1))
+        .length;
+    expect(count).toBeGreaterThan(0);
+  });
+
+  it("produces a table with a composite foreign key", () => {
+    const count =
+      schemas.filter(({ schema }) =>
+        schema.tables.some((t) => t.foreignKeys.some((fk) => fk.columnNames.length > 1))
+      ).length;
+    expect(count).toBeGreaterThan(0);
+  });
+
+  it("produces a schema mapped from a model carrying a subtype fact", () => {
+    const count = schemas.filter(({ model }) => model.subtypeFacts.length > 0).length;
+    expect(count).toBeGreaterThan(0);
+  });
+
+  it("produces a schema mapped from a model carrying an objectified fact type", () => {
+    const count = schemas.filter(({ model }) => model.objectifiedFactTypes.length > 0).length;
+    expect(count).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The well-formedness clauses
+// ---------------------------------------------------------------------------
+
+/**
+ * One clause is missing from this list on purpose: that a foreign key's
+ * `referencedColumns` equal the referenced table's `primaryKey`. WS5
+ * specifies it and it is red today -- an objectification replaces a
+ * table's primary key after other foreign keys to it were built, so
+ * they name a column that is no longer a key (barwise-963). It is
+ * deferred rather than weakened silently: the clauses below say
+ * "referenced columns exist", which is what actually holds, and
+ * `RelationalMapper.test.ts` pins the wrong output so that fixing it
+ * trips a test rather than passing unnoticed.
+ */
+function expectWellFormed(schema: RelationalSchema): void {
+  const byName = new Map(schema.tables.map((t) => [t.name, t]));
+  expect(byName.size, `duplicate table name in [${schema.tables.map((t) => t.name)}]`)
+    .toBe(schema.tables.length);
+
+  for (const table of schema.tables) {
+    const columnNames = table.columns.map((c) => c.name);
+    const owned = new Set(columnNames);
+    expect(owned.size, `${table.name} has a duplicate column: [${columnNames}]`)
+      .toBe(columnNames.length);
+
+    for (const pkCol of table.primaryKey.columnNames) {
+      expect(owned.has(pkCol), `${table.name} key names a missing column ${pkCol}`).toBe(true);
+    }
+
+    for (const fk of table.foreignKeys) {
+      const target = byName.get(fk.referencedTable);
+      expect(target, `${table.name} references missing table ${fk.referencedTable}`)
+        .toBeDefined();
+
+      // A zero-column foreign key constrains nothing and would not
+      // parse; it is what a role loop that found no target produces if
+      // it still emits the key.
+      expect(fk.columnNames.length, `${table.name} has an empty foreign key`)
+        .toBeGreaterThan(0);
+      // Unequal arity is the barwise-931 defect's signature: a
+      // composite target key truncated to its first column.
+      expect(
+        fk.referencedColumns.length,
+        `${table.name} -> ${fk.referencedTable} arity: `
+          + `[${fk.columnNames}] against [${fk.referencedColumns}]`,
+      ).toBe(fk.columnNames.length);
+
+      for (const local of fk.columnNames) {
+        expect(owned.has(local), `${table.name} key names a missing column ${local}`).toBe(true);
+      }
+      const targetColumns = new Set(target!.columns.map((c) => c.name));
+      for (const referenced of fk.referencedColumns) {
+        expect(
+          targetColumns.has(referenced),
+          `${fk.referencedTable} has no column ${referenced}`,
+        ).toBe(true);
+      }
+    }
+  }
+}
