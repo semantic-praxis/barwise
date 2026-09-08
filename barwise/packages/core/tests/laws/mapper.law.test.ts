@@ -90,6 +90,18 @@ describe("coverage: the generator reaches the shapes the mapper branches on", ()
    * after it was built, which is where barwise-931 and barwise-963
    * live. Counted, so a generator change that stops reaching them
    * fails here rather than passing the laws vacuously.
+   *
+   * Every assertion here is a FLOOR, not `> 0`. Two of these shapes were
+   * reached by a handful of models in 250 -- the composite foreign key
+   * by 5, the preferred identifying binary by 1 -- which is a coverage
+   * assertion that passes while the law above it means nothing, and one
+   * seed change from red either way (barwise-968). The floors sit well
+   * under the measured counts so an ordinary generator change does not
+   * trip them, and well over one so a collapse does.
+   *
+   * Measured at this seed over 250 models: composite primary key 160,
+   * composite foreign key 18, subtype fact 96, objectified fact type 70,
+   * preferred identifying binary 14.
    */
   const schemas = fc.sample(arbOrmModel(), { seed: SEED, numRuns: RUNS })
     .map((model) => ({ model, schema: mapper.map(model) }));
@@ -98,40 +110,41 @@ describe("coverage: the generator reaches the shapes the mapper branches on", ()
     const count =
       schemas.filter(({ schema }) => schema.tables.some((t) => t.primaryKey.columnNames.length > 1))
         .length;
-    expect(count).toBeGreaterThan(0);
+    expect(count).toBeGreaterThanOrEqual(50);
   });
 
   it("produces a table with a composite foreign key", () => {
+    // The one that makes the barwise-931 mutation kill meaningful:
+    // without a composite target key, truncating a foreign key to the
+    // target's first column is invisible. It stood at 5 of 250.
     const count =
       schemas.filter(({ schema }) =>
         schema.tables.some((t) => t.foreignKeys.some((fk) => fk.columnNames.length > 1))
       ).length;
-    expect(count).toBeGreaterThan(0);
+    expect(count).toBeGreaterThanOrEqual(10);
   });
 
   it("produces a schema mapped from a model carrying a subtype fact", () => {
     const count = schemas.filter(({ model }) => model.subtypeFacts.length > 0).length;
-    expect(count).toBeGreaterThan(0);
+    expect(count).toBeGreaterThanOrEqual(30);
   });
 
   it("produces a schema mapped from a model carrying an objectified fact type", () => {
     const count = schemas.filter(({ model }) => model.objectifiedFactTypes.length > 0).length;
-    expect(count).toBeGreaterThan(0);
+    expect(count).toBeGreaterThanOrEqual(30);
   });
 
   it("produces an entity identified by a preferred binary to a value type", () => {
-    // Measured at this seed: 1 model of 250, and that one model is what
-    // kills the mutation on the once-only law. One is not cover -- it is
-    // one seed change from a law that passes vacuously, the same thin
-    // spot barwise-968 records for composite foreign keys. Counted here
-    // so raising it is a visible change rather than an invisible one.
+    // Stood at 1 of 250 when the once-only law was written, and that
+    // single model was the whole of its evidence. The arbitrary now
+    // builds the shape deliberately (barwise-968).
     const count =
       schemas.filter(({ model }) =>
         model.objectTypes.some((ot) =>
           ot.kind === "entity" && preferredIdentifyingBinary(model, ot) !== undefined
         )
       ).length;
-    expect(count).toBeGreaterThan(0);
+    expect(count).toBeGreaterThanOrEqual(10);
   });
 });
 
