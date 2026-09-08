@@ -78,9 +78,12 @@ export type ElementType = ModelDelta["elementType"];
  * How each kind of element is named in prose a person reads.
  *
  * This table exists because the union was widening under readers that
- * could not see it widen. Four sites across `cli` and `vscode` wrote
- * `elementType === "object_type" ? "Object type" : "Fact type"`, and a
- * ternary has no exhaustiveness requirement -- so adding a member to
+ * could not see it widen. Seven sites across six files in `cli`, `mcp`
+ * and `vscode` chose between kinds without exhaustiveness: three wrote
+ * `elementType === "object_type" ? "Object type" : "Fact type"`, two
+ * wrote `elementType === "definition" ? d.term : d.name`, and two the
+ * duck-type `"name" in d ? d.name : d.term`. A ternary has no
+ * exhaustiveness requirement -- so adding a member to
  * `ElementType` would not fail a build, it would display a subtype fact
  * as "Fact type" in `barwise diff`, in `barwise history` and in the VS
  * Code review panel. `Record<ElementType, string>` turns that silent
@@ -127,10 +130,11 @@ export function deltaLabel(delta: ModelDelta): string {
  * What this delta is about, as the text a surface displays.
  *
  * A definition is identified by its term and the other kinds by their
- * name, which four files expressed as `d.elementType === "definition" ?
- * d.term : d.name` -- a two-case expression repeated wherever a delta
- * was rendered, and one that has no answer for a kind carrying neither
- * field. One function, one switch the compiler counts.
+ * name. That choice was made at all seven sites above, in four
+ * spellings -- inside each copy of the label helper, as a bare
+ * `d.elementType === "definition" ? d.term : d.name`, and as the
+ * duck-type check -- and none of them has an answer for a kind carrying
+ * neither field. One function, one switch the compiler counts.
  */
 export function elementName(delta: ModelDelta): string {
   switch (delta.elementType) {
