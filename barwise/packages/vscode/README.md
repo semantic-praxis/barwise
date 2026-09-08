@@ -51,5 +51,5 @@ time will pre-select this default.
 
 ## Requirements
 
-- VS Code 1.93 or later
+- VS Code 1.101 or later
 - GitHub Copilot extension (for LLM features with Copilot provider)
