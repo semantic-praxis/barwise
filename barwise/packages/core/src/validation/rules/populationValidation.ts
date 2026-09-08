@@ -16,6 +16,7 @@ import {
   checkExclusiveOrViolations,
   checkSubsetViolations,
 } from "./population/setComparison.js";
+import { buildObjectUniverse, type ObjectUniverse } from "./population/shared.js";
 import {
   checkSpanningEqualityViolations,
   checkSpanningExclusionViolations,
@@ -70,8 +71,79 @@ import {
  * Each rule family lives in its own module under `population/`; this file
  * is the orchestrator that runs them in order.
  */
+/**
+ * A rule that judges a model by what its non-sample data does NOT
+ * contain.
+ *
+ * The universe is a parameter rather than something each rule fetches,
+ * so that "which rules judge by absence" is a fact stated once, in the
+ * table below, instead of a set restated wherever someone needs it --
+ * which was `sample.law.test.ts`, and which
+ * `core-model-laws.spec.md` WS4 was going to guard with a parity
+ * manifest row (docs/specs/object-universe-as-a-parameter.spec.md).
+ */
+export type UniverseRule = (model: OrmModel, universe: ObjectUniverse) => Diagnostic[];
+
+/**
+ * The rules that judge by ABSENT data. A sample population is not
+ * evidence about the world -- `buildObjectUniverse` skips it -- so
+ * adding one may satisfy an obligation and must never create one. That
+ * is the law in `sample.law.test.ts`, which reads this list.
+ *
+ * `as const satisfies` is what makes it a claim: a rule that does not
+ * take a universe cannot be listed, and a rule that takes one and is
+ * left out never receives it, so its call below does not compile
+ * either. The other direction -- a new rule calling
+ * `buildObjectUniverse` itself instead of joining the list -- is not a
+ * type question, and is covered by the import scan in
+ * `tests/validation/universeRuleTable.test.ts`.
+ */
+export const UNIVERSE_RULES = [
+  checkMandatoryViolations,
+  checkDisjunctiveMandatoryViolations,
+  checkSpanningExclusiveOrViolations,
+  checkObjectCardinalityViolations,
+  checkJoinPathViolations,
+] as const satisfies readonly UniverseRule[];
+
+/**
+ * The subset of `UNIVERSE_RULES` that judge ONLY by absence.
+ *
+ * Two of the five read the universe and are deliberately outside this
+ * subset, and the difference is the finding rather than a convenience.
+ *
+ * `checkJoinPathViolations` reads the universe to enumerate a join
+ * path's roots, but REPORTS two operands projecting the same tuple --
+ * a present-data violation. `checkSpanningExclusiveOrViolations` reads
+ * it to know which values must play exactly one role, and reports both
+ * "plays none" (absence) and "plays two" (presence) under one rule id.
+ * A sample population supplies tuples, so it can legitimately make
+ * either fire: a sample is incomplete, not false.
+ *
+ * That is the distinction a set of rule IDS could not express, which is
+ * why `core-model-laws.spec.md` WS4's Option B was not implementable --
+ * one rule id straddles the boundary. What is left here is the three
+ * rules whose every diagnostic is derived from absence: an object that
+ * exists and plays no mandatory role, one that plays none of a
+ * disjunctive set, and a type whose instance count comes from the
+ * universe alone. A sample can only add plays, so it can only remove
+ * those.
+ *
+ * Typed as a subset of the list above, so a rule can only be here if it
+ * is also there.
+ */
+export const ABSENT_DATA_RULES = [
+  checkMandatoryViolations,
+  checkDisjunctiveMandatoryViolations,
+  checkObjectCardinalityViolations,
+] as const satisfies readonly (typeof UNIVERSE_RULES)[number][];
+
 export function populationValidationRules(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
+  // Once, not once per rule: it walks every instance of every
+  // population, and five rules used to build the same map for
+  // themselves.
+  const universe = buildObjectUniverse(model);
 
   diagnostics.push(...checkDanglingPopulationFactType(model));
   diagnostics.push(...checkIncompleteInstances(model));
@@ -84,16 +156,16 @@ export function populationValidationRules(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkSubsetViolations(model));
   diagnostics.push(...checkEqualityViolations(model));
   diagnostics.push(...checkRingViolations(model));
-  diagnostics.push(...checkMandatoryViolations(model));
-  diagnostics.push(...checkDisjunctiveMandatoryViolations(model));
+  diagnostics.push(...checkMandatoryViolations(model, universe));
+  diagnostics.push(...checkDisjunctiveMandatoryViolations(model, universe));
   diagnostics.push(...checkSpanningExclusionViolations(model));
-  diagnostics.push(...checkSpanningExclusiveOrViolations(model));
+  diagnostics.push(...checkSpanningExclusiveOrViolations(model, universe));
   diagnostics.push(...checkSpanningSubsetViolations(model));
   diagnostics.push(...checkSpanningEqualityViolations(model));
   diagnostics.push(...checkExternalUniquenessViolations(model));
-  diagnostics.push(...checkObjectCardinalityViolations(model));
+  diagnostics.push(...checkObjectCardinalityViolations(model, universe));
   diagnostics.push(...checkUnaryRoleCardinalityViolations(model));
-  diagnostics.push(...checkJoinPathViolations(model));
+  diagnostics.push(...checkJoinPathViolations(model, universe));
 
   return diagnostics;
 }

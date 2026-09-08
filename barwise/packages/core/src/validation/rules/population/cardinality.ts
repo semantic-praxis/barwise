@@ -2,7 +2,7 @@ import { isCardinality } from "../../../model/Constraint.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
 import { report, reportAs, RULE_ID } from "../../ruleId.js";
-import { buildObjectUniverse, severityForModality, valuesPlayedInRole } from "./shared.js";
+import { type ObjectUniverse, severityForModality, valuesPlayedInRole } from "./shared.js";
 
 /**
  * Object-type cardinality: the number of instances of an object type must
@@ -12,9 +12,11 @@ import { buildObjectUniverse, severityForModality, valuesPlayedInRole } from "./
  * with no sampled instances is skipped, since absence of data is not a
  * violation -- the same closed-world reading the other population rules use.
  */
-export function checkObjectCardinalityViolations(model: OrmModel): Diagnostic[] {
+export function checkObjectCardinalityViolations(
+  model: OrmModel,
+  universe: ObjectUniverse,
+): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const universe = buildObjectUniverse(model);
 
   for (const ot of model.objectTypes) {
     const card = ot.cardinality;
