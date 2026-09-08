@@ -148,26 +148,33 @@ describe("OpenAPI renderer", () => {
     it("accepts a model as the second parameter and includes its population examples", () => {
       // renderPopulationAsOpenApiExamples keys the example object by role
       // *name*; renderComponentSchema looks examples up by column name --
-      // naming the identifying role after its (reference-mode-derived)
-      // column is what makes a per-property example attach here.
+      // naming the identifying role after its column is what makes a
+      // per-property example attach here.
+      //
+      // The identifying value type used to be `Email` while the
+      // reference mode said `customer_id`, which is a model identifying
+      // a customer by their email address. That passed only because the
+      // mapper named the key from the reference mode and ignored what
+      // actually identified the entity (barwise-967); the key is now
+      // named from the value type, so the fixture says what it meant.
       const model = new OrmModel({ name: "Test" });
       const customer = model.addObjectType({
         name: "Customer",
         kind: "entity",
         referenceMode: "customer_id",
       });
-      const email = model.addObjectType({ name: "Email", kind: "value" });
+      const customerId = model.addObjectType({ name: "CustomerId", kind: "value" });
       const idFt = model.addFactType({
-        name: "Customer has Email",
+        name: "Customer has CustomerId",
         roles: [
           { id: "r1", name: "customer_id", playerId: customer.id },
-          { id: "r2", name: "is of", playerId: email.id },
+          { id: "r2", name: "is of", playerId: customerId.id },
         ],
         readings: ["{0} has {1}", "{1} is of {0}"],
         constraints: [{ type: "internal_uniqueness", roleIds: ["r1"], isPreferred: true }],
       });
       const pop = model.addPopulation({ factTypeId: idFt.id });
-      pop.addInstance({ roleValues: { r1: "C001", r2: "c001@example.com" } });
+      pop.addInstance({ roleValues: { r1: "C001", r2: "C001" } });
 
       const relSchema = mapper.map(model);
       const spec = renderOpenApi(relSchema, model);

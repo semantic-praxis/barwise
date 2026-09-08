@@ -102,7 +102,13 @@ export function routeConstraints(
           const col = c.roleIds.length === 1
             ? valueColumnForUniqueness(c.roleIds[0]!, ft, model, schema)
             : undefined;
-          if (col) {
+          // ... unless the mapping realized it as the primary key after
+          // all. Since barwise-967 the identifying binary IS the key, so
+          // routing its uniqueness would emit
+          // `UNIQUE (medical_record_number)` beside
+          // `PRIMARY KEY (medical_record_number)` -- a clause the primary
+          // key already enforces.
+          if (col && !isPrimaryKey(col, schema)) {
             route("unique", `UNIQUE (${col.column})`, col.table, c, ft);
           }
           break;
@@ -415,6 +421,13 @@ function findRole(
     if (role) return { factType: ft, role };
   }
   return undefined;
+}
+
+/** Whether a resolved column is, by itself, its table's primary key. */
+function isPrimaryKey(col: ResolvedColumn, schema: RelationalSchema): boolean {
+  const table = schema.tables.find((t) => t.name === col.table);
+  const key = table?.primaryKey.columnNames;
+  return key?.length === 1 && key[0] === col.column;
 }
 
 /**

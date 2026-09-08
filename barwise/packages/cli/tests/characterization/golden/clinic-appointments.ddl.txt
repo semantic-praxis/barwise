@@ -6,12 +6,9 @@ CREATE TABLE patient (
   -- TODO(barwise): No column description. Add one to the dbt YAML.
   medical_record_number VARCHAR(20) NOT NULL,
   -- TODO(barwise): No column description. Add one to the dbt YAML.
-  has_medical_record_number VARCHAR(20) NOT NULL,
-  -- TODO(barwise): No column description. Add one to the dbt YAML.
   provider_id VARCHAR(20) NOT NULL,
   PRIMARY KEY (medical_record_number),
-  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id),
-  UNIQUE (has_medical_record_number)
+  FOREIGN KEY (provider_id) REFERENCES doctor (provider_id)
 );
 
 -- Table: doctor
@@ -22,12 +19,9 @@ CREATE TABLE doctor (
   -- TODO(barwise): No column description. Add one to the dbt YAML.
   provider_id VARCHAR(20) NOT NULL,
   -- TODO(barwise): No column description. Add one to the dbt YAML.
-  has_provider_id VARCHAR(20) NOT NULL,
-  -- TODO(barwise): No column description. Add one to the dbt YAML.
   -- NOTE(barwise): Value constraint available: ['cardiology', 'dermatology', 'family medicine', 'orthopedics', 'pediatrics']. Consider adding an accepted_values test.
   specialty VARCHAR(30) NOT NULL,
   PRIMARY KEY (provider_id),
-  UNIQUE (has_provider_id),
   CHECK (specialty IN ('cardiology', 'dermatology', 'family medicine', 'orthopedics', 'pediatrics'))
 );
 
@@ -40,8 +34,6 @@ CREATE TABLE appointment (
   -- TODO(barwise): No column description. Add one to the dbt YAML.
   confirmation_number VARCHAR(20) NOT NULL,
   -- TODO(barwise): No column description. Add one to the dbt YAML.
-  has_confirmation_number VARCHAR(20) NOT NULL,
-  -- TODO(barwise): No column description. Add one to the dbt YAML.
   visit_reason VARCHAR(500),
   -- TODO(barwise): No column description. Add one to the dbt YAML.
   -- NOTE(barwise): Value constraint available: ['scheduled', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show']. Consider adding an accepted_values test.
@@ -49,7 +41,6 @@ CREATE TABLE appointment (
   -- TODO(barwise): No column description. Add one to the dbt YAML.
   follow_up_note VARCHAR(500),
   PRIMARY KEY (confirmation_number),
-  UNIQUE (has_confirmation_number),
   CHECK (appointment_status IN ('scheduled', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show'))
 );
 
@@ -60,10 +51,7 @@ CREATE TABLE appointment (
 CREATE TABLE exam_room (
   -- TODO(barwise): No column description. Add one to the dbt YAML.
   room_number VARCHAR(10) NOT NULL,
-  -- TODO(barwise): No column description. Add one to the dbt YAML.
-  has_room_number VARCHAR(10) NOT NULL,
-  PRIMARY KEY (room_number),
-  UNIQUE (has_room_number)
+  PRIMARY KEY (room_number)
 );
 
 -- Table: appointment_is_for_patient_with_doctor_on_appointment_date_at_time_slot

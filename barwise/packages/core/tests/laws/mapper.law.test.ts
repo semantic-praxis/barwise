@@ -20,6 +20,8 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
 import type { RelationalSchema } from "../../src/mapping/RelationalSchema.js";
+import { preferredIdentifyingBinary } from "../../src/model/identification.js";
+import type { OrmModel } from "../../src/model/OrmModel.js";
 import { arbOrmModel, RUNS, SEED } from "../arbitraries/model.js";
 
 const mapper = new RelationalMapper();
@@ -51,6 +53,30 @@ describe("law: every schema the mapper produces is well formed", () => {
     fc.assert(
       fc.property(arbOrmModel(), (model) => {
         expectWellFormed(mapper.map(model));
+      }),
+      { seed: SEED, numRuns: RUNS },
+    );
+  });
+});
+
+describe("law: one identification becomes one column", () => {
+  /**
+   * A reference mode is shorthand for an identifying binary, and a
+   * model may state both. The mapper used to believe both: it took the
+   * preferred identifier's DATA TYPE for a key named from the reference
+   * mode, then mapped the same fact type again as an ordinary value
+   * column -- two columns for one fact, on 109 entities across 15
+   * shipped models (barwise-967).
+   *
+   * Stated over the fact type rather than over column names, because
+   * the duplicate did not share a name: `pushColumn`'s collision
+   * fallback renamed the second one, which is how it survived a rename
+   * (PR #456) without being noticed as a duplicate at all.
+   */
+  it("no entity table carries its preferred identifier twice", { timeout: LAW_TIMEOUT_MS }, () => {
+    fc.assert(
+      fc.property(arbOrmModel(), (model) => {
+        expectIdentifiedOnce(model, mapper.map(model));
       }),
       { seed: SEED, numRuns: RUNS },
     );
@@ -92,6 +118,21 @@ describe("coverage: the generator reaches the shapes the mapper branches on", ()
     const count = schemas.filter(({ model }) => model.objectifiedFactTypes.length > 0).length;
     expect(count).toBeGreaterThan(0);
   });
+
+  it("produces an entity identified by a preferred binary to a value type", () => {
+    // Measured at this seed: 1 model of 250, and that one model is what
+    // kills the mutation on the once-only law. One is not cover -- it is
+    // one seed change from a law that passes vacuously, the same thin
+    // spot barwise-968 records for composite foreign keys. Counted here
+    // so raising it is a visible change rather than an invisible one.
+    const count =
+      schemas.filter(({ model }) =>
+        model.objectTypes.some((ot) =>
+          ot.kind === "entity" && preferredIdentifyingBinary(model, ot) !== undefined
+        )
+      ).length;
+    expect(count).toBeGreaterThan(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -115,6 +156,34 @@ describe("coverage: the generator reaches the shapes the mapper branches on", ()
  * -- a foreign key naming a column that is no longer a key reads as
  * well formed, which is exactly how barwise-963 and -965 passed.
  */
+/**
+ * No entity's table holds two columns derived from the one fact type
+ * that identifies it.
+ *
+ * `sourceRoleId` is the link: phase 0 stamps the key with the entity
+ * role of the preferred binary, and `mapValueTypeColumn` stamps the
+ * same role id on the column it would add for that fact type. Two
+ * columns carrying that role id is the defect, whatever they are
+ * called.
+ */
+function expectIdentifiedOnce(model: OrmModel, schema: RelationalSchema): void {
+  const bySource = new Map(schema.tables.map((t) => [t.sourceElementId, t]));
+
+  for (const ot of model.objectTypes) {
+    if (ot.kind !== "entity") continue;
+    const preferred = preferredIdentifyingBinary(model, ot);
+    if (!preferred) continue;
+    const table = bySource.get(ot.id);
+    if (!table) continue;
+
+    const fromIdentifier = table.columns.filter((c) => c.sourceRoleId === preferred.entityRole.id);
+    expect(
+      fromIdentifier.map((c) => c.name),
+      `${table.name} materialises ${preferred.factType.name} more than once`,
+    ).toHaveLength(fromIdentifier.length === 0 ? 0 : 1);
+  }
+}
+
 function expectWellFormed(schema: RelationalSchema): void {
   const byName = new Map(schema.tables.map((t) => [t.name, t]));
   expect(byName.size, `duplicate table name in [${schema.tables.map((t) => t.name)}]`)

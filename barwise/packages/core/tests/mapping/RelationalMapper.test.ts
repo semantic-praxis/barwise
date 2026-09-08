@@ -480,6 +480,78 @@ describe("RelationalMapper", () => {
     });
   });
 
+  describe("an entity that declares its identity twice", () => {
+    /**
+     * A reference mode is shorthand for an identifying binary, so a
+     * model stating both states one fact twice. The mapper used to
+     * materialise both: the key took the preferred identifier's data
+     * type and the reference mode's NAME, then phase 2 mapped the same
+     * fact type again, colliding, and `pushColumn` renamed the second
+     * to `has_medical_record_number`. 109 entities across 15 shipped
+     * models carried that duplicate (barwise-967).
+     *
+     * These are fixtures rather than only a law because the generator
+     * reaches this shape in 1 model of 250 at the fixed seed -- see the
+     * coverage block in mapper.law.test.ts.
+     */
+    function clinic(referenceMode: string) {
+      return new ModelBuilder("Clinic")
+        .withEntityType("Patient", { referenceMode })
+        .withValueType("MedicalRecordNumber", { dataType: { name: "text", length: 20 } })
+        .withBinaryFactType("Patient has MedicalRecordNumber", {
+          role1: { player: "Patient", name: "has" },
+          role2: { player: "MedicalRecordNumber", name: "is of" },
+          uniqueness: "role1",
+          mandatory: "role1",
+          isPreferred: true,
+        })
+        .build();
+    }
+
+    it("maps the identification to ONE column when both agree", () => {
+      const schema = mapper.map(clinic("medical_record_number"));
+      const table = schema.tables.find((t) => t.name === "patient")!;
+
+      expect(table.columns.map((c) => c.name)).toEqual(["medical_record_number"]);
+      expect(table.primaryKey.columnNames).toEqual(["medical_record_number"]);
+      expect(table.columns[0]!.dataType).toBe("VARCHAR(20)");
+    });
+
+    it("lets the preferred identifier win a disagreement, name and all", () => {
+      // examples/output/order-management.orm.yaml is the shipped case:
+      // Customer's reference mode says customer_id while the preferred
+      // identifier is on "Customer has Name". One rule, no special case
+      // -- and a key named `medical_record_number` on a table whose
+      // reference mode said `chart_no` is the visible consequence.
+      const schema = mapper.map(clinic("chart_no"));
+      const table = schema.tables.find((t) => t.name === "patient")!;
+
+      expect(table.columns.map((c) => c.name)).toEqual(["medical_record_number"]);
+      expect(table.primaryKey.columnNames).toEqual(["medical_record_number"]);
+    });
+
+    it("keys from the reference mode when there is no preferred identifier", () => {
+      const model = new ModelBuilder("Clinic")
+        .withEntityType("Patient", { referenceMode: "medical_record_number" })
+        .withValueType("ChartNote", { dataType: { name: "text", length: 40 } })
+        .withBinaryFactType("Patient has ChartNote", {
+          role1: { player: "Patient", name: "has" },
+          role2: { player: "ChartNote", name: "is of" },
+          uniqueness: "role1",
+        })
+        .build();
+
+      const schema = mapper.map(model);
+      const table = schema.tables.find((t) => t.name === "patient")!;
+
+      expect(table.columns.map((c) => c.name)).toEqual([
+        "medical_record_number",
+        "chart_note",
+      ]);
+      expect(table.primaryKey.columnNames).toEqual(["medical_record_number"]);
+    });
+  });
+
   describe("data type resolution", () => {
     it("resolves entity PK type from reference-mode value type", () => {
       const model = new OrmModel({ name: "Test" });
