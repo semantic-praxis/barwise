@@ -17,6 +17,7 @@ export {
   type NamedElementType,
   type ObjectifiedFactTypeDelta,
   type ObjectTypeDelta,
+  type PopulationDelta,
   type SubtypeFactDelta,
   type SynonymCandidate,
 } from "./ModelDiff.js";

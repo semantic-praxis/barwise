@@ -42,6 +42,7 @@ import type {
   ObjectTypeKind,
   ValueConstraintDef,
 } from "../model/ObjectType.js";
+import type { FactInstance } from "../model/Population.js";
 
 /** One role of a fact type, flattened to plain data with its player resolved. */
 export interface RoleSummary {
@@ -140,6 +141,34 @@ export type ChangeDescription =
     readonly from?: DerivationRule;
     readonly to?: DerivationRule;
   }
+  // --- Populations ---
+  //
+  // Only two fields can differ between two populations that matched,
+  // because the fact type and the sample flag are what made them match.
+  | {
+    readonly change: "populationDescription";
+    readonly from?: string;
+    readonly to?: string;
+  }
+  | {
+    readonly change: "populationInstances";
+    readonly from: readonly FactInstance[];
+    readonly to: readonly FactInstance[];
+    /**
+     * How many tuples appeared and disappeared, counted at diff time.
+     *
+     * Carried rather than derived here because deriving it needs the
+     * fact type's ROLE ORDER, which a delta does not have: tuples are
+     * keyed by role id, and role ids churn across a re-extraction, so a
+     * renderer comparing them by id sees every tuple as both added and
+     * removed. Six unchanged tuples and one edited one printed
+     * `instances: 6 added, 6 removed`. Positional comparison is the
+     * same basis `instancesKey` uses to decide the populations differ
+     * at all, so counting there keeps one answer instead of two.
+     */
+    readonly added: number;
+    readonly removed: number;
+  }
   // --- Definitions (the ubiquitous-language entries) ---
   //
   // `definitionText` and `context` are a standalone definition's
@@ -223,7 +252,27 @@ export function describeChange(change: ChangeDescription): string {
       return `exhaustive: ${change.from} -> ${change.to}`;
     case "definingRule":
       return "defining rule changed";
+    case "populationDescription":
+      return `population description: "${change.from ?? NONE}" -> "${change.to ?? NONE}"`;
+    case "populationInstances":
+      return describeInstanceChange(change.added, change.removed);
   }
+}
+
+/**
+ * How a population's tuples differ, in tuples rather than in counts.
+ *
+ * A count PAIR said nothing when the count did not move: editing one
+ * tuple of one printed `instances: 1 -> 1`, and the reviewer saw a
+ * modification with no visible content.
+ */
+function describeInstanceChange(added: number, removed: number): string {
+  if (added > 0 && removed > 0) return `instances: ${added} added, ${removed} removed`;
+  if (added > 0) return `instances: ${added} added`;
+  if (removed > 0) return `instances: ${removed} removed`;
+  // Same tuples, different instance ids only: the population changed in
+  // a way nothing downstream can observe, which is worth saying plainly.
+  return "instances reordered";
 }
 
 /** The deduplicated constraint type names, in first-seen order. */

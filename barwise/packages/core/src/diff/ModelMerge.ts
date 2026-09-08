@@ -29,6 +29,7 @@ import type {
   ModelDelta,
   ObjectifiedFactTypeDelta,
   ObjectTypeDelta,
+  PopulationDelta,
   SubtypeFactDelta,
 } from "./ModelDiff.js";
 
@@ -68,6 +69,14 @@ export function mergeModels(
   // phase needs: an objectified fact type references one, and a fact
   // type matched by name keeps the existing model's id.
   const incomingFtIdToMergedId = new Map<string, string>();
+
+  // And for ROLE ids, in the incoming direction. A population keys its
+  // instances by role id, so a population arriving from the incoming
+  // model names roles the merged model may not have: every fact type
+  // keeps its SOURCE role ids, and the merge picks the source per delta.
+  // `roleIdMap` below is the mirror of this for populations carried from
+  // `existing`.
+  const incomingRoleIdToMergedId = new Map<string, string | null>();
 
   // Role ids the merge rewrote, existing -> merged, or -> null where the
   // role is gone. Populations are carried from `existing` and key their
@@ -139,11 +148,17 @@ export function mergeModels(
 
     if (delta.kind === "unchanged") {
       addFactTypeToMerged(merged, delta.existing!, null, incomingIdToMergedId);
-      if (delta.incoming) incomingFtIdToMergedId.set(delta.incoming.id, delta.existing!.id);
+      if (delta.incoming) {
+        incomingFtIdToMergedId.set(delta.incoming.id, delta.existing!.id);
+        // Merged took the EXISTING roles, so an incoming population's
+        // keys must be translated to them.
+        recordIncomingRoleRemap(incomingRoleIdToMergedId, delta.incoming, delta.existing!);
+      }
     } else if (delta.kind === "added") {
       if (isAccepted) {
         addFactTypeToMerged(merged, delta.incoming!, null, incomingIdToMergedId);
         incomingFtIdToMergedId.set(delta.incoming!.id, delta.incoming!.id);
+        // Merged took the incoming roles verbatim; no translation needed.
       }
     } else if (delta.kind === "removed") {
       if (!isAccepted) {
@@ -159,8 +174,10 @@ export function mergeModels(
           incomingIdToMergedId,
         );
         recordRoleRemap(roleIdMap, delta.existing!, delta.incoming!);
+        // Merged took the INCOMING roles, so they need no translation.
       } else {
         addFactTypeToMerged(merged, delta.existing!, null, incomingIdToMergedId);
+        recordIncomingRoleRemap(incomingRoleIdToMergedId, delta.incoming!, delta.existing!);
       }
       incomingFtIdToMergedId.set(delta.incoming!.id, delta.existing!.id);
     }
@@ -248,8 +265,46 @@ export function mergeModels(
     });
   }
 
-  // Phase 6: the element kinds the diff still does not model.
-  carryUnmodelledElements(merged, existing, roleIdMap);
+  // Phase 6: populations. After fact types, because a population
+  // references one and keys its instances by that fact type's role ids.
+  const popDeltas = deltas
+    .map((d, i) => [d, i] as const)
+    .filter(([d]) => d.elementType === "population") as [PopulationDelta, number][];
+
+  for (const [delta, idx] of popDeltas) {
+    const isAccepted = accepted.has(idx);
+    const chosen = delta.kind === "unchanged"
+      ? delta.existing
+      : delta.kind === "added"
+      ? (isAccepted ? delta.incoming : undefined)
+      : delta.kind === "removed"
+      ? (isAccepted ? undefined : delta.existing)
+      : (isAccepted ? delta.incoming : delta.existing);
+    if (!chosen) continue;
+
+    // Which model it came from decides both translations: an incoming
+    // population names the incoming model's fact type and role ids, an
+    // existing one names the existing model's.
+    const fromIncoming = chosen === delta.incoming;
+    const factTypeId = fromIncoming
+      ? resolveFactTypeId(merged, chosen.factTypeId, incomingFtIdToMergedId)
+      : chosen.factTypeId;
+    if (!merged.getFactType(factTypeId)) continue;
+
+    const preferredId = delta.kind === "modified" && isAccepted ? delta.existing!.id : chosen.id;
+    const id = merged.populations.some((p) => p.id === preferredId) ? undefined : preferredId;
+    merged.addPopulation({
+      ...remapPopulationRoles(
+        toPopulationConfig(chosen),
+        fromIncoming ? incomingRoleIdToMergedId : roleIdMap,
+      ),
+      id,
+      factTypeId,
+    });
+  }
+
+  // Phase 7: the one kind the diff deliberately does not model.
+  carryUnmodelledElements(merged, existing);
 
   return merged;
 }
@@ -319,16 +374,7 @@ function addableSubtypeFact(merged: OrmModel, subtypeId: string, supertypeId: st
  * rule now guards the two diffed phases above, as
  * `addableSubtypeFact` and `addableObjectification`.
  */
-function carryUnmodelledElements(
-  merged: OrmModel,
-  existing: OrmModel,
-  roleIdMap: ReadonlyMap<string, string | null>,
-): void {
-  for (const pop of existing.populations) {
-    if (!merged.getFactType(pop.factTypeId)) continue;
-    merged.addPopulation(remapPopulationRoles(toPopulationConfig(pop), roleIdMap));
-  }
-
+function carryUnmodelledElements(merged: OrmModel, existing: OrmModel): void {
   // A layout references object and fact types by name rather than by
   // id, and already tolerates naming an element that is not present, so
   // it carries through whole.
@@ -390,6 +436,31 @@ function recordRoleRemap(
     const from = existingFt.roles[i]!.id;
     const to = incomingFt.roles[i]?.id ?? null;
     if (from !== to) roleIdMap.set(from, to);
+  }
+}
+
+/**
+ * Record how an incoming fact type's roles correspond to the ones the
+ * merged model actually took.
+ *
+ * The mirror of `recordRoleRemap`, and positional for the same reason:
+ * `diffFactType` compares roles by index, so index correspondence is
+ * the pairing the delta the user accepted was computed under. Matching
+ * any other way here would contradict it.
+ *
+ * A role the incoming fact type has and the merged one does not maps to
+ * null, so an incoming population's values for it are dropped rather
+ * than left keyed by an id nothing answers to.
+ */
+function recordIncomingRoleRemap(
+  map: Map<string, string | null>,
+  incomingFt: import("../model/FactType.js").FactType,
+  mergedFt: import("../model/FactType.js").FactType,
+): void {
+  for (let i = 0; i < incomingFt.roles.length; i++) {
+    const from = incomingFt.roles[i]!.id;
+    const to = mergedFt.roles[i]?.id ?? null;
+    if (from !== to) map.set(from, to);
   }
 }
 

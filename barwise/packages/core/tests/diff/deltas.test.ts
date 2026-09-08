@@ -86,6 +86,32 @@ const SAMPLES: ReadonlyArray<{ delta: ModelDelta; label: string; }> = [
     },
     label: "Objectification: Enrolment objectifies StudentTakesCourse",
   },
+  {
+    delta: {
+      kind: "modified",
+      elementType: "population",
+      factType: { id: "ft-works", name: "EmployeeWorksInDepartment" },
+      sample: false,
+      changes: [],
+      changeDescriptions: [],
+      breakingLevel: "caution",
+    },
+    label: "Population: tuples for EmployeeWorksInDepartment",
+  },
+  {
+    // The flag is part of the identity, so it has to reach the label:
+    // two populations on one fact type are distinguishable only by it.
+    delta: {
+      kind: "added",
+      elementType: "population",
+      factType: { id: "ft-works", name: "EmployeeWorksInDepartment" },
+      sample: true,
+      changes: [],
+      changeDescriptions: [],
+      breakingLevel: "safe",
+    },
+    label: "Population: sample tuples for EmployeeWorksInDepartment",
+  },
 ];
 
 describe("labelling a delta", () => {
