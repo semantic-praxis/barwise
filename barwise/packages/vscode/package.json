@@ -20,7 +20,7 @@
     "schema"
   ],
   "engines": {
-    "vscode": "^1.99.0"
+    "vscode": "^1.101.0"
   },
   "categories": [
     "Programming Languages",
@@ -773,7 +773,7 @@
     "@types/node": "^25.2.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
-    "@types/vscode": "^1.136.0",
+    "@types/vscode": "1.101.0",
     "@vitest/coverage-v8": "^4.1.11",
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^2.5.2",
