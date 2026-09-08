@@ -1,5 +1,5 @@
 import { OrmYamlSerializer } from "@barwise/core";
-import type { ModelDiffResult } from "@barwise/core/diff";
+import { elementName, type ModelDiffResult } from "@barwise/core/diff";
 import type { CandidateFraming } from "@barwise/llm";
 
 export const serializer = new OrmYamlSerializer();
@@ -42,7 +42,7 @@ function summarizeDiff(diff: ModelDiffResult): string {
   let modified = 0;
   const changed: string[] = [];
   for (const d of diff.deltas) {
-    const label = "name" in d ? d.name : d.term;
+    const label = elementName(d);
     if (d.kind === "added") {
       added += 1;
       changed.push(label);

@@ -2,7 +2,7 @@
  * diff_models tool: computes the diff between two ORM models.
  */
 
-import { diffModels } from "@barwise/core/diff";
+import { diffModels, elementName } from "@barwise/core/diff";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { resolveSource, type SourceInput } from "../workspace/resolve.js";
 import { sourceInputSchema } from "../workspace/sourceSchema.js";
@@ -40,7 +40,7 @@ export function executeDiff(
       .map((d) => ({
         kind: d.kind,
         elementType: d.elementType,
-        name: d.elementType === "definition" ? d.term : d.name,
+        name: elementName(d),
         breakingLevel: d.breakingLevel,
         changeDescriptions: d.changeDescriptions,
       })),

@@ -2,6 +2,7 @@ import { type OrmModel, OrmYamlSerializer, ProjectSerializer } from "@barwise/co
 import { annotateOrmYaml } from "@barwise/core/annotation";
 import {
   type BreakingLevel,
+  deltaLabel,
   diffModels,
   mergeAndValidate,
   type ModelDelta,
@@ -404,16 +405,6 @@ function buildSynonymNotes(
     result.set(Number(key), value);
   }
   return result;
-}
-
-function deltaLabel(delta: ModelDelta): string {
-  if (delta.elementType === "definition") {
-    return `Definition: ${delta.term}`;
-  }
-  const typeLabel = delta.elementType === "object_type"
-    ? "Object type"
-    : "Fact type";
-  return `${typeLabel}: ${delta.name}`;
 }
 
 interface LlmClientSelection {

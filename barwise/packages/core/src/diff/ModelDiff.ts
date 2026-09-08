@@ -16,6 +16,13 @@ import { diffDefinition, diffFactType, diffObjectType } from "./elementDiff.js";
 import { detectSynonymCandidates } from "./synonyms.js";
 
 export { type ChangeDescription, describeChange, type RoleSummary } from "./changeDescription.js";
+export {
+  deltaLabel,
+  ELEMENT_TYPES,
+  elementLabel,
+  elementName,
+  type ElementType,
+} from "./deltas.js";
 export type {
   BreakingLevel,
   DefinitionDelta,
