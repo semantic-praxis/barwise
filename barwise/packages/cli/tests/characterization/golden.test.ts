@@ -13,6 +13,12 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { runCli } from "../workspace/run.js";
+import {
+  CHECKED_FORMATS,
+  type CheckedFormat,
+  claimedFormat,
+  formatDefects,
+} from "./formatDefects.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../../..");
@@ -26,15 +32,42 @@ function normalize(text: string): string {
   return text.split(repoRoot).join("<REPO>");
 }
 
+/**
+ * A golden is checked against the LAST run's bytes and, where its name
+ * claims a format, against that format.
+ *
+ * The two halves catch different things and the second was missing for
+ * as long as the goldens existed: three were invalid documents and the
+ * diff was green on every one, because a diff cannot tell a valid file
+ * from an identical invalid one (barwise-961). See formatDefects.ts.
+ *
+ * The check runs on the UPDATE path as well, because regeneration is
+ * how the three invalid files came to be recorded in the first place.
+ * `UPDATE_GOLDEN=1` writing something no run can parse is not a refresh.
+ */
+function checkFormat(name: string, format: CheckedFormat, text: string): void {
+  expect(
+    formatDefects(format, text),
+    `${name} is not a valid ${format} document`,
+  ).toEqual([]);
+}
+
 function checkGolden(name: string, actual: string): void {
   const path = join(goldenDir, name);
   const normalized = normalize(actual);
+  const format = claimedFormat(name);
+  if (format !== undefined) checkFormat(name, format, normalized);
   if (UPDATE) {
     mkdirSync(goldenDir, { recursive: true });
     writeFileSync(path, normalized, "utf-8");
     return;
   }
   const expected = existsSync(path) ? readFileSync(path, "utf-8") : "<missing golden>";
+  // The recorded file is checked BEFORE the diff, not after. A golden
+  // that is an invalid document fails as one; left until after the
+  // comparison it would only ever report as a mismatch, which sends the
+  // reader to the exporter for a defect that is in the file.
+  if (format !== undefined && existsSync(path)) checkFormat(`recorded ${name}`, format, expected);
   expect(normalized, `golden mismatch for ${name}; run UPDATE_GOLDEN=1 to refresh`).toBe(expected);
 }
 
@@ -58,7 +91,10 @@ const MODELS: readonly ModelFixture[] = [
   },
 ];
 
-const EXPORT_FORMATS = ["ddl", "openapi", "avro"] as const;
+// Derived from the same list the validators switch over, so a format
+// added here with no validator is a compile error rather than a golden
+// that is silently never checked.
+const EXPORT_FORMATS = CHECKED_FORMATS;
 
 describe("characterization: stable CLI output over example models", () => {
   for (const m of MODELS) {
