@@ -231,6 +231,7 @@ interface RawModel {
   readonly objectTypes: readonly RawObjectType[];
   readonly factTypes: readonly RawFactType[];
   readonly constraints: readonly RawConstraint[];
+  readonly preferredIdentifier: boolean;
   readonly subtypeFacts: readonly RawSubtypeFact[];
   readonly objectified: readonly RawObjectified[];
   readonly populations: readonly RawPopulation[];
@@ -259,7 +260,13 @@ const arbDerivation: fc.Arbitrary<RawDerivation> = fc.record({
 });
 
 const arbRawObjectType: fc.Arbitrary<RawObjectType> = fc.record({
-  entity: fc.boolean(),
+  // Weighted toward entity: a composite key needs a fact type with two
+  // or more ENTITY players, and a fair coin over five object types
+  // reached that in 12 of 250 models (barwise-968).
+  entity: fc.oneof(
+    { arbitrary: fc.constant(true), weight: 2 },
+    { arbitrary: fc.constant(false), weight: 1 },
+  ),
   independent: fc.boolean(),
   definition: arbOptionalWord,
   sourceContext: arbOptionalWord,
@@ -316,6 +323,7 @@ const arbRawModel: fc.Arbitrary<RawModel> = fc.record({
   objectTypes: fc.array(arbRawObjectType, { minLength: 2, maxLength: 5 }),
   factTypes: fc.array(arbRawFactType, { minLength: 1, maxLength: 4 }),
   constraints: fc.array(arbRawConstraint, { maxLength: 5 }),
+  preferredIdentifier: fc.boolean(),
   subtypeFacts: fc.array(
     fc.record({
       pickA: fc.nat({ max: 20 }),
@@ -778,8 +786,19 @@ function toObjectified(
   const out: ObjectifiedFactTypeConfig[] = [];
   const usedFactTypes = new Set<string>();
   const usedObjectTypes = new Set<string>();
+  // Prefer a fact type with two or more entity players. That is what
+  // makes the objectified type's primary key composite, and a composite
+  // key is what a composite FOREIGN key needs to point at. Picking
+  // uniformly reached the shape in 12 of 250 models and produced a
+  // composite foreign key in 5, so the law's coverage assertion below it
+  // was one seed change from vacuous (barwise-968).
+  const multiEntity = skeletons.filter(
+    (s) => s.roles.filter((r) => entityIds.has(r.playerId)).length >= 2,
+  );
+  const candidates = multiEntity.length > 0 ? multiEntity : skeletons;
+
   for (const [i, raw] of raws.entries()) {
-    const ft = pick(skeletons, raw.factTypePick);
+    const ft = pick(candidates, raw.factTypePick);
     const ot = pick(entities, raw.objectTypePick);
     if (usedFactTypes.has(ft.id) || usedObjectTypes.has(ot.id!)) continue;
 
@@ -844,6 +863,64 @@ function toDiagramLayouts(
   });
 }
 
+/**
+ * Deliberately give one entity-value binary a preferred identifier,
+ * when the draw asks for it and the model has such a binary.
+ *
+ * A shape rather than a coincidence. The pieces -- a binary, an entity
+ * on one side, a value type on the other, and an internal uniqueness
+ * constraint on that fact type that happens to be marked preferred --
+ * co-occurred in 1 of 250 sampled models at the fixed seed, and in 0
+ * once the entity/value split was weighted toward entities for the
+ * composite-key shapes. A law over "an entity identified by a preferred
+ * binary" cannot mean anything at that rate (barwise-967, barwise-968).
+ *
+ * Returns a new array rather than mutating: `FactTypeConfig.constraints`
+ * is `readonly`, and nothing type-checks this directory (barwise-944),
+ * so an assignment would have compiled here and nowhere else.
+ */
+function withPreferredIdentifier(
+  raw: RawModel,
+  factTypes: readonly FactTypeConfig[],
+  objectTypes: readonly ObjectTypeConfig[],
+): FactTypeConfig[] {
+  const unchanged = [...factTypes];
+  if (!raw.preferredIdentifier) return unchanged;
+  const kindOf = new Map(objectTypes.map((ot) => [ot.id!, ot.kind]));
+
+  for (const [j, ft] of factTypes.entries()) {
+    if (ft.roles.length !== 2) continue;
+    const [r1, r2] = ft.roles;
+    if (!r1 || !r2) continue;
+    const entityRole = kindOf.get(r1.playerId) === "entity" && kindOf.get(r2.playerId) === "value"
+      ? r1
+      : kindOf.get(r2.playerId) === "entity" && kindOf.get(r1.playerId) === "value"
+      ? r2
+      : undefined;
+    if (!entityRole) continue;
+
+    // Never a SECOND preferred constraint on the same entity:
+    // `completeness/multiple-preferred-identifiers` calls that
+    // contradictory, and a generator producing it would be
+    // manufacturing the diagnostic rather than the shape.
+    const alreadyPreferred = factTypes.some((other) =>
+      other.roles.some((r) => r.playerId === entityRole.playerId)
+      && (other.constraints ?? []).some((c) => c.type === "internal_uniqueness" && c.isPreferred)
+    );
+    if (alreadyPreferred) return unchanged;
+
+    unchanged[j] = {
+      ...ft,
+      constraints: [
+        ...(ft.constraints ?? []),
+        { type: "internal_uniqueness", roleIds: [entityRole.id!], isPreferred: true },
+      ],
+    };
+    return unchanged;
+  }
+  return unchanged;
+}
+
 /** The generation half: raw draws in, element configs out. */
 function toPlan(raw: RawModel): ModelPlan {
   const objectTypes = toObjectTypes(raw.objectTypes);
@@ -858,10 +935,14 @@ function toPlan(raw: RawModel): ModelPlan {
     constraintsByOwner.set(materialised.ownerIndex, bucket);
   }
 
-  const factTypes: FactTypeConfig[] = skeletons.map((skeleton, j) => ({
-    ...skeleton,
-    constraints: constraintsByOwner.get(j) ?? [],
-  }));
+  const factTypes = withPreferredIdentifier(
+    raw,
+    skeletons.map((skeleton, j) => ({
+      ...skeleton,
+      constraints: constraintsByOwner.get(j) ?? [],
+    })),
+    objectTypes,
+  );
 
   const subtypeFacts = toSubtypeFacts(raw.subtypeFacts, objectTypes);
 
