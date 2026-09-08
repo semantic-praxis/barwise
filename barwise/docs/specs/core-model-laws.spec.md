@@ -1,15 +1,16 @@
 # Laws over a generated model: property-based tests for core
 
-Status: WS1, WS2 and WS3 implemented (the arbitrary, the serialization
-law, the merge law and the barwise-937 fix, the counterexample law and
-the barwise-958 fix; see Implementation notes). WS4 and WS5 not
-implemented.
+Status: WS1, WS2, WS3 and WS5 implemented (the arbitrary, the
+serialization law, the merge law and the barwise-937 fix, the
+counterexample law and the barwise-958 fix, the mapper laws and the
+barwise-961 and -962 fixes; see Implementation notes). WS4 not
+implemented; it carries this spec's last open decision.
 Created: 2026-09-07
 Last-updated: 2026-09-08
 Tracking: barwise-938 (this spec); barwise-937 (the merge defect its
 grounding found); follow-ups barwise-939, -940, -941 (found while
-implementing WS1 and WS2), barwise-958 and -959 (WS3);
-REPO_REVIEW-2026-06.md T4; the deferral
+implementing WS1 and WS2), barwise-958 and -959 (WS3), barwise-961,
+-962 and -963 (WS5); REPO_REVIEW-2026-06.md T4; the deferral
 recorded in `conformance-property.spec.md` ("the core arbitrary
 question stays open until someone brings a property that earns it")
 
@@ -144,11 +145,13 @@ Out of scope, deliberately:
 | `core/src/counterexample/values.ts`, `CounterexampleGenerator.ts` | `mintInvalidValue` reads the enumeration only                          | minted against the whole domain (WS3, barwise-958)         |
 | `core/tests/laws/sample.law.test.ts`                              | does not exist                                                         | new (WS4)                                                  |
 | `core/tests/laws/mapper.law.test.ts`                              | does not exist                                                         | new (WS5)                                                  |
+| `core/src/mapping/RelationalMapper.ts` (column naming)            | four append sites, two with no collision check                         | one `pushColumn` owner (WS5, barwise-961)                  |
+| `core/tests/mapping/RelationalMapper.test.ts`                     | fixtures for the named mapping rules                                   | three added: barwise-961, -962, the -963 ratchet (WS5)     |
 | `core/src/lineage/manifest.ts` (`hashModel`)                      | id-insensitive content hash                                            | untouched; the laws' equality                              |
 | `core/src/serialization/OrmYamlSerializer.ts`, `yaml/*.ts`        | `serialize` / `deserialize`; per-element field lists                   | untouched; the projection clause is their drift guard      |
 | `core/src/model/ObjectType.ts`, `FactType.ts` (`to*Config`)       | `Complete<Config>` projections (barwise-927)                           | untouched; the projection clause reads them                |
 | `core/src/counterexample/*`, `validation/rules/population/*`      | pure over the model                                                    | pure still; the two rows above are WS3's barwise-958 fix   |
-| `core/src/mapping/RelationalMapper.ts`                            | no throw sites; FK columns fixed in c185df6                            | untouched                                                  |
+| `core/src/mapping/RelationalMapper.ts`                            | no throw sites; FK columns fixed in c185df6                            | still no throw sites; the naming row above is WS5's fix    |
 | `core/tests/integration/roundTrip.test.ts`                        | fixture round trips                                                    | stays: readable record of named cases                      |
 | `core/tests/property/roundTrip.property.test.ts`                  | 100 seeded models from a hand-rolled PRNG; a third `RULE_BY_TYPE` copy | both halves are subsumed; retires in WS3 (see below)       |
 | `core/tests/helpers/randomModel.ts`                               | mulberry32 generator: binaries only, no populations, no subtypes       | retires with the test above (WS3)                          |
@@ -317,6 +320,16 @@ Column names are unique within each table. The composite-key defect
 barwise-931 fixed is a one-line violation of the second clause; the
 mutation check for this workstream reverts c185df6's
 `appendForeignKeyColumns` locally, once, and expects the law to fail.
+
+One clause of that -- `referencedColumns` equalling the target's
+primary key -- is red on arrival and ships deferred, because an
+objectification replaces a table's primary key after other foreign keys
+to it were built (barwise-963, whose fix changes generated DDL for
+models that map today). What ships in its place is "`referencedColumns`
+are columns of the referenced table", which is what actually holds,
+plus the arity clause that carries the barwise-931 mutation kill. The
+deferral is a ratchet rather than an omission: a fixture pins today's
+wrong output and goes red when the defect is fixed.
 
 ## API and migration impact
 
@@ -546,13 +559,56 @@ mutation check for this workstream reverts c185df6's
   so a constraint kind that gains a generator fails there until the
   arbitrary can build one.
 
+### WS5 (2026-09-08)
+
+- **Three defects, on the law's first run, in a module the Inventory
+  called untouched.** A table with two columns of the same name
+  (barwise-961: four append sites, two of which never checked); an
+  entity objectifying a fact type it plays a role in, absorbing itself
+  into its own key (barwise-962); and a foreign key built before an
+  objectification replaced the key it names (barwise-963). All three
+  produce DDL that cannot be executed. None needed an exotic model: the
+  first needs two fact types between the same entity and value type.
+- **Two fixed here, one deferred, and the line between them is whether
+  the output was ever right.** barwise-961 and -962 produce schemas
+  nobody can want, so the fix rides with the law as WS3's did.
+  barwise-963's fix changes generated DDL for models that map correctly
+  today -- foreign keys would name different columns -- which is a
+  compatibility decision rather than a defect nobody can want, and it
+  is not one to take unreviewed at 5am.
+- **The deferral is a ratchet, not an omission.** The WS5 clause it
+  disables is replaced by the weaker one that actually holds
+  (`referencedColumns` are columns of the referenced table), and a
+  fixture in `RelationalMapper.test.ts` pins the wrong output exactly,
+  so fixing barwise-963 turns it red and points at the issue. The
+  alternative -- dropping the clause with a comment -- leaves nothing
+  that fails when the defect is fixed, which is what this repository's
+  convention on findings forbids.
+- **The barwise-962 guard is held by a fixture, not by the law**, and
+  that is the deferral showing through: with the guard removed the
+  foreign key names a column that exists and is no longer a key, which
+  every shipped clause accepts and only the missing one rejects. Both
+  fixtures go in the commit that restores it.
+- **`map` never threw**, so the totality law found nothing. It stays,
+  because what it guards is the undeclared throw -- the `!` assertions
+  and the lookups that assume a table exists -- not a declared error
+  path, and it is the clause that would catch the next `roles[0]!`.
+- **The coverage assertions are the ones that needed writing.** A
+  mapper law over models with no objectification and no subtype never
+  enters either step that rewrites a primary key after it was built,
+  which is exactly where barwise-931, -962 and -963 live. Four counts
+  pin that the generator reaches them.
+
 ## Non-goals
 
 - No Alloy, TLA+ or SMT integration, and no `formal` package.
 - No change to the validator, the counterexample generator, the
-  serializer or the mapper beyond WS2's merge fix and WS3's
-  barwise-958 fix; a law that finds a defect files an issue, and the
-  fix is its own change unless separating them would put a red law on
-  main (see Implementation notes, WS3).
+  serializer or the mapper beyond WS2's merge fix, WS3's barwise-958
+  fix and WS5's barwise-961 and -962 fixes; a law that finds a defect
+  files an issue, and the fix is its own change unless separating them
+  would put a red law on main (see Implementation notes, WS3). Where a
+  fix would change output that is correct today, the law's clause is
+  deferred behind a fixture that goes red when the fix lands, rather
+  than the fix being taken (WS5, barwise-963).
 - No property-based-testing mandate for other packages. The `llm`
   property has its own spec; anything else brings its own evidence.

@@ -851,7 +851,12 @@
               {
                 "severity": "todo",
                 "message": "No column description. Add one to the dbt YAML."
-              },
+              }
+            ]
+          },
+          "has_medical_record_number": {
+            "type": "string",
+            "x-barwise-annotations": [
               {
                 "severity": "todo",
                 "message": "No column description. Add one to the dbt YAML."
@@ -870,7 +875,7 @@
         },
         "required": [
           "medical_record_number",
-          "medical_record_number",
+          "has_medical_record_number",
           "provider_id"
         ],
         "x-barwise-annotations": [
@@ -889,7 +894,12 @@
               {
                 "severity": "todo",
                 "message": "No column description. Add one to the dbt YAML."
-              },
+              }
+            ]
+          },
+          "has_provider_id": {
+            "type": "string",
+            "x-barwise-annotations": [
               {
                 "severity": "todo",
                 "message": "No column description. Add one to the dbt YAML."
@@ -912,7 +922,7 @@
         },
         "required": [
           "provider_id",
-          "provider_id",
+          "has_provider_id",
           "specialty"
         ],
         "x-barwise-annotations": [
@@ -931,7 +941,12 @@
               {
                 "severity": "todo",
                 "message": "No column description. Add one to the dbt YAML."
-              },
+              }
+            ]
+          },
+          "has_confirmation_number": {
+            "type": "string",
+            "x-barwise-annotations": [
               {
                 "severity": "todo",
                 "message": "No column description. Add one to the dbt YAML."
@@ -974,7 +989,7 @@
         },
         "required": [
           "confirmation_number",
-          "confirmation_number",
+          "has_confirmation_number",
           "appointment_status"
         ],
         "x-barwise-annotations": [
@@ -993,7 +1008,12 @@
               {
                 "severity": "todo",
                 "message": "No column description. Add one to the dbt YAML."
-              },
+              }
+            ]
+          },
+          "has_room_number": {
+            "type": "string",
+            "x-barwise-annotations": [
               {
                 "severity": "todo",
                 "message": "No column description. Add one to the dbt YAML."
@@ -1003,7 +1023,7 @@
         },
         "required": [
           "room_number",
-          "room_number"
+          "has_room_number"
         ],
         "x-barwise-annotations": [
           {

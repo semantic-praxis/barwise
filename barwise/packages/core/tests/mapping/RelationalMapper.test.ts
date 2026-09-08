@@ -1195,3 +1195,128 @@ describe("RelationalMapper", () => {
     });
   });
 });
+
+describe("well-formedness the mapper law generalises", () => {
+  /**
+   * barwise-961. Two fact types between the same entity and value type
+   * both derived a column name from the value type, and neither checked
+   * whether the other had taken it: table t1 came out with columns
+   * t1_id, t0, t0, which CREATE TABLE rejects. Neither fact type needs
+   * a uniqueness constraint for this, and barwise reports a fact type
+   * without uniqueness as a warning, so the model reaching it is one
+   * the validator accepts.
+   */
+  it("gives two fact types over the same value type distinct column names", () => {
+    const model = new OrmModel({ name: "Collide" });
+    const grade = model.addObjectType({ name: "Grade", kind: "value" });
+    const student = model.addObjectType({
+      name: "Student",
+      kind: "entity",
+      referenceMode: "student_id",
+    });
+    for (
+      const [name, verb] of [["Student earns Grade", "earns"], [
+        "Student predicts Grade",
+        "predicts",
+      ]]
+    ) {
+      model.addFactType({
+        name: name!,
+        roles: [
+          { id: `${name}::r1`, name: verb!, playerId: student.id },
+          { id: `${name}::r2`, name: "is of", playerId: grade.id },
+        ],
+        readings: [`{0} ${verb} {1}`, `{1} is of {0}`],
+      });
+    }
+
+    const table = new RelationalMapper().map(model).tables.find((t) => t.name === "student")!;
+    const names = table.columns.map((c) => c.name);
+    expect(new Set(names).size).toBe(names.length);
+    expect(names).toEqual(["student_id", "grade", "predicts_grade"]);
+  });
+
+  /**
+   * barwise-962. An entity objectifying a fact type it plays a role in
+   * used to absorb that role as a foreign key to its own primary key
+   * and then replace that primary key, leaving the key pointing at a
+   * column that is no longer a key. The mapper now skips the role; the
+   * entity keeps its own reference-mode key. Delete this test with the
+   * defensive skip when the structural rule lands.
+   */
+  it("does not absorb an objectified entity's own role into its key", () => {
+    const model = new OrmModel({ name: "SelfObjectified" });
+    const event = model.addObjectType({
+      name: "Event",
+      kind: "entity",
+      referenceMode: "event_id",
+    });
+    const ft = model.addFactType({
+      name: "Event is cancelled",
+      roles: [{ id: "r0", name: "is cancelled", playerId: event.id }],
+      readings: ["{0} is cancelled"],
+    });
+    model.addObjectifiedFactType({ factTypeId: ft.id, objectTypeId: event.id });
+
+    const table = new RelationalMapper().map(model).tables.find((t) => t.name === "event")!;
+    expect(table.primaryKey.columnNames).toEqual(["event_id"]);
+    expect(table.foreignKeys).toEqual([]);
+  });
+
+  /**
+   * KNOWN DEFECT, barwise-963: this pins output that is wrong.
+   *
+   * Step 2 builds a foreign key from the target table's primary key as
+   * it stands; step 2b then absorbs an objectified fact type's roles
+   * into the objectifying entity's table and REPLACES that primary key.
+   * The associative table below still references event(event_id) while
+   * event's key has become the absorbed column. The reference is not
+   * dangling -- event_id is still a column -- so the mapper law's
+   * "referenced columns exist" clause holds and the "equals the target's
+   * primary key" clause WS5 specified does not, which is why that clause
+   * is deferred.
+   *
+   * The assertion is deliberately exact rather than lenient: fixing
+   * barwise-963 breaks it, which is the point. Delete this test in the
+   * commit that fixes it and restore the clause in mapper.law.test.ts.
+   */
+  it("known defect barwise-963: a foreign key keeps a key the objectification replaced", () => {
+    const model = new OrmModel({ name: "StalePk" });
+    const event = model.addObjectType({
+      name: "Event",
+      kind: "entity",
+      referenceMode: "event_id",
+    });
+    const venue = model.addObjectType({
+      name: "Venue",
+      kind: "entity",
+      referenceMode: "venue_id",
+    });
+    const cancelled = model.addFactType({
+      name: "Venue is closed",
+      roles: [{ id: "c0", name: "is closed", playerId: venue.id }],
+      readings: ["{0} is closed"],
+    });
+    model.addObjectifiedFactType({ factTypeId: cancelled.id, objectTypeId: event.id });
+    model.addFactType({
+      name: "Event overlaps Event at Event",
+      roles: [
+        { id: "o0", name: "overlaps", playerId: event.id },
+        { id: "o1", name: "is overlapped by", playerId: event.id },
+        { id: "o2", name: "at", playerId: event.id },
+      ],
+      readings: ["{0} overlaps {1} at {2}"],
+    });
+
+    const schema = new RelationalMapper().map(model);
+    const eventTable = schema.tables.find((t) => t.name === "event")!;
+    const associative = schema.tables.find((t) => t.name === "event_overlaps_event_at_event")!;
+
+    // The objectification moved event's key off event_id ...
+    expect(eventTable.primaryKey.columnNames).toEqual(["venue_id"]);
+    // ... and the associative table's keys, built first, did not follow.
+    for (const fk of associative.foreignKeys) {
+      expect(fk.referencedColumns).toEqual(["event_id"]);
+    }
+  });
+});
