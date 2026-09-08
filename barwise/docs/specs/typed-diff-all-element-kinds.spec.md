@@ -1,10 +1,11 @@
 # The diff should cover the model, not three sevenths of it
 
-Status: WS1 and WS2 implemented (the element-label table; subtype facts
-and objectified fact types diffed and merged); WS3 (populations) not
-started
+Status: implemented (WS1, WS2 and WS3). `carryUnmodelledElements`
+carries diagram layouts and nothing else, which is the resolved decision
+rather than work outstanding.
 Created: 2026-09-07
-Last-updated: 2026-09-08 (WS2 shipped)
+Last-updated: 2026-09-08 (WS3 shipped; the population key gained an
+ordinal the resolved decision did not anticipate)
 Tracking: barwise-940 (this spec); barwise-937 (the merge defect that
 exposed it, fixed by carrying the four kinds through unchanged);
 `core-model-laws.spec.md`'s open decision "Shape of the barwise-937 fix",
@@ -222,7 +223,7 @@ accepted, the merged model shall contain it; when the delta is rejected,
 the merged model shall contain the existing model's subtype facts and
 not the incoming one's. The identity law stays green.
 
-### 3. Populations, and the end of the carry (provisional: not yet grounded)
+### 3. Populations, and the end of the carry (implemented)
 
 Populations, under whichever identity the open decision settles, plus
 the deletion of `carryUnmodelledElements`'s population arm and the role-remap logic it
@@ -271,7 +272,15 @@ shall carry diagram layouts and nothing else.
   `(factTypeName, sample)`.
 
   **C**, revised from B once the measurement was in, and confirmed by the
-  reviewer.
+  reviewer. Implementation found it incomplete: `(factTypeName, sample)`
+  is not injective, because nothing in the metamodel stops a fact type
+  carrying two significant populations. The merge identity law found it
+  on the first run -- a model with such a pair lost one on a merge that
+  accepted nothing. The shipped key is C plus position within the
+  `(factTypeName, sample)` group, which only matters when C collides and
+  makes the identity total over every model the metamodel permits rather
+  than the ones that happen to exist. The measurement behind the
+  decision could not have seen this: no tracked model has such a pair.
   `description` is prose, which makes it a non-key attribute, and putting
   a non-key attribute in the key turns an update to it into a delete plus
   an insert: rewording a population's description would report the

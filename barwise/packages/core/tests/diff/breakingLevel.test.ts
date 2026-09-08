@@ -75,9 +75,11 @@ describe("the most severe change decides the delta", () => {
     const caution = { change: "cardinality", from: undefined, to: { min: 1, max: 5 } } as const;
     const breaking = { change: "arity", from: 2, to: 3 } as const;
 
-    expect(classifyBreakingLevel("modified", [safe])).toBe("safe");
-    expect(classifyBreakingLevel("modified", [safe, caution])).toBe("caution");
-    expect(classifyBreakingLevel("modified", [safe, caution, breaking])).toBe("breaking");
+    expect(classifyBreakingLevel("modified", [safe], "object_type")).toBe("safe");
+    expect(classifyBreakingLevel("modified", [safe, caution], "object_type")).toBe("caution");
+    expect(classifyBreakingLevel("modified", [safe, caution, breaking], "object_type")).toBe(
+      "breaking",
+    );
   });
 
   it("reads a change kind it has never heard of as caution, not safe", () => {
@@ -91,13 +93,18 @@ describe("the most severe change decides the delta", () => {
       typeof classifyChange
     >[0];
     expect(classifyChange(fromTheFuture)).toBe("caution");
-    expect(classifyBreakingLevel("modified", [fromTheFuture])).toBe("caution");
+    expect(classifyBreakingLevel("modified", [fromTheFuture], "object_type")).toBe("caution");
   });
 
   it("decides add, remove and unchanged from the kind alone", () => {
     const breaking = { change: "arity", from: 2, to: 3 } as const;
-    expect(classifyBreakingLevel("added", [breaking])).toBe("safe");
-    expect(classifyBreakingLevel("unchanged", [breaking])).toBe("safe");
-    expect(classifyBreakingLevel("removed", [])).toBe("breaking");
+    expect(classifyBreakingLevel("added", [breaking], "object_type")).toBe("safe");
+    expect(classifyBreakingLevel("unchanged", [breaking], "object_type")).toBe("safe");
+    expect(classifyBreakingLevel("removed", [], "object_type")).toBe("breaking");
+    // A population is data, not shape: losing its tuples changes what
+    // validation can say, not what a consumer binds to. Left at
+    // breaking, every transcript import reported one, because extraction
+    // marks its populations as samples.
+    expect(classifyBreakingLevel("removed", [], "population")).toBe("caution");
   });
 });

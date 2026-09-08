@@ -14,6 +14,7 @@ import type { Definition } from "../model/Definition.js";
 import type { DerivationRule, FactType } from "../model/FactType.js";
 import type { ObjectType, ValueConstraintDef } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
+import type { Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
 import type { ChangeDescription, RoleSummary } from "./changeDescription.js";
@@ -392,6 +393,71 @@ export function diffSubtypeFact(a: SubtypeFact, b: SubtypeFact): ChangeDescripti
     });
   }
   return changes;
+}
+
+/**
+ * Compare two populations that matched on `(fact type, sample)`.
+ *
+ * Only description and instances can differ; the fact type and the flag
+ * are what made them match. Instances compare by their role values
+ * rather than by id, because ids churn across a re-extraction exactly
+ * as element ids do -- comparing them would report every population as
+ * modified on every import.
+ */
+export function diffPopulation(
+  a: Population,
+  b: Population,
+  aRoles: readonly Role[],
+  bRoles: readonly Role[],
+): ChangeDescription[] {
+  const changes: ChangeDescription[] = [];
+  if ((a.description ?? "") !== (b.description ?? "")) {
+    changes.push({
+      change: "populationDescription",
+      from: a.description,
+      to: b.description,
+    });
+  }
+  if (instancesKey(a, aRoles) !== instancesKey(b, bRoles)) {
+    changes.push({
+      change: "populationInstances",
+      from: copy(a.instances),
+      to: copy(b.instances),
+    });
+  }
+  return changes;
+}
+
+/**
+ * A stable key for a population's tuples: the role values by POSITION,
+ * with instance ids and role ids left out.
+ *
+ * By position, not by role id. Role ids churn across a re-extraction
+ * exactly as element ids do, so keying on them made two identical
+ * populations from two models compare unequal, and every import reported
+ * every population as modified with `instances: 1 -> 1`. Positional
+ * indices are the same correspondence `diffFactType` uses to decide a
+ * role changed at all, so this agrees with the delta the reviewer is
+ * looking at.
+ *
+ * A role id the fact type does not declare sorts last under its own id.
+ * That is the population-tuple hole barwise-945 describes -- nothing
+ * stops an instance naming a role of some other fact type -- and this
+ * function reports such a tuple as different rather than pretending it
+ * is comparable.
+ */
+export function instancesKey(pop: Population, roles: readonly Role[]): string {
+  const index = new Map(roles.map((r, i) => [r.id, i]));
+  return pop.instances
+    .map((inst) =>
+      Object.entries(inst.roleValues)
+        .map(([roleId, value]) => [index.get(roleId) ?? `?${roleId}`, value] as const)
+        .sort(([a], [b]) => String(a).localeCompare(String(b)))
+        .map(([slot, value]) => `${slot}=${value}`)
+        .join(",")
+    )
+    .sort()
+    .join("|");
 }
 
 export function diffDefinition(a: Definition, b: Definition): ChangeDescription[] {

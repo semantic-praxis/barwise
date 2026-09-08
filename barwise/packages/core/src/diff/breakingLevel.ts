@@ -16,7 +16,7 @@
  * shape the validation rule registry uses next door.
  */
 import type { ChangeDescription, ChangeKind } from "./changeDescription.js";
-import type { BreakingLevel, DeltaKind } from "./deltas.js";
+import type { BreakingLevel, DeltaKind, ElementType } from "./deltas.js";
 
 /**
  * How risky each kind of change is for a downstream consumer.
@@ -78,6 +78,13 @@ const CHANGE_LEVEL = {
   // primary key when it is true, and its own when it is false. That is
   // the shape a consumer binds to, changing underneath them.
   providesIdentification: "breaking",
+
+  // A population is data, not shape: nothing binds to its tuples. Its
+  // description is prose. Its instances decide what validation says
+  // about the model, which is the same reason a value constraint is
+  // caution rather than safe.
+  populationDescription: "safe",
+  populationInstances: "caution",
 } as const satisfies Record<ChangeKind, BreakingLevel>;
 
 /**
@@ -109,12 +116,33 @@ export function classifyChange(change: ChangeDescription): BreakingLevel {
  * Compute the breaking level for a delta based on its kind and changes.
  * The most severe level among all changes wins.
  */
+/**
+ * What removing an element of each kind costs a downstream consumer.
+ *
+ * Removal used to be `breaking` for everything, which was right while
+ * every element the diff knew about was part of the model's SHAPE. A
+ * population is not: nothing binds to its tuples, and losing them
+ * changes what validation can say rather than what a schema looks like.
+ * Left as breaking, every transcript import reported one -- extraction
+ * marks its populations as samples, so a model with a significant
+ * population sees the sample removed on every pass.
+ */
+const REMOVAL_LEVEL = {
+  object_type: "breaking",
+  fact_type: "breaking",
+  definition: "breaking",
+  subtype_fact: "breaking",
+  objectified_fact_type: "breaking",
+  population: "caution",
+} as const satisfies Record<ElementType, BreakingLevel>;
+
 export function classifyBreakingLevel(
   kind: DeltaKind,
   changes: readonly ChangeDescription[],
+  elementType: ElementType,
 ): BreakingLevel {
   if (kind === "unchanged" || kind === "added") return "safe";
-  if (kind === "removed") return "breaking";
+  if (kind === "removed") return REMOVAL_LEVEL[elementType];
 
   // Modified: classify each change and take the most severe.
   let level: BreakingLevel = "safe";

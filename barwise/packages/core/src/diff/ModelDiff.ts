@@ -10,6 +10,7 @@
  */
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
+import type { Population } from "../model/Population.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
 import { classifyBreakingLevel } from "./breakingLevel.js";
 import { describeChange } from "./changeDescription.js";
@@ -18,8 +19,10 @@ import {
   diffDefinition,
   diffFactType,
   diffObjectType,
+  diffPopulation,
   diffSubtypeFact,
   factTypeName,
+  instancesKey,
   playerName,
 } from "./elementDiff.js";
 import { detectSynonymCandidates } from "./synonyms.js";
@@ -43,6 +46,7 @@ export type {
   NamedElementType,
   ObjectifiedFactTypeDelta,
   ObjectTypeDelta,
+  PopulationDelta,
   SubtypeFactDelta,
   SynonymCandidate,
 } from "./deltas.js";
@@ -74,7 +78,7 @@ export function diffModels(
         existing: ot,
         changes: [],
         changeDescriptions: [],
-        breakingLevel: classifyBreakingLevel("removed", []),
+        breakingLevel: classifyBreakingLevel("removed", [], "object_type"),
       });
     } else {
       const changes = diffObjectType(ot, match, existing, incoming);
@@ -87,7 +91,7 @@ export function diffModels(
         incoming: match,
         changes,
         changeDescriptions: changes.map(describeChange),
-        breakingLevel: classifyBreakingLevel(kind, changes),
+        breakingLevel: classifyBreakingLevel(kind, changes, "object_type"),
       });
     }
   }
@@ -101,7 +105,7 @@ export function diffModels(
         incoming: ot,
         changes: [],
         changeDescriptions: [],
-        breakingLevel: classifyBreakingLevel("added", []),
+        breakingLevel: classifyBreakingLevel("added", [], "object_type"),
       });
     }
   }
@@ -120,7 +124,7 @@ export function diffModels(
         existing: ft,
         changes: [],
         changeDescriptions: [],
-        breakingLevel: classifyBreakingLevel("removed", []),
+        breakingLevel: classifyBreakingLevel("removed", [], "fact_type"),
       });
     } else {
       const changes = diffFactType(ft, match, existing, incoming);
@@ -133,7 +137,7 @@ export function diffModels(
         incoming: match,
         changes,
         changeDescriptions: changes.map(describeChange),
-        breakingLevel: classifyBreakingLevel(kind, changes),
+        breakingLevel: classifyBreakingLevel(kind, changes, "fact_type"),
       });
     }
   }
@@ -147,7 +151,7 @@ export function diffModels(
         incoming: ft,
         changes: [],
         changeDescriptions: [],
-        breakingLevel: classifyBreakingLevel("added", []),
+        breakingLevel: classifyBreakingLevel("added", [], "fact_type"),
       });
     }
   }
@@ -170,7 +174,7 @@ export function diffModels(
         existing: def,
         changes: [],
         changeDescriptions: [],
-        breakingLevel: classifyBreakingLevel("removed", []),
+        breakingLevel: classifyBreakingLevel("removed", [], "definition"),
       });
     } else {
       const changes = diffDefinition(def, match);
@@ -183,7 +187,7 @@ export function diffModels(
         incoming: match,
         changes,
         changeDescriptions: changes.map(describeChange),
-        breakingLevel: classifyBreakingLevel(kind, changes),
+        breakingLevel: classifyBreakingLevel(kind, changes, "definition"),
       });
     }
   }
@@ -197,7 +201,7 @@ export function diffModels(
         incoming: def,
         changes: [],
         changeDescriptions: [],
-        breakingLevel: classifyBreakingLevel("added", []),
+        breakingLevel: classifyBreakingLevel("added", [], "definition"),
       });
     }
   }
@@ -229,7 +233,7 @@ export function diffModels(
         existing: sf,
         changes: [],
         changeDescriptions: [],
-        breakingLevel: classifyBreakingLevel("removed", []),
+        breakingLevel: classifyBreakingLevel("removed", [], "subtype_fact"),
       });
     } else {
       const changes = diffSubtypeFact(sf, match);
@@ -242,7 +246,7 @@ export function diffModels(
         incoming: match,
         changes,
         changeDescriptions: changes.map(describeChange),
-        breakingLevel: classifyBreakingLevel(kind, changes),
+        breakingLevel: classifyBreakingLevel(kind, changes, "subtype_fact"),
       });
     }
   }
@@ -256,7 +260,7 @@ export function diffModels(
         incoming: sf,
         changes: [],
         changeDescriptions: [],
-        breakingLevel: classifyBreakingLevel("added", []),
+        breakingLevel: classifyBreakingLevel("added", [], "subtype_fact"),
       });
     }
   }
@@ -294,7 +298,7 @@ export function diffModels(
           incoming: match,
           changes: [],
           changeDescriptions: [],
-          breakingLevel: classifyBreakingLevel("unchanged", []),
+          breakingLevel: classifyBreakingLevel("unchanged", [], "objectified_fact_type"),
         }
         : {
           kind: "removed",
@@ -303,7 +307,7 @@ export function diffModels(
           existing: oft,
           changes: [],
           changeDescriptions: [],
-          breakingLevel: classifyBreakingLevel("removed", []),
+          breakingLevel: classifyBreakingLevel("removed", [], "objectified_fact_type"),
         },
     );
   }
@@ -317,9 +321,144 @@ export function diffModels(
         incoming: oft,
         changes: [],
         changeDescriptions: [],
-        breakingLevel: classifyBreakingLevel("added", []),
+        breakingLevel: classifyBreakingLevel("added", [], "objectified_fact_type"),
       });
     }
+  }
+
+  // --- Populations ---
+  //
+  // Identity is `(fact type name, sample)`; see `PopulationDelta` for
+  // why the flag is in it and the description is not.
+  //
+  // Within a group the metamodel permits several -- nothing limits a
+  // fact type to one population -- and they have no identity of their
+  // own. So a group is matched in two passes: by tuple content first,
+  // then whatever is left over pairwise in declaration order.
+  //
+  // Content first, because position alone is unsound and the merge
+  // identity law is not what catches it. Deleting the FIRST of two
+  // significant populations shifts the second into its slot, so the
+  // diff reported the survivor as a modification of the deleted one
+  // plus a removal of itself -- and the default accept-added-and-
+  // modified, reject-removed policy every surface uses then wrote both,
+  // producing two populations with identical tuples where the incoming
+  // model had one. Content matching pins the survivor to itself and
+  // leaves the deletion as a plain removal.
+  //
+  // Leftovers pair positionally, because content matching alone breaks
+  // the ordinary case: a single population whose tuples were edited
+  // matches nothing by content and would read as remove-plus-add rather
+  // than as the modification it is.
+  const popGroup = (pop: Population, model: OrmModel): string =>
+    `${factTypeName(model, pop.factTypeId)}\u0000${pop.sample ? "sample" : "significant"}`;
+  const popRef = (pop: Population, model: OrmModel) => ({
+    factType: { id: pop.factTypeId, name: factTypeName(model, pop.factTypeId) },
+    sample: pop.sample,
+  });
+  const popTuples = (pop: Population, model: OrmModel): string =>
+    instancesKey(pop, model.getFactType(pop.factTypeId)?.roles ?? []);
+
+  const groups = new Map<string, { existing: Population[]; incoming: Population[]; }>();
+  const group = (key: string) => {
+    let g = groups.get(key);
+    if (!g) {
+      g = { existing: [], incoming: [] };
+      groups.set(key, g);
+    }
+    return g;
+  };
+  for (const pop of existing.populations) group(popGroup(pop, existing)).existing.push(pop);
+  for (const pop of incoming.populations) group(popGroup(pop, incoming)).incoming.push(pop);
+
+  // Deltas are collected per group but EMITTED in the order the models
+  // declare their populations. Grouping is a matching device; letting it
+  // decide output order would reorder the merged model's populations,
+  // and `hashModel` serializes them in order -- so an identity merge
+  // would change the model's hash without changing the model.
+  const byExisting = new Map<Population, ModelDelta>();
+  const addedPops = new Map<Population, ModelDelta>();
+
+  for (const { existing: mine, incoming: theirs } of groups.values()) {
+    const pairs: Array<[Population, Population]> = [];
+    const tookMine = new Set<number>();
+    const tookTheirs = new Set<number>();
+
+    // Pass 1: identical tuples, first-with-first.
+    //
+    // Both loops run FORWARD, which matters when several populations in
+    // a group have the same tuples -- two empty ones, say. Scanning one
+    // side backwards and the other forwards cross-pairs them, so two
+    // populations that differ only in their descriptions each report the
+    // other's description as a change. The accept-all law found exactly
+    // that: two empty sample populations, one described and one not.
+    for (let i = 0; i < mine.length; i++) {
+      const key = popTuples(mine[i]!, existing);
+      for (let j = 0; j < theirs.length; j++) {
+        if (tookTheirs.has(j) || popTuples(theirs[j]!, incoming) !== key) continue;
+        pairs.push([mine[i]!, theirs[j]!]);
+        tookMine.add(i);
+        tookTheirs.add(j);
+        break;
+      }
+    }
+    // Pass 2: whatever is left, in declaration order.
+    const unmatchedMine = mine.filter((_, i) => !tookMine.has(i));
+    const unmatchedTheirs = theirs.filter((_, j) => !tookTheirs.has(j));
+    while (unmatchedMine.length > 0 && unmatchedTheirs.length > 0) {
+      pairs.push([unmatchedMine.shift()!, unmatchedTheirs.shift()!]);
+    }
+
+    for (const [mineOne, theirsOne] of pairs) {
+      const changes = diffPopulation(
+        mineOne,
+        theirsOne,
+        existing.getFactType(mineOne.factTypeId)?.roles ?? [],
+        incoming.getFactType(theirsOne.factTypeId)?.roles ?? [],
+      );
+      const kind: DeltaKind = changes.length > 0 ? "modified" : "unchanged";
+      byExisting.set(mineOne, {
+        kind,
+        elementType: "population",
+        ...popRef(mineOne, existing),
+        existing: mineOne,
+        incoming: theirsOne,
+        changes,
+        changeDescriptions: changes.map(describeChange),
+        breakingLevel: classifyBreakingLevel(kind, changes, "population"),
+      });
+    }
+    for (const pop of unmatchedMine) {
+      byExisting.set(pop, {
+        kind: "removed",
+        elementType: "population",
+        ...popRef(pop, existing),
+        existing: pop,
+        changes: [],
+        changeDescriptions: [],
+        breakingLevel: classifyBreakingLevel("removed", [], "population"),
+      });
+    }
+    for (const pop of unmatchedTheirs) {
+      addedPops.set(pop, {
+        kind: "added",
+        elementType: "population",
+        ...popRef(pop, incoming),
+        incoming: pop,
+        changes: [],
+        changeDescriptions: [],
+        breakingLevel: classifyBreakingLevel("added", [], "population"),
+      });
+    }
+  }
+
+  for (const pop of existing.populations) {
+    const d = byExisting.get(pop);
+    if (d) deltas.push(d);
+  }
+  for (const pop of incoming.populations) {
+    const d = addedPops.get(pop);
+    if (d) deltas.push(d);
   }
 
   const hasChanges = deltas.some((d) => d.kind !== "unchanged");

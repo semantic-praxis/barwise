@@ -156,6 +156,18 @@ const GOLDENS: ReadonlyArray<{ sample: ChangeDescription; text: string; }> = [
     text: "exhaustive: false -> true",
   },
   {
+    sample: { change: "populationDescription", from: "Audited placements.", to: undefined },
+    text: `population description: "Audited placements." -> "(none)"`,
+  },
+  {
+    sample: {
+      change: "populationInstances",
+      from: [{ id: "i1", roleValues: { r0: "E1" } }],
+      to: [{ id: "i2", roleValues: { r0: "E1" } }, { id: "i3", roleValues: { r0: "E2" } }],
+    },
+    text: "instances: 1 added",
+  },
+  {
     sample: {
       change: "definingRule",
       from: undefined,

@@ -107,6 +107,18 @@ describe("law: accepting every delta yields the incoming model, aliases aside", 
         expect(merged.definitions.map((d) => d.term).sort()).toEqual(
           incoming.definitions.map((d) => d.term).sort(),
         );
+
+        // The four kinds the diff learned in WS2 and WS3. Until it did,
+        // `mergeModels` carried them from the EXISTING model whatever a
+        // reviewer accepted, so this law passed while asserting only the
+        // three kinds that worked -- which is why it is stated over all
+        // six now. Diagram layouts are the seventh and are deliberately
+        // NOT here: they stay carried, so accepting every delta cannot
+        // reproduce the incoming model's layouts and must not try to
+        // (`docs/specs/typed-diff-all-element-kinds.spec.md`).
+        expect(subtypePairs(merged)).toEqual(subtypePairs(incoming));
+        expect(objectificationPairs(merged)).toEqual(objectificationPairs(incoming));
+        expect(populationKeys(merged)).toEqual(populationKeys(incoming));
       }),
       { seed: SEED, numRuns: RUNS },
     );
@@ -126,6 +138,42 @@ describe("law: accepting every delta yields the incoming model, aliases aside", 
     );
   });
 });
+
+/**
+ * The subtype relationships a model asserts, as resolved name pairs.
+ *
+ * Ids churn between two independently generated models, so the pair of
+ * names is the only comparable identity -- the same reason `diffModels`
+ * matches these by name.
+ */
+function subtypePairs(model: OrmModel): string[] {
+  return model.subtypeFacts
+    .map((sf) =>
+      `${model.getObjectType(sf.subtypeId)?.name ?? sf.subtypeId}`
+      + ` < ${model.getObjectType(sf.supertypeId)?.name ?? sf.supertypeId}`
+    )
+    .sort();
+}
+
+/** The objectifications a model asserts, as resolved name pairs. */
+function objectificationPairs(model: OrmModel): string[] {
+  return model.objectifiedFactTypes
+    .map((oft) =>
+      `${model.getObjectType(oft.objectTypeId)?.name ?? oft.objectTypeId}`
+      + ` = ${model.getFactType(oft.factTypeId)?.name ?? oft.factTypeId}`
+    )
+    .sort();
+}
+
+/** The populations a model holds, by the identity the diff keys them on. */
+function populationKeys(model: OrmModel): string[] {
+  return model.populations
+    .map((p) =>
+      `${model.getFactType(p.factTypeId)?.name ?? p.factTypeId}`
+      + `/${p.sample ? "sample" : "significant"}`
+    )
+    .sort();
+}
 
 /** Merge with every non-unchanged delta accepted. */
 function mergeAll(existing: OrmModel, incoming: OrmModel): OrmModel {

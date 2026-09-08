@@ -1043,7 +1043,7 @@ describe("mergeAndValidate", () => {
  * them and the remap is a no-op. A law there would pass vacuously,
  * which is why this is a fixture test.
  */
-describe("mergeModels: a carried population follows its fact type's roles", () => {
+describe("mergeModels: a KEPT population follows its fact type's roles", () => {
   function model(
     rolePrefix: string,
     options: { definition?: string; arity?: 2 | 3; } = {},
@@ -1090,10 +1090,26 @@ describe("mergeModels: a carried population follows its fact type's roles", () =
   }
 
   /** Merge with every non-unchanged delta accepted. */
-  function mergeAccepting(existing: OrmModel, incoming: OrmModel) {
+  /**
+   * Accept every change EXCEPT the population's.
+   *
+   * This is the path where barwise-941's remap still does work. Once
+   * populations became first-class deltas (WS3), accepting everything
+   * takes the INCOMING population, whose keys are already the incoming
+   * fact type's role ids -- so a merge that accepts the lot exercises no
+   * remap at all, and three tests in this block would have gone on
+   * passing for a reason unrelated to what they were written to check.
+   *
+   * Rejecting the population delta keeps the EXISTING population under
+   * a fact type that took the incoming roles, which is exactly the state
+   * barwise-941 describes: instances keyed by ids nothing answers to.
+   */
+  function mergeKeepingExistingPopulation(existing: OrmModel, incoming: OrmModel) {
     const { deltas } = diffModels(existing, incoming);
     const accepted = new Set(
-      deltas.map((_, i) => i).filter((i) => deltas[i]!.kind !== "unchanged"),
+      deltas
+        .map((_, i) => i)
+        .filter((i) => deltas[i]!.kind !== "unchanged" && deltas[i]!.elementType !== "population"),
     );
     return mergeModels(existing, incoming, deltas, accepted);
   }
@@ -1108,7 +1124,7 @@ describe("mergeModels: a carried population follows its fact type's roles", () =
   }
 
   it("remaps instance keys when an accepted modification swaps the roles in", () => {
-    const merged = mergeAccepting(
+    const merged = mergeKeepingExistingPopulation(
       model("r", {}),
       model("s", { definition: "A customer places an order." }),
     );
@@ -1122,7 +1138,7 @@ describe("mergeModels: a carried population follows its fact type's roles", () =
   });
 
   it("leaves the merged model free of the incomplete-instance error", () => {
-    const merged = mergeAccepting(
+    const merged = mergeKeepingExistingPopulation(
       model("r", {}),
       model("s", { definition: "A customer places an order." }),
     );
@@ -1136,7 +1152,7 @@ describe("mergeModels: a carried population follows its fact type's roles", () =
   it("drops the values of a role the incoming fact type no longer has", () => {
     // Existing is ternary, incoming binary: the third role is gone, so
     // its value has nowhere to live and must not linger under a dead id.
-    const merged = mergeAccepting(
+    const merged = mergeKeepingExistingPopulation(
       model("r", { arity: 3 }),
       model("s", { arity: 2 }),
     );
@@ -1149,10 +1165,14 @@ describe("mergeModels: a carried population follows its fact type's roles", () =
   });
 
   it("reports a role the incoming fact type added as genuinely unfilled", () => {
-    // Existing binary, incoming ternary: the two carried values follow
-    // their roles and the new role has none, which is a real
-    // incompleteness rather than an artefact of id churn.
-    const merged = mergeAccepting(
+    // Existing binary, incoming ternary, and the population kept from
+    // the existing model: its two values follow their roles and the new
+    // role has none, which is a real incompleteness in the data rather
+    // than an artefact of id churn. Accepting the population instead
+    // would take the incoming model's, which fills all three -- a
+    // different and equally correct outcome, and the reason this test
+    // now names which one it is asking for.
+    const merged = mergeKeepingExistingPopulation(
       model("r", { arity: 2 }),
       model("s", { arity: 3 }),
     );

@@ -5,6 +5,7 @@ import type { Definition } from "../model/Definition.js";
 import type { FactType } from "../model/FactType.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import type { ObjectType } from "../model/ObjectType.js";
+import type { Population } from "../model/Population.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
 import type { ChangeDescription } from "./changeDescription.js";
 
@@ -114,12 +115,41 @@ export interface ObjectifiedFactTypeDelta extends Omit<DeltaCommon, "kind" | "ch
   readonly incoming?: ObjectifiedFactType;
 }
 
+/**
+ * A population: the tuples a modeller recorded for one fact type.
+ *
+ * Identity is `(fact type, sample)`, resolved to the fact type's name
+ * for the same reason every other kind resolves to names. `sample` is
+ * in the key and `description` is not, which is the reverse of what it
+ * looks like it should be: nothing in the metamodel limits a fact type
+ * to one population, so something has to separate two, and a
+ * description is prose -- a non-key attribute whose edit would turn a
+ * modification into a delete plus an insert, so rewording one would
+ * report the population removed and a different one added, its
+ * instances appearing to vanish and reappear. `sample` is stable under
+ * that edit, is the flag the metamodel already treats as load-bearing
+ * (`docs/specs/sample-populations.spec.md`), and separates the one
+ * distinction a fact type plausibly needs: the complete extension a
+ * rule is checked against, and the illustrative tuples that are
+ * positive evidence only. Flipping it reads as remove-plus-add, which
+ * is right -- it is a change of kind, not of content.
+ */
+export interface PopulationDelta extends DeltaCommon {
+  readonly elementType: "population";
+  readonly factType: ElementRef;
+  /** Part of the identity, so it never differs between the two sides. */
+  readonly sample: boolean;
+  readonly existing?: Population;
+  readonly incoming?: Population;
+}
+
 export type ModelDelta =
   | ObjectTypeDelta
   | FactTypeDelta
   | DefinitionDelta
   | SubtypeFactDelta
-  | ObjectifiedFactTypeDelta;
+  | ObjectifiedFactTypeDelta
+  | PopulationDelta;
 
 /**
  * Which kind of element a delta is about.
@@ -154,6 +184,7 @@ const ELEMENT_LABEL = {
   definition: "Definition",
   subtype_fact: "Subtype fact",
   objectified_fact_type: "Objectification",
+  population: "Population",
 } as const satisfies Record<ElementType, string>;
 
 /** Every element kind a delta can be about. Derived from the label table. */
@@ -210,6 +241,19 @@ export function elementName(delta: ModelDelta): string {
       return `${delta.subtype.name} is a subtype of ${delta.supertype.name}`;
     case "objectified_fact_type":
       return `${delta.objectType.name} objectifies ${delta.factType.name}`;
+    // The flag is part of the identity, so it belongs in the name. The
+    // description is NOT part of the identity -- it is prose, and keying
+    // on it would turn a rewording into a delete plus an insert -- but
+    // it is what a person uses to tell two populations apart, and a
+    // fact type may carry several of one kind. Without it the VS Code
+    // review panel offered two identical checkboxes.
+    case "population": {
+      const kind = delta.sample ? "sample tuples" : "tuples";
+      const which = delta.existing?.description ?? delta.incoming?.description;
+      return which === undefined
+        ? `${kind} for ${delta.factType.name}`
+        : `${kind} for ${delta.factType.name} ("${which}")`;
+    }
   }
 }
 
