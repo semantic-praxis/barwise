@@ -223,3 +223,110 @@ describe("structuralRules", () => {
     });
   });
 });
+
+describe("identification cycles", () => {
+  /**
+   * Three shapes, all structurally accepted before this rule existed and
+   * all unmappable in a database. The mapper carried a defensive skip for
+   * the first (barwise-962) and could not see the other two, which is the
+   * argument for stating the property once over the whole identification
+   * graph rather than guarding shape by shape.
+   * Spec: docs/specs/mapper-key-settlement.spec.md, WS1.
+   */
+  const cycleIds = (model: OrmModel): string[] =>
+    structuralRules(model)
+      .map((d) => d.ruleId)
+      .filter((id) => id === "structural/identification-cycle");
+
+  it("reports a type objectifying a fact type it plays a role in", () => {
+    const model = new OrmModel({ name: "Self" });
+    const e = model.addObjectType({ name: "E", kind: "entity", referenceMode: "e_id" });
+    const ft = model.addFactType({
+      name: "E is flagged",
+      roles: [{ id: "r0", name: "is flagged", playerId: e.id }],
+      readings: ["{0} is flagged"],
+    });
+    model.addObjectifiedFactType({ factTypeId: ft.id, objectTypeId: e.id });
+
+    expect(cycleIds(model)).toHaveLength(1);
+  });
+
+  it("reports two types objectifying fact types the other plays in", () => {
+    const model = new OrmModel({ name: "Mutual" });
+    const e = model.addObjectType({ name: "E", kind: "entity", referenceMode: "e_id" });
+    const f = model.addObjectType({ name: "F", kind: "entity", referenceMode: "f_id" });
+    const flagged = model.addFactType({
+      name: "F is flagged",
+      roles: [{ id: "a0", name: "is flagged", playerId: f.id }],
+      readings: ["{0} is flagged"],
+    });
+    const noted = model.addFactType({
+      name: "E is noted",
+      roles: [{ id: "b0", name: "is noted", playerId: e.id }],
+      readings: ["{0} is noted"],
+    });
+    model.addObjectifiedFactType({ factTypeId: flagged.id, objectTypeId: e.id });
+    model.addObjectifiedFactType({ factTypeId: noted.id, objectTypeId: f.id });
+
+    expect(cycleIds(model)).toHaveLength(1);
+  });
+
+  it("reports a cycle that runs through both an objectification and a subtype", () => {
+    const model = new OrmModel({ name: "Mixed" });
+    const sup = model.addObjectType({ name: "Super", kind: "entity", referenceMode: "super_id" });
+    const sub = model.addObjectType({ name: "Sub", kind: "entity", referenceMode: "sub_id" });
+    const listed = model.addFactType({
+      name: "Sub is listed",
+      roles: [{ id: "r0", name: "is listed", playerId: sub.id }],
+      readings: ["{0} is listed"],
+    });
+    model.addObjectifiedFactType({ factTypeId: listed.id, objectTypeId: sup.id });
+    model.addSubtypeFact({
+      subtypeId: sub.id,
+      supertypeId: sup.id,
+      providesIdentification: true,
+    });
+
+    expect(cycleIds(model)).toHaveLength(1);
+  });
+
+  /**
+   * A subtype fact that does not provide identification is not an
+   * identification edge: the subtype keeps its own key, so the same
+   * shape as the mixed case above is well formed.
+   */
+  it("does not report when the subtype fact does not provide identification", () => {
+    const model = new OrmModel({ name: "NonIdentifying" });
+    const sup = model.addObjectType({ name: "Super", kind: "entity", referenceMode: "super_id" });
+    const sub = model.addObjectType({ name: "Sub", kind: "entity", referenceMode: "sub_id" });
+    const listed = model.addFactType({
+      name: "Sub is listed",
+      roles: [{ id: "r0", name: "is listed", playerId: sub.id }],
+      readings: ["{0} is listed"],
+    });
+    model.addObjectifiedFactType({ factTypeId: listed.id, objectTypeId: sup.id });
+    model.addSubtypeFact({
+      subtypeId: sub.id,
+      supertypeId: sup.id,
+      providesIdentification: false,
+    });
+
+    expect(cycleIds(model)).toEqual([]);
+  });
+
+  it("names the types on the cycle in its message", () => {
+    const model = new OrmModel({ name: "Named" });
+    const e = model.addObjectType({ name: "Reservation", kind: "entity", referenceMode: "r_id" });
+    const ft = model.addFactType({
+      name: "Reservation is confirmed",
+      roles: [{ id: "r0", name: "is confirmed", playerId: e.id }],
+      readings: ["{0} is confirmed"],
+    });
+    model.addObjectifiedFactType({ factTypeId: ft.id, objectTypeId: e.id });
+
+    const diagnostic = structuralRules(model).find(
+      (d) => d.ruleId === "structural/identification-cycle",
+    );
+    expect(diagnostic?.message).toContain("Reservation -> Reservation");
+  });
+});
