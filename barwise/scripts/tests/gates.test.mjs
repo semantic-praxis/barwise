@@ -829,3 +829,38 @@ test("a lock whose pid is gone is removed rather than obeyed, and a run releases
     rmSync(repo.dir, { recursive: true, force: true });
   }
 });
+
+test("BARWISE_COVERAGE_DIR survives Turborepo and redirects a real package's coverage", () => {
+  // The half the throwaway tests cannot reach. Turborepo 2 runs tasks in
+  // strict env mode, so a variable named nowhere in turbo.json is dropped
+  // before the task sees it: measured directly, the first version of this
+  // change looked isolated and wrote to packages/learn/coverage anyway.
+  // Nothing else asserts where coverage lands, so nothing else would
+  // notice that line being removed from turbo.json.
+  //
+  // `learn` because it is the cheapest package with a real coverage run,
+  // and `--force` because a cache hit would prove nothing about the
+  // environment the task ran in.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-covdir-"));
+  const barwise = join(REPO, "barwise");
+  try {
+    const r = spawnSync("npx", [
+      "turbo",
+      "run",
+      "test:coverage",
+      "--filter=@barwise/learn",
+      "--force",
+    ], {
+      cwd: barwise,
+      encoding: "utf8",
+      env: { ...process.env, BARWISE_COVERAGE_DIR: dir },
+    });
+    assert.equal(r.status, 0, `the coverage task must pass:\n${r.stdout}${r.stderr}`);
+    assert.ok(
+      existsSync(join(dir, "learn", "coverage-final.json")),
+      `coverage must land under BARWISE_COVERAGE_DIR, not in the package:\n${r.stdout}${r.stderr}`,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

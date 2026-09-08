@@ -1,6 +1,13 @@
 {
   "$comment": "Specs whose Status claims no implementation while commits have landed on the source files they name. Each row needs a note saying why the header is still right, or what it should say instead. Ratcheted by `npm run audit:specs -- --check` (scripts/audit-spec-status.mjs).",
   "specs": {
+    "ci-local-condition-parity.spec.md": {
+      "status": "Draft -- no workstream implemented",
+      "note": "Genuinely unimplemented, and the header is right: this spec's deliverable is teaching ci-local.mjs to read the `if:` conditions on ci.yml's steps and skip the gates CI would skip, and it still reads none -- the gate list is derived exactly as before and all 28 run. The commit below is barwise-960 giving the same script a lock, a run-scoped coverage directory, and full failure logs; it changes how a run is isolated and reported, not which gates it selects. This is the proxy false positive the gate's own header describes: two findings on one script. Remove this row when the condition filter ships and the Status says so.",
+      "commits": [
+        "0ab1495"
+      ]
+    },
     "conformance-property.spec.md": {
       "status": "Accepted (all decisions resolved 2026-08-25; both workstreams open -- design only, no implementation in this PR)",
       "note": "Genuinely unimplemented, and the header is right. Both workstreams are property-based testing (an extraction-response arbitrary, then parser totality over generated responses) and nothing of the sort exists: fast-check is not a dependency of any package, and the only 'arbitrary' in llm or promptlab is a comment in an unrelated test. The four commits below are unrelated work on files it names -- a dependabot bump, suite 2.5.0, the assertNever sweep, and the npm-audit gate. Remove this row when workstream 1 ships and the Status says so. Caught only after the gate's pattern was fixed to see the claim mid-line; it had escaped on position alone (barwise-912 class-C pass).",
