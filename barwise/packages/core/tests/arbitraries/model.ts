@@ -24,9 +24,11 @@
  *
  * **Structural validity is by construction, not by filter.** Every
  * choice that `structuralRules` would report is made unreachable here:
- * subtype edges always run from a higher-indexed entity to a lower one
- * (so the hierarchy cannot cycle), an objectification target is used at
- * most once, and a binary fact type always carries two readings. The
+ * every identification edge runs from a higher-indexed entity to a lower
+ * one -- a subtype to its supertype, and an objectifying type to each
+ * entity player of the fact type it objectifies -- so the identification
+ * graph cannot cycle; an objectification target is used at most once;
+ * and a binary fact type always carries two readings. The
  * laws assert the result rather than trusting this comment.
  *
  * **Serializer conflations are avoided, not normalised away**, except
@@ -739,9 +741,39 @@ function toObjectified(
   raws: readonly RawObjectified[],
   objectTypes: readonly ObjectTypeConfig[],
   skeletons: readonly FactTypeSkeleton[],
+  subtypeFacts: readonly SubtypeFactConfig[],
 ): ObjectifiedFactTypeConfig[] {
   const entities = objectTypes.filter((ot) => ot.kind === "entity");
   if (entities.length === 0) return [];
+
+  const entityIds = new Set(entities.map((ot) => ot.id!));
+
+  // An objectifying entity is identified by the fact type it objectifies,
+  // so it depends on every entity player of that fact type -- the same
+  // kind of edge an identifying subtype fact makes to its supertype, and
+  // together they are what `structural/identification-cycle` forbids.
+  // Subtype edges are a DAG already (higher index to lower, above), but
+  // adding objectification edges to them is not: picking any entity for
+  // any fact type produced a cycle in 57 of 250 sampled models, 55 of
+  // them an entity objectifying a fact type it plays a role in.
+  //
+  // The check is incremental rather than a rule about indices. An index
+  // rule -- objectifier above every player -- is also acyclic, and it
+  // cost the mapper law's composite-foreign-key coverage: a composite
+  // key needs a fact type with two entity players, and few entities sit
+  // above two others. Rejecting only the edges that actually close a
+  // cycle keeps every shape the rule permits.
+  const edges = new Map<string, string[]>();
+  for (const sf of subtypeFacts) {
+    if (!sf.providesIdentification) continue;
+    edges.set(sf.subtypeId, [...(edges.get(sf.subtypeId) ?? []), sf.supertypeId]);
+  }
+  const reaches = (from: string, target: string, seen = new Set<string>()): boolean => {
+    if (from === target) return true;
+    if (seen.has(from)) return false;
+    seen.add(from);
+    return (edges.get(from) ?? []).some((next) => reaches(next, target, seen));
+  };
 
   const out: ObjectifiedFactTypeConfig[] = [];
   const usedFactTypes = new Set<string>();
@@ -750,6 +782,15 @@ function toObjectified(
     const ft = pick(skeletons, raw.factTypePick);
     const ot = pick(entities, raw.objectTypePick);
     if (usedFactTypes.has(ft.id) || usedObjectTypes.has(ot.id!)) continue;
+
+    const players = ft.roles
+      .map((role) => role.playerId)
+      .filter((id) => entityIds.has(id));
+    // A new edge ot -> player closes a cycle exactly when the player
+    // already reaches ot.
+    if (players.some((player) => reaches(player, ot.id!))) continue;
+
+    edges.set(ot.id!, [...(edges.get(ot.id!) ?? []), ...players]);
     usedFactTypes.add(ft.id);
     usedObjectTypes.add(ot.id!);
     out.push({ id: `oft${i}`, factTypeId: ft.id, objectTypeId: ot.id! });
@@ -822,6 +863,8 @@ function toPlan(raw: RawModel): ModelPlan {
     constraints: constraintsByOwner.get(j) ?? [],
   }));
 
+  const subtypeFacts = toSubtypeFacts(raw.subtypeFacts, objectTypes);
+
   return {
     model: {
       name: "Generated",
@@ -830,8 +873,8 @@ function toPlan(raw: RawModel): ModelPlan {
     },
     objectTypes,
     factTypes,
-    subtypeFacts: toSubtypeFacts(raw.subtypeFacts, objectTypes),
-    objectifiedFactTypes: toObjectified(raw.objectified, objectTypes, skeletons),
+    subtypeFacts,
+    objectifiedFactTypes: toObjectified(raw.objectified, objectTypes, skeletons, subtypeFacts),
     populations: toPopulations(raw.populations, skeletons),
     // Terms are index-suffixed because the merge keys definitions by
     // term: two definitions sharing one would collapse, and the law
