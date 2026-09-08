@@ -204,6 +204,42 @@ describe("the identity key separates a significant population from a sample", ()
   });
 });
 
+describe("tuple counts survive role-id churn", () => {
+  /** Six tuples, one of which differs, under role ids that churn. */
+  function sixTuples(rolePrefix: string, lastValue: string) {
+    const m = new OrmModel({ name: "M" });
+    m.addObjectType({ id: "ot", name: "T", kind: "entity", referenceMode: "nr" });
+    m.addFactType({
+      id: "ft",
+      name: "F",
+      roles: [{ id: `${rolePrefix}0`, name: "a", playerId: "ot" }],
+      readings: ["{0} x"],
+    });
+    m.addPopulation({
+      id: "p",
+      factTypeId: "ft",
+      instances: ["A", "B", "C", "D", "E", lastValue].map((v, i) => ({
+        id: `i${i}`,
+        roleValues: { [`${rolePrefix}0`]: v },
+      })),
+    });
+    return m;
+  }
+
+  it("reports one tuple changed, not all six", () => {
+    // The count and the comparison that decided there was a change must
+    // share a basis. They did not: `instancesKey` compares by role
+    // POSITION, because role ids churn across a re-extraction, while the
+    // count keyed by role id -- so every tuple looked both added and
+    // removed and a one-tuple edit printed `instances: 6 added, 6
+    // removed`. The same defect the reviewer found in `instancesKey`
+    // itself, surviving in the second place it mattered.
+    const { deltas } = diffModels(sixTuples("r", "F1"), sixTuples("s", "F2"));
+    const pop = deltas.find((d) => d.elementType === "population")!;
+    expect(pop.changeDescriptions).toEqual(["instances: 1 added, 1 removed"]);
+  });
+});
+
 describe("a population merges from its delta rather than being carried", () => {
   it("takes the incoming tuples when the delta is accepted", () => {
     const existing = bothKinds("E1", "E2");

@@ -164,6 +164,8 @@ const GOLDENS: ReadonlyArray<{ sample: ChangeDescription; text: string; }> = [
       change: "populationInstances",
       from: [{ id: "i1", roleValues: { r0: "E1" } }],
       to: [{ id: "i2", roleValues: { r0: "E1" } }, { id: "i3", roleValues: { r0: "E2" } }],
+      added: 1,
+      removed: 0,
     },
     text: "instances: 1 added",
   },

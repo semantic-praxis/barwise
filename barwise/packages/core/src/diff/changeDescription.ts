@@ -154,6 +154,20 @@ export type ChangeDescription =
     readonly change: "populationInstances";
     readonly from: readonly FactInstance[];
     readonly to: readonly FactInstance[];
+    /**
+     * How many tuples appeared and disappeared, counted at diff time.
+     *
+     * Carried rather than derived here because deriving it needs the
+     * fact type's ROLE ORDER, which a delta does not have: tuples are
+     * keyed by role id, and role ids churn across a re-extraction, so a
+     * renderer comparing them by id sees every tuple as both added and
+     * removed. Six unchanged tuples and one edited one printed
+     * `instances: 6 added, 6 removed`. Positional comparison is the
+     * same basis `instancesKey` uses to decide the populations differ
+     * at all, so counting there keeps one answer instead of two.
+     */
+    readonly added: number;
+    readonly removed: number;
   }
   // --- Definitions (the ubiquitous-language entries) ---
   //
@@ -241,36 +255,18 @@ export function describeChange(change: ChangeDescription): string {
     case "populationDescription":
       return `population description: "${change.from ?? NONE}" -> "${change.to ?? NONE}"`;
     case "populationInstances":
-      return describeInstanceChange(change.from, change.to);
+      return describeInstanceChange(change.added, change.removed);
   }
 }
 
 /**
  * How a population's tuples differ, in tuples rather than in counts.
  *
- * A count pair said nothing when the count did not move: editing one
+ * A count PAIR said nothing when the count did not move: editing one
  * tuple of one printed `instances: 1 -> 1`, and the reviewer saw a
- * modification with no visible content. The change is detected on
- * content, so it is reported on content.
- *
- * Tuples compare by their own role ids here rather than by position,
- * which is enough because both sides of ONE delta were already matched
- * as the same population -- the positional comparison that survives id
- * churn is `instancesKey`, and it has already run by the time this does.
+ * modification with no visible content.
  */
-function describeInstanceChange(
-  from: readonly FactInstance[],
-  to: readonly FactInstance[],
-): string {
-  const key = (inst: FactInstance): string =>
-    Object.entries(inst.roleValues)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([role, value]) => `${role}=${value}`)
-      .join(",");
-  const before = new Set(from.map(key));
-  const after = new Set(to.map(key));
-  const added = [...after].filter((k) => !before.has(k)).length;
-  const removed = [...before].filter((k) => !after.has(k)).length;
+function describeInstanceChange(added: number, removed: number): string {
   if (added > 0 && removed > 0) return `instances: ${added} added, ${removed} removed`;
   if (added > 0) return `instances: ${added} added`;
   if (removed > 0) return `instances: ${removed} removed`;

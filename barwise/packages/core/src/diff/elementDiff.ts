@@ -14,7 +14,7 @@ import type { Definition } from "../model/Definition.js";
 import type { DerivationRule, FactType } from "../model/FactType.js";
 import type { ObjectType, ValueConstraintDef } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
-import type { Population } from "../model/Population.js";
+import type { FactInstance, Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
 import type { ChangeDescription, RoleSummary } from "./changeDescription.js";
@@ -419,10 +419,17 @@ export function diffPopulation(
     });
   }
   if (instancesKey(a, aRoles) !== instancesKey(b, bRoles)) {
+    // Counted here, on the same positional basis `instancesKey` used to
+    // decide they differ, because this is the last place the role order
+    // is available.
+    const before = new Set(a.instances.map((i) => tupleKey(i, aRoles)));
+    const after = new Set(b.instances.map((i) => tupleKey(i, bRoles)));
     changes.push({
       change: "populationInstances",
       from: copy(a.instances),
       to: copy(b.instances),
+      added: [...after].filter((k) => !before.has(k)).length,
+      removed: [...before].filter((k) => !after.has(k)).length,
     });
   }
   return changes;
@@ -447,17 +454,24 @@ export function diffPopulation(
  * is comparable.
  */
 export function instancesKey(pop: Population, roles: readonly Role[]): string {
+  return pop.instances.map((inst) => tupleKey(inst, roles)).sort().join("|");
+}
+
+/**
+ * One tuple, keyed by role POSITION rather than by role id.
+ *
+ * Shared by `instancesKey` and the added/removed count above so the two
+ * cannot answer differently about whether a tuple is the same tuple --
+ * they did, and the count reported six added and six removed for a
+ * single edited tuple among six.
+ */
+function tupleKey(inst: FactInstance, roles: readonly Role[]): string {
   const index = new Map(roles.map((r, i) => [r.id, i]));
-  return pop.instances
-    .map((inst) =>
-      Object.entries(inst.roleValues)
-        .map(([roleId, value]) => [index.get(roleId) ?? `?${roleId}`, value] as const)
-        .sort(([a], [b]) => String(a).localeCompare(String(b)))
-        .map(([slot, value]) => `${slot}=${value}`)
-        .join(",")
-    )
-    .sort()
-    .join("|");
+  return Object.entries(inst.roleValues)
+    .map(([roleId, value]) => [index.get(roleId) ?? `?${roleId}`, value] as const)
+    .sort(([a], [b]) => String(a).localeCompare(String(b)))
+    .map(([slot, value]) => `${slot}=${value}`)
+    .join(",");
 }
 
 export function diffDefinition(a: Definition, b: Definition): ChangeDescription[] {
