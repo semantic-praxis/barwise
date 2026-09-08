@@ -1,6 +1,9 @@
 # Settle every primary key before anything reads one
 
-Status: Draft -- no workstream implemented
+Status: WS1 implemented (the identification-cycle rule, the shared
+identification graph, the arbitrary's cycle discipline, and the two
+spurious objectifications deleted from the taxonomy example). WS2 not
+implemented.
 Created: 2026-09-08
 Last-updated: 2026-09-08
 Tracking: barwise-966 (this spec); barwise-963 (a foreign key keeps a
@@ -300,25 +303,35 @@ shall go red.
   cycle. All three shapes are unmappable in a database, so this converts
   a silent bad mapping into a reported error.
 
-## Open decisions (for review)
+## Open decisions (resolved 2026-09-08)
 
-- **The orphaned reference-mode column.** An objectified entity gets a
-  reference-mode column in phase 0 and then a different key in phase 1,
-  leaving the first column neither key nor reference (`assignment_id` in
-  barwise-965's reproduction). Option A: keep it, as a surrogate a user
-  may want. Option B: do not create it for an entity that objectifies a
-  fact type, since ORM says its identity comes from the objectification.
-  Recommend B -- a column no key and no reference names is exactly the
-  "unknown unknown" this project's principles warn about, and a reader
-  cannot tell from the schema whether it is meaningful. A is the safer
-  choice if any consumer joins on it, and none is known.
-- **`structural/*` or `constraint/*` for the cycle rule.** Structural
-  rules are the ones `arbOrmModel` must avoid, so choosing `structural/*`
-  puts real work in WS1 (teaching the generator) and makes a cycle a
-  load error. `constraint/*` is cheaper and leaves the mapper facing
-  cycles forever. Recommend `structural/*`: a type identified by itself
-  is malformed, not merely unsatisfiable, and `structural/subtype-cycle`
-  already sits at that severity for the narrower case.
+- **The orphaned reference-mode column: do not create it.** An
+  objectified entity used to get a reference-mode column in phase 0 and a
+  different key in phase 1, leaving the first neither key nor reference
+  (`assignment_id` in barwise-965's reproduction). It is no longer
+  created: ORM says an objectified type's identity comes from the
+  objectification, and a column that is neither key nor reference is the
+  "unknown unknown" the principles warn about -- a reader cannot tell
+  from the schema whether it means anything. Keeping it as a surrogate
+  was the alternative and was rejected: no consumer is known to join on
+  it.
+- **The cycle rule is `structural/*`.** A type identified by itself is
+  malformed, not merely unsatisfiable, and `structural/subtype-cycle`
+  already sits at that severity for the narrower case. The cost is
+  accepted and is most of WS1: `structural/*` is `error` severity, so
+  the arbitrary must stop generating cycles (57 of 250 sampled models)
+  and `rb-global-account-taxonomy` must be fixed in the same PR or
+  `validate:examples` goes red. `constraint/*` would have been cheaper
+  and would have left the mapper facing cycles forever, with phase 1
+  unable to assume a DAG.
+
+A third decision, taken at the same time, belongs to a later spec and is
+recorded here because it touches the same column. When an entity's
+reference mode and its preferred identifier disagree, **the preferred
+identifier wins** -- one rule, no special case, and the reading
+`completenessWarnings.ts` already documents: the preferred identifier is
+the authority and the reference mode is the guess it exists to prevent.
+That change is barwise-967 and is out of scope here.
 
 ## Risks and testing
 
