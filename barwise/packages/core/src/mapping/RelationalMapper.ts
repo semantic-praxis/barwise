@@ -471,17 +471,6 @@ export class RelationalMapper {
       const player = model.getObjectType(role.playerId);
       if (!player || player.kind !== "entity") continue;
 
-      // An entity objectifying a fact type it plays a role in cannot be
-      // part of its own key: absorbing that role appended a column
-      // referencing this table's own primary key and then replaced that
-      // primary key with the new column, leaving a foreign key pointing
-      // at a column that is no longer a key of anything. Skipping it
-      // leaves the entity's own reference-mode key in place, which is
-      // coherent. The real fix is upstream -- an objectifying entity
-      // type is a new type in ORM, and nothing structural says so yet
-      // (barwise-962) -- so this guard goes when that rule lands.
-      if (player.id === oft.objectTypeId) continue;
-
       const targetTable = entityTables.get(player.id);
       if (!targetTable) continue;
 
