@@ -15,6 +15,7 @@ import type { DerivationRule, FactType } from "../model/FactType.js";
 import type { ObjectType, ValueConstraintDef } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { Role } from "../model/Role.js";
+import type { SubtypeFact } from "../model/SubtypeFact.js";
 import type { ChangeDescription, RoleSummary } from "./changeDescription.js";
 
 export function diffObjectType(
@@ -91,6 +92,14 @@ export function diffObjectType(
  */
 export function playerName(model: OrmModel, playerId: string): string {
   return model.getObjectType(playerId)?.name ?? playerId;
+}
+
+/**
+ * Resolve a fact type id to its name using the given model.
+ * Returns the id itself if the fact type is not found, like `playerName`.
+ */
+export function factTypeName(model: OrmModel, factTypeId: string): string {
+  return model.getFactType(factTypeId)?.name ?? factTypeId;
 }
 
 export function diffFactType(
@@ -348,6 +357,40 @@ function diffConstraints(
     changes.push({ change: "constraintsRemoved", constraints: removed.map(copy) });
   }
 
+  return changes;
+}
+
+/**
+ * Compare two subtype facts that matched on `(subtype, supertype)`.
+ *
+ * Only the four fields a subtype fact carries beyond that pair can
+ * differ, since the pair is what made them match. An objectified fact
+ * type has no equivalent function: it carries nothing beyond its two
+ * references, so two that match are equal by construction, which is why
+ * `ObjectifiedFactTypeDelta` forbids `modified` in its type.
+ */
+export function diffSubtypeFact(a: SubtypeFact, b: SubtypeFact): ChangeDescription[] {
+  const changes: ChangeDescription[] = [];
+  if (a.providesIdentification !== b.providesIdentification) {
+    changes.push({
+      change: "providesIdentification",
+      from: a.providesIdentification,
+      to: b.providesIdentification,
+    });
+  }
+  if (a.isExclusive !== b.isExclusive) {
+    changes.push({ change: "subtypeExclusive", from: a.isExclusive, to: b.isExclusive });
+  }
+  if (a.isExhaustive !== b.isExhaustive) {
+    changes.push({ change: "subtypeExhaustive", from: a.isExhaustive, to: b.isExhaustive });
+  }
+  if (derivationKey(a.definingRule) !== derivationKey(b.definingRule)) {
+    changes.push({
+      change: "definingRule",
+      from: copy(a.definingRule),
+      to: copy(b.definingRule),
+    });
+  }
   return changes;
 }
 

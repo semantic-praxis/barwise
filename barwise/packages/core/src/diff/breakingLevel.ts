@@ -63,6 +63,21 @@ const CHANGE_LEVEL = {
   constraintsAdded: "caution",
   constraintsRemoved: "caution",
   derivation: "caution",
+
+  // A subtype fact's own fields. `isExclusive` and `isExhaustive` state
+  // which populations the model admits; a defining rule decides what a
+  // derived subtype contains. Neither changes the shape a consumer
+  // binds to.
+  subtypeExclusive: "caution",
+  subtypeExhaustive: "caution",
+  definingRule: "caution",
+
+  // `providesIdentification` is the exception, and it is breaking
+  // rather than caution because it reaches the relational mapping:
+  // `RelationalMapper` gives the subtype's table the SUPERTYPE's
+  // primary key when it is true, and its own when it is false. That is
+  // the shape a consumer binds to, changing underneath them.
+  providesIdentification: "breaking",
 } as const satisfies Record<ChangeKind, BreakingLevel>;
 
 /**

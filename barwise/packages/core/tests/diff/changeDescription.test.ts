@@ -143,6 +143,26 @@ const GOLDENS: ReadonlyArray<{ sample: ChangeDescription; text: string; }> = [
     sample: { change: "context", from: "Sales", to: undefined },
     text: `context: "Sales" -> "(none)"`,
   },
+  {
+    sample: { change: "providesIdentification", from: true, to: false },
+    text: "provides identification: true -> false",
+  },
+  {
+    sample: { change: "subtypeExclusive", from: false, to: true },
+    text: "exclusive: false -> true",
+  },
+  {
+    sample: { change: "subtypeExhaustive", from: false, to: true },
+    text: "exhaustive: false -> true",
+  },
+  {
+    sample: {
+      change: "definingRule",
+      from: undefined,
+      to: { kind: "derived", expression: "Employee with rank > 5", isFormal: false },
+    },
+    text: "defining rule changed",
+  },
 ];
 
 describe("rendering a change", () => {

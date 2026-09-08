@@ -60,6 +60,32 @@ const SAMPLES: ReadonlyArray<{ delta: ModelDelta; label: string; }> = [
     },
     label: "Definition: Churn",
   },
+  {
+    delta: {
+      kind: "modified",
+      elementType: "subtype_fact",
+      subtype: { id: "ot-manager", name: "Manager" },
+      supertype: { id: "ot-employee", name: "Employee" },
+      changes: [],
+      changeDescriptions: [],
+      breakingLevel: "caution",
+    },
+    // The verbalizer's own phrasing, so the diff names the element the
+    // way the rest of the product already talks about it.
+    label: "Subtype fact: Manager is a subtype of Employee",
+  },
+  {
+    delta: {
+      kind: "added",
+      elementType: "objectified_fact_type",
+      objectType: { id: "ot-enrolment", name: "Enrolment" },
+      factType: { id: "ft-sc", name: "StudentTakesCourse" },
+      changes: [],
+      changeDescriptions: [],
+      breakingLevel: "safe",
+    },
+    label: "Objectification: Enrolment objectifies StudentTakesCourse",
+  },
 ];
 
 describe("labelling a delta", () => {

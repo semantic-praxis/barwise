@@ -114,7 +114,17 @@ export function computeSampleAgreement(models: readonly OrmModel[]): SampleAgree
     if (i === medoidIndex) continue;
     const diff = diffModels(medoid, models[i]!);
     for (const d of diff.deltas) {
-      if (d.kind !== "modified" || d.elementType === "definition") continue;
+      // Object types and fact types only. The exclusion used to name
+      // `definition` alone, which silently admitted every kind the diff
+      // later learned to emit; naming what this DOES measure is what
+      // made the compiler catch the widening when subtype facts and
+      // objectifications arrived (WS2 of
+      // `docs/specs/typed-diff-all-element-kinds.spec.md`). Extending
+      // agreement to the new kinds is a separate question about what a
+      // renamed relationship means, and is deliberately not answered
+      // here.
+      if (d.kind !== "modified") continue;
+      if (d.elementType !== "object_type" && d.elementType !== "fact_type") continue;
       const key = keyOf(d.elementType, d.name);
       const entry = shapeDisagree.get(key)
         ?? { elementType: d.elementType, name: d.name, count: 0 };
