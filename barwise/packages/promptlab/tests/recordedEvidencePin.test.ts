@@ -30,19 +30,29 @@ import { rescoreDirectory } from "../src/record/rescore.js";
 const ROUND = join(import.meta.dirname, "../../../eval-payloads/20260828-1647");
 const suite = loadSuite(defaultSuitePath());
 
-// Per arm: payload count and mean, under suite 2.9.0. Every arm fell
-// when must_validate left the rubric (barwise-902), and the SHAPE of
-// the fall is the point: the weakest arm lost most (-0.0144) and the
-// strongest least (-0.0017). A check that always passed was propping
-// up the payloads with the most failures.
+// Per arm: payload count and mean, under suite 2.11.0.
+//
+// 2.9.0: every arm fell when must_validate left the rubric
+// (barwise-902), and the SHAPE of that fall was the point -- the
+// weakest arm lost most (-0.0144) and the strongest least (-0.0017),
+// because a check that always passed was propping up the payloads with
+// the most failures.
+//
+// 2.11.0 moves five of the eight, and this time the shape is which arms
+// move at all. `structural/identification-cycle` is a new
+// error-severity rule (barwise-966), and 9 of the round's 115 payloads
+// declare an object type as the objectification of a fact type it plays
+// a role in. Only the arms holding one move; the other three are
+// unchanged to six places and none rises. Five different model arms
+// produced the shape, which is the finding.
 const EXPECTED: readonly (readonly [string, number, number])[] = [
   ["default-haiku-dev", 13, 0.907859],
-  ["default-haiku-train", 18, 0.856735],
-  ["default-sonnet-dev", 13, 0.847562],
-  ["default-sonnet-train", 13, 0.940673],
-  ["haiku45-2-dev", 11, 0.952047],
+  ["default-haiku-train", 18, 0.853031],
+  ["default-sonnet-dev", 13, 0.838507],
+  ["default-sonnet-train", 13, 0.938688],
+  ["haiku45-2-dev", 11, 0.950027],
   ["haiku45-2-train", 16, 0.895506],
-  ["sonnet5-3-dev", 14, 0.829137],
+  ["sonnet5-3-dev", 14, 0.827405],
   ["sonnet5-3-train", 17, 0.891838],
 ];
 
