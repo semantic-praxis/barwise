@@ -22,6 +22,7 @@
  */
 
 import type { FactType } from "../model/FactType.js";
+import { identificationOrder } from "../model/identification.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import type { DataTypeDef, ObjectType } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
@@ -57,32 +58,84 @@ export class RelationalMapper {
   map(model: OrmModel, options?: RelationalMapperOptions): RelationalSchema {
     const fallbackPkType = strategyToSqlType(options?.preferredIdentifierStrategy);
     const associativeTables: MutableTable[] = [];
-    const entityTables = new Map<string, MutableTable>();
+    const settling = new Map<string, SettlingTable>();
 
-    // Step 1: Create a table for each entity type.
+    const objectifiedByType = new Map<string, ObjectifiedFactType>();
+    for (const oft of model.objectifiedFactTypes) objectifiedByType.set(oft.objectTypeId, oft);
+
+    // An identification cycle has no settlement order. WS1's structural
+    // rule rejects such a model, but `map` must stay total for one that
+    // reached here unvalidated, so it falls back to declaration order and
+    // gives every entity its reference-mode key -- what the mapper did
+    // before it had phases. The output is best-effort; the diagnostic is
+    // where the answer lives.
+    const settlement = identificationOrder(model);
+    const settleable = "order" in settlement;
+    const order = settleable
+      ? settlement.order
+      : model.objectTypes.filter((ot) => ot.kind === "entity").map((ot) => ot.id);
+
+    // Phase 0: one table per entity type, carrying its reference-mode key
+    // unless phase 1 is going to replace that key anyway.
     for (const ot of model.objectTypes) {
-      if (ot.kind === "entity") {
-        const pkColName = ot.referenceMode ?? `${toSnake(ot.name)}_id`;
-        // Resolve the PK data type from the reference-mode value type.
-        const pkDataType = resolveEntityPkType(ot, model, fallbackPkType);
-        const table: MutableTable = {
-          name: toSnake(ot.name),
-          columns: [{ name: pkColName, dataType: pkDataType, nullable: false }],
-          primaryKey: { columnNames: [pkColName] },
-          foreignKeys: [],
-          sourceElementId: ot.id,
-        };
-        entityTables.set(ot.id, table);
+      if (ot.kind !== "entity") continue;
+
+      // An objectified entity is identified by the fact type it
+      // objectifies, so a reference-mode column would end up neither key
+      // nor reference (mapper-key-settlement.spec.md, resolved decision).
+      // It is still created when absorption cannot produce a key -- a
+      // fact type over value types alone absorbs nothing -- because a
+      // table with no key at all is worse than a redundant column.
+      const absorbing = settleable && this.absorbsAKey(objectifiedByType.get(ot.id), model);
+      const pkColName = ot.referenceMode ?? `${toSnake(ot.name)}_id`;
+      const pkDataType = resolveEntityPkType(ot, model, fallbackPkType);
+      settling.set(ot.id, {
+        name: toSnake(ot.name),
+        columns: absorbing ? [] : [{ name: pkColName, dataType: pkDataType, nullable: false }],
+        primaryKey: { columnNames: absorbing ? [] : [pkColName] },
+        foreignKeys: [],
+        sourceElementId: ot.id,
+      });
+    }
+
+    // Phase 1: settle every key, dependencies first, so that nothing in
+    // phase 2 can read a key that is still going to change.
+    const identifyingSubtypeFacts = new Map<string, SubtypeFact>();
+    for (const sf of model.subtypeFacts) {
+      if (sf.providesIdentification && !identifyingSubtypeFacts.has(sf.subtypeId)) {
+        identifyingSubtypeFacts.set(sf.subtypeId, sf);
       }
     }
 
-    // Collect fact type ids that are objectified -- they are handled
-    // separately in step 2b and should not produce their own mapping.
+    const settledBySubtypeFact = new Set<string>();
+    for (const entityId of order) {
+      const oft = objectifiedByType.get(entityId);
+      if (settleable && this.absorbsAKey(oft, model)) {
+        this.settleObjectifiedKey(oft!, model, settling);
+        // An entity that both objectifies a fact type and is an
+        // identified subtype declares its identity twice. Objectification
+        // wins, being the more specific statement, and the subtype fact
+        // becomes an ordinary foreign key in phase 2. That is what fixes
+        // barwise-965: the subtype arm's shared key starts from the
+        // subtype's own key, and dual identification was the only way for
+        // that key to be composite by the time it ran.
+        continue;
+      }
+      const sf = identifyingSubtypeFacts.get(entityId);
+      if (sf) {
+        this.settleSubtypeKey(sf, settling);
+        settledBySubtypeFact.add(sf.id);
+      }
+    }
+
+    // Phase 2: every key is final, so a foreign key built here names one
+    // that will not move under it.
+    const entityTables = new Map<string, MutableTable>(settling);
+
     const objectifiedFactTypeIds = new Set(
       model.objectifiedFactTypes.map((oft) => oft.factTypeId),
     );
 
-    // Step 2: Process each non-objectified fact type.
     for (const ft of model.factTypes) {
       if (objectifiedFactTypeIds.has(ft.id)) continue;
 
@@ -95,19 +148,11 @@ export class RelationalMapper {
       }
     }
 
-    // Step 2b: Process objectified fact types. The objectified entity's
-    // table absorbs the underlying fact type's roles as FK columns, and
-    // its PK becomes the composite of those columns.
-    for (const oft of model.objectifiedFactTypes) {
-      this.mapObjectifiedFactType(oft, model, entityTables);
-    }
-
-    // Step 3: Process subtype facts.
     for (const sf of model.subtypeFacts) {
-      this.mapSubtypeFact(sf, model, entityTables);
+      if (settledBySubtypeFact.has(sf.id)) continue;
+      this.addSubtypeForeignKey(sf, entityTables);
     }
 
-    // Collect all tables: entity tables first, then associative tables.
     const allTables: Table[] = [...entityTables.values(), ...associativeTables].map(
       (t) => freezeTable(t),
     );
@@ -116,6 +161,18 @@ export class RelationalMapper {
       tables: allTables,
       sourceModelId: model.name,
     };
+  }
+
+  /**
+   * Whether absorbing this objectification would yield a key at all.
+   * A fact type over value types alone contributes no foreign key
+   * columns, so there would be nothing for the key to be.
+   */
+  private absorbsAKey(oft: ObjectifiedFactType | undefined, model: OrmModel): boolean {
+    if (!oft) return false;
+    const factType = model.getFactType(oft.factTypeId);
+    if (!factType) return false;
+    return factType.roles.some((role) => model.getObjectType(role.playerId)?.kind === "entity");
   }
 
   /**
@@ -391,77 +448,97 @@ export class RelationalMapper {
   }
 
   /**
-   * Subtype fact mapping: add a FK from the subtype's PK to the
-   * supertype's PK. When providesIdentification is true, the subtype
-   * table's PK column is also a FK to the supertype table (shared PK).
+   * Phase 1: an identified subtype's key mirrors its supertype's.
+   *
+   * The shared-key pattern: the subtype's own first key column doubles
+   * as the first component of a foreign key to the supertype, and one
+   * column is added per further supertype key column so the two keys
+   * have the same arity (barwise-931).
+   *
+   * The subtype's own key is single-column whenever this runs. Phase 0
+   * gives every entity one reference-mode column, and the only thing
+   * that makes a key composite is absorbing an objectification -- which
+   * `map` takes in preference to this, so an entity reaching here has
+   * not absorbed one. That is what stops the first column being taken
+   * and the rest silently dropped (barwise-965).
    */
-  private mapSubtypeFact(
+  private settleSubtypeKey(
     sf: SubtypeFact,
-    _model: OrmModel,
+    tables: Map<string, SettlingTable>,
+  ): void {
+    const subtypeTable = tables.get(sf.subtypeId);
+    const supertypeTable = tables.get(sf.supertypeId);
+    if (!subtypeTable || !supertypeTable) return;
+
+    const [firstSupertypeCol, ...restSupertypeCols] = supertypeTable.primaryKey.columnNames;
+    if (firstSupertypeCol === undefined) return;
+
+    const ownKey = subtypeTable.primaryKey.columnNames;
+    if (ownKey.length !== 1) return; // see the comment above: unreachable by construction
+
+    const sharedCols = [ownKey[0]!];
+    for (const supertypeCol of restSupertypeCols) {
+      const pkCol = supertypeTable.columns.find((c) => c.name === supertypeCol);
+      sharedCols.push(pushColumn(subtypeTable.columns, {
+        name: supertypeCol,
+        dataType: pkCol?.dataType ?? "TEXT",
+        nullable: false,
+      }, `fk_${supertypeCol}`));
+    }
+    subtypeTable.primaryKey = { columnNames: sharedCols };
+
+    subtypeTable.foreignKeys.push({
+      columnNames: sharedCols,
+      referencedTable: supertypeTable.name,
+      referencedColumns: [firstSupertypeCol, ...restSupertypeCols],
+      sourceConstraintId: sf.id,
+    });
+  }
+
+  /**
+   * Phase 2: a subtype fact that does not identify its subtype, or one
+   * whose subtype was identified by an objectification instead, becomes
+   * an ordinary foreign key -- one nullable column per supertype key
+   * column, added against a key that can no longer change.
+   */
+  private addSubtypeForeignKey(
+    sf: SubtypeFact,
     entityTables: Map<string, MutableTable>,
   ): void {
     const subtypeTable = entityTables.get(sf.subtypeId);
     const supertypeTable = entityTables.get(sf.supertypeId);
     if (!subtypeTable || !supertypeTable) return;
 
-    if (sf.providesIdentification) {
-      // Shared PK pattern: the subtype's existing PK column is the
-      // first FK component, unchanged from before. A supertype with a
-      // composite PK (an objectified entity) needs the shared key to
-      // extend to the rest of that composite too, rather than
-      // truncating to the first column (barwise-931) -- one new
-      // column per additional supertype PK part, and the subtype's own
-      // PK grows to match so the shared key is actually shared.
-      const [firstSupertypeCol, ...restSupertypeCols] = supertypeTable.primaryKey.columnNames;
-      if (firstSupertypeCol === undefined) return;
-
-      const sharedCols = [subtypeTable.primaryKey.columnNames[0]!];
-      for (const supertypeCol of restSupertypeCols) {
-        const pkCol = supertypeTable.columns.find((c) => c.name === supertypeCol);
-        sharedCols.push(pushColumn(subtypeTable.columns, {
-          name: supertypeCol,
-          dataType: pkCol?.dataType ?? "TEXT",
-          nullable: false,
-        }, `fk_${supertypeCol}`));
-      }
-      subtypeTable.primaryKey = { columnNames: sharedCols };
-
-      subtypeTable.foreignKeys.push({
-        columnNames: sharedCols,
-        referencedTable: supertypeTable.name,
-        referencedColumns: [firstSupertypeCol, ...restSupertypeCols],
-        sourceConstraintId: sf.id,
-      });
-    } else {
-      // Separate identification: add a nullable FK column per
-      // supertype PK column.
-      const colNames = this.appendForeignKeyColumns(
-        subtypeTable.columns,
-        supertypeTable,
-        false,
-        undefined,
-        (pkColName) => `fk_${pkColName}`,
-      );
-      subtypeTable.foreignKeys.push({
-        columnNames: colNames,
-        referencedTable: supertypeTable.name,
-        referencedColumns: [...supertypeTable.primaryKey.columnNames],
-        sourceConstraintId: sf.id,
-      });
-    }
+    const colNames = this.appendForeignKeyColumns(
+      subtypeTable.columns,
+      supertypeTable,
+      false,
+      undefined,
+      (pkColName) => `fk_${pkColName}`,
+    );
+    subtypeTable.foreignKeys.push({
+      columnNames: colNames,
+      referencedTable: supertypeTable.name,
+      referencedColumns: [...supertypeTable.primaryKey.columnNames],
+      sourceConstraintId: sf.id,
+    });
   }
 
   /**
-   * Objectified fact type mapping: absorb the underlying fact type's
-   * roles into the objectified entity's table as FK columns, and set
-   * the PK to the composite of those columns.
+   * Phase 1: an objectified entity's key is the composite of the columns
+   * absorbed from its fact type's entity players.
+   *
+   * Each absorbed column mirrors a column of that player's key, which
+   * the settlement order guarantees is already final -- so the foreign
+   * key this pushes names a key that will not move under it, which is
+   * the whole point of the phase split (barwise-963).
    */
-  private mapObjectifiedFactType(
+  private settleObjectifiedKey(
     oft: ObjectifiedFactType,
     model: OrmModel,
-    entityTables: Map<string, MutableTable>,
+    tables: Map<string, SettlingTable>,
   ): void {
-    const entityTable = entityTables.get(oft.objectTypeId);
+    const entityTable = tables.get(oft.objectTypeId);
     const factType = model.getFactType(oft.factTypeId);
     if (!entityTable || !factType) return;
 
@@ -471,7 +548,7 @@ export class RelationalMapper {
       const player = model.getObjectType(role.playerId);
       if (!player || player.kind !== "entity") continue;
 
-      const targetTable = entityTables.get(player.id);
+      const targetTable = tables.get(player.id);
       if (!targetTable) continue;
 
       // Disambiguate if the same entity appears in multiple roles.
@@ -492,7 +569,6 @@ export class RelationalMapper {
       });
     }
 
-    // Replace the PK with the composite of FK columns.
     if (fkColNames.length > 0) {
       entityTable.primaryKey = { columnNames: fkColNames };
     }
@@ -560,13 +636,27 @@ export class RelationalMapper {
 
 // -- Helpers --
 
+/**
+ * A table under construction. Phase 2 may append columns and foreign
+ * keys; only phase 1 may set `primaryKey`, which is what `SettlingTable`
+ * below expresses and this type withholds.
+ *
+ * Four defects came from a mutable key read before it was final
+ * (barwise-931, -963, -965, and the identification cycles WS1 rejects).
+ * Making the field readonly here is the guard: a future step that wants
+ * to rewrite a key fails to compile rather than silently invalidating
+ * every foreign key already built against it.
+ */
 interface MutableTable {
   name: string;
   columns: Column[];
-  primaryKey: PrimaryKey;
+  readonly primaryKey: PrimaryKey;
   foreignKeys: ForeignKey[];
   sourceElementId: string;
 }
+
+/** The same table during phase 1, where the key is still being decided. */
+type SettlingTable = Omit<MutableTable, "primaryKey"> & { primaryKey: PrimaryKey; };
 
 function freezeTable(t: MutableTable): Table {
   return {
