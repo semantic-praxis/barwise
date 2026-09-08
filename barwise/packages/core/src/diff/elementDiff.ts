@@ -12,7 +12,13 @@
 import type { Constraint, JoinOperand } from "../model/Constraint.js";
 import type { Definition } from "../model/Definition.js";
 import type { DerivationRule, FactType } from "../model/FactType.js";
-import type { ObjectType, ValueConstraintDef } from "../model/ObjectType.js";
+import {
+  isEntityType,
+  isValueType,
+  type ObjectType,
+  type ValueConstraintDef,
+  type ValueType,
+} from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { FactInstance, Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
@@ -27,11 +33,27 @@ export function diffObjectType(
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 
+  // The diff is one of the few places that genuinely holds both variants
+  // at once -- `a` and `b` may differ in kind, and that difference is
+  // itself a reported change -- so it reads the variant fields through
+  // these rather than narrowing. Absent reads as undefined, which is what
+  // the old single class stored for the fields its kind did not use, so
+  // every comparison below means exactly what it meant before.
+  const referenceModeOf = (ot: ObjectType): string | undefined =>
+    isEntityType(ot) ? ot.referenceMode : undefined;
+  const valuePartOf = (ot: ObjectType): ValueType | undefined => isValueType(ot) ? ot : undefined;
+  const aValue = valuePartOf(a);
+  const bValue = valuePartOf(b);
+
   if (a.kind !== b.kind) {
     changes.push({ change: "kind", from: a.kind, to: b.kind });
   }
-  if ((a.referenceMode ?? "") !== (b.referenceMode ?? "")) {
-    changes.push({ change: "referenceMode", from: a.referenceMode, to: b.referenceMode });
+  if ((referenceModeOf(a) ?? "") !== (referenceModeOf(b) ?? "")) {
+    changes.push({
+      change: "referenceMode",
+      from: referenceModeOf(a),
+      to: referenceModeOf(b),
+    });
   }
   if ((a.definition ?? "") !== (b.definition ?? "")) {
     changes.push({ change: "definition", from: a.definition, to: b.definition });
@@ -40,11 +62,11 @@ export function diffObjectType(
     changes.push({ change: "sourceContext", from: a.sourceContext, to: b.sourceContext });
   }
 
-  if (valueConstraintKey(a.valueConstraint) !== valueConstraintKey(b.valueConstraint)) {
+  if (valueConstraintKey(aValue?.valueConstraint) !== valueConstraintKey(bValue?.valueConstraint)) {
     changes.push({
       change: "valueConstraint",
-      from: copy(a.valueConstraint),
-      to: copy(b.valueConstraint),
+      from: copy(aValue?.valueConstraint),
+      to: copy(bValue?.valueConstraint),
     });
   }
 
@@ -60,20 +82,24 @@ export function diffObjectType(
   if (a.independent !== b.independent) {
     changes.push({ change: "independent", from: a.independent, to: b.independent });
   }
-  if ((a.defaultValue ?? "") !== (b.defaultValue ?? "")) {
-    changes.push({ change: "defaultValue", from: a.defaultValue, to: b.defaultValue });
+  if ((aValue?.defaultValue ?? "") !== (bValue?.defaultValue ?? "")) {
+    changes.push({
+      change: "defaultValue",
+      from: aValue?.defaultValue,
+      to: bValue?.defaultValue,
+    });
   }
 
   // Aliases comparison (order-insensitive).
-  const aAliases = (a.aliases ?? []).slice().sort().join(",");
-  const bAliases = (b.aliases ?? []).slice().sort().join(",");
+  const aAliases = a.aliases.slice().sort().join(",");
+  const bAliases = b.aliases.slice().sort().join(",");
   if (aAliases !== bAliases) {
-    changes.push({ change: "aliases", from: [...a.aliases ?? []], to: [...b.aliases ?? []] });
+    changes.push({ change: "aliases", from: [...a.aliases], to: [...b.aliases] });
   }
 
   // Data type comparison.
-  const aDt = a.dataType;
-  const bDt = b.dataType;
+  const aDt = aValue?.dataType;
+  const bDt = bValue?.dataType;
   if (aDt && bDt) {
     if (aDt.name !== bDt.name || aDt.length !== bDt.length || aDt.scale !== bDt.scale) {
       changes.push({ change: "dataTypeChanged", from: copy(aDt), to: copy(bDt) });

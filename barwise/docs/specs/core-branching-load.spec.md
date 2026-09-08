@@ -5,10 +5,12 @@ Status: WS0 complete -- barwise-927..931 shipped (PRs #426, #428, #429,
 (ring types as algebra) shipped as barwise-935 and WS4 (exhaustiveness)
 as barwise-936, which found the sweep to be one gap rather than
 thirteen. The diff half of the 927 symptom shipped separately as
-barwise-934 (PR #438). WS1-WS3 and WS6-WS8 not implemented. WS1
+barwise-934 (PR #438). WS2-WS3 and WS6-WS8 not implemented, WS1 partly. WS1
 regrounded 2026-09-08 against main 96369f8 (barwise-973); its radius
 was understated and two Evidenced sites have since closed -- see
-Regrounding below.
+Regrounding below. WS1 step 1 (`ObjectType` as a sealed union) shipped
+2026-09-08; the remaining element kinds, `ModelBuilder` and `OrmModel`
+are not implemented.
 Created: 2026-09-06
 Last-updated: 2026-09-08
 Tracking: barwise-924 (this review), barwise-973 (WS1), barwise-x4z (the wider
@@ -350,7 +352,7 @@ The value: sealed records, no classes, no methods, no setters (WS1)
   interface ObjectTypeBase { id; name; definition?; sourceContext?; aliases: readonly string[];
                              independent: boolean; note?; cardinality?: CardinalityRange }
   interface EntityType extends ObjectTypeBase { kind: "entity"; referenceMode: string }
-  interface ValueType  extends ObjectTypeBase { kind: "value";  dataType: DataTypeDef;
+  interface ValueType  extends ObjectTypeBase { kind: "value";  dataType?: DataTypeDef;
                                                 valueConstraint?: ValueConstraintDef; defaultValue?: string }
   type ObjectType = EntityType | ValueType            // the sealed set; "sealed trait" spelled in TypeScript
 
@@ -983,3 +985,43 @@ an editor in WS1's radius rather than a reader, so `DiagramPanel` and
 `extension.ts` take `ModelBuilder.from(model)` alongside the importer
 migration. The builder also has to run two whole-graph passes for the
 cycle rules, recorded in WS1 above.
+
+## WS1 step 1 as shipped: `ObjectType` (2026-09-08)
+
+WS1 lands in steps, because the workstream as scoped is the whole
+metamodel plus `ModelBuilder` plus `OrmModel`, and the accessor churn
+alone (815+ call sites) is coupled to WS3's `ModelGraph`. `ObjectType`
+is the first element kind and is separable: it is the one with the
+required-or-forbidden field structure the union exists to express, and
+it carries the spec's fourth Evidenced site.
+
+Two corrections the implementation forced, both found by building
+against the shipped corpus rather than by reading the sketch:
+
+- **`ValueType.dataType` is optional, not required.** The target sketch
+  above made it required. 54 of the 302 value types in this
+  repository's models declare none (counted across the 59 `.orm.yaml`
+  files that deserialize, including four promptlab eval references), so
+  a required field would refuse to build them. An unspecified data type
+  is incomplete rather than malformed, which is what
+  `completeness/missing-value-type-data-type` already reports and keeps
+  reporting. The sketch is corrected above. This is the shape of
+  mistake the spec's own "define errors out of existence" framing
+  invites: tightening a field is only free when the corpus agrees, and
+  the corpus is checkable.
+
+- **`toObjectTypeConfig` and its `Complete<>` machinery are deleted, as
+  predicted.** WS0's `toFactTypeConfig` comment said the sealed record
+  would make the projection redundant because a spread of the record
+  does the same job. It does: the record is directly assignable to
+  `ObjectTypeConfig`, so `ModelMerge` spreads it. The equivalent for
+  `FactType` waits on that kind's conversion.
+
+One thing the step cost that the spec did not anticipate: `ObjectType`
+no longer extends `ModelElement`, so it stopped inheriting that class's
+name validation _and its test coverage_. Deleting the `requireName`
+call from `createObjectType` left the entire core suite green. The rule
+is now shared (`model/name.ts`, one copy for both halves of the
+metamodel while WS1 is partway through) and pinned by tests that go red
+on both mutations. Every later element kind leaves the same hole when
+it converts, and the same two mutations are the check.

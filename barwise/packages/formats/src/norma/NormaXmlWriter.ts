@@ -30,6 +30,7 @@ import type {
   Role,
   ValueComparisonOperator,
   ValueRange,
+  ValueType,
 } from "@barwise/core";
 import type {
   NormaCardinality,
@@ -247,7 +248,11 @@ function collectPreferredIdentifiers(model: OrmModel): Map<string, string> {
   return result;
 }
 
-function writeValueType(ot: ObjectType, playedRoleRefs: string[]): NormaValueType {
+// `ValueType`, not `ObjectType`: the one call site is inside a
+// `kind === "value"` branch, so the narrower parameter costs nothing and
+// lets the body read `dataType`, `valueConstraint` and `defaultValue`
+// without asking whether they exist.
+function writeValueType(ot: ValueType, playedRoleRefs: string[]): NormaValueType {
   const dt = ot.dataType;
   const valueConstraint = toInlineValueConstraint(ot.valueConstraint);
   return {

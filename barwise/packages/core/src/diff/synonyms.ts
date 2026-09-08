@@ -2,6 +2,7 @@
  * Synonym-candidate detection: flags removed+added pairs that may be the
  * same concept renamed, using structural heuristics (never auto-linked).
  */
+import { referenceModeOf, valueConstraintOf } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { FactTypeDelta, ModelDelta, ObjectTypeDelta, SynonymCandidate } from "./deltas.js";
 import { playerName } from "./elementDiff.js";
@@ -92,8 +93,8 @@ export function detectSynonymCandidates(
       }
 
       // Signal 2: Matching reference mode suffix.
-      const rSuffix = refModeSuffix(rOt.referenceMode, rOt.name);
-      const aSuffix = refModeSuffix(aOt.referenceMode, aOt.name);
+      const rSuffix = refModeSuffix(referenceModeOf(rOt), rOt.name);
+      const aSuffix = refModeSuffix(referenceModeOf(aOt), aOt.name);
       if (rSuffix && aSuffix && rSuffix === aSuffix) {
         reasons.push(
           `matching reference mode suffix: "${rSuffix}"`,
@@ -102,8 +103,8 @@ export function detectSynonymCandidates(
 
       // Signal 3: Overlapping value constraints.
       const overlap = valueConstraintOverlap(
-        rOt.valueConstraint?.values,
-        aOt.valueConstraint?.values,
+        valueConstraintOf(rOt)?.values,
+        valueConstraintOf(aOt)?.values,
       );
       if (overlap >= 0.5) {
         reasons.push(

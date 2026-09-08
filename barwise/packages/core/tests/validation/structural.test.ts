@@ -14,7 +14,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { FactType } from "../../src/model/FactType.js";
-import { ObjectType } from "../../src/model/ObjectType.js";
+import { createObjectType } from "../../src/model/ObjectType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { structuralRules } from "../../src/validation/rules/structural.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
@@ -63,7 +63,7 @@ describe("structuralRules", () => {
       // FactType does not validate playerIds -- it just stores them.
       // We create a fact type with a bogus playerId and inject it
       // into the model to trigger the structural rule.
-      const ot = new ObjectType({ name: "Customer", kind: "entity", referenceMode: "cid" });
+      const ot = createObjectType({ name: "Customer", kind: "entity", referenceMode: "cid" });
       const ft = new FactType({
         name: "Customer places Order",
         roles: [
@@ -103,8 +103,8 @@ describe("structuralRules", () => {
 
     it("detects duplicate object type names", () => {
       // OrmModel.addObjectType prevents duplicates, so we inject directly.
-      const ot1 = new ObjectType({ name: "Customer", kind: "entity", referenceMode: "cid1" });
-      const ot2 = new ObjectType({ name: "Customer", kind: "entity", referenceMode: "cid2" });
+      const ot1 = createObjectType({ name: "Customer", kind: "entity", referenceMode: "cid1" });
+      const ot2 = createObjectType({ name: "Customer", kind: "entity", referenceMode: "cid2" });
 
       const model = new OrmModel({ name: "Test" });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -121,7 +121,7 @@ describe("structuralRules", () => {
     });
 
     it("detects duplicate fact type names", () => {
-      const ot = new ObjectType({ name: "Customer", kind: "entity", referenceMode: "cid" });
+      const ot = createObjectType({ name: "Customer", kind: "entity", referenceMode: "cid" });
       const ft1 = new FactType({
         name: "Customer exists",
         roles: [{ name: "exists", playerId: ot.id }],

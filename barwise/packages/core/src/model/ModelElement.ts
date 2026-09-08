@@ -1,4 +1,5 @@
 import { generateId } from "./id.js";
+import { requireName } from "./name.js";
 
 /**
  * Base class for all ORM model elements.
@@ -12,11 +13,8 @@ export class ModelElement {
   private _name: string;
 
   constructor(name: string, id?: string) {
-    if (!name || name.trim().length === 0) {
-      throw new Error("Model element name must be a non-empty string.");
-    }
+    this._name = requireName(name);
     this.id = id ?? generateId();
-    this._name = name.trim();
   }
 
   get name(): string {
@@ -24,9 +22,6 @@ export class ModelElement {
   }
 
   set name(value: string) {
-    if (!value || value.trim().length === 0) {
-      throw new Error("Model element name must be a non-empty string.");
-    }
-    this._name = value.trim();
+    this._name = requireName(value);
   }
 }

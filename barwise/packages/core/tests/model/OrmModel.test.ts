@@ -12,6 +12,7 @@
  *   - Summary statistics (element counts)
  */
 import { describe, expect, it } from "vitest";
+import { isValueType } from "../../src/model/ObjectType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 
 describe("OrmModel", () => {
@@ -55,7 +56,7 @@ describe("OrmModel", () => {
     it("adds a value type", () => {
       const model = new OrmModel({ name: "Test" });
       const ot = model.addObjectType({ name: "Rating", kind: "value" });
-      expect(ot.isValue).toBe(true);
+      expect(isValueType(ot)).toBe(true);
     });
 
     it("rejects duplicate object type names", () => {

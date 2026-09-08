@@ -10,7 +10,7 @@
 import { type Constraint, isInternalUniqueness, isMandatoryRole } from "../model/Constraint.js";
 import { matchesConstraintType } from "../model/constraintKeyword.js";
 import type { FactType } from "../model/FactType.js";
-import type { ObjectType } from "../model/ObjectType.js";
+import { type ObjectType, referenceModeOf } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { expandReading } from "../model/ReadingOrder.js";
 import type { Role } from "../model/Role.js";
@@ -99,7 +99,7 @@ class QueryContext {
       name: ot.name,
       entityKind: ot.kind,
       ...(ot.definition !== undefined ? { definition: ot.definition } : {}),
-      ...(ot.referenceMode !== undefined ? { referenceMode: ot.referenceMode } : {}),
+      ...(referenceModeOf(ot) !== undefined ? { referenceMode: referenceModeOf(ot) } : {}),
     };
   }
 
@@ -442,7 +442,7 @@ class QueryContext {
       }
     }
 
-    const referenceMode = entity.referenceMode;
+    const referenceMode = referenceModeOf(entity);
     return {
       entity: entity.name,
       ...(referenceMode !== undefined ? { referenceMode } : {}),

@@ -11,6 +11,7 @@
  *   - Edge cases: empty names, duplicate names, unresolvable roles
  *   - Skip-reason tracking for constraints that cannot be applied
  */
+import { OrmYamlSerializer } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { parseDraftModel } from "../src/DraftModelParser.js";
 import type { ExtractionResponse } from "../src/ExtractionTypes.js";
@@ -242,7 +243,8 @@ describe("DraftModelParser", () => {
       );
 
       const ot = result.model.getObjectTypeByName("Customer")!;
-      expect(ot.aliases).toBeUndefined();
+      expect(ot.aliases).toEqual([]);
+      expect(new OrmYamlSerializer().serialize(result.model)).not.toContain("aliases");
     });
 
     it("omits aliases when empty array", () => {
@@ -261,7 +263,8 @@ describe("DraftModelParser", () => {
       );
 
       const ot = result.model.getObjectTypeByName("Customer")!;
-      expect(ot.aliases).toBeUndefined();
+      expect(ot.aliases).toEqual([]);
+      expect(new OrmYamlSerializer().serialize(result.model)).not.toContain("aliases");
     });
   });
 

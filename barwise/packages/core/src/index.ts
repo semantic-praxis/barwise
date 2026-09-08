@@ -69,12 +69,21 @@ export {
   type CardinalityRange,
   CONCEPTUAL_DATA_TYPE_NAMES,
   type ConceptualDataTypeName,
+  createObjectType,
   type DataTypeDef,
-  ObjectType,
+  dataTypeOf,
+  type EntityType,
+  isEntityType,
+  isValueType,
+  type ObjectType,
+  type ObjectTypeBase,
   type ObjectTypeConfig,
   type ObjectTypeKind,
+  referenceModeOf,
   type ValueConstraintDef,
+  valueConstraintOf,
   type ValueRange,
+  type ValueType,
 } from "./model/ObjectType.js";
 export { OrmModel, type OrmModelConfig } from "./model/OrmModel.js";
 export {

@@ -14,7 +14,7 @@
  * attribute. The identifying fact's own instances stay implicit, exactly
  * as NORMA writes them.
  */
-import type { ObjectType, OrmModel } from "@barwise/core";
+import { type ObjectType, type OrmModel, referenceModeOf } from "@barwise/core";
 import type {
   NormaConstraint,
   NormaEntityTypeInstance,
@@ -235,7 +235,7 @@ function synthesizeExpansion(
   const entityRoleId = `${factId}_r0`;
   const valueRoleId = `${factId}_r1`;
   const preferredUcId = `${factId}_puc`;
-  const valueTypeName = `${entity.name}_${entity.referenceMode || "id"}`;
+  const valueTypeName = `${entity.name}_${referenceModeOf(entity) || "id"}`;
 
   graph.extraValueTypes.push({
     id: valueTypeId,

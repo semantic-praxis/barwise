@@ -2,7 +2,7 @@ import type { Definition } from "./Definition.js";
 import type { DiagramLayout } from "./DiagramLayout.js";
 import { FactType, type FactTypeConfig } from "./FactType.js";
 import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
-import { ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
+import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
 import { Population, type PopulationConfig } from "./Population.js";
 import type { Role } from "./Role.js";
 import { SubtypeFact, type SubtypeFactConfig } from "./SubtypeFact.js";
@@ -102,7 +102,7 @@ export class OrmModel {
         `Object type "${config.name}" already exists in model "${this._name}".`,
       );
     }
-    const ot = new ObjectType(config);
+    const ot = createObjectType(config);
     this._objectTypes.set(ot.id, ot);
     return ot;
   }

@@ -1,4 +1,4 @@
-import type { OrmModel, RingType } from "@barwise/core";
+import { type OrmModel, referenceModeOf, type RingType } from "@barwise/core";
 import type {
   ConstraintEdge,
   ConstraintKind,
@@ -172,8 +172,8 @@ export function modelToGraph(
       id: ot.id,
       name: ot.name,
       objectTypeKind: ot.kind,
-      referenceMode: ot.referenceMode,
-      aliases: ot.aliases?.length ? ot.aliases : undefined,
+      referenceMode: referenceModeOf(ot),
+      aliases: ot.aliases.length > 0 ? ot.aliases : undefined,
       annotations: otAnnotations?.length ? otAnnotations : undefined,
     });
   }

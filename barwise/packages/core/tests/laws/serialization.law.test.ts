@@ -36,7 +36,6 @@ import { describe, expect, it } from "vitest";
 import { hashModel } from "../../src/lineage/manifest.js";
 import { CONSTRAINT_TYPES } from "../../src/model/Constraint.js";
 import { toFactTypeConfig } from "../../src/model/FactType.js";
-import { toObjectTypeConfig } from "../../src/model/ObjectType.js";
 import type { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { structuralRules } from "../../src/validation/rules/structural.js";
@@ -178,9 +177,11 @@ describe("coverage: the generator reaches the shapes the recorded defects lived 
 // ---------------------------------------------------------------------------
 
 function objectTypeProjections(model: OrmModel): unknown[] {
-  return model.objectTypes.map((ot) =>
-    stripObjectTypeIds(normaliseObjectTypeConfig(toObjectTypeConfig(ot)))
-  );
+  // The record is the projection. `toObjectTypeConfig` existed to list
+  // every field once so a hand-copied literal could not drop one
+  // (barwise-927); a spread of the sealed record cannot drop one either,
+  // and needs no edit when a field is added.
+  return model.objectTypes.map((ot) => stripObjectTypeIds(normaliseObjectTypeConfig(ot)));
 }
 
 function factTypeProjections(model: OrmModel): unknown[] {

@@ -1,5 +1,5 @@
-import type { Complete } from "../util/complete.js";
-import { ModelElement } from "./ModelElement.js";
+import { generateId } from "./id.js";
+import { requireName } from "./name.js";
 
 /**
  * Whether the object type is an entity (identified by a reference scheme)
@@ -158,165 +158,175 @@ export interface ObjectTypeConfig {
 }
 
 /**
- * An ObjectType represents a concept in the domain.
+ * An ObjectType is a concept in the domain, and it is exactly one of two
+ * things.
  *
- * Entity types are identified by a reference scheme (e.g. Customer identified
- * by customer_id). Value types are self-identifying (e.g. a Name string or
- * a Rating enumeration).
+ * An entity type is identified by a reference scheme (Customer, identified
+ * by customer_id); a value type is self-identifying (a Name string, a
+ * Rating enumeration). Four fields are required-or-forbidden by which one
+ * it is, and until WS1 of `core-branching-load.spec.md` that was enforced
+ * by throws in a constructor: one class carried `referenceMode?`,
+ * `dataType?`, `valueConstraint?` and `defaultValue?` and rejected the
+ * illegal combinations at run time.
+ *
+ * As a union the compiler enforces it instead. `EntityType` has a
+ * `referenceMode: string` that cannot be absent, `ValueType` has no
+ * `referenceMode` at all, and a consumer that wants either must say which
+ * one it is looking at. That is what removes the defensive branches: a
+ * fallback for an entity without a reference mode was unreachable code no
+ * reader could tell was dead (the spec's fourth evidenced site).
  */
-export class ObjectType extends ModelElement {
-  readonly kind: ObjectTypeKind;
-  private _referenceMode: string | undefined;
-  private _definition: string | undefined;
-  private _sourceContext: string | undefined;
-  private _valueConstraint: ValueConstraintDef | undefined;
-  private _dataType: DataTypeDef | undefined;
-  private _aliases: readonly string[] | undefined;
-  private _independent: boolean;
-  private _defaultValue: string | undefined;
-  private _note: string | undefined;
-  private _cardinality: CardinalityRange | undefined;
+export interface ObjectTypeBase {
+  readonly id: string;
+  /** Trimmed and non-empty; `createObjectType` refuses anything else. */
+  readonly name: string;
+  readonly definition?: string;
+  readonly sourceContext?: string;
+  /** Always present, possibly empty: the default is applied once, here. */
+  readonly aliases: readonly string[];
+  /** Always present: the default is applied once, here. */
+  readonly independent: boolean;
+  readonly note?: string;
+  readonly cardinality?: CardinalityRange;
+}
 
-  constructor(config: ObjectTypeConfig) {
-    super(config.name, config.id);
-    this.kind = config.kind;
-    this._referenceMode = config.referenceMode;
-    this._definition = config.definition;
-    this._sourceContext = config.sourceContext;
-    this._valueConstraint = config.valueConstraint;
-    this._dataType = config.dataType;
-    this._aliases = config.aliases && config.aliases.length > 0
-      ? Object.freeze([...config.aliases])
-      : undefined;
-    this._independent = config.independent ?? false;
-    this._defaultValue = config.defaultValue;
-    this._note = config.note;
-    this._cardinality = config.cardinality;
-
-    if (this.kind === "entity" && !this._referenceMode) {
-      throw new Error(
-        `Entity type "${this.name}" must have a reference mode.`,
-      );
-    }
-
-    if (this.kind === "value" && this._referenceMode) {
-      throw new Error(
-        `Value type "${this.name}" should not have a reference mode.`,
-      );
-    }
-
-    if (
-      this._valueConstraint
-      && this._valueConstraint.values.length === 0
-      && (this._valueConstraint.ranges?.length ?? 0) === 0
-    ) {
-      throw new Error(
-        `Value constraint on "${this.name}" must have at least one value or range.`,
-      );
-    }
-
-    if (this._cardinality) {
-      const { min, max } = this._cardinality;
-      if (min < 0) {
-        throw new Error(
-          `Cardinality on "${this.name}" must have a non-negative minimum.`,
-        );
-      }
-      if (max !== "unbounded" && max < min) {
-        throw new Error(
-          `Cardinality on "${this.name}" must have max >= min.`,
-        );
-      }
-    }
-  }
-
-  get referenceMode(): string | undefined {
-    return this._referenceMode;
-  }
-
-  get definition(): string | undefined {
-    return this._definition;
-  }
-
-  set definition(value: string | undefined) {
-    this._definition = value;
-  }
-
-  get sourceContext(): string | undefined {
-    return this._sourceContext;
-  }
-
-  set sourceContext(value: string | undefined) {
-    this._sourceContext = value;
-  }
-
-  get valueConstraint(): ValueConstraintDef | undefined {
-    return this._valueConstraint;
-  }
-
-  get dataType(): DataTypeDef | undefined {
-    return this._dataType;
-  }
-
-  get aliases(): readonly string[] | undefined {
-    return this._aliases;
-  }
-
-  get independent(): boolean {
-    return this._independent;
-  }
-
-  get defaultValue(): string | undefined {
-    return this._defaultValue;
-  }
-
-  get note(): string | undefined {
-    return this._note;
-  }
-
-  set note(value: string | undefined) {
-    this._note = value;
-  }
-
-  get cardinality(): CardinalityRange | undefined {
-    return this._cardinality;
-  }
-
-  get isEntity(): boolean {
-    return this.kind === "entity";
-  }
-
-  get isValue(): boolean {
-    return this.kind === "value";
-  }
+/** An object type identified by a reference scheme. */
+export interface EntityType extends ObjectTypeBase {
+  readonly kind: "entity";
+  /**
+   * Never absent. The old class allowed `referenceMode?` on both kinds and
+   * threw for an entity without one, so every consumer either narrowed by
+   * hand or wrote a fallback for a state the constructor forbade.
+   */
+  readonly referenceMode: string;
 }
 
 /**
- * Project an ObjectType back to the config shape that constructed it,
- * listing every field once. Callers that rebuild an object type (the
- * merge today; WS8's builder-based split once it exists) spread this
- * and override only what they mean to change, so a field added to
- * `ObjectTypeConfig` cannot be dropped by a hand-copied literal
- * elsewhere (barwise-927). The literal is typed `Complete<...>` so it
- * cannot drop the field either: the next config field is a compile
- * error here until it is listed. WS1's sealed records make this
- * redundant -- a spread of the record itself will do the same job.
+ * A self-identifying object type.
+ *
+ * `dataType` is optional, and deliberately so: the spec's target sketch
+ * made it required, and 54 of the 302 value types in this repository's
+ * models declare none (measured 2026-09-08 across the 59 `.orm.yaml`
+ * files that deserialize, including four promptlab eval references).
+ * Requiring it would refuse to build them. An unspecified data type is
+ * incomplete rather than malformed, which is why
+ * `completeness/missing-value-type-data-type` reports it as a warning and
+ * keeps doing so.
  */
-export function toObjectTypeConfig(ot: ObjectType): ObjectTypeConfig {
-  const config: Complete<ObjectTypeConfig> = {
-    name: ot.name,
-    id: ot.id,
-    kind: ot.kind,
-    referenceMode: ot.referenceMode,
-    definition: ot.definition,
-    sourceContext: ot.sourceContext,
-    valueConstraint: ot.valueConstraint,
-    dataType: ot.dataType,
-    aliases: ot.aliases,
-    independent: ot.independent,
-    defaultValue: ot.defaultValue,
-    note: ot.note,
-    cardinality: ot.cardinality,
+export interface ValueType extends ObjectTypeBase {
+  readonly kind: "value";
+  readonly dataType?: DataTypeDef;
+  readonly valueConstraint?: ValueConstraintDef;
+  readonly defaultValue?: string;
+}
+
+/**
+ * The sealed set. TypeScript has inheritance but no `sealed`, so the union
+ * declaration is how the compiler learns the child list is closed -- which
+ * is what makes a match over it exhaustive.
+ */
+export type ObjectType = EntityType | ValueType;
+
+/** Whether this object type is an entity type, narrowing to `EntityType`. */
+export function isEntityType(ot: ObjectType): ot is EntityType {
+  return ot.kind === "entity";
+}
+
+/** Whether this object type is a value type, narrowing to `ValueType`. */
+export function isValueType(ot: ObjectType): ot is ValueType {
+  return ot.kind === "value";
+}
+
+/**
+ * Build an object type from a config, applying every default and refusing
+ * every combination the old constructor threw for.
+ *
+ * The refusals are unchanged in wording and in what they reject; what
+ * changes is that two of them are now unreachable from typed code, since
+ * a caller with an `EntityTypeConfig` cannot omit the reference mode and
+ * one with a `ValueTypeConfig` cannot supply it. They stay because
+ * `ObjectTypeConfig` is also built from parsed YAML, where the compiler
+ * has no say.
+ */
+export function createObjectType(config: ObjectTypeConfig): ObjectType {
+  const name = requireName(config.name);
+
+  if (config.valueConstraint) {
+    const { values, ranges } = config.valueConstraint;
+    if (values.length === 0 && (ranges?.length ?? 0) === 0) {
+      throw new Error(
+        `Value constraint on "${name}" must have at least one value or range.`,
+      );
+    }
+  }
+
+  if (config.cardinality) {
+    const { min, max } = config.cardinality;
+    if (min < 0) {
+      throw new Error(
+        `Cardinality on "${name}" must have a non-negative minimum.`,
+      );
+    }
+    if (max !== "unbounded" && max < min) {
+      throw new Error(`Cardinality on "${name}" must have max >= min.`);
+    }
+  }
+
+  const base = {
+    id: config.id ?? generateId(),
+    name,
+    aliases: Object.freeze([...(config.aliases ?? [])]),
+    independent: config.independent ?? false,
+    ...(config.definition !== undefined ? { definition: config.definition } : {}),
+    ...(config.sourceContext !== undefined ? { sourceContext: config.sourceContext } : {}),
+    ...(config.note !== undefined ? { note: config.note } : {}),
+    ...(config.cardinality !== undefined ? { cardinality: config.cardinality } : {}),
   };
-  return config;
+
+  if (config.kind === "entity") {
+    if (!config.referenceMode) {
+      throw new Error(`Entity type "${name}" must have a reference mode.`);
+    }
+    return Object.freeze({ ...base, kind: "entity", referenceMode: config.referenceMode });
+  }
+
+  if (config.referenceMode) {
+    throw new Error(`Value type "${name}" should not have a reference mode.`);
+  }
+  return Object.freeze({
+    ...base,
+    kind: "value",
+    ...(config.dataType !== undefined ? { dataType: config.dataType } : {}),
+    ...(config.valueConstraint !== undefined ? { valueConstraint: config.valueConstraint } : {}),
+    ...(config.defaultValue !== undefined ? { defaultValue: config.defaultValue } : {}),
+  });
+}
+
+/**
+ * The reference mode when this is an entity type, and `undefined`
+ * otherwise.
+ *
+ * For the consumers that genuinely hold either variant -- the diff, which
+ * reports a kind change as a change; the synonym matcher, which compares
+ * any two object types; the describe summaries, which render whatever they
+ * are given. Those read `undefined` for the other kind, which is exactly
+ * what the old single class stored, so they mean what they always meant.
+ *
+ * Not for a consumer that knows the kind. Narrow with `isEntityType` there
+ * and get a `string`: reaching for this instead puts back the optional the
+ * union exists to remove, and with it the fallback for a case that cannot
+ * happen.
+ */
+export function referenceModeOf(ot: ObjectType): string | undefined {
+  return isEntityType(ot) ? ot.referenceMode : undefined;
+}
+
+/** The declared data type when this is a value type. See `referenceModeOf`. */
+export function dataTypeOf(ot: ObjectType): DataTypeDef | undefined {
+  return isValueType(ot) ? ot.dataType : undefined;
+}
+
+/** The value constraint when this is a value type. See `referenceModeOf`. */
+export function valueConstraintOf(ot: ObjectType): ValueConstraintDef | undefined {
+  return isValueType(ot) ? ot.valueConstraint : undefined;
 }

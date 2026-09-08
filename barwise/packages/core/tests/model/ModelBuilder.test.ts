@@ -10,6 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { isInternalUniqueness, isMandatoryRole } from "../../src/model/Constraint.js";
+import { isEntityType, isValueType } from "../../src/model/ObjectType.js";
 import { expandReading } from "../../src/model/ReadingOrder.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
@@ -64,14 +65,14 @@ describe("ModelBuilder", () => {
     expect(model.objectTypes).toHaveLength(4);
     const customer = model.getObjectTypeByName("Customer");
     expect(customer).toBeDefined();
-    expect(customer!.isEntity).toBe(true);
+    expect(isEntityType(customer!)).toBe(true);
     expect(customer!.referenceMode).toBe("customer_id");
     expect(customer!.definition).toContain("placed at least one order");
     expect(customer!.sourceContext).toBe("crm");
 
     const rating = model.getObjectTypeByName("Rating");
     expect(rating).toBeDefined();
-    expect(rating!.isValue).toBe(true);
+    expect(isValueType(rating!)).toBe(true);
     expect(rating!.valueConstraint?.values).toEqual([
       "A",
       "B",
