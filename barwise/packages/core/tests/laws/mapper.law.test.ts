@@ -13,7 +13,7 @@
  * reproduces it.
  */
 
-/** See `serialization.law.test.ts`: 250 runs is not a fixture test. */
+/** See `serialization.law.test.ts`: 250 runs under parallel coverage. */
 const LAW_TIMEOUT_MS = 120_000;
 
 import fc from "fast-check";
@@ -99,15 +99,21 @@ describe("coverage: the generator reaches the shapes the mapper branches on", ()
 // ---------------------------------------------------------------------------
 
 /**
- * One clause is missing from this list on purpose: that a foreign key's
- * `referencedColumns` equal the referenced table's `primaryKey`. WS5
- * specifies it and it is red today -- an objectification replaces a
- * table's primary key after other foreign keys to it were built, so
- * they name a column that is no longer a key (barwise-963). It is
- * deferred rather than weakened silently: the clauses below say
- * "referenced columns exist", which is what actually holds, and
- * `RelationalMapper.test.ts` pins the wrong output so that fixing it
- * trips a test rather than passing unnoticed.
+ * Every clause `core-model-laws.spec.md` WS5 specified, including the
+ * one it had to defer.
+ *
+ * "A foreign key's `referencedColumns` equal the referenced table's
+ * primary key, in order" was red on arrival: the mapper replaced a key
+ * after foreign keys to it were built (barwise-963), and a subtype fact
+ * truncated a composite subtype key (barwise-965). Both are fixed by
+ * settling every key before anything reads one
+ * (`mapper-key-settlement.spec.md` WS2), so the clause is back and the
+ * fixture that pinned the wrong output is gone.
+ *
+ * It is the clause that does the work. Under the weaker one that
+ * shipped in its place -- referenced columns merely EXIST in the target
+ * -- a foreign key naming a column that is no longer a key reads as
+ * well formed, which is exactly how barwise-963 and -965 passed.
  */
 function expectWellFormed(schema: RelationalSchema): void {
   const byName = new Map(schema.tables.map((t) => [t.name, t]));
@@ -145,13 +151,12 @@ function expectWellFormed(schema: RelationalSchema): void {
       for (const local of fk.columnNames) {
         expect(owned.has(local), `${table.name} key names a missing column ${local}`).toBe(true);
       }
-      const targetColumns = new Set(target!.columns.map((c) => c.name));
-      for (const referenced of fk.referencedColumns) {
-        expect(
-          targetColumns.has(referenced),
-          `${fk.referencedTable} has no column ${referenced}`,
-        ).toBe(true);
-      }
+      // The clause WS5 deferred: not merely that the referenced columns
+      // exist, but that they ARE the target's key.
+      expect(
+        [...fk.referencedColumns],
+        `${table.name} -> ${fk.referencedTable} does not name that table's key`,
+      ).toEqual([...target!.primaryKey.columnNames]);
     }
   }
 }

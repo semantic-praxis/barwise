@@ -11,10 +11,13 @@
  *
  * Spec: docs/specs/core-model-laws.spec.md, WS2.
  *
- * On the timeout, see the module comment in `serialization.law.test.ts`:
- * a 250-run property is not a fixture test, and `hashModel` is slower
- * than it should be (barwise-939).
+ * These carried an explicit 120s timeout until `hashModel` stopped
+ * compiling a JSON Schema it never used on every call (barwise-939); see
+ * the module comment in `serialization.law.test.ts`.
  */
+
+/** See `serialization.law.test.ts`: 250 runs under parallel coverage. */
+const LAW_TIMEOUT_MS = 120_000;
 
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
@@ -25,20 +28,20 @@ import { hashModel } from "../../src/lineage/manifest.js";
 import type { OrmModel } from "../../src/model/OrmModel.js";
 import { arbOrmModel, RUNS, SEED } from "../arbitraries/model.js";
 
-const LAW_TIMEOUT_MS = 120_000;
-
 describe("law: merging nothing changes nothing", () => {
-  it("diffing a model against itself reports only unchanged deltas", {
-    timeout: LAW_TIMEOUT_MS,
-  }, () => {
-    fc.assert(
-      fc.property(arbOrmModel(), (model) => {
-        const { deltas } = diffModels(model, model);
-        expect(deltas.filter((d) => d.kind !== "unchanged")).toEqual([]);
-      }),
-      { seed: SEED, numRuns: RUNS },
-    );
-  });
+  it(
+    "diffing a model against itself reports only unchanged deltas",
+    { timeout: LAW_TIMEOUT_MS },
+    () => {
+      fc.assert(
+        fc.property(arbOrmModel(), (model) => {
+          const { deltas } = diffModels(model, model);
+          expect(deltas.filter((d) => d.kind !== "unchanged")).toEqual([]);
+        }),
+        { seed: SEED, numRuns: RUNS },
+      );
+    },
+  );
 
   it("merging a model with itself, accepting nothing, preserves its hash", {
     timeout: LAW_TIMEOUT_MS,

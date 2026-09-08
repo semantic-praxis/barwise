@@ -12,7 +12,7 @@
  * reproduces it.
  */
 
-/** See `serialization.law.test.ts`: 250 runs is not a fixture test. */
+/** See `serialization.law.test.ts`: 250 runs under parallel coverage. */
 const LAW_TIMEOUT_MS = 120_000;
 
 import fc from "fast-check";

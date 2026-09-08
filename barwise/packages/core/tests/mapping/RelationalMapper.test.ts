@@ -1235,25 +1235,17 @@ describe("well-formedness the mapper law generalises", () => {
     expect(new Set(names).size).toBe(names.length);
     expect(names).toEqual(["student_id", "grade", "predicts_grade"]);
   });
+});
 
+describe("keys are settled before anything reads one", () => {
   /**
-   * KNOWN DEFECT, barwise-963: this pins output that is wrong.
-   *
-   * Step 2 builds a foreign key from the target table's primary key as
-   * it stands; step 2b then absorbs an objectified fact type's roles
-   * into the objectifying entity's table and REPLACES that primary key.
-   * The associative table below still references event(event_id) while
-   * event's key has become the absorbed column. The reference is not
-   * dangling -- event_id is still a column -- so the mapper law's
-   * "referenced columns exist" clause holds and the "equals the target's
-   * primary key" clause WS5 specified does not, which is why that clause
-   * is deferred.
-   *
-   * The assertion is deliberately exact rather than lenient: fixing
-   * barwise-963 breaks it, which is the point. Delete this test in the
-   * commit that fixes it and restore the clause in mapper.law.test.ts.
+   * barwise-963. Step 2 used to build a foreign key from the target's
+   * key as it stood, and step 2b then replaced that key when the target
+   * turned out to be an objectified entity. The associative table below
+   * is built from event's key; before phase 1, it named event(event_id)
+   * while event's key had become the absorbed column.
    */
-  it("known defect barwise-963: a foreign key keeps a key the objectification replaced", () => {
+  it("an associative table's foreign key names the key the objectification settled", () => {
     const model = new OrmModel({ name: "StalePk" });
     const event = model.addObjectType({
       name: "Event",
@@ -1265,12 +1257,12 @@ describe("well-formedness the mapper law generalises", () => {
       kind: "entity",
       referenceMode: "venue_id",
     });
-    const cancelled = model.addFactType({
+    const closed = model.addFactType({
       name: "Venue is closed",
       roles: [{ id: "c0", name: "is closed", playerId: venue.id }],
       readings: ["{0} is closed"],
     });
-    model.addObjectifiedFactType({ factTypeId: cancelled.id, objectTypeId: event.id });
+    model.addObjectifiedFactType({ factTypeId: closed.id, objectTypeId: event.id });
     model.addFactType({
       name: "Event overlaps Event at Event",
       roles: [
@@ -1285,11 +1277,129 @@ describe("well-formedness the mapper law generalises", () => {
     const eventTable = schema.tables.find((t) => t.name === "event")!;
     const associative = schema.tables.find((t) => t.name === "event_overlaps_event_at_event")!;
 
-    // The objectification moved event's key off event_id ...
     expect(eventTable.primaryKey.columnNames).toEqual(["venue_id"]);
-    // ... and the associative table's keys, built first, did not follow.
     for (const fk of associative.foreignKeys) {
-      expect(fk.referencedColumns).toEqual(["event_id"]);
+      expect(fk.referencedColumns).toEqual(eventTable.primaryKey.columnNames);
     }
+  });
+
+  /**
+   * The settlement ORDER, not just the phase split. A's key depends on
+   * B's and B's on C's and D's, while declaration order runs A first.
+   * Settled in declaration order, A would mirror B's reference-mode key
+   * before absorption replaced it -- barwise-963 again, one level up.
+   */
+  it("settles a chain of objectifications in dependency order, not declaration order", () => {
+    const model = new OrmModel({ name: "Chain" });
+    const a = model.addObjectType({ name: "A", kind: "entity", referenceMode: "a_id" });
+    const b = model.addObjectType({ name: "B", kind: "entity", referenceMode: "b_id" });
+    const c = model.addObjectType({ name: "C", kind: "entity", referenceMode: "c_id" });
+    const d = model.addObjectType({ name: "D", kind: "entity", referenceMode: "d_id" });
+    const bFact = model.addFactType({
+      name: "B is noted",
+      roles: [{ id: "r0", name: "is noted", playerId: b.id }],
+      readings: ["{0} is noted"],
+    });
+    const cFact = model.addFactType({
+      name: "C pairs D",
+      roles: [
+        { id: "r1", name: "pairs", playerId: c.id },
+        { id: "r2", name: "is paired by", playerId: d.id },
+      ],
+      readings: ["{0} pairs {1}", "{1} is paired by {0}"],
+    });
+    model.addObjectifiedFactType({ factTypeId: bFact.id, objectTypeId: a.id });
+    model.addObjectifiedFactType({ factTypeId: cFact.id, objectTypeId: b.id });
+
+    const schema = new RelationalMapper().map(model);
+    const tableA = schema.tables.find((t) => t.name === "a")!;
+    const tableB = schema.tables.find((t) => t.name === "b")!;
+
+    expect(tableB.primaryKey.columnNames).toEqual(["c_id", "d_id"]);
+    expect(tableA.primaryKey.columnNames).toEqual(["c_id", "d_id"]);
+    expect(tableA.foreignKeys).toHaveLength(1);
+    expect(tableA.foreignKeys[0]!.referencedColumns).toEqual(tableB.primaryKey.columnNames);
+  });
+
+  /**
+   * barwise-965. Assignment declares its identity twice: it objectifies
+   * "Seat on Flight" and is an identified subtype of Booking. The
+   * objectification wins, being the more specific statement, and the
+   * subtype fact becomes an ordinary foreign key.
+   *
+   * Before, the subtype arm took only the first column of Assignment's
+   * own composite key: the table came out keyed on seat_id alone, so two
+   * assignments of one seat to different flights collided, and seat_id
+   * was simultaneously a foreign key to seat and to booking.
+   */
+  it("an objectification outranks an identifying subtype fact on the same type", () => {
+    const model = new OrmModel({ name: "DualIdentification" });
+    const seat = model.addObjectType({ name: "Seat", kind: "entity", referenceMode: "seat_id" });
+    const flight = model.addObjectType({
+      name: "Flight",
+      kind: "entity",
+      referenceMode: "flight_id",
+    });
+    const booking = model.addObjectType({
+      name: "Booking",
+      kind: "entity",
+      referenceMode: "booking_id",
+    });
+    const assignment = model.addObjectType({
+      name: "Assignment",
+      kind: "entity",
+      referenceMode: "assignment_id",
+    });
+    const onFlight = model.addFactType({
+      name: "Seat on Flight",
+      roles: [
+        { id: "r0", name: "is on", playerId: seat.id },
+        { id: "r1", name: "carries", playerId: flight.id },
+      ],
+      readings: ["{0} is on {1}", "{1} carries {0}"],
+    });
+    model.addObjectifiedFactType({ factTypeId: onFlight.id, objectTypeId: assignment.id });
+    model.addSubtypeFact({
+      subtypeId: assignment.id,
+      supertypeId: booking.id,
+      providesIdentification: true,
+    });
+
+    const table = new RelationalMapper().map(model).tables.find((t) => t.name === "assignment")!;
+
+    // Both absorbed columns are the key, so an assignment is identified
+    // by its seat AND its flight.
+    expect(table.primaryKey.columnNames).toEqual(["seat_id", "flight_id"]);
+    // No column serves as a foreign key to two unrelated tables.
+    const byColumn = new Map<string, string[]>();
+    for (const fk of table.foreignKeys) {
+      for (const col of fk.columnNames) {
+        byColumn.set(col, [...(byColumn.get(col) ?? []), fk.referencedTable]);
+      }
+    }
+    for (const [column, targets] of byColumn) {
+      expect(targets, `${column} references ${targets.join(" and ")}`).toHaveLength(1);
+    }
+  });
+
+  /**
+   * An identification cycle has no settlement order, and WS1's structural
+   * rule rejects such a model -- but `map` is reachable without
+   * validation, so it degrades instead of throwing: every entity keeps
+   * its reference-mode key and nothing is absorbed.
+   */
+  it("maps a model with an identification cycle without throwing", () => {
+    const model = new OrmModel({ name: "Cyclic" });
+    const e = model.addObjectType({ name: "E", kind: "entity", referenceMode: "e_id" });
+    const ft = model.addFactType({
+      name: "E is flagged",
+      roles: [{ id: "r0", name: "is flagged", playerId: e.id }],
+      readings: ["{0} is flagged"],
+    });
+    model.addObjectifiedFactType({ factTypeId: ft.id, objectTypeId: e.id });
+
+    const table = new RelationalMapper().map(model).tables.find((t) => t.name === "e")!;
+    expect(table.primaryKey.columnNames).toEqual(["e_id"]);
+    expect(table.columns.map((c) => c.name)).toContain("e_id");
   });
 });
