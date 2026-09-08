@@ -168,3 +168,69 @@ export function preferredIdentifyingBinary(
   }
   return undefined;
 }
+
+/**
+ * Every way an object type acquires an identity.
+ *
+ * Three kinds, and a model may declare more than one. A preferred
+ * internal uniqueness constraint names the fact type that identifies
+ * the entity; objectifying a fact type means being identified by it;
+ * and a subtype fact declaring `providesIdentification` means
+ * inheriting the supertype's identifier. `identificationGraph` above
+ * already walks the last two, because they are the ones that create a
+ * settlement dependency -- a preferred uniqueness does not, since a
+ * value type has no key of its own to wait for.
+ *
+ * A reference mode is deliberately NOT a source. It is shorthand for an
+ * identifying binary rather than an independent declaration, and the
+ * mapper already treats it as the fallback a preferred identifier
+ * overrides (`preferredIdentifyingBinary`). Counting it would make every
+ * objectified entity that also carries one a conflict -- 25 types in
+ * this repository alone, none of them contradictory.
+ *
+ * A union rather than a count, because the diagnostic that reads this
+ * names the kinds and a count cannot. The preferred-uniqueness arm
+ * counts the same constraints `completenessWarnings` counts -- any
+ * arity, over `factTypesForObjectType` -- so the two rules cannot
+ * disagree about how many there are.
+ */
+export type IdentificationSource =
+  | { readonly kind: "preferred-uniqueness"; readonly factTypeId: string; }
+  | { readonly kind: "objectification"; readonly factTypeId: string; }
+  | { readonly kind: "identifying-subtype"; readonly supertypeId: string; };
+
+/** A label for each kind, for a diagnostic that has to name them. */
+export const IDENTIFICATION_SOURCE_LABEL: Record<IdentificationSource["kind"], string> = {
+  "preferred-uniqueness": "a preferred uniqueness constraint",
+  "objectification": "an objectification",
+  "identifying-subtype": "an identifying subtype fact",
+};
+
+export function identificationSources(
+  model: OrmModel,
+  entity: ObjectType,
+): readonly IdentificationSource[] {
+  const sources: IdentificationSource[] = [];
+
+  for (const ft of model.factTypesForObjectType(entity.id)) {
+    for (const c of ft.constraints) {
+      if (c.type === "internal_uniqueness" && c.isPreferred) {
+        sources.push({ kind: "preferred-uniqueness", factTypeId: ft.id });
+      }
+    }
+  }
+
+  for (const oft of model.objectifiedFactTypes) {
+    if (oft.objectTypeId === entity.id) {
+      sources.push({ kind: "objectification", factTypeId: oft.factTypeId });
+    }
+  }
+
+  for (const sf of model.subtypeFacts) {
+    if (sf.subtypeId === entity.id && sf.providesIdentification) {
+      sources.push({ kind: "identifying-subtype", supertypeId: sf.supertypeId });
+    }
+  }
+
+  return sources;
+}

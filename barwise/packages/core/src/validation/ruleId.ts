@@ -43,6 +43,7 @@ export const RULE_ID = {
   missingObjectTypeDefinition: "completeness/missing-object-type-definition",
   missingPreferredIdentifier: "completeness/missing-preferred-identifier",
   missingValueTypeDataType: "completeness/missing-value-type-data-type",
+  conflictingIdentification: "completeness/conflicting-identification",
   multiplePreferredIdentifiers: "completeness/multiple-preferred-identifiers",
   cardinalityInvalidRole: "constraint/cardinality-invalid-role",
   cardinalityMaxLessThanMin: "constraint/cardinality-max-less-than-min",
@@ -171,6 +172,15 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (otName: string): string =>
         `Value type "${otName}" has no data type. The relational mapper will default to TEXT.`,
+    },
+  },
+  [RULE_ID.conflictingIdentification]: {
+    severity: "warning",
+    description:
+      "An object type inherits its identity through an identifying subtype fact and also declares one of its own.",
+    messages: {
+      default: (otName: string, kinds: string): string =>
+        `Object type "${otName}" inherits its identity from a supertype and also declares ${kinds}. Each object type should be identified once; the relational mapper picks one.`,
     },
   },
   [RULE_ID.multiplePreferredIdentifiers]: {

@@ -1,3 +1,8 @@
+import {
+  IDENTIFICATION_SOURCE_LABEL,
+  type IdentificationSource,
+  identificationSources,
+} from "../../model/identification.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import { report, RULE_ID } from "../ruleId.js";
@@ -13,6 +18,7 @@ import { report, RULE_ID } from "../ruleId.js";
  * - Object types not participating in any fact type (isolated types).
  * - Value types without a declared data type.
  * - Entity types with zero or multiple preferred identifiers.
+ * - Object types that declare their identity in more than one way.
  */
 export function completenessWarnings(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -23,6 +29,7 @@ export function completenessWarnings(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkIsolatedObjectTypes(model));
   diagnostics.push(...checkMissingValueTypeDataType(model));
   diagnostics.push(...checkPreferredIdentifiers(model));
+  diagnostics.push(...checkConflictingIdentification(model));
 
   return diagnostics;
 }
@@ -169,6 +176,60 @@ function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
         report(RULE_ID.multiplePreferredIdentifiers, "default", ot.id, ot.name, preferredCount),
       );
     }
+  }
+
+  return diagnostics;
+}
+
+/**
+ * An object type that inherits its identity must not also declare one.
+ *
+ * `checkPreferredIdentifiers` above covers more than one source of ONE
+ * kind -- two preferred uniqueness constraints. This covers the
+ * cross-kind case that nothing reported: a subtype fact declaring
+ * `providesIdentification` says "this type is identified by its
+ * supertype's identifier", and a type that says that AND objectifies a
+ * fact type, or AND carries its own preferred identifier, has declared
+ * its identity twice. That is not an identification CYCLE, so
+ * `structural/identification-cycle` does not fire either -- the graph
+ * simply has two out-edges from one node.
+ *
+ * It is worth reporting because it has already cost a defect:
+ * barwise-965's truncated composite key was only reachable through the
+ * objectification-plus-subtype shape. The mapper now resolves it -- the
+ * objectification wins, being the more specific statement -- and that
+ * resolution is unchanged here. A modeller who wrote both probably
+ * meant one, and until now nothing told them.
+ *
+ * A preferred uniqueness constraint on an OBJECTIFIED type is
+ * deliberately not a conflict. ORM lets an objectified fact type carry
+ * its own reference scheme -- "Review has ReviewId" on a Review that
+ * objectifies "Reviewer reviews Paper" is ordinary modelling, not a
+ * contradiction. A first draft of this rule fired on it, and the
+ * measurement is why it does not: 13 of the 115 recorded eval payloads
+ * carry exactly that shape, from four different model arms, and
+ * charging them would have moved six of eight arms' scores for good
+ * modelling.
+ */
+function checkConflictingIdentification(model: OrmModel): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+
+  for (const ot of model.objectTypes) {
+    const kinds = new Set<IdentificationSource["kind"]>(
+      identificationSources(model, ot).map((s) => s.kind),
+    );
+    if (!kinds.has("identifying-subtype") || kinds.size < 2) continue;
+
+    const others = [...kinds].filter((k) => k !== "identifying-subtype");
+    diagnostics.push(
+      report(
+        RULE_ID.conflictingIdentification,
+        "default",
+        ot.id,
+        ot.name,
+        others.map((k) => IDENTIFICATION_SOURCE_LABEL[k]).join(" and "),
+      ),
+    );
   }
 
   return diagnostics;
