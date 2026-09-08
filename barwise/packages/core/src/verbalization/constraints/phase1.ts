@@ -233,7 +233,7 @@ export function verbalizeBinaryMandatory(
  * Render a value range as a natural-language phrase, e.g. "between 1 and 10",
  * "at least 18", or "less than 100".
  */
-function describeValueRange(r: ValueRange): string {
+export function describeValueRange(r: ValueRange): string {
   const minIncl = r.minInclusive !== false;
   const maxIncl = r.maxInclusive !== false;
   const lower = minIncl ? `at least ${r.min}` : `greater than ${r.min}`;

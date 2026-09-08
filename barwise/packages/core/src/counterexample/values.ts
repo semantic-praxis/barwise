@@ -2,6 +2,7 @@ import { isValueConstraint } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { Role } from "../model/Role.js";
+import { type ValueDomain, valueDomainPredicate } from "../model/valueDomain.js";
 
 /**
  * Deterministic placeholder-value minting for counterexample populations.
@@ -48,19 +49,48 @@ export function mintValue(
   return `${playerName(role, model)}#${index + 1}`;
 }
 
-/** A stable value guaranteed to fall outside the given allowed set. */
+/**
+ * A stable value the given domain forbids, or undefined when no candidate
+ * this function knows how to build is forbidden.
+ *
+ * The domain is the whole value constraint, not just its enumeration: a
+ * constraint carrying ranges admits values the enumeration does not list,
+ * and minting against the enumeration alone produced counterexamples the
+ * model in fact permitted (barwise-958). Every candidate is checked with
+ * `valueDomainPredicate`, the same predicate population validation
+ * applies, so
+ * the two cannot answer differently.
+ *
+ * The candidates are a fixed short list rather than a search. The first
+ * family is the player-named token the enumeration-only case has always
+ * produced, so a constraint with no ranges mints exactly what it did
+ * before; the rest reach past a range's bounds from either side, lexically
+ * and numerically. A domain that admits all of them admits so much that
+ * saying what it forbids is not useful -- typically an unbounded range,
+ * which forbids nothing at all -- and undefined means the caller emits no
+ * counterexample. Under-generating a probe is safe; claiming the model
+ * forbids a value it accepts is not.
+ */
 export function mintInvalidValue(
-  values: readonly string[],
+  domain: ValueDomain,
   role: Role,
   model: OrmModel,
-): string {
-  const set = new Set(values);
+): string | undefined {
   const base = `${playerName(role, model)}#invalid`;
-  let candidate = base;
-  let i = 1;
-  while (set.has(candidate)) {
-    candidate = `${base}-${i}`;
-    i += 1;
-  }
-  return candidate;
+  const candidates = [
+    base,
+    `${base}-1`,
+    `${base}-2`,
+    // Sorts below every digit and letter, and above every letter: between
+    // them these clear a range bounded on one side under lexical
+    // comparison, whichever side it is bounded on.
+    `!${base}`,
+    `~${base}`,
+    // Numeric extremes, for a range whose bounds and value both parse as
+    // numbers and are therefore compared numerically.
+    "-1e308",
+    "1e308",
+  ];
+  const allowed = valueDomainPredicate(domain);
+  return candidates.find((candidate) => !allowed(candidate));
 }

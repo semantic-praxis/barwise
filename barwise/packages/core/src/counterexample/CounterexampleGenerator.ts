@@ -21,6 +21,7 @@ import { Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
 import { assertNever } from "../util/assertNever.js";
 import { identificationSharingAncestry } from "../validation/rules/population/shared.js";
+import { describeValueRange } from "../verbalization/constraints/phase1.js";
 import {
   kwSeg,
   textSeg,
@@ -165,14 +166,23 @@ function forValue(
   const role = ft.roles.find((r) => r.id === vc.roleId);
   if (!role) return undefined;
 
-  const invalid = mintInvalidValue(vc.values, role, model);
+  // Undefined when the constraint's ranges admit every candidate -- an
+  // unbounded range forbids nothing, so there is nothing to probe.
+  const invalid = mintInvalidValue(vc, role, model);
+  if (invalid === undefined) return undefined;
+
   const inst: RoleValues = {};
   for (const r of ft.roles) {
     inst[r.id] = r.id === vc.roleId ? invalid : mintValue(r, ft, model, 0);
   }
 
-  const reason = `${playerName(role, model)} taking a value outside `
-    + `{${vc.values.join(", ")}}`;
+  // The domain is worded the way the constraint verbalizer words it, so a
+  // constraint carrying only ranges does not read as "outside {}".
+  const domain = [
+    ...vc.values,
+    ...(vc.ranges ?? []).map((r) => describeValueRange(r)),
+  ].join(", ");
+  const reason = `${playerName(role, model)} taking a value outside {${domain}}`;
   return makeCounterexample(ft, vc, [inst], reason, model);
 }
 
