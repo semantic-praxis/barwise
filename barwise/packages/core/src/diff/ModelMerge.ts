@@ -271,6 +271,10 @@ export function mergeModels(
  * relationship.
  */
 function addableSubtypeFact(merged: OrmModel, subtypeId: string, supertypeId: string): boolean {
+  // `SubtypeFact`'s own constructor rejects self-subtyping, and both ids
+  // pass through a resolver here, so the two could in principle land on
+  // one merged element even though the source model kept them apart.
+  if (subtypeId === supertypeId) return false;
   if (merged.getObjectType(subtypeId)?.kind !== "entity") return false;
   if (merged.getObjectType(supertypeId)?.kind !== "entity") return false;
   return !merged.subtypeFacts.some(
@@ -349,6 +353,9 @@ function addableObjectification(
   objectTypeId: string,
   factTypeId: string,
 ): boolean {
+  // `ObjectifiedFactType`'s constructor rejects the two being equal, for
+  // the same reason as above: both ids pass through a resolver.
+  if (objectTypeId === factTypeId) return false;
   if (merged.getObjectType(objectTypeId)?.kind !== "entity") return false;
   if (!merged.getFactType(factTypeId)) return false;
   return !merged.objectifiedFactTypes.some(
