@@ -1055,10 +1055,3 @@ model:
         - type: internal_uniqueness
           roles:
             - 2d5b5448-2659-486a-b2b8-429e5c7375a3
-  objectified_fact_types:
-    - id: aa43cb18-fefc-45f8-8c94-898f9a3ee87d
-      fact_type: a14b2d50-341e-4e61-974e-58346ff64e30
-      object_type: ac9f73ff-ccb7-4990-8d0c-88a70b55c155
-    - id: 3353d15f-7ca7-4dd9-98c1-7e474793bd78
-      fact_type: 3e88952e-30b2-4e20-a109-f602e5710128
-      object_type: 0c22947c-d995-4dfe-bf85-4918db482ba7

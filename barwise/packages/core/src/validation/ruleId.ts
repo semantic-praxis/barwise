@@ -104,6 +104,7 @@ export const RULE_ID = {
   objectifiedDanglingFactType: "structural/objectified-dangling-fact-type",
   objectifiedDanglingObjectType: "structural/objectified-dangling-object-type",
   objectifiedNotEntity: "structural/objectified-not-entity",
+  identificationCycle: "structural/identification-cycle",
   subtypeCycle: "structural/subtype-cycle",
   subtypeDanglingSubtype: "structural/subtype-dangling-subtype",
   subtypeDanglingSupertype: "structural/subtype-dangling-supertype",
@@ -772,6 +773,17 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (objectTypeName: string, objectTypeKind: string): string =>
         `Objectified fact type references "${objectTypeName}" as the entity type, but it is a ${objectTypeKind} type. Only entity types can be objectifications.`,
+    },
+  },
+  [RULE_ID.identificationCycle]: {
+    severity: "error",
+    description:
+      "An object type is identified, directly or transitively, by itself, so no key can be assigned.",
+    messages: {
+      default: (path: string): string =>
+        `Identification cycle: ${path}. An objectifying type is identified by the fact type it `
+        + `objectifies, and an identified subtype by its supertype, so a type cannot appear in `
+        + `its own identification.`,
     },
   },
   [RULE_ID.subtypeCycle]: {

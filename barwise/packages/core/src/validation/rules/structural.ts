@@ -1,3 +1,4 @@
+import { identificationOrder } from "../../model/identification.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import { report, RULE_ID } from "../ruleId.js";
@@ -25,6 +26,7 @@ export function structuralRules(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkSubtypeFactReferences(model));
   diagnostics.push(...checkSubtypeCycles(model));
   diagnostics.push(...checkObjectifiedFactTypeReferences(model));
+  diagnostics.push(...checkIdentificationCycles(model));
 
   return diagnostics;
 }
@@ -194,6 +196,31 @@ function checkSubtypeCycles(model: OrmModel): Diagnostic[] {
   }
 
   return diagnostics;
+}
+
+/**
+ * No object type may be identified, directly or transitively, by itself.
+ *
+ * Broader than `checkSubtypeCycles` above, and for a different reason.
+ * That rule asks whether a type is its own ancestor; this asks whether a
+ * type's KEY depends on its own, which an objectification creates as
+ * readily as a subtype fact does. The two edges are defined once in
+ * `identificationGraph`, which the relational mapper also reads to order
+ * key settlement -- so a model this rule accepts is one the mapper can
+ * settle, and that is the point of the rule rather than a side effect.
+ *
+ * The length-one case is an object type objectifying a fact type it
+ * plays a role in (barwise-962). The mapper carried a defensive skip for
+ * exactly that shape and could not see the longer ones.
+ */
+function checkIdentificationCycles(model: OrmModel): Diagnostic[] {
+  const result = identificationOrder(model);
+  if (!("cycle" in result)) return [];
+
+  const names = result.cycle.map((id) => model.getObjectType(id)?.name ?? id);
+  return [
+    report(RULE_ID.identificationCycle, "default", result.cycle[0]!, names.join(" -> ")),
+  ];
 }
 
 /**

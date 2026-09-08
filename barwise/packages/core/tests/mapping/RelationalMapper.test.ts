@@ -1237,33 +1237,6 @@ describe("well-formedness the mapper law generalises", () => {
   });
 
   /**
-   * barwise-962. An entity objectifying a fact type it plays a role in
-   * used to absorb that role as a foreign key to its own primary key
-   * and then replace that primary key, leaving the key pointing at a
-   * column that is no longer a key. The mapper now skips the role; the
-   * entity keeps its own reference-mode key. Delete this test with the
-   * defensive skip when the structural rule lands.
-   */
-  it("does not absorb an objectified entity's own role into its key", () => {
-    const model = new OrmModel({ name: "SelfObjectified" });
-    const event = model.addObjectType({
-      name: "Event",
-      kind: "entity",
-      referenceMode: "event_id",
-    });
-    const ft = model.addFactType({
-      name: "Event is cancelled",
-      roles: [{ id: "r0", name: "is cancelled", playerId: event.id }],
-      readings: ["{0} is cancelled"],
-    });
-    model.addObjectifiedFactType({ factTypeId: ft.id, objectTypeId: event.id });
-
-    const table = new RelationalMapper().map(model).tables.find((t) => t.name === "event")!;
-    expect(table.primaryKey.columnNames).toEqual(["event_id"]);
-    expect(table.foreignKeys).toEqual([]);
-  });
-
-  /**
    * KNOWN DEFECT, barwise-963: this pins output that is wrong.
    *
    * Step 2 builds a foreign key from the target table's primary key as
