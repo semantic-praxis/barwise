@@ -31,7 +31,7 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
@@ -668,4 +668,164 @@ test("check-book-citations is green on the current tree, from every cwd", () => 
   const runs = CWDS.map((cwd) => ({ cwd, ...gate("check-book-citations.mjs", cwd) }));
   for (const r of runs) assert.equal(r.status, 0, `failed in ${r.cwd}:\n${r.stdout}${r.stderr}`);
   assert.equal(new Set(runs.map((r) => r.stdout.trim())).size, 1, "coverage depends on cwd");
+});
+
+// --- barwise-960: a local CI run reports its own tree, and says what broke ---
+
+/**
+ * A throwaway checkout shaped like this one, so `ci-local.mjs` finds the
+ * things it resolves relative to itself: `../.github/workflows/ci.yml`
+ * for the gate list, and `package.json` beside it for the scripts.
+ *
+ * A throwaway rather than this repo, for one specific reason: `npm run
+ * test:scripts` is itself a gate inside `ci:local`, so a test that wrote
+ * to the real lock file would corrupt the lock of the run executing it.
+ */
+function tempCiRepo() {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-cilocal-"));
+  const root = join(dir, "barwise");
+  mkdirSync(join(root, "scripts"), { recursive: true });
+  mkdirSync(join(dir, ".github", "workflows"), { recursive: true });
+  writeFileSync(
+    join(dir, ".github", "workflows", "ci.yml"),
+    [
+      "jobs:",
+      "  build:",
+      "    steps:",
+      "      - run: npm ci",
+      "      - run: npm run pass",
+      "      - run: npm run boom",
+      "",
+    ]
+      .join("\n"),
+  );
+  writeFileSync(
+    join(root, "package.json"),
+    JSON.stringify({
+      name: "fake",
+      private: true,
+      scripts: { pass: 'node -e ""', boom: "node scripts/boom.mjs" },
+    }),
+  );
+  // The marker is the FIRST line and the filler is longer than the tail
+  // the summary prints, so a marker found in the log file could only have
+  // come from the log file.
+  writeFileSync(
+    join(root, "scripts", "boom.mjs"),
+    [
+      'console.log("MARKER-FIRST-LINE");',
+      "for (let i = 1; i <= 200; i++) console.log(`filler ${i}`);",
+      "console.log(`COVERAGE_DIR=${process.env.BARWISE_COVERAGE_DIR}`);",
+      "process.exit(1);",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(join(root, "scripts", "ci-local.mjs"), readFileSync(join(SCRIPTS, "ci-local.mjs")));
+  return {
+    dir,
+    root,
+    script: join(root, "scripts", "ci-local.mjs"),
+    lock: join(root, "node_modules", ".ci-local.lock"),
+  };
+}
+
+function runCiLocal(repo, ...args) {
+  const r = spawnSync(process.execPath, [repo.script, ...args], {
+    cwd: repo.dir,
+    encoding: "utf8",
+  });
+  return { ...r, all: `${r.stdout}${r.stderr}` };
+}
+
+/**
+ * The log of ONE named gate, selected by name rather than by being the
+ * first `full output:` line in the summary. Written that way after a
+ * flake: when a second gate also failed, "the first path printed" was
+ * the wrong gate's log, and the test failed for a reason unrelated to
+ * what it asserts.
+ */
+function failureLog(r, gate) {
+  const dir = /\nLogs: (\S+)/.exec(r.all);
+  assert.ok(dir, `the summary must name the log directory:\n${r.all}`);
+  const path = join(dir[1], `${gate}.log`);
+  assert.ok(
+    r.all.includes(`full output: ${path}`),
+    `the summary must name ${gate}'s log file:\n${r.all}`,
+  );
+  return readFileSync(path, "utf8");
+}
+
+test("a failing gate's FULL output is on disk, not just the tail printed", () => {
+  // The tail is what this printed before barwise-960: 25 lines, which for
+  // a turbo run over twelve packages is the summary footer and the npm
+  // error banner and never the failing test's name. Diagnosing one such
+  // failure cost three separate reproduction runs.
+  const repo = tempCiRepo();
+  try {
+    const r = runCiLocal(repo);
+    assert.equal(r.status, 1, `a failing gate must fail the run:\n${r.all}`);
+    assert.doesNotMatch(
+      r.all,
+      /MARKER-FIRST-LINE/,
+      "the printed tail must NOT reach the first line -- if it does, this test proves nothing",
+    );
+
+    assert.match(
+      failureLog(r, "run-boom"),
+      /MARKER-FIRST-LINE/,
+      "the log must carry output the tail could not reach",
+    );
+  } finally {
+    rmSync(repo.dir, { recursive: true, force: true });
+  }
+});
+
+test("each gate runs with BARWISE_COVERAGE_DIR pointed outside the checkout", () => {
+  const repo = tempCiRepo();
+  try {
+    const r = runCiLocal(repo);
+    assert.equal(r.status, 1, `the probing gate must fail so its output is kept:\n${r.all}`);
+    const dir = /COVERAGE_DIR=(\S+)/.exec(failureLog(r, "run-boom"));
+    assert.ok(dir, "the gate must see BARWISE_COVERAGE_DIR set");
+    assert.notEqual(dir[1], "undefined", "the variable must reach the gate's environment");
+    assert.ok(
+      !dir[1].startsWith(repo.dir),
+      `coverage must not be written inside the checkout: ${dir[1]}`,
+    );
+  } finally {
+    rmSync(repo.dir, { recursive: true, force: true });
+  }
+});
+
+test("a second run refuses while a live run holds the lock, and runs no gate", () => {
+  const repo = tempCiRepo();
+  try {
+    mkdirSync(dirname(repo.lock), { recursive: true });
+    // This test's own pid: alive by construction, for as long as it takes
+    // to assert against it.
+    writeFileSync(repo.lock, JSON.stringify({ pid: process.pid, started: "2026-09-08T00:00:00Z" }));
+
+    const r = runCiLocal(repo);
+    assert.equal(r.status, 1, `a held lock must refuse:\n${r.all}`);
+    assert.match(r.all, new RegExp(`already running: pid ${process.pid}`));
+    assert.doesNotMatch(r.stdout, /Running \d+ gates/, "it must refuse BEFORE running any gate");
+  } finally {
+    rmSync(repo.dir, { recursive: true, force: true });
+  }
+});
+
+test("a lock whose pid is gone is removed rather than obeyed, and a run releases its own", () => {
+  const repo = tempCiRepo();
+  try {
+    // A pid that has certainly exited: this process waited for it.
+    const dead = spawnSync(process.execPath, ["-e", ""]).pid;
+    mkdirSync(dirname(repo.lock), { recursive: true });
+    writeFileSync(repo.lock, JSON.stringify({ pid: dead, started: "2026-09-08T00:00:00Z" }));
+
+    const r = runCiLocal(repo);
+    assert.match(r.stdout, /Running 2 gates/, `a stale lock must not stop a run:\n${r.all}`);
+    assert.equal(existsSync(repo.lock), false, "a finished run must release its lock");
+  } finally {
+    rmSync(repo.dir, { recursive: true, force: true });
+  }
 });

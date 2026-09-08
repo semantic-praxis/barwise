@@ -1,5 +1,22 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  // Turborepo 2 runs tasks in strict env mode: a variable not named here
+  // never reaches the task. BARWISE_COVERAGE_DIR is how `ci:local` points
+  // a run's coverage output at a directory of its own, and it was silently
+  // dropped until this line existed -- the run looked isolated and wrote
+  // to packages/*/coverage anyway. It is a pass-through rather than an
+  // `env` input on purpose: a value that is unique per run would miss the
+  // cache every time, and turn a 30s pre-push hook into a 2m40s one.
+  //
+  // The cost of that choice: a run with the variable set produces no
+  // `coverage/**`, so turbo caches an empty output set under a hash a
+  // later run WITHOUT the variable also matches, and that run replays
+  // with no local coverage directory. Its verdict is still the one the
+  // original run reached; only the HTML report is missing, and nothing
+  // reads it -- `ci.yml` uploads no coverage artifact. A developer who
+  // wants the report runs `npx vitest run --coverage` in the package,
+  // which turbo does not cache at all.
+  "globalPassThroughEnv": ["BARWISE_COVERAGE_DIR"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
