@@ -58,29 +58,38 @@ export function mintValue(
  * and minting against the enumeration alone produced counterexamples the
  * model in fact permitted (barwise-958). Every candidate is checked with
  * `valueDomainPredicate`, the same predicate population validation
- * applies, so
- * the two cannot answer differently.
+ * applies, so the two cannot answer differently.
  *
- * The candidates are a fixed short list rather than a search. The first
- * family is the player-named token the enumeration-only case has always
- * produced, so a constraint with no ranges mints exactly what it did
- * before; the rest reach past a range's bounds from either side, lexically
- * and numerically. A domain that admits all of them admits so much that
- * saying what it forbids is not useful -- typically an unbounded range,
- * which forbids nothing at all -- and undefined means the caller emits no
- * counterexample. Under-generating a probe is safe; claiming the model
- * forbids a value it accepts is not.
+ * Two arms, and the split is where the totality argument lives. Against
+ * an enumeration alone the suffix family is exhaustive: the candidates
+ * are distinct and there is one more of them than the enumeration has
+ * entries, so one of them must escape. That case therefore never returns
+ * undefined, and mints the same token it always did.
+ *
+ * A range cannot be escaped by suffixing -- every suffix of a
+ * player-named token sits on the same side of a bound -- so the second
+ * arm reaches past the bounds instead, from either side and both
+ * lexically and numerically. That arm is a fixed list rather than a
+ * search, and a domain admitting all of it may still forbid something
+ * this function will not find. Returning undefined then means the caller
+ * emits no counterexample, which is the safe direction: an unbounded
+ * range genuinely forbids nothing, and under-generating a probe costs
+ * less than claiming the model forbids a value it accepts.
  */
 export function mintInvalidValue(
   domain: ValueDomain,
   role: Role,
   model: OrmModel,
 ): string | undefined {
+  const allowed = valueDomainPredicate(domain);
   const base = `${playerName(role, model)}#invalid`;
-  const candidates = [
-    base,
-    `${base}-1`,
-    `${base}-2`,
+
+  for (let i = 0; i <= domain.values.length; i += 1) {
+    const candidate = i === 0 ? base : `${base}-${i}`;
+    if (!allowed(candidate)) return candidate;
+  }
+
+  return [
     // Sorts below every digit and letter, and above every letter: between
     // them these clear a range bounded on one side under lexical
     // comparison, whichever side it is bounded on.
@@ -90,7 +99,5 @@ export function mintInvalidValue(
     // numbers and are therefore compared numerically.
     "-1e308",
     "1e308",
-  ];
-  const allowed = valueDomainPredicate(domain);
-  return candidates.find((candidate) => !allowed(candidate));
+  ].find((candidate) => !allowed(candidate));
 }

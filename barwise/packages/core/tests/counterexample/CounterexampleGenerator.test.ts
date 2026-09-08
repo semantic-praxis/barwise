@@ -674,6 +674,44 @@ describe("model-wide round-trip completeness", () => {
     expect(counterexampleRoundTripFailure(model)).toBeUndefined();
   });
 
+  /**
+   * The suffix family is exhaustive against an enumeration alone: one
+   * more candidate than the enumeration has entries, all distinct, so
+   * one must escape. This pins that, because the range arm below it is
+   * a fixed list and it would be easy to make the whole function a
+   * fixed list by accident -- which it briefly was.
+   */
+  it("always finds a value outside an enumeration, however it is populated", () => {
+    const model = new OrmModel({ name: "Adversarial" });
+    const token = model.addObjectType({ name: "Token", kind: "value" });
+    const ft = model.addFactType({
+      name: "Token is held",
+      roles: [{ name: "is held", playerId: token.id, id: "r0" }],
+      readings: ["{0} is held"],
+    });
+    // Every candidate the range arm can offer, plus a suffix run long
+    // enough that a fixed-length family would exhaust: only an
+    // enumeration-sized search escapes this.
+    const base = "Token#invalid";
+    ft.addConstraint({
+      type: "value_constraint",
+      id: "vc0",
+      roleId: "r0",
+      values: [
+        base,
+        ...Array.from({ length: 12 }, (_, i) => `${base}-${i + 1}`),
+        `!${base}`,
+        `~${base}`,
+        "-1e308",
+        "1e308",
+      ],
+    });
+
+    const ces = generateCounterexamples(model);
+    expect(ces).toHaveLength(1);
+    expect(counterexampleRoundTripFailure(model)).toBeUndefined();
+  });
+
   /** An unbounded range forbids nothing, so there is nothing to probe. */
   it("emits no counterexample for a value constraint that admits everything", () => {
     const model = new OrmModel({ name: "Unbounded" });
