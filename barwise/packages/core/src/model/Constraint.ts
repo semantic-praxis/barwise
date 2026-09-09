@@ -590,3 +590,39 @@ export function roleIdsOf(c: Constraint): string[] {
 export function operandRoleIds(o: JoinOperand): string[] {
   return o.path.steps.flatMap((s) => [s.entry, s.exit]);
 }
+
+/**
+ * Every OBJECT TYPE id a constraint references.
+ *
+ * Only join constraints have any: each operand's role path is rooted at
+ * an object type (the correlation variable's type). Exhaustive over the
+ * union with no `default` arm for the same reason as `roleIdsOf` -- a
+ * kind added later must be classified rather than silently reporting
+ * none.
+ *
+ * Separate from `roleIdsOf` because the two resolve against different
+ * stores, and a caller checking references has to know which is which.
+ */
+export function objectTypeIdsOf(c: Constraint): string[] {
+  switch (c.type) {
+    case "internal_uniqueness":
+    case "external_uniqueness":
+    case "disjunctive_mandatory":
+    case "exclusion":
+    case "exclusive_or":
+    case "frequency":
+    case "mandatory":
+    case "cardinality":
+    case "value_constraint":
+    case "subset":
+    case "equality":
+    case "ring":
+    case "value_comparison":
+      return [];
+    case "join_subset":
+      return [c.subset.path.root, c.superset.path.root];
+    case "join_equality":
+    case "join_exclusion":
+      return c.operands.map((o) => o.path.root);
+  }
+}

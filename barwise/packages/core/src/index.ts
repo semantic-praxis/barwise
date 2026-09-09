@@ -33,6 +33,7 @@ export {
   type JoinOperand,
   type JoinSubsetConstraint,
   type MandatoryRoleConstraint,
+  objectTypeIdsOf,
   operandRoleIds,
   RING_TYPES,
   type RingConstraint,

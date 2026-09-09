@@ -26,7 +26,7 @@
  * for the record conversion rather than shipping unsound here.
  */
 
-import { type Constraint, roleIdsOf } from "./Constraint.js";
+import { type Constraint, objectTypeIdsOf, roleIdsOf } from "./Constraint.js";
 import type { FactType } from "./FactType.js";
 import type { ObjectifiedFactType } from "./ObjectifiedFactType.js";
 import type { ObjectType } from "./ObjectType.js";
@@ -196,6 +196,21 @@ export function graphOf(model: OrmModel): GraphResult {
         const list = constraintsByRole.get(role.id);
         if (list) list.push(c);
         else constraintsByRole.set(role.id, [c]);
+      }
+      // A join operand's path is rooted at an object type, which is a
+      // reference like any other. Enumerated systematically rather than
+      // found one at a time: Role.playerId, the constraint role ids,
+      // these path roots, SubtypeFact's two ends, ObjectifiedFactType's
+      // two, and Population.factTypeId are every id-shaped field in the
+      // metamodel. JoinOperand.projection holds indices, not ids.
+      for (const otId of objectTypeIdsOf(c)) {
+        if (!model.getObjectType(otId)) {
+          unresolved.push({
+            from: { kind: "constraint", constraint: c, factType: ft },
+            field: "path.root",
+            missing: otId,
+          });
+        }
       }
       rolesOfConstraint.set(c, resolved);
     }

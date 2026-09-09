@@ -109,6 +109,32 @@ describe("graphOf: references that do not resolve", () => {
     expect(dup?.from.kind).toBe("role");
   });
 
+  // A join operand's path is rooted at an object type. Enumerating every
+  // id-shaped field in the metamodel found this as the one reference
+  // kind the first cut of graphOf missed -- better than discovering the
+  // kinds one at a time as each consumer needs them.
+  it("fails when a join operand's path root does not resolve", () => {
+    const model = simpleModel();
+    const ft = model.factTypes[0]!;
+    const step = { entry: ft.roles[0]!.id, exit: ft.roles[1]!.id };
+    ft.addConstraint({
+      type: "join_equality",
+      id: "je",
+      operands: [
+        { path: { root: "ot-missing", steps: [step] }, projection: [0] },
+        { path: { root: ft.roles[0]!.playerId, steps: [step] }, projection: [0] },
+      ],
+    });
+
+    const result = graphOf(model);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const root = result.unresolved.find((u) => u.field === "path.root");
+    expect(root?.missing).toBe("ot-missing");
+    if (root?.from.kind !== "constraint") throw new Error("expected a constraint source");
+    expect(root.from.constraint.type).toBe("join_equality");
+  });
+
   it("does not return a graph when a reference dangles", () => {
     const model = simpleModel();
     model.factTypes[0]!.addConstraint({ type: "mandatory", roleId: "bogus", id: "c" });
