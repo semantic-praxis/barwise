@@ -21,7 +21,15 @@ export function verbalizeInternalUniqueness(
   factType: FactType,
   model: OrmModel,
 ): Verbalization {
-  if (factType.arity === 2 && roleIds.length === 1) {
+  // `factType.hasRole` is not redundant with the arity test. The binary
+  // path resolves its role with `findIndex` and then asserts the result
+  // is present, so a constraint naming a role of ANOTHER fact type
+  // indexes `roles[-1]` and dies on `undefined.playerId`. That is
+  // reachable today: `barwise verbalize` crashes on a schema-valid file
+  // whose constraint names a real role of a different fact type, and no
+  // surface validates before verbalizing (barwise-979). The graph does
+  // not close it -- a foreign role resolves -- so the guard is here.
+  if (factType.arity === 2 && roleIds.length === 1 && factType.hasRole(roleIds[0]!)) {
     return verbalizeBinaryUniqueness(
       roleIds[0]!,
       factType,
@@ -172,7 +180,9 @@ export function verbalizeMandatory(
   factType: FactType,
   model: OrmModel,
 ): Verbalization {
-  if (factType.arity === 2) {
+  // See `verbalizeInternalUniqueness` for why `hasRole` guards the
+  // binary path (barwise-979).
+  if (factType.arity === 2 && factType.hasRole(roleId)) {
     return verbalizeBinaryMandatory(roleId, factType, model);
   }
 
