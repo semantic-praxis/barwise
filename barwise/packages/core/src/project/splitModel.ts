@@ -11,7 +11,7 @@
  */
 
 import { parse, stringify } from "yaml";
-import type { Constraint, JoinOperand } from "../model/Constraint.js";
+import { roleIdsOf } from "../model/Constraint.js";
 import { ContextMapping } from "../model/ContextMapping.js";
 import { OrmProject } from "../model/OrmProject.js";
 import { MappingSerializer } from "../serialization/MappingSerializer.js";
@@ -574,40 +574,6 @@ function pickWinner(votes: ReadonlyMap<string, number>): string | undefined {
  */
 function constraintRoleIds(constraint: RawConstraint): string[] {
   return roleIdsOf(deserializeConstraint(constraint as unknown as OrmYamlConstraint));
-}
-
-function roleIdsOf(c: Constraint): string[] {
-  switch (c.type) {
-    case "internal_uniqueness":
-    case "external_uniqueness":
-    case "disjunctive_mandatory":
-    case "exclusion":
-    case "exclusive_or":
-    case "frequency":
-      return [...c.roleIds];
-    case "mandatory":
-    case "cardinality":
-      return [c.roleId];
-    case "value_constraint":
-      return c.roleId ? [c.roleId] : [];
-    case "subset":
-      return [...c.subsetRoleIds, ...c.supersetRoleIds];
-    case "equality":
-      return [...c.roleIds1, ...c.roleIds2];
-    case "ring":
-    case "value_comparison":
-      return [c.roleId1, c.roleId2];
-    case "join_subset":
-      return [...operandRoleIds(c.subset), ...operandRoleIds(c.superset)];
-    case "join_equality":
-    case "join_exclusion":
-      return c.operands.flatMap(operandRoleIds);
-  }
-}
-
-/** Role ids a join operand references: both ends of every hop in its path. */
-function operandRoleIds(o: JoinOperand): string[] {
-  return o.path.steps.flatMap((s) => [s.entry, s.exit]);
 }
 
 /**
