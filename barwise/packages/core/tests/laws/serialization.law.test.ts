@@ -39,7 +39,6 @@ import { toFactTypeConfig } from "../../src/model/FactType.js";
 import type { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { structuralRules } from "../../src/validation/rules/structural.js";
-import { graphFor } from "../helpers/graphFor.js";
 import { arbOrmModel, RUNS, SEED } from "../arbitraries/model.js";
 import {
   normaliseFactTypeConfig,
@@ -47,6 +46,7 @@ import {
   stripFactTypeIds,
   stripObjectTypeIds,
 } from "../arbitraries/normalise.js";
+import { graphFor } from "../helpers/graphFor.js";
 
 const serializer = new OrmYamlSerializer();
 

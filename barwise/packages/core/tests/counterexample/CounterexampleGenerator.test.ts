@@ -1,4 +1,3 @@
-import { graphFor } from "../helpers/graphFor.js";
 import { describe, expect, it } from "vitest";
 import type { Counterexample } from "../../src/counterexample/Counterexample.js";
 import {
@@ -9,6 +8,7 @@ import type { RingType } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
 import { counterexampleRoundTripFailure } from "../helpers/counterexampleRules.js";
+import { graphFor } from "../helpers/graphFor.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 /**

@@ -24,9 +24,7 @@ import {
   checkSpanningExclusiveOrViolations,
   checkSpanningSubsetViolations,
 } from "./population/spanning.js";
-import {
-  checkIncompleteInstances,
-} from "./population/structural.js";
+import { checkIncompleteInstances } from "./population/structural.js";
 import {
   checkExternalUniquenessViolations,
   checkUniquenessViolations,

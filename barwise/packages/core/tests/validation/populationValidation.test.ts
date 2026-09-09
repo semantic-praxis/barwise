@@ -13,11 +13,11 @@
  *   - Ring constraint violations (all 8 ring types)
  *   - Valid populations produce no diagnostics
  */
-import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";
 import { describe, expect, it } from "vitest";
 import type { ValueRange } from "../../src/model/ObjectType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
+import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";
 
 /**
  * Build a model with "Customer places Order" fact type and configurable

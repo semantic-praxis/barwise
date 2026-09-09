@@ -1,12 +1,14 @@
 # Resolve references once: `ModelGraph`, and which id spaces earn a brand
 
-Status: Workstream 1 (`NormaId`) shipped 2026-09-09; Workstreams 2-5 not
-implemented
+Status: Workstreams 1 (`NormaId`), 2 (`graphOf`) and 3 (validation
+split) shipped 2026-09-09; Workstreams 4-5 not implemented
 Created: 2026-09-09
 Last-updated: 2026-09-09
 Tracking: barwise-974 (this spec), barwise-973 (WS1, partly shipped),
 barwise-924 (the parent review, closed since PR #423), barwise-945 (the
-population tuple, out of scope here and named in Non-goals)
+population tuple, out of scope here and named in Non-goals),
+barwise-976, barwise-977, barwise-978 (what WS3's implementation found
+that this spec had wrong -- see Workstream 3 below)
 
 This respecifies WS3 of `core-branching-load.spec.md` as a standalone
 spec, because the branded-id question belongs in the same design and
@@ -175,19 +177,19 @@ Every row re-measured on `main` `7600a7b`, 2026-09-09. The parent
 spec's WS3 figures were taken at `664b9fe`; three of eight are wrong
 rather than stale, and are corrected here.
 
-| Area                                                    | Current state                                                                                                                                                             | Verdict                                                           |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `model/Role.ts`                                         | `playerId: string`; a bare reference                                                                                                                                      | unchanged; the graph resolves it                                  |
-| `model/OrmModel.ts`                                     | `getObjectType(id): ObjectType \| undefined`, 131 call sites repo-wide                                                                                                    | unchanged; stays the raw store                                    |
-| `model/roleGraph.ts`                                    | `hopsFrom(model, objectTypeId: string)`, one caller (`query/evaluate.ts:357`); `RoleHop` referenced nowhere else                                                          | moves into `ModelGraph` (WS4)                                     |
-| `validation/rules/*.ts`                                 | 13 reference lookups (`structural` 6, `joinConstraintRules` 4, `constraintConsistency` 2, `derivationRules` 1); some are prologues, some ARE the dangling-reference check | split: prologues take the graph, checks move into `graphOf` (WS3) |
-| `verbalization/`, `counterexample/`                     | 28 lines ending in a `?? roleId` / `?? roleIds[i]` fallback, 27 of them in `constraints/phase1.ts` and `phase2.ts`                                                        | takes resolved roles; fallbacks go (WS5)                          |
-| `query/evaluate.ts`                                     | 3 `?? playerId` fallbacks; imports `hopsFrom`                                                                                                                             | takes the graph (WS4)                                             |
-| `describe/summaries.ts`                                 | 2 `?? playerId` fallbacks (lines 47, 189), the same shape as query's                                                                                                      | takes the graph (WS4)                                             |
-| `counterexample/CounterexampleGenerator.ts`             | `findRoleById` at :537, a linear scan                                                                                                                                     | replaced by a graph accessor (WS5)                                |
-| `formats/norma/NormaXmlWriter.ts`, `populationGraph.ts` | two `normaId` definitions, agreement guarded by a comment, unregistered                                                                                                   | one owner, branded `NormaId` (WS1)                                |
-| `packages/core/src/mapping/`                            | **no** `?? id` player fallbacks                                                                                                                                           | untouched -- see below                                            |
-| `validation/constraintEnforcement.ts`                   | no graph today                                                                                                                                                            | builds the graph internally, so `learn` is untouched (WS3)        |
+| Area                                                    | Current state                                                                                                                                                                                                                      | Verdict                                                           |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `model/Role.ts`                                         | `playerId: string`; a bare reference                                                                                                                                                                                               | unchanged; the graph resolves it                                  |
+| `model/OrmModel.ts`                                     | `getObjectType(id): ObjectType \| undefined`, 131 call sites repo-wide                                                                                                                                                             | unchanged; stays the raw store                                    |
+| `model/roleGraph.ts`                                    | `hopsFrom(model, objectTypeId: string)`, one caller (`query/evaluate.ts:357`); `RoleHop` referenced nowhere else                                                                                                                   | moves into `ModelGraph` (WS4)                                     |
+| `validation/rules/*.ts`                                 | 13 reference lookups (`structural` 6, `joinConstraintRules` 4, `constraintConsistency` 2, `derivationRules` 1); some are prologues, some ARE the dangling-reference check. **Undercounted: see the correction below the command.** | split: prologues take the graph, checks move into `graphOf` (WS3) |
+| `verbalization/`, `counterexample/`                     | 28 lines ending in a `?? roleId` / `?? roleIds[i]` fallback, 27 of them in `constraints/phase1.ts` and `phase2.ts`                                                                                                                 | takes resolved roles; fallbacks go (WS5)                          |
+| `query/evaluate.ts`                                     | 3 `?? playerId` fallbacks; imports `hopsFrom`                                                                                                                                                                                      | takes the graph (WS4)                                             |
+| `describe/summaries.ts`                                 | 2 `?? playerId` fallbacks (lines 47, 189), the same shape as query's                                                                                                                                                               | takes the graph (WS4)                                             |
+| `counterexample/CounterexampleGenerator.ts`             | `findRoleById` at :537, a linear scan                                                                                                                                                                                              | replaced by a graph accessor (WS5)                                |
+| `formats/norma/NormaXmlWriter.ts`, `populationGraph.ts` | two `normaId` definitions, agreement guarded by a comment, unregistered                                                                                                                                                            | one owner, branded `NormaId` (WS1)                                |
+| `packages/core/src/mapping/`                            | **no** `?? id` player fallbacks                                                                                                                                                                                                    | untouched -- see below                                            |
+| `validation/constraintEnforcement.ts`                   | no graph today                                                                                                                                                                                                                     | builds the graph internally, so `learn` is untouched (WS3)        |
 
 The lookup count has a command, because two readers counting different
 things is how the parent spec's figures went wrong in the first place:
@@ -203,6 +205,24 @@ prologues and ~20 undefined guards" is a fourth figure it got wrong --
 the guard count is 12 by
 `grep -rn -A2 ... | grep -cE 'if \(!|\?\?|continue|\?\.'`. Whichever
 pattern a later reader prefers, the point is that it is written down.
+
+**And writing it down is what caught it being wrong.** The glob is
+`rules/*.ts`, one directory level, and `rules/population/` holds eleven
+more files. The same pattern over `rules/` gives 29, and 57 once
+`hasRole(` and `factTypeOfRole(` join it -- the two spellings of a
+lookup that does not go through `model.get*` at all:
+
+```sh
+grep -rn 'getObjectType(\|getRoleById(\|getFactType(' \
+  packages/core/src/validation/rules/ | wc -l                        # 29
+grep -rn 'getObjectType(\|getRoleById(\|getFactType(\|hasRole(\|factTypeOfRole(' \
+  packages/core/src/validation/rules/ | wc -l                        # 57
+```
+
+The four-fold gap did not change WS3's shape, because most of what it
+turned up is not reference resolution at all (next section). It is
+recorded because "the point is that it is written down" is only true if
+someone re-runs it, and the correction is what re-running produced.
 
 Four corrections a reviewer should not have to find:
 
@@ -438,32 +458,100 @@ have, it shall return a failure naming that reference. Both halves are
 required -- the failure case is what makes the success case mean
 something, and it is the reading that must be established first.
 
-### 3. Validation rules split: prologues take the graph, checks move into it
+### 3. Validation rules split: prologues take the graph, checks move into it (SHIPPED)
 
 **Not every lookup in `validation/rules/` is a prologue, and this is
-the workstream where that distinction decides the design.** Three of
-the 13 are the dangling-reference check itself: `structural.ts:43`
-(`if (!model.getObjectType(role.playerId))`, which emits
-`RULE_ID.danglingRoleReference`), `constraintConsistency.ts`'s
-`ft.hasRole(...)` guards, and `joinConstraintRules.ts:148-151`
-resolving `step.entry` / `step.exit`. Those cannot "take the graph": a
-model with a dangling reference has no graph to take.
+the workstream where that distinction decides the design.** The draft
+of this section named three lookups as "the dangling-reference check
+itself" and said all three could move into `graphOf`. Implementing it
+showed that **two of the three are not reference checks at all**, and
+the correction is the most useful thing WS3 produced (barwise-976).
 
-So `graphOf` becomes the single owner of reference resolution. The
-three checks are deleted here and their tests move to `graphOf`'s;
-every remaining lookup is a prologue and reads the graph.
-`ValidationEngine.validate` gains sequencing it does not have today:
-build the graph first, and when it fails, return the reference
-diagnostics mapped from `UnresolvedReference` plus the rules that need
-no references (completeness warnings, population checks), skipping the
-graph-taking rules. A caller still sees everything knowable about a
-model that cannot build.
+**Resolution asks whether an id names anything in the model. Locality
+asks whether it names something HERE.** They look identical at the call
+site and are not the same question:
 
-That ordering also prevents a duplicate: with the graph reporting
-`constraint/mandatory-invalid-role` and `constraintConsistency` still
-checking `hasRole`, one defect would produce two diagnostics, and
-`Phase2ConstraintConsistency.test.ts`'s `diags.some(...)` assertions
-would not notice.
+- `structural.ts:43` (`!model.getObjectType(role.playerId)`) is pure
+  resolution. So are the subtype and objectification dangling arms,
+  `population/structural.ts:12`, and `joinConstraintRules`'s
+  `!model.getObjectType(path.root)`. These moved into `graphOf`.
+- `constraintConsistency.ts`'s `ft.hasRole(roleId)` guards are
+  **locality**. Their own message says so -- "references role id X which
+  does not belong to this fact type". A constraint on fact type A naming
+  a real role of fact type B is reported today and resolves perfectly
+  well in the graph; deleting the guard in favour of `graphOf` would
+  have dropped that case silently. Measured, not reasoned: a
+  `ModelBuilder` model with two fact types and a `mandatory` constraint
+  pointing across reports `constraint/mandatory-invalid-role` from the
+  engine while `graphOf(model).ok` is `true`.
+- `joinConstraintRules`'s step check is both at once:
+  `factTypeOfRole(model, step.entry)` resolves across every fact type,
+  then `stepFt.getRoleById(step.exit)` requires the exit in that same
+  one. The resolution half moved; `joinBadStep` stayed for the locality
+  half.
+
+So `graphOf` is the single owner of **resolution**, not of every guard
+that used a lookup. `ValidationEngine.validate` builds the graph first
+and dispatches: on success every rule runs and the graph-taking ones
+read resolved values; on failure the unresolvable references are
+reported through `validation/referenceDiagnostics.ts`, in the rule ids
+the deleted checks owned, and only the reference-free rules run.
+
+`ValidationRule` gained a sibling, `GraphValidationRule`, rather than
+one signature with an optional graph, because the difference decides
+whether a rule can run at all. The type catches the dangerous half of a
+miscategorisation: a rule that takes the graph will not compile in the
+reference-free list.
+
+That ordering prevents the duplicate this section predicted -- with the
+graph reporting `constraint/mandatory-invalid-role` and
+`constraintConsistency` still checking `hasRole`, one defect would
+produce two diagnostics. The fix is not to delete the guard but to
+register `constraintConsistencyRules` as graph-taking: it does not read
+the graph, it depends on the graph having BUILT, and once it has, every
+role id resolves and `hasRole` can only mean "belongs elsewhere".
+
+**Two claims in the draft of this section were wrong, and both cost
+something a reader should not pay twice.**
+
+The first is "A caller still sees everything knowable about a model
+that cannot build." It does not (barwise-978). One dangling id
+suppresses every graph-taking rule for that pass, so a model with both
+a dangling role and a duplicate tuple reports only the first. That is
+the compiler's bargain -- a parse error suppresses type errors -- and it
+is the price of resolving each reference once instead of at 131
+lookups, but it is a cost, not a free improvement. It is pinned by name
+in `tests/validation/engineSequencing.test.ts` rather than incidentally,
+which is how `populationIntegration.test.ts` had been pinning it.
+
+The second is that these checks had consumers at all.
+`OrmModel.addObjectifiedFactType` and `addPopulation` throw on a missing
+reference and take no `skipPlayerValidation` option, unlike
+`addFactType` and `addSubtypeFact`, so no caller -- the deserializer
+included -- can hand the validator a model carrying one, and
+`structural/objectified-dangling-*` and `population/dangling-fact-type`
+have never fired for anybody (barwise-977). A schema-valid `.orm.yaml`
+whose population names a missing fact type does not produce that
+diagnostic; it fails to load, and `barwise validate` prints one parse
+error instead of every problem in the file.
+
+**One thing the graph checks that nothing checked before**: role ids
+must be unique. An id-keyed index keeps the last writer, so the
+alternative to refusing a duplicate is answering confidently for the
+wrong fact type. That is a new finding, so it got a new rule id
+(`structural/duplicate-role-id`) rather than borrowing
+`danglingRoleReference`, whose message would have claimed the id named a
+missing object type. One existing test fixture was reusing a role id
+across two fact types.
+
+**Not shipped, and deliberately**: the ~18 `model.getFactType(
+pop.factTypeId)` guards inside `rules/population/*`. They resolve, and
+after the engine's sequencing they are dead rather than wrong -- the
+graph has already guaranteed what they check. Migrating them drags
+`buildObjectUniverse` and the `*For` entry points that
+`constraintEnforcement` exposes to `@barwise/learn` into a signature
+change that buys no behaviour. Left as cleanup, named here so it is a
+decision rather than an oversight.
 
 `constraintEnforcement.ts` builds the graph internally, so
 `@barwise/learn`'s calls into core do not change. That is the only
@@ -471,10 +559,13 @@ sense in which learn is untouched: it holds 12 `getObjectType` lookups
 of its own in `evaluate/populationMapping.ts`, among the 54 named out
 of scope above.
 
-Acceptance: when a validation rule needs a role's player, it shall read
-it from the graph; no rule in `validation/rules/` shall resolve a
-reference itself; and when `graphOf` fails, `validate` shall return one
-diagnostic per unresolvable reference and no duplicates.
+Acceptance, as shipped: when a validation rule needs a role's player it
+reads it from the graph; no rule in `validation/rules/` decides whether
+a reference RESOLVES (locality checks stay, and are named above); and
+when `graphOf` fails, `validate` returns one diagnostic per unresolvable
+reference and no duplicates. The original wording said "no rule shall
+resolve a reference itself", which -- read literally against the
+corrected 57-site count -- would have deleted the locality checks too.
 
 ### 4. Query and describe take the graph; `hopsFrom` moves
 

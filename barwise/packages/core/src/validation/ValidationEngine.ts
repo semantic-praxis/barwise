@@ -7,7 +7,7 @@ import { constraintConsistencyRules } from "./rules/constraintConsistency.js";
 import { derivationRules } from "./rules/derivationRules.js";
 import { joinConstraintRules } from "./rules/joinConstraintRules.js";
 import { populationValidationRules } from "./rules/populationValidation.js";
-import { structuralRules } from "./rules/structural.js";
+import { structuralRules, structuralWellFormedness } from "./rules/structural.js";
 import type { GraphValidationRule, ValidationRule } from "./ValidationRule.js";
 
 /**
@@ -32,6 +32,7 @@ import type { GraphValidationRule, ValidationRule } from "./ValidationRule.js";
 export class ValidationEngine {
   /** Rules that read only what is written in the model. */
   private readonly rules: ValidationRule[] = [
+    structuralWellFormedness,
     completenessWarnings,
   ];
 

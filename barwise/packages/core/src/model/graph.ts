@@ -275,14 +275,13 @@ export function graphOf(model: OrmModel): GraphResult {
 
   if (unresolved.length > 0) return { ok: false, unresolved };
 
-  // Past this point every lookup below is proved, which is what lets the
-  // accessors assert rather than branch. A `!` here is a claim the loops
-  // above established, not a shortcut.
-  // Building proved every reference the model DECLARES. It cannot prove
-  // anything about an id or element a caller invents, so a miss here is
-  // a programming error, not a model defect -- and `undefined` typed as
-  // present would surface far from its cause, which is the failure mode
-  // this whole module exists to remove. Fail where the mistake is.
+  // Past this point every reference the model DECLARES is proved, which
+  // is what lets the accessors return a value rather than branch. What
+  // building cannot prove is anything about an id or element a caller
+  // invents, so a miss here is a programming error, not a model defect
+  // -- and `undefined` typed as present would surface far from its
+  // cause, which is the failure mode this whole module exists to
+  // remove. Fail where the mistake is, with the id in the message.
   const must = <T>(value: T | undefined, what: string, id: string): T => {
     if (value === undefined) {
       throw new Error(

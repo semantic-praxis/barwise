@@ -16,7 +16,10 @@ import { describe, expect, it } from "vitest";
 import { FactType } from "../../src/model/FactType.js";
 import { createObjectType } from "../../src/model/ObjectType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
-import { structuralRules } from "../../src/validation/rules/structural.js";
+import {
+  structuralRules,
+  structuralWellFormedness,
+} from "../../src/validation/rules/structural.js";
 import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
@@ -115,7 +118,7 @@ describe("structuralRules", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (model as any)._objectTypes.set(ot2.id, ot2);
 
-      const diagnostics = structuralRules(model, graphFor(model));
+      const diagnostics = structuralWellFormedness(model);
       const dupes = diagnostics.filter(
         (d) => d.ruleId === "structural/duplicate-object-type-name",
       );
@@ -144,7 +147,7 @@ describe("structuralRules", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (model as any)._factTypes.set(ft2.id, ft2);
 
-      const diagnostics = structuralRules(model, graphFor(model));
+      const diagnostics = structuralWellFormedness(model);
       const dupes = diagnostics.filter(
         (d) => d.ruleId === "structural/duplicate-fact-type-name",
       );
@@ -176,7 +179,7 @@ describe("structuralRules", () => {
         readings: ["{0} places {1}"], // only forward reading
       });
 
-      const diagnostics = structuralRules(model, graphFor(model));
+      const diagnostics = structuralWellFormedness(model);
       const readingWarnings = diagnostics.filter(
         (d) => d.ruleId === "structural/binary-missing-inverse-reading",
       );

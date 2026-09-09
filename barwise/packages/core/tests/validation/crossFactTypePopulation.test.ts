@@ -3,10 +3,10 @@
  * disjunctive mandatory, checked against the object universe (the set of
  * values appearing in any role played by a type across all populations).
  */
-import { graphFor } from "../helpers/graphFor.js";
 import { describe, expect, it } from "vitest";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
+import { graphFor } from "../helpers/graphFor.js";
 
 /** Customer is identified, and must place an Order (mandatory on the Customer role). */
 function mandatoryModel(playsOrder: boolean): OrmModel {

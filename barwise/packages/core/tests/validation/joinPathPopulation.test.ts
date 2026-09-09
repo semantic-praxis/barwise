@@ -6,11 +6,11 @@
  * the Person root, satisfy the constraint's relation over a sample
  * population.
  */
-import { graphFor } from "../helpers/graphFor.js";
 import { describe, expect, it } from "vitest";
 import type { Constraint } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
+import { graphFor } from "../helpers/graphFor.js";
 
 interface BornCitizen {
   person: string;
@@ -76,7 +76,9 @@ const citizenOf = {
 };
 
 function joinDiags(model: OrmModel) {
-  return populationValidationRules(model, graphFor(model)).filter((d) => d.ruleId.startsWith("population/join-"));
+  return populationValidationRules(model, graphFor(model)).filter((d) =>
+    d.ruleId.startsWith("population/join-")
+  );
 }
 
 describe("join constraint population satisfaction", () => {

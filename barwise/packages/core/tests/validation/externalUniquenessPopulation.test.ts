@@ -4,12 +4,12 @@
  * share an identifying combination, and the graceful skip when the join
  * key cannot be inferred as a single clear object type.
  */
-import { graphFor } from "../helpers/graphFor.js";
 import { describe, expect, it } from "vitest";
 import type { FactType } from "../../src/model/FactType.js";
 import type { ObjectType } from "../../src/model/ObjectType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
+import { graphFor } from "../helpers/graphFor.js";
 
 interface RoleSpec {
   readonly player: ObjectType;

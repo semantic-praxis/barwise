@@ -69,6 +69,29 @@ describe("ValidationEngine sequencing around graph construction", () => {
     expect(invalid).toHaveLength(1);
   });
 
+  it("still reports the reference-free structural findings when the graph fails", () => {
+    const model = withPopulationViolation();
+    // A binary fact type with one reading, which nothing about the
+    // dangling id below affects.
+    model.addFactType({
+      name: "Order has Code",
+      roles: [
+        { name: "has", playerId: model.objectTypes[1]!.id },
+        { name: "is of", playerId: model.objectTypes[0]!.id },
+      ],
+      readings: ["{0} has {1}"],
+    });
+    model.factTypes[0]!.addConstraint({ type: "mandatory", roleId: "r-bad", id: "c-bad" });
+
+    const ruleIds = new ValidationEngine().validate(model).map((d) => d.ruleId);
+
+    expect(ruleIds).toContain(RULE_ID.mandatoryInvalidRole);
+    // Reference-free: reported despite the graph failing. Before the
+    // split this warning vanished from `barwise validate` output the
+    // moment any id in the file dangled.
+    expect(ruleIds).toContain(RULE_ID.binaryMissingInverseReading);
+  });
+
   it("still reports a role of another fact type, which resolves but is not local", () => {
     const model = withPopulationViolation();
     const other = model.addFactType({

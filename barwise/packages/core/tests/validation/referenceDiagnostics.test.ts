@@ -163,8 +163,16 @@ describe("referenceDiagnostics for states no constructor admits", () => {
     const oft = model.addObjectifiedFactType({ factTypeId: ft.id, objectTypeId: ot.id });
 
     const diags = referenceDiagnostics([
-      { from: { kind: "objectifiedFactType", objectifiedFactType: oft }, field: "factTypeId", missing: "ft-missing" },
-      { from: { kind: "objectifiedFactType", objectifiedFactType: oft }, field: "objectTypeId", missing: "ot-missing" },
+      {
+        from: { kind: "objectifiedFactType", objectifiedFactType: oft },
+        field: "factTypeId",
+        missing: "ft-missing",
+      },
+      {
+        from: { kind: "objectifiedFactType", objectifiedFactType: oft },
+        field: "objectTypeId",
+        missing: "ot-missing",
+      },
     ]);
 
     expect(diags.map((d) => d.ruleId)).toEqual([

@@ -22,17 +22,38 @@ import { report, RULE_ID } from "../ruleId.js";
  * id. The diagnostic ids did not move with the checks -- a dangling
  * player still reports `structural/dangling-role-reference` -- because
  * a rule id is a promise to whoever reads validator output.
+ *
+ * They ship as two exports rather than one, and the split is worth more
+ * than it looks. Four of the seven checks read no reference at all: two
+ * compare names, one counts readings, one walks subtype ids as a graph
+ * of ids. Left in the graph-taking export they would be suppressed
+ * whenever any id in the model dangled -- and `barwise validate` on a
+ * file with one bad constraint role would stop reporting that a binary
+ * fact type has only one reading, which has nothing to do with the bad
+ * id. Splitting them keeps that cost (barwise-978) to the findings that
+ * genuinely need resolution.
  */
 export function structuralRules(model: OrmModel, graph: ModelGraph): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+
+  diagnostics.push(...checkSubtypeFactKinds(model, graph));
+  diagnostics.push(...checkObjectifiedFactTypeKinds(model, graph));
+  diagnostics.push(...checkIdentificationCycles(model, graph));
+
+  return diagnostics;
+}
+
+/**
+ * The structural checks that read no reference, so they run whether or
+ * not the model's ids resolve.
+ */
+export function structuralWellFormedness(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   diagnostics.push(...checkDuplicateObjectTypeNames(model));
   diagnostics.push(...checkDuplicateFactTypeNames(model));
   diagnostics.push(...checkBinaryFactTypeReadings(model));
-  diagnostics.push(...checkSubtypeFactKinds(model, graph));
   diagnostics.push(...checkSubtypeCycles(model));
-  diagnostics.push(...checkObjectifiedFactTypeKinds(model, graph));
-  diagnostics.push(...checkIdentificationCycles(model, graph));
 
   return diagnostics;
 }

@@ -7,13 +7,13 @@
  * kind the predicate does not cover reported as unanswered rather than as
  * satisfied.
  */
-import { graphFor } from "../helpers/graphFor.js";
 import { describe, expect, it } from "vitest";
 import type { Constraint } from "../../src/model/Constraint.js";
 import type { FactType } from "../../src/model/FactType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { evaluateConstraintEnforcement } from "../../src/validation/constraintEnforcement.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
+import { graphFor } from "../helpers/graphFor.js";
 
 /** The rule ids the predicate's seven kinds can produce. */
 const COVERED_RULE_IDS = new Set([

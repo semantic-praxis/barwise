@@ -7,11 +7,11 @@
  *     population -> warning (its facts are computed, not asserted)
  *   - Derived-and-stored and semiderived populations are accepted
  */
-import { graphFor } from "../helpers/graphFor.js";
 import { describe, expect, it } from "vitest";
 import type { DerivationRule } from "../../src/model/FactType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { derivationRules } from "../../src/validation/rules/derivationRules.js";
+import { graphFor } from "../helpers/graphFor.js";
 
 function modelWithDerivedFactType(derivation: DerivationRule): OrmModel {
   const model = new OrmModel({ name: "Test" });

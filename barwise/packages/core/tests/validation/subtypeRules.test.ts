@@ -10,7 +10,10 @@
 import { describe, expect, it } from "vitest";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { SubtypeFact } from "../../src/model/SubtypeFact.js";
-import { structuralRules } from "../../src/validation/rules/structural.js";
+import {
+  structuralRules,
+  structuralWellFormedness,
+} from "../../src/validation/rules/structural.js";
 import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";
 
 describe("subtype structural rules", () => {
@@ -143,7 +146,7 @@ describe("subtype structural rules", () => {
     });
     (model as any)._subtypeFacts.set(cycleSf.id, cycleSf);
 
-    const diags = structuralRules(model, graphFor(model));
+    const diags = structuralWellFormedness(model);
     const cycleDiags = diags.filter(
       (d) => d.ruleId === "structural/subtype-cycle",
     );

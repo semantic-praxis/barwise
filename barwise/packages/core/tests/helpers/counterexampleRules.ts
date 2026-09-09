@@ -17,13 +17,13 @@
  * cannot leave a stale literal behind.
  */
 
-import { graphFor } from "./graphFor.js";
 import type { Counterexample } from "../../src/counterexample/Counterexample.js";
 import { generateCounterexamples } from "../../src/counterexample/CounterexampleGenerator.js";
 import type { Constraint } from "../../src/model/Constraint.js";
 import type { OrmModel } from "../../src/model/OrmModel.js";
 import { RULE_ID } from "../../src/validation/ruleId.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
+import { graphFor } from "./graphFor.js";
 
 /**
  * The population rule each constraint kind's counterexample must trip.

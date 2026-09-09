@@ -3,12 +3,12 @@
  * exclusion, exclusive-or, subset, and equality whose roles span two fact
  * types.
  */
-import { graphFor } from "../helpers/graphFor.js";
 import { describe, expect, it } from "vitest";
 import type { FactType } from "../../src/model/FactType.js";
 import type { ObjectType } from "../../src/model/ObjectType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
+import { graphFor } from "../helpers/graphFor.js";
 
 interface RoleSpec {
   readonly player: ObjectType;
