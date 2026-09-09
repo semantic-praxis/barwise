@@ -37,7 +37,7 @@ AppointmentStatus is status of Appointment
 Appointment has FollowUpNote
 FollowUpNote is for Appointment
   Each Appointment has at most one FollowUpNote.
-  If Appointment then e013fc4a-a9bf-457c-862c-f2dadaa37ff3.
+  If Appointment then Appointment in Appointment has AppointmentStatus.
 Doctor is assigned to ExamRoom on AppointmentDate
   For each Doctor and AppointmentDate combination, at most one ExamRoom applies.
 Patient has Doctor as primary doctor

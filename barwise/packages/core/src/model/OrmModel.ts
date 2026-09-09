@@ -362,46 +362,59 @@ export class OrmModel {
 
   /**
    * Add an objectified fact type to the model.
-   * @throws If the referenced fact type does not exist.
-   * @throws If the referenced object type does not exist or is not an entity.
+   * @param config - The objectified fact type configuration.
+   * @param options - Optional settings.
+   * @param options.skipPlayerValidation - When true, skip the checks that
+   *   the referenced fact type and object type exist. Used for lenient
+   *   loads and merge fragments, as on `addFactType` and
+   *   `addSubtypeFact`.
+   * @throws If the referenced fact type does not exist (unless skipPlayerValidation).
+   * @throws If the referenced object type does not exist or is not an entity (unless skipPlayerValidation).
    * @throws If the fact type is already objectified.
    */
   addObjectifiedFactType(
     config: ObjectifiedFactTypeConfig,
+    options?: { skipPlayerValidation?: boolean; },
   ): ObjectifiedFactType {
     const factType = this._factTypes.get(config.factTypeId);
-    if (!factType) {
-      throw new Error(
-        `Fact type id "${config.factTypeId}" does not exist in the model.`,
-      );
-    }
-
     const objectType = this._objectTypes.get(config.objectTypeId);
-    if (!objectType) {
-      throw new Error(
-        `Object type id "${config.objectTypeId}" does not exist in the model.`,
-      );
-    }
-    if (objectType.kind !== "entity") {
-      throw new Error(
-        `Object type "${objectType.name}" must be an entity type, not a ${objectType.kind} type.`,
-      );
-    }
 
-    // Check that the fact type is not already objectified.
-    for (const existing of this._objectifiedFactTypes.values()) {
-      if (existing.factTypeId === config.factTypeId) {
+    if (!options?.skipPlayerValidation) {
+      if (!factType) {
         throw new Error(
-          `Fact type "${factType.name}" is already objectified.`,
+          `Fact type id "${config.factTypeId}" does not exist in the model.`,
+        );
+      }
+      if (!objectType) {
+        throw new Error(
+          `Object type id "${config.objectTypeId}" does not exist in the model.`,
+        );
+      }
+      if (objectType.kind !== "entity") {
+        throw new Error(
+          `Object type "${objectType.name}" must be an entity type, not a ${objectType.kind} type.`,
         );
       }
     }
 
-    // Check that the object type is not already used as an objectification.
+    // Duplicate objectification is a property of THIS model's own
+    // records, not of what they reference, so it is checked either way.
+    // The names fall back to the ids because a skipped load may not have
+    // the elements to name.
+    for (const existing of this._objectifiedFactTypes.values()) {
+      if (existing.factTypeId === config.factTypeId) {
+        throw new Error(
+          `Fact type "${factType?.name ?? config.factTypeId}" is already objectified.`,
+        );
+      }
+    }
+
     for (const existing of this._objectifiedFactTypes.values()) {
       if (existing.objectTypeId === config.objectTypeId) {
         throw new Error(
-          `Object type "${objectType.name}" is already used as an objectification.`,
+          `Object type "${
+            objectType?.name ?? config.objectTypeId
+          }" is already used as an objectification.`,
         );
       }
     }
@@ -466,11 +479,17 @@ export class OrmModel {
 
   /**
    * Add a population to the model.
-   * @throws If the referenced fact type does not exist.
+   * @param options - Optional settings.
+   * @param options.skipPlayerValidation - When true, skip the check that
+   *   the referenced fact type exists. Used for lenient loads, as on
+   *   `addFactType` and `addSubtypeFact`.
+   * @throws If the referenced fact type does not exist (unless skipPlayerValidation).
    */
-  addPopulation(config: PopulationConfig): Population {
-    const factType = this._factTypes.get(config.factTypeId);
-    if (!factType) {
+  addPopulation(
+    config: PopulationConfig,
+    options?: { skipPlayerValidation?: boolean; },
+  ): Population {
+    if (!options?.skipPlayerValidation && !this._factTypes.get(config.factTypeId)) {
       throw new Error(
         `Fact type id "${config.factTypeId}" does not exist in the model.`,
       );

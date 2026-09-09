@@ -130,11 +130,15 @@ export interface ResolvedDomains {
  *   project manifest is given as inline content (it needs a path to resolve
  *   its referenced files).
  */
-export function resolveModels(input: SourceInput, domain?: string): ResolvedDomains {
+export function resolveModels(
+  input: SourceInput,
+  domain?: string,
+  options?: { lenient?: boolean; },
+): ResolvedDomains {
   const { path, content } = normalizeSource(input);
 
   if (path !== undefined && path.endsWith(".orm-project.yaml")) {
-    return resolveProject(path, domain);
+    return resolveProject(path, domain, options);
   }
 
   // A manifest supplied as inline content has no base directory to resolve
@@ -147,12 +151,16 @@ export function resolveModels(input: SourceInput, domain?: string): ResolvedDoma
     );
   }
 
-  return { resolved: [{ model: resolveSource(input) }], problems: [] };
+  return { resolved: [{ model: resolveSource(input, options) }], problems: [] };
 }
 
 /** Load a project manifest from disk and select the requested domain(s). */
-function resolveProject(manifestPath: string, domain?: string): ResolvedDomains {
-  const { project, problems } = loadProject(manifestPath);
+function resolveProject(
+  manifestPath: string,
+  domain?: string,
+  options?: { lenient?: boolean; },
+): ResolvedDomains {
+  const { project, problems } = loadProject(manifestPath, options);
 
   if (domain !== undefined) {
     const dm = project.getDomain(domain);

@@ -734,3 +734,132 @@ describe("completenessWarnings", () => {
     });
   });
 });
+
+/**
+ * An entity type that objectifies a fact type is identified BY that fact
+ * type -- that is what objectification means.
+ *
+ * `checkPreferredIdentifiers` used to enumerate identification itself
+ * and knew only about a preferred uniqueness constraint and an
+ * identifying subtype fact, so it told 25 objectified types across this
+ * repository that the relational mapper must guess their key, while
+ * `settleObjectifiedKey` was building that key from the absorbed columns
+ * and `identificationGraph` was treating the objectification as an
+ * identifying edge (barwise-972). It reads `identificationSources` now,
+ * which is the same owner `checkConflictingIdentification` was already
+ * using twenty lines further down the same file.
+ */
+describe("identification through objectification", () => {
+  /** Enrollment objectifies "Student enrolls in Course". */
+  function objectifiedModel(): OrmModel {
+    const model = new ModelBuilder("Objectified")
+      .withEntityType("Student")
+      .withEntityType("Course")
+      .withEntityType("Enrollment")
+      .withBinaryFactType("Student enrolls in Course", {
+        role1: { player: "Student", name: "enrolls in" },
+        role2: { player: "Course", name: "has enrolled" },
+        uniqueness: "spanning",
+        isPreferred: true,
+      })
+      .withObjectifiedFactType("Student enrolls in Course", "Enrollment")
+      .build();
+    return model;
+  }
+
+  const missingFor = (model: OrmModel, name: string) =>
+    completenessWarnings(model).filter(
+      (d) =>
+        d.ruleId === "completeness/missing-preferred-identifier"
+        && d.elementId === model.getObjectTypeByName(name)!.id,
+    );
+
+  it("does not report an objectified entity as missing a preferred identifier", () => {
+    expect(missingFor(objectifiedModel(), "Enrollment")).toHaveLength(0);
+  });
+
+  it("still reports an entity that objectifies nothing and has no identifier", () => {
+    // The escape must be objectification, not "any entity in a model
+    // that happens to contain one".
+    const model = objectifiedModel();
+    model.addObjectType({ name: "Building", kind: "entity", referenceMode: "building_id" });
+    expect(missingFor(model, "Building")).toHaveLength(1);
+  });
+
+  it("does not treat objectification as a second preferred identifier", () => {
+    // An objectified type carrying its own reference scheme is ordinary
+    // ORM. Counting the objectification alongside the constraint would
+    // make that a conflict.
+    const model = objectifiedModel();
+    const enrollment = model.getObjectTypeByName("Enrollment")!;
+    model.addFactType({
+      name: "Enrollment has EnrollmentId",
+      roles: [
+        { name: "has", playerId: enrollment.id },
+        {
+          name: "identifies",
+          playerId: model.addObjectType({
+            name: "EnrollmentId",
+            kind: "value",
+          }).id,
+        },
+      ],
+      readings: ["{0} has {1}", "{1} identifies {0}"],
+      constraints: [{ type: "internal_uniqueness", roleIds: [], isPreferred: true }],
+    });
+
+    expect(
+      completenessWarnings(model).filter(
+        (d) => d.ruleId === "completeness/multiple-preferred-identifiers",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("does not let an identifying subtype of an unidentified parent count", () => {
+    // `identificationSources` reports the subtype fact without asking
+    // whether the supertype is identified, so the rule's recursion is
+    // load-bearing rather than decorative.
+    const model = new ModelBuilder("Chain")
+      .withEntityType("Vehicle")
+      .withEntityType("Car")
+      .build();
+    const vehicle = model.getObjectTypeByName("Vehicle")!;
+    const car = model.getObjectTypeByName("Car")!;
+    model.addSubtypeFact({
+      subtypeId: car.id,
+      supertypeId: vehicle.id,
+      providesIdentification: true,
+    });
+
+    expect(missingFor(model, "Car")).toHaveLength(1);
+  });
+
+  it("terminates on a subtype cycle rather than recursing forever", () => {
+    // The recursion above follows `providesIdentification` edges, and
+    // `structural/identification-cycle` reports a cycle among them but
+    // does not prevent one reaching this rule -- a completeness warning
+    // is computed over whatever model it is handed. Without the `seen`
+    // guard this is a stack overflow, and with the guard inverted the
+    // cycle would identify both types out of nothing, so the assertion
+    // is both that it returns and what it returns.
+    const model = new ModelBuilder("Cycle")
+      .withEntityType("Alpha")
+      .withEntityType("Beta")
+      .build();
+    const alpha = model.getObjectTypeByName("Alpha")!;
+    const beta = model.getObjectTypeByName("Beta")!;
+    model.addSubtypeFact({
+      subtypeId: alpha.id,
+      supertypeId: beta.id,
+      providesIdentification: true,
+    });
+    model.addSubtypeFact({
+      subtypeId: beta.id,
+      supertypeId: alpha.id,
+      providesIdentification: true,
+    });
+
+    expect(missingFor(model, "Alpha")).toHaveLength(1);
+    expect(missingFor(model, "Beta")).toHaveLength(1);
+  });
+});

@@ -1,7 +1,7 @@
 Person drives Car
 Car is driven by Person
   Each Person drives at most one Car.
-  Each Person either drives some Person or r-person-rides some r-person-rides but not both.
+  Each Person either drives some Person or rides some Person but not both.
 Person rides Bus
 Bus is ridden by Person
   Each Person rides at most one Bus.
@@ -9,7 +9,7 @@ Person purchases Ticket
 Ticket is purchased by Person
   Each Ticket is purchased by at most one Person.
   Each Ticket is purchased by at least one Person.
-  If Person then r-person-rides.
+  If Person then Person in Person rides Bus.
 Person is parent of Person
 Person is child of Person
   Each combination of Person and Person is unique in Person is parent of Person.
