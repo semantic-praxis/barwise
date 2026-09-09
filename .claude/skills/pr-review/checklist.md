@@ -88,6 +88,146 @@ here, and none of them fails a build today.
   `docs/specs/closed-sets-as-unions.spec.md`, WS2.
 - **A surface extending a core set declares its own registry**, and
   core does not learn the surface's identifiers. Authority: same, WS2.
+- **A result whose fields depend on a flag is a union, not a record
+  with optionals.** `{ success: boolean; ast?: ...; error?: string }`
+  makes every reader test the flag and then the field, and lets a
+  success carry no `ast`. `CalciteParseResponse` (`sql/types.ts`) has
+  that shape, and `MergeValidationResult` (`diff/ModelMerge.ts`) pairs
+  `isValid: boolean` with `model: OrmModel | null`, so `merge.ts`
+  checks both for one fact. `MigrationPlan` (`schemaVersion.ts`) is
+  the shape to copy: `ok: true` carries `steps`, `ok: false` carries
+  `reason`, and neither arm is optional. Authority: root `CLAUDE.md`,
+  define errors out of existence; `closed-sets-as-unions.spec.md` for
+  the same move on string sets.
+- **Two id spaces that flow through one `string` meet at a typed
+  boundary; nothing else earns a brand.** Where the diff can pass a
+  value from one space where another is accepted with no type between
+  them (a model id and a NORMA id in `@barwise/formats`), the boundary
+  gets a branded type with one conversion owner. A brand on every id
+  catches only the cross-kind confusion parameter names already
+  separate, misses the same-kind swap (`subtypeId` for `supertypeId`)
+  that has consequences, and breaks every id literal in the tests.
+  Authority: `docs/specs/model-graph-and-id-spaces.spec.md`, "Should
+  we brand all ids?" (a draft; its resolution is measured with a `tsc`
+  probe rather than argued).
+
+## When a module, function, or interface was introduced, or a signature widened
+
+The question this group asks is whether the reader pays less after the
+change than before. CLAUDE.md's shared vocabulary is descriptive, not a
+gate: "shallow" is not a finding until the item names what the reader
+now holds, guards, or learns that they did not have to.
+
+- **The interface is smaller than what it hides.** Read the signature,
+  then the body. A wrapper that forwards its parameters, a method that
+  passes through to the one it calls, a helper whose parameter list is
+  its whole implementation, or a field added to a type for a question
+  that type does not answer: each adds an interface to learn and
+  removes nothing to think about. Hanging `corrections` on
+  `DraftModelResult` was rejected on exactly this test, and so was a
+  mock `LlmClient` seam that would have existed only for a test.
+  Authority: root `CLAUDE.md`, deep versus shallow modules;
+  `docs/specs/pipeline-observability.spec.md`;
+  `docs/specs/offline-eval-rehearsal.spec.md`.
+- **A failure the callee can rule out is not exported to its
+  callers.** A `T | undefined` return, a throw, or a false arm for a
+  state the callee's inputs cannot produce, or that one place could
+  establish once, puts a guard at every call site, and the guard for
+  the impossible case is dead code no reader can tell is dead. Making
+  five readers handle a composite key (barwise-931) left the state in
+  which carelessness is possible, and two more defects followed
+  (barwise-963, -965); `getObjectType` returns `undefined` at about
+  130 sites for a state `structural/dangling-role-reference` refuses.
+  Explicit declaration is right for what a caller genuinely decides,
+  and wrong as a way to avoid solving something once. Authority: root
+  `CLAUDE.md`, define errors out of existence;
+  `docs/specs/mapper-key-settlement.spec.md`;
+  `docs/specs/model-graph-and-id-spaces.spec.md`.
+- **The consumer's question has an interface that answers it.** When
+  a package reconstructs an answer from a wider one (mapping rule ids
+  to constraint kinds, attributing diagnostics, diffing before and
+  after), the fix is the operation the question wants, owned by the
+  module that has the facts. `@barwise/learn` rebuilt "does this
+  constraint reject this population" in three layers over
+  `validate(model)`'s flat `Diagnostic[]` before core exposed
+  `evaluateConstraintEnforcement`. Authority:
+  `docs/specs/constraint-enforcement-predicate.spec.md`.
+- **A guard or fallback carries the failure it prevents.** A `??`
+  fallback, a defensive `if`, or a magic value with no reason is an
+  unknown unknown: the next reader cannot tell whether it is live. The
+  `?? roleId` fallbacks in verbalization defend a state validation
+  refuses, nothing at the site says so, and the tests came to pin them
+  as behaviour. Authority: root `CLAUDE.md`, comments describe what the
+  code cannot; `docs/specs/core-branching-load.spec.md`, Principle.
+- **A comment near moved or changed code still describes it.**
+  `roleGraph.ts`'s header promised a second caller that never
+  arrived, and the WS3 spec repeated "two callers" from it instead of
+  measuring; PR #448's review found a stale module comment nothing
+  else had. A stale comment is trusted where a missing one is not.
+  Authority: root `CLAUDE.md`, comments describe what the code cannot.
+- **A new name is free.** Grep for it first: `ModelBuilder` names a
+  planned WS1 class in one spec and an existing fixture builder under
+  `tests/helpers/`, and a recommendation built on the wrong one had to
+  be withdrawn. Authority: `docs/specs/model-graph-and-id-spaces.spec.md`,
+  Open decisions, the withdrawal.
+- **Together or apart follows lifetime and question, not size.** Code
+  answering different questions, or changing for different reasons,
+  lives apart even when small; code always read together lives
+  together even when large. `DraftModelResult` was refused a field
+  with a different lifetime, and four guards sharing one principle
+  were refused one gate whose failure output would have had to say
+  which of four things went wrong. Authority:
+  `docs/specs/pipeline-observability.spec.md`;
+  `docs/specs/deterministic-guards.spec.md`.
+- **A parameter that exports a decision the callee could make is a
+  configuration parameter, and it moves complexity up.** Ask who can
+  choose the value better; if the answer is the callee, it decides and
+  the parameter goes. Nearest instance, not yet a defect: `lenient`
+  travels from `cli/workspace/io.ts` and `mcp/workspace/resolve.ts`
+  through `deserialize` to `addFactType` as `skipPlayerValidation`, so
+  three layers carry a choice about reference checking that the loader
+  could settle once (14 references; the WS3 spec's third open decision
+  asks whether it survives). Authority: Ousterhout ch. 8, pull
+  complexity downwards; the first instance here replaces this one.
+- **Adjacent layers have different abstractions.** A method whose
+  signature is the one it calls, a variable threaded through a layer
+  that only forwards it, or a wrapper that adds no vocabulary: each
+  layer that does not change the abstraction is a layer the reader
+  pays for and learns nothing from. Nearest instance: the same
+  `lenient` passes through `loadModel` and `deserialize` untouched
+  before anything reads it. Authority: Ousterhout ch. 7, different
+  layer, different abstraction.
+- **A general mechanism is reused, not forked for the special case.**
+  A new helper written for its one call site beside a general one it
+  could have been, or a general mechanism grown a special-case branch.
+  `roleGraph.ts` states the rule for one walk ("reuse the traversal,
+  don't fork it", ADR-0001) and `joinConstraintRules.ts:148-151`
+  validates a role path with its own `getRoleById` walk anyway;
+  `RoleHop` is referenced in no file outside `roleGraph.ts`.
+  Authority: `model/roleGraph.ts` header; Ousterhout ch. 6,
+  general-purpose modules are deeper.
+- **A class of errors is handled once, at the level that can act, and
+  never swallowed.** A `catch` per call site aggregates upward into
+  one handler; a `catch` that drops the error or returns a default
+  masks it; and a failure that escapes to the top with no context is
+  the same defect from the other side. Instance: a dangling
+  constraint-to-role reference reaches `barwise verbalize` as "Cannot
+  read properties of undefined (reading 'playerId')", exit 1 (PR
+  #475's review), a `TypeError` from `phase1.ts` with no layer between
+  it and the operator saying what was wrong. Authority: Ousterhout
+  ch. 10, exception aggregation and masking; root `CLAUDE.md`, define
+  errors out of existence, for the case where the error should not
+  exist at all.
+- **Knowledge is not split by when it runs.** Temporal decomposition
+  puts one fact into every stage that touches it, so a change to the
+  fact edits every stage and misses one silently. A new model field
+  needs the class, the config, the serializer twice, the schema, the
+  diff, the merge and the split, and two of those failed silently
+  (barwise-927: a merge that drops six fields). Authority:
+  `docs/specs/core-branching-load.spec.md`, Principle; Ousterhout
+  ch. 5, information hiding.
+- Two modules that both know one format or convention is the first
+  item of the copy group below; run it there.
 
 ## When a copy was added or a copy was edited
 
@@ -129,6 +269,25 @@ here, and none of them fails a build today.
   with a recommended default; every mechanism a requirement names
   exists or is delivered by a named workstream; the header dates are
   current. Authority: `spec-writer` skill, the design gate.
+- The spec's anchors, the three or four facts the design rests on,
+  are re-verified against the code by the reviewer, load-bearing
+  first: a spec breaks when an anchor is invalidated, and its author
+  is the person least placed to see it. PR #475's spec rested on "the
+  surfaces validate before verbalizing", "two callers" and "13
+  prologues", none verified, and all three fell on re-measurement.
+  Authority: `spec-writer/sensemaking.md`, Anchors and Expectancies.
+- Alternatives considered are live competing frames, not strawmen:
+  each could have been built, and the reason it lost is grounded
+  against the code rather than narrated. A section written to be
+  rejected is the dismissible-tension bucket the same file warns is
+  where fixation hides. Authority: `spec-writer/sensemaking.md`, Hold
+  two or three frames; root `CLAUDE.md`, design it twice.
+- Claims drafted ahead of their grounding are marked provisional, and
+  tripwires name the signal that reopens the design. A confident
+  forward section becomes an anchor for the next revision: the parent
+  spec's `joinSegments` helper was invented in a sketch, never built,
+  and carried as fact until re-measured. Authority:
+  `spec-writer/sensemaking.md`, Forward sections and Tripwires.
 
 ## When Python was touched
 
