@@ -14,7 +14,7 @@ import {
   type Verbalization,
   type VerbalizationSegment,
 } from "../Verbalization.js";
-import { extractPredicate } from "./sentence.js";
+import { extractPredicate, localRole } from "./sentence.js";
 
 export function verbalizeInternalUniqueness(
   roleIds: readonly string[],
@@ -140,8 +140,7 @@ export function verbalizeGenericUniqueness(
   model: OrmModel,
 ): Verbalization {
   const roleNames = roleIds.map((rid) => {
-    const role = factType.getRoleById(rid);
-    if (!role) return rid;
+    const role = localRole(factType, rid);
     const ot = model.getObjectType(role.playerId);
     return ot?.name ?? role.name;
   });
@@ -151,18 +150,13 @@ export function verbalizeGenericUniqueness(
   ];
 
   for (let i = 0; i < roleIds.length; i++) {
-    const role = factType.getRoleById(roleIds[i]!);
+    const role = localRole(factType, roleIds[i]!);
     if (i > 0 && i === roleIds.length - 1) {
       segments.push(textSeg(" and "));
     } else if (i > 0) {
       segments.push(textSeg(", "));
     }
-    segments.push(
-      refSeg(
-        roleNames[i]!,
-        role?.playerId ?? roleIds[i]!,
-      ),
-    );
+    segments.push(refSeg(roleNames[i]!, role.playerId));
   }
 
   segments.push(textSeg(" is unique in "));
@@ -186,15 +180,15 @@ export function verbalizeMandatory(
     return verbalizeBinaryMandatory(roleId, factType, model);
   }
 
-  const role = factType.getRoleById(roleId);
-  const ot = role ? model.getObjectType(role.playerId) : undefined;
-  const name = ot?.name ?? role?.name ?? roleId;
+  const role = localRole(factType, roleId);
+  const ot = model.getObjectType(role.playerId);
+  const name = ot?.name ?? role.name;
   const reading = factType.readings[0]?.template ?? "";
   const expanded = reading.replace(/\{\d+\}/g, name);
 
   return buildVerbalization(factType.id, "constraint", [
     kwSeg("Each "),
-    refSeg(name, role?.playerId ?? roleId),
+    refSeg(name, role.playerId),
     textSeg(" must: "),
     textSeg(expanded),
     textSeg("."),
@@ -270,10 +264,10 @@ export function verbalizeValueConstraint(
   let targetId: string;
 
   if (roleId) {
-    const role = factType.getRoleById(roleId);
-    const ot = role ? model.getObjectType(role.playerId) : undefined;
-    targetName = ot?.name ?? role?.name ?? roleId;
-    targetId = role?.playerId ?? roleId;
+    const role = localRole(factType, roleId);
+    const ot = model.getObjectType(role.playerId);
+    targetName = ot?.name ?? role.name;
+    targetId = role.playerId;
   } else {
     targetName = factType.name;
     targetId = factType.id;

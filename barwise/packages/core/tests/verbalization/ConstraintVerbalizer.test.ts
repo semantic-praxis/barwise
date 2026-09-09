@@ -170,7 +170,7 @@ describe("ConstraintVerbalizer", () => {
       expect(v[0]!.text).toBe("Each is placed by is placed by at most one Customer.");
     });
 
-    it("generic (full-spanning) uniqueness separates 3+ roles with commas and falls back for unresolved or unplayered roles", () => {
+    it("says a uniqueness constraint is malformed when it names a role the fact type does not have", () => {
       const model = new OrmModel({ name: "Test" });
       const a = model.addObjectType({ name: "A", kind: "entity", referenceMode: "a_id" });
       const ft = model.addFactType(
@@ -181,10 +181,11 @@ describe("ConstraintVerbalizer", () => {
             { id: "r2", name: "secondrole", playerId: "missing-b-type" },
           ],
           readings: ["{0} relates {1}"],
-          // Full spanning uniqueness (roleIds.length === arity) with a
-          // bogus id mixed in -- generic uniqueness is the fallback
-          // branch for input that couldn't be normalized to binary or
-          // multi-role phrasing.
+          // A uniqueness constraint must be local, and "bogus" is no
+          // role of this fact type. This used to reach the generic
+          // phrasing and produce "Each combination of bogus, A and
+          // secondrole is unique ...", a sentence about a type called
+          // bogus that a reader could not tell from a real one.
           constraints: [{ type: "internal_uniqueness", roleIds: ["bogus", "r1", "r2"] }],
         },
         { skipPlayerValidation: true },
@@ -192,7 +193,8 @@ describe("ConstraintVerbalizer", () => {
 
       const v = verbalizer.verbalizeAll(ft, model);
       expect(v[0]!.text).toBe(
-        "Each combination of bogus, A and secondrole is unique in A relates B and C.",
+        'Malformed: the uniqueness constraint on A relates B and C names role "bogus", '
+          + "which is not among its roles.",
       );
     });
 
@@ -373,7 +375,7 @@ describe("ConstraintVerbalizer", () => {
       expect(v[0]!.text).toBe("Each Employee must: Employee works on Employee in Employee.");
     });
 
-    it("mandatory on a non-binary fact type falls back to the raw role id when unresolved", () => {
+    it("says a mandatory constraint is malformed when it names a role the fact type does not have", () => {
       const model = new OrmModel({ name: "Test" });
       const emp = model.addObjectType({
         name: "Employee",
@@ -402,7 +404,10 @@ describe("ConstraintVerbalizer", () => {
       });
 
       const v = verbalizer.verbalizeAll(ft, model);
-      expect(v[0]!.text).toBe("Each bogus must: bogus works on bogus in bogus.");
+      expect(v[0]!.text).toBe(
+        "Malformed: the mandatory constraint on Employee works on Project in Department "
+          + 'names role "bogus", which is not among its roles.',
+      );
     });
   });
 
@@ -565,7 +570,7 @@ describe("ConstraintVerbalizer", () => {
       expect(valueLiterals[0]!.text).toBe("'A', 'B'");
     });
 
-    it("falls back to the raw role id when a role-level value constraint's role is unresolved", () => {
+    it("says a value constraint is malformed when it names a role the fact type does not have", () => {
       const model = new OrmModel({ name: "Test" });
       const student = model.addObjectType({
         name: "Student",
@@ -582,7 +587,10 @@ describe("ConstraintVerbalizer", () => {
       });
 
       const v = verbalizer.verbalizeAll(ft, model);
-      expect(v[0]!.text).toBe("The possible values of bogus are: {'A'}.");
+      expect(v[0]!.text).toBe(
+        'Malformed: the value constraint on Student has Rating names role "bogus", '
+          + "which is not among its roles.",
+      );
     });
 
     it("renders an exclusive lower bound with no upper bound", () => {

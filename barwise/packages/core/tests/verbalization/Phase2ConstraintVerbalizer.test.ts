@@ -254,7 +254,7 @@ describe("Phase 2 constraint verbalization", () => {
     );
   });
 
-  it("verbalizes ring with an unresolved role id, falling back to the raw id", () => {
+  it("says a ring constraint is malformed for a non-local role", () => {
     const { model, ft } = buildSelfRefModel();
     const c: Constraint = {
       type: "ring",
@@ -263,7 +263,13 @@ describe("Phase 2 constraint verbalization", () => {
       ringType: "irreflexive",
     };
     const v = verbalizer.verbalize(c, ft, model);
-    expect(v.text).toBe("No bogus is parent of that same bogus.");
+    // Was "No bogus is parent of that same bogus." -- a well-formed
+    // English sentence asserting a rule about a type that does not
+    // exist, which is the shape of output worth removing.
+    expect(v.text).toBe(
+      'Malformed: the ring constraint on Person is parent of Person names role "bogus", '
+        + "which is not among its roles.",
+    );
   });
 
   it("verbalizes a ring constraint on a non-binary fact type with a generic '...' predicate", () => {
@@ -451,6 +457,14 @@ describe("Phase 2 constraint verbalization", () => {
       expect(v.text).toContain("Object");
     });
 
+    /**
+     * The local-role kinds no longer phrase a sentence around an id they
+     * could not resolve. Each of the four below used to assert that they
+     * did -- "Each combination of bogus, Project occurs exactly 1 time." --
+     * which is a test pinning a limitation as behaviour. The exclusion case
+     * above keeps its fallback and must: exclusion spans fact types on
+     * purpose, so a non-local role there is not a defect (barwise-979).
+     */
     it("exclusion falls back to the raw role id when a role does not resolve", () => {
       const { model, ft } = buildBinaryModel();
       const c: Constraint = { type: "exclusion", roleIds: ["bogus", "r1"] };
@@ -502,12 +516,17 @@ describe("Phase 2 constraint verbalization", () => {
       expect(v.text).toBe("Customer if and only if bogus.");
     });
 
-    it("verbalizeGenericFrequency falls back to the raw role id when unresolved", () => {
+    it("says a single-role frequency constraint is malformed for a non-local role", () => {
       const { model, ft } = buildTernaryModel();
       const c: Constraint = { type: "frequency", roleIds: ["bogus"], min: 1, max: 3 };
       const v = verbalizer.verbalize(c, ft, model);
-      expect(v.text).toContain("bogus");
-      expect(v.text).toContain("at least 1 and at most 3 times");
+      expect(v.text).toBe(
+        "Malformed: the frequency constraint on Employee works on Project in Department "
+          + 'names role "bogus", which is not among its roles.',
+      );
+      // The quantifier is gone with the sentence: there is no fact to
+      // quantify until the constraint names a role of this fact type.
+      expect(v.text).not.toContain("at least 1 and at most 3 times");
     });
 
     it("multi-role frequency renders an unbounded quantifier", () => {
@@ -526,21 +545,27 @@ describe("Phase 2 constraint verbalization", () => {
       );
     });
 
-    it("multi-role frequency falls back to the raw role id for an unresolved role", () => {
+    it("says a multi-role frequency constraint is malformed for a non-local role", () => {
       const { model, ft } = buildTernaryModel();
       const c: Constraint = { type: "frequency", roleIds: ["bogus", "r2"], min: 1, max: 1 };
       const v = verbalizer.verbalize(c, ft, model);
-      expect(v.text).toBe("Each combination of bogus, Project occurs exactly 1 time.");
+      expect(v.text).toBe(
+        "Malformed: the frequency constraint on Employee works on Project in Department "
+          + 'names role "bogus", which is not among its roles.',
+      );
     });
 
-    it("cardinality falls back to the raw role id for an unresolved role", () => {
+    it("says a cardinality constraint is malformed for a non-local role", () => {
       const { model, ft } = buildBinaryModel();
       const c: Constraint = { type: "cardinality", roleId: "bogus", min: 1, max: 5 };
       const v = verbalizer.verbalize(c, ft, model);
-      expect(v.text).toContain("bogus instances");
+      expect(v.text).toBe(
+        'Malformed: the cardinality constraint on Customer places Order names role "bogus", '
+          + "which is not among its roles.",
+      );
     });
 
-    it("value comparison falls back to the raw role ids and the literal operator when unresolved", () => {
+    it("names every non-local role a value comparison constraint gets wrong", () => {
       const { model, ft } = buildBinaryModel();
       const c: Constraint = {
         type: "value_comparison",
@@ -549,7 +574,12 @@ describe("Phase 2 constraint verbalization", () => {
         operator: "!=" as ValueComparisonOperator,
       };
       const v = verbalizer.verbalize(c, ft, model);
-      expect(v.text).toBe("bogus1 must be != bogus2.");
+      // Both ids, and the plural agreeing with them -- reporting only
+      // the first would send a reader back for a second round.
+      expect(v.text).toBe(
+        "Malformed: the value comparison constraint on Customer places Order names roles "
+          + '"bogus1", "bogus2", which are not among its roles.',
+      );
     });
 
     it("cardinalityQuantifier: unbounded, exact, and non-zero-min range", () => {

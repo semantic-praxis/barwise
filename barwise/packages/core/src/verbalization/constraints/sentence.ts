@@ -5,6 +5,37 @@
  */
 import type { FactType } from "../../model/FactType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
+import type { Role } from "../../model/Role.js";
+
+/**
+ * The role a local-role constraint names, which `ConstraintVerbalizer`
+ * has already established belongs to this fact type.
+ *
+ * Not a fallback. The kinds this serves are the ones
+ * `requiresLocalRoles` marks -- uniqueness, mandatory, value, ring,
+ * frequency, cardinality, value comparison -- and the dispatcher answers
+ * a non-local role with a malformed-constraint sentence before reaching
+ * them (barwise-979). So a miss is a caller that bypassed the
+ * dispatcher: a programming error, not a model defect. It says so where
+ * the mistake is, rather than phrasing a sentence around an id and
+ * letting a reader believe it.
+ *
+ * The spanning kinds -- exclusion, subset, equality, exclusive-or,
+ * disjunctive mandatory, external uniqueness -- must NOT use this. A
+ * non-local role is correct for them, and their `?? roleId` fallbacks
+ * stay for that reason.
+ */
+export function localRole(factType: FactType, roleId: string): Role {
+  const role = factType.getRoleById(roleId);
+  if (!role) {
+    throw new Error(
+      `verbalization: role "${roleId}" is not a role of fact type "${factType.name}". `
+        + `Constraint kinds that require local roles are screened by `
+        + `ConstraintVerbalizer.verbalize; this helper was reached another way.`,
+    );
+  }
+  return role;
+}
 
 export function resolveCommonPlayer(
   roleIds: readonly string[],

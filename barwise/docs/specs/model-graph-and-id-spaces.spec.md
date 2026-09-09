@@ -1,8 +1,7 @@
 # Resolve references once: `ModelGraph`, and which id spaces earn a brand
 
-Status: Workstreams 1 (`NormaId`), 2 (`graphOf`), 3 (validation split)
-and 4 (query and describe) shipped 2026-09-09; Workstream 5 not
-implemented
+Status: Workstreams 1 (`NormaId`), 2 (`graphOf`), 3 (validation split),
+4 (query and describe) and 5 (verbalization) shipped 2026-09-09
 Created: 2026-09-09
 Last-updated: 2026-09-09
 Tracking: barwise-974 (this spec), barwise-973 (WS1, partly shipped),
@@ -666,18 +665,61 @@ The crash is gone; the output is the id-prose the rest of this
 workstream is about, which is what makes the decision below concrete
 rather than hypothetical.
 
-**This workstream carries a test question that is a reviewer's call,
-not an implementer's**, and the measurement above makes it bigger than
-the draft framed it. 46 assertions across five files pin the prose
-produced for an unresolvable reference -- the `bogus` fixtures. For a
-dangling role that prose does become unreachable and the assertions pin
-a limitation, which the `assertion-audit` skill calls out. For a foreign
-role it stays reachable, and after the guards above it is what a user
-sees: `barwise verbalize` prints "Each r3 must: r3 has r3." and exits 0
-for a model `barwise validate` rejects. Whether that is acceptable, or
-whether verbalization should refuse such a model as query and describe
-now refuse an unresolvable one, is the decision. It governs ~26 call
-sites, not 15 test assertions. See Open decisions.
+**The test question this workstream carried was a reviewer's call, and
+it was taken: verbalization says the constraint is malformed.** The
+options were to keep the id-prose, to refuse the model as query and
+describe now do, or to emit an explicit malformed-constraint statement.
+The third was chosen, and the reason it beats refusing is that
+`verbalize` is the capability that runs on models nobody has validated
+-- no surface validates before verbalizing -- so refusing would take
+away its use on work in progress. The other constraints still verbalize;
+the broken one says what is wrong with it:
+
+```
+$ barwise verbalize m.orm.yaml
+Customer has Name
+Name is of Customer
+  Malformed: the mandatory constraint on Customer has Name names role
+  "r3", which is not among its roles.
+```
+
+**One guard, at `ConstraintVerbalizer.verbalize`, rather than a fallback
+at each site.** Below that line a local-role constraint's roles are all
+roles of the fact type, which is what lets the per-kind verbalizers
+index them without guarding. The `?? roleId` fallbacks in those kinds
+are gone, replaced by `localRole`, which throws -- a miss there is a
+caller that bypassed the dispatcher, a programming error rather than a
+model defect.
+
+**Which kinds the guard applies to is the whole subtlety, and it is
+`requiresLocalRoles` in `model/Constraint.ts`.** Exclusion, subset,
+equality, exclusive-or and disjunctive mandatory span fact types
+routinely; an external uniqueness constraint that is entirely local is
+the anomaly, not the other way round; join constraints reach across by
+construction. Their `?? roleId` fallbacks STAY, because a non-local role
+is correct for them. A blanket guard would have reported a false finding
+on every correct model that uses one -- which is why most of the 26
+fallbacks counted above are still there and should be.
+
+That classification now lives in two places -- this predicate and
+`constraintConsistency`'s per-kind switch -- and the repo's rule is that
+such a pair is shared, derived, registered or drift-tested in the same
+commit. Sharing does not fit: `constraintConsistency` needs a rule id
+per kind, not a boolean. So `tests/model/requiresLocalRoles.test.ts` is
+the drift test, and it is empirical rather than a second list: for each
+kind it plants a role of another fact type and asks the engine whether
+that is an error.
+
+**`findRoleById`'s scan in `counterexample/` is deliberately NOT
+replaced**, against this section's draft. Using `ModelGraph` would mean
+adding a `role(id) -> Role | undefined` accessor beside the total one,
+because counterexample generation is best-effort -- each call site
+answers a miss with "no counterexample for this constraint" rather than
+refusing the model, which would also stop it generating counterexamples
+for the constraints that are sound. Widening a deliberately total
+interface with the fallible accessor it exists to remove is a worse
+trade than a scan over a few hundred roles. The reason is recorded at
+the function.
 
 ## API and migration impact
 
@@ -714,7 +756,15 @@ sites, not 15 test assertions. See Open decisions.
   re-taking the decision, so either is usable -- but it has to be the
   same one both times, which is why the command is here rather than
   the description.
-- **What happens to the 15 `bogus` prose assertions.** The 46 is
+- **What happens to the 15 `bogus` prose assertions.** RESOLVED by
+  Workstream 5, 2026-09-09, and none of the three options below is
+  what was taken -- the answer was (d): verbalization emits an
+  explicit malformed-constraint sentence, so the model still
+  verbalizes and the broken constraint says what is wrong with it.
+  Eight of the assertions were converted to assert that sentence; the
+  exclusion one keeps its fallback assertion, because a non-local
+  role is correct for a spanning kind. The options are kept below as
+  the record of what was considered. The 46 is
   occurrences of the string, not assertions, and it mixes two
   populations. `Phase2ConstraintConsistency.test.ts` holds 11 and
   `structural.test.ts` 1: those already assert the reference is
@@ -731,12 +781,16 @@ sites, not 15 test assertions. See Open decisions.
   behaviour that will exist and it needs nothing that does not;
   (b) delete them as testing a state no supported caller reaches;
   (c) keep a subset if `skipPlayerValidation` and `lenient` survive
-  (14 references today). This is a reviewer's call because it decides
-  whether verbalizing an unvalidated model stays supported. An earlier
+  (14 references today). This was a reviewer's call because it decides
+  whether verbalizing an unvalidated model stays supported -- and it
+  does: `verbalize` is the capability that runs on models nobody has
+  validated, so refusing them was rejected in favour of (d). An earlier
   draft of this spec recommended converting them to _builder-rejection_
   tests; that was withdrawn on grounding, because the builder it named
   does not exist.
 - **Whether `graphOf` belongs in `core`'s root barrel or a subpath.**
+  RESOLVED by Workstream 2, 2026-09-09, as recommended: it ships from
+  the root barrel. The reasoning is kept below.
   The package convention puts capability modules on subpaths
   (`@barwise/core/mapping`, `/diff`) and the metamodel on the root. The
   graph is derived from the metamodel and used by capabilities, so it
