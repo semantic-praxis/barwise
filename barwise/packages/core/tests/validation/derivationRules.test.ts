@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import type { DerivationRule } from "../../src/model/FactType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { derivationRules } from "../../src/validation/rules/derivationRules.js";
+import { graphFor } from "../helpers/graphFor.js";
 
 function modelWithDerivedFactType(derivation: DerivationRule): OrmModel {
   const model = new OrmModel({ name: "Test" });
@@ -40,23 +41,26 @@ function populate(model: OrmModel): void {
 
 describe("derivationRules", () => {
   it("warns when a derived fact type has blank rule text", () => {
-    const diags = derivationRules(modelWithDerivedFactType({ kind: "derived", expression: "  " }));
+    const model = modelWithDerivedFactType({ kind: "derived", expression: "  " });
+    const diags = derivationRules(model, graphFor(model));
     expect(diags).toHaveLength(1);
     expect(diags[0]!.ruleId).toBe("derivation/missing-rule");
     expect(diags[0]!.severity).toBe("warning");
   });
 
   it("does not warn when a derived fact type has rule text", () => {
-    const diags = derivationRules(
-      modelWithDerivedFactType({ kind: "derived", expression: "Quantity * UnitPrice" }),
-    );
+    const model = modelWithDerivedFactType({
+      kind: "derived",
+      expression: "Quantity * UnitPrice",
+    });
+    const diags = derivationRules(model, graphFor(model));
     expect(diags).toHaveLength(0);
   });
 
   it("warns when a purely-derived fact type carries a population", () => {
     const model = modelWithDerivedFactType({ kind: "derived", expression: "Quantity * UnitPrice" });
     populate(model);
-    const diags = derivationRules(model);
+    const diags = derivationRules(model, graphFor(model));
     expect(diags).toHaveLength(1);
     expect(diags[0]!.ruleId).toBe("derivation/derived-with-population");
   });
@@ -68,13 +72,13 @@ describe("derivationRules", () => {
       expression: "Quantity * UnitPrice",
     });
     populate(model);
-    expect(derivationRules(model)).toHaveLength(0);
+    expect(derivationRules(model, graphFor(model))).toHaveLength(0);
   });
 
   it("accepts a population on a semiderived fact type", () => {
     const model = modelWithDerivedFactType({ kind: "semiderived", expression: "partial rule" });
     populate(model);
-    expect(derivationRules(model)).toHaveLength(0);
+    expect(derivationRules(model, graphFor(model))).toHaveLength(0);
   });
 
   it("warns when a subtype defining rule is blank", () => {
@@ -95,7 +99,7 @@ describe("derivationRules", () => {
       definingRule: { kind: "derived", expression: "" },
     });
 
-    const diags = derivationRules(model);
+    const diags = derivationRules(model, graphFor(model));
     expect(diags).toHaveLength(1);
     expect(diags[0]!.ruleId).toBe("derivation/missing-rule");
     expect(diags[0]!.message).toContain("Adult");

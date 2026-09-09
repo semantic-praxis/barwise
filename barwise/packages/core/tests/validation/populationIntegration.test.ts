@@ -255,7 +255,11 @@ describe("Population validation integration", () => {
       readings: ["{0} places {1}"],
       constraints: [
         { type: "internal_uniqueness", roleIds: ["r2"] },
-        { type: "mandatory", roleId: "r-bad" }, // Structural error!
+        // A structural error that does NOT dangle: "r2" is a real role, so
+        // the graph still builds and the population rules still run. A
+        // dangling id here would suppress them (barwise-978), which is a
+        // different claim than the one this test is named for.
+        { type: "cardinality", roleId: "r2", min: 0, max: 1 },
       ],
     });
 

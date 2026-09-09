@@ -579,10 +579,9 @@ export function roleIdsOf(c: Constraint): string[] {
     case "value_comparison":
       return [c.roleId1, c.roleId2];
     case "join_subset":
-      return [...operandRoleIds(c.subset), ...operandRoleIds(c.superset)];
     case "join_equality":
     case "join_exclusion":
-      return c.operands.flatMap(operandRoleIds);
+      return joinOperandsOf(c).flatMap(operandRoleIds);
   }
 }
 
@@ -620,9 +619,41 @@ export function objectTypeIdsOf(c: Constraint): string[] {
     case "value_comparison":
       return [];
     case "join_subset":
-      return [c.subset.path.root, c.superset.path.root];
     case "join_equality":
     case "join_exclusion":
-      return c.operands.map((o) => o.path.root);
+      return joinOperandsOf(c).map((o) => o.path.root);
+  }
+}
+
+/**
+ * The join operands a constraint carries, or none for the kinds that
+ * have no role path.
+ *
+ * The three join kinds spell their operands differently -- `join_subset`
+ * names its two, the other two hold a list -- and three call sites had
+ * each grown their own version of that switch. Exhaustive with no
+ * `default` arm, for the reason `roleIdsOf` gives.
+ */
+export function joinOperandsOf(c: Constraint): readonly JoinOperand[] {
+  switch (c.type) {
+    case "internal_uniqueness":
+    case "external_uniqueness":
+    case "disjunctive_mandatory":
+    case "exclusion":
+    case "exclusive_or":
+    case "frequency":
+    case "mandatory":
+    case "cardinality":
+    case "value_constraint":
+    case "subset":
+    case "equality":
+    case "ring":
+    case "value_comparison":
+      return [];
+    case "join_subset":
+      return [c.subset, c.superset];
+    case "join_equality":
+    case "join_exclusion":
+      return c.operands;
   }
 }

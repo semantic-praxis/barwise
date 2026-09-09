@@ -6,6 +6,7 @@ import {
   type JoinOperand,
 } from "../../model/Constraint.js";
 import type { FactType } from "../../model/FactType.js";
+import type { ModelGraph } from "../../model/graph.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import { report, RULE_ID } from "../ruleId.js";
@@ -19,14 +20,21 @@ import { report, RULE_ID } from "../ruleId.js";
  * the current node), steps are contiguous, each projection index is a valid
  * path node, and all operands of a constraint project tuples of the same
  * arity and matching column object types (so the tuple sets are comparable).
+ *
+ * Whether a path root or a step role names anything at all is `graphOf`'s
+ * question, not this rule's. What survives here is what the graph cannot
+ * answer: that a step's exit is a role of the SAME fact type as its
+ * entry. That is a locality check, and `joinBadStep` still reports it --
+ * a role of another fact type resolves perfectly well and is still not a
+ * hop.
  */
-export function joinConstraintRules(model: OrmModel): Diagnostic[] {
+export function joinConstraintRules(model: OrmModel, graph: ModelGraph): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   for (const ft of model.factTypes) {
     for (const c of ft.constraints) {
       if (isJoinSubset(c)) {
-        checkOperands([c.subset, c.superset], c, ft, model, diagnostics);
+        checkOperands([c.subset, c.superset], c, ft, graph, diagnostics);
       } else if (isJoinEquality(c) || isJoinExclusion(c)) {
         if (c.operands.length < 2) {
           diagnostics.push(
@@ -39,20 +47,12 @@ export function joinConstraintRules(model: OrmModel): Diagnostic[] {
             ),
           );
         }
-        checkOperands(c.operands, c, ft, model, diagnostics);
+        checkOperands(c.operands, c, ft, graph, diagnostics);
       }
     }
   }
 
   return diagnostics;
-}
-
-/** The fact type owning a role id, scanning the model. */
-function factTypeOfRole(model: OrmModel, roleId: string): FactType | undefined {
-  for (const ft of model.factTypes) {
-    if (ft.getRoleById(roleId)) return ft;
-  }
-  return undefined;
 }
 
 /**
@@ -63,10 +63,10 @@ function checkOperands(
   operands: readonly JoinOperand[],
   c: Constraint,
   ft: FactType,
-  model: OrmModel,
+  graph: ModelGraph,
   diagnostics: Diagnostic[],
 ): void {
-  const columnTypes = operands.map((o) => checkOperand(o, c, ft, model, diagnostics));
+  const columnTypes = operands.map((o) => checkOperand(o, c, ft, graph, diagnostics));
   const valid = columnTypes.filter((t): t is readonly string[] => t !== undefined);
   if (valid.length !== operands.length) return; // a malformed operand was already flagged
 
@@ -94,10 +94,10 @@ function checkOperand(
   operand: JoinOperand,
   c: Constraint,
   ft: FactType,
-  model: OrmModel,
+  graph: ModelGraph,
   diagnostics: Diagnostic[],
 ): readonly string[] | undefined {
-  const nodeTypes = pathNodeTypes(operand, c, ft, model, diagnostics);
+  const nodeTypes = pathNodeTypes(operand, c, ft, graph, diagnostics);
   if (!nodeTypes) return undefined;
 
   const columns: string[] = [];
@@ -126,29 +126,29 @@ function checkOperand(
 
 /**
  * The object-type id at each path node (node 0 = root, node k = player after
- * step k), validating the root exists and every step is a contiguous hop.
- * Returns undefined if the path is malformed.
+ * step k), validating that every step is a contiguous hop. Returns undefined
+ * if the path is malformed.
+ *
+ * The root and both step roles resolve -- the graph is the precondition for
+ * running at all -- so what is left to check is that entry and exit belong to
+ * one fact type, and that the entry is played by the node the path has
+ * reached.
  */
 function pathNodeTypes(
   operand: JoinOperand,
   c: Constraint,
   ft: FactType,
-  model: OrmModel,
+  graph: ModelGraph,
   diagnostics: Diagnostic[],
 ): string[] | undefined {
   const { path } = operand;
-  if (!model.getObjectType(path.root)) {
-    diagnostics.push(report(RULE_ID.joinUnknownRoot, "default", c.id ?? ft.id, ft.name, path.root));
-    return undefined;
-  }
-
   const nodeTypes = [path.root];
   let currentTypeId = path.root;
   for (const step of path.steps) {
-    const stepFt = factTypeOfRole(model, step.entry);
-    const entryRole = stepFt?.getRoleById(step.entry);
-    const exitRole = stepFt?.getRoleById(step.exit);
-    if (!stepFt || !entryRole || !exitRole) {
+    const stepFt = graph.factTypeOf(graph.role(step.entry));
+    const entryRole = stepFt.getRoleById(step.entry);
+    const exitRole = stepFt.getRoleById(step.exit);
+    if (!entryRole || !exitRole) {
       diagnostics.push(
         report(RULE_ID.joinBadStep, "default", c.id ?? ft.id, ft.name, step.entry, step.exit),
       );

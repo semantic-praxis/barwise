@@ -8,6 +8,7 @@ import type { RingType } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
 import { counterexampleRoundTripFailure } from "../helpers/counterexampleRules.js";
+import { graphFor } from "../helpers/graphFor.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 /**
@@ -23,7 +24,7 @@ function forbids(model: OrmModel, ce: Counterexample, ruleId: string): boolean {
       pop.addInstance({ roleValues: { ...inst.roleValues } });
     }
   }
-  return populationValidationRules(model).some((d) => d.ruleId === ruleId);
+  return populationValidationRules(model, graphFor(model)).some((d) => d.ruleId === ruleId);
 }
 
 function placesModel(): OrmModel {

@@ -10,7 +10,11 @@
 import { describe, expect, it } from "vitest";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { SubtypeFact } from "../../src/model/SubtypeFact.js";
-import { structuralRules } from "../../src/validation/rules/structural.js";
+import {
+  structuralRules,
+  structuralWellFormedness,
+} from "../../src/validation/rules/structural.js";
+import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";
 
 describe("subtype structural rules", () => {
   it("produces no diagnostics for a valid subtype hierarchy", () => {
@@ -30,7 +34,7 @@ describe("subtype structural rules", () => {
       supertypeId: person.id,
     });
 
-    const diags = structuralRules(model);
+    const diags = structuralRules(model, graphFor(model));
     expect(diags).toHaveLength(0);
   });
 
@@ -49,7 +53,9 @@ describe("subtype structural rules", () => {
     });
     (model as any)._subtypeFacts.set(badSf.id, badSf);
 
-    const diags = structuralRules(model);
+    // The check moved into `graphOf`; the diagnostic id did not move
+    // with it, because that id is what a consumer reads.
+    const diags = unresolvedDiagnostics(model);
     const subtypeDiags = diags.filter((d) => d.ruleId === "structural/subtype-dangling-supertype");
     expect(subtypeDiags).toHaveLength(1);
     expect(subtypeDiags[0]!.message).toContain("nonexistent-id");
@@ -70,7 +76,7 @@ describe("subtype structural rules", () => {
     });
     (model as any)._subtypeFacts.set(badSf.id, badSf);
 
-    const diags = structuralRules(model);
+    const diags = unresolvedDiagnostics(model);
     const subtypeDiags = diags.filter((d) => d.ruleId === "structural/subtype-dangling-subtype");
     expect(subtypeDiags).toHaveLength(1);
     expect(subtypeDiags[0]!.message).toContain("nonexistent-id");
@@ -92,7 +98,7 @@ describe("subtype structural rules", () => {
     });
     (model as any)._subtypeFacts.set(badSf.id, badSf);
 
-    const diags = structuralRules(model);
+    const diags = structuralRules(model, graphFor(model));
     const notEntityDiags = diags.filter(
       (d) => d.ruleId === "structural/subtype-not-entity",
     );
@@ -116,7 +122,7 @@ describe("subtype structural rules", () => {
     });
     (model as any)._subtypeFacts.set(badSf.id, badSf);
 
-    const diags = structuralRules(model);
+    const diags = structuralRules(model, graphFor(model));
     const notEntityDiags = diags.filter(
       (d) => d.ruleId === "structural/subtype-not-entity",
     );
@@ -140,7 +146,7 @@ describe("subtype structural rules", () => {
     });
     (model as any)._subtypeFacts.set(cycleSf.id, cycleSf);
 
-    const diags = structuralRules(model);
+    const diags = structuralWellFormedness(model);
     const cycleDiags = diags.filter(
       (d) => d.ruleId === "structural/subtype-cycle",
     );
@@ -157,7 +163,7 @@ describe("subtype structural rules", () => {
     model.addSubtypeFact({ subtypeId: a.id, supertypeId: b.id });
     model.addSubtypeFact({ subtypeId: b.id, supertypeId: c.id });
 
-    const diags = structuralRules(model);
+    const diags = structuralRules(model, graphFor(model));
     const cycleDiags = diags.filter(
       (d) => d.ruleId === "structural/subtype-cycle",
     );
@@ -177,7 +183,7 @@ describe("subtype structural rules", () => {
     model.addSubtypeFact({ subtypeId: b.id, supertypeId: a.id });
     model.addSubtypeFact({ subtypeId: c.id, supertypeId: a.id });
 
-    const diags = structuralRules(model);
+    const diags = structuralRules(model, graphFor(model));
     const cycleDiags = diags.filter(
       (d) => d.ruleId === "structural/subtype-cycle",
     );

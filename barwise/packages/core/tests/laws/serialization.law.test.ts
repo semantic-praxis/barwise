@@ -46,6 +46,7 @@ import {
   stripFactTypeIds,
   stripObjectTypeIds,
 } from "../arbitraries/normalise.js";
+import { graphFor } from "../helpers/graphFor.js";
 
 const serializer = new OrmYamlSerializer();
 
@@ -53,7 +54,7 @@ describe("law: every generated model is structurally valid", () => {
   it("carries no structural/* diagnostic", { timeout: LAW_TIMEOUT_MS }, () => {
     fc.assert(
       fc.property(arbOrmModel(), (model) => {
-        expect(structuralRules(model)).toEqual([]);
+        expect(structuralRules(model, graphFor(model))).toEqual([]);
       }),
       { seed: SEED, numRuns: RUNS },
     );

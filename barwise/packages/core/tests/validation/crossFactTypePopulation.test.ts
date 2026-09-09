@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
+import { graphFor } from "../helpers/graphFor.js";
 
 /** Customer is identified, and must place an Order (mandatory on the Customer role). */
 function mandatoryModel(playsOrder: boolean): OrmModel {
@@ -103,26 +104,30 @@ function disjunctiveModel(hasPhone: boolean): OrmModel {
 
 describe("cross-fact-type population validation: mandatory", () => {
   it("flags an instance that does not play a mandatory role", () => {
-    const diags = populationValidationRules(mandatoryModel(false));
+    const m = mandatoryModel(false);
+    const diags = populationValidationRules(m, graphFor(m));
     expect(diags.some((d) => d.ruleId === "population/mandatory-violation")).toBe(true);
   });
 
   it("passes when every instance plays the mandatory role", () => {
-    const diags = populationValidationRules(mandatoryModel(true));
+    const m = mandatoryModel(true);
+    const diags = populationValidationRules(m, graphFor(m));
     expect(diags.some((d) => d.ruleId === "population/mandatory-violation")).toBe(false);
   });
 });
 
 describe("cross-fact-type population validation: disjunctive mandatory", () => {
   it("flags an instance that plays none of the disjunctive roles", () => {
-    const diags = populationValidationRules(disjunctiveModel(false));
+    const m = disjunctiveModel(false);
+    const diags = populationValidationRules(m, graphFor(m));
     expect(
       diags.some((d) => d.ruleId === "population/disjunctive-mandatory-violation"),
     ).toBe(true);
   });
 
   it("passes when the instance plays at least one of the roles", () => {
-    const diags = populationValidationRules(disjunctiveModel(true));
+    const m = disjunctiveModel(true);
+    const diags = populationValidationRules(m, graphFor(m));
     expect(
       diags.some((d) => d.ruleId === "population/disjunctive-mandatory-violation"),
     ).toBe(false);
@@ -186,7 +191,8 @@ function subtypeWitnessModel(providesIdentification: boolean): OrmModel {
 
 describe("subtype instances witness supertype existence", () => {
   it("flags a Manager who works in no department, through the Employee mandatory", () => {
-    const diags = populationValidationRules(subtypeWitnessModel(true));
+    const m = subtypeWitnessModel(true);
+    const diags = populationValidationRules(m, graphFor(m));
     expect(diags.some((d) => d.ruleId === "population/mandatory-violation")).toBe(true);
   });
 
@@ -194,7 +200,8 @@ describe("subtype instances witness supertype existence", () => {
     // providesIdentification: false means Manager and Employee values
     // live in different spaces; crediting "E1" to Employee would assert
     // an identity nothing established.
-    const diags = populationValidationRules(subtypeWitnessModel(false));
+    const m = subtypeWitnessModel(false);
+    const diags = populationValidationRules(m, graphFor(m));
     expect(diags.some((d) => d.ruleId === "population/mandatory-violation")).toBe(false);
   });
 });

@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { ObjectifiedFactType } from "../../src/model/ObjectifiedFactType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { structuralRules } from "../../src/validation/rules/structural.js";
+import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";
 
 describe("objectified fact type structural rules", () => {
   it("produces no diagnostics for a valid objectified fact type", () => {
@@ -41,7 +42,7 @@ describe("objectified fact type structural rules", () => {
       objectTypeId: marriage.id,
     });
 
-    const diags = structuralRules(model);
+    const diags = structuralRules(model, graphFor(model));
     const oftDiags = diags.filter((d) => d.ruleId?.startsWith("structural/objectified"));
     expect(oftDiags).toHaveLength(0);
   });
@@ -61,7 +62,9 @@ describe("objectified fact type structural rules", () => {
     });
     (model as any)._objectifiedFactTypes.set(badOft.id, badOft);
 
-    const diags = structuralRules(model);
+    // The check moved into `graphOf`; the diagnostic id did not move
+    // with it, because that id is what a consumer reads.
+    const diags = unresolvedDiagnostics(model);
     const danglingDiags = diags.filter(
       (d) => d.ruleId === "structural/objectified-dangling-fact-type",
     );
@@ -92,7 +95,7 @@ describe("objectified fact type structural rules", () => {
     });
     (model as any)._objectifiedFactTypes.set(badOft.id, badOft);
 
-    const diags = structuralRules(model);
+    const diags = unresolvedDiagnostics(model);
     const danglingDiags = diags.filter(
       (d) => d.ruleId === "structural/objectified-dangling-object-type",
     );
@@ -124,7 +127,7 @@ describe("objectified fact type structural rules", () => {
     });
     (model as any)._objectifiedFactTypes.set(badOft.id, badOft);
 
-    const diags = structuralRules(model);
+    const diags = structuralRules(model, graphFor(model));
     const notEntityDiags = diags.filter(
       (d) => d.ruleId === "structural/objectified-not-entity",
     );
@@ -169,7 +172,7 @@ describe("objectified fact type structural rules", () => {
     });
     (model as any)._objectifiedFactTypes.set(dupOft.id, dupOft);
 
-    const diags = structuralRules(model);
+    const diags = structuralRules(model, graphFor(model));
     const dupDiags = diags.filter(
       (d) => d.ruleId === "structural/duplicate-objectification",
     );
@@ -216,7 +219,7 @@ describe("objectified fact type structural rules", () => {
     });
     (model as any)._objectifiedFactTypes.set(dupOft.id, dupOft);
 
-    const diags = structuralRules(model);
+    const diags = structuralRules(model, graphFor(model));
     const dupTargetDiags = diags.filter(
       (d) => d.ruleId === "structural/duplicate-objectification-target",
     );

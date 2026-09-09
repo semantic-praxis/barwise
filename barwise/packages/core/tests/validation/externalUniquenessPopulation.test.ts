@@ -9,6 +9,7 @@ import type { FactType } from "../../src/model/FactType.js";
 import type { ObjectType } from "../../src/model/ObjectType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
+import { graphFor } from "../helpers/graphFor.js";
 
 interface RoleSpec {
   readonly player: ObjectType;
@@ -40,7 +41,7 @@ function pop(m: OrmModel, factTypeId: string, roleValues: Record<string, string>
 }
 
 function flags(model: OrmModel, ruleId: string): boolean {
-  return populationValidationRules(model).some((d) => d.ruleId === ruleId);
+  return populationValidationRules(model, graphFor(model)).some((d) => d.ruleId === ruleId);
 }
 
 /**

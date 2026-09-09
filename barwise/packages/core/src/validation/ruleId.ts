@@ -102,6 +102,7 @@ export const RULE_ID = {
   duplicateObjectTypeName: "structural/duplicate-object-type-name",
   duplicateObjectification: "structural/duplicate-objectification",
   duplicateObjectificationTarget: "structural/duplicate-objectification-target",
+  duplicateRoleId: "structural/duplicate-role-id",
   objectifiedDanglingFactType: "structural/objectified-dangling-fact-type",
   objectifiedDanglingObjectType: "structural/objectified-dangling-object-type",
   objectifiedNotEntity: "structural/objectified-not-entity",
@@ -716,6 +717,30 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (ftName: string, ftReadingsLength: number): string =>
         `Binary fact type "${ftName}" has only ${ftReadingsLength} reading. Binary fact types typically have both a forward and inverse reading.`,
+    },
+  },
+  [RULE_ID.duplicateRoleId]: {
+    severity: "error",
+    description:
+      "Two roles share an id, so any reference to that id names one of them arbitrarily.",
+    messages: {
+      // Reported by `graphOf` rather than by a rule: nothing checked this
+      // before, because nothing needed role ids to be unique until the
+      // graph indexed by them. An id-keyed index keeps the last writer,
+      // so the alternative to refusing is answering confidently for the
+      // wrong fact type.
+      //
+      // The house rule asks whether a new check belongs in the
+      // constructor instead of as a rule (pr-review checklist, "@barwise
+      // /core changed"). Here it does not, and this workstream is why:
+      // `addObjectifiedFactType` and `addPopulation` DO refuse their bad
+      // states, and the result is three rule ids that have never fired
+      // and a schema-valid file that reports one parse error instead of
+      // every problem in it (barwise-977). A constructor that throws
+      // cannot tell an operator what else is wrong.
+      default: (roleName: string, ftName: string, roleId: string): string =>
+        `Role "${roleName}" in fact type "${ftName}" has id "${roleId}", which another role `
+        + `already uses. Role ids must be unique across the model.`,
     },
   },
   [RULE_ID.danglingRoleReference]: {

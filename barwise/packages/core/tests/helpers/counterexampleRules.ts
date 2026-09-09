@@ -23,6 +23,7 @@ import type { Constraint } from "../../src/model/Constraint.js";
 import type { OrmModel } from "../../src/model/OrmModel.js";
 import { RULE_ID } from "../../src/validation/ruleId.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
+import { graphFor } from "./graphFor.js";
 
 /**
  * The population rule each constraint kind's counterexample must trip.
@@ -77,7 +78,7 @@ function ruleIdsWith(model: OrmModel, ce: Counterexample): string[] {
     }
     added.push(pop.id);
   }
-  const ruleIds = populationValidationRules(model).map((d) => d.ruleId);
+  const ruleIds = populationValidationRules(model, graphFor(model)).map((d) => d.ruleId);
   for (const id of added) model.removePopulation(id);
   return ruleIds;
 }

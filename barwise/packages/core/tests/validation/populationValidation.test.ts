@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import type { ValueRange } from "../../src/model/ObjectType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
+import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";
 
 /**
  * Build a model with "Customer places Order" fact type and configurable
@@ -95,13 +96,13 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "C001", r2: "O124" } });
       pop.addInstance({ roleValues: { r1: "C002", r2: "O125" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(0);
     });
 
     it("produces no diagnostics when no populations exist", () => {
       const model = makeOrderModel();
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(0);
     });
 
@@ -110,7 +111,7 @@ describe("populationValidationRules", () => {
       const ft = model.getFactTypeByName("Customer places Order")!;
       model.addPopulation({ factTypeId: ft.id });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(0);
     });
   });
@@ -124,7 +125,9 @@ describe("populationValidationRules", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       model.removeFactType(ft.id);
 
-      const diags = populationValidationRules(model);
+      // The check moved into `graphOf`; the diagnostic id did not move
+      // with it, because that id is what a consumer reads.
+      const diags = unresolvedDiagnostics(model);
       expect(diags).toHaveLength(1);
       expect(diags[0]!.ruleId).toBe("population/dangling-fact-type");
       expect(diags[0]!.elementId).toBe(pop.id);
@@ -145,7 +148,7 @@ describe("populationValidationRules", () => {
         roleValues: { r1: "C002", r2: "O123" },
       }); // Duplicate on r2
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(1);
       expect(diags[0]!.ruleId).toBe("population/uniqueness-violation");
       expect(diags[0]!.message).toContain("inst-2");
@@ -165,7 +168,7 @@ describe("populationValidationRules", () => {
         roleValues: { r1: "C001", r2: "O123" },
       }); // Exact duplicate
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(1);
       expect(diags[0]!.ruleId).toBe("population/uniqueness-violation");
     });
@@ -178,7 +181,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "C001", r2: "O124" } });
       pop.addInstance({ roleValues: { r1: "C002", r2: "O123" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(0);
     });
 
@@ -190,7 +193,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ id: "inst-2", roleValues: { r1: "C001", r2: "O124" } });
       pop.addInstance({ id: "inst-3", roleValues: { r1: "C001", r2: "O125" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       // inst-2 and inst-3 both duplicate inst-1's r1 value
       expect(diags).toHaveLength(2);
       expect(diags.every((d) => d.ruleId === "population/uniqueness-violation")).toBe(true);
@@ -209,7 +212,7 @@ describe("populationValidationRules", () => {
         roleValues: { r1: "C999", r2: "O123" },
       });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(1);
       expect(diags[0]!.ruleId).toBe("population/value-constraint-violation");
       expect(diags[0]!.message).toContain("C999");
@@ -226,7 +229,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ id: "lo", roleValues: { r1: "0", r2: "O2" } });
       pop.addInstance({ id: "hi", roleValues: { r1: "11", r2: "O3" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(2);
       expect(diags.map((d) => d.message).join(" ")).toContain('"0"');
       expect(diags.map((d) => d.message).join(" ")).toContain('"11"');
@@ -244,7 +247,7 @@ describe("populationValidationRules", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ id: "edge", roleValues: { r1: "100", r2: "O1" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(1); // 100 excluded by exclusive upper bound
     });
 
@@ -260,7 +263,7 @@ describe("populationValidationRules", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ id: "edge", roleValues: { r1: "0", r2: "O1" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(1); // 0 excluded by exclusive lower bound
     });
 
@@ -278,7 +281,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ id: "lo", roleValues: { r1: "A", r2: "O2" } });
       pop.addInstance({ id: "hi", roleValues: { r1: "E", r2: "O3" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(2);
       expect(diags.map((d) => d.message).join(" ")).toContain('"A"');
       expect(diags.map((d) => d.message).join(" ")).toContain('"E"');
@@ -297,7 +300,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ id: "min-edge", roleValues: { r1: "B", r2: "O1" } });
       pop.addInstance({ id: "max-edge", roleValues: { r1: "D", r2: "O2" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       // Both edges are excluded by the exclusive bounds.
       expect(diags).toHaveLength(2);
     });
@@ -310,7 +313,7 @@ describe("populationValidationRules", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ roleValues: { r2: "O123" } }); // r1 absent entirely
 
-      const diags = populationValidationRules(model).filter(
+      const diags = populationValidationRules(model, graphFor(model)).filter(
         (d) => d.ruleId === "population/value-constraint-violation",
       );
       expect(diags).toHaveLength(0);
@@ -324,7 +327,7 @@ describe("populationValidationRules", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ roleValues: { r1: "C999", r2: "O123" } });
 
-      const diags = populationValidationRules(model).filter(
+      const diags = populationValidationRules(model, graphFor(model)).filter(
         (d) => d.ruleId === "population/value-constraint-violation",
       );
       expect(diags).toHaveLength(0);
@@ -339,7 +342,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "C001", r2: "O123" } });
       pop.addInstance({ roleValues: { r1: "C002", r2: "O124" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(0);
     });
 
@@ -352,7 +355,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "C002", r2: "O123" } });
       pop.addInstance({ roleValues: { r1: "C003", r2: "O124" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(2);
     });
   });
@@ -366,7 +369,7 @@ describe("populationValidationRules", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ roleValues: { r1: "C001", r2: "O123" } }); // C001 appears once
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(1);
       expect(diags[0]!.ruleId).toBe("population/frequency-violation");
       expect(diags[0]!.message).toContain("1 time(s)");
@@ -383,7 +386,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "C001", r2: "O124" } });
       pop.addInstance({ roleValues: { r1: "C001", r2: "O125" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(1);
       expect(diags[0]!.ruleId).toBe("population/frequency-violation");
       expect(diags[0]!.message).toContain("3 time(s)");
@@ -418,7 +421,7 @@ describe("populationValidationRules", () => {
       // A distinct pair is fine.
       pop.addInstance({ roleValues: { r1: "R1", r2: "T2" } });
 
-      const diags = populationValidationRules(model).filter(
+      const diags = populationValidationRules(model, graphFor(model)).filter(
         (d) => d.ruleId === "population/frequency-violation",
       );
       expect(diags).toHaveLength(1);
@@ -435,7 +438,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "C001", r2: "O123" } });
       pop.addInstance({ roleValues: { r1: "C001", r2: "O124" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(0);
     });
 
@@ -463,7 +466,7 @@ describe("populationValidationRules", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ roleValues: { r1: "R1" } }); // r2 missing: not a full tuple
 
-      const diags = populationValidationRules(model).filter(
+      const diags = populationValidationRules(model, graphFor(model)).filter(
         (d) => d.ruleId === "population/frequency-violation",
       );
       expect(diags).toHaveLength(0);
@@ -487,7 +490,7 @@ describe("populationValidationRules", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ roleValues: { r1: "R1" } });
 
-      const diags = populationValidationRules(model).filter(
+      const diags = populationValidationRules(model, graphFor(model)).filter(
         (d) => d.ruleId === "population/frequency-violation",
       );
       expect(diags).toHaveLength(0);
@@ -503,7 +506,7 @@ describe("populationValidationRules", () => {
         pop.addInstance({ roleValues: { r1: "C001", r2: `O${i}` } });
       }
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       expect(diags).toHaveLength(0);
     });
   });
@@ -526,7 +529,7 @@ describe("populationValidationRules", () => {
         roleValues: { r1: "C999", r2: "O123" },
       });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       // One uniqueness + one value constraint violation
       expect(diags).toHaveLength(2);
       const ruleIds = new Set(diags.map((d) => d.ruleId));
@@ -549,7 +552,7 @@ describe("populationValidationRules", () => {
       // P001 appears in both r1 and r2 -- violates exclusion.
       pop.addInstance({ id: "inst-1", roleValues: { r1: "P001", r2: "P001" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const excl = diags.filter(
         (d) => d.ruleId === "population/exclusion-violation",
       );
@@ -566,7 +569,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "P001", r2: "P002" } });
       pop.addInstance({ roleValues: { r1: "P003", r2: "P004" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const excl = diags.filter(
         (d) => d.ruleId === "population/exclusion-violation",
       );
@@ -584,7 +587,7 @@ describe("populationValidationRules", () => {
       // Instance with no values for either role.
       pop.addInstance({ id: "inst-1", roleValues: {} });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const xor = diags.filter(
         (d) => d.ruleId === "population/exclusive-or-violation",
       );
@@ -600,7 +603,7 @@ describe("populationValidationRules", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ id: "inst-1", roleValues: { r1: "P001", r2: "P002" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const xor = diags.filter(
         (d) => d.ruleId === "population/exclusive-or-violation",
       );
@@ -617,7 +620,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "P001" } });
       pop.addInstance({ roleValues: { r2: "P002" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const xor = diags.filter(
         (d) => d.ruleId === "population/exclusive-or-violation",
       );
@@ -635,7 +638,7 @@ describe("populationValidationRules", () => {
       // r1 has "P001" but r2 has "P002" -- P001 not in superset.
       pop.addInstance({ id: "inst-1", roleValues: { r1: "P001", r2: "P002" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const sub = diags.filter(
         (d) => d.ruleId === "population/subset-violation",
       );
@@ -653,7 +656,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "P001", r2: "P001" } });
       pop.addInstance({ roleValues: { r1: "P002", r2: "P002" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const sub = diags.filter(
         (d) => d.ruleId === "population/subset-violation",
       );
@@ -671,7 +674,7 @@ describe("populationValidationRules", () => {
       // Does (A, B) appear in superset set? Superset has (B, A). No match.
       pop.addInstance({ id: "inst-1", roleValues: { r1: "A", r2: "B" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const sub = diags.filter(
         (d) => d.ruleId === "population/subset-violation",
       );
@@ -689,7 +692,7 @@ describe("populationValidationRules", () => {
       // r1 has {P001}, r2 has {P002} -- not equal.
       pop.addInstance({ id: "inst-1", roleValues: { r1: "P001", r2: "P002" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const eq = diags.filter(
         (d) => d.ruleId === "population/equality-violation",
       );
@@ -706,7 +709,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "P001", r2: "P001" } });
       pop.addInstance({ roleValues: { r1: "P002", r2: "P002" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const eq = diags.filter(
         (d) => d.ruleId === "population/equality-violation",
       );
@@ -723,7 +726,7 @@ describe("populationValidationRules", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ id: "inst-1", roleValues: { r1: "P001", r2: "P001" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const ring = diags.filter((d) => d.ruleId === "population/ring-violation");
       expect(ring).toHaveLength(1);
       expect(ring[0]!.message).toContain("irreflexive");
@@ -737,7 +740,7 @@ describe("populationValidationRules", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ roleValues: { r1: "P001", r2: "P002" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const ring = diags.filter((d) => d.ruleId === "population/ring-violation");
       expect(ring).toHaveLength(0);
     });
@@ -751,7 +754,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ id: "inst-1", roleValues: { r1: "P001", r2: "P002" } });
       pop.addInstance({ id: "inst-2", roleValues: { r1: "P002", r2: "P001" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const ring = diags.filter((d) => d.ruleId === "population/ring-violation");
       expect(ring.length).toBeGreaterThan(0);
       expect(ring[0]!.message).toContain("asymmetric");
@@ -765,7 +768,7 @@ describe("populationValidationRules", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ id: "inst-1", roleValues: { r1: "P001", r2: "P001" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const ring = diags.filter((d) => d.ruleId === "population/ring-violation");
       expect(ring).toHaveLength(1);
       expect(ring[0]!.message).toContain("asymmetric");
@@ -780,7 +783,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ id: "inst-1", roleValues: { r1: "P001", r2: "P002" } });
       pop.addInstance({ id: "inst-2", roleValues: { r1: "P002", r2: "P001" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const ring = diags.filter((d) => d.ruleId === "population/ring-violation");
       expect(ring.length).toBeGreaterThan(0);
       expect(ring[0]!.message).toContain("antisymmetric");
@@ -794,7 +797,7 @@ describe("populationValidationRules", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ roleValues: { r1: "P001", r2: "P001" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const ring = diags.filter((d) => d.ruleId === "population/ring-violation");
       expect(ring).toHaveLength(0);
     });
@@ -807,7 +810,7 @@ describe("populationValidationRules", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ id: "inst-1", roleValues: { r1: "P001", r2: "P002" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const ring = diags.filter((d) => d.ruleId === "population/ring-violation");
       expect(ring).toHaveLength(1);
       expect(ring[0]!.message).toContain("symmetric");
@@ -822,7 +825,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "P001", r2: "P002" } });
       pop.addInstance({ roleValues: { r1: "P002", r2: "P001" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const ring = diags.filter((d) => d.ruleId === "population/ring-violation");
       expect(ring).toHaveLength(0);
     });
@@ -837,7 +840,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "B", r2: "C" } });
       pop.addInstance({ roleValues: { r1: "A", r2: "C" } }); // violates intransitive
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const ring = diags.filter((d) => d.ruleId === "population/ring-violation");
       expect(ring.length).toBeGreaterThan(0);
       expect(ring[0]!.message).toContain("intransitive");
@@ -853,7 +856,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "B", r2: "C" } });
       // No (A, C) -- intransitive is satisfied.
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const ring = diags.filter((d) => d.ruleId === "population/ring-violation");
       expect(ring).toHaveLength(0);
     });
@@ -868,7 +871,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "B", r2: "C" } });
       // Missing (A, C) violates transitivity.
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const ring = diags.filter((d) => d.ruleId === "population/ring-violation");
       expect(ring.length).toBeGreaterThan(0);
       expect(ring[0]!.message).toContain("transitive");
@@ -884,7 +887,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "B", r2: "C" } });
       pop.addInstance({ roleValues: { r1: "A", r2: "C" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const ring = diags.filter((d) => d.ruleId === "population/ring-violation");
       expect(ring).toHaveLength(0);
     });
@@ -899,7 +902,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "B", r2: "C" } });
       pop.addInstance({ roleValues: { r1: "C", r2: "A" } }); // cycle A->B->C->A
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const ring = diags.filter((d) => d.ruleId === "population/ring-violation");
       expect(ring).toHaveLength(1);
       expect(ring[0]!.message).toContain("acyclic");
@@ -916,7 +919,7 @@ describe("populationValidationRules", () => {
       pop.addInstance({ roleValues: { r1: "B", r2: "C" } });
       pop.addInstance({ roleValues: { r1: "A", r2: "C" } }); // DAG, no cycle
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const ring = diags.filter((d) => d.ruleId === "population/ring-violation");
       expect(ring).toHaveLength(0);
     });
@@ -929,7 +932,7 @@ describe("populationValidationRules", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ id: "inst-1", roleValues: { r1: "P001", r2: "P002" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const ring = diags.filter((d) => d.ruleId === "population/ring-violation");
       expect(ring).toHaveLength(1);
       expect(ring[0]!.message).toContain("purely reflexive");
@@ -943,7 +946,7 @@ describe("populationValidationRules", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ roleValues: { r1: "P001", r2: "P001" } });
 
-      const diags = populationValidationRules(model);
+      const diags = populationValidationRules(model, graphFor(model));
       const ring = diags.filter((d) => d.ruleId === "population/ring-violation");
       expect(ring).toHaveLength(0);
     });
@@ -1059,7 +1062,7 @@ describe("value comparison violations", () => {
     pop.addInstance({ id: "ok", roleValues: { r0: "T1", r1: "1", r2: "5" } });
     pop.addInstance({ id: "bad", roleValues: { r0: "T2", r1: "9", r2: "3" } });
 
-    const diags = populationValidationRules(model);
+    const diags = populationValidationRules(model, graphFor(model));
     expect(diags).toHaveLength(1);
     expect(diags[0]!.ruleId).toBe("population/value-comparison-violation");
     expect(diags[0]!.message).toContain("bad");
@@ -1071,7 +1074,7 @@ describe("value comparison violations", () => {
     pop.addInstance({ id: "ok", roleValues: { r0: "T1", r1: "apple", r2: "banana" } });
     pop.addInstance({ id: "bad", roleValues: { r0: "T2", r1: "cherry", r2: "banana" } });
 
-    const diags = populationValidationRules(model);
+    const diags = populationValidationRules(model, graphFor(model));
     expect(diags).toHaveLength(1);
     expect(diags[0]!.message).toContain("bad");
   });
@@ -1081,14 +1084,14 @@ describe("value comparison violations", () => {
     const eqPop = eq.model.addPopulation({ factTypeId: eq.ft.id });
     eqPop.addInstance({ id: "same", roleValues: { r0: "T1", r1: "apple", r2: "apple" } });
     eqPop.addInstance({ id: "diff", roleValues: { r0: "T2", r1: "apple", r2: "banana" } });
-    const eqDiags = populationValidationRules(eq.model);
+    const eqDiags = populationValidationRules(eq.model, graphFor(eq.model));
     expect(eqDiags).toHaveLength(1);
     expect(eqDiags[0]!.message).toContain("diff");
 
     const ne = makeComparisonModel("<>");
     const nePop = ne.model.addPopulation({ factTypeId: ne.ft.id });
     nePop.addInstance({ id: "same", roleValues: { r0: "T1", r1: "5", r2: "5" } });
-    const neDiags = populationValidationRules(ne.model);
+    const neDiags = populationValidationRules(ne.model, graphFor(ne.model));
     expect(neDiags).toHaveLength(1);
     expect(neDiags[0]!.message).toContain("same");
 
@@ -1096,7 +1099,7 @@ describe("value comparison violations", () => {
     const gtPop = gt.model.addPopulation({ factTypeId: gt.ft.id });
     gtPop.addInstance({ id: "ok", roleValues: { r0: "T1", r1: "9", r2: "3" } });
     gtPop.addInstance({ id: "bad", roleValues: { r0: "T2", r1: "1", r2: "5" } });
-    const gtDiags = populationValidationRules(gt.model);
+    const gtDiags = populationValidationRules(gt.model, graphFor(gt.model));
     expect(gtDiags).toHaveLength(1);
     expect(gtDiags[0]!.message).toContain("bad");
   });
@@ -1108,7 +1111,7 @@ describe("value comparison violations", () => {
 
     // The value-comparison check itself skips the partial instance; the
     // incompleteness is reported once, by its own named rule.
-    const diags = populationValidationRules(model);
+    const diags = populationValidationRules(model, graphFor(model));
     expect(diags).toHaveLength(1);
     expect(diags[0]!.ruleId).toBe("population/incomplete-instance");
   });
@@ -1143,7 +1146,7 @@ describe("incomplete instances", () => {
     pop.addInstance({ id: "i2", roleValues: { r2: "Field Operations" } });
     pop.addInstance({ id: "i3", roleValues: { r1: "D1", r2: "Legal" } });
 
-    const incomplete = populationValidationRules(model).filter(
+    const incomplete = populationValidationRules(model, graphFor(model)).filter(
       (d) => d.ruleId === "population/incomplete-instance",
     );
     expect(incomplete).toHaveLength(2);
@@ -1179,13 +1182,15 @@ describe("deontic modality", () => {
   }
 
   it("an alethic violation is an error", () => {
-    const diags = populationValidationRules(violatingModel("alethic"));
+    const m = violatingModel("alethic");
+    const diags = populationValidationRules(m, graphFor(m));
     expect(diags).toHaveLength(1);
     expect(diags[0]!.severity).toBe("error");
   });
 
   it("a deontic violation is a warning", () => {
-    const diags = populationValidationRules(violatingModel("deontic"));
+    const m = violatingModel("deontic");
+    const diags = populationValidationRules(m, graphFor(m));
     expect(diags).toHaveLength(1);
     expect(diags[0]!.severity).toBe("warning");
   });
@@ -1237,7 +1242,7 @@ describe("deontic modality", () => {
       pop.addInstance({ roleValues: { d1: "D2", c1: "Y" } });
       pop.addInstance({ roleValues: { d1: "D3", c1: "Z" } });
 
-      const diags = populationValidationRules(model).filter(
+      const diags = populationValidationRules(model, graphFor(model)).filter(
         (d) => d.ruleId === "population/object-cardinality-violation",
       );
       expect(diags).toHaveLength(1);
@@ -1251,7 +1256,7 @@ describe("deontic modality", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ roleValues: { d1: "D1", c1: "X" } });
 
-      const diags = populationValidationRules(model).filter(
+      const diags = populationValidationRules(model, graphFor(model)).filter(
         (d) => d.ruleId === "population/object-cardinality-violation",
       );
       expect(diags).toHaveLength(1);
@@ -1265,12 +1270,12 @@ describe("deontic modality", () => {
       pop.addInstance({ roleValues: { d1: "D1", c1: "X" } });
       pop.addInstance({ roleValues: { d1: "D2", c1: "Y" } });
 
-      expect(populationValidationRules(model)).toHaveLength(0);
+      expect(populationValidationRules(model, graphFor(model))).toHaveLength(0);
     });
 
     it("does not flag an object-type cardinality when no population exists", () => {
       const model = makeDeptModel({ min: 2, max: 10 });
-      expect(populationValidationRules(model)).toHaveLength(0);
+      expect(populationValidationRules(model, graphFor(model))).toHaveLength(0);
     });
 
     it("flags a unary role played by more instances than its max", () => {
@@ -1281,7 +1286,7 @@ describe("deontic modality", () => {
       pop.addInstance({ roleValues: { p1: "P2" } });
       pop.addInstance({ roleValues: { p1: "P3" } });
 
-      const diags = populationValidationRules(model).filter(
+      const diags = populationValidationRules(model, graphFor(model)).filter(
         (d) => d.ruleId === "population/unary-role-cardinality-violation",
       );
       expect(diags).toHaveLength(1);
@@ -1296,7 +1301,7 @@ describe("deontic modality", () => {
       pop.addInstance({ roleValues: { p1: "P2" } });
       pop.addInstance({ roleValues: { p1: "P3" } });
 
-      const diags = populationValidationRules(model).filter(
+      const diags = populationValidationRules(model, graphFor(model)).filter(
         (d) => d.ruleId === "population/unary-role-cardinality-violation",
       );
       expect(diags).toHaveLength(1);
@@ -1318,7 +1323,7 @@ describe("deontic modality", () => {
       });
       // No population added at all.
 
-      expect(populationValidationRules(model)).toHaveLength(0);
+      expect(populationValidationRules(model, graphFor(model))).toHaveLength(0);
     });
 
     it("flags a unary role played by fewer instances than its min", () => {
@@ -1337,7 +1342,7 @@ describe("deontic modality", () => {
       const pop = model.addPopulation({ factTypeId: ft.id });
       pop.addInstance({ roleValues: { p1: "P1" } });
 
-      const diags = populationValidationRules(model).filter(
+      const diags = populationValidationRules(model, graphFor(model)).filter(
         (d) => d.ruleId === "population/unary-role-cardinality-violation",
       );
       expect(diags).toHaveLength(1);
@@ -1361,7 +1366,7 @@ describe("deontic modality", () => {
       pop.addInstance({ roleValues: { p1: "P1" } });
       pop.addInstance({ roleValues: { p1: "P2" } });
 
-      expect(populationValidationRules(model)).toHaveLength(0);
+      expect(populationValidationRules(model, graphFor(model))).toHaveLength(0);
     });
 
     it("falls back to the fact type id when a min- or max-violating cardinality constraint has no id", () => {
@@ -1382,17 +1387,20 @@ describe("deontic modality", () => {
       const underPop = model.addPopulation({ factTypeId: underMin.id });
       underPop.addInstance({ roleValues: { p1: "P1" } });
 
+      // A distinct role id: this fixture reused "p1" across both fact
+      // types, which the graph now refuses (structural/duplicate-role-id)
+      // and which was never what this test is about.
       const overMax = model.addFactType({
         name: "Promotion is discounted",
-        roles: [{ name: "is discounted", playerId: promo.id, id: "p1" }],
+        roles: [{ name: "is discounted", playerId: promo.id, id: "p2" }],
         readings: ["{0} is discounted"],
       });
-      overMax.addConstraint({ type: "cardinality", roleId: "p1", min: 0, max: 1 });
+      overMax.addConstraint({ type: "cardinality", roleId: "p2", min: 0, max: 1 });
       const overPop = model.addPopulation({ factTypeId: overMax.id });
-      overPop.addInstance({ roleValues: { p1: "P1" } });
-      overPop.addInstance({ roleValues: { p1: "P2" } });
+      overPop.addInstance({ roleValues: { p2: "P1" } });
+      overPop.addInstance({ roleValues: { p2: "P2" } });
 
-      const diags = populationValidationRules(model).filter(
+      const diags = populationValidationRules(model, graphFor(model)).filter(
         (d) => d.ruleId === "population/unary-role-cardinality-violation",
       );
       expect(diags).toHaveLength(2);

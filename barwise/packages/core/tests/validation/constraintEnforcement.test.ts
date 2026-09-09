@@ -13,6 +13,7 @@ import type { FactType } from "../../src/model/FactType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { evaluateConstraintEnforcement } from "../../src/validation/constraintEnforcement.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
+import { graphFor } from "../helpers/graphFor.js";
 
 /** The rule ids the predicate's seven kinds can produce. */
 const COVERED_RULE_IDS = new Set([
@@ -75,7 +76,7 @@ describe("evaluateConstraintEnforcement", () => {
 
     // The model-wide sweep reports one violation and cannot say which
     // constraint owns it -- both diagnostics would carry the population id.
-    expect(populationValidationRules(model)).toHaveLength(1);
+    expect(populationValidationRules(model, graphFor(model))).toHaveLength(1);
 
     const violated = evaluateConstraintEnforcement(model, ft, constraintById(ft, "uc-r2"));
     const satisfied = evaluateConstraintEnforcement(model, ft, constraintById(ft, "uc-r1"));
@@ -147,7 +148,7 @@ describe("evaluateConstraintEnforcement agrees with the model-wide sweep", () =>
         }
       }
     }
-    const fromSweep = populationValidationRules(model)
+    const fromSweep = populationValidationRules(model, graphFor(model))
       .filter((d) => COVERED_RULE_IDS.has(d.ruleId))
       .map((d) => `${d.severity}|${d.ruleId}|${d.elementId}|${d.message}`);
 
@@ -219,7 +220,7 @@ describe("evaluateConstraintEnforcement agrees with the model-wide sweep", () =>
 
     // Guard the guard: if the model stopped producing violations this test
     // would agree vacuously.
-    const sweep = populationValidationRules(model)
+    const sweep = populationValidationRules(model, graphFor(model))
       .filter((d) => COVERED_RULE_IDS.has(d.ruleId));
     expect(new Set(sweep.map((d) => d.ruleId))).toEqual(
       new Set([

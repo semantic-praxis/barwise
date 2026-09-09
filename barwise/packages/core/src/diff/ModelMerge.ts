@@ -15,14 +15,16 @@
  */
 
 import { type FactTypeConfig, toFactTypeConfig } from "../model/FactType.js";
+import { graphOf } from "../model/graph.js";
 import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { type PopulationConfig, toPopulationConfig } from "../model/Population.js";
 import { toSubtypeFactConfig } from "../model/SubtypeFact.js";
 import type { Diagnostic } from "../validation/Diagnostic.js";
+import { referenceDiagnostics } from "../validation/referenceDiagnostics.js";
 import { report, RULE_ID } from "../validation/ruleId.js";
-import { structuralRules } from "../validation/rules/structural.js";
+import { structuralRules, structuralWellFormedness } from "../validation/rules/structural.js";
 import type {
   DefinitionDelta,
   FactTypeDelta,
@@ -673,9 +675,27 @@ export interface MergeValidationResult {
  * names, broken subtype/objectification references, subtype cycles)
  * but NOT completeness warnings or constraint consistency checks.
  * A merged model that is structurally valid is safe to write to disk.
+ *
+ * The merge path is the one place in the repository that routinely
+ * holds a model with unresolvable references -- `merge` loads its
+ * incoming model with `lenient: true` precisely so it can diff a broken
+ * file. So this cannot assume the graph builds: when it does not, the
+ * unresolved references ARE the structural errors, reported under the
+ * same rule ids `structuralRules` used before those checks moved into
+ * `graphOf`.
  */
 export function getStructuralErrors(model: OrmModel): readonly Diagnostic[] {
-  return structuralRules(model).filter((d) => d.severity === "error");
+  const result = graphOf(model);
+  const diagnostics = [
+    // Duplicate names and the subtype-cycle walk read no reference, so a
+    // merge that produced BOTH a dangling id and a duplicate name still
+    // reports both. Dropping the second half here is exactly the loss
+    // barwise-978 names, and on this path it would let a duplicate name
+    // reach disk.
+    ...structuralWellFormedness(model),
+    ...(result.ok ? structuralRules(model, result.graph) : referenceDiagnostics(result.unresolved)),
+  ];
+  return diagnostics.filter((d) => d.severity === "error");
 }
 
 /**

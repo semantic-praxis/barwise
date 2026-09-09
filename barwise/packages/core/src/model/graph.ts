@@ -4,20 +4,39 @@
  *
  * The problem this exists for: `Role.playerId` is a bare `string`, so
  * every consumer looks the player up, guards against a failure
- * validation already refuses, and then discriminates on kind -- 131
- * `getObjectType` call sites across the repo, 13 lookup prologues in the
- * validation rules alone, and in a model that validates the `undefined`
- * arm of each is unreachable with nothing to tell a reader so
- * (`docs/specs/model-graph-and-id-spaces.spec.md`).
+ * validation already refuses, and then discriminates on kind. In a model
+ * that validates, the `undefined` arm of each is unreachable with
+ * nothing to tell a reader so
+ * (`docs/specs/model-graph-and-id-spaces.spec.md`). The count, with the
+ * command, because a bare figure in a comment is how the spec's own
+ * inventory went stale:
+ *
+ *   grep -rn 'getObjectType(' --include=*.ts \
+ *     --exclude-dir=dist --exclude-dir=tests packages | wc -l
+ *
+ * gives 129 today. (Spelled with --exclude-dir rather than a path glob
+ * because a glob of the form packages/<star>/src contains the two
+ * characters that close a block comment, which is how this header first
+ * failed to compile.)
  *
  * TOTALITY IS A PROPERTY OF A BUILT GRAPH, NOT OF `graphOf`. Building is
  * where a dangling reference is found, so that is where it is reported;
  * every accessor on a graph that was built is total. That is the whole
- * trade -- one failure point instead of 131. The distinction matters
- * because an `OrmModel` really can hold an unresolvable reference:
- * `constraintConsistency` reports a constraint naming a role its fact
- * type does not have, but reporting is a separate pass no caller is
- * required to run, and no shipped surface runs it before verbalizing.
+ * trade -- one failure point instead of one per lookup.
+ *
+ * The distinction matters because an `OrmModel` really can hold an
+ * unresolvable reference. `ValidationEngine.validate` now builds this
+ * graph first and reports what it finds, but validating is a separate
+ * pass no caller is required to run, and no shipped surface runs it
+ * before verbalizing (WS5 owns that). A caller holding a model loaded
+ * with `lenient` and never validated is the case this refuses to answer
+ * wrongly for.
+ *
+ * What it does NOT refuse is a role id that resolves to a role of the
+ * WRONG fact type. That is a locality question, not a resolution one,
+ * and `constraintConsistency` still owns it -- deleting its
+ * `ft.hasRole` guards in favour of this module would have dropped the
+ * case silently (barwise-976).
  *
  * DERIVED, NEVER STORED. Two live representations would have to be kept
  * in sync; one value and one view rebuilt from it cannot disagree.
@@ -104,6 +123,26 @@ export interface ResolvedConstraint {
  * return `undefined` for a reference the model declares.
  */
 export interface ModelGraph {
+  /**
+   * Resolve an object type, a role or a fact type by id, totally.
+   *
+   * By id and not by element, deliberately: the model's own data is
+   * id-shaped in the places these serve -- a join path step holds
+   * `entry`/`exit` role ids, a path holds a `root` object type id, a
+   * cycle result is a list of object type ids. Handing those an
+   * element-shaped accessor would just move the lookup back to the
+   * caller. What the graph removes here is not the id but the GUARD:
+   * building proved these resolve, so there is no `undefined` arm.
+   *
+   * Three of these rather than a named accessor per relationship
+   * (`subtypeOf`, `supertypeOf`, `factTypeOfObjectified`, ...) because
+   * those would each be one line calling `objectType`, and five
+   * one-line wrappers are an interface to learn that hides nothing.
+   * Callers compose: `g.factTypeOf(g.role(step.entry))`.
+   */
+  objectType(id: string): ObjectType;
+  role(id: string): Role;
+  factType(id: string): FactType;
   player(role: Role): ObjectType;
   factTypeOf(role: Role): FactType;
   rolesOf(c: Constraint): readonly Role[];
@@ -255,12 +294,29 @@ export function graphOf(model: OrmModel): GraphResult {
 
   if (unresolved.length > 0) return { ok: false, unresolved };
 
-  // Past this point every lookup below is proved, which is what lets the
-  // accessors assert rather than branch. A `!` here is a claim the loops
-  // above established, not a shortcut.
+  // Past this point every reference the model DECLARES is proved, which
+  // is what lets the accessors return a value rather than branch. What
+  // building cannot prove is anything about an id or element a caller
+  // invents, so a miss here is a programming error, not a model defect
+  // -- and `undefined` typed as present would surface far from its
+  // cause, which is the failure mode this whole module exists to
+  // remove. Fail where the mistake is, with the id in the message.
+  const must = <T>(value: T | undefined, what: string, id: string): T => {
+    if (value === undefined) {
+      throw new Error(
+        `ModelGraph: no ${what} "${id}" in this model. The graph resolves only `
+          + `references the model declares; this id belongs to another model or none.`,
+      );
+    }
+    return value;
+  };
+
   const graph: ModelGraph = {
-    player: (role) => playerOfRole.get(role.id)!,
-    factTypeOf: (role) => factTypeOfRole.get(role.id)!,
+    objectType: (id) => must(model.getObjectType(id), "object type", id),
+    role: (id) => must(roleById.get(id), "role", id),
+    factType: (id) => must(model.getFactType(id), "fact type", id),
+    player: (role) => must(playerOfRole.get(role.id), "player for role", role.id),
+    factTypeOf: (role) => must(factTypeOfRole.get(role.id), "fact type for role", role.id),
     rolesOf: (c) => rolesOfConstraint.get(c) ?? [],
     constraintsOn: (role) => constraintsByRole.get(role.id) ?? [],
     rolesPlayedBy: (ot) => rolesByPlayer.get(ot.id) ?? [],
@@ -272,8 +328,8 @@ export function graphOf(model: OrmModel): GraphResult {
       const roles = rolesOfConstraint.get(c) ?? [];
       const resolvedRoles: ResolvedRole[] = roles.map((role) => ({
         role,
-        player: playerOfRole.get(role.id)!,
-        factType: factTypeOfRole.get(role.id)!,
+        player: must(playerOfRole.get(role.id), "player for role", role.id),
+        factType: must(factTypeOfRole.get(role.id), "fact type for role", role.id),
       }));
       const factTypeIds = new Set(resolvedRoles.map((r) => r.factType.id));
       const playerIds = new Set(resolvedRoles.map((r) => r.player.id));
