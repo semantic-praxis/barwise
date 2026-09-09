@@ -28,9 +28,18 @@ export function registerValidateCommand(program: Command): void {
     .option("--no-warnings", "Suppress warnings")
     .action(async (file: string, opts: ValidateOptions) => {
       try {
+        // Loaded leniently, because reporting what is wrong with a model
+        // is this command's whole job and a loader throw pre-empts it.
+        // `addPopulation` and friends refuse a dangling reference, so a
+        // schema-valid file naming a missing fact type used to print one
+        // parse error instead of every diagnostic -- and three rules
+        // that report exactly that could never fire (barwise-977).
+        // `ValidationEngine` reports unresolved references itself now,
+        // so deferring them to it loses nothing: the JSON Schema check
+        // still runs at parse time, and only reference resolution moves.
         const diagnostics = isProjectFile(file)
           ? collectProjectDiagnostics(file)
-          : new ValidationEngine().validate(loadModel(file));
+          : new ValidationEngine().validate(loadModel(file, { lenient: true }));
         // Recorded under the command name, not the path: a path is the
         // user's directory layout, which is theirs and not ours to
         // accumulate (docs/specs/pipeline-observability.spec.md).
@@ -56,7 +65,11 @@ export function registerValidateCommand(program: Command): void {
  * project-level diagnostics are prefixed with `[project]`.
  */
 function collectProjectDiagnostics(file: string): Diagnostic<RuleId | CliRuleId>[] {
-  const { project, problems } = loadProject(file);
+  // Lenient for the same reason the single-model path above is: a domain
+  // whose deserialization throws is dropped into `problems` and never
+  // validated, so validating a project reported one loader message where
+  // validating the same file alone reported every diagnostic in it.
+  const { project, problems } = loadProject(file, { lenient: true });
   const engine = new ValidationEngine();
   const diagnostics: Diagnostic<RuleId | CliRuleId>[] = [];
 

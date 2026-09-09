@@ -37,7 +37,11 @@ export function executeValidate(
   source: SourceInput,
   domain?: string,
 ): { content: Array<{ type: "text"; text: string; }>; } {
-  const { resolved, problems } = resolveModels(source, domain);
+  // Loaded leniently, because reporting what is wrong with a model is
+  // this tool's whole job and a loader throw pre-empts it. The JSON
+  // Schema check still runs at parse time; only reference resolution
+  // moves to `ValidationEngine`, which reports it (barwise-977).
+  const { resolved, problems } = resolveModels(source, domain, { lenient: true });
 
   const blocks = resolved.map(({ context, model }) => {
     const result = validateOne(model);

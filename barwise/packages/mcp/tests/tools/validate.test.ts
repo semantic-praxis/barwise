@@ -26,9 +26,20 @@ describe("validate_model tool", () => {
   });
 
   it("returns errors for an invalid model", () => {
-    // The invalid fixture has a dangling player reference, which
-    // triggers a deserialization error. executeValidate should throw.
-    expect(() => executeValidate(`${fixtures}/invalid.orm.yaml`)).toThrow();
+    // What the name says. This used to assert a THROW: the fixture has a
+    // dangling player reference, the tool loaded strictly, and the
+    // loader's error pre-empted the report -- so a caller asking "what
+    // is wrong with this model" got one exception and no diagnostics,
+    // and the test pinned that as correct (barwise-977).
+    const parsed = JSON.parse(executeValidate(`${fixtures}/invalid.orm.yaml`).content[0]!.text);
+
+    expect(parsed.valid).toBe(false);
+    expect(parsed.errorCount).toBeGreaterThan(0);
+    expect(parsed.errors.map((e: { ruleId: string; }) => e.ruleId))
+      .toContain("structural/dangling-role-reference");
+    // And the rest of the file is reported too, which is the point of
+    // loading it at all rather than refusing it.
+    expect(parsed.warnings.length).toBeGreaterThan(0);
   });
 
   it("returns diagnostics with ruleId and message", () => {
@@ -73,6 +84,25 @@ describe("validate_model tool", () => {
 
     it("throws for an unknown domain, listing the available ones", () => {
       expect(() => executeValidate(project, "ghost")).toThrow(/crm, billing/);
+    });
+
+    it("validates a domain whose reference does not resolve, rather than dropping it", () => {
+      // A domain that throws on deserialization used to land in the
+      // assembly warnings and never be validated, so the tool answered
+      // a different question than the caller asked (barwise-977). The
+      // CLI has the same test against its own fixture; the capability
+      // matrix puts validate at parity across the surfaces.
+      const result = executeValidate(
+        `${fixtures}/project/dangling-domain.orm-project.yaml`,
+      );
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.valid).toBe(false);
+      expect(parsed.errors.map((e: { ruleId: string; }) => e.ruleId))
+        .toContain("population/dangling-fact-type");
+      expect(parsed.warnings ?? []).not.toContainEqual(
+        expect.stringContaining("does not exist in the model"),
+      );
     });
 
     it("carries assembly warnings alongside the single resolved domain", () => {

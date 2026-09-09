@@ -47,6 +47,19 @@ const MAPPING = `mapping:
       target_object_type: Account
 `;
 
+/** CRM with a population naming a fact type that is not in the file. */
+const DANGLING_CRM = `orm_version: "1.0"
+model:
+  name: CRM
+  domain_context: crm
+  object_types:
+    - { id: ot-customer, name: Customer, kind: entity, reference_mode: id }
+  populations:
+    - id: pop-dangling
+      fact_type: ft-missing
+      instances: []
+`;
+
 function content(yaml: string): ProjectFile {
   return { content: yaml };
 }
@@ -164,6 +177,30 @@ describe("assembleProject", () => {
 
     expect(problems).toHaveLength(1);
     expect(problems[0]).toContain("Mapping (./mappings/crm-billing.map.yaml)");
+  });
+
+  it("drops a domain whose reference does not resolve, by default", () => {
+    const files = fullFiles();
+    files.domains.set("./domains/crm.orm.yaml", content(DANGLING_CRM));
+
+    const { project, problems } = assembleProject(MANIFEST, files);
+
+    expect(project.getDomain("crm")?.model).toBeUndefined();
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain('Fact type id "ft-missing"');
+  });
+
+  it("attaches that domain when lenient, for a caller that is about to validate", () => {
+    // The strict default is right for mapping and export, which need
+    // every reference to resolve. It is wrong for validation, whose
+    // whole job is reporting the unresolved one (barwise-977).
+    const files = fullFiles();
+    files.domains.set("./domains/crm.orm.yaml", content(DANGLING_CRM));
+
+    const { project, problems } = assembleProject(MANIFEST, files, { lenient: true });
+
+    expect(problems).toEqual([]);
+    expect(project.getDomain("crm")?.model?.populations).toHaveLength(1);
   });
 
   it("throws ProjectLoadError when the manifest itself cannot be parsed", () => {

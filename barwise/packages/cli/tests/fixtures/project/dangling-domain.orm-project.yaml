@@ -1,0 +1,6 @@
+project:
+  name: "Dangling Reference Project"
+
+  domains:
+    - path: "./domains/dangling.orm.yaml"
+      context: "dangling"

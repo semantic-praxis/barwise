@@ -22,9 +22,14 @@ import { dirname, resolve } from "node:path";
 /**
  * Load a `.orm-project.yaml` manifest and every file it references.
  *
+ * @param options.lenient - Forwarded to each domain's deserialization;
+ *   see {@link assembleProject}. Only the validate path passes it.
  * @throws {ProjectLoadError} if the manifest cannot be read or parsed.
  */
-export function loadProject(manifestPath: string): LoadedProject {
+export function loadProject(
+  manifestPath: string,
+  options?: { lenient?: boolean; },
+): LoadedProject {
   let manifestYaml: string;
   try {
     manifestYaml = readFileSync(manifestPath, "utf-8");
@@ -44,7 +49,7 @@ export function loadProject(manifestPath: string): LoadedProject {
   return assembleProject(manifestYaml, {
     domains: readReferencedFiles(baseDir, domainPaths),
     mappings: readReferencedFiles(baseDir, mappingPaths),
-  });
+  }, options);
 }
 
 function readReferencedFiles(

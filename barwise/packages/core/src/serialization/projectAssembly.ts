@@ -85,11 +85,20 @@ export function projectFilePaths(
  * a path/context reference, and `projectRules` validates products by
  * dependency name.
  *
+ * @param options.lenient - Passed to each domain's deserialization. A
+ *   caller that is about to VALIDATE the project wants a domain with a
+ *   dangling reference attached and reported by the rules, not dropped
+ *   into `problems` -- validated on its own the same file yields four
+ *   diagnostics, and as a project domain it yielded one loader message
+ *   (barwise-977). A caller that is about to map, export or query wants
+ *   the default, because those need every reference to resolve.
+ *
  * @throws {ProjectLoadError} if the manifest itself cannot be parsed.
  */
 export function assembleProject(
   manifestYaml: string,
   files: ProjectFiles,
+  options?: { lenient?: boolean; },
 ): LoadedProject {
   const project = parseManifestOrThrow(manifestYaml);
   const problems: string[] = [];
@@ -105,7 +114,7 @@ export function assembleProject(
       problems.push(`${label}: ${file.readError}`);
     } else {
       try {
-        domain.setModel(modelSerializer.deserialize(file.content));
+        domain.setModel(modelSerializer.deserialize(file.content, options));
       } catch (err) {
         problems.push(`${label}: ${(err as Error).message}`);
       }

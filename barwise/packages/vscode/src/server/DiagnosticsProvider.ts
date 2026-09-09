@@ -40,7 +40,10 @@ export class DiagnosticsProvider {
 
     try {
       const sourceMap = new YamlSourceMap(text);
-      const model = this.serializer.deserialize(text);
+      // Lenient for the reason the CLI and MCP validate paths are: a
+      // dangling reference is a diagnostic to show in the editor, not
+      // a reason to show nothing but a parse error (barwise-977).
+      const model = this.serializer.deserialize(text, { lenient: true });
       const ormDiagnostics = this.validationEngine.validate(model);
 
       for (const d of ormDiagnostics) {

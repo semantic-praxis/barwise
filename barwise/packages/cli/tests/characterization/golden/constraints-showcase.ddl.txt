@@ -1,5 +1,5 @@
--- Constraint (not expressible in SQL DDL): Each Person either drives some Person or r-person-rides some r-person-rides but not both.
--- Constraint (not expressible in SQL DDL): If Person then r-person-rides.
+-- Constraint (not expressible in SQL DDL): Each Person either drives some Person or rides some Person but not both.
+-- Constraint (not expressible in SQL DDL): If Person then Person in Person rides Bus.
 -- Table: person
 -- Source: Person (ot-person)
 -- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.

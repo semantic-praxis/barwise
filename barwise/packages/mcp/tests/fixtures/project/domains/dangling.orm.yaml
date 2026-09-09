@@ -1,0 +1,22 @@
+# A schema-valid domain whose population names a fact type that does not
+# exist. It loads leniently and the validator reports the dangling
+# reference; a strict load throws in `addPopulation` and the domain is
+# dropped before any rule sees it (barwise-977).
+orm_version: "1.0"
+
+model:
+  name: "Dangling"
+  domain_context: "dangling"
+
+  object_types:
+    - id: "ot-person"
+      name: "Person"
+      kind: "entity"
+      reference_mode: "person_id"
+
+  fact_types: []
+
+  populations:
+    - id: "pop-dangling"
+      fact_type: "ft-missing"
+      instances: []

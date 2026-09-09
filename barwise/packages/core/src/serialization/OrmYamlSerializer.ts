@@ -248,12 +248,18 @@ export class OrmYamlSerializer {
 
     // Add objectified fact types (after object types and fact types).
     for (const oftDoc of doc.model.objectified_fact_types ?? []) {
-      model.addObjectifiedFactType(deserializeObjectifiedFactType(oftDoc));
+      model.addObjectifiedFactType(
+        deserializeObjectifiedFactType(oftDoc),
+        { skipPlayerValidation: options?.lenient },
+      );
     }
 
     // Add populations (after fact types, since they reference them).
     for (const popDoc of doc.model.populations ?? []) {
-      const pop = model.addPopulation(deserializePopulation(popDoc));
+      const pop = model.addPopulation(
+        deserializePopulation(popDoc),
+        { skipPlayerValidation: options?.lenient },
+      );
       for (const instDoc of popDoc.instances) {
         pop.addInstance(deserializeFactInstance(instDoc));
       }

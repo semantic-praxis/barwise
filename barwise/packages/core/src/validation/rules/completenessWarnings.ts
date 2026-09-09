@@ -132,42 +132,62 @@ function checkFactTypesWithoutUniqueness(model: OrmModel): Diagnostic[] {
  * Each entity type should have exactly one preferred identifier
  * (an internal uniqueness constraint with isPreferred = true on one
  * of its identifying fact types). Zero means the relational mapper
- * must guess; more than one is contradictory. A subtype that inherits
- * identification -- a provides_identification path to a supertype
- * with a preferred identifier -- is identified through that chain and
- * is not flagged.
+ * must guess; more than one is contradictory.
+ *
+ * What counts as identified is `identificationSources`, not a second
+ * enumeration written here. It was one, and it knew about a preferred
+ * uniqueness constraint and an identifying subtype fact but not about
+ * objectification -- so 25 objectified entity types across this
+ * repository were told the mapper must guess their key, while
+ * `settleObjectifiedKey` was building it from the absorbed columns and
+ * `identificationGraph` was treating the objectification as an
+ * identifying edge (barwise-972). An entity that objectifies a fact
+ * type is identified BY that fact type; that is what objectification
+ * means.
+ *
+ * `checkConflictingIdentification`, twenty lines down this same file,
+ * was already reading the shared owner. Two rules in one file
+ * disagreeing about what identifies an entity is the shape the
+ * duplication rule exists to catch.
+ *
+ * The MULTIPLE arm still counts preferred uniqueness alone. Objectifying
+ * a fact type and also carrying a reference scheme is ordinary ORM --
+ * "Review has ReviewId" on a Review that objectifies "Reviewer reviews
+ * Paper" -- so counting other kinds here would charge good modelling,
+ * which is the measurement recorded on `identificationSources` itself.
  */
 function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
-  const preferredCounts = new Map<string, number>();
+  const sourcesOf = new Map<string, readonly IdentificationSource[]>();
   for (const ot of model.objectTypes) {
     if (ot.kind !== "entity") continue;
-    let count = 0;
-    for (const ft of model.factTypesForObjectType(ot.id)) {
-      for (const c of ft.constraints) {
-        if (c.type === "internal_uniqueness" && c.isPreferred) count++;
-      }
-    }
-    preferredCounts.set(ot.id, count);
+    sourcesOf.set(ot.id, identificationSources(model, ot));
   }
+  const countOf = (id: string, kind: IdentificationSource["kind"]): number =>
+    (sourcesOf.get(id) ?? []).filter((s) => s.kind === kind).length;
 
-  /** Is this entity identified, directly or through its subtype chain? */
+  /**
+   * Is this entity identified, directly or through its subtype chain?
+   *
+   * The subtype arm recurses because `identificationSources` reports an
+   * identifying subtype fact without asking whether the SUPERTYPE is
+   * itself identified -- inheriting from an unidentified parent
+   * identifies nothing.
+   */
   const isIdentified = (id: string, seen: Set<string>): boolean => {
     if (seen.has(id)) return false; // subtype cycle: structural rule reports it
     seen.add(id);
-    if ((preferredCounts.get(id) ?? 0) > 0) return true;
-    return model.subtypeFacts.some(
-      (sf) =>
-        sf.subtypeId === id
-        && sf.providesIdentification
-        && isIdentified(sf.supertypeId, seen),
+    const sources = sourcesOf.get(id) ?? [];
+    if (sources.some((s) => s.kind !== "identifying-subtype")) return true;
+    return sources.some(
+      (s) => s.kind === "identifying-subtype" && isIdentified(s.supertypeId, seen),
     );
   };
 
   for (const ot of model.objectTypes) {
     if (ot.kind !== "entity") continue;
-    const preferredCount = preferredCounts.get(ot.id) ?? 0;
+    const preferredCount = countOf(ot.id, "preferred-uniqueness");
 
     if (preferredCount === 0 && !isIdentified(ot.id, new Set())) {
       diagnostics.push(report(RULE_ID.missingPreferredIdentifier, "default", ot.id, ot.name));
