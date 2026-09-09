@@ -538,3 +538,55 @@ export function isJoinEquality(c: Constraint): c is JoinEqualityConstraint {
 export function isJoinExclusion(c: Constraint): c is JoinExclusionConstraint {
   return c.type === "join_exclusion";
 }
+
+/**
+ * Every role id a constraint references, across every constraint shape.
+ *
+ * The switch is exhaustive over the `Constraint` union with NO default
+ * arm, which is the whole point: a constraint kind added later fails to
+ * compile here until it is classified, rather than falling through as
+ * "references no roles". That silent-`[]` behaviour is not hypothetical
+ * -- `splitModel` hand-listed eight raw document keys, matched none of a
+ * join constraint's `subset`/`superset`/`operands`, and treated every
+ * join constraint as context-local no matter which fact types its
+ * operand paths reached (barwise-928).
+ *
+ * Lives here rather than in either caller because it is a derivation
+ * that belongs to the data: `splitModel` asks it which context a
+ * constraint is homed in, and `graphOf` asks it which references a model
+ * must resolve. Two hand-written copies of "which fields hold role ids"
+ * is the must-agree duplication the root CLAUDE.md forbids.
+ */
+export function roleIdsOf(c: Constraint): string[] {
+  switch (c.type) {
+    case "internal_uniqueness":
+    case "external_uniqueness":
+    case "disjunctive_mandatory":
+    case "exclusion":
+    case "exclusive_or":
+    case "frequency":
+      return [...c.roleIds];
+    case "mandatory":
+    case "cardinality":
+      return [c.roleId];
+    case "value_constraint":
+      return c.roleId ? [c.roleId] : [];
+    case "subset":
+      return [...c.subsetRoleIds, ...c.supersetRoleIds];
+    case "equality":
+      return [...c.roleIds1, ...c.roleIds2];
+    case "ring":
+    case "value_comparison":
+      return [c.roleId1, c.roleId2];
+    case "join_subset":
+      return [...operandRoleIds(c.subset), ...operandRoleIds(c.superset)];
+    case "join_equality":
+    case "join_exclusion":
+      return c.operands.flatMap(operandRoleIds);
+  }
+}
+
+/** Role ids a join operand references: both ends of every hop in its path. */
+export function operandRoleIds(o: JoinOperand): string[] {
+  return o.path.steps.flatMap((s) => [s.entry, s.exit]);
+}

@@ -33,9 +33,11 @@ export {
   type JoinOperand,
   type JoinSubsetConstraint,
   type MandatoryRoleConstraint,
+  operandRoleIds,
   RING_TYPES,
   type RingConstraint,
   type RingType,
+  roleIdsOf,
   type RolePath,
   type RolePathStep,
   type SubsetConstraint,
@@ -59,6 +61,14 @@ export {
   FactType,
   type FactTypeConfig,
 } from "./model/FactType.js";
+export {
+  graphOf,
+  type GraphResult,
+  type ModelGraph,
+  type ResolvedConstraint,
+  type ResolvedRole,
+  type UnresolvedReference,
+} from "./model/graph.js";
 export { generateId, type IdGenerator, setIdGenerator, uuidv7FromParts } from "./model/id.js";
 export { ModelElement } from "./model/ModelElement.js";
 export {
