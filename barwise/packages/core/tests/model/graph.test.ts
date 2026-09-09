@@ -289,6 +289,37 @@ describe("graphOf: a built graph is total", () => {
     expect(result.graph.rolesPlayedBy(person).length).toBeGreaterThan(0);
   });
 
+  it("resolves object types, roles and fact types by id", () => {
+    const model = simpleModel();
+    const result = graphOf(model);
+    if (!result.ok) throw new Error("expected a graph");
+
+    const ft = model.factTypes[0]!;
+    const role = ft.roles[0]!;
+    expect(result.graph.objectType(role.playerId).id).toBe(role.playerId);
+    expect(result.graph.role(role.id).id).toBe(role.id);
+    expect(result.graph.factType(ft.id).id).toBe(ft.id);
+    // Composes, which is why there is no factTypeOfRoleId accessor.
+    expect(result.graph.factTypeOf(result.graph.role(role.id)).id).toBe(ft.id);
+  });
+
+  // Building proves the references the model DECLARES; it proves nothing
+  // about an id a caller invents. Returning `undefined` typed as present
+  // would surface far from its cause -- the failure mode this module
+  // exists to remove -- so the accessor fails where the mistake is.
+  it("throws rather than returning undefined for an id the model does not declare", () => {
+    const result = graphOf(simpleModel());
+    if (!result.ok) throw new Error("expected a graph");
+
+    expect(() => result.graph.objectType("not-in-this-model")).toThrow(
+      /no object type "not-in-this-model"/,
+    );
+    expect(() => result.graph.role("not-a-role")).toThrow(/no role "not-a-role"/);
+    expect(() => result.graph.factType("not-a-fact-type")).toThrow(
+      /no fact type "not-a-fact-type"/,
+    );
+  });
+
   it("returns an empty list rather than undefined for an object type that plays no role", () => {
     const model = new ModelBuilder("Isolated")
       .withEntityType("Customer")

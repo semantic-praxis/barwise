@@ -39,6 +39,7 @@ import { toFactTypeConfig } from "../../src/model/FactType.js";
 import type { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { structuralRules } from "../../src/validation/rules/structural.js";
+import { graphFor } from "../helpers/graphFor.js";
 import { arbOrmModel, RUNS, SEED } from "../arbitraries/model.js";
 import {
   normaliseFactTypeConfig,
@@ -53,7 +54,7 @@ describe("law: every generated model is structurally valid", () => {
   it("carries no structural/* diagnostic", { timeout: LAW_TIMEOUT_MS }, () => {
     fc.assert(
       fc.property(arbOrmModel(), (model) => {
-        expect(structuralRules(model)).toEqual([]);
+        expect(structuralRules(model, graphFor(model))).toEqual([]);
       }),
       { seed: SEED, numRuns: RUNS },
     );

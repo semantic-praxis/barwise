@@ -104,6 +104,26 @@ export interface ResolvedConstraint {
  * return `undefined` for a reference the model declares.
  */
 export interface ModelGraph {
+  /**
+   * Resolve an object type, a role or a fact type by id, totally.
+   *
+   * By id and not by element, deliberately: the model's own data is
+   * id-shaped in the places these serve -- a join path step holds
+   * `entry`/`exit` role ids, a path holds a `root` object type id, a
+   * cycle result is a list of object type ids. Handing those an
+   * element-shaped accessor would just move the lookup back to the
+   * caller. What the graph removes here is not the id but the GUARD:
+   * building proved these resolve, so there is no `undefined` arm.
+   *
+   * Three of these rather than a named accessor per relationship
+   * (`subtypeOf`, `supertypeOf`, `factTypeOfObjectified`, ...) because
+   * those would each be one line calling `objectType`, and five
+   * one-line wrappers are an interface to learn that hides nothing.
+   * Callers compose: `g.factTypeOf(g.role(step.entry))`.
+   */
+  objectType(id: string): ObjectType;
+  role(id: string): Role;
+  factType(id: string): FactType;
   player(role: Role): ObjectType;
   factTypeOf(role: Role): FactType;
   rolesOf(c: Constraint): readonly Role[];
@@ -258,9 +278,27 @@ export function graphOf(model: OrmModel): GraphResult {
   // Past this point every lookup below is proved, which is what lets the
   // accessors assert rather than branch. A `!` here is a claim the loops
   // above established, not a shortcut.
+  // Building proved every reference the model DECLARES. It cannot prove
+  // anything about an id or element a caller invents, so a miss here is
+  // a programming error, not a model defect -- and `undefined` typed as
+  // present would surface far from its cause, which is the failure mode
+  // this whole module exists to remove. Fail where the mistake is.
+  const must = <T>(value: T | undefined, what: string, id: string): T => {
+    if (value === undefined) {
+      throw new Error(
+        `ModelGraph: no ${what} "${id}" in this model. The graph resolves only `
+          + `references the model declares; this id belongs to another model or none.`,
+      );
+    }
+    return value;
+  };
+
   const graph: ModelGraph = {
-    player: (role) => playerOfRole.get(role.id)!,
-    factTypeOf: (role) => factTypeOfRole.get(role.id)!,
+    objectType: (id) => must(model.getObjectType(id), "object type", id),
+    role: (id) => must(roleById.get(id), "role", id),
+    factType: (id) => must(model.getFactType(id), "fact type", id),
+    player: (role) => must(playerOfRole.get(role.id), "player for role", role.id),
+    factTypeOf: (role) => must(factTypeOfRole.get(role.id), "fact type for role", role.id),
     rolesOf: (c) => rolesOfConstraint.get(c) ?? [],
     constraintsOn: (role) => constraintsByRole.get(role.id) ?? [],
     rolesPlayedBy: (ot) => rolesByPlayer.get(ot.id) ?? [],
@@ -272,8 +310,8 @@ export function graphOf(model: OrmModel): GraphResult {
       const roles = rolesOfConstraint.get(c) ?? [];
       const resolvedRoles: ResolvedRole[] = roles.map((role) => ({
         role,
-        player: playerOfRole.get(role.id)!,
-        factType: factTypeOfRole.get(role.id)!,
+        player: must(playerOfRole.get(role.id), "player for role", role.id),
+        factType: must(factTypeOfRole.get(role.id), "fact type for role", role.id),
       }));
       const factTypeIds = new Set(resolvedRoles.map((r) => r.factType.id));
       const playerIds = new Set(resolvedRoles.map((r) => r.player.id));

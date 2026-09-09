@@ -1,3 +1,4 @@
+import type { ModelGraph } from "../../model/graph.js";
 import { identificationOrder } from "../../model/identification.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { Diagnostic } from "../Diagnostic.js";
@@ -7,53 +8,31 @@ import { report, RULE_ID } from "../ruleId.js";
  * Structural validation rules.
  *
  * These check the basic well-formedness of the model:
- * - Every role in every fact type references an object type that exists.
  * - No duplicate object type names.
  * - No duplicate fact type names.
  * - Binary fact types have at least two readings (forward and inverse).
- * - Subtype facts reference existing entity types.
+ * - Subtype facts relate entity types, not value types.
  * - Subtype hierarchy has no cycles.
- * - Objectified fact types reference existing fact types and entity types.
+ * - Objectified fact types objectify entity types.
  * - No duplicate objectification of the same fact type.
+ *
+ * What is NOT here any more: whether each of those references resolves
+ * at all. `graphOf` owns that, so these rules receive a graph in which
+ * every id already names something, and read the thing rather than the
+ * id. The diagnostic ids did not move with the checks -- a dangling
+ * player still reports `structural/dangling-role-reference` -- because
+ * a rule id is a promise to whoever reads validator output.
  */
-export function structuralRules(model: OrmModel): Diagnostic[] {
+export function structuralRules(model: OrmModel, graph: ModelGraph): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
-  diagnostics.push(...checkDanglingRoleReferences(model));
   diagnostics.push(...checkDuplicateObjectTypeNames(model));
   diagnostics.push(...checkDuplicateFactTypeNames(model));
   diagnostics.push(...checkBinaryFactTypeReadings(model));
-  diagnostics.push(...checkSubtypeFactReferences(model));
+  diagnostics.push(...checkSubtypeFactKinds(model, graph));
   diagnostics.push(...checkSubtypeCycles(model));
-  diagnostics.push(...checkObjectifiedFactTypeReferences(model));
-  diagnostics.push(...checkIdentificationCycles(model));
-
-  return diagnostics;
-}
-
-/**
- * Every role's playerId must reference an object type that exists
- * in the model.
- */
-function checkDanglingRoleReferences(model: OrmModel): Diagnostic[] {
-  const diagnostics: Diagnostic[] = [];
-
-  for (const ft of model.factTypes) {
-    for (const role of ft.roles) {
-      if (!model.getObjectType(role.playerId)) {
-        diagnostics.push(
-          report(
-            RULE_ID.danglingRoleReference,
-            "default",
-            ft.id,
-            role.name,
-            ft.name,
-            role.playerId,
-          ),
-        );
-      }
-    }
-  }
+  diagnostics.push(...checkObjectifiedFactTypeKinds(model, graph));
+  diagnostics.push(...checkIdentificationCycles(model, graph));
 
   return diagnostics;
 }
@@ -121,26 +100,22 @@ function checkBinaryFactTypeReadings(model: OrmModel): Diagnostic[] {
 }
 
 /**
- * Subtype facts must reference existing entity types for both the
- * subtype and supertype sides.
+ * Both sides of a subtype fact must be entity types. That they exist at
+ * all is the graph's guarantee, not this rule's question.
  */
-function checkSubtypeFactReferences(model: OrmModel): Diagnostic[] {
+function checkSubtypeFactKinds(model: OrmModel, graph: ModelGraph): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   for (const sf of model.subtypeFacts) {
-    const subtype = model.getObjectType(sf.subtypeId);
-    if (!subtype) {
-      diagnostics.push(report(RULE_ID.subtypeDanglingSubtype, "default", sf.id, sf.subtypeId));
-    } else if (subtype.kind !== "entity") {
+    const subtype = graph.objectType(sf.subtypeId);
+    if (subtype.kind !== "entity") {
       diagnostics.push(
         report(RULE_ID.subtypeNotEntity, "subtypeSide", sf.id, subtype.name, subtype.kind),
       );
     }
 
-    const supertype = model.getObjectType(sf.supertypeId);
-    if (!supertype) {
-      diagnostics.push(report(RULE_ID.subtypeDanglingSupertype, "default", sf.id, sf.supertypeId));
-    } else if (supertype.kind !== "entity") {
+    const supertype = graph.objectType(sf.supertypeId);
+    if (supertype.kind !== "entity") {
       diagnostics.push(
         report(RULE_ID.subtypeNotEntity, "supertypeSide", sf.id, supertype.name, supertype.kind),
       );
@@ -213,42 +188,29 @@ function checkSubtypeCycles(model: OrmModel): Diagnostic[] {
  * plays a role in (barwise-962). The mapper carried a defensive skip for
  * exactly that shape and could not see the longer ones.
  */
-function checkIdentificationCycles(model: OrmModel): Diagnostic[] {
+function checkIdentificationCycles(model: OrmModel, graph: ModelGraph): Diagnostic[] {
   const result = identificationOrder(model);
   if (!("cycle" in result)) return [];
 
-  const names = result.cycle.map((id) => model.getObjectType(id)?.name ?? id);
+  const names = result.cycle.map((id) => graph.objectType(id).name);
   return [
     report(RULE_ID.identificationCycle, "default", result.cycle[0]!, names.join(" -> ")),
   ];
 }
 
 /**
- * Objectified fact types must reference existing fact types and entity types.
- * Also checks for duplicate objectification (one fact type can only be
- * objectified once, and one entity type can only serve as one objectification).
+ * An objectified fact type must objectify an entity type, and no fact
+ * type or entity type may be objectified twice. That both ends exist is
+ * the graph's guarantee.
  */
-function checkObjectifiedFactTypeReferences(model: OrmModel): Diagnostic[] {
+function checkObjectifiedFactTypeKinds(model: OrmModel, graph: ModelGraph): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const seenFactTypes = new Set<string>();
   const seenObjectTypes = new Set<string>();
 
   for (const oft of model.objectifiedFactTypes) {
-    // Check that the fact type exists.
-    const factType = model.getFactType(oft.factTypeId);
-    if (!factType) {
-      diagnostics.push(
-        report(RULE_ID.objectifiedDanglingFactType, "default", oft.id, oft.factTypeId),
-      );
-    }
-
-    // Check that the object type exists and is an entity type.
-    const objectType = model.getObjectType(oft.objectTypeId);
-    if (!objectType) {
-      diagnostics.push(
-        report(RULE_ID.objectifiedDanglingObjectType, "default", oft.id, oft.objectTypeId),
-      );
-    } else if (objectType.kind !== "entity") {
+    const objectType = graph.objectType(oft.objectTypeId);
+    if (objectType.kind !== "entity") {
       diagnostics.push(
         report(RULE_ID.objectifiedNotEntity, "default", oft.id, objectType.name, objectType.kind),
       );
