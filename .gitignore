@@ -160,3 +160,9 @@ __pycache__/
 # Adoption is a human act -- a candidate is copied into
 # packages/llm/prompts/ deliberately, never by being left lying around.
 barwise/optimizer/out/
+
+# Turborepo's cache. barwise/.gitignore already ignores barwise/.turbo/,
+# but `npm run <script>` from the repo ROOT forwards into barwise/ and
+# turbo writes its cache HERE, outside that file's reach -- 11 MB of
+# .tar.zst that a `git add -A` stages silently.
+.turbo/

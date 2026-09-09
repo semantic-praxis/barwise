@@ -7,6 +7,7 @@
  * integrity -- that is the mapper's responsibility.
  */
 import { XMLParser } from "fast-xml-parser";
+import { asNormaId, type NormaId } from "./normaId.js";
 import type {
   NormaCardinality,
   NormaCardinalityRange,
@@ -89,7 +90,7 @@ export function parseNormaXml(xml: string): NormaDocument {
     throw new NormaParseError("Missing ORMModel element inside ORM2.");
   }
 
-  const modelId = attr(ormModel, "id") ?? "";
+  const modelId = asNormaId(attr(ormModel, "id") ?? "");
   const modelName = attr(ormModel, "Name") ?? "Unnamed";
 
   // Parse each section.
@@ -195,7 +196,7 @@ function parseEntityTypes(
     const defs = parseDefinitionText(et);
 
     return {
-      id: attr(et, "id") ?? "",
+      id: asNormaId(attr(et, "id") ?? ""),
       name: attr(et, "Name") ?? "",
       referenceMode: attr(et, "_ReferenceMode"),
       preferredIdentifier: prefId ? attr(prefId, "ref") : undefined,
@@ -232,7 +233,7 @@ function parseValueTypes(
     const dtScale = scaleStr ? parseInt(scaleStr, 10) : undefined;
 
     return {
-      id: attr(vt, "id") ?? "",
+      id: asNormaId(attr(vt, "id") ?? ""),
       name: attr(vt, "Name") ?? "",
       playedRoleRefs: parseRoleRefs(playedRoles),
       definition: defs,
@@ -240,7 +241,7 @@ function parseValueTypes(
       valueConstraint: valueRestriction
         ? parseValueRestriction(valueRestriction)
         : undefined,
-      dataTypeRef: cdt ? attr(cdt, "ref") : undefined,
+      dataTypeRef: cdt ? asNormaId(attr(cdt, "ref") ?? "") : undefined,
       ...(defaultValue !== undefined ? { defaultValue } : {}),
       dataTypeLength: dtLength !== undefined && !isNaN(dtLength) ? dtLength : undefined,
       dataTypeScale: dtScale !== undefined && !isNaN(dtScale) ? dtScale : undefined,
@@ -262,9 +263,9 @@ function parseObjectifiedTypes(
     const defs = parseDefinitionText(ot);
 
     return {
-      id: attr(ot, "id") ?? "",
+      id: asNormaId(attr(ot, "id") ?? ""),
       name: attr(ot, "Name") ?? "",
-      nestedFactTypeRef: nested ? (attr(nested, "ref") ?? "") : "",
+      nestedFactTypeRef: nested ? asNormaId(attr(nested, "ref") ?? "") : asNormaId(""),
       referenceMode: attr(ot, "_ReferenceMode"),
       note: parseNotesText(ot),
       preferredIdentifier: prefId ? attr(prefId, "ref") : undefined,
@@ -277,10 +278,10 @@ function parseObjectifiedTypes(
 
 function parseRoleRefs(
   playedRoles: Record<string, unknown> | undefined,
-): string[] {
+): NormaId[] {
   if (!playedRoles) return [];
   return asArray(playedRoles["Role"]).map(
-    (r) => attr(r, "ref") ?? "",
+    (r) => asNormaId(attr(r, "ref") ?? ""),
   );
 }
 
@@ -403,7 +404,7 @@ function parseFactTypes(
     const defs = parseDefinitionText(ft);
 
     return {
-      id: attr(ft, "id") ?? "",
+      id: asNormaId(attr(ft, "id") ?? ""),
       name: attr(ft, "_Name") ?? "",
       roles: parseRoles(factRoles),
       readingOrders: parseReadingOrders(readingOrders),
@@ -425,9 +426,9 @@ function parseRoles(
     const cardinality = parseCardinalityRestriction(r, "UnaryRoleCardinalityConstraint");
     const roleInstances = parseRoleInstanceDecls(r);
     return {
-      id: attr(r, "id") ?? "",
+      id: asNormaId(attr(r, "id") ?? ""),
       name: attr(r, "Name") ?? "",
-      playerRef: playerEl ? (attr(playerEl, "ref") ?? "") : "",
+      playerRef: playerEl ? asNormaId(attr(playerEl, "ref") ?? "") : asNormaId(""),
       isMandatory: attr(r, "_IsMandatory") === "true",
       multiplicity: parseMultiplicity(attr(r, "_Multiplicity")),
       ...(cardinality ? { cardinality } : {}),
@@ -463,7 +464,7 @@ function parseRoleInstanceDecls(
       const id = attr(el, "id");
       const ref = attr(el, "ref");
       if (!id || !ref) continue;
-      decls.push({ id, objectInstanceRef: ref, consumer });
+      decls.push({ id: asNormaId(id), objectInstanceRef: asNormaId(ref), consumer });
     }
   }
   return decls;
@@ -480,7 +481,7 @@ function parseValueInstances(
     const id = attr(el, "id");
     const raw = el["Value"];
     if (!id || raw === undefined || raw === null || typeof raw === "object") continue;
-    instances.push({ id, value: String(raw) });
+    instances.push({ id: asNormaId(id), value: String(raw) });
   }
   return instances;
 }
@@ -497,7 +498,7 @@ function parseEntityInstances(
     if (!id) continue;
     const unaryRoleRefs = parseUnaryRoleRefs(el);
     instances.push({
-      id,
+      id: asNormaId(id),
       roleInstanceRefs: parseInstanceRoleRefs(el),
       ...(unaryRoleRefs.length > 0 ? { unaryRoleRefs } : {}),
     });
@@ -506,13 +507,13 @@ function parseEntityInstances(
 }
 
 /** EntityTypeUnaryRoleInstance refs: unary roles this instance populates. */
-function parseUnaryRoleRefs(instance: Record<string, unknown>): string[] {
+function parseUnaryRoleRefs(instance: Record<string, unknown>): NormaId[] {
   const container = child(instance, "RoleInstances") as Record<string, unknown> | undefined;
   if (!container) return [];
-  const refs: string[] = [];
+  const refs: NormaId[] = [];
   for (const el of asArray(container["EntityTypeUnaryRoleInstance"])) {
     const ref = attr(el, "ref");
-    if (ref) refs.push(ref);
+    if (ref) refs.push(asNormaId(ref));
   }
   return refs;
 }
@@ -527,21 +528,21 @@ function parseFactInstances(
   for (const el of asArray(container["FactTypeInstance"])) {
     const id = attr(el, "id");
     if (!id) continue;
-    instances.push({ id, roleInstanceRefs: parseInstanceRoleRefs(el) });
+    instances.push({ id: asNormaId(id), roleInstanceRefs: parseInstanceRoleRefs(el) });
   }
   return instances;
 }
 
 /** The ref list inside an instance's RoleInstances container (any tag kind). */
-function parseInstanceRoleRefs(instance: Record<string, unknown>): string[] {
+function parseInstanceRoleRefs(instance: Record<string, unknown>): NormaId[] {
   const container = child(instance, "RoleInstances") as Record<string, unknown> | undefined;
   if (!container) return [];
-  const refs: string[] = [];
+  const refs: NormaId[] = [];
   for (const tag of ["EntityTypeRoleInstance", "ValueTypeRoleInstance", "FactTypeRoleInstance"]) {
     for (const el of asArray(container[tag])) {
       const ref = attr(el, "ref");
       // Declarations carry id + ref; consumer references carry ref only.
-      if (ref && !attr(el, "id")) refs.push(ref);
+      if (ref && !attr(el, "id")) refs.push(asNormaId(ref));
     }
   }
   return refs;
@@ -587,7 +588,7 @@ function parseReadingOrders(
     const roleSeq = firstRoleSequence(ro);
 
     return {
-      id: attr(ro, "id") ?? "",
+      id: asNormaId(attr(ro, "id") ?? ""),
       readings: parseReadings(readings),
       roleSequence: roleSeq ? parseRoleSequenceRefs(roleSeq) : [],
     };
@@ -599,16 +600,16 @@ function parseReadings(
 ): NormaReading[] {
   if (!readings) return [];
   return asArray(readings["Reading"]).map((r) => ({
-    id: attr(r, "id") ?? "",
+    id: asNormaId(attr(r, "id") ?? ""),
     data: String(child(r, "Data") ?? ""),
   }));
 }
 
 function parseRoleSequenceRefs(
   roleSeq: Record<string, unknown> | undefined,
-): string[] {
+): NormaId[] {
   if (!roleSeq) return [];
-  return asArray(roleSeq["Role"]).map((r) => attr(r, "ref") ?? "");
+  return asArray(roleSeq["Role"]).map((r) => asNormaId(attr(r, "ref") ?? ""));
 }
 
 /**
@@ -624,9 +625,9 @@ function firstRoleSequence(
 
 function parseInternalConstraintRefs(
   ic: Record<string, unknown> | undefined,
-): string[] {
+): NormaId[] {
   if (!ic) return [];
-  const refs: string[] = [];
+  const refs: NormaId[] = [];
   for (
     const tag of [
       "UniquenessConstraint",
@@ -641,7 +642,7 @@ function parseInternalConstraintRefs(
   ) {
     for (const el of asArray(ic[tag])) {
       const ref = attr(el, "ref");
-      if (ref) refs.push(ref);
+      if (ref) refs.push(asNormaId(ref));
     }
   }
   return refs;
@@ -657,32 +658,32 @@ function parseSubtypeFacts(
     const factRoles = child(sf, "FactRoles") as Record<string, unknown> | undefined;
     const providesId = attr(sf, "PreferredIdentificationPath") !== "false";
 
-    let subtypeRoleId = "";
-    let subtypePlayerRef = "";
-    let supertypeRoleId = "";
-    let supertypePlayerRef = "";
+    let subtypeRoleId = asNormaId("");
+    let subtypePlayerRef = asNormaId("");
+    let supertypeRoleId = asNormaId("");
+    let supertypePlayerRef = asNormaId("");
 
     if (factRoles) {
       // SubtypeMetaRole and SupertypeMetaRole
       const subtypeRoles = asArray(factRoles["SubtypeMetaRole"]);
       if (subtypeRoles.length > 0) {
         const sr = subtypeRoles[0]!;
-        subtypeRoleId = attr(sr, "id") ?? "";
+        subtypeRoleId = asNormaId(attr(sr, "id") ?? "");
         const player = child(sr, "RolePlayer") as Record<string, unknown> | undefined;
-        subtypePlayerRef = player ? (attr(player, "ref") ?? "") : "";
+        subtypePlayerRef = player ? asNormaId(attr(player, "ref") ?? "") : asNormaId("");
       }
 
       const supertypeRoles = asArray(factRoles["SupertypeMetaRole"]);
       if (supertypeRoles.length > 0) {
         const sr = supertypeRoles[0]!;
-        supertypeRoleId = attr(sr, "id") ?? "";
+        supertypeRoleId = asNormaId(attr(sr, "id") ?? "");
         const player = child(sr, "RolePlayer") as Record<string, unknown> | undefined;
-        supertypePlayerRef = player ? (attr(player, "ref") ?? "") : "";
+        supertypePlayerRef = player ? asNormaId(attr(player, "ref") ?? "") : asNormaId("");
       }
     }
 
     return {
-      id: attr(sf, "id") ?? "",
+      id: asNormaId(attr(sf, "id") ?? ""),
       subtypeRoleId,
       subtypePlayerRef,
       supertypeRoleId,
@@ -703,13 +704,13 @@ function parseConstraints(
   // UniquenessConstraint
   for (const uc of asArray(constraints["UniquenessConstraint"])) {
     const roleSeqs = asArray(uc["RoleSequence"]);
-    const roleRefs: string[] = [];
+    const roleRefs: NormaId[] = [];
     for (const seq of roleSeqs) {
-      roleRefs.push(...asArray(seq["Role"]).map((r) => attr(r, "ref") ?? ""));
+      roleRefs.push(...asArray(seq["Role"]).map((r) => asNormaId(attr(r, "ref") ?? "")));
     }
     result.push({
       type: "uniqueness",
-      id: attr(uc, "id") ?? "",
+      id: asNormaId(attr(uc, "id") ?? ""),
       name: attr(uc, "Name") ?? "",
       ...(attr(uc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       isInternal: attr(uc, "IsInternal") === "true",
@@ -727,14 +728,14 @@ function parseConstraints(
       | undefined;
     result.push({
       type: "mandatory",
-      id: attr(mc, "id") ?? "",
+      id: asNormaId(attr(mc, "id") ?? ""),
       name: attr(mc, "Name") ?? "",
       ...(attr(mc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       isSimple: attr(mc, "IsSimple") === "true",
       isImplied: attr(mc, "IsImplied") === "true",
       roleRefs: roleSeq ? parseRoleSequenceRefs(roleSeq) : [],
       ...(xorExclusion && attr(xorExclusion, "ref")
-        ? { exclusiveOrExclusionRef: attr(xorExclusion, "ref") }
+        ? { exclusiveOrExclusionRef: asNormaId(attr(xorExclusion, "ref") ?? "") }
         : {}),
     });
   }
@@ -746,7 +747,7 @@ function parseConstraints(
     const maxStr = attr(fc, "MaxFrequency");
     result.push({
       type: "frequency",
-      id: attr(fc, "id") ?? "",
+      id: asNormaId(attr(fc, "id") ?? ""),
       name: attr(fc, "Name") ?? "",
       ...(attr(fc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       min: minStr ? parseInt(minStr, 10) : 1,
@@ -764,7 +765,7 @@ function parseConstraints(
       : { values: [], ranges: [] };
     result.push({
       type: "value_constraint",
-      id: attr(vc, "id") ?? "",
+      id: asNormaId(attr(vc, "id") ?? ""),
       name: attr(vc, "Name") ?? "",
       ...(attr(vc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       roleRefs: roleSeq ? parseRoleSequenceRefs(roleSeq) : [],
@@ -778,7 +779,7 @@ function parseConstraints(
     const { sequences, joinPaths } = parseRoleSequencesWithJoins(sc);
     result.push({
       type: "subset",
-      id: attr(sc, "id") ?? "",
+      id: asNormaId(attr(sc, "id") ?? ""),
       name: attr(sc, "Name") ?? "",
       ...(attr(sc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       subsetRoleRefs: sequences[0] ?? [],
@@ -796,13 +797,13 @@ function parseConstraints(
       | undefined;
     result.push({
       type: "exclusion",
-      id: attr(ec, "id") ?? "",
+      id: asNormaId(attr(ec, "id") ?? ""),
       name: attr(ec, "Name") ?? "",
       ...(attr(ec, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       roleSequences: sequences,
       ...(joinPaths.some(Boolean) ? { joinPaths } : {}),
       ...(xorMandatory && attr(xorMandatory, "ref")
-        ? { exclusiveOrMandatoryRef: attr(xorMandatory, "ref") }
+        ? { exclusiveOrMandatoryRef: asNormaId(attr(xorMandatory, "ref") ?? "") }
         : {}),
     });
   }
@@ -812,7 +813,7 @@ function parseConstraints(
     const roleSeq = firstRoleSequence(vcc);
     result.push({
       type: "value_comparison",
-      id: attr(vcc, "id") ?? "",
+      id: asNormaId(attr(vcc, "id") ?? ""),
       name: attr(vcc, "Name") ?? "",
       ...(attr(vcc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       operator: parseValueComparisonOperator(attr(vcc, "Operator")),
@@ -825,7 +826,7 @@ function parseConstraints(
     const { sequences, joinPaths } = parseRoleSequencesWithJoins(eq);
     result.push({
       type: "equality",
-      id: attr(eq, "id") ?? "",
+      id: asNormaId(attr(eq, "id") ?? ""),
       name: attr(eq, "Name") ?? "",
       ...(attr(eq, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       roleSequences: sequences,
@@ -839,7 +840,7 @@ function parseConstraints(
     const ringTypeStr = attr(rc, "Type") ?? attr(rc, "RingType") ?? "";
     result.push({
       type: "ring",
-      id: attr(rc, "id") ?? "",
+      id: asNormaId(attr(rc, "id") ?? ""),
       name: attr(rc, "Name") ?? "",
       ...(attr(rc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       ringType: normalizeRingType(ringTypeStr),
@@ -852,17 +853,17 @@ function parseConstraints(
 
 function parseRoleSequencesWithJoins(
   el: Record<string, unknown>,
-): { sequences: string[][]; joinPaths: (NormaJoinPath | undefined)[]; } {
+): { sequences: NormaId[][]; joinPaths: (NormaJoinPath | undefined)[]; } {
   // NORMA wraps multi-role-sequence constraints in <RoleSequences>
   // (e.g. SubsetConstraint, ExclusionConstraint, EqualityConstraint).
   // Simpler constraints (Uniqueness, Mandatory) use <RoleSequence> directly.
   const wrapper = child(el, "RoleSequences") as Record<string, unknown> | undefined;
   const seqParent = wrapper ?? el;
 
-  const sequences: string[][] = [];
+  const sequences: NormaId[][] = [];
   const joinPaths: (NormaJoinPath | undefined)[] = [];
   for (const seq of asArray(seqParent["RoleSequence"])) {
-    sequences.push(asArray(seq["Role"]).map((r) => attr(r, "ref") ?? ""));
+    sequences.push(asArray(seq["Role"]).map((r) => asNormaId(attr(r, "ref") ?? "")));
     joinPaths.push(parseJoinRule(seq));
   }
   return { sequences, joinPaths };
@@ -900,17 +901,17 @@ function parseJoinRule(
 
   const pathedWrapper = (child(rolePath, "PathedRoles") ?? rolePath) as Record<string, unknown>;
   const pathedRoles: NormaPathedRole[] = asArray(pathedWrapper["PathedRole"]).map((pr) => ({
-    id: attr(pr, "id") ?? "",
-    roleRef: attr(pr, "ref") ?? "",
+    id: asNormaId(attr(pr, "id") ?? ""),
+    roleRef: asNormaId(attr(pr, "ref") ?? ""),
     purpose: parsePathedRolePurpose(attr(pr, "Purpose")),
   }));
   if (pathedRoles.length === 0) return undefined;
 
   return {
-    id: attr(joinPath, "id") ?? "",
+    id: asNormaId(attr(joinPath, "id") ?? ""),
     rolePath: {
-      id: attr(rolePath, "id") ?? "",
-      rootObjectTypeRef: attr(rootEl, "ref") ?? "",
+      id: asNormaId(attr(rolePath, "id") ?? ""),
+      rootObjectTypeRef: asNormaId(attr(rootEl, "ref") ?? ""),
       pathedRoles,
     },
     projections: parseJoinProjections(joinPath),
@@ -939,8 +940,8 @@ function parseJoinProjections(
     for (const crp of asArray(proj["ConstraintRoleProjection"])) {
       const source = child(crp, "ProjectedFromPathedRole") as Record<string, unknown> | undefined;
       projections.push({
-        constraintRoleRef: attr(crp, "ref") ?? "",
-        pathedRoleRef: source ? (attr(source, "ref") ?? "") : "",
+        constraintRoleRef: asNormaId(attr(crp, "ref") ?? ""),
+        pathedRoleRef: source ? asNormaId(attr(source, "ref") ?? "") : asNormaId(""),
       });
     }
   }
@@ -1020,7 +1021,7 @@ function parseCardinalityRestriction(
   });
   if (ranges.length === 0) return undefined;
   return {
-    id: attr(cc, "id") ?? "",
+    id: asNormaId(attr(cc, "id") ?? ""),
     ranges,
     ...(attr(cc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
   };
@@ -1045,12 +1046,12 @@ function parseDerivationRule(
   const completeness = attr(rule, "DerivationCompleteness");
   const storage = attr(rule, "DerivationStorage");
   return {
-    id: attr(rule, "id") ?? "",
+    id: asNormaId(attr(rule, "id") ?? ""),
     ...(completeness === "FullyDerived" || completeness === "PartiallyDerived"
       ? { completeness }
       : {}),
     ...(storage === "NotStored" || storage === "Stored" ? { storage } : {}),
-    noteId: note ? (attr(note, "id") ?? "") : "",
+    noteId: note ? asNormaId(attr(note, "id") ?? "") : asNormaId(""),
     noteBody: body,
   };
 }
@@ -1069,7 +1070,7 @@ function parseDiagrams(root: Record<string, unknown>): NormaDiagram[] {
       collectShapes(shapesEl, "FactTypeShape", "fact_type", shapes);
     }
     return {
-      id: attr(d, "id") ?? "",
+      id: asNormaId(attr(d, "id") ?? ""),
       name: attr(d, "Name") ?? "",
       shapes,
     };
@@ -1089,9 +1090,9 @@ function collectShapes(
     const parts = boundsStr.split(",").map((v) => parseFloat(v.trim()));
     if (parts.length !== 4 || parts.some((v) => Number.isNaN(v))) continue;
     out.push({
-      id: attr(shape, "id") ?? "",
+      id: asNormaId(attr(shape, "id") ?? ""),
       kind,
-      subjectRef: attr(subject, "ref") ?? "",
+      subjectRef: asNormaId(attr(subject, "ref") ?? ""),
       x: parts[0]!,
       y: parts[1]!,
       width: parts[2]!,
@@ -1118,7 +1119,7 @@ function parseDataTypes(
     for (const dt of elements) {
       const id = attr(dt, "id");
       if (id) {
-        result.push({ id, kind: dataTypeTagToKind(tag) });
+        result.push({ id: asNormaId(id), kind: dataTypeTagToKind(tag) });
       }
     }
   }

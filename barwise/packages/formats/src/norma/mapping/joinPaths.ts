@@ -15,6 +15,7 @@
  * flat constraint mapping (today's behavior for join sequences).
  */
 import type { JoinOperand, RolePathStep } from "@barwise/core";
+import { type NormaId } from "../normaId.js";
 import type { NormaDocument, NormaJoinPath } from "../NormaXmlTypes.js";
 import type { NormaMappingContext } from "./context.js";
 
@@ -48,13 +49,13 @@ export function createJoinDecoder(ctx: NormaMappingContext): NormaJoinDecoder {
 }
 
 interface RoleInfo {
-  readonly factTypeId: string;
-  readonly playerRef: string;
+  readonly factTypeId: NormaId;
+  readonly playerRef: NormaId;
 }
 
 /** Index every fact role in the document by id. */
-function buildRoleIndex(doc: NormaDocument): Map<string, RoleInfo> {
-  const index = new Map<string, RoleInfo>();
+function buildRoleIndex(doc: NormaDocument): Map<NormaId, RoleInfo> {
+  const index = new Map<NormaId, RoleInfo>();
   for (const nft of doc.factTypes) {
     for (const role of nft.roles) {
       index.set(role.id, { factTypeId: nft.id, playerRef: role.playerRef });

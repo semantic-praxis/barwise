@@ -15,6 +15,7 @@
  * as NORMA writes them.
  */
 import { type ObjectType, type OrmModel, referenceModeOf } from "@barwise/core";
+import { derivedNormaId, type NormaId, toNormaId } from "./normaId.js";
 import type {
   NormaConstraint,
   NormaEntityTypeInstance,
@@ -24,11 +25,6 @@ import type {
   NormaValueType,
   NormaValueTypeInstance,
 } from "./NormaXmlTypes.js";
-
-/** Mirrors the writer's id convention ("_<model-id>", never doubled). */
-function normaId(id: string): string {
-  return id.startsWith("_") ? id : `_${id}`;
-}
 
 export interface PopulationGraph {
   /** NORMA value-type id -> its ValueTypeInstance elements. */
@@ -48,13 +44,13 @@ export interface PopulationGraph {
   /** NORMA entity id -> synthesized preferred-identifier constraint id. */
   readonly syntheticPreferredIdByEntity: Map<string, string>;
   /** Model object-type id -> synthesized played-role refs to append. */
-  readonly extraPlayedRolesByOwner: Map<string, string[]>;
+  readonly extraPlayedRolesByOwner: Map<string, NormaId[]>;
 }
 
 /** The identifying value seat for a populated entity, in NORMA ids. */
 interface IdentifyingSeat {
-  readonly valueRoleId: string;
-  readonly valueTypeId: string;
+  readonly valueRoleId: NormaId;
+  readonly valueTypeId: NormaId;
 }
 
 export function buildPopulationGraph(model: OrmModel): PopulationGraph {
@@ -71,10 +67,10 @@ export function buildPopulationGraph(model: OrmModel): PopulationGraph {
   };
 
   const counters = new Map<string, number>();
-  const nextId = (prefix: string): string => {
+  const nextId = (prefix: NormaId): NormaId => {
     const n = (counters.get(prefix) ?? 0) + 1;
     counters.set(prefix, n);
-    return `${prefix}${n}`;
+    return derivedNormaId(prefix, String(n));
   };
   const push = <T>(map: Map<string, T[]>, key: string, item: T): void => {
     const list = map.get(key);
@@ -84,30 +80,32 @@ export function buildPopulationGraph(model: OrmModel): PopulationGraph {
 
   // Interners: one instance per (owner, value); one declaration per
   // (role, object instance).
-  const valueInstanceByKey = new Map<string, string>();
-  const entityInstanceByKey = new Map<string, string>();
-  const declByKey = new Map<string, string>();
+  // Keyed by a composite string; the VALUE is a NORMA id, which is what
+  // lets the intern helpers return NormaId without a cast.
+  const valueInstanceByKey = new Map<string, NormaId>();
+  const entityInstanceByKey = new Map<string, NormaId>();
+  const declByKey = new Map<string, NormaId>();
   const seatByEntity = new Map<string, IdentifyingSeat>();
 
-  const internValueInstance = (ownerNormaId: string, value: string): string => {
+  const internValueInstance = (ownerNormaId: NormaId, value: string): NormaId => {
     const key = `${ownerNormaId} ${value}`;
     const existing = valueInstanceByKey.get(key);
     if (existing) return existing;
-    const id = nextId(`${ownerNormaId}_pi`);
+    const id = nextId(derivedNormaId(ownerNormaId, "_pi"));
     valueInstanceByKey.set(key, id);
     push(graph.valueInstancesByOwner, ownerNormaId, { id, value });
     return id;
   };
 
   const internDecl = (
-    roleNormaId: string,
-    objectInstanceRef: string,
+    roleNormaId: NormaId,
+    objectInstanceRef: NormaId,
     consumer: "entity" | "fact",
-  ): string => {
+  ): NormaId => {
     const key = `${roleNormaId} ${objectInstanceRef} ${consumer}`;
     const existing = declByKey.get(key);
     if (existing) return existing;
-    const id = nextId(`${roleNormaId}_ri`);
+    const id = nextId(derivedNormaId(roleNormaId, "_ri"));
     declByKey.set(key, id);
     push(graph.roleDeclsByRole, roleNormaId, { id, objectInstanceRef, consumer });
     return id;
@@ -121,8 +119,8 @@ export function buildPopulationGraph(model: OrmModel): PopulationGraph {
   >();
   const unaryMarksSeen = new Set<string>();
 
-  const internEntityInstance = (entity: ObjectType, value: string): string => {
-    const ownerNormaId = normaId(entity.id);
+  const internEntityInstance = (entity: ObjectType, value: string): NormaId => {
+    const ownerNormaId = toNormaId(entity.id);
     const key = `${ownerNormaId} ${value}`;
     const existing = entityInstanceByKey.get(key);
     if (existing) return existing;
@@ -133,9 +131,9 @@ export function buildPopulationGraph(model: OrmModel): PopulationGraph {
     }
     const valueInstanceId = internValueInstance(seat.valueTypeId, value);
     const declId = internDecl(seat.valueRoleId, valueInstanceId, "entity");
-    const id = nextId(`${ownerNormaId}_pi`);
+    const id = nextId(derivedNormaId(ownerNormaId, "_pi"));
     entityInstanceByKey.set(key, id);
-    const record = { id, roleInstanceRefs: [declId], unaryRoleRefs: [] as string[] };
+    const record = { id, roleInstanceRefs: [declId], unaryRoleRefs: [] as NormaId[] };
     entityRecordByInstanceId.set(id, record);
     push(graph.entityInstancesByOwner, ownerNormaId, record);
     return id;
@@ -162,25 +160,25 @@ export function buildPopulationGraph(model: OrmModel): PopulationGraph {
       for (const instance of population.instances) {
         const value = instance.roleValues[role.id];
         if (value === undefined) continue;
-        markUnary(internEntityInstance(player, value), normaId(role.id));
+        markUnary(internEntityInstance(player, value), toNormaId(role.id));
       }
       continue;
     }
     for (const instance of population.instances) {
-      const refs: string[] = [];
+      const refs: NormaId[] = [];
       for (const role of ft.roles) {
         const value = instance.roleValues[role.id];
         if (value === undefined) continue;
         const player = model.getObjectType(role.playerId);
         if (!player) continue;
         const objectInstanceId = player.kind === "value"
-          ? internValueInstance(normaId(player.id), value)
+          ? internValueInstance(toNormaId(player.id), value)
           : internEntityInstance(player, value);
-        refs.push(internDecl(normaId(role.id), objectInstanceId, "fact"));
+        refs.push(internDecl(toNormaId(role.id), objectInstanceId, "fact"));
       }
       if (refs.length > 0) {
-        push(graph.factInstancesByFact, normaId(ft.id), {
-          id: nextId(`${normaId(ft.id)}_fi`),
+        push(graph.factInstancesByFact, toNormaId(ft.id), {
+          id: nextId(derivedNormaId(toNormaId(ft.id), "_fi")),
           roleInstanceRefs: refs,
         });
       }
@@ -211,8 +209,8 @@ function findIdentifyingSeat(
       const player = model.getObjectType(valueRole.playerId);
       if (player?.kind !== "value") continue;
       return {
-        valueRoleId: normaId(valueRole.id),
-        valueTypeId: normaId(player.id),
+        valueRoleId: toNormaId(valueRole.id),
+        valueTypeId: toNormaId(player.id),
       };
     }
   }
@@ -229,12 +227,12 @@ function synthesizeExpansion(
   graph: PopulationGraph,
   entity: ObjectType,
 ): IdentifyingSeat {
-  const base = normaId(entity.id);
-  const valueTypeId = `${base}_idvt`;
-  const factId = `${base}_idfact`;
-  const entityRoleId = `${factId}_r0`;
-  const valueRoleId = `${factId}_r1`;
-  const preferredUcId = `${factId}_puc`;
+  const base = toNormaId(entity.id);
+  const valueTypeId = derivedNormaId(base, "_idvt");
+  const factId = derivedNormaId(base, "_idfact");
+  const entityRoleId = derivedNormaId(factId, "_r0");
+  const valueRoleId = derivedNormaId(factId, "_r1");
+  const preferredUcId = derivedNormaId(factId, "_puc");
   const valueTypeName = `${entity.name}_${referenceModeOf(entity) || "id"}`;
 
   graph.extraValueTypes.push({
@@ -263,12 +261,16 @@ function synthesizeExpansion(
     ],
     readingOrders: [
       {
-        id: `${factId}_ro0`,
-        readings: [{ id: `${factId}_rd0`, data: "{0} has {1}" }],
+        id: derivedNormaId(factId, "_ro0"),
+        readings: [{ id: derivedNormaId(factId, "_rd0"), data: "{0} has {1}" }],
         roleSequence: [entityRoleId, valueRoleId],
       },
     ],
-    internalConstraintRefs: [preferredUcId, `${factId}_uc`, `${factId}_mc`],
+    internalConstraintRefs: [
+      preferredUcId,
+      derivedNormaId(factId, "_uc"),
+      derivedNormaId(factId, "_mc"),
+    ],
   });
   graph.extraConstraints.push(
     {
@@ -281,7 +283,7 @@ function synthesizeExpansion(
     },
     {
       type: "uniqueness",
-      id: `${factId}_uc`,
+      id: derivedNormaId(factId, "_uc"),
       name: "",
       isInternal: true,
       isPreferred: false,
@@ -289,7 +291,7 @@ function synthesizeExpansion(
     },
     {
       type: "mandatory",
-      id: `${factId}_mc`,
+      id: derivedNormaId(factId, "_mc"),
       name: "",
       isSimple: true,
       isImplied: false,

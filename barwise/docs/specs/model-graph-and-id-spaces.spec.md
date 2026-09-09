@@ -1,6 +1,7 @@
 # Resolve references once: `ModelGraph`, and which id spaces earn a brand
 
-Status: Draft -- no workstream implemented
+Status: Workstream 1 (`NormaId`) shipped 2026-09-09; Workstreams 2-5 not
+implemented
 Created: 2026-09-09
 Last-updated: 2026-09-09
 Tracking: barwise-974 (this spec), barwise-973 (WS1, partly shipped),
@@ -110,14 +111,16 @@ lookup. Typing an argument that is about to stop being passed is
 motion, not progress.
 
 One id space does earn a brand, and resolution cannot help it:
-`@barwise/formats` runs model ids and NORMA ids through the same
-`string`. `normaId` is defined twice -- `NormaXmlWriter.ts:64` and
-`populationGraph.ts:29` -- and the second carries the comment "Mirrors
-the writer's id convention". That copy is registered in neither
-`parity.manifest.json` nor `audit-baseline.json`, so its agreement is
+`@barwise/formats` ran model ids and NORMA ids through the same
+`string`. `normaId` was defined twice -- `NormaXmlWriter.ts:64` and
+`populationGraph.ts:29` -- and the second carried the comment "Mirrors
+the writer's id convention". That copy was registered in neither
+`parity.manifest.json` nor `audit-baseline.json`, so its agreement was
 guarded by a comment, which the root `CLAUDE.md` convention forbids
-outright. Branding `NormaId` gives the conversion one owner and makes
-the two spaces non-interchangeable at compile time.
+outright. Workstream 1 shipped `normaId.ts` as the one owner, so the
+copy is gone rather than registered. The brand runs one way: a bare
+`string` cannot reach NORMA output, while a `NormaId` still flows into
+a model-id position, which is what the import path has always done.
 
 ## Scope
 
@@ -358,20 +361,46 @@ Two rules the sketch encodes, so no workstream can drift from them:
 Ordered smallest-blast-radius first. Each is its own PR and keeps the
 full suite green.
 
-### 1. `NormaId`, and one owner for the conversion
+### 1. `NormaId`, and one owner for the conversion (SHIPPED)
 
 The only workstream with no dependency on the graph, and the one that
-closes a live convention violation. Introduce
-`packages/formats/src/norma/normaId.ts` exporting the `NormaId` brand
-and `toNormaId`; delete both `normaId` definitions in favour of it.
-Blast radius is one package and roughly a dozen call sites.
+closes a live convention violation.
+`packages/formats/src/norma/normaId.ts` owns the `NormaId` brand,
+`toNormaId` (convert a model id, idempotently), `asNormaId` (assert
+provenance for a token read from a NORMA document) and
+`derivedNormaId` (extend a NORMA id, because template concatenation
+erases the brand). Both duplicate `normaId` definitions are gone.
 
-Acceptance: when code converts a model id for NORMA output, it shall do
-so through `toNormaId`, and passing a `NormaId` where a model id is
-required shall fail to compile. The two-definition copy is gone rather
-than registered, so no `parity.manifest.json` entry is needed -- and if
-the implementation finds a reason to keep two, the entry is required in
-the same commit.
+**Two corrections this workstream forced.**
+
+The blast radius was stated as "roughly a dozen call sites". It is one
+package, as claimed, and about 110 touch points: 59 id and `*Ref`
+fields in `NormaXmlTypes.ts`, ~50 conversion sites in the writer and
+population graph, and 28 provenance assertions at the parser's XML
+boundary. The estimate was an order of magnitude low.
+
+The acceptance criterion named an unachievable direction. "Passing a
+`NormaId` where a model id is required shall fail to compile" cannot
+hold while model ids are plain `string`: a branded string IS assignable
+to `string`, verified with a `tsc --strict` probe. That direction is
+also the one the import path needs, because `mapping/objectTypes.ts`
+assigns `id: et.id` verbatim and a NORMA id legitimately becomes a
+model id. The criterion below states the direction that is both
+achievable and valuable.
+
+Acceptance: when code sends a value to NORMA output, a bare `string`
+shall not be accepted where a `NormaId` is required, so every value
+passes through `toNormaId`, `asNormaId` or `derivedNormaId`. Watched
+going red on three planted defects: a forgotten conversion on an id
+field, one on a `*Ref` field, and a derived id built by template
+instead of the helper.
+
+**The `*Ref` fields are in scope, and finding that out is why the
+mutation check matters.** An earlier cut of this workstream typed only
+the 33 `id` fields, reasoning that `*Ref` fields are consumption sites
+rather than mint sites. The first mutation -- dropping `toNormaId` from
+`subjectRef` in the writer -- compiled clean, because `subjectRef` is a
+conversion site wearing a Ref name. All 28 are typed.
 
 ### 2. `graphOf` and `ModelGraph`, with no consumer migrated
 

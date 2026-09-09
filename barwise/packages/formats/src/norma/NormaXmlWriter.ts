@@ -32,6 +32,7 @@ import type {
   ValueRange,
   ValueType,
 } from "@barwise/core";
+import { asNormaId, derivedNormaId, type NormaId, toNormaId } from "./normaId.js";
 import type {
   NormaCardinality,
   NormaConstraint,
@@ -54,16 +55,6 @@ import type {
   NormaValueType,
 } from "./NormaXmlTypes.js";
 import { buildPopulationGraph, type PopulationGraph } from "./populationGraph.js";
-
-/**
- * Convert a model id into a NORMA-style id token. NORMA accepts any unique
- * token; we prefix with "_" (NORMA's convention) unless the id already
- * carries that prefix. Role ids imported from NORMA already start with "_"
- * (they pass through the mapper unchanged), so this avoids double-prefixing.
- */
-function normaId(id: string): string {
-  return id.startsWith("_") ? id : `_${id}`;
-}
 
 /**
  * Write an OrmModel into a NormaDocument. Pure: same model, same document.
@@ -99,7 +90,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
     const refs = playedRoles.get(ot.id) ?? [];
     if (ot.kind === "value") {
       const vt = writeValueType(ot, refs);
-      const instances = popGraph.valueInstancesByOwner.get(normaId(ot.id));
+      const instances = popGraph.valueInstancesByOwner.get(toNormaId(ot.id));
       valueTypes.push(instances ? { ...vt, instances } : vt);
       continue;
     }
@@ -107,9 +98,9 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
     if (objectifiedObjectTypeIds.has(ot.id)) {
       const factTypeId = objectifiedByObjectType.get(ot.id)!;
       objectifiedTypes.push({
-        id: normaId(ot.id),
+        id: toNormaId(ot.id),
         name: ot.name,
-        nestedFactTypeRef: normaId(factTypeId),
+        nestedFactTypeRef: toNormaId(factTypeId),
         referenceMode: ot.referenceMode,
         preferredIdentifier: preferredIdByEntity.get(ot.id),
         playedRoleRefs: refs,
@@ -119,13 +110,13 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
       });
     } else {
       const extraRefs = popGraph.extraPlayedRolesByOwner.get(ot.id) ?? [];
-      const instances = popGraph.entityInstancesByOwner.get(normaId(ot.id));
+      const instances = popGraph.entityInstancesByOwner.get(toNormaId(ot.id));
       entityTypes.push({
-        id: normaId(ot.id),
+        id: toNormaId(ot.id),
         name: ot.name,
         referenceMode: ot.referenceMode,
         preferredIdentifier: preferredIdByEntity.get(ot.id)
-          ?? popGraph.syntheticPreferredIdByEntity.get(normaId(ot.id)),
+          ?? popGraph.syntheticPreferredIdByEntity.get(toNormaId(ot.id)),
         playedRoleRefs: [...refs, ...extraRefs],
         definition: ot.definition,
         note: ot.note,
@@ -182,7 +173,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
   const dataTypes = collectDataTypes(valueTypes);
 
   return {
-    modelId: normaId(modelIdFor(model)),
+    modelId: toNormaId(modelIdFor(model)),
     modelName: model.name,
     entityTypes,
     valueTypes,
@@ -209,12 +200,12 @@ function modelIdFor(model: OrmModel): string {
 // ---------------------------------------------------------------------------
 
 /** Build a map from object-type id to the NORMA-style ids of roles it plays. */
-function collectPlayedRoles(model: OrmModel): Map<string, string[]> {
-  const result = new Map<string, string[]>();
+function collectPlayedRoles(model: OrmModel): Map<string, NormaId[]> {
+  const result = new Map<string, NormaId[]>();
   for (const ft of model.factTypes) {
     for (const role of ft.roles) {
       const list = result.get(role.playerId) ?? [];
-      list.push(normaId(role.id));
+      list.push(toNormaId(role.id));
       result.set(role.playerId, list);
     }
   }
@@ -240,7 +231,7 @@ function collectPreferredIdentifiers(model: OrmModel): Map<string, string> {
         if (constrainedRoleIds.has(role.id)) continue;
         const player = model.getObjectType(role.playerId);
         if (player && player.kind === "entity" && c.id) {
-          result.set(player.id, normaId(c.id));
+          result.set(player.id, toNormaId(c.id));
         }
       }
     }
@@ -252,11 +243,11 @@ function collectPreferredIdentifiers(model: OrmModel): Map<string, string> {
 // `kind === "value"` branch, so the narrower parameter costs nothing and
 // lets the body read `dataType`, `valueConstraint` and `defaultValue`
 // without asking whether they exist.
-function writeValueType(ot: ValueType, playedRoleRefs: string[]): NormaValueType {
+function writeValueType(ot: ValueType, playedRoleRefs: NormaId[]): NormaValueType {
   const dt = ot.dataType;
   const valueConstraint = toInlineValueConstraint(ot.valueConstraint);
   return {
-    id: normaId(ot.id),
+    id: toNormaId(ot.id),
     name: ot.name,
     playedRoleRefs,
     definition: ot.definition,
@@ -292,27 +283,27 @@ function writeFactType(
   popGraph: PopulationGraph,
 ): { norma: NormaFactType; internalRefs: string[]; } {
   const roles: NormaRole[] = ft.roles.map((role) => writeRole(ft, role, popGraph));
-  const factInstances = popGraph.factInstancesByFact.get(normaId(ft.id));
+  const factInstances = popGraph.factInstancesByFact.get(toNormaId(ft.id));
   const readingOrders: NormaReadingOrder[] = ft.readings.map((reading, i) => ({
-    id: `${normaId(ft.id)}_ro${i}`,
-    readings: [{ id: `${normaId(ft.id)}_rd${i}`, data: reading.template }],
-    roleSequence: ft.roles.map((r) => normaId(r.id)),
+    id: derivedNormaId(toNormaId(ft.id), `_ro${i}`),
+    readings: [{ id: derivedNormaId(toNormaId(ft.id), `_rd${i}`), data: reading.template }],
+    roleSequence: ft.roles.map((r) => toNormaId(r.id)),
   }));
 
-  const internalRefs: string[] = [];
+  const internalRefs: NormaId[] = [];
   ft.constraints.forEach((c, i) => {
     // Constraints attached through the FactType constructor carry an id;
     // those attached later by the importer (external uniqueness, role-level
     // value constraints) do not. Derive a deterministic, collision-free id
     // from the fact type id and the constraint's position so every emitted
     // constraint has a unique id token.
-    const fallbackId = `${normaId(ft.id)}_c${i}`;
+    const fallbackId = derivedNormaId(toNormaId(ft.id), `_c${i}`);
     if (c.type === "exclusive_or") {
       // NORMA has no single xor element: the native encoding is an
       // exclusion + disjunctive mandatory pair joined by mutual coupler
       // refs. Both halves are multi-fact, so neither is internal.
-      const exclusionId = c.id ? normaId(c.id) : fallbackId;
-      const mandatoryId = `${exclusionId}_xormand`;
+      const exclusionId = c.id ? toNormaId(c.id) : fallbackId;
+      const mandatoryId = derivedNormaId(exclusionId, "_xormand");
       if (seen.has(exclusionId)) return;
       seen.add(exclusionId);
       seen.add(mandatoryId);
@@ -322,7 +313,7 @@ function writeFactType(
         id: exclusionId,
         name: "",
         ...modality,
-        roleSequences: c.roleIds.map((r) => [normaId(r)]),
+        roleSequences: c.roleIds.map((r) => [toNormaId(r)]),
         exclusiveOrMandatoryRef: mandatoryId,
       });
       constraints.push({
@@ -332,7 +323,7 @@ function writeFactType(
         ...modality,
         isSimple: false,
         isImplied: false,
-        roleRefs: c.roleIds.map(normaId),
+        roleRefs: c.roleIds.map(toNormaId),
         exclusiveOrExclusionRef: exclusionId,
       });
       return;
@@ -352,7 +343,7 @@ function writeFactType(
 
   return {
     norma: {
-      id: normaId(ft.id),
+      id: toNormaId(ft.id),
       name: ft.name,
       roles,
       readingOrders,
@@ -373,18 +364,18 @@ function writeRole(ft: FactType, role: Role, popGraph: PopulationGraph): NormaRo
   const card = ft.constraints.find(
     (c): c is CardinalityConstraint => c.type === "cardinality" && c.roleId === role.id,
   );
-  const roleInstances = popGraph.roleDeclsByRole.get(normaId(role.id));
+  const roleInstances = popGraph.roleDeclsByRole.get(toNormaId(role.id));
   return {
-    id: normaId(role.id),
+    id: toNormaId(role.id),
     name: role.name,
-    playerRef: normaId(role.playerId),
+    playerRef: toNormaId(role.playerId),
     isMandatory,
     multiplicity: "Unspecified",
     ...(roleInstances ? { roleInstances } : {}),
     ...(card
       ? {
         cardinality: {
-          id: card.id ? normaId(card.id) : `${normaId(role.id)}_card`,
+          id: card.id ? toNormaId(card.id) : derivedNormaId(toNormaId(role.id), "_card"),
           ranges: [{ from: card.min, ...(card.max !== "unbounded" ? { to: card.max } : {}) }],
           ...(card.modality === "deontic" ? { modality: "deontic" as const } : {}),
         },
@@ -417,8 +408,8 @@ function isInternalConstraint(c: Constraint): boolean {
 // Constraints
 // ---------------------------------------------------------------------------
 
-function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | undefined {
-  const id = c.id ? normaId(c.id) : fallbackId;
+function writeConstraint(c: Constraint, fallbackId: NormaId): NormaConstraint | undefined {
+  const id = c.id ? toNormaId(c.id) : fallbackId;
   const modality = c.modality === "deontic" ? ({ modality: "deontic" } as const) : {};
   switch (c.type) {
     case "internal_uniqueness":
@@ -429,7 +420,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         ...modality,
         isInternal: true,
         isPreferred: c.isPreferred ?? false,
-        roleRefs: c.roleIds.map(normaId),
+        roleRefs: c.roleIds.map(toNormaId),
       };
     case "external_uniqueness":
       return {
@@ -439,7 +430,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         ...modality,
         isInternal: false,
         isPreferred: false,
-        roleRefs: c.roleIds.map(normaId),
+        roleRefs: c.roleIds.map(toNormaId),
       };
     case "mandatory":
       return {
@@ -449,7 +440,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         ...modality,
         isSimple: true,
         isImplied: false,
-        roleRefs: [normaId(c.roleId)],
+        roleRefs: [toNormaId(c.roleId)],
       };
     case "disjunctive_mandatory":
       return {
@@ -459,7 +450,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         ...modality,
         isSimple: false,
         isImplied: false,
-        roleRefs: c.roleIds.map(normaId),
+        roleRefs: c.roleIds.map(toNormaId),
       };
     case "frequency":
       return {
@@ -469,7 +460,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         ...modality,
         min: c.min,
         max: c.max,
-        roleRefs: c.roleIds.map(normaId),
+        roleRefs: c.roleIds.map(toNormaId),
       };
     case "value_constraint":
       return {
@@ -477,7 +468,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         id,
         name: "",
         ...modality,
-        roleRefs: c.roleId ? [normaId(c.roleId)] : [],
+        roleRefs: c.roleId ? [toNormaId(c.roleId)] : [],
         values: [...c.values],
         ...(c.ranges && c.ranges.length > 0 ? { ranges: c.ranges.map((r) => ({ ...r })) } : {}),
       };
@@ -487,8 +478,8 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         id,
         name: "",
         ...modality,
-        subsetRoleRefs: c.subsetRoleIds.map(normaId),
-        supersetRoleRefs: c.supersetRoleIds.map(normaId),
+        subsetRoleRefs: c.subsetRoleIds.map(toNormaId),
+        supersetRoleRefs: c.supersetRoleIds.map(toNormaId),
       };
     case "equality":
       return {
@@ -496,7 +487,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         id,
         name: "",
         ...modality,
-        roleSequences: [c.roleIds1.map(normaId), c.roleIds2.map(normaId)],
+        roleSequences: [c.roleIds1.map(toNormaId), c.roleIds2.map(toNormaId)],
       };
     case "exclusion":
       return {
@@ -504,7 +495,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         id,
         name: "",
         ...modality,
-        roleSequences: c.roleIds.map((r) => [normaId(r)]),
+        roleSequences: c.roleIds.map((r) => [toNormaId(r)]),
       };
     case "exclusive_or":
       // Emitted by writeFactType as NORMA's coupled exclusion +
@@ -517,13 +508,13 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         name: "",
         ...modality,
         ringType: c.ringType as NormaRingType,
-        roleRefs: [normaId(c.roleId1), normaId(c.roleId2)],
+        roleRefs: [toNormaId(c.roleId1), toNormaId(c.roleId2)],
       };
     case "join_subset": {
       const subsetRefs = joinOperandRoleRefs(c.subset);
       const supersetRefs = joinOperandRoleRefs(c.superset);
-      const subsetJoinPath = writeJoinPath(c.subset, `${id}_jp0`);
-      const supersetJoinPath = writeJoinPath(c.superset, `${id}_jp1`);
+      const subsetJoinPath = writeJoinPath(c.subset, derivedNormaId(id, "_jp0"));
+      const supersetJoinPath = writeJoinPath(c.superset, derivedNormaId(id, "_jp1"));
       if (!subsetRefs || !supersetRefs || !subsetJoinPath || !supersetJoinPath) return undefined;
       return {
         type: "subset",
@@ -547,7 +538,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
         name: "",
         ...modality,
         operator: valueComparisonOperatorToNorma[c.operator],
-        roleRefs: [normaId(c.roleId1), normaId(c.roleId2)],
+        roleRefs: [toNormaId(c.roleId1), toNormaId(c.roleId2)],
       };
     case "join_equality":
     case "join_exclusion": {
@@ -555,7 +546,7 @@ function writeConstraint(c: Constraint, fallbackId: string): NormaConstraint | u
       const joinPaths: NormaJoinPath[] = [];
       for (let i = 0; i < c.operands.length; i++) {
         const refs = joinOperandRoleRefs(c.operands[i]!);
-        const joinPath = writeJoinPath(c.operands[i]!, `${id}_jp${i}`);
+        const joinPath = writeJoinPath(c.operands[i]!, derivedNormaId(id, `_jp${i}`));
         if (!refs || !joinPath) return undefined;
         roleSequences.push(refs);
         joinPaths.push(joinPath);
@@ -597,17 +588,17 @@ const valueComparisonOperatorToNorma: Record<
  * root), node k is the exit role of step k. Returns undefined for an
  * operand whose projection points outside its path.
  */
-function joinOperandRoleRefs(o: JoinOperand): string[] | undefined {
-  const refs: string[] = [];
+function joinOperandRoleRefs(o: JoinOperand): NormaId[] | undefined {
+  const refs: NormaId[] = [];
   for (const node of o.projection) {
     if (node === 0) {
       const step = o.path.steps[0];
       if (!step) return undefined;
-      refs.push(normaId(step.entry));
+      refs.push(toNormaId(step.entry));
     } else {
       const step = o.path.steps[node - 1];
       if (!step) return undefined;
-      refs.push(normaId(step.exit));
+      refs.push(toNormaId(step.exit));
     }
   }
   return refs.length > 0 ? refs : undefined;
@@ -620,34 +611,34 @@ function joinOperandRoleRefs(o: JoinOperand): string[] | undefined {
  * to the pathed role at its node. Ids derive deterministically from the
  * constraint id so export stays a pure function of the model.
  */
-function writeJoinPath(o: JoinOperand, id: string): NormaJoinPath | undefined {
+function writeJoinPath(o: JoinOperand, id: NormaId): NormaJoinPath | undefined {
   if (o.path.steps.length === 0) return undefined;
 
   const pathedRoles: NormaPathedRole[] = [];
   o.path.steps.forEach((step, i) => {
     pathedRoles.push({
-      id: `${id}_p${2 * i}`,
-      roleRef: normaId(step.entry),
+      id: derivedNormaId(id, `_p${2 * i}`),
+      roleRef: toNormaId(step.entry),
       purpose: i === 0 ? "None" : "PostInnerJoin",
     });
     pathedRoles.push({
-      id: `${id}_p${2 * i + 1}`,
-      roleRef: normaId(step.exit),
+      id: derivedNormaId(id, `_p${2 * i + 1}`),
+      roleRef: toNormaId(step.exit),
       purpose: "SameFactType",
     });
   });
 
   // Node 0 projects from the first entry; node k from the exit of step k.
-  const pathedIdForNode = (node: number): string =>
-    node === 0 ? `${id}_p0` : `${id}_p${2 * node - 1}`;
+  const pathedIdForNode = (node: number): NormaId =>
+    node === 0 ? derivedNormaId(id, "_p0") : derivedNormaId(id, `_p${2 * node - 1}`);
   const roleRefs = joinOperandRoleRefs(o);
   if (!roleRefs) return undefined;
 
   return {
     id,
     rolePath: {
-      id: `${id}_rp`,
-      rootObjectTypeRef: normaId(o.path.root),
+      id: derivedNormaId(id, "_rp"),
+      rootObjectTypeRef: toNormaId(o.path.root),
       pathedRoles,
     },
     projections: o.projection.map((node, i) => ({
@@ -675,15 +666,15 @@ function writeSubtypeFacts(
   >();
 
   for (const sf of model.subtypeFacts) {
-    const id = normaId(sf.id);
-    const subtypeRoleId = `${id}_sub`;
-    const supertypeRoleId = `${id}_super`;
+    const id = toNormaId(sf.id);
+    const subtypeRoleId = derivedNormaId(id, "_sub");
+    const supertypeRoleId = derivedNormaId(id, "_super");
     out.push({
       id,
       subtypeRoleId,
-      subtypePlayerRef: normaId(sf.subtypeId),
+      subtypePlayerRef: toNormaId(sf.subtypeId),
       supertypeRoleId,
-      supertypePlayerRef: normaId(sf.supertypeId),
+      supertypePlayerRef: toNormaId(sf.supertypeId),
       providesIdentification: sf.providesIdentification,
     });
 
@@ -703,7 +694,7 @@ function writeSubtypeFacts(
     if (group.isExclusive) {
       constraints.push({
         type: "exclusion",
-        id: `_subtype_excl_${supertypeId}`,
+        id: toNormaId(`subtype_excl_${supertypeId}`),
         name: "",
         roleSequences: group.supertypeRoleIds.map((r) => [r]),
       });
@@ -711,11 +702,11 @@ function writeSubtypeFacts(
     if (group.isExhaustive) {
       constraints.push({
         type: "mandatory",
-        id: `_subtype_exh_${supertypeId}`,
+        id: toNormaId(`subtype_exh_${supertypeId}`),
         name: "",
         isSimple: false,
         isImplied: false,
-        roleRefs: group.supertypeRoleIds,
+        roleRefs: group.supertypeRoleIds.map(asNormaId),
       });
     }
   }
@@ -754,7 +745,7 @@ function writeCardinality(ot: ObjectType): NormaCardinality | undefined {
   const c = ot.cardinality;
   if (!c) return undefined;
   return {
-    id: `${normaId(ot.id)}_card`,
+    id: derivedNormaId(toNormaId(ot.id), "_card"),
     ranges: [{ from: c.min, ...(c.max !== "unbounded" ? { to: c.max } : {}) }],
   };
 }
@@ -768,10 +759,10 @@ function writeDerivationRule(ft: FactType): NormaDerivationRule | undefined {
   const d = ft.derivation;
   if (!d) return undefined;
   return {
-    id: `${normaId(ft.id)}_drule`,
+    id: derivedNormaId(toNormaId(ft.id), "_drule"),
     ...(d.kind === "semiderived" ? { completeness: "PartiallyDerived" as const } : {}),
     ...(d.storage === "derived_and_stored" ? { storage: "Stored" as const } : {}),
-    noteId: `${normaId(ft.id)}_dnote`,
+    noteId: derivedNormaId(toNormaId(ft.id), "_dnote"),
     noteBody: d.expression,
   };
 }
@@ -813,9 +804,9 @@ function writeDiagrams(model: OrmModel): NormaDiagram[] {
       const kind = ot ? "object_type" as const : "fact_type" as const;
       const size = estimateShapeSize(kind, name, ft ? ft.roles.length : 0);
       shapes.push({
-        id: `${normaId(element.id)}_shape${di}`,
+        id: derivedNormaId(toNormaId(element.id), `_shape${di}`),
         kind,
-        subjectRef: normaId(element.id),
+        subjectRef: toNormaId(element.id),
         x: pos.x / PX_PER_INCH - size.width / 2,
         y: pos.y / PX_PER_INCH - size.height / 2,
         width: size.width,
@@ -824,15 +815,15 @@ function writeDiagrams(model: OrmModel): NormaDiagram[] {
     }
     const slug = layout.name.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
     return {
-      id: `_diagram_${slug || String(di)}`,
+      id: toNormaId(`diagram_${slug || String(di)}`),
       name: layout.name,
       shapes,
     };
   });
 }
 
-function dataTypeIdFor(name: ConceptualDataTypeName): string {
-  return `_dt_${conceptualToNormaKind[name]}`;
+function dataTypeIdFor(name: ConceptualDataTypeName): NormaId {
+  return toNormaId(`dt_${conceptualToNormaKind[name]}`);
 }
 
 /** Collect the distinct DataType definitions referenced by value types. */
@@ -842,7 +833,10 @@ function collectDataTypes(valueTypes: readonly NormaValueType[]): NormaDataType[
     if (!vt.dataTypeRef) continue;
     if (byId.has(vt.dataTypeRef)) continue;
     const kind = vt.dataTypeRef.replace(/^_dt_/, "");
-    byId.set(vt.dataTypeRef, { id: vt.dataTypeRef, kind });
+    // dataTypeRef is a *Ref: already a token in NORMA space, so this
+    // asserts provenance rather than converting. The 28 *Ref fields stay
+    // `string` in this workstream -- see the spec's WS1 note.
+    byId.set(vt.dataTypeRef, { id: asNormaId(vt.dataTypeRef), kind });
   }
   return [...byId.values()];
 }
