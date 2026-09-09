@@ -5,6 +5,7 @@
   "ignoreBinaries": ["depcruise", "jscpd", "shellcheck", "uv"],
   "ignoreDependencies": ["@dprint/json", "@dprint/markdown", "@dprint/typescript", "dependency-cruiser", "jscpd"],
   "workspaces": {
+    ".": { "entry": ["scripts/at-root.mjs"] },
     "packages/core": {
       "ignore": ["scripts/**"]
     },
