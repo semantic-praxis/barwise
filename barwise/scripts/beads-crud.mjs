@@ -20,6 +20,7 @@
 //   node scripts/beads-crud.mjs update <id> [--title ...] [--description ...]
 //     [--status ...] [--priority N] [--type ...] [--owner ...] [--design ...]
 //     [--acceptance-criteria ...] [--notes ...] [--depends-on ID[:TYPE]]
+//     [--allow-empty]   (update only: permit blanking a non-empty field)
 //   node scripts/beads-crud.mjs close <id> [--reason "..."]
 //   node scripts/beads-crud.mjs delete <id> [--force]
 
@@ -302,6 +303,18 @@ function splitList(value) {
   return String(value).split(",").map((x) => x.trim()).filter(Boolean);
 }
 
+/** Empty for this guard: undefined, null, "", whitespace, or an empty list. */
+function isBlank(value) {
+  if (value === undefined || value === null) return true;
+  if (Array.isArray(value)) return value.length === 0;
+  return String(value).trim() === "";
+}
+
+/** How much a refusal is protecting, in the units of the field. */
+function lengthOf(value) {
+  return Array.isArray(value) ? `${value.length} entries` : `${String(value).length} characters`;
+}
+
 function cmdUpdate(positional, flags) {
   const [id] = positional;
   if (!id) fail("update requires <id>");
@@ -321,6 +334,16 @@ function cmdUpdate(positional, flags) {
     if (field === "status" && !STATUS.has(value)) fail(`unknown status: ${value}`);
     if (field === "issue_type" && !ITYPE.has(value)) fail(`unknown issue_type: ${value}`);
     if (LIST_FIELDS.has(field)) value = splitList(value);
+    if (isBlank(value) && !isBlank(r.obj[field]) && !flags["allow-empty"]) {
+      fail(
+        `--${flag} is empty and would erase ${lengthOf(r.obj[field])} of existing `
+          + `content on ${id}.\n`
+          + `  A shell substitution that failed produces exactly this: the inner `
+          + `command exits non-zero, $(...) yields "", and the write reports `
+          + `success. That erased 4544 characters of barwise-906's notes.\n`
+          + `  Pass --allow-empty to clear the field deliberately.`,
+      );
+    }
     r.obj[field] = value;
     changed = true;
   }
@@ -421,7 +444,7 @@ const ACCEPTED_FLAGS = {
   // have refused them -- turning a silent drop into a hard refusal of
   // something that worked. The allowlist has to match what the function
   // reads, not what one table in it happens to hold.
-  update: [...Object.keys(UPDATABLE_FIELDS), "depends-on", "created-by"],
+  update: [...Object.keys(UPDATABLE_FIELDS), "depends-on", "created-by", "allow-empty"],
   close: ["reason"],
   delete: ["force"],
 };

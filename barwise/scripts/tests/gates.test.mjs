@@ -211,6 +211,68 @@ test("check-beads --strict fails an open issue whose notes claim a shipped PR", 
   assert.equal(pending.status, 0, `PR pending is not shipped:\n${pending.stdout}${pending.stderr}`);
 });
 
+/**
+ * `beads-crud update` in a throwaway repo carrying one issue, so a
+ * destructive write can be attempted without risking this repo's tracker.
+ */
+function beadsCrud(notes, ...args) {
+  const dir = tempRepo();
+  try {
+    mkdirSync(join(dir, ".beads"), { recursive: true });
+    writeFileSync(join(dir, ".beads", "issues.jsonl"), issueLine({ notes }));
+    const run = spawnSync(
+      process.execPath,
+      [join(SCRIPTS, "beads-crud.mjs"), ...args],
+      { cwd: dir, encoding: "utf8" },
+    );
+    const after = JSON.parse(readFileSync(join(dir, ".beads", "issues.jsonl"), "utf8").trim());
+    return { ...run, notesAfter: after.notes };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("beads-crud update refuses to blank a non-empty field, and clears it on request", () => {
+  // The incident: `--notes "$(node beads-crud.mjs show X --json)"`. The
+  // inner command was refused for the unknown flag, exited 1, and the
+  // substitution yielded "". The write then reported success and 4544
+  // characters of barwise-906's notes were gone -- recovered only because
+  // the file is tracked. Every field this tool writes is reachable the
+  // same way, so the refusal is on the write, not on one flag.
+  const red = beadsCrud("four thousand characters of history", "update", "t-1", "--notes", "");
+  assert.equal(red.status, 1, `expected a refusal:\n${red.stdout}${red.stderr}`);
+  assert.match(red.stderr + red.stdout, /would erase 35 characters/);
+  assert.equal(
+    red.notesAfter,
+    "four thousand characters of history",
+    "a refused update must not have written anything",
+  );
+
+  const deliberate = beadsCrud(
+    "history",
+    "update",
+    "t-1",
+    "--notes",
+    "",
+    "--allow-empty",
+  );
+  assert.equal(
+    deliberate.status,
+    0,
+    `--allow-empty must still clear it:\n${deliberate.stdout}${deliberate.stderr}`,
+  );
+  assert.equal(deliberate.notesAfter, "");
+
+  // A field that was already empty is not protected by anything, so an
+  // empty write to it is not a refusal.
+  const wasEmpty = beadsCrud(undefined, "update", "t-1", "--notes", "");
+  assert.equal(
+    wasEmpty.status,
+    0,
+    `nothing to erase is not an erasure:\n${wasEmpty.stdout}${wasEmpty.stderr}`,
+  );
+});
+
 test("check-root-scripts fails on drift in either direction", () => {
   const dir = tempRepo();
   const inner = (scripts) => `${JSON.stringify({ name: "inner", scripts }, null, 2)}\n`;
