@@ -4,6 +4,7 @@
  */
 import { matchesConstraintType } from "../model/constraintKeyword.js";
 import type { FactType } from "../model/FactType.js";
+import type { ModelGraph } from "../model/graph.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { Verbalizer } from "../verbalization/Verbalizer.js";
@@ -23,10 +24,11 @@ import type { ConstraintSummary, DomainDescription } from "./types.js";
  */
 export function describeFullModel(
   model: OrmModel,
+  graph: ModelGraph,
   includePopulations: boolean,
 ): DomainDescription {
   const entitySummaries = model.objectTypes.map(summarizeEntity);
-  const factTypeSummaries = model.factTypes.map((ft) => summarizeFactType(model, ft));
+  const factTypeSummaries = model.factTypes.map((ft) => summarizeFactType(model, ft, graph));
 
   const verbalizer = new Verbalizer();
   const constraintSummaries: ConstraintSummary[] = [];
@@ -69,6 +71,7 @@ export function describeFullModel(
  */
 export function describeEntity(
   model: OrmModel,
+  graph: ModelGraph,
   entity: ObjectType,
   includePopulations: boolean,
 ): DomainDescription {
@@ -79,7 +82,7 @@ export function describeEntity(
     ft.roles.some((r) => r.playerId === entity.id)
   );
 
-  const factTypeSummaries = relatedFactTypes.map((ft) => summarizeFactType(model, ft));
+  const factTypeSummaries = relatedFactTypes.map((ft) => summarizeFactType(model, ft, graph));
 
   // Find all constraints on those fact types.
   const verbalizer = new Verbalizer();
@@ -125,10 +128,11 @@ export function describeEntity(
  */
 export function describeFactType(
   model: OrmModel,
+  graph: ModelGraph,
   factType: FactType,
   includePopulations: boolean,
 ): DomainDescription {
-  const factTypeSummary = summarizeFactType(model, factType);
+  const factTypeSummary = summarizeFactType(model, factType, graph);
 
   // Find all entities involved in this fact type.
   const involvedEntities = factType.roles
@@ -160,7 +164,7 @@ export function describeFactType(
 
   const summary = buildFactTypeFocusSummary(
     factType,
-    involvedEntities,
+    graph,
     constraintSummaries,
     populationSummaries,
   );
@@ -179,6 +183,7 @@ export function describeFactType(
  */
 export function describeConstraintType(
   model: OrmModel,
+  graph: ModelGraph,
   constraintTypeKeyword: string,
   includePopulations: boolean,
 ): DomainDescription {
@@ -204,7 +209,7 @@ export function describeConstraintType(
     }
   }
 
-  const factTypeSummaries = relatedFactTypes.map((ft) => summarizeFactType(model, ft));
+  const factTypeSummaries = relatedFactTypes.map((ft) => summarizeFactType(model, ft, graph));
 
   // Get entities involved in related fact types.
   const involvedEntityIds = new Set<string>();

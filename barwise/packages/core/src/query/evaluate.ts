@@ -10,11 +10,11 @@
 import { type Constraint, isInternalUniqueness, isMandatoryRole } from "../model/Constraint.js";
 import { matchesConstraintType } from "../model/constraintKeyword.js";
 import type { FactType } from "../model/FactType.js";
+import { type ModelGraph, requireGraph } from "../model/graph.js";
 import { type ObjectType, referenceModeOf } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { expandReading } from "../model/ReadingOrder.js";
 import type { Role } from "../model/Role.js";
-import { hopsFrom } from "../model/roleGraph.js";
 import { Verbalizer } from "../verbalization/Verbalizer.js";
 import type {
   ConstraintRef,
@@ -36,7 +36,7 @@ import type {
  * @returns A deterministic {@link QueryResult}.
  */
 export function queryModel(model: OrmModel, query: ModelQuery): QueryResult {
-  const ctx = new QueryContext(model);
+  const ctx = new QueryContext(model, requireGraph(model));
 
   switch (query.kind) {
     case "list-entities":
@@ -77,7 +77,10 @@ export function queryModel(model: OrmModel, query: ModelQuery): QueryResult {
 class QueryContext {
   private readonly verbalizer = new Verbalizer();
 
-  constructor(private readonly model: OrmModel) {}
+  constructor(
+    private readonly model: OrmModel,
+    private readonly graph: ModelGraph,
+  ) {}
 
   // ---- Element resolution ------------------------------------------------
 
@@ -123,11 +126,10 @@ class QueryContext {
   }
 
   private roleRef(role: Role, ft: FactType): RoleRef {
-    const player = this.model.getObjectType(role.playerId);
     return {
       id: role.id,
       name: role.name,
-      player: player?.name ?? role.playerId,
+      player: this.graph.player(role).name,
       factType: ft.name,
       factTypeId: ft.id,
     };
@@ -201,10 +203,7 @@ class QueryContext {
       return { kind: "not-found", message: `No fact type named "${name}".` };
     }
 
-    const playerNames = ft.roles.map((r) => {
-      const ot = this.model.getObjectType(r.playerId);
-      return ot?.name ?? r.playerId;
-    });
+    const playerNames = ft.roles.map((r) => this.graph.player(r).name);
 
     return {
       kind: "fact-type-detail",
@@ -354,7 +353,7 @@ class QueryContext {
 
     while (queue.length > 0) {
       const currentId = queue.shift()!;
-      for (const hop of hopsFrom(this.model, currentId)) {
+      for (const hop of this.graph.hopsFrom(this.graph.objectType(currentId))) {
         const neighborId = hop.exitRole.playerId;
         if (visited.has(neighborId)) continue;
         visited.add(neighborId);
@@ -433,7 +432,7 @@ class QueryContext {
         ) {
           const identifierTypes = ft.roles
             .filter((r) => r.playerId !== entity.id)
-            .map((r) => this.model.getObjectType(r.playerId)?.name ?? r.playerId);
+            .map((r) => this.graph.player(r).name);
           preferredIdentifier = { factType: ft.name, identifierTypes };
         }
         if (isMandatoryRole(c) && ft.getRoleById(c.roleId)?.playerId === entity.id) {
