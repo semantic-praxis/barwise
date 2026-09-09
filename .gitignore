@@ -166,3 +166,8 @@ barwise/optimizer/out/
 # turbo writes its cache HERE, outside that file's reach -- 11 MB of
 # .tar.zst that a `git add -A` stages silently.
 .turbo/
+
+# Retained only when `scripts/mutate.mjs` cannot verify a restore; the
+# path is printed so the operator can reach it, which a temp dir the
+# container discards would defeat.
+.mutate-backups/
