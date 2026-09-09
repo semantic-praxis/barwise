@@ -51,7 +51,32 @@ from `subsetRoleIds`, because each pair carries the same brand -- and
 those are the swaps with real consequences: an inverted subtype
 relation, an inverted subset constraint.
 
-Measured rather than assumed, with a `tsc --strict` probe:
+Measured rather than assumed. The probe, so the table below can be
+re-derived rather than trusted:
+
+```ts
+declare const brand: unique symbol;
+type Brand<T, B extends string> = T & { readonly [brand]: B; };
+type ObjectTypeId = Brand<string, "ObjectTypeId">;
+type RoleId = Brand<string, "RoleId">;
+
+declare function getObjectType(id: ObjectTypeId): string;
+declare const someRoleId: RoleId;
+declare const someOtId: ObjectTypeId;
+
+getObjectType("ot-1"); // TS2345: string is not assignable to ObjectTypeId
+getObjectType(someRoleId); // TS2345: RoleId is not assignable to ObjectTypeId
+getObjectType(someOtId); // ok
+const m = new Map<ObjectTypeId, number>();
+m.set(someOtId, 1); // ok
+const s: string = someOtId; // ok
+const t = `${someOtId}`; // ok
+```
+
+Run it with the repo's own compiler --
+`node node_modules/typescript/bin/tsc --noEmit --strict --target es2022 probe.ts`
+-- which reports exactly the two errors annotated above and nothing
+else from this file:
 
 | Property                                             | Branded id   |
 | ---------------------------------------------------- | ------------ |
@@ -119,6 +144,15 @@ Out of scope, each named so the boundary is explicit:
 - **The rest of WS1.** `Role`, `FactType`, `SubtypeFact`,
   `ObjectifiedFactType` and `Population` stay classes; see the
   dependency correction in Workstream 2.
+- **The 54 lookups outside `@barwise/core`.** The Principle section
+  opens with 131 `getObjectType` call sites, and this spec reaches 77
+  of them. The rest are `formats` 19, `diagram` 12, `learn` 12, `llm` 6
+  and `vscode` 5, each resolving references against a model it holds.
+  They are out of scope because `graphOf` is core's to build and its
+  consumers migrate one package at a time; they are named here because
+  a spec that opens with 131 and silently delivers 77 is the same
+  unchecked claim this respec exists to correct. Migrating them is a
+  follow-on, and cheap once the graph exists.
 - **WS2, WS4-WS8** of the parent spec.
 
 ## Inventory
@@ -127,18 +161,19 @@ Every row re-measured on `main` `7600a7b`, 2026-09-09. The parent
 spec's WS3 figures were taken at `664b9fe`; three of eight are wrong
 rather than stale, and are corrected here.
 
-| Area                                                    | Current state                                                           | Verdict                                                    |
-| ------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `model/Role.ts`                                         | `playerId: string`; a bare reference                                    | unchanged; the graph resolves it                           |
-| `model/OrmModel.ts`                                     | `getObjectType(id): ObjectType \| undefined`, 131 call sites repo-wide  | unchanged; stays the raw store                             |
-| `model/roleGraph.ts`                                    | `hopsFrom(model, objectTypeId: string)`, two callers                    | moves into `ModelGraph` (WS4)                              |
-| `validation/rules/*.ts`                                 | 13 lookup prologues, 12 with an `undefined` guard                       | takes the graph; prologues go (WS3)                        |
-| `verbalization/constraints/phase1.ts`, `phase2.ts`      | 28 lines ending in a `?? roleId` / `?? roleIds[i]` fallback             | takes resolved roles; fallbacks go (WS5)                   |
-| `query/evaluate.ts`                                     | 3 `?? playerId` fallbacks; imports `hopsFrom`                           | takes the graph (WS4)                                      |
-| `counterexample/CounterexampleGenerator.ts`             | `findRoleById` at :537, a linear scan                                   | replaced by a graph accessor (WS5)                         |
-| `formats/norma/NormaXmlWriter.ts`, `populationGraph.ts` | two `normaId` definitions, agreement guarded by a comment, unregistered | one owner, branded `NormaId` (WS1)                         |
-| `packages/core/src/mapping/`                            | **no** `?? id` player fallbacks                                         | untouched -- see below                                     |
-| `validation/constraintEnforcement.ts`                   | no graph today                                                          | builds the graph internally, so `learn` is untouched (WS3) |
+| Area                                                    | Current state                                                                                                      | Verdict                                                    |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| `model/Role.ts`                                         | `playerId: string`; a bare reference                                                                               | unchanged; the graph resolves it                           |
+| `model/OrmModel.ts`                                     | `getObjectType(id): ObjectType \| undefined`, 131 call sites repo-wide                                             | unchanged; stays the raw store                             |
+| `model/roleGraph.ts`                                    | `hopsFrom(model, objectTypeId: string)`, two callers                                                               | moves into `ModelGraph` (WS4)                              |
+| `validation/rules/*.ts`                                 | 13 lookup prologues, 12 with an `undefined` guard                                                                  | takes the graph; prologues go (WS3)                        |
+| `verbalization/`, `counterexample/`                     | 28 lines ending in a `?? roleId` / `?? roleIds[i]` fallback, 27 of them in `constraints/phase1.ts` and `phase2.ts` | takes resolved roles; fallbacks go (WS5)                   |
+| `query/evaluate.ts`                                     | 3 `?? playerId` fallbacks; imports `hopsFrom`                                                                      | takes the graph (WS4)                                      |
+| `describe/summaries.ts`                                 | 2 `?? playerId` fallbacks (lines 47, 189), the same shape as query's                                               | takes the graph (WS4)                                      |
+| `counterexample/CounterexampleGenerator.ts`             | `findRoleById` at :537, a linear scan                                                                              | replaced by a graph accessor (WS5)                         |
+| `formats/norma/NormaXmlWriter.ts`, `populationGraph.ts` | two `normaId` definitions, agreement guarded by a comment, unregistered                                            | one owner, branded `NormaId` (WS1)                         |
+| `packages/core/src/mapping/`                            | **no** `?? id` player fallbacks                                                                                    | untouched -- see below                                     |
+| `validation/constraintEnforcement.ts`                   | no graph today                                                                                                     | builds the graph internally, so `learn` is untouched (WS3) |
 
 Three corrections a reviewer should not have to find:
 
@@ -319,17 +354,23 @@ something, and it is the reading that must be established first.
 
 The 13 prologues and 12 `undefined` guards in
 `validation/rules/*.ts` go. `constraintEnforcement.ts` builds the graph
-internally so `@barwise/learn` is untouched.
+internally, so `@barwise/learn`'s calls into core do not change. That
+is the only sense in which learn is untouched: it holds 12
+`getObjectType` lookups of its own in `evaluate/populationMapping.ts`,
+which are among the 54 named out of scope above.
 
 Acceptance: when a validation rule needs a role's player, it shall read
 it from the graph; no rule in `validation/rules/` shall call
 `getObjectType`.
 
-### 4. Query takes the graph; `hopsFrom` moves
+### 4. Query and describe take the graph; `hopsFrom` moves
 
-The 3 `?? playerId` fallbacks in `query/evaluate.ts` go, and
-`model/roleGraph.ts`'s `hopsFrom` becomes a graph accessor. Two
-callers, so the move is contained.
+The 3 `?? playerId` fallbacks in `query/evaluate.ts` and the 2 in
+`describe/summaries.ts` go, and `model/roleGraph.ts`'s `hopsFrom`
+becomes a graph accessor. Two `hopsFrom` callers, so the move is
+contained. `describe/` rides along rather than getting its own
+workstream because its two fallbacks are the same shape as query's,
+resolved the same way, in the same package.
 
 ### 5. Verbalization and counterexample take resolved roles (largest)
 
