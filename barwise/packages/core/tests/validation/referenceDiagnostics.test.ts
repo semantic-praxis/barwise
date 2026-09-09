@@ -217,6 +217,30 @@ describe("referenceDiagnostics for join constraint paths", () => {
     expectSame(withJoin(() => ({ root: "ot-missing", steps: [] })), RULE_ID.joinUnknownRoot);
   });
 
+  it("reports every dangling hop, where the old rule stopped at the first", () => {
+    const model = withJoin((m) => ({
+      root: m.objectTypes[0]!.id,
+      steps: [
+        { entry: m.factTypes[0]!.roles[0]!.id, exit: "role-missing-1" },
+        { entry: m.factTypes[0]!.roles[1]!.id, exit: "role-missing-2" },
+      ],
+    }));
+
+    const badSteps = mapped(model, RULE_ID.joinBadStep);
+
+    // The behaviour change `referenceDiagnostics`'s header states: the
+    // rule walked and returned at the first bad hop (its `return
+    // undefined` is still there, for paths that DO resolve), so it
+    // reported one; the graph enumerates references, so it reports both.
+    // Asserted on the graph's own output rather than against "before",
+    // which this suite cannot run.
+    expect(badSteps).toHaveLength(2);
+    expect(badSteps[0]!.message).toContain("role-missing-1");
+    expect(badSteps[1]!.message).toContain("role-missing-2");
+    // And the engine passes both through without duplicating either.
+    expect(today(model, RULE_ID.joinBadStep)).toEqual(badSteps);
+  });
+
   it("bad path step", () => {
     const model = withJoin((m) => ({
       root: m.objectTypes[0]!.id,

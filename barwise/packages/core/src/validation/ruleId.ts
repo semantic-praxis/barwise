@@ -729,6 +729,15 @@ const RULE_DESCRIPTORS = {
       // graph indexed by them. An id-keyed index keeps the last writer,
       // so the alternative to refusing is answering confidently for the
       // wrong fact type.
+      //
+      // The house rule asks whether a new check belongs in the
+      // constructor instead of as a rule (pr-review checklist, "@barwise
+      // /core changed"). Here it does not, and this workstream is why:
+      // `addObjectifiedFactType` and `addPopulation` DO refuse their bad
+      // states, and the result is three rule ids that have never fired
+      // and a schema-valid file that reports one parse error instead of
+      // every problem in it (barwise-977). A constructor that throws
+      // cannot tell an operator what else is wrong.
       default: (roleName: string, ftName: string, roleId: string): string =>
         `Role "${roleName}" in fact type "${ftName}" has id "${roleId}", which another role `
         + `already uses. Role ids must be unique across the model.`,

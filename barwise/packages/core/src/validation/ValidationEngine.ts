@@ -25,9 +25,11 @@ import type { GraphValidationRule, ValidationRule } from "./ValidationRule.js";
  *
  * The cost of that ordering is stated rather than hidden: a model with
  * one dangling id no longer gets the graph-taking rules' findings in
- * the same pass. That is the compiler's bargain -- a parse error
- * suppresses type errors -- and it is the price of resolving each
- * reference once instead of at all 131 lookups.
+ * the same pass (barwise-978). That is the compiler's bargain -- a
+ * parse error suppresses type errors -- and it is the price of
+ * resolving each reference once rather than guarding every
+ * `getObjectType` call in the repository. The reference-free rules
+ * still run, so the caller is never left with only the one error.
  */
 export class ValidationEngine {
   /** Rules that read only what is written in the model. */

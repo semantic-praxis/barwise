@@ -4,20 +4,39 @@
  *
  * The problem this exists for: `Role.playerId` is a bare `string`, so
  * every consumer looks the player up, guards against a failure
- * validation already refuses, and then discriminates on kind -- 131
- * `getObjectType` call sites across the repo, 13 lookup prologues in the
- * validation rules alone, and in a model that validates the `undefined`
- * arm of each is unreachable with nothing to tell a reader so
- * (`docs/specs/model-graph-and-id-spaces.spec.md`).
+ * validation already refuses, and then discriminates on kind. In a model
+ * that validates, the `undefined` arm of each is unreachable with
+ * nothing to tell a reader so
+ * (`docs/specs/model-graph-and-id-spaces.spec.md`). The count, with the
+ * command, because a bare figure in a comment is how the spec's own
+ * inventory went stale:
+ *
+ *   grep -rn 'getObjectType(' --include=*.ts \
+ *     --exclude-dir=dist --exclude-dir=tests packages | wc -l
+ *
+ * gives 129 today. (Spelled with --exclude-dir rather than a path glob
+ * because a glob of the form packages/<star>/src contains the two
+ * characters that close a block comment, which is how this header first
+ * failed to compile.)
  *
  * TOTALITY IS A PROPERTY OF A BUILT GRAPH, NOT OF `graphOf`. Building is
  * where a dangling reference is found, so that is where it is reported;
  * every accessor on a graph that was built is total. That is the whole
- * trade -- one failure point instead of 131. The distinction matters
- * because an `OrmModel` really can hold an unresolvable reference:
- * `constraintConsistency` reports a constraint naming a role its fact
- * type does not have, but reporting is a separate pass no caller is
- * required to run, and no shipped surface runs it before verbalizing.
+ * trade -- one failure point instead of one per lookup.
+ *
+ * The distinction matters because an `OrmModel` really can hold an
+ * unresolvable reference. `ValidationEngine.validate` now builds this
+ * graph first and reports what it finds, but validating is a separate
+ * pass no caller is required to run, and no shipped surface runs it
+ * before verbalizing (WS5 owns that). A caller holding a model loaded
+ * with `lenient` and never validated is the case this refuses to answer
+ * wrongly for.
+ *
+ * What it does NOT refuse is a role id that resolves to a role of the
+ * WRONG fact type. That is a locality question, not a resolution one,
+ * and `constraintConsistency` still owns it -- deleting its
+ * `ft.hasRole` guards in favour of this module would have dropped the
+ * case silently (barwise-976).
  *
  * DERIVED, NEVER STORED. Two live representations would have to be kept
  * in sync; one value and one view rebuilt from it cannot disagree.

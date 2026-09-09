@@ -14,15 +14,13 @@
  * is a promise to whoever reads validator output, and moving WHERE a
  * check runs must not change WHAT a consumer sees.
  *
- * One multiplicity difference is deliberate and is the exception that
- * proves the rule. `joinConstraintRules` walked a path and gave up at
- * the first bad hop, so a path with two dangling steps produced one
- * diagnostic; the graph enumerates references rather than walking, so it
- * produces two. Each is identical to the one the old rule would have
- * given for that hop alone. Reporting the second is the improvement the
- * workstream is for -- a caller sees everything knowable about a model
- * that cannot build -- but it is a change, so it is stated here rather
- * than discovered.
+ * One multiplicity difference is deliberate. `joinConstraintRules`
+ * walked a path and gave up at the first bad hop, so a path with two
+ * dangling steps produced one diagnostic; the graph enumerates
+ * references rather than walking, so it produces two. Each is identical
+ * to the one the old rule would have given for that hop alone. Reporting
+ * the second is an improvement, but it is still a change, so it is
+ * stated here rather than discovered.
  */
 
 import type { Constraint, JoinOperand } from "../model/Constraint.js";
@@ -36,20 +34,9 @@ import { report, RULE_ID } from "./ruleId.js";
 type JoinConstraintType = "join_subset" | "join_equality" | "join_exclusion";
 
 /**
- * The rule id for a dangling role reference on a constraint, by kind.
- *
- * A total `Record` rather than a switch with a default arm: a constraint
- * kind added later fails to compile here until it is given an id,
- * instead of silently reporting under someone else's. The join kinds are
- * excluded because their references are reported per hop, not per role
- * -- see `joinStepDiagnostic`. Kinds whose dangling roles were never
- * reported separately map to the internal-uniqueness id, which is what
- * `constraintConsistency` used for the generic case.
- */
-/**
  * The invalid-role ids, every one of which renders from (factTypeName,
- * roleId). Naming the union keeps `report` type-checked at the call
- * site below, where a single id would not fit the map.
+ * roleId). Naming the union rather than widening to every rule id keeps
+ * `report` type-checked where the map is read.
  */
 type InvalidRoleRuleId =
   | typeof RULE_ID.internalUniquenessInvalidRole
@@ -60,6 +47,17 @@ type InvalidRoleRuleId =
   | typeof RULE_ID.valueComparisonInvalidRole
   | typeof RULE_ID.ringInvalidRole;
 
+/**
+ * The rule id for a dangling role reference on a constraint, by kind.
+ *
+ * A total `Record` rather than a switch with a default arm: a constraint
+ * kind added later fails to compile here until it is given an id,
+ * instead of silently reporting under someone else's. The join kinds are
+ * excluded because their references are reported per hop, not per role
+ * -- see `joinStepDiagnostic`. Kinds whose dangling roles were never
+ * reported separately map to the internal-uniqueness id, which is what
+ * `constraintConsistency` used for the generic case.
+ */
 const CONSTRAINT_INVALID_ROLE: Record<
   Exclude<Constraint["type"], JoinConstraintType>,
   InvalidRoleRuleId
@@ -110,12 +108,25 @@ function diagnosticFor(u: UnresolvedReference): Diagnostic {
       if (u.field === "path.root") {
         return report(RULE_ID.joinUnknownRoot, "default", elementId, factType.name, u.missing);
       }
-      const operands = joinOperandsOf(constraint);
-      if (operands.length > 0) {
-        return joinStepDiagnostic(operands, elementId, factType.name, u.missing);
+      // Narrowed on the kind rather than on `joinOperandsOf(...).length`,
+      // which reads the same and is not: a `join_equality` declaring no
+      // operands would take the second branch, and the `Record` has no
+      // entry for it. That is a cast away from `report(undefined, ...)`
+      // for a state `joinTooFewOperands` already reports.
+      if (
+        constraint.type === "join_subset"
+        || constraint.type === "join_equality"
+        || constraint.type === "join_exclusion"
+      ) {
+        return joinStepDiagnostic(
+          joinOperandsOf(constraint),
+          elementId,
+          factType.name,
+          u.missing,
+        );
       }
       return report(
-        CONSTRAINT_INVALID_ROLE[constraint.type as Exclude<Constraint["type"], JoinConstraintType>],
+        CONSTRAINT_INVALID_ROLE[constraint.type],
         "default",
         factType.id,
         factType.name,
@@ -171,6 +182,11 @@ function joinStepDiagnostic(
     step = operand.path.steps.find((s) => s.entry === missing || s.exit === missing);
     if (step) break;
   }
+  // The search cannot miss: `roleIdsOf` derives a join constraint's role
+  // ids from these same steps, so an id the graph could not resolve came
+  // from one of them. Naming the missing id twice is what the old rule
+  // did for a step it could not resolve at all, so the degraded form is
+  // the old form rather than something new to read.
   return report(
     RULE_ID.joinBadStep,
     "default",
