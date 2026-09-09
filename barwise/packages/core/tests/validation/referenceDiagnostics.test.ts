@@ -39,6 +39,7 @@ function base(): OrmModel {
     .build();
 }
 
+/** What the engine says now, for the diagnostics of one rule id. */
 function today(model: OrmModel, ruleId: string) {
   return new ValidationEngine().validate(model).filter((d) => d.ruleId === ruleId);
 }
@@ -49,12 +50,94 @@ function mapped(model: OrmModel, ruleId: string) {
   return referenceDiagnostics(result.unresolved).filter((d) => d.ruleId === ruleId);
 }
 
-function expectSame(model: OrmModel, ruleId: string): void {
-  const before = today(model, ruleId);
-  // Without this the case would pass vacuously when the rule stops
-  // firing for an unrelated reason.
-  expect(before.length).toBeGreaterThan(0);
-  expect(mapped(model, ruleId)).toEqual(before);
+/**
+ * The expected diagnostic, captured by RUNNING the pre-change engine.
+ *
+ * The obvious form of this test compares the mapping against
+ * `new ValidationEngine().validate(model)`, and that is what it did
+ * until the engine started routing through the mapping -- at which point
+ * it compared `referenceDiagnostics` with `referenceDiagnostics` and
+ * would have agreed with any change to either. That is barwise-906's
+ * class exactly: an instrument that cannot report the outcome it claims
+ * to check.
+ *
+ * So the other side of the comparison is pinned text, and the text is
+ * not written by hand. It was produced on 8410d6e (this branch's merge
+ * base, before any of these checks moved) by building each model below
+ * and printing `validate(model)` filtered to the rule id. A message
+ * changing here means a consumer's output changed, which is the whole
+ * claim the workstream rests on.
+ */
+const BEFORE: Record<string, { ruleId: string; severity: string; message: string; }> = {
+  mandatory: {
+    ruleId: "constraint/mandatory-invalid-role",
+    severity: "error",
+    message:
+      'Mandatory constraint in fact type "Customer has Name" references role id "bogus" which does not belong to this fact type.',
+  },
+  ring: {
+    ruleId: "constraint/ring-invalid-role",
+    severity: "error",
+    message:
+      'Ring constraint in fact type "Customer has Name" references role id "bogus" which does not belong to this fact type.',
+  },
+  frequency: {
+    ruleId: "constraint/frequency-invalid-role",
+    severity: "error",
+    message:
+      'Frequency constraint in fact type "Customer has Name" references role id "bogus" which does not belong to this fact type.',
+  },
+  cardinality: {
+    ruleId: "constraint/cardinality-invalid-role",
+    severity: "error",
+    message:
+      'Cardinality constraint in fact type "Customer has Name" references role id "bogus" which does not belong to this fact type.',
+  },
+  subtypeDangling: {
+    ruleId: "structural/subtype-dangling-subtype",
+    severity: "error",
+    message: 'Subtype fact references subtype id "sub-missing" which does not exist in the model.',
+  },
+  supertypeDangling: {
+    ruleId: "structural/subtype-dangling-supertype",
+    severity: "error",
+    message:
+      'Subtype fact references supertype id "sup-missing" which does not exist in the model.',
+  },
+  joinRoot: {
+    ruleId: "constraint/join-unknown-root",
+    severity: "error",
+    message:
+      'Join constraint in fact type "Customer has Name" references an unknown root object type "ot-missing".',
+  },
+  joinStep: {
+    ruleId: "constraint/join-bad-step",
+    severity: "error",
+    message:
+      'Join constraint in fact type "Customer has Name" has a step whose entry "Customer has Name::role1" / exit "role-missing" are not both roles of one fact type.',
+  },
+  rolePlayer: {
+    ruleId: "structural/dangling-role-reference",
+    severity: "error",
+    message:
+      'Role "is of" in fact type "Customer has X" references object type id "ot-missing" which does not exist in the model.',
+  },
+};
+
+/**
+ * The mapping reproduces what the pre-change engine said, and the engine
+ * still delivers it. Both halves matter: the first is the mapping's
+ * contract, the second is that nothing between the mapping and the
+ * caller drops or duplicates it.
+ */
+function expectSame(model: OrmModel, key: keyof typeof BEFORE): void {
+  const before = BEFORE[key]!;
+  const got = mapped(model, before.ruleId);
+  expect(got).toHaveLength(1);
+  expect(got[0]!.ruleId).toBe(before.ruleId);
+  expect(got[0]!.severity).toBe(before.severity);
+  expect(got[0]!.message).toBe(before.message);
+  expect(today(model, before.ruleId)).toEqual(got);
 }
 
 describe("referenceDiagnostics reproduces today's diagnostics", () => {
@@ -69,13 +152,13 @@ describe("referenceDiagnostics reproduces today's diagnostics", () => {
       ],
       readings: ["{0} has {1}"],
     }, { skipPlayerValidation: true });
-    expectSame(model, RULE_ID.danglingRoleReference);
+    expectSame(model, "rolePlayer");
   });
 
   it("dangling mandatory constraint role", () => {
     const model = base();
     model.factTypes[0]!.addConstraint({ type: "mandatory", roleId: "bogus", id: "c1" });
-    expectSame(model, RULE_ID.mandatoryInvalidRole);
+    expectSame(model, "mandatory");
   });
 
   it("dangling ring constraint role", () => {
@@ -88,7 +171,7 @@ describe("referenceDiagnostics reproduces today's diagnostics", () => {
       roleId2: ft.roles[1]!.id,
       ringType: "irreflexive",
     });
-    expectSame(model, RULE_ID.ringInvalidRole);
+    expectSame(model, "ring");
   });
 
   it("dangling frequency constraint role", () => {
@@ -100,7 +183,7 @@ describe("referenceDiagnostics reproduces today's diagnostics", () => {
       min: 1,
       max: 2,
     });
-    expectSame(model, RULE_ID.frequencyInvalidRole);
+    expectSame(model, "frequency");
   });
 
   it("dangling cardinality constraint role", () => {
@@ -112,7 +195,7 @@ describe("referenceDiagnostics reproduces today's diagnostics", () => {
       min: 0,
       max: 1,
     });
-    expectSame(model, RULE_ID.cardinalityInvalidRole);
+    expectSame(model, "cardinality");
   });
 
   it("dangling subtype and supertype", () => {
@@ -121,8 +204,8 @@ describe("referenceDiagnostics reproduces today's diagnostics", () => {
       { subtypeId: "sub-missing", supertypeId: "sup-missing" },
       { skipPlayerValidation: true },
     );
-    expectSame(model, RULE_ID.subtypeDanglingSubtype);
-    expectSame(model, RULE_ID.subtypeDanglingSupertype);
+    expectSame(model, "subtypeDangling");
+    expectSame(model, "supertypeDangling");
   });
 });
 
@@ -214,7 +297,7 @@ describe("referenceDiagnostics for join constraint paths", () => {
   }
 
   it("unknown path root", () => {
-    expectSame(withJoin(() => ({ root: "ot-missing", steps: [] })), RULE_ID.joinUnknownRoot);
+    expectSame(withJoin(() => ({ root: "ot-missing", steps: [] })), "joinRoot");
   });
 
   it("reports every dangling hop, where the old rule stopped at the first", () => {
@@ -246,6 +329,6 @@ describe("referenceDiagnostics for join constraint paths", () => {
       root: m.objectTypes[0]!.id,
       steps: [{ entry: m.factTypes[0]!.roles[0]!.id, exit: "role-missing" }],
     }));
-    expectSame(model, RULE_ID.joinBadStep);
+    expectSame(model, "joinStep");
   });
 });
