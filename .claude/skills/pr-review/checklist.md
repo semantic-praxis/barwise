@@ -152,6 +152,33 @@ now holds, guards, or learns that they did not have to.
   `validate(model)`'s flat `Diagnostic[]` before core exposed
   `evaluateConstraintEnforcement`. Authority:
   `docs/specs/constraint-enforcement-predicate.spec.md`.
+- **A guard or fallback carries the failure it prevents.** A `??`
+  fallback, a defensive `if`, or a magic value with no reason is an
+  unknown unknown: the next reader cannot tell whether it is live. The
+  `?? roleId` fallbacks in verbalization defend a state validation
+  refuses, nothing at the site says so, and the tests came to pin them
+  as behaviour. Authority: root `CLAUDE.md`, comments describe what the
+  code cannot; `docs/specs/core-branching-load.spec.md`, Principle.
+- **A comment near moved or changed code still describes it.**
+  `roleGraph.ts`'s header promised a second caller that never
+  arrived, and the WS3 spec repeated "two callers" from it instead of
+  measuring; PR #448's review found a stale module comment nothing
+  else had. A stale comment is trusted where a missing one is not.
+  Authority: root `CLAUDE.md`, comments describe what the code cannot.
+- **A new name is free.** Grep for it first: `ModelBuilder` names a
+  planned WS1 class in one spec and an existing fixture builder under
+  `tests/helpers/`, and a recommendation built on the wrong one had to
+  be withdrawn. Authority: `docs/specs/model-graph-and-id-spaces.spec.md`,
+  Open decisions, the withdrawal.
+- **Together or apart follows lifetime and question, not size.** Code
+  answering different questions, or changing for different reasons,
+  lives apart even when small; code always read together lives
+  together even when large. `DraftModelResult` was refused a field
+  with a different lifetime, and four guards sharing one principle
+  were refused one gate whose failure output would have had to say
+  which of four things went wrong. Authority:
+  `docs/specs/pipeline-observability.spec.md`;
+  `docs/specs/deterministic-guards.spec.md`.
 - Two modules that both know one format or convention is the first
   item of the copy group below; run it there.
 
@@ -195,6 +222,25 @@ now holds, guards, or learns that they did not have to.
   with a recommended default; every mechanism a requirement names
   exists or is delivered by a named workstream; the header dates are
   current. Authority: `spec-writer` skill, the design gate.
+- The spec's anchors, the three or four facts the design rests on,
+  are re-verified against the code by the reviewer, load-bearing
+  first: a spec breaks when an anchor is invalidated, and its author
+  is the person least placed to see it. PR #475's spec rested on "the
+  surfaces validate before verbalizing", "two callers" and "13
+  prologues", none verified, and all three fell on re-measurement.
+  Authority: `spec-writer/sensemaking.md`, Anchors and Expectancies.
+- Alternatives considered are live competing frames, not strawmen:
+  each could have been built, and the reason it lost is grounded
+  against the code rather than narrated. A section written to be
+  rejected is the dismissible-tension bucket the same file warns is
+  where fixation hides. Authority: `spec-writer/sensemaking.md`, Hold
+  two or three frames; root `CLAUDE.md`, design it twice.
+- Claims drafted ahead of their grounding are marked provisional, and
+  tripwires name the signal that reopens the design. A confident
+  forward section becomes an anchor for the next revision: the parent
+  spec's `joinSegments` helper was invented in a sketch, never built,
+  and carried as fact until re-measured. Authority:
+  `spec-writer/sensemaking.md`, Forward sections and Tripwires.
 
 ## When Python was touched
 

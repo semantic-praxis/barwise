@@ -29,8 +29,12 @@ rule. `security-review`
 applies when the diff touches subprocess, network, or file I/O;
 `duplication-audit` when it adds a copy; `assertion-audit` when it
 adds a test for a refusal or error; `articulation` in critique mode
-for the body and any doc. What `npm run ci:local` checks is never a
-finding here: CI will say it, and saying it twice costs a round trip.
+for the body and any doc; and `sensemaking` -- the repo's own copy is
+`spec-writer/sensemaking.md`, and the skill of that name, where
+available, is the same discipline -- for section 2, where the body is
+the author's frame and its claims are the anchors. What `npm run
+ci:local` checks is never a finding here: CI will say it, and saying
+it twice costs a round trip.
 Where `/code-review` is not available (another harness, a Copilot
 session), run its angles yourself on the spine and say so under Not
 checked: read each hunk and its enclosing function, audit each deleted
@@ -66,6 +70,17 @@ pitfalls.
   without it disproved the PR's central claim while the reviewer with
   it had listed that case under Not checked. Everything below this
   bullet is cheaper than that mistake.
+- Run the claims the way `spec-writer/sensemaking.md` runs a design.
+  State the expectancy before checking ("if the surfaces validate
+  before verbalizing, `verbalize.ts` calls `ValidationEngine`"), so a
+  surprise arrives as a tension and not as something absorbed; test
+  load-bearing anchors first and cheap ones next; and elaborate the
+  strongest competing frame and look for evidence *for* it, because a
+  mind dismisses evidence against its leader more readily than it
+  finds evidence for a rival. PR #475's central behaviour claim fell to
+  one CLI run against the competitor ("verbalize never validates").
+  Cleared is then the verified anchors with their tests, and Not
+  checked the unverified ones with the test a human would run.
 - Check out the head. Re-run the command behind every number in the
   body. A figure without a command is a finding in itself.
 - A new gate, check, hook, or test is verified only after you have
@@ -157,6 +172,9 @@ CLAUDE.md makes that vocabulary descriptive, not a gate.
   REFUTED needs the quoted line, type, or guard that makes the
   candidate impossible; "seems unlikely" refutes nothing, and a wrong
   refutation is the same confident wrong answer as a wrong finding.
+  These are sensemaking's verified, unverified-with-a-trigger, and
+  contradicted; a dismissal is grounded against the code, never
+  narrated, because narrated dismissal is where fixation hides.
 - Correctness outranks cleanup. Nits last, labelled as nits. No
   praise, no restatement of the diff, nothing dprint or eslint
   polices.
