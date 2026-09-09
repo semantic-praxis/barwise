@@ -90,6 +90,8 @@ export const RULE_ID = {
   uniquenessViolation: "population/uniqueness-violation",
   valueComparisonViolation: "population/value-comparison-violation",
   valueConstraintViolation: "population/value-constraint-violation",
+  valueTypeDomainViolation: "population/value-type-domain-violation",
+  valueTypeDataTypeViolation: "population/value-type-data-type-violation",
   entityMappingSourceMissing: "project/entity-mapping-source-missing",
   entityMappingTargetMissing: "project/entity-mapping-target-missing",
   mappingSourceContextMissing: "project/mapping-source-context-missing",
@@ -660,6 +662,40 @@ const RULE_DESCRIPTORS = {
         rangeNote: string,
       ): string =>
         `Population "${popId}": instance "${instId}" has value "${val}" for role "${vcRoleId}" which is not in the allowed set [${vcValues}]${rangeNote}.`,
+    },
+  },
+  [RULE_ID.valueTypeDomainViolation]: {
+    severity: "error",
+    description:
+      "An instance holds a value outside the value constraint its player value type declares.",
+    messages: {
+      default: (
+        popId: string,
+        instId: string,
+        val: string,
+        playerName: string,
+        vcValues: string,
+        rangeNote: string,
+      ): string =>
+        `Population "${popId}": instance "${instId}" has value "${val}" for a role played by `
+        + `value type "${playerName}", whose declared value constraint permits only `
+        + `[${vcValues}]${rangeNote}.`,
+    },
+  },
+  [RULE_ID.valueTypeDataTypeViolation]: {
+    severity: "error",
+    description:
+      "An instance holds a value that cannot be read as the data type its player value type declares.",
+    messages: {
+      default: (
+        popId: string,
+        instId: string,
+        val: string,
+        playerName: string,
+        dataTypeName: string,
+      ): string =>
+        `Population "${popId}": instance "${instId}" has value "${val}" for a role played by `
+        + `value type "${playerName}", which declares data type ${dataTypeName}.`,
     },
   },
   [RULE_ID.entityMappingSourceMissing]: {
