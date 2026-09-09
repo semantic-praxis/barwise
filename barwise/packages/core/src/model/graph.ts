@@ -28,11 +28,13 @@
 
 import { type Constraint, roleIdsOf } from "./Constraint.js";
 import type { FactType } from "./FactType.js";
+import type { ObjectifiedFactType } from "./ObjectifiedFactType.js";
 import type { ObjectType } from "./ObjectType.js";
 import type { OrmModel } from "./OrmModel.js";
 import type { Population } from "./Population.js";
 import type { Role } from "./Role.js";
 import { hopsFrom, type RoleHop } from "./roleGraph.js";
+import type { SubtypeFact } from "./SubtypeFact.js";
 
 /**
  * A reference the model declares and cannot resolve.
@@ -44,16 +46,37 @@ import { hopsFrom, type RoleHop } from "./roleGraph.js";
  * consumer reads them directly.
  */
 export interface UnresolvedReference {
-  /** The element that carries the dangling reference. */
-  readonly from: {
-    readonly kind: "role" | "constraint" | "subtypeFact" | "objectifiedFactType" | "population";
-    readonly id: string;
-  };
+  /** The element that carries the dangling reference, resolved. */
+  readonly from: ReferenceSource;
   /** The field that holds it, e.g. "playerId", "roleIds", "factTypeId". */
   readonly field: string;
   /** The id that does not resolve. */
   readonly missing: string;
 }
+
+/**
+ * The element carrying an unresolvable reference -- the element itself,
+ * not its id.
+ *
+ * An id would make every consumer look the element up, which is the
+ * defect this whole module exists to remove; a record produced BY the
+ * thing that eliminates lookups must not hand out bare ids. It is also
+ * not enough in practice: `validation/` reports a dangling constraint
+ * role under a per-KIND rule id (`mandatoryInvalidRole`,
+ * `ringInvalidRole`, `frequencyInvalidRole` and four more), keyed on the
+ * constraint's `type`, and names the owning fact type as the affected
+ * element. Neither is recoverable from an id -- a constraint's id is
+ * optional, so there may not even be one.
+ */
+export type ReferenceSource =
+  | { readonly kind: "role"; readonly role: Role; readonly factType: FactType; }
+  | { readonly kind: "constraint"; readonly constraint: Constraint; readonly factType: FactType; }
+  | { readonly kind: "subtypeFact"; readonly subtypeFact: SubtypeFact; }
+  | {
+    readonly kind: "objectifiedFactType";
+    readonly objectifiedFactType: ObjectifiedFactType;
+  }
+  | { readonly kind: "population"; readonly population: Population; };
 
 export type GraphResult =
   | { readonly ok: true; readonly graph: ModelGraph; }
@@ -115,7 +138,7 @@ export function graphOf(model: OrmModel): GraphResult {
       // ids -- so the graph refuses rather than answering wrongly.
       if (roleById.has(role.id)) {
         unresolved.push({
-          from: { kind: "role", id: role.id },
+          from: { kind: "role", role, factType: ft },
           field: "id",
           missing: role.id,
         });
@@ -134,7 +157,7 @@ export function graphOf(model: OrmModel): GraphResult {
       const player = model.getObjectType(role.playerId);
       if (!player) {
         unresolved.push({
-          from: { kind: "role", id: role.id },
+          from: { kind: "role", role, factType: ft },
           field: "playerId",
           missing: role.playerId,
         });
@@ -158,15 +181,12 @@ export function graphOf(model: OrmModel): GraphResult {
   const constraintsByRole = new Map<string, Constraint[]>();
   for (const ft of model.factTypes) {
     for (const c of ft.constraints) {
-      // A constraint without an id is reported against its fact type,
-      // which is the nearest element a reader can actually find.
-      const reportedId = c.id ?? ft.id;
       const resolved: Role[] = [];
       for (const roleId of roleIdsOf(c)) {
         const role = roleById.get(roleId);
         if (!role) {
           unresolved.push({
-            from: { kind: "constraint", id: reportedId },
+            from: { kind: "constraint", constraint: c, factType: ft },
             field: "roleIds",
             missing: roleId,
           });
@@ -186,7 +206,7 @@ export function graphOf(model: OrmModel): GraphResult {
       const [field, id] of [["subtypeId", sf.subtypeId], ["supertypeId", sf.supertypeId]] as const
     ) {
       if (!model.getObjectType(id)) {
-        unresolved.push({ from: { kind: "subtypeFact", id: sf.id }, field, missing: id });
+        unresolved.push({ from: { kind: "subtypeFact", subtypeFact: sf }, field, missing: id });
       }
     }
   }
@@ -194,14 +214,14 @@ export function graphOf(model: OrmModel): GraphResult {
   for (const oft of model.objectifiedFactTypes) {
     if (!model.getFactType(oft.factTypeId)) {
       unresolved.push({
-        from: { kind: "objectifiedFactType", id: oft.id },
+        from: { kind: "objectifiedFactType", objectifiedFactType: oft },
         field: "factTypeId",
         missing: oft.factTypeId,
       });
     }
     if (!model.getObjectType(oft.objectTypeId)) {
       unresolved.push({
-        from: { kind: "objectifiedFactType", id: oft.id },
+        from: { kind: "objectifiedFactType", objectifiedFactType: oft },
         field: "objectTypeId",
         missing: oft.objectTypeId,
       });
@@ -211,7 +231,7 @@ export function graphOf(model: OrmModel): GraphResult {
   for (const pop of model.populations) {
     if (!model.getFactType(pop.factTypeId)) {
       unresolved.push({
-        from: { kind: "population", id: pop.id },
+        from: { kind: "population", population: pop },
         field: "factTypeId",
         missing: pop.factTypeId,
       });

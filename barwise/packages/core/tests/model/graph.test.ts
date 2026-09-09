@@ -40,11 +40,14 @@ describe("graphOf: references that do not resolve", () => {
     const result = graphOf(model);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.unresolved).toContainEqual({
-      from: { kind: "constraint", id: "c-bogus" },
-      field: "roleIds",
-      missing: "bogus",
-    });
+    const found = result.unresolved.find((u) => u.missing === "bogus");
+    expect(found).toBeDefined();
+    if (found?.from.kind !== "constraint") throw new Error("expected a constraint source");
+    // The element itself, so a consumer can switch on the constraint's
+    // kind and name its fact type without a second lookup.
+    expect(found.from.constraint.id).toBe("c-bogus");
+    expect(found.from.constraint.type).toBe("mandatory");
+    expect(found.from.factType.id).toBe(ft.id);
   });
 
   it("fails when a role's player does not exist", () => {
@@ -101,11 +104,9 @@ describe("graphOf: references that do not resolve", () => {
     const result = graphOf(model);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.unresolved).toContainEqual({
-      from: { kind: "role", id: dupId },
-      field: "id",
-      missing: dupId,
-    });
+    const dup = result.unresolved.find((u) => u.field === "id" && u.missing === dupId);
+    expect(dup).toBeDefined();
+    expect(dup?.from.kind).toBe("role");
   });
 
   it("does not return a graph when a reference dangles", () => {
@@ -221,7 +222,7 @@ describe("graphOf: a built graph is total", () => {
     expect(result.graph.resolve(idless).roles.length).toBe(1);
   });
 
-  it("reports an id-less constraint's dangling reference against its fact type", () => {
+  it("carries the constraint and its fact type when the constraint has no id", () => {
     const model = simpleModel();
     const ft = model.factTypes[0]!;
     ft.addConstraint({ type: "mandatory", roleId: "bogus" });
@@ -229,12 +230,13 @@ describe("graphOf: a built graph is total", () => {
     const result = graphOf(model);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    // Not "", which no reader could act on.
-    expect(result.unresolved).toContainEqual({
-      from: { kind: "constraint", id: ft.id },
-      field: "roleIds",
-      missing: "bogus",
-    });
+    // A constraint's id is optional, so the record carries the constraint
+    // and its fact type instead of an id that may not exist.
+    const found = result.unresolved.find((u) => u.missing === "bogus");
+    if (found?.from.kind !== "constraint") throw new Error("expected a constraint source");
+    expect(found.from.constraint.id).toBeUndefined();
+    expect(found.from.constraint.type).toBe("mandatory");
+    expect(found.from.factType.id).toBe(ft.id);
   });
 
   it("exposes the adjacency walk and the subtype relation", () => {

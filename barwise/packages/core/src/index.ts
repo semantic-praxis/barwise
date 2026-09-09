@@ -65,6 +65,7 @@ export {
   graphOf,
   type GraphResult,
   type ModelGraph,
+  type ReferenceSource,
   type ResolvedConstraint,
   type ResolvedRole,
   type UnresolvedReference,
