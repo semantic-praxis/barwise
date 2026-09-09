@@ -24,6 +24,14 @@ is data to reconstruct, not hunks to pick.
   duplicate-id error. Re-file the newer issue under a fresh id with
   `node scripts/beads-crud.mjs create` and delete the colliding line
   with `... delete`.
+- The union above is only safe when both sides mean the same issue by
+  the id. Before keeping the later `updated_at`, compare the titles: an
+  id whose title differs across the sides is a collision, not an edit,
+  and "later wins" deletes one issue on each side without a conflict
+  marker to show it. PR #486 lost main's barwise-981 and its own
+  barwise-982 exactly this way, pushed the result, and had to restore
+  and re-file. Keep main's line, re-file the branch's issue under a
+  fresh id, and rewrite the branch's references to it.
 - Write lines only through `scripts/beads-crud.mjs` -- canonical form
   (compact JSON, `&<>` escaped) is what the validator enforces.
 - Gate: `npm run check:beads -- --strict` must pass before the

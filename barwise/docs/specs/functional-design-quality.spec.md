@@ -4,7 +4,7 @@ Status: Draft -- the five open decisions resolved in review 2026-09-09
 (see Decisions); no workstream implemented
 Created: 2026-09-09
 Last-updated: 2026-09-09
-Tracking: barwise-981 (this spec); barwise-x4z (the purity half of the
+Tracking: barwise-983 (this spec); barwise-x4z (the purity half of the
 analysis this answers; the type-system half went to
 `core-branching-load.spec.md`); barwise-e8m (the standing commitment to
 a clean functional core); the omission defects that ground it:
