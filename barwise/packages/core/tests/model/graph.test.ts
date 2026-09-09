@@ -80,6 +80,34 @@ describe("graphOf: references that do not resolve", () => {
     expect(result.unresolved.map((u) => u.missing).sort()).toEqual(["bogus1", "bogus2"]);
   });
 
+  // Not an unresolvable reference but an ambiguous one, and it defeats
+  // totality the same way: an id-keyed index keeps the last writer, so
+  // `factTypeOf` would answer confidently for the wrong fact type.
+  // structural.ts guards duplicate NAMES, not ids, so nothing else in
+  // the repo reports this.
+  it("fails when two roles share an id", () => {
+    const model = simpleModel();
+    const ft = model.factTypes[0]!;
+    const dupId = ft.roles[0]!.id;
+    model.addFactType({
+      name: "Customer also has Name",
+      roles: [
+        { name: "also has", playerId: ft.roles[0]!.playerId, id: dupId },
+        { name: "also is of", playerId: ft.roles[1]!.playerId },
+      ],
+      readings: ["{0} also has {1}"],
+    });
+
+    const result = graphOf(model);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.unresolved).toContainEqual({
+      from: { kind: "role", id: dupId },
+      field: "id",
+      missing: dupId,
+    });
+  });
+
   it("does not return a graph when a reference dangles", () => {
     const model = simpleModel();
     model.factTypes[0]!.addConstraint({ type: "mandatory", roleId: "bogus", id: "c" });
@@ -171,6 +199,42 @@ describe("graphOf: a built graph is total", () => {
     // trivially common.
     const resolved = result.graph.resolve(model.factTypes[0]!.constraints[0]!);
     expect(resolved.commonPlayer).toBeDefined();
+  });
+
+  // A constraint's id is OPTIONAL and `addConstraint` does not mint one
+  // (only FactType's constructor does), so an index keyed by `c.id`
+  // reports "no roles" for a constraint that references real ones, on a
+  // graph that built successfully. Found by reviewing this workstream
+  // before it opened; it is the silent-[] shape of barwise-928.
+  it("resolves roles for a constraint that carries no id", () => {
+    const model = simpleModel();
+    const ft = model.factTypes[0]!;
+    ft.addConstraint({ type: "mandatory", roleId: ft.roles[0]!.id });
+
+    const result = graphOf(model);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const idless = ft.constraints.find((c) => !c.id)!;
+    expect(idless).toBeDefined();
+    expect(result.graph.rolesOf(idless).map((r) => r.id)).toEqual([ft.roles[0]!.id]);
+    expect(result.graph.resolve(idless).roles.length).toBe(1);
+  });
+
+  it("reports an id-less constraint's dangling reference against its fact type", () => {
+    const model = simpleModel();
+    const ft = model.factTypes[0]!;
+    ft.addConstraint({ type: "mandatory", roleId: "bogus" });
+
+    const result = graphOf(model);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    // Not "", which no reader could act on.
+    expect(result.unresolved).toContainEqual({
+      from: { kind: "constraint", id: ft.id },
+      field: "roleIds",
+      missing: "bogus",
+    });
   });
 
   it("exposes the adjacency walk and the subtype relation", () => {

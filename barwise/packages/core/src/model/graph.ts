@@ -107,6 +107,20 @@ export function graphOf(model: OrmModel): GraphResult {
   const factTypeOfRole = new Map<string, FactType>();
   for (const ft of model.factTypes) {
     for (const role of ft.roles) {
+      // A duplicate role id is not an unresolvable reference but an
+      // AMBIGUOUS one, and it defeats totality just as thoroughly: an
+      // id-keyed index keeps the last writer, so `factTypeOf` would
+      // answer confidently for the wrong fact type. Nothing else in the
+      // repo reports this -- structural.ts guards duplicate NAMES, not
+      // ids -- so the graph refuses rather than answering wrongly.
+      if (roleById.has(role.id)) {
+        unresolved.push({
+          from: { kind: "role", id: role.id },
+          field: "id",
+          missing: role.id,
+        });
+        continue;
+      }
       roleById.set(role.id, role);
       factTypeOfRole.set(role.id, ft);
     }
@@ -134,16 +148,25 @@ export function graphOf(model: OrmModel): GraphResult {
   }
 
   // Constraint -> roles, and the reverse index.
-  const rolesOfConstraint = new Map<string, Role[]>();
+  // Keyed by the constraint OBJECT, not by `c.id`. `Constraint.id` is
+  // optional and `FactType.addConstraint` does not mint one (only the
+  // constructor does), so an id-keyed index silently reports "no roles"
+  // for a constraint that references real ones -- the same silent-[]
+  // failure barwise-928 was about, which is why this is not keyed the
+  // obvious way.
+  const rolesOfConstraint = new Map<Constraint, Role[]>();
   const constraintsByRole = new Map<string, Constraint[]>();
   for (const ft of model.factTypes) {
     for (const c of ft.constraints) {
+      // A constraint without an id is reported against its fact type,
+      // which is the nearest element a reader can actually find.
+      const reportedId = c.id ?? ft.id;
       const resolved: Role[] = [];
       for (const roleId of roleIdsOf(c)) {
         const role = roleById.get(roleId);
         if (!role) {
           unresolved.push({
-            from: { kind: "constraint", id: c.id ?? "" },
+            from: { kind: "constraint", id: reportedId },
             field: "roleIds",
             missing: roleId,
           });
@@ -154,7 +177,7 @@ export function graphOf(model: OrmModel): GraphResult {
         if (list) list.push(c);
         else constraintsByRole.set(role.id, [c]);
       }
-      if (c.id) rolesOfConstraint.set(c.id, resolved);
+      rolesOfConstraint.set(c, resolved);
     }
   }
 
@@ -203,7 +226,7 @@ export function graphOf(model: OrmModel): GraphResult {
   const graph: ModelGraph = {
     player: (role) => playerOfRole.get(role.id)!,
     factTypeOf: (role) => factTypeOfRole.get(role.id)!,
-    rolesOf: (c) => (c.id ? rolesOfConstraint.get(c.id) ?? [] : []),
+    rolesOf: (c) => rolesOfConstraint.get(c) ?? [],
     constraintsOn: (role) => constraintsByRole.get(role.id) ?? [],
     rolesPlayedBy: (ot) => rolesByPlayer.get(ot.id) ?? [],
     populationsOf: (ft) => model.populationsForFactType(ft.id),
@@ -211,7 +234,7 @@ export function graphOf(model: OrmModel): GraphResult {
     subtypesOf: (ot) => model.subtypesOf(ot.id),
     hopsFrom: (ot) => hopsFrom(model, ot.id),
     resolve: (c) => {
-      const roles = c.id ? rolesOfConstraint.get(c.id) ?? [] : [];
+      const roles = rolesOfConstraint.get(c) ?? [];
       const resolvedRoles: ResolvedRole[] = roles.map((role) => ({
         role,
         player: playerOfRole.get(role.id)!,
