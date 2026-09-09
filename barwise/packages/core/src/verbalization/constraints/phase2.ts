@@ -16,7 +16,7 @@ import {
   type Verbalization,
   type VerbalizationSegment,
 } from "../Verbalization.js";
-import { extractPredicate, resolveCommonPlayer } from "./sentence.js";
+import { extractPredicate, localRole, resolveCommonPlayer } from "./sentence.js";
 
 export function verbalizeDisjunctiveMandatory(
   roleIds: readonly string[],
@@ -193,10 +193,10 @@ export function verbalizeRing(
   factType: FactType,
   model: OrmModel,
 ): Verbalization {
-  const role1 = factType.getRoleById(roleId1);
-  const ot = role1 ? model.getObjectType(role1.playerId) : undefined;
-  const typeName = ot?.name ?? role1?.name ?? roleId1;
-  const typeId = role1?.playerId ?? roleId1;
+  const role1 = localRole(factType, roleId1);
+  const ot = model.getObjectType(role1.playerId);
+  const typeName = ot?.name ?? role1.name;
+  const typeId = role1.playerId;
   const name1 = refSeg(typeName + "1", typeId);
   const name2 = refSeg(typeName + "2", typeId);
   const name3 = refSeg(typeName + "3", typeId);
@@ -387,9 +387,9 @@ export function verbalizeGenericFrequency(
   factType: FactType,
   model: OrmModel,
 ): Verbalization {
-  const role = factType.getRoleById(roleId);
-  const ot = role ? model.getObjectType(role.playerId) : undefined;
-  const name = ot?.name ?? role?.name ?? roleId;
+  const role = localRole(factType, roleId);
+  const ot = model.getObjectType(role.playerId);
+  const name = ot?.name ?? role.name;
 
   let quantifier: string;
   if (max === "unbounded") {
@@ -402,7 +402,7 @@ export function verbalizeGenericFrequency(
 
   return buildVerbalization(factType.id, "constraint", [
     kwSeg("Each "),
-    refSeg(name, role?.playerId ?? roleId),
+    refSeg(name, role.playerId),
     textSeg(` participates ${quantifier} in `),
     textSeg(factType.name),
     textSeg("."),
@@ -426,9 +426,9 @@ function verbalizeMultiRoleFrequency(
   model: OrmModel,
 ): Verbalization {
   const names = roleIds.map((rid) => {
-    const role = factType.getRoleById(rid);
-    const ot = role ? model.getObjectType(role.playerId) : undefined;
-    return ot?.name ?? role?.name ?? rid;
+    const role = localRole(factType, rid);
+    const ot = model.getObjectType(role.playerId);
+    return ot?.name ?? role.name;
   });
 
   let quantifier: string;
@@ -464,18 +464,18 @@ export function verbalizeValueComparison(
   factType: FactType,
   model: OrmModel,
 ): Verbalization {
-  const role1 = factType.getRoleById(roleId1);
-  const role2 = factType.getRoleById(roleId2);
+  const role1 = localRole(factType, roleId1);
+  const role2 = localRole(factType, roleId2);
   const ot1 = role1 ? model.getObjectType(role1.playerId) : undefined;
   const ot2 = role2 ? model.getObjectType(role2.playerId) : undefined;
-  const name1 = ot1?.name ?? role1?.name ?? roleId1;
-  const name2 = ot2?.name ?? role2?.name ?? roleId2;
+  const name1 = ot1?.name ?? role1.name;
+  const name2 = ot2?.name ?? role2.name;
   const phrase = VALUE_COMPARISON_PHRASES[operator] ?? operator;
 
   return buildVerbalization(factType.id, "constraint", [
-    refSeg(name1, role1?.playerId ?? roleId1),
+    refSeg(name1, role1.playerId),
     textSeg(` must be ${phrase} `),
-    refSeg(name2, role2?.playerId ?? roleId2),
+    refSeg(name2, role2.playerId),
     textSeg("."),
   ]);
 }
@@ -515,16 +515,16 @@ export function verbalizeCardinality(
   factType: FactType,
   model: OrmModel,
 ): Verbalization {
-  const role = factType.getRoleById(roleId);
-  const ot = role ? model.getObjectType(role.playerId) : undefined;
-  const typeName = ot?.name ?? role?.name ?? roleId;
+  const role = localRole(factType, roleId);
+  const ot = model.getObjectType(role.playerId);
+  const typeName = ot?.name ?? role.name;
   const predicate = unaryPredicate(factType);
   const quantifier = cardinalityQuantifier(min, max);
 
   return buildVerbalization(factType.id, "constraint", [
     textSeg(`The '${predicate}' role is played by `),
     kwSeg(`${quantifier} `),
-    refSeg(typeName, role?.playerId ?? roleId),
+    refSeg(typeName, role.playerId),
     textSeg(" instances."),
   ]);
 }

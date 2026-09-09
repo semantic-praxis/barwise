@@ -534,6 +534,25 @@ function findAnchorRole(
 }
 
 /** Find the fact type and role for a role id. */
+/**
+ * The role and its fact type, found by scanning the model.
+ *
+ * The graph indexes exactly this, and `model-graph-and-id-spaces.spec.md`
+ * WS5 listed replacing the scan. It is deliberately still a scan. Using
+ * `ModelGraph` would mean adding a `role(id) -> Role | undefined`
+ * accessor beside the total `role(id) -> Role`, because counterexample
+ * generation is best-effort -- each of the five call sites answers a
+ * miss with "no counterexample for this constraint" and moves on, rather
+ * than refusing the model, which would also stop it generating
+ * counterexamples for the constraints that ARE sound. Widening a
+ * deliberately total interface with the fallible accessor it exists to
+ * remove is a worse trade than a scan over a few hundred roles, and the
+ * repo's DRY rule prefers the small parallel index to the abstraction
+ * that makes one side bend.
+ *
+ * If this ever shows up in a profile, the fix is a local map built once
+ * per generation, not a change to `ModelGraph`.
+ */
 function findRoleById(
   model: OrmModel,
   roleId: string,

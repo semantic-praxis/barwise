@@ -657,3 +657,48 @@ export function joinOperandsOf(c: Constraint): readonly JoinOperand[] {
       return c.operands;
   }
 }
+
+/**
+ * Whether every role a constraint names must belong to the fact type
+ * that carries it.
+ *
+ * Most constraints are local, but the exceptions are not an oversight
+ * -- they are the point of those kinds. An external uniqueness
+ * constraint that is entirely local is the anomaly, and
+ * `constraint/external-uniqueness-all-local` reports it. Exclusion,
+ * subset, equality, exclusive-or and disjunctive mandatory span fact
+ * types routinely, which is why `rules/population/spanning.ts` exists.
+ * Join constraints reach across by construction.
+ *
+ * So a caller cannot ask "is this role id one of the fact type's" and
+ * treat a "no" as a defect: whether it is a defect depends on the kind,
+ * and that judgement is this function.
+ *
+ * A total `Record` rather than a list of the seven, so a constraint kind
+ * added later fails to compile until someone classifies it, instead of
+ * silently defaulting to whichever answer the author of the list
+ * happened to write first.
+ */
+const REQUIRES_LOCAL_ROLES: Record<Constraint["type"], boolean> = {
+  internal_uniqueness: true,
+  mandatory: true,
+  value_constraint: true,
+  ring: true,
+  frequency: true,
+  cardinality: true,
+  value_comparison: true,
+  external_uniqueness: false,
+  disjunctive_mandatory: false,
+  exclusion: false,
+  exclusive_or: false,
+  subset: false,
+  equality: false,
+  join_subset: false,
+  join_equality: false,
+  join_exclusion: false,
+};
+
+/** See `REQUIRES_LOCAL_ROLES`. */
+export function requiresLocalRoles(c: Constraint): boolean {
+  return REQUIRES_LOCAL_ROLES[c.type];
+}

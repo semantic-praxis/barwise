@@ -78,6 +78,40 @@ describe("verbalizing a constraint that names a role of another fact type", () =
     expect(() => verbalizedText(model)).not.toThrow();
   });
 
+  it("does not wrap a malformed constraint in the deontic obligation", () => {
+    const { model, foreignRoleId } = twoFactTypes();
+    model.factTypes[0]!.addConstraint({
+      type: "mandatory",
+      roleId: foreignRoleId,
+      id: "c5",
+      modality: "deontic",
+    });
+
+    // The guard returns before `toDeontic`, deliberately: "It is
+    // obligatory that malformed: ..." would assert an obligation about a
+    // constraint that states nothing.
+    const text = verbalizedText(model);
+    expect(text).toContain("Malformed: the mandatory constraint");
+    expect(text).not.toContain("It is obligatory that malformed");
+    expect(text).not.toContain("It is obligatory that Malformed");
+  });
+
+  it("leaves the spanning kinds alone, where a non-local role is correct", () => {
+    const { model, foreignRoleId } = twoFactTypes();
+    const localRoleId = model.factTypes[0]!.roles[0]!.id;
+    // External uniqueness spanning two fact types is the normal case for
+    // that kind -- validation reports the ALL-local one as the anomaly.
+    // A guard that flagged this would be a false finding on a correct
+    // model.
+    model.factTypes[0]!.addConstraint({
+      type: "external_uniqueness",
+      roleIds: [localRoleId, foreignRoleId],
+      id: "c6",
+    });
+
+    expect(verbalizedText(model)).not.toContain("Malformed");
+  });
+
   it("still takes the binary path for a role that IS local", () => {
     const { model } = twoFactTypes();
     const localRoleId = model.factTypes[0]!.roles[1]!.id;
