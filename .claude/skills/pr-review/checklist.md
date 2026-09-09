@@ -53,6 +53,15 @@ output specification for the PR body (spec:
   downstream packages compile against the new `dist`, not the old.
 - A metamodel or serialization change bumps or handles
   `schemaVersion`.
+- **A new or widened validation rule checks a state construction could
+  refuse instead.** `structural.ts` and `population/structural.ts`
+  carry fourteen rule ids re-checking what a stricter builder would
+  rule out (`core-branching-load.spec.md`); a fifteenth is the same
+  defect wearing a rule id, not more coverage. Ask whether the check
+  belongs in the constructor before adding it as a rule. Same item as
+  "a failure the callee can rule out is not exported to its callers"
+  below, seen from the rule side. Authority: root `CLAUDE.md`, define
+  errors out of existence.
 
 ## When a type was introduced, or a field's type chosen
 
@@ -253,6 +262,18 @@ now holds, guards, or learns that they did not have to.
   existence, no golden regenerated without a reason in the commit.
 - A new test was seen failing on the defect it guards before it was
   seen passing. Authority: `session-review` skill.
+- **A fixture, `ModelBuilder`, or `fc.Arbitrary` hand-avoids a state
+  construction should refuse, rather than constructing it and
+  asserting refusal.** `tests/arbitraries/model.ts` derives ids and
+  identification-edge direction from position specifically because
+  `OrmModel.add*` will not itself refuse a dangling reference or a
+  cycle -- the workaround is a marker that the invariant lives one
+  layer too late, not evidence of careful test authoring. Name what
+  would remove it (usually: the constructor gains the check) rather
+  than polishing the workaround. Same item as "a failure the callee
+  can rule out is not exported to its callers" above, seen from the
+  test side. Authority: root `CLAUDE.md`, define errors out of
+  existence.
 
 ## When a check, gate, hook, or script was added or changed
 
