@@ -179,6 +179,53 @@ now holds, guards, or learns that they did not have to.
   which of four things went wrong. Authority:
   `docs/specs/pipeline-observability.spec.md`;
   `docs/specs/deterministic-guards.spec.md`.
+- **A parameter that exports a decision the callee could make is a
+  configuration parameter, and it moves complexity up.** Ask who can
+  choose the value better; if the answer is the callee, it decides and
+  the parameter goes. Nearest instance, not yet a defect: `lenient`
+  travels from `cli/workspace/io.ts` and `mcp/workspace/resolve.ts`
+  through `deserialize` to `addFactType` as `skipPlayerValidation`, so
+  three layers carry a choice about reference checking that the loader
+  could settle once (14 references; the WS3 spec's third open decision
+  asks whether it survives). Authority: Ousterhout ch. 8, pull
+  complexity downwards; the first instance here replaces this one.
+- **Adjacent layers have different abstractions.** A method whose
+  signature is the one it calls, a variable threaded through a layer
+  that only forwards it, or a wrapper that adds no vocabulary: each
+  layer that does not change the abstraction is a layer the reader
+  pays for and learns nothing from. Nearest instance: the same
+  `lenient` passes through `loadModel` and `deserialize` untouched
+  before anything reads it. Authority: Ousterhout ch. 7, different
+  layer, different abstraction.
+- **A general mechanism is reused, not forked for the special case.**
+  A new helper written for its one call site beside a general one it
+  could have been, or a general mechanism grown a special-case branch.
+  `roleGraph.ts` states the rule for one walk ("reuse the traversal,
+  don't fork it", ADR-0001) and `joinConstraintRules.ts:148-151`
+  validates a role path with its own `getRoleById` walk anyway;
+  `RoleHop` is referenced in no file outside `roleGraph.ts`.
+  Authority: `model/roleGraph.ts` header; Ousterhout ch. 6,
+  general-purpose modules are deeper.
+- **A class of errors is handled once, at the level that can act, and
+  never swallowed.** A `catch` per call site aggregates upward into
+  one handler; a `catch` that drops the error or returns a default
+  masks it; and a failure that escapes to the top with no context is
+  the same defect from the other side. Instance: a dangling
+  constraint-to-role reference reaches `barwise verbalize` as "Cannot
+  read properties of undefined (reading 'playerId')", exit 1 (PR
+  #475's review), a `TypeError` from `phase1.ts` with no layer between
+  it and the operator saying what was wrong. Authority: Ousterhout
+  ch. 10, exception aggregation and masking; root `CLAUDE.md`, define
+  errors out of existence, for the case where the error should not
+  exist at all.
+- **Knowledge is not split by when it runs.** Temporal decomposition
+  puts one fact into every stage that touches it, so a change to the
+  fact edits every stage and misses one silently. A new model field
+  needs the class, the config, the serializer twice, the schema, the
+  diff, the merge and the split, and two of those failed silently
+  (barwise-927: a merge that drops six fields). Authority:
+  `docs/specs/core-branching-load.spec.md`, Principle; Ousterhout
+  ch. 5, information hiding.
 - Two modules that both know one format or convention is the first
   item of the copy group below; run it there.
 
