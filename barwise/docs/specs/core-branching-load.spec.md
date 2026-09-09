@@ -5,14 +5,15 @@ Status: WS0 complete -- barwise-927..931 shipped (PRs #426, #428, #429,
 (ring types as algebra) shipped as barwise-935 and WS4 (exhaustiveness)
 as barwise-936, which found the sweep to be one gap rather than
 thirteen. The diff half of the 927 symptom shipped separately as
-barwise-934 (PR #438). WS2-WS3 and WS6-WS8 not implemented, WS1 partly. WS1
+barwise-934 (PR #438). WS2 and WS6-WS8 not implemented, WS1 partly; WS3 respecified in
+model-graph-and-id-spaces.spec.md (barwise-974). WS1
 regrounded 2026-09-08 against main 96369f8 (barwise-973); its radius
 was understated and two Evidenced sites have since closed -- see
 Regrounding below. WS1 step 1 (`ObjectType` as a sealed union) shipped
 2026-09-08; the remaining element kinds, `ModelBuilder` and `OrmModel`
 are not implemented.
 Created: 2026-09-06
-Last-updated: 2026-09-08
+Last-updated: 2026-09-09
 Tracking: barwise-924 (this review), barwise-973 (WS1), barwise-x4z (the wider
 functional/type analysis this partly answers), barwise-e8m (the
 functional-core commitment), barwise-923 (the hashModel bug the same
@@ -584,6 +585,18 @@ field" from eight edits into two. Depends on WS1: the table's keys are
 the record's keys.
 
 ### 3. `ModelGraph`, and the capabilities that read it
+
+**Respecified standalone in
+`docs/specs/model-graph-and-id-spaces.spec.md` (barwise-974), which is
+the authority for this workstream.** The branded-id question belongs in
+the same design and this sketch cannot carry it; regrounding also found
+three of the eight figures below wrong rather than stale -- the mapper
+has no `?? id` player fallback, `joinSegments` does not exist anywhere
+in the repository, and the two verbalization counts are understated by
+roughly four times. The dependency line at the end of this paragraph is
+also wrong: the graph does not depend on WS1, only its memoization
+does. The original sketch is kept unedited below as the record of what
+was designed before it was measured.
 
 `graphOf(model)` with the accessors sketched; `hopsFrom` moves from
 `roleGraph.ts` into it. Validation rules take the graph and lose the 13
