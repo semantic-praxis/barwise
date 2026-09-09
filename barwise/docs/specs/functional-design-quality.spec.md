@@ -1,6 +1,7 @@
 # Functional design quality: five caller-side measures for core, each a ratchet
 
-Status: Draft -- no workstream implemented
+Status: Draft -- the five open decisions resolved in review 2026-09-09
+(see Decisions); no workstream implemented
 Created: 2026-09-09
 Last-updated: 2026-09-09
 Tracking: barwise-981 (this spec); barwise-x4z (the purity half of the
@@ -15,7 +16,9 @@ caller can observe -- determinism, no escaping mutation, totality,
 knowable domains stated as types, and law coverage -- each as a check
 with a baseline that moves in one direction, and not by size or syntax
 counts, because size predicts churn rather than defects and syntax
-counts reward style over substance.
+counts reward style over substance. Beside the five, Sarkar's
+API-based modularization measure replaces the raw export count as the
+interface instrument (Decisions).
 
 The measurements below were taken on 2026-09-09 against main `a3c6a86`.
 Every number is reproducible from the command that produced it, and
@@ -82,20 +85,27 @@ In scope, stated as requirements:
 
 - When `npm run audit:functional -- --check` runs, the system shall
   fail on a detected candidate absent from `functional-baseline.json`
-  AND on a baseline entry no longer detected, for each of three
+  AND on a baseline entry no longer detected, for each of four
   detectors: `invariant` (a comment carrying invariant vocabulary over
   a type in `packages/core/src/model`), `throw` (a `throw` site in
   `packages/core/src` classified as lookup, construction, boundary or
-  removal-guard), and `law` (a capability directory under
-  `packages/core/src` with no test under `packages/core/tests/laws`).
+  removal-guard, plus each by-id lookup method on `OrmModel` typed
+  `T | undefined` with its call-site count), `law` (a capability
+  directory under `packages/core/src` with no test under
+  `packages/core/tests/laws`), and `api` (a cross-directory import
+  inside `packages/core/src` that does not go through the target
+  directory's `index.ts`).
 - When `npm run lint` runs over `packages/core/src`, the system shall
   fail on assignment to a parameter or to a property of one
   (`no-param-reassign` with `props: true`), with no baseline: the two
   sites that exist are fixed in the same workstream.
 - When `npm run lint` runs over `packages/core/src`, the system shall
-  fail on a function parameter typed as a mutable container (`T[]`,
-  `Array<T>`, `Map`, `Set`, `Record`) that is absent from the lint
-  baseline, and on a baseline entry no longer needed.
+  fail on a function parameter or declared return type typed as a
+  mutable container (`T[]`, `Array<T>`, `Map`, `Set`, `Record`) that is
+  absent from `eslint-suppressions.json`, and on a suppression no
+  longer used. ESLint 10.9.1 does both: an unused suppression exits 2
+  naming `--prune-suppressions`, a new violation exits 1, and a count
+  exceeded surfaces every violation in that file (verified 2026-09-09).
 - When any of the checks above fails, the system shall print the
   candidate's stable key, the file, and the sentence that says what to
   do (fix, or classify in the baseline with an issue), matching
@@ -118,8 +128,9 @@ Out of scope, and where it lives instead:
   `core-branching-load.spec.md` WS1; this spec measures the gap those
   close.
 - A `Result` type and a migration of throw sites to it. This spec
-  classifies and ratchets the sites; what replaces them is an Open
-  decision that waits on the classification.
+  classifies and ratchets the sites; what replaces them is settled in
+  Decisions (nothing: the sealed record defines them out), and the
+  deletion itself is `core-branching-load` WS1's.
 - Any rule against loops. See Alternatives.
 - The ReScript adoption decision. The measures here are the
   TypeScript side of that experiment's criteria; the experiment reads
@@ -127,16 +138,17 @@ Out of scope, and where it lives instead:
 
 ## Inventory
 
-| Property                          | Instrument today                               | Measured 2026-09-09                                                                                                                                  | Verdict                                         |
-| --------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| Determinism                       | `scripts/check-core-purity.mjs`                | 0 violations                                                                                                                                         | stays; the floor                                |
-| No escaping mutation: assignment  | none                                           | 2 sites, both `renderers/openapi.ts` (rebinding the `path` parameter)                                                                                | hard rule, WS2                                  |
-| No escaping mutation: input types | none                                           | 39 of 1,762 parameters typed as a mutable container; 90 typed readonly; 464 untyped (inferred)                                                       | ratchet, WS2                                    |
-| Totality                          | none                                           | 95 `throw` sites: 50 construction, 28 boundary, 8 lookup, 6 removal-guard, 3 impossibility                                                           | classify and ratchet, WS3                       |
-| Knowable domains as types         | `core-branching-load` evidenced sites, by hand | 88 comment lines carrying invariant vocabulary over `src/model`; 36 in `Constraint.ts` (provisional: crude word list)                                | ratchet, WS1                                    |
-| Law coverage                      | `tests/laws/`, by hand                         | 5 laws over 5 capabilities (serialization, merge, counterexample, sample population, mapper); 17 top-level directories, not all of them capabilities | ratchet, WS4                                    |
-| Interface size                    | none                                           | 167 names exported from `src/index.ts`                                                                                                               | record in the report only; no ratchet           |
-| Module-level mutable state        | none                                           | 1 site: `model/id.ts` `installedGenerator`, the id-generator install hook                                                                            | accept in baseline; it is the seam the laws use |
+| Property                           | Instrument today                                      | Measured 2026-09-09                                                                                                                                                                  | Verdict                                             |
+| ---------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| Determinism                        | `scripts/check-core-purity.mjs`                       | 0 violations                                                                                                                                                                         | stays; the floor                                    |
+| No escaping mutation: assignment   | none                                                  | 2 sites, both `renderers/openapi.ts` (rebinding the `path` parameter)                                                                                                                | hard rule, WS2                                      |
+| No escaping mutation: input types  | none                                                  | 39 of 1,762 parameters typed as a mutable container; 90 typed readonly; 464 untyped (inferred)                                                                                       | ratchet, WS2                                        |
+| No escaping mutation: return types | none                                                  | 119 of 1,071 functions declare a mutable-container return; 24 readonly; 414 inferred; 68 of the 119 are `Diagnostic[]` in `validation`                                               | ratchet, WS2                                        |
+| Totality                           | none                                                  | 95 `throw` sites: 50 construction, 28 boundary, 8 lookup, 6 removal-guard, 3 impossibility; 9 by-id lookups on `OrmModel` typed `T \| undefined`, 220 call sites across the packages | classify and ratchet, WS3                           |
+| Knowable domains as types          | `core-branching-load` evidenced sites, by hand        | 88 comment lines carrying invariant vocabulary over `src/model`; 36 in `Constraint.ts` (provisional: crude word list)                                                                | ratchet, WS1                                        |
+| Law coverage                       | `tests/laws/`, by hand                                | 5 laws over 5 capabilities (serialization, merge, counterexample, sample population, mapper); 17 top-level directories, not all of them capabilities                                 | ratchet, WS4                                        |
+| Interface (Sarkar)                 | the `exports` map, 10 entries, enforced for consumers | inside core, 240 cross-directory imports, 0 through a directory `index.ts`; 10 of 17 directories have one; 167 names from `src/index.ts`                                             | `api` detector, WS5; the raw count is recorded only |
+| Module-level mutable state         | none                                                  | 1 site: `model/id.ts` `installedGenerator`, the id-generator install hook                                                                                                            | accept in baseline; it is the seam the laws use     |
 
 The 95 throw sites classify by what the caller can do about them.
 Construction (50) is `createObjectType` refusing an empty name or an
@@ -144,11 +156,18 @@ entity without a reference mode: the parse boundary, where a throw is
 the honest answer to malformed input. Boundary (28) is the same thing
 one layer out: `QueryParseError`, `ModelSplitError`,
 `DeserializationError`. Impossibility (3) is `assertNever` and the two
-range checks in `id.ts`. The 14 that matter for totality are the lookup
-throws (`Fact type with id "x" not found`, 8 sites on `OrmModel`) and
-the removal guards (6 sites: `Cannot remove object type: it is
-referenced by`). Those are domain outcomes a caller has to expect, and
-today nothing in a signature says so.
+range checks in `id.ts`. The 14 that matter for totality are the eight `not found` throws and
+the six removal guards, and grounding them changed their shape: all 14
+sit on `OrmModel`'s mutating methods (`removeObjectType`,
+`removeFactType`, `removeSubtypeFact`, `removeObjectifiedFactType`,
+`removePopulation`, `removeDiagramLayout`, `updateDiagramLayout`), and
+outside core one caller uses that API (`learn`'s `forbidsPopulation`
+check, through `removePopulation`). The getters do not throw: nine
+by-id lookups on `OrmModel` return `T | undefined`, with 220 call
+sites across the packages (123 of them `getObjectType`), each guarding
+a state `structural/dangling-role-reference` already refuses. That is
+the same totality gap in a different costume, and the Decisions below
+count it as the same debt.
 
 The 464 untyped parameters are arrow-function callbacks whose type is
 inferred from the collection they iterate. They are not a gap: an
@@ -168,14 +187,19 @@ barwise/scripts/audit-functional.mjs          three detectors, one report, one b
   throw       a `throw` in packages/core/src, classified by the error class and message:
               construction | boundary | impossibility (accepted-benign by rule)
               lookup | removal-guard (tracked: each row names its issue)
+              plus each by-id lookup on OrmModel typed T | undefined, with its call-site
+              count (tracked against model-graph-and-id-spaces.spec.md)
   law         a top-level directory of packages/core/src with no matching
               tests/laws/<name>.law.test.ts; keyed by directory name
+  api         a cross-directory import inside packages/core/src that does not resolve to
+              the target directory's index.ts; keyed by importing file + target directory
 barwise/functional-baseline.json              every candidate carries a verdict:
                                               accepted-benign or tracked:<issue>
 barwise/eslint.config.mjs                     a block scoped to packages/core/src/**/*.ts:
   no-param-reassign: ["error", { props: true }]
-  functional/prefer-immutable-types: parameters ReadonlyShallow, returns off (Decisions)
-barwise/eslint-suppressions.json              the 39 sites, pruned as they close (Decisions)
+  functional/prefer-immutable-types: parameters and returns ReadonlyShallow (Decisions)
+barwise/eslint-suppressions.json              the 39 parameter and 119 return sites, written once with
+                                              --suppress-all; an unused entry exits 2 (verified)
 .github/workflows/ci.yml                      `npm run audit:functional -- --check` beside
                                               audit:duplication, so ci-local.mjs derives it
 barwise/scripts/defect-correlation.mjs        churn + size + the five measures per file,
@@ -224,8 +248,8 @@ package records its own answer in that spec's Inventory.
 
 ## Workstreams (each independently shippable)
 
-Ordered by blast radius. WS1 through WS4 touch scripts, config and
-tests only and change no behaviour. WS5 changes public types. WS6 is
+Ordered by blast radius. WS1 through WS5 touch scripts, config and
+tests only and change no behaviour. WS6 changes public types. WS7 is
 analysis.
 
 ### 1. The `invariant` detector and the baseline
@@ -259,8 +283,12 @@ the rule is the one that matters and it should never acquire a first
 entry.
 Then `eslint-plugin-functional` (v10, ESLint 10; a devDependency that
 solves a real problem, not a trivial one) with `prefer-immutable-types`
-enforcing `ReadonlyShallow` on parameters only, and the 39 existing
-sites in a baseline.
+enforcing `ReadonlyShallow` on parameters and return types, and the
+158 existing sites (39 parameters, 119 returns) in
+`eslint-suppressions.json`, written once with `--suppress-all`. Of the
+119 returns, 68 are `Diagnostic[]` from the validation rules; typing
+those `readonly Diagnostic[]` is one mechanical change whose consumer
+radius (`push` and spread sites) WS2 counts before it starts.
 
 The baseline is expected to shrink in three moves, none of them lint
 fixes. `RelationalMapper`'s 14 sites thread `Map<string, MutableTable>`
@@ -275,14 +303,16 @@ that one is a local change to return the array, and it lands here.
 
 Classification by error class and message, as in the Inventory, with
 construction, boundary and impossibility accepted by rule and every
-lookup and removal-guard site a tracked row. The detector fails on a
-new lookup or removal-guard throw, so the count of "the caller cannot
-see this in the signature" sites only falls. What the tracked sites
-become is the Open decision below; `model-graph-and-id-spaces.spec.md`
-shipped `graphOf`, whose `GraphResult` is `{ ok: true, graph }` or
-`{ ok: false, unresolved }` rather than a throw, and the eight
-`OrmModel` lookups are candidates to route through it (provisional:
-which callers of the lookups already hold a graph is not yet counted).
+lookup and removal-guard site a tracked row. The detector also counts
+each by-id lookup on `OrmModel` typed `T | undefined` with its
+call sites, one tracked row per method. It fails on a new site of
+either kind, so the count of "the caller cannot see this in the
+signature" only falls. What the rows become is settled (Decisions):
+the 14 throws are deleted with the mutable removal API by
+`core-branching-load` WS1, and the lookup rows close as
+`model-graph-and-id-spaces.spec.md`'s resolve-once work gives callers
+references instead of ids. Nothing in this workstream migrates a site;
+it makes the debt visible and one-directional.
 
 ### 4. The `law` detector
 
@@ -298,7 +328,23 @@ a model and its serialization round-trip agree; every constraint
 verbalizes to a non-empty sentence whose reading order is the fact
 type's; `describe` of a model equals `describe` of its round-trip.
 
-### 5. Three constraint types tightened (provisional: not yet grounded)
+### 5. The `api` detector
+
+Sarkar, Rama and Kak measure modularization by whether inter-module
+calls go through declared interfaces. The module grain that has
+interfaces here is the top-level directory of `packages/core/src`: ten
+carry an `index.ts`, and the package's `exports` map exposes nine of
+them as subpaths. The detector keys each cross-directory import by
+importing file and target directory; a candidate is one that does not
+resolve to the target's `index.ts`. Today that is all 240, 197 of them
+into `model`, which has no index because the sealed record
+(`core-branching-load` WS1) is what its public surface will be. A
+directory gaining an index and its importers rerouting removes rows;
+the first baseline accepts `model` and `util` until WS1 lands there.
+Cross-package imports are not counted: the `exports` map and
+`depcruise` already make a non-API import fail to resolve.
+
+### 6. Three constraint types tightened (provisional: not yet grounded)
 
 Separate PRs, in this order, each removing rows from the WS1 baseline:
 
@@ -323,11 +369,11 @@ Separate PRs, in this order, each removing rows from the WS1 baseline:
 Whether these three belong here or in `core-branching-load` WS1 is an
 Open decision.
 
-### 6. The correlation on our own history
+### 7. The correlation on our own history
 
 `scripts/defect-correlation.mjs`: per file under `packages/core/src`,
 lines, commits touching it (Graves), relative churn (Nagappan and
-Ball), and the five measures; against it, the beads issues labelled
+Ball), and the measures above; against it, the beads issues labelled
 `defect` whose closing commit touched the file. Spearman and Kendall,
 as the paper used, because the distributions are skewed. Output is a
 dated point-in-time report under `docs/`. It runs by hand, not in CI;
@@ -337,9 +383,9 @@ the file level across the whole history rather than one week's.
 
 ## API and migration impact
 
-- WS1 through WS4 and WS6 change no public export. WS2 adds a
+- WS1 through WS4 and WS7 change no public export. WS2 adds a
   devDependency and a suppressions file at `barwise/`.
-- WS5 changes `Constraint` types exported from `@barwise/core`. The
+- WS6 changes `Constraint` types exported from `@barwise/core`. The
   build fans out to `formats`, `dbt`, `llm`, `diagram` and `vscode`
   (the `roleIds` readers) and the compiler enumerates every site. Run
   `npm run build` from `barwise/` before any per-package type-check,
@@ -347,37 +393,46 @@ the file level across the whole history rather than one week's.
 - No surface (CLI, MCP, VS Code) gains or loses a capability; the
   capability matrix is untouched.
 
-## Open decisions (for review)
+## Decisions (resolved in review, 2026-09-09)
 
-- **Lint baseline mechanism.** ESLint's bulk suppressions
-  (`eslint-suppressions.json`, `--suppress-all`, `--prune-suppressions`)
-  versus a custom count-per-file baseline in the audit script. The
-  suppressions file is the tool's own and needs no code; the question
-  is whether an unused suppression fails the run, which is what makes
-  it a ratchet rather than an allowlist. Recommend suppressions if WS2
-  confirms that on ESLint 10; otherwise the custom baseline, which
-  already has that property.
-- **What the tracked throws become.** Options: a hand-rolled
-  `Result<T, E>` in `core/util`; returning `Diagnostic[]` the way
-  validation does; routing lookups through `graphOf`'s `{ ok,
-  unresolved }`; or a library (`neverthrow`). Recommend deciding after
-  WS3's classification is a baseline, and aligning with the builder's
-  `buildResult` shape from `core-branching-load` so core has one
-  failure shape, not two. No library: the shape is ten lines.
-- **Where WS5 lands.** Here as three small PRs, or folded into
-  `core-branching-load` WS1. Recommend here: WS1 there is the element
-  kinds and the builder, and these three are constraint-local with
-  their own radius.
-- **`prefer-immutable-types` on return types.** Parameters answer "is
-  my input mutated"; returns answer "may I mutate what I got". The
-  second is the other half of the caller-side property and a larger
-  radius (every `Diagnostic[]` return). Recommend parameters only now,
-  returns as a follow-up row once the parameter baseline is empty.
-- **An interface-size ratchet.** The paper's one directional finding
-  is that a larger public interface correlated with shorter fix time,
-  at n=12. Recommend recording the 167 in the WS6 report and not
-  ratcheting it; Sarkar et al.'s API-based modularization metrics are
-  the better instrument if one is ever wanted.
+Each was an open decision in the first draft. The resolution, and what
+settled it.
+
+- **Lint baseline mechanism: ESLint's suppressions file.** Settled by
+  experiment on 10.9.1 with a scratch config over `packages/core/src`:
+  `--suppress-all` wrote the two `openapi.ts` sites with counts; a
+  planted stale entry made the run exit 2 with a message naming
+  `--prune-suppressions`; a new violation in an unsuppressed file
+  exited 1; a third violation in a file suppressed at count 2 surfaced
+  all three. Both directions are loud, which is the ratchet property,
+  and no custom baseline is needed.
+- **What the tracked throws become: nothing, they are defined out.**
+  All 14 sit on the mutable removal API with one external caller.
+  Under the sealed-record design (`core-branching-load` WS1) removal
+  is constructing a new value: removing an absent id yields the same
+  value, and a removal that leaves a dangling reference yields a
+  document validation diagnoses. WS3 ratchets the 14 until that
+  workstream deletes the API; a site that survives it takes the
+  builder's ok/fail union. No `Result` type, no `Diagnostic[]` return,
+  no library. The reviewer added the `T | undefined` lookups as the
+  same debt: WS3 counts the nine methods and their 220 call sites,
+  tracked against `model-graph-and-id-spaces.spec.md`, and each row
+  closes as its callers come to hold references.
+- **Where the constraint type tightenings land: here, as three PRs**
+  (WS6). Branching-load WS1 is the element kinds and the builder;
+  these are constraint-local with their own radius.
+- **`prefer-immutable-types` on returns: both halves from the start.**
+  One suppressions file and one migration, 158 entries to begin with.
+- **Interface size: Sarkar's API-based measure, not the raw count.**
+  Core's `exports` map declares ten entry points and Node resolution
+  enforces them for consumers, so at the package grain the API-based
+  measure is 100 percent by construction. Inside core it is not: 240
+  cross-directory imports, none through a directory's `index.ts`, and
+  7 of the 17 directories have no index at all (`model`, `validation`,
+  `serialization`, `util`, `format`, `import`, `export`). That is what
+  the `api` detector (WS5) ratchets, and it says something the raw
+  count cannot: core is one module with directories, not modules with
+  interfaces. The 167 stays recorded in the WS7 report.
 
 ## Risks and testing
 
@@ -386,12 +441,12 @@ the file level across the whole history rather than one week's.
   enumerating gates (barwise-905, -906).
 - Both directions of every baseline are loud, so closing a finding
   forces removing its row and closing its issue, as with
-  `audit-baseline.json`. The cost is that WS5 and the
+  `audit-baseline.json`. The cost is that WS6 and the
   `core-branching-load` workstreams each carry a baseline edit; that is
   the point.
 - WS2's two code changes are local rebindings; the openapi renderer
   tests and the `formats` package tests cover the renderer output.
-- WS5 is the only behaviour-adjacent change: a required `id` changes
+- WS6 is the only behaviour-adjacent change: a required `id` changes
   what the serializer writes for a constraint that had none, which the
   serialization law (`tests/laws/serialization.law.test.ts`) and the
   example-output drift test will show.
@@ -420,13 +475,13 @@ publisher pages on 2026-09-09.
 | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------- |
 | Harrison, Samaraweera, Dobie, Lewis 1995, "Measuring the Quality of Functional Programs" | Size and call counts predict modification requests and felt complexity, not errors  | the resolved question above                  |
 | Harrison et al. 1996, Software Engineering Journal                                       | Same programs in SML and C++: no difference on direct quality measures              | why language is not the measure              |
-| Kitchenham, Pfleeger, Fenton 1995, IEEE TSE                                              | What a validated measure needs: attribute, unit, instrument, relation to an outcome | WS6                                          |
+| Kitchenham, Pfleeger, Fenton 1995, IEEE TSE                                              | What a validated measure needs: attribute, unit, instrument, relation to an outcome | WS7                                          |
 | El Emam, Benlarbi, Goel, Rai 2001, IEEE TSE                                              | After controlling for size, 4 of 24 design metrics relate to faults                 | no size ratchet                              |
-| Graves, Karr, Marron, Siy 2000, IEEE TSE                                                 | Change history out-predicts product metrics                                         | WS6's churn columns                          |
-| Nagappan and Ball 2005, ICSE                                                             | Relative churn predicts defect density; absolute churn does not                     | WS6                                          |
+| Graves, Karr, Marron, Siy 2000, IEEE TSE                                                 | Change history out-predicts product metrics                                         | WS7's churn columns                          |
+| Nagappan and Ball 2005, ICSE                                                             | Relative churn predicts defect density; absolute churn does not                     | WS7                                          |
 | Di Penta et al. 2024, Empirical Software Engineering                                     | Functional constructs in Python have higher fix-inducing odds                       | no loop rule                                 |
 | Moseley and Marks 2006, Out of the Tar Pit                                               | Mutable state is the main accidental complexity; confine it to the edges            | WS2                                          |
 | Turner 2004, JUCS, Total Functional Programming                                          | Totality as a design discipline                                                     | WS3                                          |
 | Claessen and Hughes 2000, ICFP; Goldstein et al. 2024, ICSE                              | Laws over generated inputs; why practitioners do and do not write them              | WS4                                          |
-| Gao, Bird, Barr 2017, ICSE                                                               | Method: check out the fixed bug, add types, see whether the checker catches it      | the ReScript criteria, and WS6's defect join |
+| Gao, Bird, Barr 2017, ICSE                                                               | Method: check out the fixed bug, add types, see whether the checker catches it      | the ReScript criteria, and WS7's defect join |
 | Sarkar, Rama, Kak 2007, IEEE TSE                                                         | API-based modularization metrics                                                    | the interface-size decision                  |
