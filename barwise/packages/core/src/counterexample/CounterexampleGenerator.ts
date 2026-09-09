@@ -533,7 +533,6 @@ function findAnchorRole(
   return descendant;
 }
 
-/** Find the fact type and role for a role id. */
 /**
  * The role and its fact type, found by scanning the model.
  *

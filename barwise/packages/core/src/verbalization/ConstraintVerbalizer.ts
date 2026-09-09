@@ -64,7 +64,13 @@ function verbalizeMalformedConstraint(
   foreignRoleIds: readonly string[],
 ): Verbalization {
   const plural = foreignRoleIds.length > 1;
-  return buildVerbalization(constraint.id ?? factType.id, "constraint", [
+  // `factType.id`, as every other constraint row in phase1 and phase2
+  // passes. `constraint.id ?? factType.id` would put two id spaces in
+  // one field depending on whether the constraint happened to carry an
+  // id, and `barwise verbalize --format json` emits it: a consumer
+  // resolving rows with `getFactType(sourceElementId)` would get
+  // `undefined` for exactly the malformed ones.
+  return buildVerbalization(factType.id, "constraint", [
     kwSeg("Malformed: "),
     textSeg(`the ${KIND_NAME[constraint.type]} constraint on `),
     refSeg(factType.name, factType.id),

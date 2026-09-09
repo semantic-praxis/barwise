@@ -466,8 +466,8 @@ export function verbalizeValueComparison(
 ): Verbalization {
   const role1 = localRole(factType, roleId1);
   const role2 = localRole(factType, roleId2);
-  const ot1 = role1 ? model.getObjectType(role1.playerId) : undefined;
-  const ot2 = role2 ? model.getObjectType(role2.playerId) : undefined;
+  const ot1 = model.getObjectType(role1.playerId);
+  const ot2 = model.getObjectType(role2.playerId);
   const name1 = ot1?.name ?? role1.name;
   const name2 = ot2?.name ?? role2.name;
   const phrase = VALUE_COMPARISON_PHRASES[operator] ?? operator;

@@ -34,8 +34,20 @@ const SPANNING_VERBALIZERS = new Set([
   "verbalizeEquality",
 ]);
 
-const FALLBACK = /\?\?\s*(roleId\b|rid\b|roleIds1?\[|roleIds2\[|subsetRoleIds\[|supersetRoleIds\[)/;
-const FUNCTION = /^(?:export )?function (verbalize\w+)/;
+// `roleId[12]?` and not `roleId\b`: the ring and value-comparison
+// verbalizers spell their parameters `roleId1`/`roleId2`, and `\b` does
+// not match before a digit, so the first version of this gate was blind
+// to exactly two of the seven kinds it exists to cover. Planting
+// `?? roleId1` in `verbalizeValueComparison` left it green.
+const FALLBACK =
+  /\?\?\s*(roleId[12]?\b|rid\b|roleIds1?\[|roleIds2\[|subsetRoleIds\[|supersetRoleIds\[)/;
+// Every top-level function, not only `verbalize*`: attributing a
+// fallback to whichever `verbalize*` happens to precede it would exempt
+// a helper that sits after a spanning verbalizer and is called from a
+// local-role one. A top-level `const` ends the previous function for the
+// same reason.
+const FUNCTION = /^(?:export )?function (\w+)/;
+const TOP_LEVEL_CONST = /^(?:export )?const \w/;
 
 /** Each role-id fallback in a file, tagged with the function it sits in. */
 function fallbacksByFunction(file: string): { fn: string; line: number; text: string; }[] {
@@ -45,6 +57,7 @@ function fallbacksByFunction(file: string): { fn: string; line: number; text: st
   lines.forEach((text, i) => {
     const m = FUNCTION.exec(text);
     if (m) fn = m[1]!;
+    else if (TOP_LEVEL_CONST.test(text)) fn = "<file scope>";
     if (FALLBACK.test(text)) found.push({ fn, line: i + 1, text: text.trim() });
   });
   return found;

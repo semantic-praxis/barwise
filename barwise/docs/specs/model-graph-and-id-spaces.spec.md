@@ -756,7 +756,15 @@ the function.
   re-taking the decision, so either is usable -- but it has to be the
   same one both times, which is why the command is here rather than
   the description.
-- **What happens to the 15 `bogus` prose assertions.** The 46 is
+- **What happens to the 15 `bogus` prose assertions.** RESOLVED by
+  Workstream 5, 2026-09-09, and none of the three options below is
+  what was taken -- the answer was (d): verbalization emits an
+  explicit malformed-constraint sentence, so the model still
+  verbalizes and the broken constraint says what is wrong with it.
+  Eight of the assertions were converted to assert that sentence; the
+  exclusion one keeps its fallback assertion, because a non-local
+  role is correct for a spanning kind. The options are kept below as
+  the record of what was considered. The 46 is
   occurrences of the string, not assertions, and it mixes two
   populations. `Phase2ConstraintConsistency.test.ts` holds 11 and
   `structural.test.ts` 1: those already assert the reference is
@@ -773,12 +781,16 @@ the function.
   behaviour that will exist and it needs nothing that does not;
   (b) delete them as testing a state no supported caller reaches;
   (c) keep a subset if `skipPlayerValidation` and `lenient` survive
-  (14 references today). This is a reviewer's call because it decides
-  whether verbalizing an unvalidated model stays supported. An earlier
+  (14 references today). This was a reviewer's call because it decides
+  whether verbalizing an unvalidated model stays supported -- and it
+  does: `verbalize` is the capability that runs on models nobody has
+  validated, so refusing them was rejected in favour of (d). An earlier
   draft of this spec recommended converting them to _builder-rejection_
   tests; that was withdrawn on grounding, because the builder it named
   does not exist.
 - **Whether `graphOf` belongs in `core`'s root barrel or a subpath.**
+  RESOLVED by Workstream 2, 2026-09-09, as recommended: it ships from
+  the root barrel. The reasoning is kept below.
   The package convention puts capability modules on subpaths
   (`@barwise/core/mapping`, `/diff`) and the metamodel on the root. The
   graph is derived from the metamodel and used by capabilities, so it

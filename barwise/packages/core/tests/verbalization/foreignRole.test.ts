@@ -13,10 +13,12 @@
  * 'playerId')" and exited 1, while `barwise validate` on the same file
  * correctly reported constraint/mandatory-invalid-role.
  *
- * These tests pin only that it does not crash and that the output names
- * the offending id. What verbalization SHOULD say about a constraint
- * validation rejects is an open decision (barwise-979) -- deliberately
- * not pinned here, so taking it does not have to fight a test.
+ * These tests began by pinning only that it does not crash, while what
+ * verbalization SHOULD say about a constraint validation rejects was
+ * still open. WS5 took that decision -- an explicit malformed sentence,
+ * neither prose built from the id nor a refusal of the whole model --
+ * so this file now pins the sentence itself, and the deontic case
+ * around it (barwise-979).
  */
 import { describe, expect, it } from "vitest";
 import type { OrmModel } from "../../src/model/OrmModel.js";
