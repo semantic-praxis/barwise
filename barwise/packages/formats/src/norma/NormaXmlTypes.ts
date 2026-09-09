@@ -12,8 +12,10 @@
 /** Root document of a parsed NORMA .orm file. */
 import type { RingType } from "@barwise/core";
 
+import type { NormaId } from "./normaId.js";
+
 export interface NormaDocument {
-  readonly modelId: string;
+  readonly modelId: NormaId;
   readonly modelName: string;
   readonly entityTypes: NormaEntityType[];
   readonly valueTypes: NormaValueType[];
@@ -45,7 +47,7 @@ export interface NormaCardinalityRange {
  * owning element decides which NORMA tag it serializes under.
  */
 export interface NormaCardinality {
-  readonly id: string;
+  readonly id: NormaId;
   readonly ranges: readonly NormaCardinalityRange[];
   readonly modality?: "deontic";
 }
@@ -56,19 +58,19 @@ export interface NormaCardinality {
  * DerivationCompleteness / DerivationStorage attributes.
  */
 export interface NormaDerivationRule {
-  readonly id: string;
+  readonly id: NormaId;
   readonly completeness?: "FullyDerived" | "PartiallyDerived";
   readonly storage?: "NotStored" | "Stored";
-  readonly noteId: string;
+  readonly noteId: NormaId;
   readonly noteBody: string;
 }
 
 /** One diagram shape: a positioned object-type or fact-type box. */
 export interface NormaShape {
-  readonly id: string;
+  readonly id: NormaId;
   readonly kind: "object_type" | "fact_type";
   /** ref to the ObjectType / Fact element this shape displays. */
-  readonly subjectRef: string;
+  readonly subjectRef: NormaId;
   /** AbsoluteBounds, in NORMA's inch coordinates: x, y, width, height. */
   readonly x: number;
   readonly y: number;
@@ -78,7 +80,7 @@ export interface NormaShape {
 
 /** One ormDiagram:ORMDiagram section. */
 export interface NormaDiagram {
-  readonly id: string;
+  readonly id: NormaId;
   readonly name: string;
   readonly shapes: readonly NormaShape[];
 }
@@ -89,17 +91,17 @@ export interface NormaDiagram {
  * becomes "variable_length_text").
  */
 export interface NormaDataType {
-  readonly id: string;
+  readonly id: NormaId;
   readonly kind: string;
 }
 
 /** A NORMA EntityType element. */
 export interface NormaEntityType {
-  readonly id: string;
+  readonly id: NormaId;
   readonly name: string;
   readonly referenceMode?: string;
   readonly preferredIdentifier?: string; // ref to UniquenessConstraint id
-  readonly playedRoleRefs: readonly string[];
+  readonly playedRoleRefs: readonly NormaId[];
   readonly definition?: string;
   /** Notes > Note > Text: informal commentary distinct from Definitions. */
   readonly note?: string;
@@ -111,15 +113,15 @@ export interface NormaEntityType {
 
 /** A NORMA ValueType element. */
 export interface NormaValueType {
-  readonly id: string;
+  readonly id: NormaId;
   readonly name: string;
-  readonly playedRoleRefs: readonly string[];
+  readonly playedRoleRefs: readonly NormaId[];
   readonly definition?: string;
   /** Notes > Note > Text: informal commentary distinct from Definitions. */
   readonly note?: string;
   readonly valueConstraint?: NormaValueConstraintInline;
   /** Reference to a NormaDataType id from the DataTypes section. */
-  readonly dataTypeRef?: string;
+  readonly dataTypeRef?: NormaId;
   /** DefaultValue element: the declared default for this value type. */
   readonly defaultValue?: string;
   /** Length parameter from ConceptualDataType (e.g. VARCHAR length). */
@@ -148,12 +150,12 @@ export interface NormaValueConstraintInline {
 
 /** A NORMA ObjectifiedType element. */
 export interface NormaObjectifiedType {
-  readonly id: string;
+  readonly id: NormaId;
   readonly name: string;
-  readonly nestedFactTypeRef: string; // ref to Fact id
+  readonly nestedFactTypeRef: NormaId; // ref to Fact id
   readonly referenceMode?: string;
   readonly preferredIdentifier?: string;
-  readonly playedRoleRefs: readonly string[];
+  readonly playedRoleRefs: readonly NormaId[];
   readonly definition?: string;
   /** Notes > Note > Text: informal commentary distinct from Definitions. */
   readonly note?: string;
@@ -162,11 +164,11 @@ export interface NormaObjectifiedType {
 
 /** A NORMA Fact (regular fact type). */
 export interface NormaFactType {
-  readonly id: string;
+  readonly id: NormaId;
   readonly name: string;
   readonly roles: NormaRole[];
   readonly readingOrders: NormaReadingOrder[];
-  readonly internalConstraintRefs: readonly string[];
+  readonly internalConstraintRefs: readonly NormaId[];
   readonly definition?: string;
   /** Notes > Note > Text: informal commentary distinct from Definitions. */
   readonly note?: string;
@@ -189,9 +191,9 @@ export type NormaMultiplicity =
 
 /** A role within a NORMA fact type. */
 export interface NormaRole {
-  readonly id: string;
+  readonly id: NormaId;
   readonly name: string;
-  readonly playerRef: string; // ref to ObjectType id
+  readonly playerRef: NormaId; // ref to ObjectType id
   readonly isMandatory: boolean;
   readonly multiplicity: NormaMultiplicity;
   /** Unary-role cardinality (CardinalityRestriction on the Role element). */
@@ -207,9 +209,9 @@ export interface NormaRole {
  * instance by this role. Entity and fact instances reference these by id.
  */
 export interface NormaRoleInstanceDecl {
-  readonly id: string;
+  readonly id: NormaId;
   /** ref to an EntityTypeInstance or ValueTypeInstance id. */
-  readonly objectInstanceRef: string;
+  readonly objectInstanceRef: NormaId;
   /**
    * Which instance kind consumes this declaration; decides the element tag
    * (EntityTypeRoleInstance vs FactTypeRoleInstance).
@@ -219,7 +221,7 @@ export interface NormaRoleInstanceDecl {
 
 /** A ValueTypeInstance: one atomic sample value. */
 export interface NormaValueTypeInstance {
-  readonly id: string;
+  readonly id: NormaId;
   readonly value: string;
 }
 
@@ -230,37 +232,37 @@ export interface NormaValueTypeInstance {
  * unary-population seat lives on the entity instance, not the fact.
  */
 export interface NormaEntityTypeInstance {
-  readonly id: string;
-  readonly roleInstanceRefs: readonly string[];
-  readonly unaryRoleRefs?: readonly string[];
+  readonly id: NormaId;
+  readonly roleInstanceRefs: readonly NormaId[];
+  readonly unaryRoleRefs?: readonly NormaId[];
 }
 
 /** A FactTypeInstance: one sample tuple, as refs to role-instance declarations. */
 export interface NormaFactTypeInstance {
-  readonly id: string;
-  readonly roleInstanceRefs: readonly string[];
+  readonly id: NormaId;
+  readonly roleInstanceRefs: readonly NormaId[];
 }
 
 /** A reading order within a NORMA fact type. */
 export interface NormaReadingOrder {
-  readonly id: string;
+  readonly id: NormaId;
   readonly readings: NormaReading[];
   readonly roleSequence: readonly string[]; // ordered role id refs
 }
 
 /** A single reading template. */
 export interface NormaReading {
-  readonly id: string;
+  readonly id: NormaId;
   readonly data: string; // e.g. "{0} places {1}"
 }
 
 /** A NORMA SubtypeFact element. */
 export interface NormaSubtypeFact {
-  readonly id: string;
-  readonly subtypeRoleId: string;
-  readonly subtypePlayerRef: string;
-  readonly supertypeRoleId: string;
-  readonly supertypePlayerRef: string;
+  readonly id: NormaId;
+  readonly subtypeRoleId: NormaId;
+  readonly subtypePlayerRef: NormaId;
+  readonly supertypeRoleId: NormaId;
+  readonly supertypePlayerRef: NormaId;
   readonly providesIdentification: boolean;
 }
 
@@ -291,67 +293,67 @@ export type NormaValueComparisonOperator =
 /** A value-comparison constraint over a two-role sequence. */
 export interface NormaValueComparisonConstraint {
   readonly type: "value_comparison";
-  readonly id: string;
+  readonly id: NormaId;
   readonly name: string;
   readonly modality?: NormaModality;
   readonly operator: NormaValueComparisonOperator;
   /** The compared roles in RoleSequence order (left, right). */
-  readonly roleRefs: readonly string[];
+  readonly roleRefs: readonly NormaId[];
 }
 
 export interface NormaUniquenessConstraint {
   readonly type: "uniqueness";
-  readonly id: string;
+  readonly id: NormaId;
   readonly name: string;
   readonly modality?: NormaModality;
   readonly isInternal: boolean;
   readonly isPreferred: boolean;
-  readonly roleRefs: readonly string[];
+  readonly roleRefs: readonly NormaId[];
 }
 
 export interface NormaMandatoryConstraint {
   readonly type: "mandatory";
-  readonly id: string;
+  readonly id: NormaId;
   readonly name: string;
   readonly modality?: NormaModality;
   readonly isSimple: boolean;
   /** True if NORMA auto-generated this constraint (should not be imported). */
   readonly isImplied: boolean;
-  readonly roleRefs: readonly string[];
+  readonly roleRefs: readonly NormaId[];
   /**
    * ExclusiveOrExclusionConstraint coupler: the exclusion this mandatory
    * pairs with to form an exclusive-or pattern.
    */
-  readonly exclusiveOrExclusionRef?: string;
+  readonly exclusiveOrExclusionRef?: NormaId;
 }
 
 export interface NormaFrequencyConstraint {
   readonly type: "frequency";
-  readonly id: string;
+  readonly id: NormaId;
   readonly name: string;
   readonly modality?: NormaModality;
   readonly min: number;
   readonly max: number | "unbounded";
-  readonly roleRefs: readonly string[];
+  readonly roleRefs: readonly NormaId[];
 }
 
 export interface NormaValueConstraint {
   readonly type: "value_constraint";
-  readonly id: string;
+  readonly id: NormaId;
   readonly name: string;
   readonly modality?: NormaModality;
-  readonly roleRefs: readonly string[];
+  readonly roleRefs: readonly NormaId[];
   readonly values: string[];
   readonly ranges?: NormaValueRange[];
 }
 
 export interface NormaSubsetConstraint {
   readonly type: "subset";
-  readonly id: string;
+  readonly id: NormaId;
   readonly name: string;
   readonly modality?: NormaModality;
-  readonly subsetRoleRefs: readonly string[];
-  readonly supersetRoleRefs: readonly string[];
+  readonly subsetRoleRefs: readonly NormaId[];
+  readonly supersetRoleRefs: readonly NormaId[];
   /** Join path attached to the subset role sequence, if any. */
   readonly subsetJoinPath?: NormaJoinPath;
   /** Join path attached to the superset role sequence, if any. */
@@ -360,7 +362,7 @@ export interface NormaSubsetConstraint {
 
 export interface NormaExclusionConstraint {
   readonly type: "exclusion";
-  readonly id: string;
+  readonly id: NormaId;
   readonly name: string;
   readonly modality?: NormaModality;
   readonly roleSequences: readonly (readonly string[])[];
@@ -370,12 +372,12 @@ export interface NormaExclusionConstraint {
    * ExclusiveOrMandatoryConstraint coupler: the mandatory this exclusion
    * pairs with to form an exclusive-or pattern.
    */
-  readonly exclusiveOrMandatoryRef?: string;
+  readonly exclusiveOrMandatoryRef?: NormaId;
 }
 
 export interface NormaEqualityConstraint {
   readonly type: "equality";
-  readonly id: string;
+  readonly id: NormaId;
   readonly name: string;
   readonly modality?: NormaModality;
   readonly roleSequences: readonly (readonly string[])[];
@@ -395,15 +397,15 @@ export type NormaPathedRolePurpose = "None" | "PostInnerJoin" | "SameFactType";
 
 /** One purpose-tagged role along a NORMA join path. */
 export interface NormaPathedRole {
-  readonly id: string;
-  readonly roleRef: string;
+  readonly id: NormaId;
+  readonly roleRef: NormaId;
   readonly purpose: NormaPathedRolePurpose;
 }
 
 /** A linear role path: a root object type and its pathed roles, in order. */
 export interface NormaRolePathDef {
-  readonly id: string;
-  readonly rootObjectTypeRef: string;
+  readonly id: NormaId;
+  readonly rootObjectTypeRef: NormaId;
   readonly pathedRoles: readonly NormaPathedRole[];
 }
 
@@ -413,8 +415,8 @@ export interface NormaRolePathDef {
  * element (by id) whose player the constraint column projects.
  */
 export interface NormaJoinProjection {
-  readonly constraintRoleRef: string;
-  readonly pathedRoleRef: string;
+  readonly constraintRoleRef: NormaId;
+  readonly pathedRoleRef: NormaId;
 }
 
 /**
@@ -423,7 +425,7 @@ export interface NormaJoinProjection {
  * compared columns.
  */
 export interface NormaJoinPath {
-  readonly id: string;
+  readonly id: NormaId;
   readonly rolePath: NormaRolePathDef;
   readonly projections: readonly NormaJoinProjection[];
 }
@@ -437,9 +439,9 @@ export type NormaRingType = RingType;
 
 export interface NormaRingConstraint {
   readonly type: "ring";
-  readonly id: string;
+  readonly id: NormaId;
   readonly name: string;
   readonly modality?: NormaModality;
   readonly ringType: NormaRingType;
-  readonly roleRefs: readonly string[];
+  readonly roleRefs: readonly NormaId[];
 }

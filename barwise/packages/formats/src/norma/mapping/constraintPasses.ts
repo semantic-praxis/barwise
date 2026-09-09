@@ -8,6 +8,7 @@
  * constraints of one family and attaches them to the owning fact type.
  */
 import type { Constraint, OrmModel } from "@barwise/core";
+import { asNormaId } from "../normaId.js";
 import type { NormaDocument } from "../NormaXmlTypes.js";
 import { collectProcessedRefs, type NormaMappingContext } from "./context.js";
 import {
@@ -127,7 +128,7 @@ function addExternalUniquenessConstraints(
       (c) =>
         c.type === "external_uniqueness"
         && c.roleIds.length === nc.roleRefs.length
-        && c.roleIds.every((id) => nc.roleRefs.includes(id)),
+        && c.roleIds.every((id) => nc.roleRefs.includes(asNormaId(id))),
     );
     if (!alreadyExists) {
       ft.addConstraint({
