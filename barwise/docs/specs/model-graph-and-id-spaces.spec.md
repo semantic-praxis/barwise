@@ -87,9 +87,13 @@ the two spaces non-interchangeable at compile time.
 
 In scope:
 
-- When a caller requests the graph for a model, the system shall return
-  a `ModelGraph` whose accessors are total -- no accessor returns
-  `undefined` for a reference the model declares.
+- When a caller requests the graph for a model whose references all
+  resolve, the system shall return a `ModelGraph` whose accessors are
+  total -- no accessor returns `undefined` for a reference the model
+  declares.
+- When a caller requests the graph for a model holding a reference that
+  does not resolve, the system shall return a failure carrying a
+  diagnostic per unresolvable reference, and shall not return a graph.
 - When a validation rule needs a role's player, the system shall
   provide it through the graph, and the rule shall not perform its own
   lookup or guard.
@@ -159,10 +163,19 @@ Three corrections a reviewer should not have to find:
 
 ```ts
 // packages/core/src/model/graph.ts -- derived, never stored
-export function graphOf(model: OrmModel): ModelGraph;
+//
+// Fallible ONCE, at build. Building is where a dangling reference is
+// found, so that is where it is reported; every accessor on a graph
+// that was built is total. This is the whole trade: one failure point
+// instead of the 131 the lookups have today.
+export type GraphResult =
+  | { readonly ok: true; readonly graph: ModelGraph; }
+  | { readonly ok: false; readonly diagnostics: readonly Diagnostic[]; };
+
+export function graphOf(model: OrmModel): GraphResult;
 
 export interface ModelGraph {
-  // Total: the model proved these references, so none can fail.
+  // Total: building proved these references, so none can fail.
   player(role: Role): ObjectType;
   factTypeOf(role: Role): FactType;
   rolesOf(c: Constraint): readonly Role[];
@@ -196,10 +209,17 @@ export function toNormaId(modelId: string): NormaId;
 
 Two rules the sketch encodes, so no workstream can drift from them:
 
-- **Totality is the point, not convenience.** An accessor that returns
-  `ObjectType | undefined` puts the prologue back. If a reference can
-  genuinely be absent, that absence belongs in the model's own types
-  (an optional field), not in the graph's return type.
+- **Totality is a property of a built graph, not of `graphOf`.** An
+  accessor returning `ObjectType | undefined` puts the prologue back,
+  so accessors are total -- but that is only honest if something
+  established the references resolve, and today nothing does. An
+  `OrmModel` can hold a constraint naming a role that does not exist:
+  `constraintConsistency` reports it, and reporting is a separate pass
+  no caller is required to run. The 46 `bogus` tests construct exactly
+  that and verbalize it without validating. So `graphOf` is fallible
+  and a `ModelGraph` is not. If a reference can genuinely be absent,
+  that absence belongs in the model's own types (an optional field),
+  never in an accessor's return type.
 - **The graph is derived, never stored.** Two live representations
   would have to be kept in sync; one value and one view rebuilt from it
   cannot disagree. Models are hundreds of elements, so the rebuild is
@@ -226,6 +246,16 @@ Two rules the sketch encodes, so no workstream can drift from them:
   per-call scan and gives no place for the adjacency accessors
   (`rolesPlayedBy`, `hopsFrom`) that today recompute. It is the shallow
   version of the same idea.
+- **Require a pre-validated model** -- `graphOf(m: ValidatedModel)`,
+  with the type carrying the proof so `graphOf` cannot fail. This is
+  the better end state and it is not reachable yet: the only thing that
+  could mint a `ValidatedModel` is WS1's `ModelBuilder`, which does not
+  exist (`packages/core/src/model/ModelBuilder.ts` is absent; the
+  `ModelBuilder` under `tests/helpers/` is a fixture builder). Adopting
+  it would make this spec depend on WS1 after establishing that it does
+  not. A fallible `graphOf` reaches the same totality for consumers,
+  needs nothing that does not exist, and can be tightened to the
+  validated-model form later without touching a single accessor.
 - **Leave it; the branches are the domain.** The parent spec's own
   finding is that about half the branching is domain and half is
   representation. The 13 prologues and 28 fallbacks are squarely the
@@ -257,6 +287,15 @@ the same commit.
 Build the graph and its tests; change no caller. This is the step that
 proves the accessors can be total before anything depends on them.
 
+`GraphResult`'s failure arm carries `Diagnostic`, which is
+`Diagnostic<RuleId>` -- so this workstream owes an answer to "which
+rule id?" rather than inventing one. It reuses the ids
+`constraintConsistency` already emits for exactly this condition
+(`RULE_ID.constraint.*InvalidRole`) where one fits, and adds a
+`RULE_ID` registry entry in the same commit where none does. No
+diagnostic is minted outside the registry: `Diagnostic<string>` is the
+widening `closed-sets-as-unions.spec.md` WS2 exists to prevent.
+
 **Dependency correction.** The parent spec says WS3 depends on WS1. It
 does not, for this step: a graph is derived by reading a model, and
 does not care whether `Role` and `FactType` are records or classes --
@@ -269,8 +308,12 @@ then `graphOf` is called once per operation and the cost is measured
 rather than assumed.
 
 Acceptance: when `graphOf` is given any model in the `.orm.yaml`
-corpus, it shall build without error and every accessor shall return a
-defined value for every reference the model declares.
+corpus, it shall return `ok` and every accessor shall return a defined
+value for every reference the model declares; and when it is given a
+model holding a constraint that names a role the fact type does not
+have, it shall return a failure naming that reference. Both halves are
+required -- the failure case is what makes the success case mean
+something, and it is the reading that must be established first.
 
 ### 3. Validation rules take the graph
 
@@ -330,14 +373,21 @@ decisions.
   and rely on resolved pairs alone. The recommendation is (a), with the
   re-measurement being a count of surviving `[a-zA-Z]*Id: string`
   parameters in `packages/core/src` -- 177 today.
-- **What happens to the 46 `bogus` assertions.** Options: (a) convert
-  them to builder-rejection tests, so the suite pins that an
-  unresolvable reference is _refused_ rather than prosed --
-  recommended, since that is the behaviour that will actually exist;
-  (b) delete them as testing an impossible state; (c) keep a
-  deserializer-level subset if lenient loading survives. This is a
-  reviewer's call because it decides whether "a model with a dangling
-  reference" remains a representable value anywhere in core.
+- **What happens to the 46 `bogus` assertions.** They do not pin a
+  dangling _player_ -- `structural.ts` refuses those. They pin a
+  dangling constraint-to-role reference
+  (`{ type: "mandatory", roleId: "bogus" }`), constructed directly and
+  verbalized **without validating**, which is why the fallbacks exist
+  at all. Options: (a) convert them to assert that `graphOf` reports
+  the unresolvable reference -- recommended, because that is the
+  behaviour that will exist and it needs nothing that does not;
+  (b) delete them as testing a state no supported caller reaches;
+  (c) keep a subset if `skipPlayerValidation` and `lenient` survive
+  (14 references today). This is a reviewer's call because it decides
+  whether verbalizing an unvalidated model stays supported. An earlier
+  draft of this spec recommended converting them to _builder-rejection_
+  tests; that was withdrawn on grounding, because the builder it named
+  does not exist.
 - **Whether `graphOf` belongs in `core`'s root barrel or a subpath.**
   The package convention puts capability modules on subpaths
   (`@barwise/core/mapping`, `/diff`) and the metamodel on the root. The
@@ -347,11 +397,21 @@ decisions.
 
 ## Risks and testing
 
-- **The totality claim is the whole design, so it is tested first.**
-  Workstream 2 ships with a test that builds the graph over every
-  `.orm.yaml` in the corpus and asserts every accessor returns a
-  defined value. If a real model can break totality, the design is
-  wrong and it should surface before any consumer depends on it.
+- **The totality claim is the whole design, so it is tested first, in
+  both directions.** Workstream 2 ships with a test that builds the
+  graph over every `.orm.yaml` in the corpus and asserts every accessor
+  returns a defined value, AND a test that a model with an unresolvable
+  constraint-to-role reference makes `graphOf` fail. The failing
+  reading is established before the passing one; a totality test that
+  has never been seen reject anything is the untracked-probe reading
+  this repo has a ledger entry for (barwise-906).
+- **Verbalizing an unvalidated model becomes a caller decision, and
+  that is a behaviour change.** Today `verbalizeAll` proses `"bogus"`
+  for a constraint naming a missing role. Once verbalization reads a
+  graph, a caller holding such a model gets a failure from `graphOf`
+  instead of prose. The surfaces validate before verbalizing, so no
+  shipped path changes; the 46 tests that do not validate are the ones
+  affected, which is what the second Open decision settles.
 - **Verbalization output is the behaviour most at risk**, because
   Workstream 5 removes fallbacks that currently produce prose. The
   golden verbalization tests guard it; any golden that changes is a
