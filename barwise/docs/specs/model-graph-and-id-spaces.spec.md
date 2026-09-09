@@ -622,16 +622,62 @@ back to a raw fact type id, and its test still pins that.
 
 ### 5. Verbalization and counterexample take resolved roles (largest)
 
-The 28 fallback lines across `phase1.ts` and `phase2.ts` go, and
-`findRoleById`'s scan is replaced.
+**Its premise is false for most of its cases, and that is now measured
+rather than suspected (barwise-979).** The draft below said "Once the
+graph is total, that prose becomes unreachable". That holds for a
+DANGLING role id. It does not hold for a FOREIGN one -- a real role of
+another fact type -- which `graphOf` resolves perfectly well, because
+resolution and locality are different questions (barwise-976, one
+workstream earlier). Counted with the same pattern the rest of this
+spec uses:
+
+```sh
+grep -rn "??" packages/core/src/verbalization packages/core/src/counterexample \
+  | grep -E "role|player|Role|Player" | wc -l     # 49
+grep -rn "??" packages/core/src/verbalization packages/core/src/counterexample \
+  | grep -E "role\?\.|role \?|roleId\b" | wc -l  # 26
+```
+
+Roughly 26 of the 49 are guarded by a `factType.getRoleById(...)` and so
+defend against a role that is foreign OR dangling. The graph removes only
+the second half, so those fallbacks cannot simply be deleted, and what
+replaces them depends on a decision nobody has taken: what verbalizing a
+constraint that validation REJECTS should produce.
+
+**Shipped ahead of that decision, because it forecloses nothing.** Three
+binary fast paths -- `verbalizeBinaryUniqueness`, `verbalizeBinaryMandatory`
+and the single-role frequency path in `phase2.ts` -- resolved their role
+with `findIndex` and then asserted the result was present, so a foreign
+role indexed `roles[-1]` and died on `undefined.playerId`. Measured on
+`61df141` against a schema-valid file whose `ft1` mandatory constraint
+names a real role of `ft2`:
+
+```
+$ barwise validate m.orm.yaml
+ERROR  Mandatory constraint in fact type "Customer has Name" references
+       role id "r3" which does not belong to this fact type.
+$ barwise verbalize m.orm.yaml
+Error: Cannot read properties of undefined (reading 'playerId')   # exit 1
+```
+
+Each now takes its binary path only when the role is local, falling
+through to the generic path that already handles an unresolved role.
+The crash is gone; the output is the id-prose the rest of this
+workstream is about, which is what makes the decision below concrete
+rather than hypothetical.
 
 **This workstream carries a test question that is a reviewer's call,
-not an implementer's.** 46 assertions across five files pin the prose
-produced for an unresolvable reference -- the `bogus` fixtures. Once the
-graph is total, that prose becomes unreachable, so those assertions
-pin behaviour that cannot occur. Under the `assertion-audit` skill that
-is a test asserting a limitation rather than a capability. See Open
-decisions.
+not an implementer's**, and the measurement above makes it bigger than
+the draft framed it. 46 assertions across five files pin the prose
+produced for an unresolvable reference -- the `bogus` fixtures. For a
+dangling role that prose does become unreachable and the assertions pin
+a limitation, which the `assertion-audit` skill calls out. For a foreign
+role it stays reachable, and after the guards above it is what a user
+sees: `barwise verbalize` prints "Each r3 must: r3 has r3." and exits 0
+for a model `barwise validate` rejects. Whether that is acceptable, or
+whether verbalization should refuse such a model as query and describe
+now refuse an unresolvable one, is the decision. It governs ~26 call
+sites, not 15 test assertions. See Open decisions.
 
 ## API and migration impact
 

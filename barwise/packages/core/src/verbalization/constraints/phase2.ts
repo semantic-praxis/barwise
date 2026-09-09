@@ -342,7 +342,9 @@ export function verbalizeFrequency(
     return verbalizeMultiRoleFrequency(roleIds, min, max, factType, model);
   }
   const roleId = roleIds[0]!;
-  if (factType.arity !== 2) {
+  // See `verbalizeInternalUniqueness` in phase1 for why `hasRole` guards
+  // the binary path (barwise-979).
+  if (factType.arity !== 2 || !factType.hasRole(roleId)) {
     return verbalizeGenericFrequency(roleId, min, max, factType, model);
   }
 
