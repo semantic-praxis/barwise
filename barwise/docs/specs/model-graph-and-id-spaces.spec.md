@@ -4,8 +4,8 @@ Status: Draft -- no workstream implemented
 Created: 2026-09-09
 Last-updated: 2026-09-09
 Tracking: barwise-974 (this spec), barwise-973 (WS1, partly shipped),
-barwise-924 (the parent review), barwise-945 (the population tuple, out
-of scope here and named in Non-goals)
+barwise-924 (the parent review, closed since PR #423), barwise-945 (the
+population tuple, out of scope here and named in Non-goals)
 
 This respecifies WS3 of `core-branching-load.spec.md` as a standalone
 spec, because the branded-id question belongs in the same design and
@@ -86,10 +86,21 @@ else from this file:
 | usable as `string`, `Map` key, in template literals  | yes          |
 | runtime cost                                         | none         |
 
-The cost follows from row one. Branding model ids means 20 cast sites
-in `packages/core/src` (13 deserializer assignments plus 7
-`generateId()` calls) and **136 id string literals in `packages/core`
-tests** that stop compiling.
+The cost follows from row one. Branding model ids means 18 cast sites
+in `packages/core/src` and 136 id string literals in `packages/core`
+tests that stop compiling:
+
+```sh
+# 13 deserializer id assignments
+grep -rn 'id: .*Doc\.\|id: otDoc\|playerId: \|roleId: \|factTypeId: ' \
+  packages/core/src/serialization/yaml/*.ts | wc -l
+# 5 generateId() call sites (excluding its own module)
+grep -rn 'generateId()' packages/core/src --include=*.ts \
+  | grep -v 'src/model/id.ts' | wc -l
+# 136 id string literals in tests
+grep -rnE '(playerId|roleId|factTypeId|objectTypeId): "' \
+  packages/core/tests --include=*.ts | wc -l
+```
 
 The decisive argument is not cost, though. **WS3 deletes most model-id
 passing, so branding model ids invests in the code this same spec
@@ -161,21 +172,36 @@ Every row re-measured on `main` `7600a7b`, 2026-09-09. The parent
 spec's WS3 figures were taken at `664b9fe`; three of eight are wrong
 rather than stale, and are corrected here.
 
-| Area                                                    | Current state                                                                                                      | Verdict                                                    |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| `model/Role.ts`                                         | `playerId: string`; a bare reference                                                                               | unchanged; the graph resolves it                           |
-| `model/OrmModel.ts`                                     | `getObjectType(id): ObjectType \| undefined`, 131 call sites repo-wide                                             | unchanged; stays the raw store                             |
-| `model/roleGraph.ts`                                    | `hopsFrom(model, objectTypeId: string)`, two callers                                                               | moves into `ModelGraph` (WS4)                              |
-| `validation/rules/*.ts`                                 | 13 lookup prologues, 12 with an `undefined` guard                                                                  | takes the graph; prologues go (WS3)                        |
-| `verbalization/`, `counterexample/`                     | 28 lines ending in a `?? roleId` / `?? roleIds[i]` fallback, 27 of them in `constraints/phase1.ts` and `phase2.ts` | takes resolved roles; fallbacks go (WS5)                   |
-| `query/evaluate.ts`                                     | 3 `?? playerId` fallbacks; imports `hopsFrom`                                                                      | takes the graph (WS4)                                      |
-| `describe/summaries.ts`                                 | 2 `?? playerId` fallbacks (lines 47, 189), the same shape as query's                                               | takes the graph (WS4)                                      |
-| `counterexample/CounterexampleGenerator.ts`             | `findRoleById` at :537, a linear scan                                                                              | replaced by a graph accessor (WS5)                         |
-| `formats/norma/NormaXmlWriter.ts`, `populationGraph.ts` | two `normaId` definitions, agreement guarded by a comment, unregistered                                            | one owner, branded `NormaId` (WS1)                         |
-| `packages/core/src/mapping/`                            | **no** `?? id` player fallbacks                                                                                    | untouched -- see below                                     |
-| `validation/constraintEnforcement.ts`                   | no graph today                                                                                                     | builds the graph internally, so `learn` is untouched (WS3) |
+| Area                                                    | Current state                                                                                                                                                             | Verdict                                                           |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `model/Role.ts`                                         | `playerId: string`; a bare reference                                                                                                                                      | unchanged; the graph resolves it                                  |
+| `model/OrmModel.ts`                                     | `getObjectType(id): ObjectType \| undefined`, 131 call sites repo-wide                                                                                                    | unchanged; stays the raw store                                    |
+| `model/roleGraph.ts`                                    | `hopsFrom(model, objectTypeId: string)`, one caller (`query/evaluate.ts:357`); `RoleHop` referenced nowhere else                                                          | moves into `ModelGraph` (WS4)                                     |
+| `validation/rules/*.ts`                                 | 13 reference lookups (`structural` 6, `joinConstraintRules` 4, `constraintConsistency` 2, `derivationRules` 1); some are prologues, some ARE the dangling-reference check | split: prologues take the graph, checks move into `graphOf` (WS3) |
+| `verbalization/`, `counterexample/`                     | 28 lines ending in a `?? roleId` / `?? roleIds[i]` fallback, 27 of them in `constraints/phase1.ts` and `phase2.ts`                                                        | takes resolved roles; fallbacks go (WS5)                          |
+| `query/evaluate.ts`                                     | 3 `?? playerId` fallbacks; imports `hopsFrom`                                                                                                                             | takes the graph (WS4)                                             |
+| `describe/summaries.ts`                                 | 2 `?? playerId` fallbacks (lines 47, 189), the same shape as query's                                                                                                      | takes the graph (WS4)                                             |
+| `counterexample/CounterexampleGenerator.ts`             | `findRoleById` at :537, a linear scan                                                                                                                                     | replaced by a graph accessor (WS5)                                |
+| `formats/norma/NormaXmlWriter.ts`, `populationGraph.ts` | two `normaId` definitions, agreement guarded by a comment, unregistered                                                                                                   | one owner, branded `NormaId` (WS1)                                |
+| `packages/core/src/mapping/`                            | **no** `?? id` player fallbacks                                                                                                                                           | untouched -- see below                                            |
+| `validation/constraintEnforcement.ts`                   | no graph today                                                                                                                                                            | builds the graph internally, so `learn` is untouched (WS3)        |
 
-Three corrections a reviewer should not have to find:
+The lookup count has a command, because two readers counting different
+things is how the parent spec's figures went wrong in the first place:
+
+```sh
+grep -rn 'getObjectType(\|getRoleById(\|getFactType(' \
+  packages/core/src/validation/rules/*.ts | wc -l    # 13
+```
+
+That is the pattern this spec means by "reference lookup". A narrower
+one counting only `model.get*` gives 10, and the parent spec's "13
+prologues and ~20 undefined guards" is a fourth figure it got wrong --
+the guard count is 12 by
+`grep -rn -A2 ... | grep -cE 'if \(!|\?\?|continue|\?\.'`. Whichever
+pattern a later reader prefers, the point is that it is written down.
+
+Four corrections a reviewer should not have to find:
 
 - The parent spec says "query and the mapper lose their `?? id` player
   fallbacks". There are three such sites and **all three are in
@@ -185,10 +211,21 @@ Three corrections a reviewer should not have to find:
 - The parent spec names a `joinSegments` helper with "six copies of one
   punctuation ladder". **`joinSegments` does not exist anywhere in the
   repository.** The underlying pattern is real -- 11 `.join()` ladders
-  in `verbalization` -- but the named helper was invented in the sketch
+  in `verbalization` -- 7 by
+  `grep -rn '\.join(' packages/core/src/verbalization`, not the 11 an
+  earlier draft of this spec reported from a pattern that also matched
+  non-`join` lines -- but the named helper was invented in the sketch
   and never built. It is not carried forward here; consolidating those
   ladders is a separate, smaller change with no dependency on the
   graph.
+- The parent spec says `hopsFrom` has **two callers**. It has one
+  (`query/evaluate.ts:357`), and `RoleHop` is referenced in no file
+  outside `roleGraph.ts`. The "two" comes from `roleGraph.ts`'s own
+  header naming "the forthcoming role-path constraint operands" as the
+  second; those landed in `joinConstraintRules.ts` walking
+  `getRoleById` directly. The header is stale, and an earlier draft of
+  this spec repeated it rather than measuring -- the same mistake, one
+  document further on.
 - The parent spec's "six `?? roleId` fallback ladders" is 28 lines, and
   its "~12 tests that pin `bogus` prose" is 46 occurrences across five
   files. Both are understated, which makes WS5 the largest workstream
@@ -203,9 +240,28 @@ Three corrections a reviewer should not have to find:
 // found, so that is where it is reported; every accessor on a graph
 // that was built is total. This is the whole trade: one failure point
 // instead of the 131 the lookups have today.
+// The failure arm carries plain records, NOT Diagnostic. Nothing under
+// model/ imports from validation/ today (grep), and minting a
+// Diagnostic<RuleId> here would invert that layering for a type the
+// graph does not otherwise need. validation/ maps these to diagnostics
+// under the ids it already owns; every other consumer reads them
+// directly. This is how constraintEnforcement keeps @barwise/learn out
+// of validation's types.
+export interface UnresolvedReference {
+  readonly from: {
+    readonly kind: "role" | "constraint" | "population";
+    readonly id: string;
+  };
+  readonly missing: string; // the id that does not resolve
+  readonly field: string; // "playerId", "roleId", "factTypeId", ...
+}
+
 export type GraphResult =
   | { readonly ok: true; readonly graph: ModelGraph; }
-  | { readonly ok: false; readonly diagnostics: readonly Diagnostic[]; };
+  | {
+    readonly ok: false;
+    readonly unresolved: readonly UnresolvedReference[];
+  };
 
 export function graphOf(model: OrmModel): GraphResult;
 
@@ -322,14 +378,17 @@ the same commit.
 Build the graph and its tests; change no caller. This is the step that
 proves the accessors can be total before anything depends on them.
 
-`GraphResult`'s failure arm carries `Diagnostic`, which is
-`Diagnostic<RuleId>` -- so this workstream owes an answer to "which
-rule id?" rather than inventing one. It reuses the ids
-`constraintConsistency` already emits for exactly this condition
-(`RULE_ID.constraint.*InvalidRole`) where one fits, and adds a
-`RULE_ID` registry entry in the same commit where none does. No
-diagnostic is minted outside the registry: `Diagnostic<string>` is the
-widening `closed-sets-as-unions.spec.md` WS2 exists to prevent.
+`graphOf` mints no diagnostic at all; it returns `UnresolvedReference`
+records and `validation/` maps them to the ids it already owns. `RULE_ID`
+is flat, so those are `RULE_ID.mandatoryInvalidRole`,
+`ringInvalidRole`, `frequencyInvalidRole`, `cardinalityInvalidRole`,
+`internalUniquenessInvalidRole`, `valueConstraintInvalidRole` and
+`valueComparisonInvalidRole` (`ruleId.ts:48-75`) -- `constraint/` is the
+prefix of the id STRING, not a nesting level -- plus
+`RULE_ID.danglingRoleReference` (`structural/dangling-role-reference`,
+`ruleId.ts:100`) for the player case, which is not a `constraint/` id.
+No diagnostic is minted outside the registry: `Diagnostic<string>` is
+the widening `closed-sets-as-unions.spec.md` WS2 exists to prevent.
 
 **Dependency correction.** The parent spec says WS3 depends on WS1. It
 does not, for this step: a graph is derived by reading a model, and
@@ -350,25 +409,55 @@ have, it shall return a failure naming that reference. Both halves are
 required -- the failure case is what makes the success case mean
 something, and it is the reading that must be established first.
 
-### 3. Validation rules take the graph
+### 3. Validation rules split: prologues take the graph, checks move into it
 
-The 13 prologues and 12 `undefined` guards in
-`validation/rules/*.ts` go. `constraintEnforcement.ts` builds the graph
-internally, so `@barwise/learn`'s calls into core do not change. That
-is the only sense in which learn is untouched: it holds 12
-`getObjectType` lookups of its own in `evaluate/populationMapping.ts`,
-which are among the 54 named out of scope above.
+**Not every lookup in `validation/rules/` is a prologue, and this is
+the workstream where that distinction decides the design.** Three of
+the 13 are the dangling-reference check itself: `structural.ts:43`
+(`if (!model.getObjectType(role.playerId))`, which emits
+`RULE_ID.danglingRoleReference`), `constraintConsistency.ts`'s
+`ft.hasRole(...)` guards, and `joinConstraintRules.ts:148-151`
+resolving `step.entry` / `step.exit`. Those cannot "take the graph": a
+model with a dangling reference has no graph to take.
+
+So `graphOf` becomes the single owner of reference resolution. The
+three checks are deleted here and their tests move to `graphOf`'s;
+every remaining lookup is a prologue and reads the graph.
+`ValidationEngine.validate` gains sequencing it does not have today:
+build the graph first, and when it fails, return the reference
+diagnostics mapped from `UnresolvedReference` plus the rules that need
+no references (completeness warnings, population checks), skipping the
+graph-taking rules. A caller still sees everything knowable about a
+model that cannot build.
+
+That ordering also prevents a duplicate: with the graph reporting
+`constraint/mandatory-invalid-role` and `constraintConsistency` still
+checking `hasRole`, one defect would produce two diagnostics, and
+`Phase2ConstraintConsistency.test.ts`'s `diags.some(...)` assertions
+would not notice.
+
+`constraintEnforcement.ts` builds the graph internally, so
+`@barwise/learn`'s calls into core do not change. That is the only
+sense in which learn is untouched: it holds 12 `getObjectType` lookups
+of its own in `evaluate/populationMapping.ts`, among the 54 named out
+of scope above.
 
 Acceptance: when a validation rule needs a role's player, it shall read
-it from the graph; no rule in `validation/rules/` shall call
-`getObjectType`.
+it from the graph; no rule in `validation/rules/` shall resolve a
+reference itself; and when `graphOf` fails, `validate` shall return one
+diagnostic per unresolvable reference and no duplicates.
 
 ### 4. Query and describe take the graph; `hopsFrom` moves
 
 The 3 `?? playerId` fallbacks in `query/evaluate.ts` and the 2 in
 `describe/summaries.ts` go, and `model/roleGraph.ts`'s `hopsFrom`
-becomes a graph accessor. Two `hopsFrom` callers, so the move is
-contained. `describe/` rides along rather than getting its own
+becomes a graph accessor. `hopsFrom` has one caller
+(`query/evaluate.ts:357`) plus its own test, so the move is contained --
+`roleGraph.ts`'s header claims two, naming "the forthcoming role-path
+constraint operands" as the second; those landed in
+`joinConstraintRules.ts` walking `getRoleById` directly, so the header
+is stale and an earlier draft of this spec repeated it instead of
+measuring. `describe/` rides along rather than getting its own
 workstream because its two fallbacks are the same shape as query's,
 resolved the same way, in the same package.
 
@@ -412,9 +501,22 @@ decisions.
   shrinks with every workstream here; (b) brand now, accepting that
   some of the typing lands on code Workstreams 3-5 delete; (c) never,
   and rely on resolved pairs alone. The recommendation is (a), with the
-  re-measurement being a count of surviving `[a-zA-Z]*Id: string`
-  parameters in `packages/core/src` -- 177 today.
-- **What happens to the 46 `bogus` assertions.** They do not pin a
+  re-measurement being
+  `grep -rnE '\b[a-zA-Z]*[Ii]d: string\b' packages/core/src --include=*.ts | wc -l`,
+  which is 177 today. Note what it counts: interface fields as well as
+  parameters, and the lowercase-`id` spelling. The narrower
+  `[a-zA-Z]*Id: string` gives 127. The number is only a trigger for
+  re-taking the decision, so either is usable -- but it has to be the
+  same one both times, which is why the command is here rather than
+  the description.
+- **What happens to the 15 `bogus` prose assertions.** The 46 is
+  occurrences of the string, not assertions, and it mixes two
+  populations. `Phase2ConstraintConsistency.test.ts` holds 11 and
+  `structural.test.ts` 1: those already assert the reference is
+  REPORTED, never prose, so they are settled by Workstream 3 rather
+  than by this decision. The three verbalization test files hold 34,
+  of which 19 are fixture lines and **15 are `expect` calls on prose**.
+  Those 15 are what this decides. They do not pin a
   dangling _player_ -- `structural.ts` refuses those. They pin a
   dangling constraint-to-role reference
   (`{ type: "mandatory", roleId: "bogus" }`), constructed directly and
@@ -446,13 +548,30 @@ decisions.
   reading is established before the passing one; a totality test that
   has never been seen reject anything is the untracked-probe reading
   this repo has a ledger entry for (barwise-906).
-- **Verbalizing an unvalidated model becomes a caller decision, and
-  that is a behaviour change.** Today `verbalizeAll` proses `"bogus"`
-  for a constraint naming a missing role. Once verbalization reads a
-  graph, a caller holding such a model gets a failure from `graphOf`
-  instead of prose. The surfaces validate before verbalizing, so no
-  shipped path changes; the 46 tests that do not validate are the ones
-  affected, which is what the second Open decision settles.
+- **No surface validates before verbalizing, and one shipped path
+  crashes today.** An earlier draft of this bullet claimed the
+  opposite, in the reassuring direction, and it was wrong twice.
+  `loadModel` in `packages/cli/src/workspace/io.ts` only deserializes
+  (with `lenient`); `packages/mcp/src/workspace/resolve.ts` is the
+  same; `HoverProvider.ts:71` verbalizes the parsed model directly.
+  None calls `ValidationEngine`. And `verbalizeAll` does not uniformly
+  prose `"bogus"` -- the binary mandatory path in `phase1.ts` (:106,
+  :118) has no guard on `role` at all. Reproduced on `a16a489` by
+  pointing `simple.orm.yaml`'s mandatory constraint at a missing role:
+
+  ```
+  $ barwise validate dangling.orm.yaml
+  ERROR  Mandatory constraint ... references role id "bogus" which does not belong ...
+  $ barwise verbalize dangling.orm.yaml
+  Error: Cannot read properties of undefined (reading 'playerId')   # exit 1
+  ```
+
+  So WS5 **is** a shipped-path behaviour change, and an improvement: an
+  uncaught `TypeError` becomes a reported failure. What the spec still
+  owes is the plumbing -- what each surface does when `graphOf` fails on
+  a loaded-but-unvalidated model. The answer is the one `validate`
+  already gives: surface the diagnostics and exit non-zero. WS5 owns it
+  for `cli`, `mcp` and `vscode`, and that is why WS5 is last.
 - **Verbalization output is the behaviour most at risk**, because
   Workstream 5 removes fallbacks that currently produce prose. The
   golden verbalization tests guard it; any golden that changes is a
