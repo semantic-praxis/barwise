@@ -26,6 +26,7 @@
     "test:scripts": "npm --prefix barwise run test:scripts --",
     "test:optimizer": "npm --prefix barwise run test:optimizer --",
     "audit:duplication": "npm --prefix barwise run audit:duplication --",
+    "mutate": "npm --prefix barwise run mutate --",
     "audit:specs": "npm --prefix barwise run audit:specs --",
     "survey:specs": "npm --prefix barwise run survey:specs --",
     "audit:rubric": "npm --prefix barwise run audit:rubric --",

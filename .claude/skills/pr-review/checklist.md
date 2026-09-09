@@ -260,8 +260,15 @@ now holds, guards, or learns that they did not have to.
 
 - No `.skip`, no lowered coverage threshold, no assertion loosened to
   existence, no golden regenerated without a reason in the commit.
-- A new test was seen failing on the defect it guards before it was
-  seen passing. Authority: `session-review` skill.
+- **A new test was seen failing on the defect it guards**, run through
+  `barwise/scripts/mutate.mjs` rather than by hand. Coverage does not
+  substitute: a guard on a hot path reads as 100% covered and can still
+  be indistinguishable from a no-op, which is how a `seen` cycle guard
+  shipped with all 30 tests in its file green (barwise-906, sixth
+  occurrence). Nor does a hand-rolled `sed`: an anchor a formatter has
+  reflowed matches nothing and prints a green run that reads exactly
+  like a test which missed the defect. Authority: `session-review`
+  skill; `barwise/docs/specs/mutation-verification-helper.spec.md`.
 - **A fixture, `ModelBuilder`, or `fc.Arbitrary` hand-avoids a state
   construction should refuse, rather than constructing it and
   asserting refusal.** `tests/arbitraries/model.ts` derives ids and
@@ -278,9 +285,11 @@ now holds, guards, or learns that they did not have to.
 ## When a check, gate, hook, or script was added or changed
 
 - It was watched going red on a planted defect placed where the gate
-  looks (tracked or staged, not merely on disk), and
-  `scripts/tests/*.test.mjs` pins that for a root gate. Authority:
-  `session-review` skill; `npm run test:scripts`.
+  looks (tracked or staged, not merely on disk) -- via
+  `barwise/scripts/mutate.mjs`, which refuses rather than reporting a
+  green it cannot stand behind -- and `scripts/tests/*.test.mjs` pins
+  that for a root gate. Authority: `session-review` skill; `npm run
+  test:scripts`.
 - It resolves paths from the repo root, not the cwd (barwise-918), and
   a new npm script has its root forwarder (`check:root-scripts`).
 

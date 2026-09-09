@@ -273,6 +273,192 @@ test("beads-crud update refuses to blank a non-empty field, and clears it on req
   );
 });
 
+// --- barwise-906: the helper that produces the red-then-green reading ---
+
+/**
+ * Run `mutate.mjs` inside a throwaway repo. The helper resolves --file
+ * against `git rev-parse --show-toplevel`, so the temp repo IS the repo
+ * root as far as it is concerned, and this repo's tree is never touched.
+ */
+function mutate(dir, args) {
+  return spawnSync(process.execPath, [join(SCRIPTS, "mutate.mjs"), ...args], {
+    cwd: dir,
+    encoding: "utf8",
+  });
+}
+
+/** A repo holding one subject file and one checker script over it. */
+function mutateRepo({ subject, tracked = true }) {
+  const dir = tempRepo();
+  writeFileSync(join(dir, "subject.txt"), subject);
+  if (tracked) {
+    execFileSync("git", ["add", "--", "subject.txt"], { cwd: dir });
+    execFileSync("git", ["commit", "-qm", "subject"], { cwd: dir });
+  }
+  // Exits 0 while the subject still says GOOD -- so a mutation that
+  // changes GOOD is "caught" and one that does not is "uncaught".
+  writeFileSync(
+    join(dir, "check.mjs"),
+    `import { readFileSync } from "node:fs";\n`
+      + `process.exit(readFileSync("subject.txt", "utf8").includes("GOOD") ? 0 : 1);\n`,
+  );
+  return dir;
+}
+
+test("mutate exits 0 when the command catches the mutation, and restores the file", () => {
+  const dir = mutateRepo({ subject: "value = GOOD\n" });
+  try {
+    const r = mutate(dir, [
+      "--file",
+      "subject.txt",
+      "--old",
+      "GOOD",
+      "--new",
+      "BAD",
+      "--",
+      process.execPath,
+      "check.mjs",
+    ]);
+    assert.equal(r.status, 0, `expected CAUGHT:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stdout, /CAUGHT/);
+    assert.equal(readFileSync(join(dir, "subject.txt"), "utf8"), "value = GOOD\n");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("mutate exits 1 when the command does not notice the mutation", () => {
+  const dir = mutateRepo({ subject: "value = GOOD, note = keep\n" });
+  try {
+    const r = mutate(dir, [
+      "--file",
+      "subject.txt",
+      "--old",
+      "keep",
+      "--new",
+      "drop",
+      "--",
+      process.execPath,
+      "check.mjs",
+    ]);
+    assert.equal(r.status, 1, `expected UNCAUGHT:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stdout, /UNCAUGHT/);
+    assert.equal(readFileSync(join(dir, "subject.txt"), "utf8"), "value = GOOD, note = keep\n");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("mutate refuses an anchor that is absent or ambiguous, writing nothing", () => {
+  // The failure this whole script exists for: a `sed` whose anchor no
+  // longer matches leaves the file alone and the suite green, which
+  // reads exactly like a test that missed the defect.
+  const dir = mutateRepo({ subject: "value = GOOD\nvalue = GOOD\n" });
+  try {
+    const absent = mutate(dir, [
+      "--file",
+      "subject.txt",
+      "--old",
+      "NOT PRESENT",
+      "--new",
+      "x",
+      "--",
+      process.execPath,
+      "check.mjs",
+    ]);
+    assert.equal(absent.status, 2, `expected a refusal:\n${absent.stdout}${absent.stderr}`);
+    assert.match(absent.stderr, /occurs 0 time\(s\)/);
+
+    const ambiguous = mutate(dir, [
+      "--file",
+      "subject.txt",
+      "--old",
+      "GOOD",
+      "--new",
+      "BAD",
+      "--",
+      process.execPath,
+      "check.mjs",
+    ]);
+    assert.equal(ambiguous.status, 2, `expected a refusal on 2 matches`);
+    assert.match(ambiguous.stderr, /occurs 2 time\(s\)/);
+
+    // Both refusals wrote nothing, which is the part that matters.
+    assert.equal(
+      readFileSync(join(dir, "subject.txt"), "utf8"),
+      "value = GOOD\nvalue = GOOD\n",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("mutate refuses a no-op replacement", () => {
+  const dir = mutateRepo({ subject: "value = GOOD\n" });
+  try {
+    const r = mutate(dir, [
+      "--file",
+      "subject.txt",
+      "--old",
+      "GOOD",
+      "--new",
+      "GOOD",
+      "--",
+      process.execPath,
+      "check.mjs",
+    ]);
+    assert.equal(r.status, 2, `expected a refusal:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /no-op mutation proves nothing/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("mutate reports a failed restore on an UNTRACKED file, which git diff cannot", () => {
+  // barwise-906's acceptance criteria name this case specifically. The
+  // instrument that failed was `git diff --stat` on an untracked file:
+  // it prints nothing whether the file is pristine or corrupt, so the
+  // check that claimed to prove the restore could not have failed.
+  // Here the command under test overwrites the subject, which is what a
+  // real command that writes its own inputs would do -- and the helper
+  // must notice, on a file git does not track.
+  const dir = mutateRepo({ subject: "value = GOOD\n", tracked: false });
+  try {
+    writeFileSync(
+      join(dir, "check.mjs"),
+      `import { writeFileSync } from "node:fs";\n`
+        + `writeFileSync("subject.txt", "SABOTAGED\\n");\n`
+        + `process.exit(1);\n`,
+    );
+    const r = mutate(dir, [
+      "--file",
+      "subject.txt",
+      "--old",
+      "GOOD",
+      "--new",
+      "BAD",
+      "--",
+      process.execPath,
+      "check.mjs",
+    ]);
+
+    // The command "failed", which alone would read as CAUGHT. The
+    // restore check outranks it.
+    assert.equal(r.status, 2, `expected a restore refusal:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /RESTORE FAILED/);
+
+    // Proof the file really is untracked, so this test cannot silently
+    // become the tracked case that git diff WOULD have caught.
+    const lsFiles = execFileSync("git", ["ls-files", "--", "subject.txt"], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    assert.equal(lsFiles.trim(), "", "subject.txt must be untracked for this case");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("check-root-scripts fails on drift in either direction", () => {
   const dir = tempRepo();
   const inner = (scripts) => `${JSON.stringify({ name: "inner", scripts }, null, 2)}\n`;

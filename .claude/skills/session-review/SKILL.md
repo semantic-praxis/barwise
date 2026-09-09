@@ -75,6 +75,24 @@ does this for the enumerating gates and is the worked example --
 including a test that pins the untracked-probe blind spot itself, so
 nobody re-runs that experiment and believes the result.
 
+**Use `barwise/scripts/mutate.mjs` rather than rolling the steps by
+hand.** The rule above was followed all six times this finding recurred,
+and the reading was still worthless, because the rule governs the thing
+under test and the failure was in the scaffolding around it: a `sed`
+whose anchor no longer matched printed a green run indistinguishable
+from a weak test, and a restore was "verified" by an instrument that
+prints the same thing whether the file is pristine or corrupt. The
+script refuses instead of proceeding when the anchor is absent or
+ambiguous, when the replacement is a no-op, when the command wrote to
+its own input, and when the restored bytes do not hash-match:
+
+    node scripts/mutate.mjs --file <path> --old <text> --new <text> \
+      -- <the command that should fail>
+
+It exits 0 when the mutation was CAUGHT, so `mutate ... && echo verified`
+is the whole reading. Design and the four failure modes it closes:
+`barwise/docs/specs/mutation-verification-helper.spec.md`.
+
 An entry reporting a landing you have only seen pass is not a landing
 yet. Say that, or go and break it.
 

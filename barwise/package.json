@@ -25,6 +25,7 @@
     "test:scripts": "node --test scripts/tests/*.test.mjs",
     "test:optimizer": "uv run --frozen --extra dev pytest -q",
     "audit:duplication": "node scripts/audit-duplication.mjs",
+    "mutate": "node scripts/mutate.mjs",
     "audit:specs": "node scripts/audit-spec-status.mjs",
     "survey:specs": "node scripts/audit-spec-status.mjs --survey",
     "audit:rubric": "node scripts/audit-rubric.mjs",
