@@ -131,6 +131,12 @@ violates, and the fix. A conventions finding quotes the exact rule and
 the exact line that breaks it, from the CLAUDE.md, spec, or skill that
 owns the rule; a reading of the "spirit" of a document is not a
 finding.
+A design finding (a shallow interface, a failure pushed to callers, a
+type wider than what the code knows) names the term from CLAUDE.md's
+shared vocabulary and the cost in the reader's terms -- which callers
+now guard, what a caller must learn, which knowledge sits in two places
+-- with the line that shows it; the term alone is not a finding, because
+CLAUDE.md makes that vocabulary descriptive, not a gate.
 
 - A fix with one correct mechanical form arrives as a GitHub
   suggestion block the author accepts in a click -- only when the
@@ -190,6 +196,13 @@ claim makes the verdict "cannot tell", not "merge".
   Never APPROVE and never merge. The merge decision and its
   accountability stay with a person; a model cannot be paged and
   cannot answer for what it shipped.
+- REQUEST_CHANGES is only available when the review posts as someone
+  other than the PR's author: GitHub rejects it on one's own PR, and a
+  remote session posts as the user, so on the user's PRs it fails
+  after the inline comments are already pending (PR #475). Check
+  `get_me` against the PR author before submitting; when they match,
+  submit as COMMENT with the verdict in the body's first line, which
+  is where the recommendation lives anyway.
 
 Three verdicts are honest: ready (with what was verified), not ready
 (with the blocking items), and cannot tell (with what could not be
