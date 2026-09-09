@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import type { Constraint, JoinOperand } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { joinConstraintRules } from "../../src/validation/rules/joinConstraintRules.js";
+import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";
 
 const bornIn: JoinOperand = {
   path: { root: "ot-person", steps: [{ entry: "pb-person", exit: "pb-country" }] },
@@ -53,17 +54,17 @@ function buildModel(constraint: Constraint): OrmModel {
   return model;
 }
 
-const idsOf = (model: OrmModel) => joinConstraintRules(model).map((d) => d.ruleId);
+const idsOf = (model: OrmModel) => joinConstraintRules(model, graphFor(model)).map((d) => d.ruleId);
 
 describe("joinConstraintRules", () => {
   it("accepts a well-formed join_equality", () => {
     const model = buildModel({ type: "join_equality", operands: [bornIn, citizenOf] });
-    expect(joinConstraintRules(model)).toHaveLength(0);
+    expect(joinConstraintRules(model, graphFor(model))).toHaveLength(0);
   });
 
   it("accepts a well-formed join_subset", () => {
     const model = buildModel({ type: "join_subset", subset: bornIn, superset: citizenOf });
-    expect(joinConstraintRules(model)).toHaveLength(0);
+    expect(joinConstraintRules(model, graphFor(model))).toHaveLength(0);
   });
 
   it("flags an unknown root object type", () => {
@@ -71,7 +72,10 @@ describe("joinConstraintRules", () => {
       path: { root: "ot-missing", steps: bornIn.path.steps },
       projection: [0, 1],
     };
-    expect(idsOf(buildModel({ type: "join_equality", operands: [bad, citizenOf] })))
+    // A root that names nothing is a reference failure, so `graphOf`
+    // reports it -- under the id this rule used to own.
+    const model = buildModel({ type: "join_equality", operands: [bad, citizenOf] });
+    expect(unresolvedDiagnostics(model).map((d) => d.ruleId))
       .toContain("constraint/join-unknown-root");
   });
 
@@ -119,7 +123,7 @@ describe("joinConstraintRules", () => {
 
   it("flags fewer than two operands for join_exclusion, naming it in the message", () => {
     const model = buildModel({ type: "join_exclusion", operands: [bornIn] });
-    const diags = joinConstraintRules(model);
+    const diags = joinConstraintRules(model, graphFor(model));
     const tooFew = diags.find((d) => d.ruleId === "constraint/join-too-few-operands");
     expect(tooFew).toBeDefined();
     expect(tooFew!.message).toContain("Join exclusion");
@@ -153,7 +157,7 @@ describe("joinConstraintRules", () => {
     const bad: JoinOperand = { path: { root: "ot-missing", steps: [] }, projection: [0] };
     ft.addConstraint({ type: "join_equality", operands: [bad, citizenOf] });
 
-    const diags = joinConstraintRules(model);
+    const diags = unresolvedDiagnostics(model);
     const unknownRoot = diags.find((d) => d.ruleId === "constraint/join-unknown-root");
     expect(unknownRoot).toBeDefined();
     expect(unknownRoot!.elementId).toBe(ft.id);

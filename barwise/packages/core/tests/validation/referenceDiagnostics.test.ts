@@ -126,6 +126,35 @@ describe("referenceDiagnostics reproduces today's diagnostics", () => {
   });
 });
 
+describe("referenceDiagnostics for what the graph is first to check", () => {
+  it("names a duplicate role id as its own finding, not a missing player", () => {
+    const model = base();
+    const shared = model.factTypes[0]!.roles[0]!.id;
+    model.addFactType({
+      name: "Customer has Code",
+      roles: [
+        { name: "has code", playerId: model.objectTypes[0]!.id, id: shared },
+        { name: "is code of", playerId: model.objectTypes[1]!.id },
+      ],
+      readings: ["{0} has code {1}", "{1} is code of {0}"],
+    });
+
+    const result = graphOf(model);
+    if (result.ok) throw new Error("expected graphOf to fail on a duplicate role id");
+    const diags = referenceDiagnostics(result.unresolved);
+
+    expect(diags.map((d) => d.ruleId)).toEqual([RULE_ID.duplicateRoleId]);
+    expect(diags[0]!.message).toContain(shared);
+    // Not the dangling-player message, whose text would claim the id
+    // named a missing object type.
+    expect(diags[0]!.message).not.toContain("object type");
+    // No rule reported this before, so there is nothing for it to
+    // duplicate -- and the engine surfaces it like any other.
+    expect(new ValidationEngine().validate(model).map((d) => d.ruleId))
+      .toContain(RULE_ID.duplicateRoleId);
+  });
+});
+
 describe("referenceDiagnostics for states no constructor admits", () => {
   it("dangling objectification references keep their historical ids", () => {
     const model = base();

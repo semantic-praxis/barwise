@@ -17,6 +17,7 @@
  * cannot leave a stale literal behind.
  */
 
+import { graphFor } from "./graphFor.js";
 import type { Counterexample } from "../../src/counterexample/Counterexample.js";
 import { generateCounterexamples } from "../../src/counterexample/CounterexampleGenerator.js";
 import type { Constraint } from "../../src/model/Constraint.js";
@@ -77,7 +78,7 @@ function ruleIdsWith(model: OrmModel, ce: Counterexample): string[] {
     }
     added.push(pop.id);
   }
-  const ruleIds = populationValidationRules(model).map((d) => d.ruleId);
+  const ruleIds = populationValidationRules(model, graphFor(model)).map((d) => d.ruleId);
   for (const id of added) model.removePopulation(id);
   return ruleIds;
 }

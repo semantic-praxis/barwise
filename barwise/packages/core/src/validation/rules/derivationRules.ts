@@ -1,3 +1,4 @@
+import type { ModelGraph } from "../../model/graph.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import { report, RULE_ID } from "../ruleId.js";
@@ -16,7 +17,7 @@ import { report, RULE_ID } from "../ruleId.js";
  *   suspect (warning). Derived-and-stored and semiderived populations are
  *   accepted.
  */
-export function derivationRules(model: OrmModel): Diagnostic[] {
+export function derivationRules(model: OrmModel, graph: ModelGraph): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   for (const ft of model.factTypes) {
@@ -42,9 +43,8 @@ export function derivationRules(model: OrmModel): Diagnostic[] {
     const d = sf.definingRule;
     if (!d) continue;
     if (d.expression.trim() === "") {
-      const subtype = model.getObjectType(sf.subtypeId);
       diagnostics.push(
-        report(RULE_ID.missingRule, "subtype", sf.id, subtype?.name ?? sf.subtypeId, d.kind),
+        report(RULE_ID.missingRule, "subtype", sf.id, graph.objectType(sf.subtypeId).name, d.kind),
       );
     }
   }

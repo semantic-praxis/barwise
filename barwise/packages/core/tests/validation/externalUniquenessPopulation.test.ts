@@ -4,6 +4,7 @@
  * share an identifying combination, and the graceful skip when the join
  * key cannot be inferred as a single clear object type.
  */
+import { graphFor } from "../helpers/graphFor.js";
 import { describe, expect, it } from "vitest";
 import type { FactType } from "../../src/model/FactType.js";
 import type { ObjectType } from "../../src/model/ObjectType.js";
@@ -40,7 +41,7 @@ function pop(m: OrmModel, factTypeId: string, roleValues: Record<string, string>
 }
 
 function flags(model: OrmModel, ruleId: string): boolean {
-  return populationValidationRules(model).some((d) => d.ruleId === ruleId);
+  return populationValidationRules(model, graphFor(model)).some((d) => d.ruleId === ruleId);
 }
 
 /**

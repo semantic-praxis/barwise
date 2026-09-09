@@ -3,6 +3,7 @@
  * exclusion, exclusive-or, subset, and equality whose roles span two fact
  * types.
  */
+import { graphFor } from "../helpers/graphFor.js";
 import { describe, expect, it } from "vitest";
 import type { FactType } from "../../src/model/FactType.js";
 import type { ObjectType } from "../../src/model/ObjectType.js";
@@ -39,7 +40,7 @@ function pop(m: OrmModel, factTypeId: string, roleValues: Record<string, string>
 }
 
 function flags(model: OrmModel, ruleId: string): boolean {
-  return populationValidationRules(model).some((d) => d.ruleId === ruleId);
+  return populationValidationRules(model, graphFor(model)).some((d) => d.ruleId === ruleId);
 }
 
 /** Person drives Car / rides Bus, with exclusion across the two Person roles. */

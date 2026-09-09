@@ -1,3 +1,4 @@
+import { graphFor } from "../helpers/graphFor.js";
 import { describe, expect, it } from "vitest";
 import type { Counterexample } from "../../src/counterexample/Counterexample.js";
 import {
@@ -23,7 +24,7 @@ function forbids(model: OrmModel, ce: Counterexample, ruleId: string): boolean {
       pop.addInstance({ roleValues: { ...inst.roleValues } });
     }
   }
-  return populationValidationRules(model).some((d) => d.ruleId === ruleId);
+  return populationValidationRules(model, graphFor(model)).some((d) => d.ruleId === ruleId);
 }
 
 function placesModel(): OrmModel {

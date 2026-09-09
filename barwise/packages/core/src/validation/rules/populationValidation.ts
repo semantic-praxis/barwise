@@ -1,3 +1,4 @@
+import type { ModelGraph } from "../../model/graph.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import {
@@ -24,7 +25,6 @@ import {
   checkSpanningSubsetViolations,
 } from "./population/spanning.js";
 import {
-  checkDanglingPopulationFactType,
   checkIncompleteInstances,
 } from "./population/structural.js";
 import {
@@ -138,15 +138,14 @@ export const ABSENT_DATA_RULES = [
   checkObjectCardinalityViolations,
 ] as const satisfies readonly (typeof UNIVERSE_RULES)[number][];
 
-export function populationValidationRules(model: OrmModel): Diagnostic[] {
+export function populationValidationRules(model: OrmModel, graph: ModelGraph): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   // Once, not once per rule: it walks every instance of every
   // population, and five rules used to build the same map for
   // themselves.
   const universe = buildObjectUniverse(model);
 
-  diagnostics.push(...checkDanglingPopulationFactType(model));
-  diagnostics.push(...checkIncompleteInstances(model));
+  diagnostics.push(...checkIncompleteInstances(model, graph));
   diagnostics.push(...checkUniquenessViolations(model));
   diagnostics.push(...checkValueConstraintViolations(model));
   diagnostics.push(...checkValueComparisonViolations(model));

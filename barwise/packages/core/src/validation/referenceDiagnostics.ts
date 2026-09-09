@@ -89,8 +89,13 @@ export function referenceDiagnostics(
 function diagnosticFor(u: UnresolvedReference): Diagnostic {
   switch (u.from.kind) {
     case "role":
+      // Two different findings share this source: a role whose player
+      // does not exist, and a role whose own id is already taken. The
+      // second is new -- the graph is the first thing that needed role
+      // ids to be unique -- so it gets its own id and message rather
+      // than borrowing one that would report the wrong thing.
       return report(
-        RULE_ID.danglingRoleReference,
+        u.field === "id" ? RULE_ID.duplicateRoleId : RULE_ID.danglingRoleReference,
         "default",
         u.from.factType.id,
         u.from.role.name,
