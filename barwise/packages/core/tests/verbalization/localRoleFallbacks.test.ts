@@ -24,15 +24,28 @@ const CONSTRAINTS_DIR = resolve(
   "../../src/verbalization/constraints",
 );
 
-/** Verbalizers whose kind `requiresLocalRoles` marks false. */
-const SPANNING_VERBALIZERS = new Set([
+/**
+ * Where a role-id fallback is allowed: code serving a kind
+ * `requiresLocalRoles` marks false, for which a role of another fact
+ * type is correct rather than a defect.
+ *
+ * `spanningRoleLabel` is here and holds no `??` today -- it degrades
+ * with an explicit `if (!role)` instead, which this file's regex does
+ * not match. It is listed because it is the shared degradation point
+ * that `verbalizeSubset` and `verbalizeEquality` now route through
+ * (barwise-884), so a `??` appearing there later is legitimate and
+ * should not be reported.
+ */
+const SPANNING_FALLBACK_SITES = new Set([
   "verbalizeExternalUniqueness",
   "verbalizeDisjunctiveMandatory",
   "verbalizeExclusion",
   "verbalizeExclusiveOr",
-  "verbalizeSubset",
-  "verbalizeEquality",
+  "spanningRoleLabel",
 ]);
+
+/** How many of those sites hold a matching fallback today. */
+const EXPECTED_FALLBACK_SITES = 4;
 
 // `roleId[12]?` and not `roleId\b`: the ring and value-comparison
 // verbalizers spell their parameters `roleId1`/`roleId2`, and `\b` does
@@ -67,7 +80,7 @@ describe("role-id fallbacks live only in the spanning-kind verbalizers", () => {
   for (const file of ["phase1.ts", "phase2.ts"]) {
     it(`${file} has none in a local-role verbalizer`, () => {
       const offenders = fallbacksByFunction(file)
-        .filter((f) => !SPANNING_VERBALIZERS.has(f.fn))
+        .filter((f) => !SPANNING_FALLBACK_SITES.has(f.fn))
         .map((f) => `${file}:${f.line} in ${f.fn}: ${f.text}`);
 
       expect(offenders).toEqual([]);
@@ -76,9 +89,15 @@ describe("role-id fallbacks live only in the spanning-kind verbalizers", () => {
 
   it("finds the fallbacks that are supposed to be there", () => {
     // Without this the regex could stop matching and the test above
-    // would pass by seeing nothing at all.
+    // would pass by seeing nothing at all. Asserted as a subset with a
+    // floor rather than an exact set: a legitimate site may hold no `??`
+    // at a given moment (`spanningRoleLabel` does not), and the floor is
+    // what stops the check degrading to "found almost nothing".
     const all = [...fallbacksByFunction("phase1.ts"), ...fallbacksByFunction("phase2.ts")];
+    const sites = new Set(all.map((f) => f.fn));
+
     expect(all.length).toBeGreaterThan(0);
-    expect(new Set(all.map((f) => f.fn))).toEqual(SPANNING_VERBALIZERS);
+    expect(sites.size).toBe(EXPECTED_FALLBACK_SITES);
+    expect([...sites].filter((fn) => !SPANNING_FALLBACK_SITES.has(fn))).toEqual([]);
   });
 });

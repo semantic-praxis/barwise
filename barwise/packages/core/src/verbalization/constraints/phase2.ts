@@ -28,7 +28,13 @@ export function verbalizeDisjunctiveMandatory(
   segments.push(refSeg(commonPlayer.name, commonPlayer.id));
 
   for (let i = 0; i < roleIds.length; i++) {
-    const role = factType.getRoleById(roleIds[i]!);
+    // Spanning constraints reach across fact types by definition, so
+    // resolve model-wide rather than against the owner fact type
+    // alone -- `factType.getRoleById` misses a legitimate foreign
+    // role and the fallback below then printed its raw id
+    // (barwise-884). Past this point the fallback means the role
+    // exists in NO fact type, which is a dangling reference.
+    const role = model.findRole(roleIds[i]!);
     const ot = role ? model.getObjectType(role.playerId) : undefined;
     const roleName = role?.name ?? roleIds[i]!;
     const otName = ot?.name ?? roleName;
@@ -62,7 +68,13 @@ export function verbalizeExclusion(
   segments.push(textSeg(" both "));
 
   for (let i = 0; i < roleIds.length; i++) {
-    const role = factType.getRoleById(roleIds[i]!);
+    // Spanning constraints reach across fact types by definition, so
+    // resolve model-wide rather than against the owner fact type
+    // alone -- `factType.getRoleById` misses a legitimate foreign
+    // role and the fallback below then printed its raw id
+    // (barwise-884). Past this point the fallback means the role
+    // exists in NO fact type, which is a dangling reference.
+    const role = model.findRole(roleIds[i]!);
     const ot = role ? model.getObjectType(role.playerId) : undefined;
     const roleName = role?.name ?? roleIds[i]!;
     const otName = ot?.name ?? roleName;
@@ -94,7 +106,13 @@ export function verbalizeExclusiveOr(
   segments.push(textSeg(" either "));
 
   for (let i = 0; i < roleIds.length; i++) {
-    const role = factType.getRoleById(roleIds[i]!);
+    // Spanning constraints reach across fact types by definition, so
+    // resolve model-wide rather than against the owner fact type
+    // alone -- `factType.getRoleById` misses a legitimate foreign
+    // role and the fallback below then printed its raw id
+    // (barwise-884). Past this point the fallback means the role
+    // exists in NO fact type, which is a dangling reference.
+    const role = model.findRole(roleIds[i]!);
     const ot = role ? model.getObjectType(role.playerId) : undefined;
     const roleName = role?.name ?? roleIds[i]!;
     const otName = ot?.name ?? roleName;
@@ -125,21 +143,17 @@ export function verbalizeSubset(
   const segments: VerbalizationSegment[] = [kwSeg("If ")];
 
   for (let i = 0; i < subsetRoleIds.length; i++) {
-    const role = factType.getRoleById(subsetRoleIds[i]!);
-    const ot = role ? model.getObjectType(role.playerId) : undefined;
-    const name = ot?.name ?? role?.name ?? subsetRoleIds[i]!;
+    const label = spanningRoleLabel(model, factType, subsetRoleIds[i]!);
     if (i > 0) segments.push(textSeg(" "));
-    segments.push(refSeg(name, role?.playerId ?? subsetRoleIds[i]!));
+    segments.push(refSeg(label.text, label.elementId));
   }
 
   segments.push(kwSeg(" then "));
 
   for (let i = 0; i < supersetRoleIds.length; i++) {
-    const role = factType.getRoleById(supersetRoleIds[i]!);
-    const ot = role ? model.getObjectType(role.playerId) : undefined;
-    const name = ot?.name ?? role?.name ?? supersetRoleIds[i]!;
+    const label = spanningRoleLabel(model, factType, supersetRoleIds[i]!);
     if (i > 0) segments.push(textSeg(" "));
-    segments.push(refSeg(name, role?.playerId ?? supersetRoleIds[i]!));
+    segments.push(refSeg(label.text, label.elementId));
   }
 
   segments.push(textSeg("."));
@@ -158,21 +172,17 @@ export function verbalizeEquality(
   const segments: VerbalizationSegment[] = [];
 
   for (let i = 0; i < roleIds1.length; i++) {
-    const role = factType.getRoleById(roleIds1[i]!);
-    const ot = role ? model.getObjectType(role.playerId) : undefined;
-    const name = ot?.name ?? role?.name ?? roleIds1[i]!;
+    const label = spanningRoleLabel(model, factType, roleIds1[i]!);
     if (i > 0) segments.push(textSeg(" "));
-    segments.push(refSeg(name, role?.playerId ?? roleIds1[i]!));
+    segments.push(refSeg(label.text, label.elementId));
   }
 
   segments.push(kwSeg(" if and only if "));
 
   for (let i = 0; i < roleIds2.length; i++) {
-    const role = factType.getRoleById(roleIds2[i]!);
-    const ot = role ? model.getObjectType(role.playerId) : undefined;
-    const name = ot?.name ?? role?.name ?? roleIds2[i]!;
+    const label = spanningRoleLabel(model, factType, roleIds2[i]!);
     if (i > 0) segments.push(textSeg(" "));
-    segments.push(refSeg(name, role?.playerId ?? roleIds2[i]!));
+    segments.push(refSeg(label.text, label.elementId));
   }
 
   segments.push(textSeg("."));
@@ -553,6 +563,41 @@ export function verbalizeObjectCardinality(
 // ---------------------------------------------------------------------------
 
 const objName = (model: OrmModel, otId: string): string => model.getObjectType(otId)?.name ?? otId;
+
+/**
+ * How a spanning constraint names one of its roles.
+ *
+ * Subset and equality read as "If X then Y" and "X if and only if Y",
+ * naming the players and nothing else -- which for the spanning case
+ * collapses to "If Vendor then Vendor", since such a constraint usually
+ * relates the SAME object type playing roles in two different fact
+ * types. So a role that is not the owner's is qualified by the fact type
+ * it belongs to (barwise-884).
+ *
+ * The other three spanning verbalizers -- disjunctive mandatory,
+ * exclusion, exclusive-or -- already emit the role's own name beside the
+ * player ("Vendor has some VendorStatus"), so their sentences
+ * distinguish the roles without this and are left alone.
+ */
+function spanningRoleLabel(
+  model: OrmModel,
+  owner: FactType,
+  roleId: string,
+): { text: string; elementId: string; } {
+  const role = model.findRole(roleId);
+  // No fact type has it: a dangling reference, and the id is all there
+  // is to say.
+  if (!role) return { text: roleId, elementId: roleId };
+
+  const name = model.getObjectType(role.playerId)?.name ?? role.name;
+  if (owner.getRoleById(roleId)) return { text: name, elementId: role.playerId };
+
+  const home = factTypeOfRole(model, roleId);
+  return {
+    text: home ? `${name} in ${home.name}` : name,
+    elementId: role.playerId,
+  };
+}
 
 /** The fact type owning a role id, scanning the whole model. */
 function factTypeOfRole(model: OrmModel, roleId: string): FactType | undefined {
