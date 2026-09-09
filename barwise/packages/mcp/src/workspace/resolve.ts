@@ -130,7 +130,11 @@ export interface ResolvedDomains {
  *   project manifest is given as inline content (it needs a path to resolve
  *   its referenced files).
  */
-export function resolveModels(input: SourceInput, domain?: string): ResolvedDomains {
+export function resolveModels(
+  input: SourceInput,
+  domain?: string,
+  options?: { lenient?: boolean; },
+): ResolvedDomains {
   const { path, content } = normalizeSource(input);
 
   if (path !== undefined && path.endsWith(".orm-project.yaml")) {
@@ -147,7 +151,7 @@ export function resolveModels(input: SourceInput, domain?: string): ResolvedDoma
     );
   }
 
-  return { resolved: [{ model: resolveSource(input) }], problems: [] };
+  return { resolved: [{ model: resolveSource(input, options) }], problems: [] };
 }
 
 /** Load a project manifest from disk and select the requested domain(s). */

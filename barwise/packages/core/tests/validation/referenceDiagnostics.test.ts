@@ -8,16 +8,13 @@
  * a model with one dangling reference, runs the CURRENT engine, and
  * asserts the mapped diagnostic matches it exactly.
  *
- * Two reference kinds cannot be tested that way, and the reason is worth
- * recording rather than working around: `OrmModel.addObjectifiedFactType`
- * and `OrmModel.addPopulation` throw on a missing reference and offer no
- * `skipPlayerValidation` escape, so no caller -- the deserializer
- * included -- can hand the validator a model carrying one. The rules
- * that report those two (`structural/objectified-dangling-*`,
- * `population/dangling-fact-type`) have therefore never fired for any
- * consumer, and there is no "today's behaviour" for the mapping to
- * reproduce. Those cases assert the diagnostic directly instead, so the
- * arm is covered if the constructors are ever relaxed (barwise-977).
+ * Two reference kinds could not be tested that way when this file was
+ * written: `addObjectifiedFactType` and `addPopulation` threw on a
+ * missing reference and offered no `skipPlayerValidation` escape, so no
+ * caller could hand the validator a model carrying one, and the rules
+ * reporting them had never fired. barwise-977 gave both constructors the
+ * escape their two siblings already had, so those cases are now built
+ * the same way as the rest and assert the same equivalence.
  */
 import { describe, expect, it } from "vitest";
 import { graphOf } from "../../src/model/graph.js";
@@ -238,46 +235,36 @@ describe("referenceDiagnostics for what the graph is first to check", () => {
   });
 });
 
-describe("referenceDiagnostics for states no constructor admits", () => {
-  it("dangling objectification references keep their historical ids", () => {
+describe("referenceDiagnostics for the kinds barwise-977 made reachable", () => {
+  it("reports both dangling objectification references", () => {
     const model = base();
-    const ft = model.factTypes[0]!;
-    const ot = model.objectTypes[0]!;
-    const oft = model.addObjectifiedFactType({ factTypeId: ft.id, objectTypeId: ot.id });
+    model.addObjectifiedFactType(
+      { factTypeId: "ft-missing", objectTypeId: "ot-missing", id: "oft1" },
+      { skipPlayerValidation: true },
+    );
 
-    const diags = referenceDiagnostics([
-      {
-        from: { kind: "objectifiedFactType", objectifiedFactType: oft },
-        field: "factTypeId",
-        missing: "ft-missing",
-      },
-      {
-        from: { kind: "objectifiedFactType", objectifiedFactType: oft },
-        field: "objectTypeId",
-        missing: "ot-missing",
-      },
-    ]);
+    const factTypeSide = mapped(model, RULE_ID.objectifiedDanglingFactType);
+    const objectTypeSide = mapped(model, RULE_ID.objectifiedDanglingObjectType);
 
-    expect(diags.map((d) => d.ruleId)).toEqual([
-      RULE_ID.objectifiedDanglingFactType,
-      RULE_ID.objectifiedDanglingObjectType,
-    ]);
-    expect(diags[0]!.message).toContain("ft-missing");
-    expect(diags[1]!.message).toContain("ot-missing");
-    expect(diags.every((d) => d.elementId === oft.id)).toBe(true);
+    expect(factTypeSide[0]!.message).toContain("ft-missing");
+    expect(objectTypeSide[0]!.message).toContain("ot-missing");
+    expect(factTypeSide[0]!.elementId).toBe("oft1");
+    // And the engine delivers them, which is what "reachable" means:
+    // before barwise-977 the constructor threw and no consumer saw these.
+    expect(today(model, RULE_ID.objectifiedDanglingFactType)).toEqual(factTypeSide);
+    expect(today(model, RULE_ID.objectifiedDanglingObjectType)).toEqual(objectTypeSide);
   });
 
-  it("dangling population fact type keeps its historical id", () => {
+  it("reports a dangling population fact type", () => {
     const model = base();
-    const pop = model.addPopulation({ factTypeId: model.factTypes[0]!.id });
+    const pop = model.addPopulation({ factTypeId: "ft-missing" }, { skipPlayerValidation: true });
 
-    const diags = referenceDiagnostics([
-      { from: { kind: "population", population: pop }, field: "factTypeId", missing: "ft-missing" },
-    ]);
+    const diags = mapped(model, RULE_ID.danglingFactType);
 
-    expect(diags[0]!.ruleId).toBe(RULE_ID.danglingFactType);
+    expect(diags).toHaveLength(1);
     expect(diags[0]!.message).toContain("ft-missing");
     expect(diags[0]!.message).toContain(pop.id);
+    expect(today(model, RULE_ID.danglingFactType)).toEqual(diags);
   });
 });
 
