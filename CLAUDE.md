@@ -251,6 +251,18 @@ exists. Anything else -- `npx`, `node scripts/...`, a relative path --
 still means what it says relative to your cwd, so prefer absolute paths
 there.
 
+From anywhere inside the repository, a package directory included,
+`node "$(git rev-parse --show-toplevel)/barwise/scripts/at-root.mjs"
+<script> [args]` runs the same npm script with no `cd` in the command.
+It exists because `cd barwise` fails when the working directory is
+already `barwise/`, and this harness moves the working directory
+between commands: twice in one session a satisfied `cd` failed, and
+the second time it headed an `&&` chain, so `npm run fmt` was skipped
+silently and the gate run went red (barwise-907, second occurrence).
+A `cd` in a command is the habit that fails; spell the location once,
+in the path. `scripts/tests/at-root.test.mjs` proves the wrapper gives
+the same answer from the root, from `barwise/`, and from a package.
+
 `npm run build`, `test`, and `lint` fan out via Turborepo in dependency
 order; per-package runs use `npx vitest run` / `npx tsc --noEmit` from
 the package directory.
