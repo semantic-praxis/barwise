@@ -3,6 +3,7 @@
  * AI-assisted development and human review. This entry dispatches on the
  * focus option; the describers, summaries, and types live in siblings.
  */
+import { requireGraph } from "../model/graph.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import {
   describeConstraintType,
@@ -35,10 +36,15 @@ export function describeDomain(
 ): DomainDescription {
   const focus = options.focus?.toLowerCase();
   const includePopulations = options.includePopulations ?? true;
+  // Built once, here, rather than by each describer: describing a model
+  // whose ids do not resolve has no useful partial answer, and before
+  // this the attempt crashed with "Cannot read properties of undefined
+  // (reading 'playerId')" rather than saying which reference was bad.
+  const graph = requireGraph(model);
 
   // If no focus, return full summary.
   if (!focus) {
-    return describeFullModel(model, includePopulations);
+    return describeFullModel(model, graph, includePopulations);
   }
 
   // Try to match focus to an entity name.
@@ -46,7 +52,7 @@ export function describeDomain(
     (ot) => ot.name.toLowerCase() === focus,
   );
   if (entityMatch) {
-    return describeEntity(model, entityMatch, includePopulations);
+    return describeEntity(model, graph, entityMatch, includePopulations);
   }
 
   // Try to match focus to a fact type name.
@@ -54,12 +60,12 @@ export function describeDomain(
     (ft) => ft.name.toLowerCase() === focus,
   );
   if (factTypeMatch) {
-    return describeFactType(model, factTypeMatch, includePopulations);
+    return describeFactType(model, graph, factTypeMatch, includePopulations);
   }
 
   // Try to match focus to a constraint type keyword.
   if (isConstraintTypeKeyword(focus)) {
-    return describeConstraintType(model, focus, includePopulations);
+    return describeConstraintType(model, graph, focus, includePopulations);
   }
 
   // No match - return empty description with a message.

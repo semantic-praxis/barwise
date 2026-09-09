@@ -7,12 +7,12 @@
  * population/definition fields being present or absent.
  */
 import { describe, expect, it } from "vitest";
+import { describeDomain } from "../../src/describe/describeDomain.js";
 import {
   buildConstraintTypeFocusSummary,
   buildEntityFocusSummary,
   buildFactTypeFocusSummary,
   buildFullSummary,
-  summarizeFactType,
   summarizePopulation,
 } from "../../src/describe/summaries.js";
 import type {
@@ -20,19 +20,21 @@ import type {
   EntitySummary,
   PopulationSummary,
 } from "../../src/describe/types.js";
+import { ModelNotResolvableError } from "../../src/model/graph.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { Population } from "../../src/model/Population.js";
+import { graphFor } from "../helpers/graphFor.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 describe("summarizeFactType", () => {
-  it("falls back to the raw player id when a role's player type is not in the model", () => {
+  it("reports the unresolvable reference instead of describing around it", () => {
     const model = new OrmModel({ name: "Test" });
     const customer = model.addObjectType({
       name: "Customer",
       kind: "entity",
       referenceMode: "customer_id",
     });
-    const ft = model.addFactType(
+    model.addFactType(
       {
         name: "Customer places Order",
         roles: [
@@ -44,9 +46,13 @@ describe("summarizeFactType", () => {
       { skipPlayerValidation: true },
     );
 
-    const summary = summarizeFactType(model, ft);
-    expect(summary.involvedEntities).toContain("Customer");
-    expect(summary.involvedEntities).toContain("missing-order-type");
+    // This used to return "missing-order-type" among the involved
+    // entities -- an id where a name belongs, pinned as behaviour. What a
+    // caller actually got at the surface was worse: `barwise describe` on
+    // such a model died with "Cannot read properties of undefined
+    // (reading 'playerId')". Both are replaced by one named failure.
+    expect(() => describeDomain(model)).toThrow(ModelNotResolvableError);
+    expect(() => describeDomain(model)).toThrow("missing-order-type");
   });
 });
 
@@ -129,7 +135,7 @@ describe("buildEntityFocusSummary", () => {
 });
 
 describe("buildFactTypeFocusSummary", () => {
-  it("falls back to the raw player id when the entity list omits a role's player", () => {
+  it("names every role's player, with no list for a caller to filter", () => {
     const model = new OrmModel({ name: "Test" });
     const customer = model.addObjectType({
       name: "Customer",
@@ -146,10 +152,14 @@ describe("buildFactTypeFocusSummary", () => {
       readings: ["{0} places {1}", "{1} is placed by {0}"],
     });
 
-    // Only Customer is in the entities list -- Order's summary is missing,
-    // as would happen if the caller filtered entities before calling in.
-    const text = buildFactTypeFocusSummary(ft, [customer], [], undefined);
-    expect(text).toContain(`played by ${order.id}`);
+    // This used to take an `entities` list and print the raw id for any
+    // role whose player the caller had filtered out -- a test pinned that
+    // as behaviour. The graph is not a list a caller assembles, so the
+    // case is designed out rather than handled.
+    const text = buildFactTypeFocusSummary(ft, graphFor(model), [], undefined);
+    expect(text).toContain("played by Customer");
+    expect(text).toContain("played by Order");
+    expect(text).not.toContain(order.id);
   });
 
   it("shows a population's description and sample instances when present", () => {
@@ -175,7 +185,7 @@ describe("buildFactTypeFocusSummary", () => {
       },
     ];
 
-    const text = buildFactTypeFocusSummary(ft, [customer], [], populations);
+    const text = buildFactTypeFocusSummary(ft, graphFor(model), [], populations);
     expect(text).toContain("Description: Known active customers");
     expect(text).toContain("Sample:");
     expect(text).toContain("r1=C001");
@@ -198,7 +208,7 @@ describe("buildFactTypeFocusSummary", () => {
       { factTypeId: ft.id, factTypeName: ft.name, instanceCount: 0, sampleInstances: [] },
     ];
 
-    const text = buildFactTypeFocusSummary(ft, [customer], [], populations);
+    const text = buildFactTypeFocusSummary(ft, graphFor(model), [], populations);
     expect(text).toContain("Description: Sample data");
     expect(text).not.toContain("Sample:");
   });

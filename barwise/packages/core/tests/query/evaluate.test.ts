@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ModelNotResolvableError } from "../../src/model/graph.js";
 import type { OrmModel } from "../../src/model/OrmModel.js";
 import { queryModel } from "../../src/query/evaluate.js";
 import { runQuery } from "../../src/query/index.js";
@@ -280,5 +281,28 @@ describe("queryModel: accepts a struct directly", () => {
   it("evaluates a ModelQuery without going through the DSL", () => {
     const r: QueryResult = queryModel(model, { kind: "model-stats" });
     expect(r.kind).toBe("stats");
+  });
+});
+
+describe("queryModel on a model whose references do not resolve", () => {
+  it("reports the reference rather than answering with an id", () => {
+    const model = new ModelBuilder("Bad")
+      .withEntityType("Customer")
+      .withValueType("Name")
+      .withBinaryFactType("Customer has Name", {
+        role1: { player: "Customer", name: "has" },
+        role2: { player: "Name", name: "is of" },
+      })
+      .build();
+    model.factTypes[0]!.addConstraint({ type: "mandatory", roleId: "bogus", id: "c1" });
+
+    // Before the graph this reached the evaluator, which printed the raw
+    // playerId where a name belonged or -- at the CLI, measured on
+    // 8410d6e -- died with "Cannot read properties of undefined
+    // (reading 'playerId')". The exit code was already 1; only the
+    // message changes.
+    expect(() => queryModel(model, { kind: "model-stats" }))
+      .toThrow(ModelNotResolvableError);
+    expect(() => queryModel(model, { kind: "model-stats" })).toThrow("bogus");
   });
 });

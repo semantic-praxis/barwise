@@ -1,20 +1,13 @@
 /**
- * Role-graph traversal primitive.
+ * The shape of one hop in the model's role graph.
  *
- * The single, pure adjacency walk over an ORM model's fact-type graph,
- * shared by the symbolic query path search (read-time discovery in
- * `query/evaluate.ts`) and the forthcoming role-path constraint operands
- * (declared and serialized -- see docs/specs/archive/role-path-model.spec.md). One
- * walk, two callers: query BFS expands `hopsFrom` to find a path between two
- * entities; a declared role path is validated by checking each of its steps
- * is a real `RoleHop` and that consecutive steps are contiguous.
- *
- * Keeping the adjacency here (rather than open-coded in each caller) is the
- * ADR-0001 "reuse the traversal, don't fork it" requirement made concrete.
+ * The walk that produces these lives in `graph.ts`, which is its only
+ * caller. This file keeps the type because `RoleHop` is part of
+ * `ModelGraph`'s published interface and importing it from the module
+ * that builds the graph would be circular.
  */
 
 import type { FactType } from "./FactType.js";
-import type { OrmModel } from "./OrmModel.js";
 import type { Role } from "./Role.js";
 
 /**
@@ -26,28 +19,4 @@ export interface RoleHop {
   readonly factType: FactType;
   readonly entryRole: Role;
   readonly exitRole: Role;
-}
-
-/**
- * Every one-fact-type hop leaving `objectTypeId`, in deterministic order:
- * fact types in `factTypesForObjectType` order, then for each role the object
- * plays (the entry role) each other role of that fact type (the exit role) in
- * `roles` order.
- *
- * Ring hops -- where the exit role's player is the object itself -- are
- * included; a caller walking the graph as a simple node graph (e.g. BFS
- * discovery) skips them via its own visited set, while a ring-constraint
- * evaluator needs them.
- */
-export function hopsFrom(model: OrmModel, objectTypeId: string): RoleHop[] {
-  const hops: RoleHop[] = [];
-  for (const factType of model.factTypesForObjectType(objectTypeId)) {
-    for (const entryRole of factType.rolesForPlayer(objectTypeId)) {
-      for (const exitRole of factType.roles) {
-        if (exitRole.id === entryRole.id) continue;
-        hops.push({ factType, entryRole, exitRole });
-      }
-    }
-  }
-  return hops;
 }

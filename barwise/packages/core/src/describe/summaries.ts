@@ -3,6 +3,7 @@
  * derived from them.
  */
 import type { FactType } from "../model/FactType.js";
+import type { ModelGraph } from "../model/graph.js";
 import { type ObjectType, referenceModeOf } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { Population } from "../model/Population.js";
@@ -33,6 +34,7 @@ export function summarizeEntity(entity: ObjectType): EntitySummary {
 export function summarizeFactType(
   model: OrmModel,
   factType: FactType,
+  graph: ModelGraph,
 ): FactTypeSummary {
   const verbalizer = new Verbalizer();
   const primaryVerbalization = verbalizer.factTypes.verbalizePrimary(
@@ -42,10 +44,7 @@ export function summarizeFactType(
   const primaryReading = primaryVerbalization.text;
 
   const involvedEntities = factType.roles
-    .map((r) => {
-      const ot = model.getObjectType(r.playerId);
-      return ot?.name ?? r.playerId;
-    })
+    .map((r) => graph.player(r).name)
     .filter((name, idx, arr) => arr.indexOf(name) === idx); // unique
 
   return {
@@ -174,7 +173,7 @@ export function buildEntityFocusSummary(
  */
 export function buildFactTypeFocusSummary(
   factType: FactType,
-  entities: readonly ObjectType[],
+  graph: ModelGraph,
   constraints: readonly ConstraintSummary[],
   populations: readonly PopulationSummary[] | undefined,
 ): string {
@@ -185,9 +184,10 @@ export function buildFactTypeFocusSummary(
 
   parts.push(`\nRoles:`);
   for (const role of factType.roles) {
-    const entity = entities.find((e) => e.id === role.playerId);
-    const entityName = entity?.name ?? role.playerId;
-    parts.push(`  - ${role.name} (played by ${entityName})`);
+    // The `entities` list this used to search was the roles' own players,
+    // so the search could only fail for a role whose player did not
+    // exist -- and then it printed the id. The graph answers directly.
+    parts.push(`  - ${role.name} (played by ${graph.player(role).name})`);
   }
 
   parts.push(`\nConstraints: ${constraints.length}`);

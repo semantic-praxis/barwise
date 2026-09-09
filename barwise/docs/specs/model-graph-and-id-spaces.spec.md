@@ -1,7 +1,8 @@
 # Resolve references once: `ModelGraph`, and which id spaces earn a brand
 
-Status: Workstreams 1 (`NormaId`), 2 (`graphOf`) and 3 (validation
-split) shipped 2026-09-09; Workstreams 4-5 not implemented
+Status: Workstreams 1 (`NormaId`), 2 (`graphOf`), 3 (validation split)
+and 4 (query and describe) shipped 2026-09-09; Workstream 5 not
+implemented
 Created: 2026-09-09
 Last-updated: 2026-09-09
 Tracking: barwise-974 (this spec), barwise-973 (WS1, partly shipped),
@@ -567,7 +568,7 @@ reference and no duplicates. The original wording said "no rule shall
 resolve a reference itself", which -- read literally against the
 corrected 57-site count -- would have deleted the locality checks too.
 
-### 4. Query and describe take the graph; `hopsFrom` moves
+### 4. Query and describe take the graph; `hopsFrom` moves (SHIPPED)
 
 The 3 `?? playerId` fallbacks in `query/evaluate.ts` and the 2 in
 `describe/summaries.ts` go, and `model/roleGraph.ts`'s `hopsFrom`
@@ -580,6 +581,44 @@ is stale and an earlier draft of this spec repeated it instead of
 measuring. `describe/` rides along rather than getting its own
 workstream because its two fallbacks are the same shape as query's,
 resolved the same way, in the same package.
+
+**What the entry points do when the graph does not build was the only
+real decision here, and measuring settled it.** `queryModel(model,
+query)` and `describeDomain(model, options)` keep their signatures and
+build the graph internally, as `constraintEnforcement` already does for
+`@barwise/learn`; on failure they throw `ModelNotResolvableError`,
+which carries the `UnresolvedReference` records rather than only prose.
+
+That looks like exporting a failure to callers, which the house rules
+warn against, so it was checked against what callers see today rather
+than argued. On `8410d6e`, against a schema-valid file whose mandatory
+constraint names a missing role:
+
+```
+$ barwise describe m.orm.yaml
+Error: Cannot read properties of undefined (reading 'playerId')   # exit 1
+$ barwise query m.orm.yaml fact-type "Customer has Name"
+Error: Cannot read properties of undefined (reading 'playerId')   # exit 1
+```
+
+Both surfaces already caught and exited 1. So this is not a new failure
+being introduced; it is the same failure, named, with the reference that
+caused it. Only the message changes, which is why WS4 needed no surface
+plumbing and why widening `QueryResult` with an `unresolved` arm -- the
+alternative -- was rejected: it would have pulled WS5's surface work
+forward to render an arm for a case the surfaces already handle.
+
+`buildFactTypeFocusSummary` lost its `entities` parameter rather than
+gaining a graph beside it. It searched that list for each role's player
+and printed the raw id when the caller had filtered one out, and a test
+pinned that as behaviour. The graph is not a list a caller assembles, so
+the case is designed out rather than handled.
+
+**Two tests pinned a fallback as behaviour** and were converted, not
+deleted: one now asserts that `describeDomain` reports the unresolvable
+reference, the other that every role's player is named. A third of the
+same shape survives out of scope -- `summarizePopulation` still falls
+back to a raw fact type id, and its test still pins that.
 
 ### 5. Verbalization and counterexample take resolved roles (largest)
 

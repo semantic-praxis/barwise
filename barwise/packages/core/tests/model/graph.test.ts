@@ -12,7 +12,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { roleIdsOf } from "../../src/model/Constraint.js";
-import { graphOf } from "../../src/model/graph.js";
+import { graphOf, ModelNotResolvableError, requireGraph } from "../../src/model/graph.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
@@ -379,5 +379,45 @@ describe("graphOf over the shipped example models", () => {
         expect(result.graph.resolve(c).roles.length).toBe(roleIdsOf(c).length);
       }
     }
+  });
+});
+
+describe("requireGraph", () => {
+  it("returns the graph when every reference resolves", () => {
+    const model = new ModelBuilder("Ok")
+      .withEntityType("Customer")
+      .withValueType("Name")
+      .withBinaryFactType("Customer has Name", {
+        role1: { player: "Customer", name: "has" },
+        role2: { player: "Name", name: "is of" },
+      })
+      .build();
+    expect(requireGraph(model).objectType(model.objectTypes[0]!.id).name).toBe("Customer");
+  });
+
+  it("throws a named error listing what did not resolve", () => {
+    const model = new ModelBuilder("Bad")
+      .withEntityType("Customer")
+      .withValueType("Name")
+      .withBinaryFactType("Customer has Name", {
+        role1: { player: "Customer", name: "has" },
+        role2: { player: "Name", name: "is of" },
+      })
+      .build();
+    model.factTypes[0]!.addConstraint({ type: "mandatory", roleId: "bogus", id: "c1" });
+
+    // The error carries the references, not just prose: a caller that
+    // wants to report them properly (a surface, in WS5) can, without
+    // parsing the message.
+    let caught: unknown;
+    try {
+      requireGraph(model);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(ModelNotResolvableError);
+    expect((caught as ModelNotResolvableError).unresolved).toHaveLength(1);
+    expect((caught as ModelNotResolvableError).unresolved[0]!.missing).toBe("bogus");
+    expect((caught as Error).message).toContain("bogus");
   });
 });

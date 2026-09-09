@@ -1,19 +1,29 @@
 /**
- * Tests for the shared role-graph traversal primitive `hopsFrom`.
+ * Tests for the role-graph adjacency walk, now `ModelGraph.hopsFrom`.
  *
- * `hopsFrom` is the single adjacency walk under both the query path search
- * and the forthcoming role-path constraints. These tests pin its shape: one
- * hop per (entry role played by the object, other role of the same fact
- * type), ring hops included, deterministic order.
+ * They moved here with the walk itself. The "forthcoming role-path
+ * constraints" the old header named as its second caller never arrived --
+ * those landed in `joinConstraintRules.ts` walking role ids directly --
+ * so the query path search is the only caller, and it now reaches the
+ * walk through the graph. These tests pin its shape: one hop per (entry
+ * role played by the object, other role of the same fact type), ring hops
+ * included, deterministic order.
  */
 import { describe, expect, it } from "vitest";
-import { hopsFrom } from "../../src/model/roleGraph.js";
+import type { OrmModel } from "../../src/model/OrmModel.js";
+import { graphFor } from "../helpers/graphFor.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
-function idOf(model: ReturnType<ModelBuilder["build"]>, name: string): string {
+function idOf(model: OrmModel, name: string): string {
   const ot = model.getObjectTypeByName(name);
   if (!ot) throw new Error(`no object type ${name}`);
   return ot.id;
+}
+
+/** The hops leaving one object type, by name, through the graph. */
+function hopsFrom(model: OrmModel, objectTypeId: string) {
+  const graph = graphFor(model);
+  return graph.hopsFrom(graph.objectType(objectTypeId));
 }
 
 describe("hopsFrom", () => {

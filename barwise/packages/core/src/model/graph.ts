@@ -52,7 +52,7 @@ import type { ObjectType } from "./ObjectType.js";
 import type { OrmModel } from "./OrmModel.js";
 import type { Population } from "./Population.js";
 import type { Role } from "./Role.js";
-import { hopsFrom, type RoleHop } from "./roleGraph.js";
+import type { RoleHop } from "./roleGraph.js";
 import type { SubtypeFact } from "./SubtypeFact.js";
 
 /**
@@ -323,7 +323,7 @@ export function graphOf(model: OrmModel): GraphResult {
     populationsOf: (ft) => model.populationsForFactType(ft.id),
     supertypesOf: (ot) => model.supertypesOf(ot.id),
     subtypesOf: (ot) => model.subtypesOf(ot.id),
-    hopsFrom: (ot) => hopsFrom(model, ot.id),
+    hopsFrom: (ot) => hopsOf(model, ot.id),
     resolve: (c) => {
       const roles = rolesOfConstraint.get(c) ?? [];
       const resolvedRoles: ResolvedRole[] = roles.map((role) => ({
@@ -344,4 +344,84 @@ export function graphOf(model: OrmModel): GraphResult {
   };
 
   return { ok: true, graph };
+}
+
+/**
+ * Every one-fact-type hop leaving an object type, in deterministic order:
+ * fact types in `factTypesForObjectType` order, then for each role the
+ * object plays (the entry role) each other role of that fact type (the
+ * exit role) in `roles` order.
+ *
+ * Ring hops -- where the exit role's player is the object itself -- are
+ * included; a caller walking this as a simple node graph (BFS discovery)
+ * skips them with its own visited set, while a ring evaluator needs them.
+ *
+ * Lives here rather than in `roleGraph.ts` because the graph is now its
+ * only caller. `roleGraph.ts`'s header claimed a second one -- "the
+ * forthcoming role-path constraint operands" -- which never arrived:
+ * those landed in `joinConstraintRules.ts` walking role ids directly.
+ * That stale claim was repeated into a spec before anyone measured it.
+ */
+function hopsOf(model: OrmModel, objectTypeId: string): RoleHop[] {
+  const hops: RoleHop[] = [];
+  for (const factType of model.factTypesForObjectType(objectTypeId)) {
+    for (const entryRole of factType.rolesForPlayer(objectTypeId)) {
+      for (const exitRole of factType.roles) {
+        if (exitRole.id === entryRole.id) continue;
+        hops.push({ factType, entryRole, exitRole });
+      }
+    }
+  }
+  return hops;
+}
+
+/**
+ * Thrown when a capability that needs resolved references is handed a
+ * model that has none.
+ *
+ * A capability like query or describe has no useful partial answer for a
+ * model whose ids do not resolve, and no result shape to put one in.
+ * Before the graph, both DID answer: they printed the raw id where a
+ * name belonged, or -- more often -- crashed. Measured on 8410d6e, on a
+ * file whose mandatory constraint names a missing role:
+ *
+ *   $ barwise describe m.orm.yaml
+ *   Error: Cannot read properties of undefined (reading 'playerId')   # exit 1
+ *
+ * So this is not a new failure mode being introduced. It is the same
+ * failure, named, with the reference that caused it, at the point where
+ * it is known. The surfaces already catch and exit 1, which is why this
+ * needs no plumbing: only the message changes.
+ *
+ * `validate` is the one capability that must NOT use this. Reporting
+ * what is wrong with a broken model is its whole job, so it maps the
+ * unresolved references to diagnostics instead
+ * (`validation/referenceDiagnostics.ts`).
+ */
+export class ModelNotResolvableError extends Error {
+  /** The references that did not resolve, in the graph's own terms. */
+  readonly unresolved: readonly UnresolvedReference[];
+
+  constructor(unresolved: readonly UnresolvedReference[]) {
+    super(
+      `Model has ${unresolved.length} unresolvable reference(s): `
+        + unresolved.map((u) => `${u.from.kind}.${u.field} -> "${u.missing}"`).join(", ")
+        + ". Run `barwise validate` for the full diagnostics.",
+    );
+    this.name = "ModelNotResolvableError";
+    this.unresolved = unresolved;
+  }
+}
+
+/**
+ * The graph for a model a capability cannot proceed without.
+ *
+ * `graphOf` returns a result because its caller may want to REPORT what
+ * did not resolve; this is for the callers that cannot use the answer at
+ * all, so that each one does not write the same three-line throw.
+ */
+export function requireGraph(model: OrmModel): ModelGraph {
+  const result = graphOf(model);
+  if (!result.ok) throw new ModelNotResolvableError(result.unresolved);
+  return result.graph;
 }
