@@ -138,7 +138,7 @@ export function resolveModels(
   const { path, content } = normalizeSource(input);
 
   if (path !== undefined && path.endsWith(".orm-project.yaml")) {
-    return resolveProject(path, domain);
+    return resolveProject(path, domain, options);
   }
 
   // A manifest supplied as inline content has no base directory to resolve
@@ -155,8 +155,12 @@ export function resolveModels(
 }
 
 /** Load a project manifest from disk and select the requested domain(s). */
-function resolveProject(manifestPath: string, domain?: string): ResolvedDomains {
-  const { project, problems } = loadProject(manifestPath);
+function resolveProject(
+  manifestPath: string,
+  domain?: string,
+  options?: { lenient?: boolean; },
+): ResolvedDomains {
+  const { project, problems } = loadProject(manifestPath, options);
 
   if (domain !== undefined) {
     const dm = project.getDomain(domain);

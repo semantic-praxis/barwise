@@ -86,6 +86,25 @@ describe("validate_model tool", () => {
       expect(() => executeValidate(project, "ghost")).toThrow(/crm, billing/);
     });
 
+    it("validates a domain whose reference does not resolve, rather than dropping it", () => {
+      // A domain that throws on deserialization used to land in the
+      // assembly warnings and never be validated, so the tool answered
+      // a different question than the caller asked (barwise-977). The
+      // CLI has the same test against its own fixture; the capability
+      // matrix puts validate at parity across the surfaces.
+      const result = executeValidate(
+        `${fixtures}/project/dangling-domain.orm-project.yaml`,
+      );
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.valid).toBe(false);
+      expect(parsed.errors.map((e: { ruleId: string; }) => e.ruleId))
+        .toContain("population/dangling-fact-type");
+      expect(parsed.warnings ?? []).not.toContainEqual(
+        expect.stringContaining("does not exist in the model"),
+      );
+    });
+
     it("carries assembly warnings alongside the single resolved domain", () => {
       const broken = `${fixtures}/project/broken.orm-project.yaml`;
       const result = executeValidate(broken);

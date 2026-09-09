@@ -833,4 +833,33 @@ describe("identification through objectification", () => {
 
     expect(missingFor(model, "Car")).toHaveLength(1);
   });
+
+  it("terminates on a subtype cycle rather than recursing forever", () => {
+    // The recursion above follows `providesIdentification` edges, and
+    // `structural/identification-cycle` reports a cycle among them but
+    // does not prevent one reaching this rule -- a completeness warning
+    // is computed over whatever model it is handed. Without the `seen`
+    // guard this is a stack overflow, and with the guard inverted the
+    // cycle would identify both types out of nothing, so the assertion
+    // is both that it returns and what it returns.
+    const model = new ModelBuilder("Cycle")
+      .withEntityType("Alpha")
+      .withEntityType("Beta")
+      .build();
+    const alpha = model.getObjectTypeByName("Alpha")!;
+    const beta = model.getObjectTypeByName("Beta")!;
+    model.addSubtypeFact({
+      subtypeId: alpha.id,
+      supertypeId: beta.id,
+      providesIdentification: true,
+    });
+    model.addSubtypeFact({
+      subtypeId: beta.id,
+      supertypeId: alpha.id,
+      providesIdentification: true,
+    });
+
+    expect(missingFor(model, "Alpha")).toHaveLength(1);
+    expect(missingFor(model, "Beta")).toHaveLength(1);
+  });
 });

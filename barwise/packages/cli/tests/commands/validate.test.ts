@@ -86,6 +86,33 @@ describe("barwise validate (project)", () => {
     expect(result.stdout + result.stderr).toContain("ghost");
   });
 
+  it("validates a domain whose reference does not resolve, rather than dropping it", async () => {
+    // The bug this pins: a domain that throws on deserialization goes
+    // into `problems` and is never validated, so a project reported one
+    // loader message where the same file alone reported every
+    // diagnostic in it (barwise-977). Compared against the single-model
+    // path rather than a literal, because the two paths agreeing is the
+    // property; a literal would pass with both of them wrong.
+    const asProject = await runCli([
+      "validate",
+      `${fixtures}/project/dangling-domain.orm-project.yaml`,
+    ]);
+    const asModel = await runCli([
+      "validate",
+      `${fixtures}/project/domains/dangling.orm.yaml`,
+    ]);
+
+    expect(asProject.exitCode).toBe(1);
+    expect(asProject.stdout).toContain(
+      'Population "pop-dangling" references fact type id "ft-missing"',
+    );
+    for (const line of asModel.stdout.split("\n")) {
+      const message = line.trim().replace(/^(ERROR|WARNING|INFO)\s+/, "");
+      if (message === "" || message.includes(".orm.yaml:")) continue;
+      expect(asProject.stdout).toContain(`[dangling] ${message}`);
+    }
+  });
+
   it("reports an error for a nonexistent project file", async () => {
     const result = await runCli([
       "validate",

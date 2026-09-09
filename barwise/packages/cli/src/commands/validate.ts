@@ -65,7 +65,11 @@ export function registerValidateCommand(program: Command): void {
  * project-level diagnostics are prefixed with `[project]`.
  */
 function collectProjectDiagnostics(file: string): Diagnostic<RuleId | CliRuleId>[] {
-  const { project, problems } = loadProject(file);
+  // Lenient for the same reason the single-model path above is: a domain
+  // whose deserialization throws is dropped into `problems` and never
+  // validated, so validating a project reported one loader message where
+  // validating the same file alone reported every diagnostic in it.
+  const { project, problems } = loadProject(file, { lenient: true });
   const engine = new ValidationEngine();
   const diagnostics: Diagnostic<RuleId | CliRuleId>[] = [];
 
