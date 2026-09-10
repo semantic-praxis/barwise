@@ -444,6 +444,371 @@ describe("ExtractionConformance", () => {
       expect(corrections).toHaveLength(1);
       expect(corrections[0]!.category).toBe("duplicate_constraint");
     });
+
+    // The three types below are the rest of the hole `ring_type` was
+    // the found instance of (barwise-883). The key was
+    // `type|fact_type|roles` plus a ring special case, so for these
+    // three the field that says what the constraint actually asserts
+    // was not in the key at all, and the second was deleted.
+    //
+    // Each pair is one of two things and neither is a duplicate:
+    // independent content, or a contradiction that survives so a
+    // reader can see it. Nothing downstream reports the contradiction
+    // today -- a model carrying both frequency constraints below
+    // validates without a diagnostic about them (barwise-1008) -- which
+    // is a reason to keep the pair, not to drop one.
+
+    it("keeps value constraints that differ only in their values", () => {
+      const valueConstraint = (values: readonly string[], description: string) => ({
+        type: "value_constraint" as const,
+        fact_type: "Order has Status",
+        roles: ["Status"],
+        description,
+        confidence: "high" as const,
+        values,
+        source_references: REF,
+      });
+      const input = makeResponse({
+        object_types: [
+          { name: "Order", kind: "entity", source_references: REF },
+          { name: "Status", kind: "value", source_references: REF },
+        ],
+        inferred_constraints: [
+          valueConstraint(["open", "closed"], "A Status is open or closed"),
+          valueConstraint(["draft", "sent"], "A Status is draft or sent"),
+          valueConstraint(["closed", "open"], "Restated, in the other order"),
+        ],
+      });
+
+      const { response, corrections } = enforceConformance(input);
+      // The third is a genuine duplicate of the first: a domain is a
+      // set, so the order it is listed in cannot make it a different
+      // domain.
+      expect(response.inferred_constraints.map((c) => c.values)).toEqual([
+        ["open", "closed"],
+        ["draft", "sent"],
+      ]);
+      expect(corrections).toHaveLength(1);
+      expect(corrections[0]!.category).toBe("duplicate_constraint");
+    });
+
+    it("keeps frequency constraints that differ only in their bounds", () => {
+      const frequency = (
+        min: number,
+        max: number | "unbounded",
+        description: string,
+      ) => ({
+        type: "frequency" as const,
+        fact_type: "Employee works on Project",
+        roles: ["Employee"],
+        description,
+        confidence: "high" as const,
+        min,
+        max,
+        source_references: REF,
+      });
+      const input = makeResponse({
+        object_types: [
+          { name: "Employee", kind: "entity", source_references: REF },
+          { name: "Project", kind: "entity", source_references: REF },
+        ],
+        inferred_constraints: [
+          frequency(1, 3, "An Employee works on one to three Projects"),
+          // Differs from the first in its MIN alone, and the next in
+          // its MAX alone, so neither bound can be dropped from the key
+          // without collapsing one of these pairs.
+          frequency(2, 3, "An Employee works on two to three Projects"),
+          frequency(1, "unbounded", "An Employee works on at least one Project"),
+        ],
+      });
+
+      const { response, corrections } = enforceConformance(input);
+      expect(response.inferred_constraints.map((c) => [c.min, c.max])).toEqual([
+        [1, 3],
+        [2, 3],
+        [1, "unbounded"],
+      ]);
+      expect(corrections).toHaveLength(0);
+    });
+
+    it("keeps subset constraints that differ only in their superset", () => {
+      const subset = (
+        supersetFactType: string,
+        supersetRoles: readonly string[],
+        description: string,
+      ) => ({
+        type: "subset" as const,
+        fact_type: "Employee manages Project",
+        roles: ["Employee", "Project"],
+        description,
+        confidence: "high" as const,
+        superset_fact_type: supersetFactType,
+        superset_roles: supersetRoles,
+        source_references: REF,
+      });
+      const input = makeResponse({
+        object_types: [
+          { name: "Employee", kind: "entity", source_references: REF },
+          { name: "Project", kind: "entity", source_references: REF },
+        ],
+        inferred_constraints: [
+          subset("Employee works on Project", ["Employee", "Project"], "Managing implies working"),
+          subset("Employee is assigned to Project", ["Employee", "Project"], "and being assigned"),
+          // Same superset fact type, roles the other way round. Those
+          // roles pair POSITIONALLY with `roles`, so this is a
+          // different claim, not a restatement -- which is why
+          // superset_roles is compared in order where `roles` is not.
+          subset("Employee works on Project", ["Project", "Employee"], "Reversed pairing"),
+        ],
+      });
+
+      const { response, corrections } = enforceConformance(input);
+      expect(response.inferred_constraints.map((c) => c.superset_roles)).toEqual([
+        ["Employee", "Project"],
+        ["Employee", "Project"],
+        ["Project", "Employee"],
+      ]);
+      expect(corrections).toHaveLength(0);
+    });
+
+    it.each([
+      [
+        "their type",
+        { type: "mandatory" as const },
+        { type: "internal_uniqueness" as const },
+      ],
+      [
+        "their fact type",
+        { fact_type: "Customer places Order" },
+        { fact_type: "Customer cancels Order" },
+      ],
+      [
+        "which roles they cover",
+        { roles: ["Customer"] },
+        { roles: ["Order"] },
+      ],
+    ])("separates two constraints differing only in %s", (_which, first, second) => {
+      // The two fields nobody would think to test, which is why they
+      // went untested: every other fixture pairs a difference in type
+      // or fact type with a difference in some other field, so neither
+      // was ever the reason a pair stayed apart.
+      const base = {
+        type: "mandatory" as const,
+        fact_type: "Customer places Order",
+        roles: ["Customer"],
+        description: "A Customer places an Order",
+        confidence: "high" as const,
+        source_references: REF,
+      };
+      const input = makeResponse({
+        object_types: [
+          { name: "Customer", kind: "entity", source_references: REF },
+          { name: "Order", kind: "entity", source_references: REF },
+        ],
+        inferred_constraints: [{ ...base, ...first }, { ...base, ...second }],
+      });
+
+      const { response, corrections } = enforceConformance(input);
+      expect(response.inferred_constraints).toHaveLength(2);
+      expect(corrections.filter((c) => c.category === "duplicate_constraint")).toHaveLength(0);
+    });
+
+    it("treats a role list as a set, so its order cannot make a duplicate distinct", () => {
+      // The counterpart to superset_roles above: `roles` names which
+      // roles a constraint covers, not an ordering of them, so a
+      // restatement listing them the other way round is the same key.
+      const uniqueness = (roles: readonly string[], description: string) => ({
+        type: "internal_uniqueness" as const,
+        fact_type: "Customer places Order",
+        roles,
+        description,
+        confidence: "high" as const,
+        source_references: REF,
+      });
+      const input = makeResponse({
+        object_types: [
+          { name: "Customer", kind: "entity", source_references: REF },
+          { name: "Order", kind: "entity", source_references: REF },
+        ],
+        inferred_constraints: [
+          uniqueness(["Customer", "Order"], "One Customer-Order pair at most once"),
+          uniqueness(["Order", "Customer"], "Restated the other way round"),
+        ],
+      });
+
+      const { response, corrections } = enforceConformance(input);
+      expect(response.inferred_constraints).toHaveLength(1);
+      expect(corrections.filter((c) => c.category === "duplicate_constraint")).toHaveLength(1);
+    });
+
+    it("drops a uniqueness constraint differing only in is_preferred", () => {
+      // The deliberate, uncomfortable row of the classification table.
+      // is_preferred qualifies a uniqueness assertion without changing
+      // which roles it covers, so keying on it would emit two identical
+      // uniqueness constraints. The cost is that the flag is lost when
+      // the preferred one comes second, as it does here -- which wants
+      // the survivor to absorb the flag rather than the pair to
+      // survive, and that is barwise-1007 rather than this fix. Pinned
+      // so the loss is a recorded decision instead of a surprise.
+      const uniqueness = (isPreferred: boolean, description: string) => ({
+        type: "internal_uniqueness" as const,
+        fact_type: "Customer has CustomerId",
+        roles: ["CustomerId"],
+        description,
+        confidence: "high" as const,
+        ...(isPreferred ? { is_preferred: true } : {}),
+        source_references: REF,
+      });
+      const input = makeResponse({
+        object_types: [
+          // The reference mode matters: without it this is not an
+          // identifier fact type, check 6 clears is_preferred before
+          // the key is ever computed, and the fixture cannot see what
+          // the key does with the flag at all.
+          {
+            name: "Customer",
+            kind: "entity",
+            reference_mode: "customer_id",
+            source_references: REF,
+          },
+          { name: "CustomerId", kind: "value", source_references: REF },
+        ],
+        fact_types: [
+          {
+            name: "Customer has CustomerId",
+            roles: [
+              { player: "Customer", role_name: "identified" },
+              { player: "CustomerId", role_name: "identifier" },
+            ],
+            readings: ["{0} has {1}"],
+            source_references: REF,
+          },
+        ],
+        inferred_constraints: [
+          uniqueness(false, "Each CustomerId identifies one Customer"),
+          uniqueness(true, "CustomerId is the preferred identifier"),
+        ],
+      });
+
+      const { response, corrections } = enforceConformance(input);
+      expect(response.inferred_constraints).toHaveLength(1);
+      expect(response.inferred_constraints[0]!.is_preferred).toBeUndefined();
+      expect(corrections.filter((c) => c.category === "duplicate_constraint")).toHaveLength(1);
+    });
+
+    it("separates constraints whose difference is WHICH field carries a value", () => {
+      // "At least two" and "at most two" on one role: opposite claims,
+      // and a frequency constraint may carry either bound alone.
+      //
+      // The key omits absent fields, so position no longer says which
+      // field a value came from -- min and max are adjacent in the
+      // field order, and these two reduce to the identical sequence
+      // unless each value carries its field name. The second would be
+      // deleted as a duplicate of the first.
+      const frequency = (
+        bound: { min: number; } | { max: number; },
+        description: string,
+      ) => ({
+        type: "frequency" as const,
+        fact_type: "Employee works on Project",
+        roles: ["Employee"],
+        description,
+        confidence: "high" as const,
+        ...bound,
+        source_references: REF,
+      });
+      const input = makeResponse({
+        object_types: [
+          { name: "Employee", kind: "entity", source_references: REF },
+          { name: "Project", kind: "entity", source_references: REF },
+        ],
+        inferred_constraints: [
+          frequency({ min: 2 }, "An Employee works on at least two Projects"),
+          frequency({ max: 2 }, "An Employee works on at most two Projects"),
+        ],
+      });
+
+      const { response, corrections } = enforceConformance(input);
+      expect(response.inferred_constraints.map((c) => [c.min, c.max])).toEqual([
+        [2, undefined],
+        [undefined, 2],
+      ]);
+      expect(corrections.filter((c) => c.category === "duplicate_constraint")).toHaveLength(0);
+    });
+
+    it("drops a duplicate that cites a different part of the transcript", () => {
+      // source_references is provenance, not content: a model restating
+      // one rule from two places in the transcript has asserted it
+      // once. Every other fixture here shares one REF constant, so
+      // nothing else can tell whether the key reads this field.
+      const otherRef = [{ quote: "Elsewhere, the same rule", location: "line 99" }];
+      const mandatory = (
+        sourceReferences: typeof REF,
+        description: string,
+      ) => ({
+        type: "mandatory" as const,
+        fact_type: "Customer places Order",
+        roles: ["Customer"],
+        description,
+        confidence: "high" as const,
+        source_references: sourceReferences,
+      });
+      const input = makeResponse({
+        object_types: [
+          { name: "Customer", kind: "entity", source_references: REF },
+          { name: "Order", kind: "entity", source_references: REF },
+        ],
+        inferred_constraints: [
+          mandatory(REF, "Every Customer places an Order"),
+          mandatory(otherRef, "Every Customer places an Order"),
+        ],
+      });
+
+      const { response, corrections } = enforceConformance(input);
+      expect(response.inferred_constraints).toHaveLength(1);
+      expect(corrections.filter((c) => c.category === "duplicate_constraint")).toHaveLength(1);
+    });
+
+    it("still drops a constraint differing only in prose or confidence", () => {
+      // The other half of the rule: description, confidence,
+      // source_references and is_preferred annotate an assertion
+      // without changing it, so two constraints differing only there
+      // are duplicates and the widened key must not start keeping them.
+      const input = makeResponse({
+        object_types: [
+          { name: "Customer", kind: "entity", source_references: REF },
+          { name: "Order", kind: "entity", source_references: REF },
+        ],
+        inferred_constraints: [
+          {
+            type: "frequency",
+            fact_type: "Customer places Order",
+            roles: ["Customer"],
+            description: "A Customer places at least one Order",
+            confidence: "high",
+            min: 1,
+            max: "unbounded",
+            source_references: REF,
+          },
+          {
+            type: "frequency",
+            fact_type: "Customer places Order",
+            roles: ["Customer"],
+            description: "Restated: every Customer has an Order",
+            confidence: "low",
+            min: 1,
+            max: "unbounded",
+            source_references: REF,
+          },
+        ],
+      });
+
+      const { response, corrections } = enforceConformance(input);
+      expect(response.inferred_constraints).toHaveLength(1);
+      expect(response.inferred_constraints[0]!.confidence).toBe("high");
+      expect(corrections).toHaveLength(1);
+      expect(corrections[0]!.category).toBe("duplicate_constraint");
+    });
   });
 
   describe("reference modes", () => {

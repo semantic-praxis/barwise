@@ -714,16 +714,114 @@ function expectedArityDescription(type: InferredConstraint["type"]): string {
   }
 }
 
+/**
+ * Every field of `InferredConstraint`, classified by whether it is part
+ * of what the constraint ASSERTS or only annotates the assertion.
+ *
+ * This table is the guard, not documentation. The key used to be a
+ * hand-written template string over three fields, and the defect it
+ * carried was always the same shape: a field that distinguishes two
+ * constraints was not in it, so the second was silently dropped as a
+ * duplicate. `ring_type` was the instance found live -- irreflexive and
+ * acyclic on "Incident is duplicate of Incident", both true, both
+ * accepted by the validator, and the second deleted (suite 2.5.0).
+ * `values`, `min`, `max`, `superset_fact_type` and `superset_roles`
+ * were the same hole, still open, for value, frequency and subset
+ * constraints (barwise-883).
+ *
+ * A mapped type over `keyof Required<InferredConstraint>` is what stops
+ * it recurring: add a field to the interface and this object no longer
+ * compiles until the field is classified. An allow-list that a reader
+ * has to audit against the type is what failed twice.
+ *
+ * The classification, and why each one:
+ *
+ *   - "identity" -- part of the assertion, compared as-is. Order
+ *     matters for `superset_roles`, which pairs POSITIONALLY with
+ *     `roles`: sorting it would conflate "(A,B) is a subset of (X,Y)"
+ *     with "(A,B) is a subset of (Y,X)", which are different claims.
+ *   - "identity-unordered" -- part of the assertion, but a set. Two
+ *     value constraints listing the same values in a different order
+ *     are one domain, and two uniqueness constraints over the same
+ *     roles in a different order are one key.
+ *   - "annotation" -- prose, provenance, or a flag that qualifies an
+ *     assertion without changing it. Two constraints differing only
+ *     here really are duplicates and the second is dropped.
+ *
+ * `is_preferred` is an annotation deliberately, and it is the one
+ * uncomfortable row: two uniqueness constraints over the same roles,
+ * one preferred, are the same key with a flag on one of them, so
+ * keying on it would emit a genuine duplicate. Dropping the second
+ * loses the flag when the preferred one came second, which wants a
+ * merge rather than a drop -- barwise-1007, not this fix.
+ */
+const CONSTRAINT_FIELDS: {
+  readonly [K in keyof Required<InferredConstraint>]:
+    | "identity"
+    | "identity-unordered"
+    | "annotation";
+} = {
+  type: "identity",
+  fact_type: "identity",
+  roles: "identity-unordered",
+  ring_type: "identity",
+  values: "identity-unordered",
+  min: "identity",
+  max: "identity",
+  superset_fact_type: "identity",
+  superset_roles: "identity",
+  description: "annotation",
+  confidence: "annotation",
+  is_preferred: "annotation",
+  source_references: "annotation",
+};
+
+/** The identifying fields, in a fixed order so the key is stable. */
+const IDENTITY_FIELDS = (Object.keys(CONSTRAINT_FIELDS) as (keyof InferredConstraint)[])
+  .filter((f) => CONSTRAINT_FIELDS[f] !== "annotation")
+  .sort();
+
+/**
+ * A key under which two constraints are the same assertion.
+ *
+ * Dropping a constraint that is not a duplicate is the harm this
+ * guards against, and it has two shapes, both of which the widened key
+ * prevents. Independent content: two ring types, both true, and the
+ * second deleted. A contradiction: two frequency constraints demanding
+ * 1..3 and 5..9 of one role, which no population satisfies -- deleting
+ * one leaves a model that looks consistent and is not.
+ *
+ * Nothing downstream currently reports that second case: a model
+ * carrying both of those frequency constraints validates with no
+ * diagnostic about them (measured, not assumed -- barwise-1008 tracks
+ * the missing rule). So the pair surviving is not "the eval charges for
+ * it" yet; it is that conformance must not silently decide which of two
+ * things the extraction asserted it meant.
+ */
 function constraintKey(ic: InferredConstraint): string {
-  const sortedRoles = [...ic.roles].sort().join(",");
-  // Ring constraints with different ring types are independent
-  // assertions on the same role pair -- irreflexive and acyclic on one
-  // fact type both hold and the validator accepts both. Without the
-  // ring type in the key, the second was silently dropped as a
-  // duplicate (found on a recorded incident-response payload carrying
-  // exactly that pair).
-  const ring = ic.type === "ring" ? `|${ic.ring_type ?? ""}` : "";
-  return `${ic.type}|${ic.fact_type}|${sortedRoles}${ring}`;
+  // Each value is paired with its FIELD NAME, and absent fields are
+  // dropped rather than written as a sentinel.
+  //
+  // The pairing is load-bearing once fields can be absent: without it,
+  // position is the only thing saying which field a value came from,
+  // and omitting the absent ones shifts every later position. A
+  // frequency constraint carrying only `min: 2` and one carrying only
+  // `max: 2` -- "at least two" and "at most two", opposite claims --
+  // then produce the identical sequence, and the second is deleted as
+  // a duplicate of the first.
+  //
+  // Dropping rather than sentinelling follows from the pairing rather
+  // than motivating it: with the name present there is nothing a
+  // sentinel would disambiguate that the field name does not.
+  const identity = IDENTITY_FIELDS.flatMap((field) => {
+    const value = ic[field];
+    if (value === undefined) return [];
+    const normalised = CONSTRAINT_FIELDS[field] === "identity-unordered" && Array.isArray(value)
+      ? [...value].sort()
+      : value;
+    return [[field, normalised]];
+  });
+  return JSON.stringify(identity);
 }
 
 // ---------------------------------------------------------------------------
