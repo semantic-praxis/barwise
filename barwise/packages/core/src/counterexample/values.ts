@@ -1,8 +1,14 @@
 import { isValueConstraint } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
+import { dataTypeOf, valueConstraintOf } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { Role } from "../model/Role.js";
-import { type ValueDomain, valueDomainPredicate } from "../model/valueDomain.js";
+import {
+  mintAllowedValue,
+  mintValueOfType,
+  type ValueDomain,
+  valueDomainPredicate,
+} from "../model/valueDomain.js";
 
 /**
  * Deterministic placeholder-value minting for counterexample populations.
@@ -12,15 +18,17 @@ import { type ValueDomain, valueDomainPredicate } from "../model/valueDomain.js"
  * referentially transparent (same model in, identical output out).
  */
 
-/** Allowed values declared by a role-level value constraint, if any. */
-function roleAllowedValues(
-  roleId: string,
-  factType: FactType,
-): readonly string[] | undefined {
+/**
+ * The whole value domain a role-level constraint declares, if any.
+ *
+ * The WHOLE domain, enumeration and ranges together. This used to
+ * return only the enumeration and only when it was non-empty, so a
+ * range-only constraint read as "no constraint" and the caller minted a
+ * player-named token the range forbids (barwise-959).
+ */
+function roleValueDomain(roleId: string, factType: FactType): ValueDomain | undefined {
   for (const c of factType.constraints) {
-    if (isValueConstraint(c) && c.roleId === roleId && c.values.length > 0) {
-      return c.values;
-    }
+    if (isValueConstraint(c) && c.roleId === roleId) return c;
   }
   return undefined;
 }
@@ -32,8 +40,13 @@ export function playerName(role: Role, model: OrmModel): string {
 
 /**
  * A stable placeholder value for a role at a given index. Within a role's
- * value-constraint domain when one exists; otherwise a player-named token
- * like `Customer#1`.
+ * value-constraint domain when one exists and a value can be constructed
+ * from it; otherwise a player-named token like `Customer#1`.
+ *
+ * The fallback is reached only when the role declares no domain, or when
+ * `mintAllowedValue` cannot construct one from the ranges it declares --
+ * not, as before, whenever the domain happened to be expressed as a
+ * range rather than an enumeration.
  */
 export function mintValue(
   role: Role,
@@ -41,11 +54,29 @@ export function mintValue(
   model: OrmModel,
   index: number,
 ): string {
-  const allowed = roleAllowedValues(role.id, factType);
-  const fromDomain = allowed?.[index % allowed.length];
-  if (fromDomain !== undefined) {
-    return fromDomain;
+  // Three sources, narrowest first. A role-level constraint is the most
+  // specific statement about this role; the player's own value
+  // constraint governs every role it plays; its data type is the
+  // weakest of the three. Each was a separate way for a filler value to
+  // break a rule the probe was not about (barwise-959, and then
+  // barwise-945's new rules made the player-level half visible).
+  const roleDomain = roleValueDomain(role.id, factType);
+  const fromRole = roleDomain === undefined ? undefined : mintAllowedValue(roleDomain, index);
+  if (fromRole !== undefined) return fromRole;
+
+  const player = model.getObjectType(role.playerId);
+  if (player !== undefined) {
+    const playerDomain = valueConstraintOf(player);
+    const fromPlayer = playerDomain === undefined
+      ? undefined
+      : mintAllowedValue(playerDomain, index);
+    if (fromPlayer !== undefined) return fromPlayer;
+
+    const dataType = dataTypeOf(player);
+    const fromType = dataType === undefined ? undefined : mintValueOfType(dataType.name, index);
+    if (fromType !== undefined) return fromType;
   }
+
   return `${playerName(role, model)}#${index + 1}`;
 }
 
