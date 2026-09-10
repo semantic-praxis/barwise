@@ -78,6 +78,15 @@ is the twenty-four-point gap between "the tests execute this code" and
 predicted this; the table measures it here, and it is the strongest
 argument in this spec because it is not borrowed.
 
+Both numbers are as of 2026-09-10 and both have since moved a little:
+barwise-993's first triage pass killed three conditional survivors in
+`RelationalMapper.ts`, taking that file from 79.27% to 79.91%. The
+directory totals above have not been re-taken -- a full run over both
+directories is 16 minutes, and the point of the table is the gap rather
+than the third digit. This note is here so a later reader does not treat
+them as current; that they need a note at all is the argument for
+barwise-994's ratchet.
+
 Our own history says the instrument is not merely weak but unstable.
 `packages/core/CLAUDE.md` sets coverage targets of 95% for model,
 validation and serialization and 90% for verbalization and mapping.
