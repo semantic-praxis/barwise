@@ -223,25 +223,25 @@ divergence that had not held for some time (barwise-988). Where a row's
 VS Code answer rests on the tool registration rather than the palette,
 it is qualified by `barwise.enableMcpServer`, which defaults on.
 
-| Capability                                            | CLI | MCP | VS Code | Divergence                              |
-| ----------------------------------------------------- | --- | --- | ------- | --------------------------------------- |
-| validate, verbalize, diagram, export, import, analyze | yes | yes | yes     | none                                    |
-| `review`                                              | yes | yes | yes     | none (VS Code as a language-model tool) |
-| schema, diff, query, describe, lineage, impact        | yes | yes | yes     | none (VS Code as language-model tools)  |
-| `merge`                                               | yes | yes | yes     | none (VS Code as a language-model tool) |
-| `gym`                                                 | yes | yes | no      | deliberate: the editor has no exercise surface |
-| `project`, `history`                                  | yes | no  | no      | deliberate: repository operations       |
-| `prompt`                                              | yes | no  | no      | deliberate: dev tooling                 |
-| `llm-usage`                                           | yes | no  | no      | deliberate: reads a local operator log  |
-| prompt-artifact override (`--artifacts`)              | yes | no  | no      | deliberate: candidates are measured, not sent |
-| multi-sample import (`--samples`)                     | yes | yes | no      | deliberate: an editor wants one quick pass    |
+| Capability                                            | CLI | MCP | VS Code | Divergence                                                    |
+| ----------------------------------------------------- | --- | --- | ------- | ------------------------------------------------------------- |
+| validate, verbalize, diagram, export, import, analyze | yes | yes | yes     | none                                                          |
+| `review`                                              | yes | yes | yes     | none (VS Code as a language-model tool)                       |
+| schema, diff, query, describe, lineage, impact        | yes | yes | yes     | none (VS Code as language-model tools)                        |
+| `merge`                                               | yes | yes | yes     | none (VS Code as a language-model tool)                       |
+| `gym`                                                 | yes | yes | no      | deliberate: the editor has no exercise surface                |
+| `project`, `history`                                  | yes | no  | no      | deliberate: repository operations                             |
+| `prompt`                                              | yes | no  | no      | deliberate: dev tooling                                       |
+| `llm-usage`                                           | yes | no  | no      | deliberate: reads a local operator log                        |
+| prompt-artifact override (`--artifacts`)              | yes | no  | no      | deliberate: candidates are measured, not sent                 |
+| multi-sample import (`--samples`)                     | yes | yes | no      | deliberate: an editor wants one quick pass                    |
 | thinking-budget override (`--thinking-budget`)        | yes | no  | no      | deliberate: an experiment dimension, recorded per history row |
 
 Every remaining gap is marked deliberate, which is the point: an
 unmarked gap is a bug.
 
 The `--artifacts` row hides a boundary the table's own axis cannot
-show, because it falls *within* the CLI rather than between surfaces:
+show, because it falls _within_ the CLI rather than between surfaces:
 `barwise prompt eval`, `prompt artifact` and `prompt run` accept a
 directory of unshipped prompt candidates; `barwise import transcript`
 and `barwise review` do not, and must not
@@ -288,6 +288,7 @@ real content (barwise-812).
 `npm run <script>` works from the repo root **and** from `barwise/`.
 The real package.json is `barwise/package.json`; the root one is
 generated and does nothing but forward (`npm --prefix barwise run
+
 <script> --`). It used to not exist, and `npm run build` at the root
 failed with a bare ENOENT -- five broken commands in one session, and
 one wrong claim, because the habit that teaches is "run it from

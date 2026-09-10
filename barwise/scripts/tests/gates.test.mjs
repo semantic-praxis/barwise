@@ -31,7 +31,15 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
@@ -55,6 +63,120 @@ function gate(script, cwd, ...args) {
     encoding: "utf8",
   });
 }
+
+/**
+ * Run a gate with `git` replaced by a stub, to test the refusal path.
+ *
+ * `mode` is "empty" (git exits 0 printing nothing) or "fail" (git exits
+ * 127). The empty case is the one worth having: a failing git throws
+ * out of execFileSync and is at least loud, while a SUCCEEDING git that
+ * prints nothing yields `REPO_ROOT === ""`, and `resolve("", file)`
+ * silently means cwd. That is the reading that looks like an answer.
+ */
+function gateWithStubGit(script, mode, ...args) {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-nogit-"));
+  try {
+    const stub = join(dir, "git");
+    writeFileSync(stub, mode === "empty" ? "#!/bin/sh\nexit 0\n" : "#!/bin/sh\nexit 127\n");
+    chmodSync(stub, 0o755);
+    return spawnSync(process.execPath, [join(SCRIPTS, script), ...args], {
+      cwd: REPO,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${dir}:${process.env.PATH ?? ""}` },
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// --- barwise-989: a gate that cannot see its input must not print PASS ---
+
+/**
+ * Every gate that resolves the repo root through `lib/tracked.mjs`, plus
+ * the two that used to re-derive it themselves.
+ *
+ * Before this, all seven exited 1 with a Node stack trace -- a path
+ * built from `""`, not a guard that noticed. A stack trace reads as a
+ * defect in the gate, which sends the reader hunting something that is
+ * not there; exit 2 says "could not answer" and is the third result the
+ * contract exists to give (docs/specs/gate-refusal-contract.spec.md).
+ */
+const ROOT_DEPENDENT_GATES = [
+  "check-no-nul.mjs",
+  "check-python-uv.mjs",
+  "check-book-citations.mjs",
+  "check-core-purity.mjs",
+  "check-file-size.mjs",
+];
+
+for (const script of ROOT_DEPENDENT_GATES) {
+  for (const mode of ["empty", "fail"]) {
+    test(`${script} refuses with exit 2 when git ${mode === "empty" ? "answers emptily" : "fails"}`, () => {
+      const r = gateWithStubGit(script, mode);
+      assert.equal(
+        r.status,
+        2,
+        `expected refusal (2), got ${r.status}:\n${r.stdout}${r.stderr}`,
+      );
+      assert.match(r.stderr, /repository root is unknown/);
+      // The point of the contract: never a stack trace, never a PASS.
+      assert.doesNotMatch(r.stderr, /at .*\.mjs:\d+/);
+      assert.doesNotMatch(r.stdout, /OK|PASS/);
+    });
+  }
+}
+
+test("trackedFiles refuses rather than reporting OK over an empty listing", () => {
+  // git ls-files returning nothing is barwise-905's shape: every caller
+  // filters the list and reports OK on finding no offenders, so an empty
+  // listing is exactly the reading that looks like success. The stub
+  // answers every git call, so `rev-parse` refuses first -- which is the
+  // correct order and is why this asserts the contract rather than the
+  // specific message.
+  const r = gateWithStubGit("check-no-nul.mjs", "empty");
+  assert.equal(r.status, 2, `${r.stdout}${r.stderr}`);
+  assert.doesNotMatch(r.stdout, /tracked files/);
+});
+
+// --- barwise-990: fmt:check reported OK over a set it could not see ---
+
+/**
+ * `dprint.json` lives in `barwise/` and `npm run fmt` runs from there,
+ * so dprint never walked up: README.md, CLAUDE.md, AGENTS.md and every
+ * `.claude/skills/*.md` were outside its reach and had never been
+ * formatted, while `fmt:check` exited 0. barwise-905's shape applied to
+ * formatting, and the three files it missed are the three a new
+ * contributor reads first.
+ */
+test("fmt-root covers the files outside barwise/, from every cwd", () => {
+  const runs = CWDS.map((cwd) => ({ cwd, ...gate("fmt-root.mjs", cwd, "--check") }));
+  for (const r of runs) {
+    assert.equal(r.status, 0, `fmt-root failed in ${r.cwd}:\n${r.stdout}${r.stderr}`);
+  }
+  // The COUNT is the tell, exactly as it was for check-no-nul: a run
+  // that formatted nothing also exits 0 and also prints OK.
+  const counts = new Set(runs.map((r) => /(\d+) file\(s\)/.exec(r.stdout)?.[1]));
+  assert.equal(counts.size, 1, `fmt-root's coverage depends on cwd: ${[...counts].join(", ")}`);
+  assert.ok(Number([...counts][0]) > 0, "fmt-root reported zero files, which cannot be right");
+});
+
+test("fmt-root refuses when git cannot say where the repository is", () => {
+  // Named for what it actually reaches. An earlier version of this test
+  // was called "refuses over an empty file set" and did NOT test that:
+  // with the stub answering every git call, REPO_ROOT refuses before
+  // `targets` is ever computed, so fmt-root's own `targets.length === 0`
+  // guard is never entered. `npm run mutate` disabling that guard came
+  // back UNCAUGHT, which is how the mislabelling was found -- a test
+  // named after a guard it does not exercise is the same defect as a
+  // guard that cannot fire.
+  //
+  // fmt-root's own empty-set guard is covered instead by mutating the
+  // `!f.startsWith("barwise/")` filter, which is the only way to reach
+  // it: trackedFiles() refuses on an empty listing first.
+  const r = gateWithStubGit("fmt-root.mjs", "empty", "--check");
+  assert.equal(r.status, 2, `expected refusal, got ${r.status}:\n${r.stdout}${r.stderr}`);
+  assert.doesNotMatch(r.stdout, /OK/);
+});
 
 /** A throwaway git repo, so a planted defect never touches this one's index. */
 function tempRepo() {

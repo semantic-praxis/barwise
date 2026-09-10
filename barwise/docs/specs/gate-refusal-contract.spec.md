@@ -1,6 +1,7 @@
 # A gate that cannot see its input must be unable to print PASS
 
-Status: WS1 implemented; WS2 and WS3 open (see Implementation notes)
+Status: WS1 and WS2 implemented; WS3 open. WS2's design was corrected
+during grounding -- see its section
 Created: 2026-09-10
 Last-updated: 2026-09-10
 Tracking: barwise-987 (WS1, the instance: `audit-gate` reports PASS with zero
@@ -204,15 +205,56 @@ that root has no `package.json` or no lockfile; add two tests to
 `gates.test.mjs` -- the reading is identical from three cwds, and a root
 without a manifest refuses rather than passing.
 
-### 2. The contract for the remaining nine gates (provisional: not yet grounded)
+### 2. The contract for the remaining gates (implemented; the draft's design was wrong)
 
-The seven that crash on empty `git` get an explicit guard and exit `2`
-instead of a stack trace. Each needs its own precondition named, so this
-is nine small changes rather than one shared helper -- a shared
-`assertPrecondition` would be a shallow module wrapping one
-`existsSync`.
+**The draft said nine small changes, not a shared helper, on the grounds
+that a shared `assertPrecondition` would be a shallow module. Grounding
+it showed the shared owner already exists.** All seven crashers reach
+the repository root through one path, and five of them literally import
+it: `lib/tracked.mjs` resolves `REPO_ROOT` from `git rev-parse
+--show-toplevel`, and when git answers emptily that constant becomes
+`""`. Nothing crashed on a guard; they crashed on a path derived from
+an empty string, several frames later.
 
-### 3. The fault matrix as a harness (provisional: not yet grounded)
+So the guard went where the resolution already lives. That is not a new
+wrapper -- `tracked.mjs`'s own header says the listing "lives in one
+place that is correct by construction", and an unguarded root was that
+claim not yet finished.
+
+Two of the seven were not importing it. `check-core-purity.mjs` and
+`check-file-size.mjs` each ran their own `execFileSync("git",
+["rev-parse", "--show-toplevel"])` -- a third and fourth copy of one
+decision, unguarded and unregistered, which CLAUDE.md's must-agree rule
+forbids. They now import `REPO_ROOT`, which removes the duplication and
+gives them the guard as a consequence rather than as a second change.
+
+Landed:
+
+- `REPO_ROOT` refuses with exit `2` when `git` fails, and separately
+  when it succeeds and prints nothing. The second is the quieter and
+  worse case: `resolve("", file)` silently means cwd.
+- `trackedFiles()` refuses on an empty listing. Every caller filters
+  that list and reports OK on finding no offenders, so empty is exactly
+  the reading that looks like success -- barwise-905, where the gate
+  printed OK having scanned nothing.
+- `check-core-purity` and `check-file-size` import `REPO_ROOT` instead
+  of re-deriving it.
+- Eleven tests in `gates.test.mjs`: five gates x two git failure modes,
+  plus the empty-listing case.
+
+Verified red, three mutations, each failing every test it should:
+
+| Mutation                                    | Result  |
+| ------------------------------------------- | ------- |
+| the empty-root guard disabled               | 5 fail  |
+| `process.exit(2)` becomes `process.exit(1)` | 10 fail |
+| the refusal message reworded                | 10 fail |
+
+The exit-code and message mutations failing all ten is the useful
+reading: every one of the ten tests reads both, so none of them is
+passing incidentally on a gate that happened to exit non-zero.
+
+### 3. The fault matrix as a harness (provisional: not yet grounded, and still open)
 
 The probe that produced the reading above, made repeatable: run every
 gate under the six enumerated perturbations and assert each either

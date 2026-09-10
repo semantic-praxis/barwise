@@ -10,15 +10,15 @@ Add 7 new constraint types to the metamodel, validation, verbalization, and seri
 
 Add to the existing constraint type union:
 
-| Constraint | Key Fields | Notes |
-|---|---|---|
-| `DisjunctiveMandatoryConstraint` | roleIds: string[] (2+, can span fact types) | "At least one of these roles" |
-| `ExclusionConstraint` | roleIds: string[] (2+, can span fact types) | "No instance plays both" |
-| `ExclusiveOrConstraint` | roleIds: string[] (2+) | Logical combination of disjunctive mandatory + exclusion |
-| `SubsetConstraint` | subsetRoleIds: string[], supersetRoleIds: string[] | Role sequence subset |
-| `EqualityConstraint` | roleIds1: string[], roleIds2: string[] | Bidirectional subset |
-| `RingConstraint` | roleId1: string, roleId2: string, ringType: RingType | Reflexive relationship constraint |
-| `FrequencyConstraint` | roleId: string, min: number, max: number \| "unbounded" | How many times an object plays a role |
+| Constraint                       | Key Fields                                              | Notes                                                    |
+| -------------------------------- | ------------------------------------------------------- | -------------------------------------------------------- |
+| `DisjunctiveMandatoryConstraint` | roleIds: string[] (2+, can span fact types)             | "At least one of these roles"                            |
+| `ExclusionConstraint`            | roleIds: string[] (2+, can span fact types)             | "No instance plays both"                                 |
+| `ExclusiveOrConstraint`          | roleIds: string[] (2+)                                  | Logical combination of disjunctive mandatory + exclusion |
+| `SubsetConstraint`               | subsetRoleIds: string[], supersetRoleIds: string[]      | Role sequence subset                                     |
+| `EqualityConstraint`             | roleIds1: string[], roleIds2: string[]                  | Bidirectional subset                                     |
+| `RingConstraint`                 | roleId1: string, roleId2: string, ringType: RingType    | Reflexive relationship constraint                        |
+| `FrequencyConstraint`            | roleId: string, min: number, max: number \| "unbounded" | How many times an object plays a role                    |
 
 `RingType` enum: `irreflexive`, `asymmetric`, `antisymmetric`, `intransitive`, `acyclic`, `symmetric`, `transitive`, `purely_reflexive`.
 

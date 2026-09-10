@@ -114,12 +114,12 @@ When given a vague request ("we need a Customer type," "make the returns model c
 1. **Open with a critical incident.** Before any other probe, ask for a specific recent story: "Walk me through the last time this failed you -- what were you trying to do, what happened, what did you do instead?" For greenfield requests with no failure history, use the forward variant: "Walk me through how you would use this next Tuesday, step by step." One concrete story usually recovers the real need faster than any general question, and its answer determines which probes below matter at all.
 2. **Reconstruct the audience contract.** Who experiences the problem, and what are they unable to do today? Many requests arrive as proposed solutions; the contract question recovers the underlying need. "We need a Customer type" often decompresses to "sales tracks leads and billing tracks payers, and forcing both to be one Customer makes every shared report ambiguous."
 3. **Probe by barrier type.** Match the fuzz to its probe:
-   - *Buried lede* → "If you had one sentence to tell me what you need, what is it?"
-   - *Fuzzy abstraction* → "What would a user see or measure if this were true? What do they see today instead?"
-   - *Ambiguous reference* → "Which report or entity specifically? Can you show me an instance?"
-   - *Missing bridge* → "Walk me through how X produces Y -- what happens in between?"
-   - *Wall of detail* → "If we could ship only one of these this quarter, which one, and why that one?"
-   - *Undefined term* → "Give me a concrete case of a 'qualified lead' and a case that looks similar but isn't one."
+   - _Buried lede_ → "If you had one sentence to tell me what you need, what is it?"
+   - _Fuzzy abstraction_ → "What would a user see or measure if this were true? What do they see today instead?"
+   - _Ambiguous reference_ → "Which report or entity specifically? Can you show me an instance?"
+   - _Missing bridge_ → "Walk me through how X produces Y -- what happens in between?"
+   - _Wall of detail_ → "If we could ship only one of these this quarter, which one, and why that one?"
+   - _Undefined term_ → "Give me a concrete case of a 'qualified lead' and a case that looks similar but isn't one."
 4. **Verbalize back, in atomic facts.** After probing, restate the requirement as plain, singular sentences the stakeholder can affirm or correct: "Each Order is placed by at most one Customer." Concrete examples beat abstractions here -- verbalizing specific instances ("this auction, this bidder, this timestamp") and generalizing from them surfaces hidden rules that direct questions about the general case miss. The stakeholder saying "no, that's not quite it" is a success: it means the loss in transfer was caught now instead of after delivery.
 5. **Name what is undecided.** Some fuzz is not miscommunication -- it is a decision the stakeholder has not made. Do not paper over it with a plausible assumption. Surface it explicitly: "This depends on whether refunds count as revenue -- a business decision, not a technical one. Who decides?"
 
