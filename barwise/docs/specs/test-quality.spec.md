@@ -1,6 +1,8 @@
 # Test quality: four evidence-side measures, and why coverage is not one of them
 
-Status: WS1 implemented; WS2 through WS5 open (see Implementation notes)
+Status: WS1 implemented; WS2 through WS5 open. Measure 4 was corrected
+after review (see "Measure 4, and how it avoids testing our own
+beliefs") -- the first draft would have manufactured its own diagnostics.
 Created: 2026-09-10
 Last-updated: 2026-09-10
 Tracking: barwise-986 (this spec). The design-side sibling is
@@ -81,31 +83,89 @@ property; let the shadow be a sanity check.
 
 ## The four measures
 
-| # | Property                                           | Instrument                                                       | Baseline                                      | Today                                                                                                  |
-| - | -------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| 1 | A test can fail on the defect it claims to catch   | mutation score over a declared operator set, per `src` directory | per-directory ratchet                         | `mutate.mjs` does one mutation on demand; no aggregate has ever been taken                             |
-| 2 | Generated inputs reach the branch a law asserts on | `describe("coverage: ...")` blocks and their floors              | the floor numbers                             | five law files, all now carrying one (WS1)                                                             |
-| 3 | The expected answer comes from outside the system  | oracle kind per assertion group                                  | share that is self-referential, moving down   | goldens, round-trips and self-diffs are barwise-vs-barwise; `SqlglotBridge` is the one external oracle |
-| 4 | The invalid domain is generated, not fixtured      | a malformed-model arbitrary per rule set                         | rules with fixture-only evidence, moving down | none; `arbOrmModel` makes invalid choices unreachable by construction                                  |
+| # | Property                                           | Instrument                                                       | Baseline                                    | Today                                                                                                  |
+| - | -------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| 1 | A test can fail on the defect it claims to catch   | mutation score over a declared operator set, per `src` directory | per-directory ratchet                       | `mutate.mjs` does one mutation on demand; no aggregate has ever been taken                             |
+| 2 | Generated inputs reach the branch a law asserts on | `describe("coverage: ...")` blocks and their floors              | the floor numbers                           | five law files, all now carrying one (WS1)                                                             |
+| 3 | The expected answer comes from outside the system  | oracle kind per assertion group                                  | share that is self-referential, moving down | goldens, round-trips and self-diffs are barwise-vs-barwise; `SqlglotBridge` is the one external oracle |
+| 4 | The invalid domain is generated, not fixtured      | rule-id reachability over `RULE_IDS`                             | unreached rule ids, moving down             | 22 of 79 reached; `constraint` 1 of 28 and `structural` 0 of 15                                        |
 
 The fifth measure -- law coverage per capability -- is
 `functional-design-quality.spec.md` WS4 and is **not restated here**. It
 is referenced, so the two specs cannot drift into two versions of one
 rule.
 
-Measure 4 deserves its own sentence because it is the one with nothing
-at all today. `tests/arbitraries/model.ts` opens by describing itself as
-"a seeded fast-check arbitrary over structurally valid `OrmModel`s", and
-line 26 is explicit that "a choice that `structuralRules` would report
-is made unreachable here". `serialization.law.test.ts` then promotes
-that to a law. This is correct for the laws that exist -- merge,
-serialization and mapping are operations on valid models -- but it means
-the validation layer, whose entire job is deciding what is invalid, is
-tested only by hand-written fixtures. The `assertion-audit` skill
-records what hand-written rejection tests do: barwise-855 pinned a
-limitation as a requirement and the suite defended it for two
-capability generations. A generated malformed model cannot encode
-somebody's belief about what ought to be rejected.
+## Measure 4, and how it avoids testing our own beliefs (resolved: generate through the door invalidity actually uses)
+
+Measure 4 is the one with nothing today, and it is the one where a
+naive instrument would be worse than none. It gets its own section
+because the first draft of this spec got it wrong.
+
+**The draft said:** build an arbitrary that makes exactly one invalid
+choice reachable per draw, and assert `structuralRules` reports that
+rule. **The objection:** an arbitrary that constructs the shape a rule
+looks for, and then asserts that rule fires, has encoded the rule
+twice. It tests our belief about what is invalid, which is the same
+defect as the hand-written fixture it was meant to replace. The repo
+had already spotted this once -- `generator-coverage-floors.spec.md`
+refuses to build a second preferred identifier because
+"`completeness/multiple-preferred-identifiers` calls that
+contradictory, and a generator producing it would be manufacturing the
+diagnostic rather than the shape."
+
+**The resolution is to notice which door invalidity comes through.**
+`tests/arbitraries/model.ts` builds models by calling
+`model.addObjectType(config)` and `model.addFactType(config)` -- the
+**validating** API, which throws on a duplicate name and on a dangling
+reference. The generator therefore cannot produce what that API
+rejects, and that is not a flaw in the generator: it is "define errors
+out of existence" working correctly at the constructor. But
+`OrmYamlSerializer` takes a `lenient` option that passes
+`skipPlayerValidation: true`, so **deserialization constructs models
+the API would reject**. Real `.orm.yaml` on disk is the door, and it is
+a door the generator has never gone through.
+
+So measure 4 does not manufacture violations. It generates a valid
+model, serializes it, perturbs the _text_, loads it leniently, and
+asserts which rules fire. The perturbation knows nothing about the rule
+set; what makes it non-circular is that the generator does not choose
+which rule it trips.
+
+**And the instrument is not a belief either.** `RULE_ID` in
+`validation/ruleId.ts` is the closed set of rule identifiers, complete
+by construction -- an identifier used in a rule module and missing from
+the record is a compile error -- and `RULE_IDS` exports it. That is the
+authority for what failures exist. Reachability against it is a number,
+measured over the 250 models the generator already draws:
+
+| Namespace      | Rule ids | Reached | Note                                              |
+| -------------- | -------: | ------: | ------------------------------------------------- |
+| `completeness` |        8 |       7 |                                                   |
+| `population`   |       19 |      13 |                                                   |
+| `derivation`   |        2 |       1 |                                                   |
+| `constraint`   |       28 |       1 | malformed constraint definitions                  |
+| `structural`   |       15 |       0 | asserted as a law by `serialization.law`          |
+| `project`      |        6 |       0 | takes `OrmProject`; out of this generator's scope |
+| `merge-error`  |        1 |       0 |                                                   |
+| **Total**      |   **79** |  **22** |                                                   |
+
+`structural` reading zero is not a gap that crept in; it is the law
+`serialization.law.test.ts` asserts. `constraint` reading 1 of 28 is
+the finding: the largest namespace in the registry, almost entirely
+about malformed constraint definitions, and the generator builds
+well-formed constraints by construction.
+
+**This also makes measure 4 a dead-code detector, which is a claim to
+be careful with.** A rule id no door can reach is either untested or
+unreachable, and the count alone cannot say which. Nothing here
+establishes that any specific rule is dead -- 57 unreached ids is a
+question, not an answer, and the question only becomes answerable once
+the lenient-load door is generated over.
+
+The `assertion-audit` skill records the cost of the alternative:
+barwise-855 pinned a limitation as a requirement and the suite defended
+it for two capability generations. That is what a hand-written
+rejection test does when nobody re-derives the belief behind it.
 
 ## Scope
 
@@ -120,8 +180,8 @@ In scope, stated as requirements:
 - When an assertion group is added, the system shall classify its
   oracle kind, and the share of self-referential groups shall not
   increase. (WS3)
-- When a validation rule set gains a rule, the system shall reach it
-  from a malformed-model arbitrary, or record it as fixture-only. (WS4)
+- When `RULE_IDS` gains an identifier, the system shall either reach it
+  from a generated input or record it as unreached with a reason. (WS4)
 
 Out of scope:
 
@@ -154,7 +214,7 @@ anything about whether a test can fail.
 Measure 1  npm run audit:mutation -- --check   ->  mutation-baseline.json
 Measure 2  core suite (lawPremises.test.ts)    ->  the floors, in the law files
 Measure 3  npm run audit:oracle -- --check     ->  oracle-baseline.json
-Measure 4  core suite (malformed arbitrary)    ->  rules with fixture-only evidence
+Measure 4  npm run audit:reachability -- --check ->  reachability-baseline.json
 
 Measure 5  functional-design-quality.spec.md WS4 -- referenced, not owned
 ```
@@ -190,6 +250,13 @@ script with a baseline, matching `audit:duplication` and `audit:rubric`.
   spread to a second package, the check moves and this paragraph is the
   record of why it was not built that way first.
 
+- **An arbitrary that constructs violations directly** (`arbMalformedOrmModel`,
+  one invalid choice per draw). This was the first draft's WS4 and it is
+  wrong: building the shape a rule looks for and then asserting that rule
+  fires encodes the rule twice, which is the fixture problem it was meant
+  to solve. Recorded here rather than deleted because it is the obvious
+  design and the next reader will propose it again.
+
 - **Assert only that a `coverage:` block exists.** Rejected as too easy
   to satisfy without meaning it: an empty `describe` would pass. WS1
   asserts two markers, the second being that the block draws from
@@ -220,12 +287,17 @@ self-referential share downward. The cheapest real win is likely
 running exported DDL through the `SqlglotBridge` that already exists,
 which turns a golden into a derived oracle.
 
-### 4. The malformed-model arbitrary (provisional: not yet grounded)
+### 4. Reachability over the lenient-load door (provisional: not yet grounded)
 
-`arbMalformedOrmModel()`, the mirror of the existing generator: instead
-of making every invalid choice unreachable, make exactly one reachable
-per draw and assert `structuralRules` reports that rule and no other.
-Baseline: validation rules whose only evidence is a fixture.
+Two steps, and the first is worth landing alone. **(a)** Record the
+reachability number against `RULE_IDS` as a baseline, so the 22 of 79
+above cannot drift down unnoticed; this needs no new generator and is
+the cheapest measure in the spec. **(b)** Generate through the door
+invalidity actually uses: draw a valid model, serialize it, perturb the
+YAML text, load with `lenient: true`, and record which rules fire. The
+perturbation is text-level and rule-agnostic on purpose -- see the
+measure 4 section for why constructing violations directly would test
+our own beliefs.
 
 ### 5. Retire or keep the coverage thresholds (provisional; depends on Open decision 2)
 
@@ -262,12 +334,12 @@ Baseline: validation rules whose only evidence is a fixture.
   writing it (assertion-audit rule 0; barwise-906, six occurrences).
   Use `npm run mutate` and establish the failing reading first. WS1's
   three assertions were verified this way; see Implementation notes.
-- **Measure 4 could manufacture its own diagnostics.** An arbitrary
-  that builds invalid models can build ones the validator was never
-  meant to see, and asserting on those pins noise. The rule the
-  existing generator already follows applies: never build a shape the
-  rule set calls contradictory (`withPreferredIdentifier` refuses a
-  second preferred identifier for exactly this reason).
+- **Measure 4 could manufacture its own diagnostics**, which is why it
+  generates through the lenient-load door rather than constructing
+  violations. Even so, a text perturbation can produce YAML the loader
+  was never meant to see, and asserting on those pins noise. The
+  discriminating assertion is "this rule and no other", not "some
+  diagnostic appeared".
 - **Measure 1 will surface equivalent mutants**, which are undecidable
   in general and are the standing cost of mutation testing (Papadakis
   et al. 2019). The baseline must tolerate a known-equivalent list
