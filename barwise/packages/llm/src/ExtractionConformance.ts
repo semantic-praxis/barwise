@@ -753,7 +753,7 @@ function expectedArityDescription(type: InferredConstraint["type"]): string {
  * one preferred, are the same key with a flag on one of them, so
  * keying on it would emit a genuine duplicate. Dropping the second
  * loses the flag when the preferred one came second, which wants a
- * merge rather than a drop -- barwise-1007, not this fix.
+ * merge rather than a drop -- barwise-1010, not this fix.
  */
 const CONSTRAINT_FIELDS: {
   readonly [K in keyof Required<InferredConstraint>]:

@@ -27,6 +27,8 @@
     "audit:duplication": "node scripts/audit-duplication.mjs",
     "mutate": "node scripts/mutate.mjs",
     "fault-matrix": "node scripts/fault-matrix.mjs",
+    "test:cli-checks": "bash test-plan/cli-checks.sh",
+    "test:mcp-checks": "node test-plan/mcp-checks.mjs",
     "audit:specs": "node scripts/audit-spec-status.mjs",
     "survey:specs": "node scripts/audit-spec-status.mjs --survey",
     "audit:rubric": "node scripts/audit-rubric.mjs",

@@ -407,7 +407,24 @@ perturbation is text-level and rule-agnostic on purpose -- see the
 measure 4 section for why constructing violations directly would test
 our own beliefs.
 
-### 5. Retire or keep the coverage thresholds (provisional; depends on Open decision 2)
+### 5. Keep the coverage thresholds, as a floor (resolved 2026-09-10)
+
+**They stay, they are documented as a floor against catastrophe rather
+than a quality bar, and they do not ratchet up.** One comment on
+`CoverageFloors` in `vitest.shared.ts`; no threshold value changes.
+
+The removal argument was that two instruments for one property is one too
+many and the weaker gets optimised. That is right about _ratcheting_ and
+wrong about _having_. What a floor catches is a test file deleted or a
+module that stopped being exercised at all -- cheap, and nothing else
+catches it. What it must never do is rise toward whatever coverage a
+package happens to have, because that is the move that turns a smoke
+alarm into a target.
+
+This is CLAUDE.md's "shadow and the property" applied to the pair this
+spec measured: 99.5% line coverage against a 75.4% mutation score on the
+same files. Coverage is the shadow, the mutation score is the property.
+Look at the shadow; ratchet on the property (WS2 and barwise-994).
 
 ## Open decisions (for review)
 
@@ -431,17 +448,45 @@ our own beliefs.
   an `npm run mutation` script; (b) keep `stryker.conf.json` committed
   and run via `npx` when wanted, paying the install each time and owning
   nothing; (c) build the batch runner on `mutate.mjs` and own a worse
-  engine forever. Recommended: (b). It reproduces the number without
-  taking the dependency, and (a) becomes right only once the ratchet
-  runs often enough that the install cost is felt.
+  engine forever.
 
-- **Do the coverage thresholds stay?** Options: (a) keep them as a
-  floor against catastrophe while ratcheting on measures 1 through 4;
-  (b) remove them once measure 1 has a baseline, on the grounds that
-  two instruments for one property is one too many and the weaker will
-  be the one people optimize. Recommended: (a) until WS2 produces a
-  number, then revisit. They cost little and the Node-portability
-  problem is documented rather than surprising.
+  **Resolved 2026-09-10: (a), because (b) does not exist.** The `npx`
+  spelling this section recommended, and that
+  `packages/core/CLAUDE.md` documented, fails outright:
+  `npx --yes @stryker-mutator/core@9 @stryker-mutator/vitest-runner@9
+  stryker run` instruments all 468 mutants and then dies with
+  `ERR_MODULE_NOT_FOUND` -- Stryker's tsconfig preprocessor does a bare
+  `import("typescript")`, which resolves to nothing from an npx cache
+  directory. It was written down and never run. Both scores taken so far
+  were taken with `npm install --no-save`.
+
+  That changes the trade-off rather than the wording. The real
+  alternative to a locked devDependency is a transient install
+  resolving the same 126 packages **fresh from the registry, outside
+  the lock**, on whichever machine takes the score -- which against
+  `supply-chain-hardening.spec.md` is not the safer half. Locked and
+  auditable beats unlocked and transient.
+
+  What decides it is frequency, and the answer is the same one this
+  section anticipated: (a) becomes right once the ratchet runs often
+  enough that the install cost is felt. **It will**, because the ratchet
+  is going on a schedule rather than on demand -- see barwise-994. A
+  ratchet that fires only when someone remembers is a gate nobody pulls,
+  which is the shape this spec exists to argue against.
+
+- **Do the coverage thresholds stay? (resolved 2026-09-10: yes, as a
+  floor.)** Options were: (a) keep them as a floor against catastrophe
+  while ratcheting on measures 1 through 4; (b) remove them once measure
+  1 has a baseline, on the grounds that two instruments for one property
+  is one too many and the weaker will be the one people optimize.
+
+  **(a).** WS2 produced the number the revisit was waiting on, and it
+  argues for keeping them while making their scope explicit: 99.5% line
+  coverage beside a 75.4% mutation score is exactly why a threshold
+  cannot stand in for test quality, and also why it costs nothing to
+  leave one in place. The (b) argument survives as a rule rather than a
+  deletion -- **the floors never ratchet up** -- since raising one is the
+  move that makes the weaker instrument a target. Landed in WS5.
 
 - **Where does measure 3's classification live?** Options: (a) a
   baseline file listing groups by oracle kind, like

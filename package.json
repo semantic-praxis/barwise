@@ -28,6 +28,8 @@
     "audit:duplication": "npm --prefix barwise run audit:duplication --",
     "mutate": "npm --prefix barwise run mutate --",
     "fault-matrix": "npm --prefix barwise run fault-matrix --",
+    "test:cli-checks": "npm --prefix barwise run test:cli-checks --",
+    "test:mcp-checks": "npm --prefix barwise run test:mcp-checks --",
     "audit:specs": "npm --prefix barwise run audit:specs --",
     "survey:specs": "npm --prefix barwise run survey:specs --",
     "audit:rubric": "npm --prefix barwise run audit:rubric --",

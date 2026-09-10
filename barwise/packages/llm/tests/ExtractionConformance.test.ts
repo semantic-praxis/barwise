@@ -648,7 +648,7 @@ describe("ExtractionConformance", () => {
       // uniqueness constraints. The cost is that the flag is lost when
       // the preferred one comes second, as it does here -- which wants
       // the survivor to absorb the flag rather than the pair to
-      // survive, and that is barwise-1007 rather than this fix. Pinned
+      // survive, and that is barwise-1010 rather than this fix. Pinned
       // so the loss is a recorded decision instead of a surprise.
       const uniqueness = (isPreferred: boolean, description: string) => ({
         type: "internal_uniqueness" as const,
