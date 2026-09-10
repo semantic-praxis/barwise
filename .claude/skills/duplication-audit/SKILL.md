@@ -34,12 +34,12 @@ The precedents, for calibration:
 The classification rubric -- apply it before calling anything a
 defect:
 
-| Verdict         | Meaning                                                          |
-| --------------- | ---------------------------------------------------------------- |
+| Verdict         | Meaning                                                                             |
+| --------------- | ----------------------------------------------------------------------------------- |
 | guarded         | A mechanical check fails when the copies disagree (verify the test exists; read it) |
-| benign parallel | Copies serve genuinely different concerns; agreement not required |
-| drift-prone     | Copies must agree; nothing checks; divergence would be silent    |
-| diverged        | Drift-prone and the copies already disagree                      |
+| benign parallel | Copies serve genuinely different concerns; agreement not required                   |
+| drift-prone     | Copies must agree; nothing checks; divergence would be silent                       |
+| diverged        | Drift-prone and the copies already disagree                                         |
 
 The discriminator is not "is this duplicated" but "**must these agree
 for the system to be correct, and what notices when they stop?**"

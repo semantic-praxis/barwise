@@ -149,8 +149,8 @@ Operational rules for the mutation pass, each learned the hard way:
 - **Revert everything and prove it**: `git status` clean except
   intended changes, then full build + test + lint from `barwise/`.
 
-**Pass 3 -- checks that cannot fail.** Pass 2 mutates the *producer*
-to see whether a test notices. This pass mutates the *subject* to see
+**Pass 3 -- checks that cannot fail.** Pass 2 mutates the _producer_
+to see whether a test notices. This pass mutates the _subject_ to see
 whether a check can fail at all. It applies wherever passes are
 counted rather than merely observed -- an eval rubric, a conformance
 suite, a validation gate: delete from the fixture the very thing the

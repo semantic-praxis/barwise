@@ -38,14 +38,14 @@ the learner has not run `barwise gym check` yet -- point them at
    catalog in `barwise/docs/specs/learning-design.spec.md` pairs each
    failure signature with the habit of thought that produces it:
 
-   | Recurring failure signature | Likely reductive reading |
-   | --- | --- |
-   | `requires_verbalization` on elementary facts | Table-thinking: lumping elementary facts into one wide fact type |
-   | `requires_element` (a missing fact type between two types) | Attribute-first thinking from ER / dimensional modeling |
-   | `forbids_population` on a ternary decomposed as binaries | Assuming binary arity; missing a genuine ternary |
-   | `must_validate` on missing reference schemes | Conflating entity types with value types |
-   | `forbids_population` wholesale (unconstrained model) | Treating constraints as decoration added after |
-   | `requires_element` (no subtype-only fact) | Reading subtypes as an ISA taxonomy, not role-derived |
+   | Recurring failure signature                                | Likely reductive reading                                         |
+   | ---------------------------------------------------------- | ---------------------------------------------------------------- |
+   | `requires_verbalization` on elementary facts               | Table-thinking: lumping elementary facts into one wide fact type |
+   | `requires_element` (a missing fact type between two types) | Attribute-first thinking from ER / dimensional modeling          |
+   | `forbids_population` on a ternary decomposed as binaries   | Assuming binary arity; missing a genuine ternary                 |
+   | `must_validate` on missing reference schemes               | Conflating entity types with value types                         |
+   | `forbids_population` wholesale (unconstrained model)       | Treating constraints as decoration added after                   |
+   | `requires_element` (no subtype-only fact)                  | Reading subtypes as an ISA taxonomy, not role-derived            |
 
    Name the bias plainly and explain why that reading produced exactly
    this failure. The miss-card backs carry the authored `diagnosis` and
@@ -84,4 +84,4 @@ the learner has not run `barwise gym check` yet -- point them at
 - Do not drive the other artifacts (deck, tutorial) from here -- the
   loop couples through file formats only. Recommend; don't orchestrate.
 - The gym grades models, this skill coaches study habits. For help
-  *authoring* a model, use the `barwise-modeling` skill instead.
+  _authoring_ a model, use the `barwise-modeling` skill instead.

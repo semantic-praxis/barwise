@@ -11,15 +11,19 @@
 //
 // Usage: node barwise/scripts/check-file-size.mjs [threshold]
 
-import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { REPO_ROOT } from "./lib/tracked.mjs";
 
 const THRESHOLD = Number(process.argv[2] ?? 600);
 
-const gitRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
-  encoding: "utf8",
-}).trim();
+// The repo root comes from `lib/tracked.mjs`, which is where it is
+// already resolved and now guarded: a `git` that fails, or one that
+// succeeds and prints nothing, refuses with exit 2 rather than leaving
+// this gate to crash on a path derived from `""`. Re-deriving it here
+// was a third copy of one decision with nothing keeping the three
+// honest (docs/specs/gate-refusal-contract.spec.md WS2).
+const gitRoot = REPO_ROOT;
 const packages = join(gitRoot, "barwise", "packages");
 
 function walk(dir) {
