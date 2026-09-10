@@ -38,6 +38,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1484,4 +1485,137 @@ test("every node gate CI runs is a script that exists", () => {
     gates.some((g) => g.script === "scripts/fmt-root.mjs"),
     "the compound `fmt:check` script must still resolve to its node half",
   );
+});
+
+// --- barwise-984: an id names one issue, and created_at says which ---------
+//
+// Five collisions across three sessions. `beads-crud` mints ids from the
+// highest in the LOCAL .beads/issues.jsonl, which is stale by construction
+// on any branch behind main, so two branches mint the same id for unrelated
+// issues. The `duplicate id` rule above catches the merged file while it
+// still holds both rows; the damage happens at the RESOLUTION, where union
+// by id with the later `updated_at` winning treats a collision as an edit,
+// keeps one row and deletes an issue. That resolution produces a file every
+// other rule accepts, because both sides are individually valid.
+//
+// The fixture is a throwaway repo whose `barwise/` is a SYMLINK to this
+// one. The gate resolves two things from two different places: the git
+// history from `git rev-parse --show-toplevel` (so the temp repo owns the
+// branches, the merge base, and the tracker under test) and the Python
+// interpreter from `uv run --project <root>/barwise` (so it needs a real
+// pyproject and lock, which the temp repo has no business carrying). The
+// symlink is what lets those be different answers.
+
+/**
+ * A throwaway repo with `main` carrying `mainRows`, and a `feature` branch
+ * checked out carrying `branchRows`. Returns its path.
+ */
+function beadsRepo(mainRows, branchRows, { withMain = true } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-beadsid-"));
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  execFileSync("git", ["config", "user.email", "gate@test"], { cwd: dir });
+  execFileSync("git", ["config", "user.name", "gate"], { cwd: dir });
+  symlinkSync(join(REPO, "barwise"), join(dir, "barwise"));
+  mkdirSync(join(dir, ".beads"), { recursive: true });
+  const write = (rows) => writeFileSync(join(dir, ".beads", "issues.jsonl"), rows.join(""));
+  write(mainRows);
+  execFileSync("git", ["add", "-A"], { cwd: dir });
+  execFileSync("git", ["commit", "-qm", "base"], { cwd: dir });
+  execFileSync("git", ["branch", "-M", withMain ? "main" : "trunk"], { cwd: dir });
+  execFileSync("git", ["checkout", "-qb", "feature"], { cwd: dir });
+  write(branchRows);
+  return dir;
+}
+
+function beadsCheckIn(dir) {
+  return spawnSync("bash", [join(SCRIPTS, "check-beads.sh"), "--strict"], {
+    cwd: dir,
+    encoding: "utf8",
+  });
+}
+
+test("check-beads fails when an id names a different issue than main's", () => {
+  const dir = beadsRepo(
+    [issueLine({ id: "t-1", title: "main issue", created_at: "2026-01-01T00:00:00Z" })],
+    [issueLine({ id: "t-1", title: "branch issue", created_at: "2026-02-02T00:00:00Z" })],
+  );
+  try {
+    const r = beadsCheckIn(dir);
+    assert.equal(r.status, 1, `expected a collision error:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stdout, /names a DIFFERENT issue on main/);
+    // Both titles, because the whole point is that the reader compares them
+    // before choosing a resolution -- three times the resolution was chosen
+    // without ever seeing the other side's title.
+    assert.match(r.stdout, /main issue/);
+    assert.match(r.stdout, /branch issue/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-beads accepts an ordinary edit to an issue main also has", () => {
+  // Guard the guard. `created_at` is the discriminator precisely because a
+  // title, a status and a note all change legitimately; a rule keyed on any
+  // of those would fail on every second commit and be turned off.
+  const dir = beadsRepo(
+    [issueLine({ id: "t-1", title: "before", created_at: "2026-01-01T00:00:00Z" })],
+    [
+      issueLine({
+        id: "t-1",
+        title: "after, retitled and closed",
+        status: "closed",
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-03-03T00:00:00Z",
+      }),
+    ],
+  );
+  try {
+    const r = beadsCheckIn(dir);
+    assert.equal(r.status, 0, `an edit is not a collision:\n${r.stdout}${r.stderr}`);
+    assert.doesNotMatch(r.stdout, /DIFFERENT issue/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-beads notes an issue that was at the merge base and is gone", () => {
+  // A warning, not an error: `beads-crud delete` exists and deleting a
+  // throwaway is legitimate. What is not legitimate is doing it by accident
+  // while resolving a collision, which is what happened, so the reader gets
+  // told which issue left and asked which of the two it was.
+  const dir = beadsRepo(
+    [
+      issueLine({ id: "t-1", title: "kept", created_at: "2026-01-01T00:00:00Z" }),
+      issueLine({ id: "t-2", title: "vanished", created_at: "2026-01-01T00:00:00Z" }),
+    ],
+    [issueLine({ id: "t-1", title: "kept", created_at: "2026-01-01T00:00:00Z" })],
+  );
+  try {
+    const r = beadsCheckIn(dir);
+    assert.equal(r.status, 0, `a deletion is a warning, not an error:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stdout, /'t-2' was in the tracker at the merge base and is gone/);
+    assert.match(r.stdout, /vanished/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-beads says so out loud when it has no baseline to compare against", () => {
+  // The rule that cannot run must not read as the rule that ran and found
+  // nothing (docs/specs/gate-refusal-contract.spec.md). A warning rather
+  // than a refusal because the gate's other dozen rules still answered --
+  // but the line is unconditional, so the reader can tell which reading
+  // they got.
+  const dir = beadsRepo(
+    [issueLine({ id: "t-1", title: "x", created_at: "2026-01-01T00:00:00Z" })],
+    [issueLine({ id: "t-1", title: "x", created_at: "2026-01-01T00:00:00Z" })],
+    { withMain: false },
+  );
+  try {
+    const r = beadsCheckIn(dir);
+    assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+    assert.match(r.stdout, /id-identity check DID NOT RUN/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
