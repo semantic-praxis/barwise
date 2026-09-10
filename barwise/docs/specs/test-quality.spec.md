@@ -330,11 +330,33 @@ different findings and should not be read together:
   -- the entity/value split feeding the mapper is unasserted at that
   branch.
 
-Not every survivor is a defect: a mutation testing pass surfaces
-equivalent mutants, which are undecidable in general (Papadakis et al.
-2019), and some of the 180 string survivors will be log text no test
-should pin. Triage is the work this number makes possible, not work it
-replaces.
+**A named cause for some of them, found in triage and correcting the
+first reading.** The run sets `disableTypeChecks: true`, which Stryker
+needs so that many mutations compile at all. It also means a mutation
+into a TYPED position survives that TypeScript would reject outright.
+`elementDiff.ts:53` was reported here as a real gap -- `change:
+"referenceMode"` blanked and no test noticed -- and it is not one:
+`change` is typed as `ChangeKind`, and `tsc` rejects the mutation with
+`TS2322`. The suite does not need to catch what the compiler already
+prevents.
+
+That is not a small correction. `elementDiff.ts` contributes 64 of the
+180 `StringLiteral` survivors and its string literals are largely
+`change:` tags, so a substantial share of that cluster is
+type-protected rather than untested. The survivors that remain real are
+the ones in UNTYPED positions: `openapi.ts` builds its operations as
+`Record<string, unknown>`, so `operationId: ``` is valid TypeScript and
+the gap was genuine. Both are now killed by `tests/mapping/openapi.test.ts`.
+
+The general lesson is the specific one this spec keeps arriving at: the
+survivor count is an instrument with a stated condition, and the
+condition here is "type checks disabled". Reading it without that
+condition overstates the finding, which is what the first reading did.
+
+Not every remaining survivor is a defect either: equivalent mutants are
+undecidable in general (Papadakis et al. 2019), and some of the string
+survivors will be log text no test should pin. Triage is the work this
+number makes possible, not work it replaces.
 
 **Still open: the ratchet.** The number exists; nothing yet fails when
 it drops. That is `mutation-baseline.json` plus a `--check` mode, and it
