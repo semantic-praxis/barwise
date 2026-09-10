@@ -38,6 +38,7 @@ import type { DiagnosticSeverity } from "./severity.js";
 /** Every rule identifier, by name, so no emit site repeats the string. */
 export const RULE_ID = {
   factTypeWithoutConstraints: "completeness/fact-type-without-constraints",
+  frequencyWithoutEffect: "completeness/frequency-without-effect",
   factTypeWithoutUniqueness: "completeness/fact-type-without-uniqueness",
   isolatedObjectType: "completeness/isolated-object-type",
   missingObjectTypeDefinition: "completeness/missing-object-type-definition",
@@ -135,6 +136,17 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (ftName: string): string =>
         `Fact type "${ftName}" has no constraints. Most fact types need at least a uniqueness constraint.`,
+    },
+  },
+  [RULE_ID.frequencyWithoutEffect]: {
+    severity: "warning",
+    description:
+      "A frequency constraint whose minimum is 1 or less and whose maximum is unbounded excludes nothing.",
+    messages: {
+      default: (factTypeName: string, min: number): string =>
+        `Fact type "${factTypeName}" has a frequency constraint of at least ${min} with no maximum, `
+        + `which excludes nothing: a frequency counts only the instances that do play the role, so `
+        + `every counted instance already occurs at least once. Give it a maximum, or remove it.`,
     },
   },
   [RULE_ID.factTypeWithoutUniqueness]: {

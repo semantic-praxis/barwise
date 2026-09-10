@@ -30,6 +30,7 @@ export function completenessWarnings(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkMissingValueTypeDataType(model));
   diagnostics.push(...checkPreferredIdentifiers(model));
   diagnostics.push(...checkConflictingIdentification(model));
+  diagnostics.push(...checkFrequencyWithoutEffect(model));
 
   return diagnostics;
 }
@@ -250,6 +251,49 @@ function checkConflictingIdentification(model: OrmModel): Diagnostic[] {
         others.map((k) => IDENTIFICATION_SOURCE_LABEL[k]).join(" and "),
       ),
     );
+  }
+
+  return diagnostics;
+}
+
+/**
+ * A frequency constraint of "at least 1, at most unbounded" excludes
+ * nothing, and until barwise-943 nothing said so.
+ *
+ * Halpin's counting semantics is that a frequency constraint applies
+ * only to the instances that DO play the role, so every counted
+ * instance already occurs at least once. "At least 1, no maximum" is
+ * therefore exactly as empty as "at least 0" -- which barwise already
+ * rejects outright as `constraint/frequency-invalid-min` (barwise-830).
+ * The two vacuous spellings were treated as opposites: one a hard
+ * error, the other indistinguishable from a real constraint, so a
+ * modeller writing the second got no signal that the line they just
+ * added says nothing while it verbalized and diagrammed as though it
+ * constrained something.
+ *
+ * A WARNING rather than an error, and the distinction is the artifact
+ * rather than the modeller. A min of 0 cannot be serialized and read
+ * back at all (barwise-942), so it is a defect in the file; this is a
+ * legal model carrying a useless line. Errors stay reserved for the
+ * former.
+ *
+ * THE BOUNDARY IS THE WHOLE RULE. A minimum of 1 with a FINITE maximum
+ * is not vacuous -- "at most 5" is the entire content of that
+ * constraint, and 1..5 is the ordinary way to write it. All six
+ * frequency constraints shipped in this repository are of that form, so
+ * a rule that flagged them would be wrong six times over on its first
+ * run. Only an unbounded maximum with a minimum of 1 or less is empty.
+ */
+function checkFrequencyWithoutEffect(model: OrmModel): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+
+  for (const ft of model.factTypes) {
+    for (const c of ft.constraints) {
+      if (c.type !== "frequency") continue;
+      if (c.max === "unbounded" && c.min <= 1) {
+        diagnostics.push(report(RULE_ID.frequencyWithoutEffect, "default", ft.id, ft.name, c.min));
+      }
+    }
   }
 
   return diagnostics;

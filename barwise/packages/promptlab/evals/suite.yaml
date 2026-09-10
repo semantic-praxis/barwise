@@ -180,7 +180,33 @@
 # Five different model arms produced the same malformed shape -- an
 # object type identified, transitively, by itself -- and nothing scored
 # it until now.
-version: 2.11.0
+#
+# 2.12.0 changes no case, no weight, no floor and no split. Same shape
+# as 1.3.0, 2.0.0 and 2.11.0: a change OUTSIDE this file that moves what
+# a score means. `completeness/frequency-without-effect` is a new
+# WARNING-severity validation rule (barwise-943), reported when a
+# frequency constraint declares a minimum of 1 or less with an unbounded
+# maximum -- a form that excludes nothing, because a frequency counts
+# only the instances that do play the role. The rubric charges 0.05 for
+# a residual warning, so an extraction carrying one scores lower.
+#
+# Exactly ONE arm moves, and the smallness is the finding rather than a
+# reason to skip the bump. On the recorded 20260828-1647 round, 1 of 115
+# payloads carries the shape: default-haiku-dev falls 0.907859 ->
+# 0.906833 (-0.001026). The other seven arms are unchanged to six places
+# and no arm rises. Rows either side of this line are not comparable.
+#
+# The payload is default-haiku-dev/incident-response-run2.json, whose
+# inferred_constraints declare {"type":"frequency","fact_type":"Service
+# owns Incident","roles":["Incident"],"min":1,"max":"unbounded"} -- with
+# a prose description, as though it constrained something. That is the
+# defect barwise-943 describes, produced by a model rather than
+# hypothesised: the vacuous spelling is invisible to a reader and to
+# every tool, while the min-0 spelling of the same emptiness has been a
+# hard error since barwise-830. No model shipped in this repository
+# writes the vacuous form, so the eval corpus is the only place it
+# occurs, and it took a new rule to see it.
+version: 2.12.0
 
 # Re-fitted for the rated form, because rating changed what a weight
 # means. A weight is now the cost of a model in which EVERY element
