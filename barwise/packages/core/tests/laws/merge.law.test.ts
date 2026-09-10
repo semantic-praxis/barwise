@@ -143,6 +143,113 @@ describe("law: accepting every delta yields the incoming model, aliases aside", 
 });
 
 /**
+ * The premises the two-draw laws above rest on, as measured floors.
+ *
+ * A law stated over `(existing, incoming)` only says something where
+ * the two models differ in the dimension being compared. Where they
+ * agree, `expect(names(merged.objectTypes)).toEqual(names(incoming.objectTypes))`
+ * compares a value to itself and holds whatever `mergeModels` did --
+ * `x toEqual x`, 250 times, reading as coverage. `sample.law.test.ts`
+ * names the same failure ("the law compares two empty lists 250
+ * times"); this file was the only law file with no such block, and the
+ * only one whose properties take two draws, which is where the premise
+ * is hardest to eyeball (`docs/specs/pair-coverage-floors.spec.md`,
+ * barwise-985).
+ *
+ * Measured at this seed over 250 pairs: object type names 181, fact
+ * type names 184, definitions 231, subtype pairs 159, objectification
+ * pairs 120, population keys 218, non-empty residual 224.
+ *
+ * The objectification row is the thin one, and thin for a traceable
+ * reason: barwise-968 recorded an objectified fact type in 70 models of
+ * 250, and a PAIR needs one side non-empty, so (180/250)^2 predicts 130
+ * both-empty pairs against the 127 measured. A dimension adequately
+ * covered per model is the square of that per pair. It is also the
+ * clause that matters most -- until the diff learned these four kinds,
+ * `mergeModels` carried them from the EXISTING model whatever a
+ * reviewer accepted, which is the regression the clause exists to
+ * catch, asserting `[] toEqual []` in more than half its runs.
+ *
+ * Floors sit near half the measured counts, per the rule
+ * `generator-coverage-floors.spec.md` set: well under the measurement
+ * so ordinary generator churn does not trip them, well over one so a
+ * collapse does.
+ */
+describe("coverage: the two-draw laws are not vacuous", () => {
+  /**
+   * The pairs the laws above actually see.
+   *
+   * `fc.sample(fc.tuple(a, b))` is a different call than
+   * `fc.property(a, b, ...)`, so "same pairs" is a claim rather than a
+   * definition. It was checked: counting collisions from inside the
+   * property returned 69 identical object-type name sets, and these
+   * sampled pairs return 250 - 181 = 69.
+   */
+  const pairs = fc.sample(fc.tuple(arbOrmModel(), arbOrmModel()), {
+    seed: SEED,
+    numRuns: RUNS,
+  });
+
+  /** How many sampled pairs the two models differ in, under `project`. */
+  function differing(project: (model: OrmModel) => string[]): number {
+    return pairs.filter(([existing, incoming]) =>
+      JSON.stringify(project(existing)) !== JSON.stringify(project(incoming))
+    ).length;
+  }
+
+  /** A floor, stated so the failure reports the drift rather than `false`. */
+  function expectFloor(dimension: string, count: number, floor: number): void {
+    expect(
+      count,
+      `${dimension}: ${count} of ${pairs.length} pairs differ, floor is ${floor}`,
+    ).toBeGreaterThanOrEqual(floor);
+  }
+
+  it("draws pairs whose object type names differ", () => {
+    expectFloor("object type names", differing((m) => names(m.objectTypes)), 90);
+  });
+
+  it("draws pairs whose fact type names differ", () => {
+    expectFloor("fact type names", differing((m) => names(m.factTypes)), 90);
+  });
+
+  it("draws pairs whose definitions differ", () => {
+    expectFloor(
+      "definition terms",
+      differing((m) => m.definitions.map((d) => d.term).sort()),
+      120,
+    );
+  });
+
+  it("draws pairs whose subtype facts differ", () => {
+    expectFloor("subtype pairs", differing(subtypePairs), 80);
+  });
+
+  it("draws pairs whose objectifications differ", () => {
+    // The thinnest row: 127 pairs of 250 have BOTH sides empty.
+    expectFloor("objectification pairs", differing(objectificationPairs), 60);
+  });
+
+  it("draws pairs whose populations differ", () => {
+    expectFloor("population keys", differing(populationKeys), 110);
+  });
+
+  it("draws pairs that leave a residual delta to inspect", () => {
+    // The second law asserts INSIDE `for (const delta of residual)`.
+    // Where the residual is empty the body never runs and the test
+    // passes having executed no assertion -- the it()-shaped version of
+    // a check that cannot fail. It stood at 224 of 250.
+    const count =
+      pairs.filter(([existing, incoming]) =>
+        diffModels(mergeAll(existing, incoming), incoming).deltas.some((d) =>
+          d.kind !== "unchanged"
+        )
+      ).length;
+    expectFloor("non-empty residual", count, 120);
+  });
+});
+
+/**
  * The subtype relationships a model asserts, as resolved name pairs.
  *
  * Ids churn between two independently generated models, so the pair of

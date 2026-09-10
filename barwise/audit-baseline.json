@@ -196,10 +196,10 @@
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"File path to .orm.yaml or inline YAML content\" in packages/mcp/src/tools/diagram.ts, packages/mcp/src/tools/schema.ts"
     },
-    "prose:3ab05c3cbd94": {
+    "prose:72691d1d4c85": {
       "status": "accepted-benign",
-      "note": "the capability matrix's own honesty note; the matrix is re-audited by convention",
-      "detail": "../CLAUDE.md: run`, which is what that lane is for. This table is hand-maintained and therefore the"
+      "note": "the capability matrix's own honesty note. The tool-list halves of the matrix are no longer prose: mcp/tests/serverSpawn.test.ts and vscode/tests/unit/toolRegistration.test.ts pin them with toEqual. What is left is the note explaining that the remaining rows are still hand-maintained, which is a claim about the document rather than a copy of anything",
+      "detail": "../CLAUDE.md: still hand-maintained and is therefore still the kind of claim that"
     },
     "prose:5236a3a26169": {
       "status": "accepted-benign",
