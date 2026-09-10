@@ -330,15 +330,21 @@ different findings and should not be read together:
   -- the entity/value split feeding the mapper is unasserted at that
   branch.
 
-**A named cause for some of them, found in triage and correcting the
-first reading.** The run sets `disableTypeChecks: true`, which Stryker
-needs so that many mutations compile at all. It also means a mutation
-into a TYPED position survives that TypeScript would reject outright.
+**A named cause for some of them, found in triage, and then corrected
+again by measuring it.** The first reading blamed
+`disableTypeChecks: true`. That was wrong: re-running `elementDiff.ts`
+with the flag set to `false` gives 480 mutants, 130 survivors, 72.92%
+-- byte-identical. The flag changes nothing here.
+
+The real cause is one layer down. Vitest runs through esbuild, which
+strips types without checking them, so **no mutation into a typed
+position can ever be caught by the test suite** -- the suite never
+type-checks. Stryker's option only matters for runners that do.
 `elementDiff.ts:53` was reported here as a real gap -- `change:
 "referenceMode"` blanked and no test noticed -- and it is not one:
-`change` is typed as `ChangeKind`, and `tsc` rejects the mutation with
-`TS2322`. The suite does not need to catch what the compiler already
-prevents.
+`change` is typed as `ChangeKind`, and `tsc --noEmit` rejects the
+mutation with `TS2322`. That check runs in CI as its own gate. The suite
+does not need to catch what the build already prevents.
 
 That is not a small correction. `elementDiff.ts` contributes 64 of the
 180 `StringLiteral` survivors and its string literals are largely
@@ -348,10 +354,20 @@ the ones in UNTYPED positions: `openapi.ts` builds its operations as
 `Record<string, unknown>`, so `operationId: ``` is valid TypeScript and
 the gap was genuine. Both are now killed by `tests/mapping/openapi.test.ts`.
 
-The general lesson is the specific one this spec keeps arriving at: the
-survivor count is an instrument with a stated condition, and the
-condition here is "type checks disabled". Reading it without that
-condition overstates the finding, which is what the first reading did.
+The general lesson is the one this spec keeps arriving at, and it took
+two passes to state correctly here. The survivor count is an instrument
+with a condition, and the condition is **"the test runner does not
+type-check"** -- not a Stryker flag, which is what the first correction
+guessed and the measurement disproved. Reading the count without that
+condition overstates the finding; naming the wrong condition for it is
+the same error one level in, and the only thing that separated them was
+running the experiment.
+
+That also bounds what a re-run can tell us. The typed-versus-untyped
+split cannot be obtained by flipping a Stryker option, because no option
+makes vitest type-check. It needs the declared type at each mutation
+site, or a rule that counts a survivor as covered when `tsc` rejects the
+same mutation.
 
 Not every remaining survivor is a defect either: equivalent mutants are
 undecidable in general (Papadakis et al. 2019), and some of the string
