@@ -114,19 +114,49 @@ export function diffObjectType(
 }
 
 /**
- * Resolve an object type id to its name using the given model.
- * Returns the id itself if the object type is not found.
+ * Resolve an object type id to its name, against the model the element
+ * came from and then against the other model of the same diff.
+ *
+ * The second model is not a nicety. A lenient fragment -- one that
+ * references an object type without defining it, which `barwise merge`
+ * and the MCP merge tool accept -- makes the owning model unable to
+ * name its own element's endpoints. Resolving against it alone then
+ * yields a UUID, which does two visible things: it keys the element
+ * differently from the model that DOES define it, so an unchanged
+ * subtype fact reads as a removed-plus-added pair, and it labels every
+ * delta with an id no reader recognises (barwise-957).
+ *
+ * Both models are required rather than one plus an optional fallback,
+ * because every call site has both and an optional one is a decision a
+ * caller can forget to make. Returns the id when neither model defines
+ * it -- a dangling reference, which `ValidationEngine` reports and
+ * `diffModels` refuses to build a pair-matched delta from.
  */
-export function playerName(model: OrmModel, playerId: string): string {
-  return model.getObjectType(playerId)?.name ?? playerId;
+export function playerName(model: OrmModel, playerId: string, other: OrmModel): string {
+  return model.getObjectType(playerId)?.name
+    ?? other.getObjectType(playerId)?.name
+    ?? playerId;
 }
 
 /**
- * Resolve a fact type id to its name using the given model.
- * Returns the id itself if the fact type is not found, like `playerName`.
+ * Resolve a fact type id to its name, with the same two-model rule and
+ * for the same reason as `playerName`. A lenient fragment can carry an
+ * objectification or a population whose fact type it does not define.
  */
-export function factTypeName(model: OrmModel, factTypeId: string): string {
-  return model.getFactType(factTypeId)?.name ?? factTypeId;
+export function factTypeName(model: OrmModel, factTypeId: string, other: OrmModel): string {
+  return model.getFactType(factTypeId)?.name
+    ?? other.getFactType(factTypeId)?.name
+    ?? factTypeId;
+}
+
+/** True when neither model of the diff defines this object type. */
+export function isDanglingPlayer(a: OrmModel, b: OrmModel, playerId: string): boolean {
+  return !a.getObjectType(playerId) && !b.getObjectType(playerId);
+}
+
+/** True when neither model of the diff defines this fact type. */
+export function isDanglingFactType(a: OrmModel, b: OrmModel, factTypeId: string): boolean {
+  return !a.getFactType(factTypeId) && !b.getFactType(factTypeId);
 }
 
 export function diffFactType(
@@ -144,8 +174,8 @@ export function diffFactType(
     for (let i = 0; i < a.arity; i++) {
       const ra = a.roles[i]!;
       const rb = b.roles[i]!;
-      const summaryA = roleSummary(ra, existingModel);
-      const summaryB = roleSummary(rb, incomingModel);
+      const summaryA = roleSummary(ra, existingModel, incomingModel);
+      const summaryB = roleSummary(rb, incomingModel, existingModel);
       if (summaryA.playerName !== summaryB.playerName) {
         changes.push({ change: "rolePlayer", index: i, from: summaryA, to: summaryB });
       }
@@ -189,19 +219,24 @@ export function diffFactType(
 
 /**
  * A role as plain data, with its player resolved against the model the
- * role came from.
+ * role came from, falling back to the other model of the diff.
  *
  * Both sides of a role change are resolved against _different_ models,
  * which is why the name is carried rather than left for a consumer to
  * look up: given only the delta, there is no model in which both names
  * resolve.
+ *
+ * The fallback is what stops a lenient fragment reporting a fact type
+ * as modified when nothing about it changed -- its roles name the same
+ * players, and only the fragment's failure to define them made one side
+ * read as a UUID (barwise-957).
  */
-function roleSummary(role: Role, model: OrmModel): RoleSummary {
+function roleSummary(role: Role, model: OrmModel, other: OrmModel): RoleSummary {
   return {
     id: role.id,
     name: role.name,
     playerId: role.playerId,
-    playerName: playerName(model, role.playerId),
+    playerName: playerName(model, role.playerId, other),
   };
 }
 
