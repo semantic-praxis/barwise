@@ -1,4 +1,4 @@
-import type { ValueRange } from "./ObjectType.js";
+import type { ConceptualDataTypeName, ValueRange } from "./ObjectType.js";
 
 /**
  * What a value constraint admits, as one predicate.
@@ -62,4 +62,52 @@ export function valueDomainPredicate(domain: ValueDomain): (val: string) => bool
   const allowed = new Set(domain.values);
   const ranges = domain.ranges ?? [];
   return (val) => allowed.has(val) || ranges.some((r) => valueInRange(val, r));
+}
+
+/**
+ * Whether a value is a possible instance of a conceptual data type.
+ *
+ * The second half of "is this value admissible here". `valueDomainPredicate`
+ * above answers it for a declared enumeration or range; this answers it for
+ * the declared TYPE, which a model may carry without any enumeration at all.
+ * Both were declared, serialized, and exported to SQL as a CHECK, and
+ * neither was ever applied to the model's own sample data (barwise-945): a
+ * value type could declare `integer` and its population could hold
+ * "banana".
+ *
+ * DELIBERATELY PARTIAL, and that is the design rather than an omission. It
+ * returns true for every type whose admissible spellings this codebase
+ * cannot pin down, because a false positive here accuses a modeller of an
+ * error in correct data, which is worse than a missed check:
+ *
+ * - `date`, `time`, `datetime`, `timestamp` -- no format is declared
+ *   anywhere in the metamodel, so "2026-09-09", "09/09/2026" and
+ *   "Sept 9" are all defensible and none is checkable.
+ * - `uuid` -- a definite shape exists, but this corpus already carries
+ *   NORMA-derived ids like `_84B3E1CA-690B-...` that a strict RFC 4122
+ *   test would reject.
+ * - `text`, `binary`, `other` -- no constraint by definition.
+ *
+ * Widening this is the safe direction and narrowing it is not, so a type
+ * joins the checked set only once a real model shows the check would have
+ * helped.
+ */
+export function dataTypeAdmits(type: ConceptualDataTypeName, val: string): boolean {
+  const trimmed = val.trim();
+  switch (type) {
+    case "integer":
+    case "auto_counter":
+      return /^[+-]?\d+$/.test(trimmed);
+    case "decimal":
+    case "money":
+    case "float":
+      return isFiniteNumber(trimmed);
+    case "boolean":
+      // "1"/"0" alongside true/false because that is what a SQL or CSV
+      // export of the same fact produces, and a model assembled from one
+      // is not in error.
+      return ["true", "false", "1", "0"].includes(trimmed.toLowerCase());
+    default:
+      return true;
+  }
 }

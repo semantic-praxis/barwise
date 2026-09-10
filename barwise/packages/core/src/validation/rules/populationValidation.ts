@@ -34,6 +34,7 @@ import {
   checkFrequencyViolations,
   checkValueConstraintViolations,
 } from "./population/valueFrequency.js";
+import { checkValueTypeDomainViolations } from "./population/valueTypeDomain.js";
 
 /**
  * Population validation rules.
@@ -146,6 +147,7 @@ export function populationValidationRules(model: OrmModel, graph: ModelGraph): D
   diagnostics.push(...checkIncompleteInstances(model, graph));
   diagnostics.push(...checkUniquenessViolations(model));
   diagnostics.push(...checkValueConstraintViolations(model));
+  diagnostics.push(...checkValueTypeDomainViolations(model));
   diagnostics.push(...checkValueComparisonViolations(model));
   diagnostics.push(...checkFrequencyViolations(model));
   diagnostics.push(...checkExclusionViolations(model));

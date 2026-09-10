@@ -34,9 +34,14 @@ const ALLOWED = new Set(["shared.ts", "mandatory.ts"]);
 
 describe("the universe-rule table", () => {
   it("is the only way a population rule gets the object universe", () => {
+    // A CALL, not a mention. The scan matched any occurrence of the
+    // name until a rule that deliberately does NOT use the universe
+    // said so in its header and was reported as an offender for the
+    // sentence explaining why (barwise-945). A guard that makes the
+    // correct comment unwritable is training the wrong habit.
     const offenders = readdirSync(RULES_DIR)
       .filter((f) => f.endsWith(".ts") && !ALLOWED.has(f))
-      .filter((f) => readFileSync(join(RULES_DIR, f), "utf8").includes("buildObjectUniverse"));
+      .filter((f) => /\bbuildObjectUniverse\s*\(/.test(readFileSync(join(RULES_DIR, f), "utf8")));
 
     assert.deepEqual(
       offenders,
