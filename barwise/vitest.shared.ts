@@ -16,7 +16,33 @@
  */
 import { join } from "node:path";
 
-/** The four coverage percentages a package's suite must not fall below. */
+/**
+ * The four coverage percentages a package's suite must not fall below.
+ *
+ * A FLOOR AGAINST CATASTROPHE, NOT A QUALITY BAR, and the distinction is
+ * measured rather than asserted. `@barwise/core`'s `src/diff` and
+ * `src/mapping` carry 99.5% line coverage and a 75.4% mutation score
+ * (`docs/specs/test-quality.spec.md`): nearly every line runs, and one
+ * mutant in four survives. Twenty-four points separate "the tests execute
+ * this code" from "the tests would notice if it were wrong", so a number
+ * here says almost nothing about whether the suite can catch a defect.
+ *
+ * What it does catch is a test file deleted, a suite silently excluded, a
+ * whole module that stopped being exercised at all. Cheap, and worth
+ * keeping for that.
+ *
+ * SO THESE NUMBERS DO NOT RATCHET UP. Raising a floor toward the coverage
+ * a package happens to have converts a smoke alarm into a target, and
+ * CLAUDE.md's "shadow and the property" says which instrument then gets
+ * optimised: the weaker one. Coverage is the shadow here and the mutation
+ * score is the property -- look at the shadow, ratchet on the property
+ * (barwise-994). Lower a floor when a deliberate change makes it wrong;
+ * do not raise one because a number went up.
+ *
+ * They are only comparable at all because `.nvmrc` pins Node: V8 omits
+ * functions it never compiled, and `@barwise/code-analysis` read 95%
+ * functions on Node 22 and 81% on Node 26 from identical source.
+ */
 export interface CoverageFloors {
   readonly statements: number;
   readonly branches: number;

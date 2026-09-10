@@ -303,6 +303,40 @@ jobs:
         if: steps.changes.outputs.docs_only != 'true'
         run: node packages/cli/dist/bundle/index.cjs --version
 
+      # The two release-gate harnesses, which are the fuller version of the
+      # `--version` smoke test above and were released-only until now
+      # (barwise-992). They drive the bundles the way a user would: 30
+      # checks across every CLI command, 16 across the MCP tool surface.
+      #
+      # THEY RAN ONLY ON PUSH-TO-MAIN AND ON RELEASE, so a fully green PR
+      # could merge and then fail the release build -- after review was
+      # over and with nobody watching. That is the whole reason for moving
+      # them left; the cost is not the argument, it is what makes the
+      # argument cheap.
+      #
+      # Both objections in `docs/specs/archive/manual-test-plan.spec.md`'s
+      # "not yet" were measured and had dissolved. The bundles are already
+      # built two steps up, so the marginal cost is the harnesses alone:
+      # 13s and 1s, against a gate list of about 2m40s. The LLM-gated steps
+      # SKIP without a provider key rather than failing, which the same
+      # spec chose three bullets below the objection -- verified here as
+      # 30 passed / 0 failed / 1 skipped and 16 / 0 / 1 with no key set.
+      #
+      # Ten runs of each before wiring them in, because 14 seconds that
+      # goes spuriously red is not cheap: 20 of 20 exited 0 with
+      # byte-identical result lines, 12.7-13.4s and 1.0-1.1s. The pass
+      # counts are asserted by the harnesses themselves, so a green here
+      # is a green over 30 and 16 checks rather than over none.
+      #
+      # Spelled `npm run` so `ci:local` derives them from this file like
+      # every other gate -- a bare `run: bash ...` would be invisible to it
+      # and a contributor's pre-push run would quietly differ from CI.
+      - run: npm run test:cli-checks
+        if: steps.changes.outputs.docs_only != 'true'
+
+      - run: npm run test:mcp-checks
+        if: steps.changes.outputs.docs_only != 'true'
+
       - run: npm run publint
         if: steps.changes.outputs.docs_only != 'true'
 
