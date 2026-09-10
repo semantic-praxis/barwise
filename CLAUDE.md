@@ -311,6 +311,17 @@ A `cd` in a command is the habit that fails; spell the location once,
 in the path. `scripts/tests/at-root.test.mjs` proves the wrapper gives
 the same answer from the root, from `barwise/`, and from a package.
 
+**Never wait for a long command by polling for its own process name.**
+`until ! pgrep -f "ci:local"; do sleep 10; done` matches the wait loop's
+own command line, which contains that string, so it waits on itself and
+never exits -- twice now, the second time with the first occurrence
+already written down, which is what makes "remember it" not a
+countermeasure. Run the command itself in the background and read its
+exit code, or poll a condition the waiter cannot satisfy (the log file's
+last line, a sentinel the command writes on exit). The general shape is
+the one the gates follow: an instrument that can report the state it was
+asked about, rather than one that looks identical whether or not it can.
+
 `npm run build`, `test`, and `lint` fan out via Turborepo in dependency
 order; per-package runs use `npx vitest run` / `npx tsc --noEmit` from
 the package directory.
