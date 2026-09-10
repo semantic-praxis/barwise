@@ -10,11 +10,50 @@ Barwise assumes familiarity with Object-Role Modeling. The definitive reference 
 
 ## Prerequisites
 
-| Tool    | Version   |
-|---------|-----------|
-| Node.js | >= 20.0.0 |
-| npm     | >= 10     |
-| VS Code | >= 1.93   |
+| Tool    | Version                                              |
+| ------- | ---------------------------------------------------- |
+| Node.js | the version in [`.nvmrc`](.nvmrc) (currently 26.7.0) |
+| npm     | >= 10                                                |
+| VS Code | >= 1.93                                              |
+
+`.nvmrc` is the authority, not this table -- `nvm use` in the repo root
+picks it up, and CI reads the same file. The pin is not a preference: V8
+leaves functions it never compiled out of its coverage report, so the
+same source read 95% on one Node major and 81% on another, and the
+coverage gate passes or fails by whichever Node you happen to have. Note
+that `.npmrc` does not set `engine-strict`, so npm will only _warn_ on a
+mismatched major rather than stop you.
+
+## Installation (prebuilt)
+
+Every merge to `main` rebuilds three downloadable artifacts and refreshes
+the moving [`edge`](https://github.com/semantic-praxis/barwise/releases/tag/edge)
+pre-release, so a current build always exists without a version tag per
+merge. For a stable build, use the latest
+[versioned release](https://github.com/semantic-praxis/barwise/releases)
+instead.
+
+| Asset                      | What it is                               |
+| -------------------------- | ---------------------------------------- |
+| `barwise-vscode-edge.vsix` | the VS Code extension                    |
+| `barwise-cli-edge.cjs`     | the `barwise` CLI, a single bundled file |
+| `barwise-mcp-edge.cjs`     | the MCP stdio server                     |
+| `SHA256SUMS`               | checksums for the three above            |
+
+```sh
+gh release download edge --repo semantic-praxis/barwise
+sha256sum -c SHA256SUMS
+
+code --install-extension barwise-vscode-edge.vsix
+node barwise-cli-edge.cjs --help
+```
+
+**Check that the build is the one you want.** The `edge` git tag
+deliberately never moves -- a moving tag makes every contributor's `git
+pull` fail with "would clobber existing tag" -- so GitHub keeps showing
+the release's original publish date above assets rebuilt minutes ago.
+The release _title_ carries the real build commit and date
+(`Edge build <sha> (<date>)`); read that, not the date beside the tag.
 
 ## Installation (from source)
 
@@ -94,12 +133,12 @@ code --install-extension barwise-vscode-<version>.vsix
 
 After installing, open **Settings** and search for `barwise`. The key settings are:
 
-| Setting                     | Default    | Description                                              |
-|-----------------------------|------------|----------------------------------------------------------|
-| `barwise.llmProvider`        | `copilot`  | `copilot` (uses your Copilot subscription) or `anthropic` |
-| `barwise.anthropicApiKey`    | (empty)    | Anthropic API key (falls back to `ANTHROPIC_API_KEY` env var) |
-| `barwise.anthropicModel`     | `claude-sonnet-4-5-20250929` | Model ID when using Anthropic directly                   |
-| `barwise.copilotModelFamily` | (empty)    | Preferred Copilot model family (e.g. `claude-sonnet`)     |
+| Setting                      | Default                      | Description                                                   |
+| ---------------------------- | ---------------------------- | ------------------------------------------------------------- |
+| `barwise.llmProvider`        | `copilot`                    | `copilot` (uses your Copilot subscription) or `anthropic`     |
+| `barwise.anthropicApiKey`    | (empty)                      | Anthropic API key (falls back to `ANTHROPIC_API_KEY` env var) |
+| `barwise.anthropicModel`     | `claude-sonnet-4-5-20250929` | Model ID when using Anthropic directly                        |
+| `barwise.copilotModelFamily` | (empty)                      | Preferred Copilot model family (e.g. `claude-sonnet`)         |
 
 ## Quick start
 
@@ -155,12 +194,12 @@ Each package declares its own thresholds in its `vitest.config.ts`; CI enforces 
 
 ## Commands reference
 
-| Command                   | Description                                         |
-|---------------------------|-----------------------------------------------------|
-| `npm run build`           | Build all packages (via Turborepo)                  |
-| `npm test`                | Run all tests                                       |
-| `npm run lint`            | Lint all packages (ESLint)                          |
-| `npm run clean`           | Remove all `dist/` directories                      |
-| `cd packages/core && npx vitest run`            | Run core tests only          |
-| `cd packages/core && npx vitest run --coverage`  | Run core tests with coverage |
-| `cd packages/core && npx tsc --noEmit`           | Type-check core only         |
+| Command                                         | Description                        |
+| ----------------------------------------------- | ---------------------------------- |
+| `npm run build`                                 | Build all packages (via Turborepo) |
+| `npm test`                                      | Run all tests                      |
+| `npm run lint`                                  | Lint all packages (ESLint)         |
+| `npm run clean`                                 | Remove all `dist/` directories     |
+| `cd packages/core && npx vitest run`            | Run core tests only                |
+| `cd packages/core && npx vitest run --coverage` | Run core tests with coverage       |
+| `cd packages/core && npx tsc --noEmit`          | Type-check core only               |
