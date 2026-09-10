@@ -84,6 +84,30 @@ what follows is only the vocabulary, anchored to this codebase.
   what was tried and rejected, which failure a guard prevents. This is
   the criterion behind the comment style already used throughout.
 
+- **The shadow and the property.** A cheap observable that correlates
+  with the thing you care about, through some mechanism -- and that
+  diverges from it exactly where the mechanism is bypassed, which is
+  where the defect lives. Line count predicts defects because long
+  functions thread mutable state, so a 959-line registry with no
+  mutable parameters is a false positive
+  (`functional-design-quality.spec.md`). Coverage predicts test
+  effectiveness because executing code is a precondition for detecting
+  a fault in it, so a test that executes and never asserts is the false
+  positive (`test-quality.spec.md`). `numRuns: 250` represents evidence
+  because each run is an independent trial, so 250 runs over inputs
+  that cannot discriminate is one trial repeated
+  (`pair-coverage-floors.spec.md`). A green run represents verification
+  because the check would have reported failure -- barwise-906, six
+  occurrences. The rule is **look at the shadow, ratchet on the
+  property**: none of those specs deletes its shadow, they refuse to
+  gate on it, because a gate is what adds the optimization pressure
+  that turns structural divergence into Goodhart's law. This is not
+  Goodhart by itself; the divergence is there before anyone games
+  anything. Kitchenham, Pfleeger and Fenton (1995) name the underlying
+  requirement -- a measure needs an attribute, a unit, an instrument,
+  and a stated relation to an outcome -- and a shadow is an instrument
+  whose relation holds only under a condition nobody wrote down.
+
 - **Strategic over tactical, and design it twice.** Tactical work
   optimizes for getting this change in; strategic work leaves the
   design better than it found it. "Design it twice" -- develop two or
@@ -112,6 +136,7 @@ working in a package:
 - `barwise/packages/code-analysis/CLAUDE.md` -- code connector package; registers TypeScript/Java/Kotlin importers into the `FormatDescriptor` registry
 - `barwise/packages/dbt/CLAUDE.md` -- dbt connector package; registers the dbt importer/exporter into the `FormatDescriptor` registry (owns its fs + subprocess I/O)
 - `barwise/packages/formats/CLAUDE.md` -- standard interop connector package; registers the DDL/OpenAPI/Avro/NORMA/SQL descriptors into the `FormatDescriptor` registry
+- `barwise/packages/learn/CLAUDE.md` -- learning artifacts: the modeling gym (exercise format, deterministic evaluator, miss cards) and the tutorial renderer
 - `barwise/packages/promptlab/CLAUDE.md` -- deterministic prompt evaluation: eval suite, scorer, runner, score history for the LLM surfaces
 - `barwise/packages/cli/CLAUDE.md` -- CLI tool (the full command surface is the capability matrix below plus `barwise --help`; docs/CLI.md documents every command)
 - `barwise/packages/mcp/CLAUDE.md` -- MCP server (tools, resources, prompts)
@@ -189,12 +214,22 @@ The surfaces do **not** all expose the same capabilities. Consult this
 before assuming one is reachable from the surface you are working on,
 and update it in the same commit that changes a surface's reach.
 
+**What "yes" means in the VS Code column**: the capability is reachable
+from the editor, by either mechanism -- a `contributes.commands` palette
+entry, or a language-model tool registered by `ToolRegistration.ts`.
+Both count, and the column said so for `review` while counting the same
+registration as "no" for seven others, which is how it came to assert
+divergence that had not held for some time (barwise-988). Where a row's
+VS Code answer rests on the tool registration rather than the palette,
+it is qualified by `barwise.enableMcpServer`, which defaults on.
+
 | Capability                                            | CLI | MCP | VS Code | Divergence                              |
 | ----------------------------------------------------- | --- | --- | ------- | --------------------------------------- |
 | validate, verbalize, diagram, export, import, analyze | yes | yes | yes     | none                                    |
-| `review`                                              | yes | yes | yes     | none                                    |
-| schema, diff, query, describe, gym, lineage, impact   | yes | yes | no      | deliberate: text-first tools            |
-| `merge`                                               | yes | yes | no      | deliberate: an editor wants a diff view |
+| `review`                                              | yes | yes | yes     | none (VS Code as a language-model tool) |
+| schema, diff, query, describe, lineage, impact        | yes | yes | yes     | none (VS Code as language-model tools)  |
+| `merge`                                               | yes | yes | yes     | none (VS Code as a language-model tool) |
+| `gym`                                                 | yes | yes | no      | deliberate: the editor has no exercise surface |
 | `project`, `history`                                  | yes | no  | no      | deliberate: repository operations       |
 | `prompt`                                              | yes | no  | no      | deliberate: dev tooling                 |
 | `llm-usage`                                           | yes | no  | no      | deliberate: reads a local operator log  |
@@ -217,11 +252,23 @@ surface, provider and model, which `barwise prompt artifact` computes
 offline. Put the flag on a production command and an unreviewed prompt
 can do real modelling work while the recorded `promptHash` resolves to
 nothing. Trying a candidate against a live model is `barwise prompt
-run`, which is what that lane is for. This table is hand-maintained and therefore the
-same kind of claim that went stale before -- it previously asserted
-parity that did not hold, for two years' worth of readers, because
-nothing checked it (`docs/unwired-capability-audit-2026-08-20.md`).
-Treat a surface change as incomplete until this table agrees with it.
+run`, which is what that lane is for. The tool lists behind the MCP and VS Code columns are now pinned --
+`mcp/tests/serverSpawn.test.ts` and
+`vscode/tests/unit/toolRegistration.test.ts` each assert their complete
+sorted list with `toEqual`, so adding or removing a tool fails until
+this table is updated in the same commit. The rest of the table is
+still hand-maintained and is therefore still the kind of claim that
+goes stale: it asserted parity that did not hold for two years'
+worth of readers (`docs/unwired-capability-audit-2026-08-20.md`), and
+then asserted divergence that did not hold either, because "deliberate"
+reads as intent and nothing checked it (barwise-988). Treat a surface
+change as incomplete until this table agrees with it.
+
+One name collision worth stating, because it looks like a gap and is
+not: VS Code's `barwise.newProject` scaffolds a `.orm.yaml` **model**,
+while the CLI's `project` command manages `.orm-project.yaml`
+**multi-domain projects** (`init`, `domains`, `mappings`, `split`).
+Different capabilities, similar names; the `project` row is correct.
 
 `llm-usage` reports over the JSONL call log under the operator's own
 state directory (`docs/specs/llm-call-observability.spec.md`). It stays

@@ -93,6 +93,76 @@ for (const script of ["check-no-nul.mjs", "check-shell.mjs"]) {
   });
 }
 
+/**
+ * `audit-gate` is the same property, and it is here because it broke.
+ *
+ * It spawned `npm audit` with no `cwd`, so from a workspace package it
+ * audited that package -- no lockfile of its own, therefore no
+ * advisories, therefore `PASS`. It did not merely under-report: with the
+ * advisory invisible, its ACCEPTED entry looked stale and the gate
+ * advised deleting the acceptance record for a live high-severity RCE
+ * (barwise-987, docs/specs/gate-refusal-contract.spec.md).
+ *
+ * Separate from the loop above because the gate reaches the network,
+ * which the other two do not: an environment that cannot run `npm audit`
+ * must skip loudly rather than read as a cwd defect. That is the
+ * `audit-spec-status` shallow-clone pattern, for the same reason.
+ *
+ * The skip is `every`, not `some`, and that distinction is the whole
+ * test. Written with `some`, this passed with the defect restored: from
+ * the repo root the un-pinned spawn made `npm audit` report ENOLOCK, the
+ * gate refused with exit 2, and the skip guard read that as "this
+ * environment cannot audit" and reported green. The guard added for
+ * robustness became the thing hiding the defect -- caught by `npm run
+ * mutate` returning UNCAUGHT, not by review.
+ *
+ * With the root pinned, all three runs do identical work, so they
+ * refuse together or not at all. A PARTIAL refusal is therefore not an
+ * environment fact; it is the defect, and it must fail here.
+ */
+test("audit-gate reports the same advisories from every cwd", (t) => {
+  const runs = CWDS.map((cwd) => ({ cwd, ...gate("audit-gate.mjs", cwd) }));
+  if (runs.every((r) => r.status === 2)) {
+    t.skip("`npm audit` could not run here (exit 2 from every cwd is refusal, not failure)");
+    return;
+  }
+  for (const r of runs) {
+    assert.equal(r.status, 0, `audit-gate failed in ${r.cwd}:\n${r.stdout}${r.stderr}`);
+  }
+  const outputs = new Set(runs.map((r) => r.stdout.trim()));
+  assert.equal(
+    outputs.size,
+    1,
+    `audit-gate's reading depends on cwd:\n${
+      runs.map((r) => `  ${r.cwd}\n    ${r.stdout.trim()}`).join("\n")
+    }`,
+  );
+});
+
+test("audit-gate refuses a root with no npm project rather than reporting PASS", () => {
+  // The generalising half of the fix. Pinning the root fixes this
+  // instance; refusing when the root holds no manifest is what stops the
+  // gate printing PASS over an empty scan for any other reason.
+  // `audit-gate.mjs` imports only node: builtins, so a bare copy runs.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-audit-"));
+  try {
+    mkdirSync(join(dir, "scripts"));
+    writeFileSync(
+      join(dir, "scripts", "audit-gate.mjs"),
+      readFileSync(join(SCRIPTS, "audit-gate.mjs")),
+    );
+    const r = spawnSync(process.execPath, [join(dir, "scripts", "audit-gate.mjs")], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 2, `expected refusal, got ${r.status}:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /no npm project/);
+    assert.doesNotMatch(r.stdout, /PASS/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // --- barwise-906: every gate proven red before it is trusted green ---
 
 test("check-no-nul fails on a TRACKED NUL byte and passes without one", () => {

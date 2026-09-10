@@ -15,6 +15,27 @@
 //   threshold: lowest severity that blocks (default "high")
 
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+/**
+ * The npm project root, resolved from this file rather than from cwd.
+ *
+ * `npm audit` inherits the cwd of whoever spawns it, and from a
+ * workspace package it audits that package -- which has no lockfile of
+ * its own, so it finds nothing and this gate printed PASS with zero
+ * advisories. Worse than the wrong count: with the advisory invisible,
+ * its ACCEPTED entry looked stale, and the gate advised deleting the
+ * acceptance record for a live high-severity RCE (barwise-987).
+ *
+ * NOT `REPO_ROOT` from `lib/tracked.mjs`. That is the GIT root, one
+ * level above the npm project; `package.json` and the lockfile live
+ * here. Importing the wrong one moves the false green rather than
+ * removing it. This is `ci-local.mjs`'s spelling, for the same reason
+ * it uses it (docs/specs/gate-refusal-contract.spec.md).
+ */
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const SEVERITY = ["info", "low", "moderate", "high", "critical"];
 const threshold = process.argv[2] ?? "high";
@@ -49,7 +70,25 @@ const ACCEPTED = [
   },
 ];
 
+// Refuse rather than answer a question about the wrong directory.
+// `npm audit` on a tree with no manifest reports zero vulnerabilities
+// and exits cleanly, which is indistinguishable from a healthy scan --
+// so the precondition is checked here, where the difference is still
+// visible. Exit 2 is "could not answer", the state `mutate.mjs`
+// established and this gate already uses for an unparseable report.
+const MANIFEST = join(ROOT, "package.json");
+const LOCKFILE = join(ROOT, "package-lock.json");
+if (!existsSync(MANIFEST) || !existsSync(LOCKFILE)) {
+  console.error(
+    `audit-gate: no npm project at ${ROOT} -- `
+      + `${existsSync(MANIFEST) ? "package-lock.json" : "package.json"} is missing.\n`
+      + "Refusing rather than reporting an empty scan as PASS.",
+  );
+  process.exit(2);
+}
+
 const res = spawnSync("npm", ["audit", "--json"], {
+  cwd: ROOT,
   encoding: "utf8",
   maxBuffer: 64 * 1024 * 1024,
 });
