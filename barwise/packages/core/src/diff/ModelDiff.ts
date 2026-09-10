@@ -23,6 +23,8 @@ import {
   diffSubtypeFact,
   factTypeName,
   instancesKey,
+  isDanglingFactType,
+  isDanglingPlayer,
   playerName,
 } from "./elementDiff.js";
 import { detectSynonymCandidates } from "./synonyms.js";
@@ -209,19 +211,36 @@ export function diffModels(
   // --- Subtype facts ---
   //
   // No name, so the identity is the pair it relates, resolved to names
-  // against the model it came from -- the same reason the kinds above
-  // match by name rather than by id: re-extraction mints fresh ids and
-  // only names survive. A renamed subtype therefore reads as
-  // removed-plus-added, exactly as a renamed object type does.
-  const sfKey = (sf: SubtypeFact, model: OrmModel): string =>
-    `${playerName(model, sf.subtypeId)}\u0000${playerName(model, sf.supertypeId)}`;
-  const sfRefs = (sf: SubtypeFact, model: OrmModel) => ({
-    subtype: { id: sf.subtypeId, name: playerName(model, sf.subtypeId) },
-    supertype: { id: sf.supertypeId, name: playerName(model, sf.supertypeId) },
+  // against the model it came from and then against the other -- the
+  // same reason the kinds above match by name rather than by id:
+  // re-extraction mints fresh ids and only names survive. A renamed
+  // subtype therefore reads as removed-plus-added, exactly as a renamed
+  // object type does.
+  //
+  // The pair whose endpoints NEITHER model defines is skipped rather
+  // than reported. Such an element cannot exist in any merged model --
+  // `addableSubtypeFact` requires both ends to be present, and no
+  // acceptance set can conjure an object type neither side declares --
+  // so a delta for it offers a choice that is not one: accepting it
+  // does nothing, rejecting a removal keeps nothing, and its label
+  // names two UUIDs (barwise-957). The dangling reference itself is
+  // `ValidationEngine`'s to report, and it does.
+  const sfKey = (sf: SubtypeFact, model: OrmModel, other: OrmModel): string =>
+    `${playerName(model, sf.subtypeId, other)}\u0000${playerName(model, sf.supertypeId, other)}`;
+  const sfRefs = (sf: SubtypeFact, model: OrmModel, other: OrmModel) => ({
+    subtype: { id: sf.subtypeId, name: playerName(model, sf.subtypeId, other) },
+    supertype: { id: sf.supertypeId, name: playerName(model, sf.supertypeId, other) },
   });
+  const sfResolvable = (sf: SubtypeFact): boolean =>
+    !isDanglingPlayer(existing, incoming, sf.subtypeId)
+    && !isDanglingPlayer(existing, incoming, sf.supertypeId);
 
-  const existingSfs = new Map(existing.subtypeFacts.map((sf) => [sfKey(sf, existing), sf]));
-  const incomingSfs = new Map(incoming.subtypeFacts.map((sf) => [sfKey(sf, incoming), sf]));
+  const existingSfs = new Map(
+    existing.subtypeFacts.filter(sfResolvable).map((sf) => [sfKey(sf, existing, incoming), sf]),
+  );
+  const incomingSfs = new Map(
+    incoming.subtypeFacts.filter(sfResolvable).map((sf) => [sfKey(sf, incoming, existing), sf]),
+  );
 
   for (const [key, sf] of existingSfs) {
     const match = incomingSfs.get(key);
@@ -229,7 +248,7 @@ export function diffModels(
       deltas.push({
         kind: "removed",
         elementType: "subtype_fact",
-        ...sfRefs(sf, existing),
+        ...sfRefs(sf, existing, incoming),
         existing: sf,
         changes: [],
         changeDescriptions: [],
@@ -241,7 +260,7 @@ export function diffModels(
       deltas.push({
         kind,
         elementType: "subtype_fact",
-        ...sfRefs(sf, existing),
+        ...sfRefs(sf, existing, incoming),
         existing: sf,
         incoming: match,
         changes,
@@ -256,7 +275,7 @@ export function diffModels(
       deltas.push({
         kind: "added",
         elementType: "subtype_fact",
-        ...sfRefs(sf, incoming),
+        ...sfRefs(sf, incoming, existing),
         incoming: sf,
         changes: [],
         changeDescriptions: [],
@@ -272,18 +291,30 @@ export function diffModels(
   // two that match are equal by construction. Its delta type says so --
   // `kind` excludes "modified" -- and that is why this loop has no
   // `modified` branch to write.
-  const oftKey = (oft: ObjectifiedFactType, model: OrmModel): string =>
-    `${playerName(model, oft.objectTypeId)}\u0000${factTypeName(model, oft.factTypeId)}`;
-  const oftRefs = (oft: ObjectifiedFactType, model: OrmModel) => ({
-    objectType: { id: oft.objectTypeId, name: playerName(model, oft.objectTypeId) },
-    factType: { id: oft.factTypeId, name: factTypeName(model, oft.factTypeId) },
+  //
+  // The unresolvable pair is skipped here for the reason it is skipped
+  // above, against `addableObjectification`'s equivalent guard.
+  const oftKey = (oft: ObjectifiedFactType, model: OrmModel, other: OrmModel): string =>
+    `${playerName(model, oft.objectTypeId, other)}\u0000${
+      factTypeName(model, oft.factTypeId, other)
+    }`;
+  const oftRefs = (oft: ObjectifiedFactType, model: OrmModel, other: OrmModel) => ({
+    objectType: { id: oft.objectTypeId, name: playerName(model, oft.objectTypeId, other) },
+    factType: { id: oft.factTypeId, name: factTypeName(model, oft.factTypeId, other) },
   });
+  const oftResolvable = (oft: ObjectifiedFactType): boolean =>
+    !isDanglingPlayer(existing, incoming, oft.objectTypeId)
+    && !isDanglingFactType(existing, incoming, oft.factTypeId);
 
   const existingOfts = new Map(
-    existing.objectifiedFactTypes.map((oft) => [oftKey(oft, existing), oft]),
+    existing.objectifiedFactTypes
+      .filter(oftResolvable)
+      .map((oft) => [oftKey(oft, existing, incoming), oft]),
   );
   const incomingOfts = new Map(
-    incoming.objectifiedFactTypes.map((oft) => [oftKey(oft, incoming), oft]),
+    incoming.objectifiedFactTypes
+      .filter(oftResolvable)
+      .map((oft) => [oftKey(oft, incoming, existing), oft]),
   );
 
   for (const [key, oft] of existingOfts) {
@@ -293,7 +324,7 @@ export function diffModels(
         ? {
           kind: "unchanged",
           elementType: "objectified_fact_type",
-          ...oftRefs(oft, existing),
+          ...oftRefs(oft, existing, incoming),
           existing: oft,
           incoming: match,
           changes: [],
@@ -303,7 +334,7 @@ export function diffModels(
         : {
           kind: "removed",
           elementType: "objectified_fact_type",
-          ...oftRefs(oft, existing),
+          ...oftRefs(oft, existing, incoming),
           existing: oft,
           changes: [],
           changeDescriptions: [],
@@ -317,7 +348,7 @@ export function diffModels(
       deltas.push({
         kind: "added",
         elementType: "objectified_fact_type",
-        ...oftRefs(oft, incoming),
+        ...oftRefs(oft, incoming, existing),
         incoming: oft,
         changes: [],
         changeDescriptions: [],
@@ -350,14 +381,24 @@ export function diffModels(
   // the ordinary case: a single population whose tuples were edited
   // matches nothing by content and would read as remove-plus-add rather
   // than as the modification it is.
-  const popGroup = (pop: Population, model: OrmModel): string =>
-    `${factTypeName(model, pop.factTypeId)}\u0000${pop.sample ? "sample" : "significant"}`;
-  const popRef = (pop: Population, model: OrmModel) => ({
-    factType: { id: pop.factTypeId, name: factTypeName(model, pop.factTypeId) },
+  //
+  // A population's fact type is resolved against both models for the
+  // reason the pair-matched kinds are: a lenient fragment can carry a
+  // population without the fact type it belongs to, and grouping by a
+  // UUID would split it from the population it should have matched.
+  // The roles are read the same way -- `instancesKey` orders a tuple by
+  // them, so reading them from the model that does not have the fact
+  // type keys every tuple against an empty role list.
+  const popFactType = (pop: Population, model: OrmModel, other: OrmModel) =>
+    model.getFactType(pop.factTypeId) ?? other.getFactType(pop.factTypeId);
+  const popGroup = (pop: Population, model: OrmModel, other: OrmModel): string =>
+    `${factTypeName(model, pop.factTypeId, other)}\u0000${pop.sample ? "sample" : "significant"}`;
+  const popRef = (pop: Population, model: OrmModel, other: OrmModel) => ({
+    factType: { id: pop.factTypeId, name: factTypeName(model, pop.factTypeId, other) },
     sample: pop.sample,
   });
-  const popTuples = (pop: Population, model: OrmModel): string =>
-    instancesKey(pop, model.getFactType(pop.factTypeId)?.roles ?? []);
+  const popTuples = (pop: Population, model: OrmModel, other: OrmModel): string =>
+    instancesKey(pop, popFactType(pop, model, other)?.roles ?? []);
 
   const groups = new Map<string, { existing: Population[]; incoming: Population[]; }>();
   const group = (key: string) => {
@@ -368,8 +409,12 @@ export function diffModels(
     }
     return g;
   };
-  for (const pop of existing.populations) group(popGroup(pop, existing)).existing.push(pop);
-  for (const pop of incoming.populations) group(popGroup(pop, incoming)).incoming.push(pop);
+  for (const pop of existing.populations) {
+    group(popGroup(pop, existing, incoming)).existing.push(pop);
+  }
+  for (const pop of incoming.populations) {
+    group(popGroup(pop, incoming, existing)).incoming.push(pop);
+  }
 
   // Deltas are collected per group but EMITTED in the order the models
   // declare their populations. Grouping is a matching device; letting it
@@ -393,9 +438,9 @@ export function diffModels(
     // other's description as a change. The accept-all law found exactly
     // that: two empty sample populations, one described and one not.
     for (let i = 0; i < mine.length; i++) {
-      const key = popTuples(mine[i]!, existing);
+      const key = popTuples(mine[i]!, existing, incoming);
       for (let j = 0; j < theirs.length; j++) {
-        if (tookTheirs.has(j) || popTuples(theirs[j]!, incoming) !== key) continue;
+        if (tookTheirs.has(j) || popTuples(theirs[j]!, incoming, existing) !== key) continue;
         pairs.push([mine[i]!, theirs[j]!]);
         tookMine.add(i);
         tookTheirs.add(j);
@@ -413,14 +458,14 @@ export function diffModels(
       const changes = diffPopulation(
         mineOne,
         theirsOne,
-        existing.getFactType(mineOne.factTypeId)?.roles ?? [],
-        incoming.getFactType(theirsOne.factTypeId)?.roles ?? [],
+        popFactType(mineOne, existing, incoming)?.roles ?? [],
+        popFactType(theirsOne, incoming, existing)?.roles ?? [],
       );
       const kind: DeltaKind = changes.length > 0 ? "modified" : "unchanged";
       byExisting.set(mineOne, {
         kind,
         elementType: "population",
-        ...popRef(mineOne, existing),
+        ...popRef(mineOne, existing, incoming),
         existing: mineOne,
         incoming: theirsOne,
         changes,
@@ -432,7 +477,7 @@ export function diffModels(
       byExisting.set(pop, {
         kind: "removed",
         elementType: "population",
-        ...popRef(pop, existing),
+        ...popRef(pop, existing, incoming),
         existing: pop,
         changes: [],
         changeDescriptions: [],
@@ -443,7 +488,7 @@ export function diffModels(
       addedPops.set(pop, {
         kind: "added",
         elementType: "population",
-        ...popRef(pop, incoming),
+        ...popRef(pop, incoming, existing),
         incoming: pop,
         changes: [],
         changeDescriptions: [],
