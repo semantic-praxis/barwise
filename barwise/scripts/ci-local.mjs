@@ -3,10 +3,12 @@
  * Run the CI gate list locally, in CI's order.
  *
  * The steps are PARSED OUT OF `.github/workflows/ci.yml` rather than
- * restated here. A hand-copied list would be a must-agree copy with
- * nothing keeping it honest, which is the thing CLAUDE.md forbids -- and
- * it would fail in the specific way that motivated this script: silently,
- * by omitting the gate that was about to break.
+ * restated here -- by `lib/ci-gates.mjs`, which `fault-matrix.mjs` also
+ * reads, so the two answers cannot drift. A hand-copied list would be a
+ * must-agree copy with nothing keeping it honest, which is the thing
+ * CLAUDE.md forbids -- and it would fail in the specific way that
+ * motivated this script: silently, by omitting the gate that was about
+ * to break.
  *
  * Written after two red pushes in one session, each from a gate that had
  * simply not been run (`fmt:check`, then `knip`). The subsequent
@@ -36,9 +38,9 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ciGates } from "./lib/ci-gates.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const WORKFLOW = resolve(ROOT, "../.github/workflows/ci.yml");
 
 /**
  * One run at a time, per checkout.
@@ -51,25 +53,6 @@ const WORKFLOW = resolve(ROOT, "../.github/workflows/ci.yml");
  * say what to wait for rather than just refusing.
  */
 const LOCK = resolve(ROOT, "node_modules/.ci-local.lock");
-
-/** `npm ci` installs rather than checks. Everything else CI runs, this runs. */
-const SKIP = [/^ci$/];
-
-function gates() {
-  const yml = readFileSync(WORKFLOW, "utf8");
-  const found = [];
-  for (const line of yml.split("\n")) {
-    const m = /^\s*(?:- )?run: npm (.+?)\s*$/.exec(line);
-    if (!m) continue;
-    const args = m[1];
-    if (SKIP.some((re) => re.test(args))) continue;
-    if (!found.includes(args)) found.push(args);
-  }
-  if (found.length === 0) {
-    throw new Error(`no 'run: npm ...' steps found in ${WORKFLOW}; has the workflow moved?`);
-  }
-  return found;
-}
 
 /**
  * Whether a pid is still running.
@@ -150,7 +133,7 @@ function logName(gate) {
   return `${gate.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "")}.log`;
 }
 
-const list = gates();
+const list = ciGates();
 if (process.argv.includes("--list")) {
   for (const g of list) console.log(`npm ${g}`);
   process.exit(0);

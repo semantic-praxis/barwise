@@ -113,6 +113,14 @@ function git(...args) {
  * is the barwise-905/906 defect in a new coordinate, so refuse rather
  * than reassure. CI checks out with `fetch-depth: 0`; a working copy
  * needs `git fetch --unshallow` once.
+ *
+ * Exit 2, not 1. This word "refusing" was already in the message while
+ * the code exited 1, which is this gate's code for "a spec's header is
+ * wrong" -- so a shallow clone said the specs were bad rather than that
+ * the history was short, and the reader went looking for a spec to fix.
+ * `scripts/fault-matrix.mjs` found it by shimming
+ * `rev-parse --is-shallow-repository` to true and reading the code
+ * (docs/specs/gate-refusal-contract.spec.md, WS3).
  */
 function requireFullHistory() {
   if (git("rev-parse", "--is-shallow-repository") !== "true") return;
@@ -122,7 +130,7 @@ function requireFullHistory() {
       + "  written. Refusing rather than reporting a smaller question's answer.\n"
       + "  Fix: git fetch --unshallow",
   );
-  process.exit(1);
+  process.exit(2);
 }
 
 function exists(path) {

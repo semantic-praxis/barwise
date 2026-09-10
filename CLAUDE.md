@@ -444,6 +444,22 @@ skill (`.claude/skills/release/`).
   sweep run by hand runs once, and the next edit reintroduces what it
   found. The `assertion-audit` skill carries the three mutation passes
   and the method rules.
+- **A gate that cannot see its input must not print PASS.** Pass, fail,
+  and **could not answer** -- exit `2` for the third, which is what
+  `mutate.mjs` and `audit-gate.mjs` already used and what every gate now
+  uses. It exists because `PASS` otherwise means both "the thing is
+  fine" and "I could not see the thing", and the reader cannot tell
+  which: `audit-gate` reported PASS with zero advisories from a package
+  directory, and `check-shell` reported an absent shellcheck with the
+  same exit code it uses for a real bug in a script
+  (`docs/specs/gate-refusal-contract.spec.md`). `npm run fault-matrix`
+  is the instrument: it runs every node gate ci.yml names under four
+  environment faults -- `git` answering emptily, `git` absent, a shallow
+  clone, three working directories -- and reports which refuse, which
+  are independent of the fault, and which answer anyway. Whether a gate
+  DEPENDS on the broken thing is measured (the `git` shim logs every
+  call), not declared, so no list has to be kept in step. On demand,
+  like `mutate`; not in CI.
 - ESLint config is shared at the repo root (`barwise/eslint.config.mjs`).
 - Turborepo (`barwise/turbo.json`) orchestrates build/test/lint with
   correct dependency ordering.

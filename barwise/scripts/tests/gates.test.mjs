@@ -780,7 +780,10 @@ test("audit-spec-status refuses a shallow clone rather than reporting OK", () =>
     stage(dir, "barwise/docs/specs/x.spec.md", "# x\n\nStatus: draft\n");
     execFileSync("git", ["commit", "-qm", "spec"], { cwd: dir });
     const r = gate("audit-spec-status.mjs", dir, "--check");
-    assert.equal(r.status, 1, `expected refusal, got:\n${r.stdout}${r.stderr}`);
+    // 2, not 1. Exit 1 is this gate's "a spec header is wrong"; a short
+    // history is "could not answer", and the two sent readers to
+    // different places (docs/specs/gate-refusal-contract.spec.md).
+    assert.equal(r.status, 2, `expected refusal, got:\n${r.stdout}${r.stderr}`);
     assert.match(r.stderr, /shallow clone/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -1161,6 +1164,16 @@ function tempCiRepo() {
     ].join("\n"),
   );
   writeFileSync(join(root, "scripts", "ci-local.mjs"), readFileSync(join(SCRIPTS, "ci-local.mjs")));
+  // The gate list itself lives in `lib/ci-gates.mjs`, shared with
+  // `fault-matrix.mjs` so two parsers cannot drift over one workflow
+  // file. A fixture that copies only the entry point gets ERR_MODULE_
+  // NOT_FOUND, which the assertions below report as "the summary must
+  // name the log directory" -- true, and about nothing.
+  mkdirSync(join(root, "scripts", "lib"), { recursive: true });
+  writeFileSync(
+    join(root, "scripts", "lib", "ci-gates.mjs"),
+    readFileSync(join(SCRIPTS, "lib", "ci-gates.mjs")),
+  );
   return {
     dir,
     root,
@@ -1303,4 +1316,172 @@ test("BARWISE_COVERAGE_DIR survives Turborepo and redirects a real package's cov
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// --- barwise-989 WS3: the fault matrix, and the classifier under it ---
+//
+// `fault-matrix.mjs` runs every node gate in ci.yml under four
+// environment faults and reports which answer, which refuse, and which
+// print PASS blind. Its own verdicts need testing for the reason its
+// subject does: the interesting verdict (FALSE GREEN) is the one no gate
+// in this repository still returns, so a live run cannot exercise it and
+// a classifier that never returned it would read exactly as clean.
+//
+// The end-to-end reading is verified with `npm run mutate` rather than
+// here -- planting `process.exit(0)` in `tracked.mjs`'s refusal turns
+// five gates into false greens in about a second, and asserting that
+// from a test would mean mutating the repository from inside the suite.
+// The three mutations and their readings are in
+// `docs/specs/gate-refusal-contract.spec.md`.
+
+const fm = await import(pathToFileURL(join(SCRIPTS, "fault-matrix.mjs")).href);
+const { ciGates } = await import(pathToFileURL(join(SCRIPTS, "lib", "ci-gates.mjs")).href);
+
+test("classify: a gate that answers 0 having reached for the broken thing is a false green", () => {
+  // The verdict the harness exists for. No gate returns it today, which
+  // is exactly why it is asserted here rather than trusted to a live run.
+  assert.equal(
+    fm.classify({ kind: "instrumented", baseline: 0, exit: 0, touched: 1 }).verdict,
+    "FALSE GREEN",
+  );
+  assert.equal(fm.classify({ kind: "instrumented", baseline: 0, exit: 0, touched: 1 }).ok, false);
+});
+
+test("classify: refusing is conforming, and never reaching is independence", () => {
+  assert.equal(
+    fm.classify({ kind: "instrumented", baseline: 0, exit: 2, touched: 1 }).verdict,
+    "REFUSED",
+  );
+  assert.equal(
+    fm.classify({ kind: "instrumented", baseline: 0, exit: 0, touched: 0 }).verdict,
+    "INDEPENDENT",
+  );
+  assert.equal(
+    fm.classify({ kind: "instrumented", baseline: 0, exit: 1, touched: 1 }).verdict,
+    "CRASHED",
+  );
+  for (const exit of [0, 2, 1]) {
+    assert.equal(
+      fm.classify({ kind: "instrumented", baseline: 0, exit, touched: 1 }).refused,
+      false,
+    );
+  }
+});
+
+test("classify: on the cwd axis a refusal from one directory is a moved reading", () => {
+  // The bug this test exists for. The first draft returned REFUSED
+  // before looking at the axis, so mutating `audit-gate`'s `cwd: ROOT`
+  // pin away -- the original barwise-987 defect -- produced 0, 0, 2
+  // across three directories and scored as conforming. `npm run mutate`
+  // said UNCAUGHT; nothing else would have.
+  const moved = fm.classify({ kind: "invariant", baseline: 0, exit: 2 });
+  assert.equal(moved.verdict, "READING MOVED");
+  assert.equal(moved.ok, false);
+  assert.equal(fm.classify({ kind: "invariant", baseline: 0, exit: 0 }).verdict, "INVARIANT");
+});
+
+test("classify: on a different Node major, refusing is the desired behaviour", () => {
+  // The opposite of the cwd axis, which is why the kind is explicit. The
+  // Node pin exists so an unpinned runtime does not get to answer
+  // (v8 coverage is not portable across majors), so exit 2 is the pin
+  // working -- while a DIFFERENT answer is the finding.
+  assert.equal(fm.classify({ kind: "refusable", baseline: 0, exit: 2 }).verdict, "REFUSED");
+  assert.equal(fm.classify({ kind: "refusable", baseline: 0, exit: 0 }).verdict, "INVARIANT");
+  assert.equal(fm.classify({ kind: "refusable", baseline: 0, exit: 1 }).verdict, "READING MOVED");
+});
+
+test("classify: a gate already failing unperturbed is unreadable, not conforming", () => {
+  // Every fault reading would then be about whatever is already wrong.
+  // Scoring those rows as conforming is the harness committing the
+  // defect it audits, and it is not hypothetical: `check-shell` is in
+  // this state in any container without shellcheck.
+  for (const kind of ["instrumented", "invariant", "refusable"]) {
+    const r = fm.classify({ kind, baseline: 1, exit: 2, touched: 0 });
+    assert.equal(r.verdict, "UNREADABLE", `kind ${kind}`);
+    assert.equal(r.refused, true, `kind ${kind}`);
+    assert.equal(r.ok, false, `kind ${kind}`);
+  }
+});
+
+test("classify: an axis with no kind is refused rather than scored", () => {
+  // A new axis added without a kind would otherwise be judged by
+  // whichever branch came first. That is how the cwd bug above got in,
+  // so the default case refuses instead of guessing.
+  assert.throws(
+    () => fm.classify({ kind: "wrong-node", baseline: 0, exit: 0 }),
+    /unknown axis kind/,
+  );
+});
+
+test("fault-matrix resolves a ci.yml step to the node gate it runs", () => {
+  const scripts = {
+    "check:no-nul": "node scripts/check-no-nul.mjs",
+    "audit:specs": "node scripts/audit-spec-status.mjs",
+    "fmt:check": "dprint check && node scripts/fmt-root.mjs --check",
+    lint: "turbo run lint",
+  };
+  assert.deepEqual(fm.resolveNodeGate("run check:no-nul", scripts), {
+    name: "check:no-nul",
+    script: "scripts/check-no-nul.mjs",
+    args: [],
+  });
+  // CI's own spelling of the ratchet mode. Reading package.json's
+  // default instead is not a detail: `audit:specs` without `--check`
+  // REGENERATES the baseline, and an ad-hoc probe that did exactly that
+  // replaced five classified rows with "TODO: classify" and reported a
+  // clean run.
+  assert.deepEqual(fm.resolveNodeGate("run audit:specs -- --check", scripts), {
+    name: "audit:specs",
+    script: "scripts/audit-spec-status.mjs",
+    args: ["--check"],
+  });
+  // A compound script: the third-party half is out of scope, the node
+  // half is the gate.
+  assert.deepEqual(fm.resolveNodeGate("run fmt:check", scripts), {
+    name: "fmt:check",
+    script: "scripts/fmt-root.mjs",
+    args: ["--check"],
+  });
+  assert.equal(fm.resolveNodeGate("run lint", scripts), null);
+  assert.equal(fm.resolveNodeGate("run --workspace=@barwise/cli bundle", scripts), null);
+  assert.equal(fm.resolveNodeGate("run does-not-exist", scripts), null);
+});
+
+test("fault-matrix refuses an npm script that chains two node gates", () => {
+  // One exit code cannot be attributed to two gates, and taking the
+  // first would leave the second silently unaudited -- which is the
+  // class of thing this harness is for.
+  assert.throws(
+    () =>
+      fm.resolveNodeGate("run both", {
+        both: "node scripts/check-no-nul.mjs && node scripts/check-shell.mjs",
+      }),
+    /runs 2 node gates/,
+  );
+});
+
+test("every node gate CI runs is a script that exists", () => {
+  // The self-updating half of "when a new gate is added, place it under
+  // the same contract": the list comes from ci.yml, so a gate added to
+  // CI is in the matrix the same day. This asserts the derivation still
+  // lands on real files -- a renamed script would otherwise show up as a
+  // spawn failure inside a fault reading, where it reads as a finding
+  // about the fault rather than a typo.
+  const scripts = JSON.parse(
+    readFileSync(join(REPO, "barwise", "package.json"), "utf-8"),
+  ).scripts;
+  const gates = fm.nodeGates(ciGates(), scripts);
+  assert.ok(gates.length >= 10, `expected the node gates from ci.yml, got ${gates.length}`);
+  for (const g of gates) {
+    assert.ok(
+      existsSync(join(REPO, "barwise", g.script)),
+      `${g.name} runs ${g.script}, which does not exist`,
+    );
+  }
+  // fmt-root only became a gate this month, and it is reached through a
+  // compound npm script -- the one shape a naive parse drops.
+  assert.ok(
+    gates.some((g) => g.script === "scripts/fmt-root.mjs"),
+    "the compound `fmt:check` script must still resolve to its node half",
+  );
 });
