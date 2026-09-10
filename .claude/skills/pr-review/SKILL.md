@@ -75,7 +75,7 @@ pitfalls.
   before verbalizing, `verbalize.ts` calls `ValidationEngine`"), so a
   surprise arrives as a tension and not as something absorbed; test
   load-bearing anchors first and cheap ones next; and elaborate the
-  strongest competing frame and look for evidence *for* it, because a
+  strongest competing frame and look for evidence _for_ it, because a
   mind dismisses evidence against its leader more readily than it
   finds evidence for a rival. PR #475's central behaviour claim fell to
   one CLI run against the competitor ("verbalize never validates").

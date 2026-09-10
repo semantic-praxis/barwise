@@ -78,6 +78,15 @@ is the twenty-four-point gap between "the tests execute this code" and
 predicted this; the table measures it here, and it is the strongest
 argument in this spec because it is not borrowed.
 
+Both numbers are as of 2026-09-10 and both have since moved a little:
+barwise-993's first triage pass killed three conditional survivors in
+`RelationalMapper.ts`, taking that file from 79.27% to 79.91%. The
+directory totals above have not been re-taken -- a full run over both
+directories is 16 minutes, and the point of the table is the gap rather
+than the third digit. This note is here so a later reader does not treat
+them as current; that they need a note at all is the argument for
+barwise-994's ratchet.
+
 Our own history says the instrument is not merely weak but unstable.
 `packages/core/CLAUDE.md` sets coverage targets of 95% for model,
 validation and serialization and 90% for verbalization and mapping.
@@ -330,11 +339,49 @@ different findings and should not be read together:
   -- the entity/value split feeding the mapper is unasserted at that
   branch.
 
-Not every survivor is a defect: a mutation testing pass surfaces
-equivalent mutants, which are undecidable in general (Papadakis et al.
-2019), and some of the 180 string survivors will be log text no test
-should pin. Triage is the work this number makes possible, not work it
-replaces.
+**A named cause for some of them, found in triage, and then corrected
+again by measuring it.** The first reading blamed
+`disableTypeChecks: true`. That was wrong: re-running `elementDiff.ts`
+with the flag set to `false` gives 480 mutants, 130 survivors, 72.92%
+-- byte-identical. The flag changes nothing here.
+
+The real cause is one layer down. Vitest runs through esbuild, which
+strips types without checking them, so **no mutation into a typed
+position can ever be caught by the test suite** -- the suite never
+type-checks. Stryker's option only matters for runners that do.
+`elementDiff.ts:53` was reported here as a real gap -- `change:
+"referenceMode"` blanked and no test noticed -- and it is not one:
+`change` is typed as `ChangeKind`, and `tsc --noEmit` rejects the
+mutation with `TS2322`. That check runs in CI as its own gate. The suite
+does not need to catch what the build already prevents.
+
+That is not a small correction. `elementDiff.ts` contributes 64 of the
+180 `StringLiteral` survivors and its string literals are largely
+`change:` tags, so a substantial share of that cluster is
+type-protected rather than untested. The survivors that remain real are
+the ones in UNTYPED positions: `openapi.ts` builds its operations as
+`Record<string, unknown>`, so `operationId: ``` is valid TypeScript and
+the gap was genuine. Both are now killed by `tests/mapping/openapi.test.ts`.
+
+The general lesson is the one this spec keeps arriving at, and it took
+two passes to state correctly here. The survivor count is an instrument
+with a condition, and the condition is **"the test runner does not
+type-check"** -- not a Stryker flag, which is what the first correction
+guessed and the measurement disproved. Reading the count without that
+condition overstates the finding; naming the wrong condition for it is
+the same error one level in, and the only thing that separated them was
+running the experiment.
+
+That also bounds what a re-run can tell us. The typed-versus-untyped
+split cannot be obtained by flipping a Stryker option, because no option
+makes vitest type-check. It needs the declared type at each mutation
+site, or a rule that counts a survivor as covered when `tsc` rejects the
+same mutation.
+
+Not every remaining survivor is a defect either: equivalent mutants are
+undecidable in general (Papadakis et al. 2019), and some of the string
+survivors will be log text no test should pin. Triage is the work this
+number makes possible, not work it replaces.
 
 **Still open: the ratchet.** The number exists; nothing yet fails when
 it drops. That is `mutation-baseline.json` plus a `--check` mode, and it

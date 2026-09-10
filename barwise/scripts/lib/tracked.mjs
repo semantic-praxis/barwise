@@ -30,10 +30,63 @@
  */
 import { execFileSync } from "node:child_process";
 
-/** Absolute path of the repo root. Same answer from any cwd inside it. */
-export const REPO_ROOT = execFileSync("git", ["rev-parse", "--show-toplevel"], {
-  encoding: "utf8",
-}).trim();
+/**
+ * Refuse: the third result a gate needs, beside pass and fail.
+ *
+ * `PASS` otherwise means both "the thing is fine" and "I could not see
+ * the thing", and the reader cannot tell which. Exit 2 is the state
+ * `mutate.mjs` established and `audit-gate.mjs` already used for an
+ * unparseable report (docs/specs/gate-refusal-contract.spec.md).
+ *
+ * Exiting from a library is deliberate and is scoped by what this
+ * library is: `scripts/lib/` is imported only by gate scripts, and a
+ * gate that cannot resolve the repository root has nothing left to do
+ * but say so. Returning an error would put the decision back on eight
+ * call sites, which is the shape "define errors out of existence"
+ * exists to refuse.
+ */
+function refuse(what, detail) {
+  process.stderr.write(
+    `${what}\n${detail ? `  ${detail}\n` : ""}`
+      + "  Refusing rather than answering a question about the wrong tree.\n",
+  );
+  process.exit(2);
+}
+
+/**
+ * Absolute path of the repo root. Same answer from any cwd inside it.
+ *
+ * Guarded because seven gates crashed with a Node stack trace when
+ * `git` answered emptily -- a path derived from `""`, not a check that
+ * noticed. They were accidentally loud rather than safe by
+ * construction, and a derived path that happened to resolve would have
+ * printed OK over zero files instead (barwise-905's shape, measured in
+ * the 65-run reading in `gate-refusal-contract.spec.md`).
+ *
+ * Both halves matter. A `git` that FAILS throws out of `execFileSync`;
+ * a `git` that SUCCEEDS and prints nothing returns `""`, which is the
+ * quieter and worse case: `resolve("", file)` silently means cwd.
+ */
+export const REPO_ROOT = (() => {
+  let root;
+  try {
+    root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+  } catch (error) {
+    refuse(
+      "gate: `git rev-parse --show-toplevel` failed, so the repository root is unknown.",
+      error instanceof Error ? error.message.split("\n")[0] : String(error),
+    );
+  }
+  if (root === "") {
+    refuse(
+      "gate: `git rev-parse --show-toplevel` returned nothing, so the repository root is unknown.",
+    );
+  }
+  return root;
+})();
 
 /**
  * Every tracked path in the repo, root-relative, in git's order.
@@ -43,11 +96,22 @@ export const REPO_ROOT = execFileSync("git", ["rev-parse", "--show-toplevel"], {
  * ours to check" is a per-gate question.
  */
 export function trackedFiles() {
-  return execFileSync("git", ["ls-files", "-z"], {
+  const files = execFileSync("git", ["ls-files", "-z"], {
     cwd: REPO_ROOT,
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
   })
     .split("\0")
     .filter(Boolean);
+
+  // A repository with no tracked files is not a state this repository
+  // reaches; an empty listing means git answered about something else.
+  // Every caller filters this list and reports OK on finding no
+  // offenders, so an empty listing is precisely the reading that looks
+  // like success -- barwise-905, where the gate printed OK having
+  // scanned nothing.
+  if (files.length === 0) {
+    refuse("gate: `git ls-files` listed no tracked files, so there is nothing to check.");
+  }
+  return files;
 }

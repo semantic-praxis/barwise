@@ -30,11 +30,41 @@ beads_check() {
   f="${f:-${root}/.beads/issues.jsonl}"
   [[ -f "${f}" ]] || { echo "beads_check: no such file: ${f}" >&2; return 2; }
   command -v uv >/dev/null 2>&1 || { echo "beads_check: uv required" >&2; return 2; }
+
+  # Two baselines for the id-identity rules below, written to temp files so
+  # the Python half reads paths rather than shelling out itself. An empty
+  # path means "could not be read", which the report says out loud rather
+  # than passing over -- a rule that quietly did not run is the shape
+  # docs/specs/gate-refusal-contract.spec.md exists to remove.
+  #
+  # origin/main for id REUSE: an id minted on both sides is a collision
+  # even when main minted it after this branch diverged.
+  # The merge base for DELETION: an id main has and this branch does not is
+  # the normal state of any branch behind main, so only ids the branch
+  # itself dropped are worth a word.
+  local base_main="" base_fork="" ref=""
+  local tmp; tmp="$(mktemp -d)"
+  for ref in origin/main origin/HEAD main; do
+    if git -C "${root}" rev-parse --verify --quiet "${ref}" >/dev/null 2>&1; then
+      if git -C "${root}" show "${ref}:.beads/issues.jsonl" > "${tmp}/main.jsonl" 2>/dev/null; then
+        base_main="${tmp}/main.jsonl"
+        local mb
+        if mb="$(git -C "${root}" merge-base HEAD "${ref}" 2>/dev/null)" \
+          && git -C "${root}" show "${mb}:.beads/issues.jsonl" > "${tmp}/fork.jsonl" 2>/dev/null; then
+          base_fork="${tmp}/fork.jsonl"
+        fi
+      fi
+      break
+    fi
+  done
+
   BEADS_STRICT="${strict}" uv run --project "${root}/barwise" --frozen \
-    --only-group scripts python - "${f}" <<'PY'
+    --only-group scripts python - "${f}" "${base_main}" "${base_fork}" <<'PY'
 import json, os, re, sys
 
 PATH = sys.argv[1]
+BASE_MAIN = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else None
+BASE_FORK = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] else None
 STRICT = os.environ.get("BEADS_STRICT") == "1"  # canonical-format mismatch -> error
 REQUIRED = ["_type", "id", "title", "status", "priority", "issue_type", "owner",
             "created_at", "created_by", "updated_at",
@@ -138,6 +168,74 @@ for n, obj, _ in rows:
         if isinstance(t, str) and t != src and not t.startswith("external:") and t not in ids:
             E.append(f"L{n}: dangling depends_on_id {t!r} (no matching issue)")
 
+# -- an id names one issue, and created_at is what says which ---------------
+#
+# barwise-984, five occurrences across three sessions. The allocator reads
+# the highest id in the LOCAL .beads/issues.jsonl, which is stale by
+# construction on any branch behind main, so two branches mint the same id
+# for unrelated issues. The duplicate-id rule above catches the merged file
+# while it still has both rows -- and the resolution is where the damage
+# happens: union by id with the later updated_at winning treats a collision
+# as an edit, keeps one row, and deletes an issue. That resolution produces
+# a file every other rule here accepts, because both sides ARE valid.
+#
+# `created_at` is the discriminator because it is the one field that cannot
+# legitimately change. A title can be edited; a creation event cannot be
+# re-run. So an id that origin/main created at T1 and this branch created at
+# T2 is not an edit, it is two issues wearing one id -- and one of them is
+# already gone.
+
+
+def index(path):
+    by_id = {}
+    with open(path, encoding="utf-8") as fh:
+        for raw in fh:
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                o = json.loads(raw)
+            except json.JSONDecodeError:
+                continue  # a baseline we cannot parse is not this run's finding
+            if isinstance(o, dict) and isinstance(o.get("id"), str):
+                by_id[o["id"]] = o
+    return by_id
+
+
+here = {o["id"]: o for _, o, _ in rows if isinstance(o.get("id"), str)}
+
+if BASE_MAIN is None:
+    W.append(
+        "id-identity check DID NOT RUN: no readable .beads/issues.jsonl on "
+        "origin/main, origin/HEAD or main. Collisions across branches are "
+        "unchecked in this run."
+    )
+else:
+    main_ids = index(BASE_MAIN)
+    reused = [
+        i for i, o in here.items()
+        if i in main_ids and o.get("created_at") != main_ids[i].get("created_at")
+    ]
+    for i in sorted(reused):
+        E.append(
+            f"id {i!r} names a DIFFERENT issue on main -- created_at "
+            f"{main_ids[i].get('created_at')} there, {here[i].get('created_at')} here.\n"
+            f"          main:  {main_ids[i].get('title')}\n"
+            f"          here:  {here[i].get('title')}\n"
+            f"          Two issues minted the same id (barwise-984). Re-file one under a "
+            f"fresh id; do NOT resolve by keeping the later updated_at, which deletes the "
+            f"other issue."
+        )
+    if BASE_FORK is not None:
+        fork_ids = index(BASE_FORK)
+        dropped = sorted(i for i in fork_ids if i not in here)
+        for i in dropped:
+            W.append(
+                f"id {i!r} was in the tracker at the merge base and is gone here "
+                f"({fork_ids[i].get('title')!r}). Deliberate deletion, or a collision "
+                f"resolved by union-by-id?"
+            )
+
 print(f"beads_check: {len(rows)} issues, {len(E)} error(s), {len(W)} warning(s)")
 for e in E[:50]:
     print("  ERROR", e)
@@ -147,6 +245,9 @@ if len(W) > 30:
     print(f"  ... +{len(W) - 30} more warnings")
 sys.exit(1 if E else 0)
 PY
+  local rc=$?
+  rm -rf "${tmp}"
+  return ${rc}
 }
 
 # Run directly when executed (not when sourced).

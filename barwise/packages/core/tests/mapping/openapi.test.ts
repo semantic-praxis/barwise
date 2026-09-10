@@ -597,6 +597,87 @@ describe("OpenAPI renderer", () => {
       );
     });
 
+    /**
+     * Every operation carries a non-empty, unique `operationId`.
+     *
+     * The five `toBeDefined()` assertions above prove the operations
+     * exist and say nothing about what is in them, so a mutation
+     * blanking `operationId: `list${schemaName}`` to an empty template
+     * string survived the whole suite -- one of 82 survivors in this
+     * file, the worst-scoring in `src/mapping` at 65.40%
+     * (docs/specs/test-quality.spec.md WS2, barwise-993).
+     *
+     * It is not a cosmetic field. An OpenAPI client generator derives
+     * method names from `operationId`, and the specification requires it
+     * to be unique across the whole document -- so an empty one is not a
+     * missing label, it is a document that generates a client with five
+     * identically-named methods per resource, or fails to generate at
+     * all. Uniqueness is asserted here rather than assumed because it is
+     * the property the spec actually imposes.
+     */
+    it("gives every operation a non-empty, unique operationId", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Customer", { referenceMode: "customer_id" })
+        .withEntityType("Order", { referenceMode: "order_id" })
+        .build();
+
+      const spec = renderOpenApi(mapper.map(model));
+      const ids: string[] = [];
+
+      for (const [path, item] of Object.entries(spec.paths)) {
+        for (const [method, operation] of Object.entries(item as Record<string, unknown>)) {
+          const id = (operation as { operationId?: unknown; }).operationId;
+          expect(typeof id, `${method.toUpperCase()} ${path} has no operationId`).toBe("string");
+          expect(id, `${method.toUpperCase()} ${path} has an empty operationId`).not.toBe("");
+          ids.push(id as string);
+        }
+      }
+
+      // Two resources x (list, create, get, update, delete).
+      expect(ids).toHaveLength(10);
+      expect(new Set(ids).size, `operationIds are not unique: ${ids.join(", ")}`).toBe(ids.length);
+      expect(ids.sort()).toEqual([
+        "createCustomer",
+        "createOrder",
+        "deleteCustomer",
+        "deleteOrder",
+        "getCustomer",
+        "getOrder",
+        "listCustomer",
+        "listOrder",
+        "updateCustomer",
+        "updateOrder",
+      ]);
+    });
+
+    /**
+     * Every operation carries a summary naming its resource.
+     *
+     * Same 82-survivor cluster: blanking `summary` survived. Weaker than
+     * `operationId` -- a summary is documentation, not a contract -- so
+     * this asserts the shape (non-empty, names the schema) rather than
+     * pinning the exact wording, which would make it a golden that
+     * fights every copy edit.
+     */
+    it("gives every operation a summary naming its resource", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Customer", { referenceMode: "customer_id" })
+        .build();
+
+      const spec = renderOpenApi(mapper.map(model));
+
+      for (const [path, item] of Object.entries(spec.paths)) {
+        for (const [method, operation] of Object.entries(item as Record<string, unknown>)) {
+          const summary = (operation as { summary?: unknown; }).summary;
+          expect(typeof summary, `${method.toUpperCase()} ${path} has no summary`).toBe("string");
+          expect(summary as string, `${method.toUpperCase()} ${path} summary is empty`)
+            .not.toBe("");
+          expect(summary as string, `${method.toUpperCase()} ${path} summary omits the resource`)
+            .toContain("Customer");
+        }
+      }
+    });
+
     it("references component schemas in responses", () => {
       const model = new ModelBuilder("Test")
         .withEntityType("Customer", { referenceMode: "customer_id" })

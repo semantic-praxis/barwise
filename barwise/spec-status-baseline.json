@@ -32,6 +32,13 @@
         "8a62161",
         "8175c7c"
       ]
+    },
+    "functional-design-quality.spec.md": {
+      "status": "Draft -- the five open decisions resolved in review 2026-09-09\n(see Decisions); no workstream implemented",
+      "note": "Genuinely unimplemented, and the header is right. This spec's deliverables are five detectors -- invariant, escaping mutation, throw, law, api -- each with a baseline that ratchets. None exists: there is no detector script, no baseline file, and check-core-purity.mjs still checks exactly the four things it checked before (no I/O, clock, randomness, or LLM SDK). The commit below changed how that script RESOLVES THE REPOSITORY ROOT -- it now imports the guarded REPO_ROOT from lib/tracked.mjs instead of running its own git rev-parse, so it refuses rather than crashing when git answers emptily (barwise-989 WS2, docs/specs/gate-refusal-contract.spec.md). That is the gate-refusal contract reaching a file this spec happens to name; it measures nothing this spec plans. Same proxy false positive the gate's own header describes. Remove this row when the first detector ships and the Status says so.",
+      "commits": [
+        "58122dc1"
+      ]
     }
   }
 }

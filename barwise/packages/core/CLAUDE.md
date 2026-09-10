@@ -54,15 +54,38 @@ number is reproducible, but Stryker is deliberately NOT in
 `package.json` -- it pulls 126 transitive packages for a tool run a few
 times a year, which `docs/specs/supply-chain-hardening.spec.md` makes a
 decision rather than a detail (`docs/specs/test-quality.spec.md`, Open
-decision 1). Run it with `npx`, from this directory:
+decision 1). Install it transiently and run it from this directory:
 
 ```sh
-npx --yes @stryker-mutator/core@9 @stryker-mutator/vitest-runner@9 stryker run
+npm install --no-save @stryker-mutator/core@9 @stryker-mutator/vitest-runner@9  # from barwise/
+npx stryker run                                    # from this directory
+npx stryker run --mutate 'src/mapping/RelationalMapper.ts'   # one file
+npm ci                                             # from barwise/, to restore
 ```
+
+**Not `npx --yes @stryker-mutator/core@9 ... stryker run`**, which is
+what this file used to say and what nobody had run. It fails: Stryker's
+tsconfig preprocessor does a bare `import("typescript")`, and from an
+npx cache directory that resolves to nothing --
+`ERR_MODULE_NOT_FOUND: Cannot find package 'typescript'`, after
+instrumenting every mutant. `--no-save` is the working form, and it
+leaves `package.json` and `package-lock.json` untouched; `npm ci`
+restores `node_modules`.
+
+That matters for the open decision rather than being a detail of it. The
+argument for staying off the dependency list was that `npx` made a
+devDependency unnecessary, and it does not: the real alternative is a
+transient install that resolves the 126 packages FRESH FROM THE REGISTRY
+each time, outside the lock. Locked-and-listed against unlocked-and-
+transient is a different trade-off from the one recorded, and
+`docs/specs/supply-chain-hardening.spec.md` is the frame for it
+(barwise-994).
 
 Last taken 2026-09-10 over `src/diff` and `src/mapping`: 2,479 mutants,
 **75.39%**, 16m12s at concurrency 4. The same files carry 99.5% line
-coverage, which is the gap the score exists to show. The separate
+coverage, which is the gap the score exists to show. `RelationalMapper.ts`
+alone, re-measured after the barwise-993 triage kills: 468 mutants,
+**79.91%**, up from 79.27% -- 90 survivors where there were 93. The separate
 `vitest.mutation.config.ts` exists because Stryker sandboxes the working
 directory and the shared root config cannot resolve `../../` from inside
 a sandbox. It is listed in `knip.json`'s ignore for this package

@@ -1,6 +1,7 @@
 # A gate that cannot see its input must be unable to print PASS
 
-Status: WS1 implemented; WS2 and WS3 open (see Implementation notes)
+Status: Implemented. WS2's and WS3's designs were both corrected during
+grounding -- see their sections
 Created: 2026-09-10
 Last-updated: 2026-09-10
 Tracking: barwise-987 (WS1, the instance: `audit-gate` reports PASS with zero
@@ -41,15 +42,24 @@ shape of the answer.
 Thirteen node gate scripts, four perturbations each, exit codes read
 directly with no pipe:
 
-| Behaviour                                 | Count | Gates                                                                                                                                        |
-| ----------------------------------------- | ----: | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Invariant under every perturbation        |     4 | `check-parity`, `audit-duplication`, `audit-rubric`, `check-depcruise-gate`                                                                  |
-| Crashes when `git` returns nothing        |     7 | `check-no-nul`, `regen-root-package`, `check-python-uv`, `audit-spec-status`, `check-book-citations`, `check-core-purity`, `check-file-size` |
-| Refuses correctly on its own missing tool |     1 | `check-shell`                                                                                                                                |
-| **False green**                           | **1** | **`audit-gate`**                                                                                                                             |
+| Behaviour                                            | Count | Gates                                                                                                                                        |
+| ---------------------------------------------------- | ----: | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Invariant under every perturbation                   |     4 | `check-parity`, `audit-duplication`, `audit-rubric`, `check-depcruise-gate`                                                                  |
+| Crashes when `git` returns nothing                   |     7 | `check-no-nul`, `regen-root-package`, `check-python-uv`, `audit-spec-status`, `check-book-citations`, `check-core-purity`, `check-file-size` |
+| Refuses on its own missing tool, with the wrong code |     1 | `check-shell` -- exit 1, corrected to 2 by WS3                                                                                               |
+| **False green**                                      | **1** | **`audit-gate`**                                                                                                                             |
 
 Perturbations: `git` exits 0 printing nothing; `git` exits 127; the gate
 runs from `packages/core` instead of `barwise/`; Node 20 instead of 22.
+
+**Two rows of that table were wrong, and WS3's harness is what showed
+it.** `check-shell` was recorded as refusing correctly on a missing
+shellcheck; it exited 1, which is also its code for "a script has a
+finding", so a container without the tool and a repository with a real
+bug in its shell scripts reported the same thing. And the probe never
+perturbed a shallow clone, so it missed that `audit-spec-status` -- the
+gate whose own comment says "refusing" -- exited 1 there too. A hand
+reading taken once is a hand reading; both are corrected in WS3.
 
 **The negative result matters as much as the finding.** barwise-905's
 shape did not reproduce: no gate reported OK over an empty enumeration.
@@ -138,8 +148,11 @@ In scope, stated as requirements:
 - When the gate suite runs, the system shall assert `audit-gate` gives
   the same reading from the repo root, from `barwise/`, and from a
   package directory. (WS1)
-- When a new gate is added, the system shall place it under the same
-  contract. (WS3)
+- When a new gate is added to ci.yml, the system shall include it in the
+  fault matrix without further declaration. (WS3)
+- When a gate cannot answer because a tool it needs is absent or the
+  clone is shallow, the system shall exit `2` rather than the code it
+  uses for a real finding. (WS3)
 
 Out of scope:
 
@@ -160,7 +173,9 @@ Out of scope:
 | `scripts/tests/gates.test.mjs`  | covers 8 gates; `audit-gate` is not one of them                 | gains WS1's tests               |
 | `scripts/mutate.mjs`            | exit 2 = refused, four refusal paths, four tests                | untouched; the model            |
 | `scripts/audit-spec-status.mjs` | refuses a shallow clone; cwd-invariance pinned                  | untouched; the model            |
-| `scripts/lib/tracked.mjs`       | exports `REPO_ROOT` (the **git** root)                          | untouched -- see note           |
+| `scripts/lib/tracked.mjs`       | exports `REPO_ROOT` (the **git** root)                          | gains the guard in WS2          |
+| `scripts/lib/ci-gates.mjs`      | did not exist                                                   | WS3: the ci.yml parser, shared  |
+| `scripts/fault-matrix.mjs`      | did not exist                                                   | WS3: the harness                |
 | `scripts/ci-local.mjs`          | `ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..")` | untouched; the idiom WS1 copies |
 
 A note on which root, because there are two and they differ. `REPO_ROOT`
@@ -204,21 +219,189 @@ that root has no `package.json` or no lockfile; add two tests to
 `gates.test.mjs` -- the reading is identical from three cwds, and a root
 without a manifest refuses rather than passing.
 
-### 2. The contract for the remaining nine gates (provisional: not yet grounded)
+### 2. The contract for the remaining gates (implemented; the draft's design was wrong)
 
-The seven that crash on empty `git` get an explicit guard and exit `2`
-instead of a stack trace. Each needs its own precondition named, so this
-is nine small changes rather than one shared helper -- a shared
-`assertPrecondition` would be a shallow module wrapping one
-`existsSync`.
+**The draft said nine small changes, not a shared helper, on the grounds
+that a shared `assertPrecondition` would be a shallow module. Grounding
+it showed the shared owner already exists.** All seven crashers reach
+the repository root through one path, and five of them literally import
+it: `lib/tracked.mjs` resolves `REPO_ROOT` from `git rev-parse
+--show-toplevel`, and when git answers emptily that constant becomes
+`""`. Nothing crashed on a guard; they crashed on a path derived from
+an empty string, several frames later.
 
-### 3. The fault matrix as a harness (provisional: not yet grounded)
+So the guard went where the resolution already lives. That is not a new
+wrapper -- `tracked.mjs`'s own header says the listing "lives in one
+place that is correct by construction", and an unguarded root was that
+claim not yet finished.
 
-The probe that produced the reading above, made repeatable: run every
-gate under the six enumerated perturbations and assert each either
-answers correctly or exits `2`. Runs on demand rather than in CI --
-shims for `git` and a second Node are setup CI should not carry per
-push.
+Two of the seven were not importing it. `check-core-purity.mjs` and
+`check-file-size.mjs` each ran their own `execFileSync("git",
+["rev-parse", "--show-toplevel"])` -- a third and fourth copy of one
+decision, unguarded and unregistered, which CLAUDE.md's must-agree rule
+forbids. They now import `REPO_ROOT`, which removes the duplication and
+gives them the guard as a consequence rather than as a second change.
+
+Landed:
+
+- `REPO_ROOT` refuses with exit `2` when `git` fails, and separately
+  when it succeeds and prints nothing. The second is the quieter and
+  worse case: `resolve("", file)` silently means cwd.
+- `trackedFiles()` refuses on an empty listing. Every caller filters
+  that list and reports OK on finding no offenders, so empty is exactly
+  the reading that looks like success -- barwise-905, where the gate
+  printed OK having scanned nothing.
+- `check-core-purity` and `check-file-size` import `REPO_ROOT` instead
+  of re-deriving it.
+- Eleven tests in `gates.test.mjs`: five gates x two git failure modes,
+  plus the empty-listing case.
+
+Verified red, three mutations, each failing every test it should:
+
+| Mutation                                    | Result  |
+| ------------------------------------------- | ------- |
+| the empty-root guard disabled               | 5 fail  |
+| `process.exit(2)` becomes `process.exit(1)` | 10 fail |
+| the refusal message reworded                | 10 fail |
+
+The exit-code and message mutations failing all ten is the useful
+reading: every one of the ten tests reads both, so none of them is
+passing incidentally on a gate that happened to exit non-zero.
+
+### 3. The fault matrix as a harness (implemented; the draft was under-specified)
+
+**`scripts/fault-matrix.mjs`, run by `npm run fault-matrix`.** It takes
+the fourteen node gates ci.yml runs, puts each under four environment
+faults, and reports one verdict per (gate, fault) pair. On demand, not
+in CI, per the open decision below.
+
+**The draft said "assert each either answers correctly or exits 2", and
+that is not decidable as written.** A gate exiting 0 under a broken
+`git` is not thereby defective: `check-parity` never calls git, so it is
+right to be unmoved. Telling the two apart needs to know whether the
+gate reached for the thing that broke -- and the draft's phrasing quietly
+assumed a reader who already knew which gates those were. Written down,
+that knowledge is a hand-maintained list of gate-to-resource
+dependencies: a must-agree copy, inside the harness auditing the gates
+for must-agree copies.
+
+**So it is measured instead of assumed. The `git` shim logs every call.**
+`exit 0 having called git and been told nothing` is a false green by
+observation; `exit 0 having never called git` is independence by
+observation. Nothing has to be declared, and a gate that grows a git
+dependency is reclassified the next time the harness runs.
+
+The axes, and what each asks:
+
+| Axis          | Fault                                                | Question              |
+| ------------- | ---------------------------------------------------- | --------------------- |
+| `git-empty`   | `git` exits 0 printing nothing                       | instrumented          |
+| `git-absent`  | `git` exits 127                                      | instrumented          |
+| `git-shallow` | real `git`, except `--is-shallow-repository` is true | instrumented          |
+| `cwd`         | repo root, `barwise/`, `packages/core`               | is the reading stable |
+
+`git-shallow` passes through to the real git rather than cloning at
+`--depth 1`, because a second checkout would change the tree under test
+and confound the fault with it. The `--node <path>` flag adds a fifth
+axis and is refused unless the interpreter runs and reports a
+**different** major -- an axis that silently ran against itself would
+report conformance it never tested.
+
+**The three questions are not one question, and collapsing them scored a
+real defect as conformance.** The first draft of `classify` treated "no
+resource to instrument" as "judge by invariance" but returned REFUSED
+before looking. So mutating `audit-gate`'s `cwd: ROOT` pin away -- WS1's
+original defect, restored -- produced exit 0, 0, 2 across three
+directories, and the harness called it conforming. `npm run mutate` said
+UNCAUGHT, which is the only reason it is not still doing that. The axis
+kind is now an explicit argument with no guessing default:
+
+- **instrumented** -- refusing is right, never reaching is right,
+  answering anyway having reached is a FALSE GREEN.
+- **invariant** (cwd) -- the reading must not move. A refusal from one
+  directory and a pass from another _is_ a moved reading.
+- **refusable** (Node major) -- refusing is the **desired** behaviour,
+  because the pin exists so an unpinned runtime does not get to answer.
+  A different answer is the finding.
+
+**A gate whose unperturbed run already fails is reported UNREADABLE and
+the harness exits 2.** Every fault reading would then be about whatever
+is already wrong. Scoring those rows as conforming would be this spec's
+own defect committed by its own harness, and it is not hypothetical:
+`check-shell` is in exactly that state in any container without
+shellcheck.
+
+**A gate must not write to the tree it reads, and that is asserted per
+gate rather than argued once.** Taking the first reading, an ad-hoc probe
+ran `audit-spec-status.mjs` with package.json's default arguments instead
+of ci.yml's `--check` -- and the gate regenerated
+`spec-status-baseline.json`, replacing five classified rows with
+"TODO: classify". The run reported cleanly. Deriving the arguments from
+ci.yml closes that instance; the class is not closed by construction, so
+the harness compares `git status --porcelain` before and after each gate
+and refuses naming the file.
+
+**The gate list is derived, not listed.** `scripts/lib/ci-gates.mjs`
+parses the `run: npm ...` steps out of `.github/workflows/ci.yml`, and
+`ci-local.mjs` now reads the same module rather than carrying its own
+copy of that parser. A gate added to CI is in the matrix the same day,
+which is what closes the Scope requirement "when a new gate is added,
+the system shall place it under the same contract" -- and `fmt:check`,
+whose npm script is `dprint check && node scripts/fmt-root.mjs --check`,
+proves the compound shape resolves. An npm script chaining **two** node
+gates is refused rather than guessed: one exit code cannot be attributed
+to two gates, and taking the first would leave the second unaudited.
+
+#### What it found
+
+Two gates called a refusal by name and exited 1, which is each one's
+code for a real finding:
+
+| Gate                    | Fault           | Was    | Now    |
+| ----------------------- | --------------- | ------ | ------ |
+| `audit-spec-status.mjs` | shallow clone   | exit 1 | exit 2 |
+| `check-shell.mjs`       | no `shellcheck` | exit 1 | exit 2 |
+
+Neither is cosmetic. A shallow clone said _the specs are wrong_ and sent
+the reader hunting a spec to fix; an absent shellcheck said _a script
+has a bug_. Both now say what is true, which is that the gate could not
+answer.
+
+#### The reading, with both fixed
+
+Fourteen gates, four axes, 56 readings, **0 findings, 0 unreadable** --
+every gate either refuses or is demonstrably independent of the fault.
+Nine refuse on a broken `git`; five never call it. One
+(`audit-spec-status`) refuses on a shallow clone and the other thirteen
+do not read history. Every gate's exit is invariant across the three
+directories. About 90 seconds.
+
+#### Verified red
+
+Three mutations, each through `npm run mutate` so the reading is the
+command's own status and not a belief about it:
+
+| Mutation                                               | Harness said                               |
+| ------------------------------------------------------ | ------------------------------------------ |
+| `tracked.mjs`'s refusal exits 0 instead of 2           | **FALSE GREEN** on two axes -- CAUGHT      |
+| `audit-gate.mjs`'s `cwd: ROOT` becomes `process.cwd()` | **READING MOVED** (0, 0, 2) -- CAUGHT      |
+| the harness drops ci.yml's `--check` argument          | tree guard fires, names the file -- CAUGHT |
+
+The second is WS1's original defect restored, and it is the one that was
+UNCAUGHT until the axis kinds were separated. The verdict that matters
+most -- FALSE GREEN -- is also asserted directly in `gates.test.mjs`
+against `classify`, because no gate in this repository still returns it
+and a live run therefore cannot exercise it.
+
+#### Not run, and why
+
+- **The stale-lock axis.** Perturbing `uv.lock` means writing to the
+  tree, and this harness only reads -- the tree-invariance guard above
+  would refuse its own run. It belongs with `check-python-uv`'s own
+  tests, in a throwaway project.
+- **The wrong-Node-major axis**, unless `--node` names an interpreter.
+  This is an axis the operator did not ask for rather than one that
+  could not be read, and the report says so in those words.
 
 ## Open decisions (for review)
 
@@ -237,9 +420,21 @@ push.
   refusal it needs is "the Node major is not the pinned one", which is a
   different shape from "the input is missing".
 
-- **Should WS3 run in CI at all?** Recommended: no. It needs PATH shims
-  and a second Node install, and it protects against a class that
-  changes on the order of months. On demand, like `mutate.mjs`.
+- **Should WS3 run in CI at all? (resolved: no.)** It protects against a
+  class that changes on the order of months, and the honest run costs
+  about 90 seconds -- 56 gate invocations, several of which shell out to
+  `npm audit`, `depcruise` and `jscpd`. On demand, like `mutate.mjs`. The
+  reason that was expected to settle it turned out not to apply: the
+  `git` shims are written per run into a temp directory and need no
+  setup at all, and the second Node is opt-in. The cost is time, not
+  installation.
+
+  What that leaves open, and it is a real gap: an on-demand harness runs
+  when someone remembers. The thing standing in for CI here is that the
+  three mutations above ARE asserted -- `classify`'s verdicts are pinned
+  in `gates.test.mjs`, which `test:scripts` runs on every push -- so the
+  harness cannot silently stop being able to find a false green. What CI
+  does not check is whether the gates still conform.
 
 ## Risks and testing
 

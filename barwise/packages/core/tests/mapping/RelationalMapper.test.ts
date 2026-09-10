@@ -192,6 +192,106 @@ describe("RelationalMapper", () => {
       expect(assoc).toBeDefined();
       expect(assoc!.foreignKeys).toHaveLength(2);
     });
+
+    it("stays an associative table when one role is mandatory", () => {
+      // Mandatory says the fact must hold for every Student; it says
+      // nothing about how many Courses each one enrols in. So this is
+      // still many-to-many and still an associative table -- the NOT NULL
+      // lands on the associative table's own column, not on a foreign key
+      // absorbed into `student`.
+      //
+      // Two mutants survived here (barwise-993), and both turn this case
+      // into a 1:1: `analyzeUniqueness` returning `both: true`
+      // unconditionally, and the `else if (uniqueness.both)` branch forced
+      // taken. With neither role unique but role1 mandatory, the 1:1
+      // branch absorbs the fact into `student` as a foreign key. Every
+      // other no-uniqueness case has neither role mandatory, which lands
+      // in the same `createAssociativeTable` either way -- which is why
+      // the suite could not tell.
+      const model = new ModelBuilder("Test")
+        .withEntityType("Student", { referenceMode: "student_id" })
+        .withEntityType("Course", { referenceMode: "course_id" })
+        .withBinaryFactType("Student enrolls in Course", {
+          role1: { player: "Student", name: "enrolls in" },
+          role2: { player: "Course", name: "has enrolled" },
+          mandatory: "role1",
+        })
+        .build();
+
+      const schema = mapper.map(model);
+      const assoc = schema.tables.find((t) => t.name === "student_enrolls_in_course");
+      expect(assoc, "a fact type with no uniqueness maps to an associative table").toBeDefined();
+      expect(assoc!.foreignKeys).toHaveLength(2);
+
+      // The half that fails under the mutation: nothing is absorbed.
+      const student = schema.tables.find((t) => t.name === "student")!;
+      expect(
+        student.foreignKeys,
+        "mandatory without uniqueness must not absorb the fact into student",
+      ).toHaveLength(0);
+      expect(student.columns.map((c) => c.name)).toEqual(["student_id"]);
+    });
+  });
+
+  describe("fact types of arity three and above", () => {
+    it("maps a ternary to an associative table even when one role is unique", () => {
+      // An n-ary fact type always becomes an associative table. Uniqueness
+      // on a single role of a ternary constrains the fact; it does not
+      // reduce it to a binary, and there is no pair of tables to hang a
+      // foreign key between.
+      //
+      // The mutant this kills forces `ft.arity === 2` true, sending
+      // ternaries through `mapBinaryFactType` -- which reads roles[0] and
+      // roles[1] and never looks at the third. The existing ternary
+      // coverage has no uniqueness constraint at all, so the binary path
+      // falls through to the same `createAssociativeTable` and the two
+      // readings are identical. One uniqueness constraint separates them:
+      // the binary path emits `employee -> project` and drops Department.
+      const model = new OrmModel({ name: "Test" });
+      const emp = model.addObjectType({
+        name: "Employee",
+        kind: "entity",
+        referenceMode: "emp_id",
+      });
+      const proj = model.addObjectType({
+        name: "Project",
+        kind: "entity",
+        referenceMode: "proj_id",
+      });
+      const dept = model.addObjectType({
+        name: "Department",
+        kind: "entity",
+        referenceMode: "dept_id",
+      });
+      model.addFactType({
+        name: "Employee works on Project in Department",
+        roles: [
+          { id: "r1", name: "works on", playerId: emp.id },
+          { id: "r2", name: "has worker", playerId: proj.id },
+          { id: "r3", name: "in", playerId: dept.id },
+        ],
+        readings: ["{0} works on {1} in {2}"],
+        constraints: [{ type: "internal_uniqueness", roleIds: ["r1"] }],
+      });
+
+      const schema = mapper.map(model);
+      const assoc = schema.tables.find((t) => t.name === "employee_works_on_project_in_department");
+      expect(assoc, "a ternary maps to an associative table").toBeDefined();
+      // Three roles, three foreign keys. The binary path can only produce
+      // two, and produces none at all on this input.
+      expect(assoc!.foreignKeys).toHaveLength(3);
+      expect(assoc!.foreignKeys.map((fk) => fk.referencedTable).sort()).toEqual([
+        "department",
+        "employee",
+        "project",
+      ]);
+
+      const employee = schema.tables.find((t) => t.name === "employee")!;
+      expect(
+        employee.foreignKeys,
+        "a ternary must not be absorbed into one of its players",
+      ).toHaveLength(0);
+    });
   });
 
   describe("value type columns", () => {

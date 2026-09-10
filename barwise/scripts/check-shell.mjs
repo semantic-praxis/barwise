@@ -35,15 +35,19 @@
 import { spawnSync } from "node:child_process";
 import { REPO_ROOT as ROOT, trackedFiles } from "./lib/tracked.mjs";
 
+// Exit 2, not 1: an absent shellcheck is "could not answer", and exit 1
+// is this gate's code for "a script has a finding". A container without
+// shellcheck reported the same code as a repository with a real bug in
+// its shell scripts (docs/specs/gate-refusal-contract.spec.md).
 const probe = spawnSync("shellcheck", ["--version"], { encoding: "utf8" });
 if (probe.error) {
   console.error(
-    "shellcheck is not installed.\n"
+    "shellcheck is not installed, so this gate cannot answer its question.\n"
       + "  macOS:  brew install shellcheck\n"
       + "  Debian: sudo apt-get install -y shellcheck\n"
       + "  Other:  https://github.com/koalaman/shellcheck#installing",
   );
-  process.exit(1);
+  process.exit(2);
 }
 
 // One listing, from the shared anchored helper -- see scripts/lib/
