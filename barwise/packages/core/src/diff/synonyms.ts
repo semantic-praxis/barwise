@@ -141,8 +141,8 @@ export function detectSynonymCandidates(
       let allCorrespond = true;
       const reasons: string[] = [];
       for (let i = 0; i < rFt.arity; i++) {
-        const rPlayerName = playerName(existingModel, rFt.roles[i]!.playerId);
-        const aPlayerName = playerName(incomingModel, aFt.roles[i]!.playerId);
+        const rPlayerName = playerName(existingModel, rFt.roles[i]!.playerId, incomingModel);
+        const aPlayerName = playerName(incomingModel, aFt.roles[i]!.playerId, existingModel);
         if (rPlayerName === aPlayerName) continue;
         // Check if they are an OT synonym pair.
         if (otSynonymPairs.has(`${rPlayerName}::${aPlayerName}`)) continue;
