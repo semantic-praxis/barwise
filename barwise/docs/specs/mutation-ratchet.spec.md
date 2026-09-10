@@ -1,6 +1,7 @@
 # A mutation ratchet must count only what the test suite is responsible for
 
-Status: Draft -- no workstream implemented
+Status: Draft -- no workstream implemented. All five open decisions
+resolved 2026-09-10; the workstreams below reflect them.
 Created: 2026-09-10
 Last-updated: 2026-09-10
 Tracking: barwise-994. Resolves `docs/specs/test-quality.spec.md` WS2's
@@ -101,10 +102,13 @@ remembering had already failed to fire: barwise-905, -906 (six
 occurrences), -902, -910. Adding a baseline file that only fires when
 invoked by hand would be that pattern with a JSON file attached.
 
-So: a scheduled workflow. **This repository has no scheduled workflow
-today** -- `ci.yml` and `release.yml` are both event-driven -- so this
-introduces the first, which is a cost worth naming rather than
-absorbing.
+So: a scheduled workflow, **weekly** (Open decision 2). A week of drift
+is a few PRs to bisect; nightly buys little for seven times the runner
+minutes on a sixteen-minute job.
+
+**This repository has no scheduled workflow today** -- `ci.yml` and
+`release.yml` are both event-driven -- so this introduces the first,
+which is a cost worth naming rather than absorbing.
 
 ## Scope
 
@@ -185,6 +189,50 @@ A human never types one, so the classification cannot drift from what the
 compiler actually does. Only `tracked:` and `accepted-benign` carry human
 judgement, and those are the rows that must shrink.
 
+## What Stryker already provides (checked against the schema, not from memory)
+
+**Two of this spec's three inventions already exist upstream, and one of
+them was written here under the wrong name.** Read from
+`stryker-core.json`, the published option schema:
+
+| This spec proposed                          | Stryker ships                                                     |
+| ------------------------------------------- | ----------------------------------------------------------------- |
+| WS1: apply each mutant, run `tsc`, classify | **`checkers`** -- "validate that it won't result in a type error" |
+| WS2: a file of prior results                | **`incremental`**, **`incrementalFile`**                          |
+| OD3: a mutation-score floor (declined)      | **`thresholds.break`** (default `null`)                           |
+
+The option is **`checkers`**, plural. Earlier drafts of this spec wrote
+`checker`, which would have failed at the first run of WS1 -- a small
+error, and a fair sample of what reasoning from memory about someone
+else's tool produces.
+
+**What this changes, and what it does not:**
+
+- **WS1 is upstream's.** Confirmed by the option's own description. OD1
+  already routes there; this is the evidence for it rather than a
+  preference.
+- **WS2 is not, and the distinction is worth stating precisely because
+  the names look alike.** `incrementalFile` is _state for performance_:
+  Stryker stores results so the next run can skip mutants nothing
+  touched. A ratchet is _a reviewed, committed classification_: human
+  verdicts (`tracked:<issue>`, `accepted-benign`), a note per row, and
+  failure on a stale entry. The first is a cache Stryker owns and may
+  reshape; the second is a document the repository owns and a reviewer
+  reads. Building WS2 on the incremental file would couple a gate to a
+  cache format with no compatibility promise.
+- **`thresholds.break` means OD3 declines an available mechanism rather
+  than an unbuilt one.** That strengthens the decision: the floor is one
+  config line away and is still the wrong instrument, for the reason the
+  measurement above gives.
+- **Incremental mode may undercut this spec's cadence premise.** The
+  "sixteen minutes, too slow for per-PR" argument assumes every run is a
+  cold run. If `incremental` makes a warm run cheap, per-PR returns as a
+  live option and OD2 should be re-decided rather than inherited. **WS3
+  must measure a warm incremental run before accepting weekly as
+  final.** Not verified here: the schema says the file exists and speeds
+  the next run, and says nothing about how it behaves when source moves
+  under it.
+
 ## Alternatives considered
 
 - **A per-directory score floor, as barwise-994's acceptance criterion
@@ -198,7 +246,7 @@ judgement, and those are the rows that must shrink.
   and `StringLiteral` splits 3/4 within a single file. The kind does not
   determine the verdict; the type at the mutation site does.
 
-- **Turn on Stryker's `checker: ["typescript"]` and let it mark them
+- **Turn on Stryker's `checkers: ["typescript"]` and let it mark them
   `CompileError` itself.** The option most likely to be right, and the
   plugin is real: `@stryker-mutator/typescript-checker@9.6.1` exists and
   peer-depends on `@stryker-mutator/core: ~9.0.0` and `typescript >= 3.6`,
@@ -232,13 +280,17 @@ report, applies each surviving mutant by span, runs `npx tsc --noEmit` in
 the owning package, and prints the split. **No Stryker dependency**: the
 report is an input, produced however the operator likes.
 
-First hour is grounding Open decision 1: install
-`@stryker-mutator/typescript-checker@9.6.1`, set `checker: ["typescript"]`,
-re-run, and compare against the 53/37 split measured above. If it
-reproduces, this workstream becomes a report reader and the rest of it is
-deleted before it is written. If it does not reproduce, the discrepancy
-is itself the finding and belongs in this spec before either path
-continues.
+**First step, decided (Open decision 1):** install
+`@stryker-mutator/typescript-checker@9.6.1` with `--no-save`, set
+`checkers: ["typescript"]`, re-run, and compare against the 53/37 split
+measured above. If it reproduces, this workstream becomes a report reader
+and the rest of it is deleted before it is written. If it does not
+reproduce, the discrepancy is itself the finding and belongs in this spec
+before either path continues.
+
+`--no-save` keeps the experiment reversible: WS1 proves which path is
+right without committing the repository to either. Nothing enters
+`package.json` before WS3.
 
 Restore discipline is the acceptance risk, not the classification. The
 harness writes to tracked source files in a loop. It must: read the
@@ -286,11 +338,21 @@ packages, locked and auditable, which
 as an input and need no Stryker at all, which is what keeps the
 dependency decision reversible right up to the point it is needed.
 
-Open questions this workstream must answer, not assume: what a finding
-does (Open decision 4), what the run costs on a GitHub runner rather than
-this container, and whether `npm ci` installing 126 extra packages
-measurably slows every other CI job -- which is the cost the
-devDependency actually imposes, and it has not been measured.
+**Weekly** (Open decision 2). On a finding the workflow exits non-zero
+and writes the survivor list to `$GITHUB_STEP_SUMMARY`, naming the
+long-lived tracking issue this workstream creates by hand (Open decision
+4). **The workflow does not commit to `.beads/issues.jsonl`** -- no
+workflow here writes back to the repository, none declares
+`permissions:`, and a scheduled automated writer would join the
+id-allocation race barwise-984 just closed.
+
+Three things this workstream must measure rather than assume: what a
+cold run costs on a GitHub runner rather than this container; what a
+**warm `incremental` run** costs, since a cheap one puts per-PR back on
+the table and makes OD2's weekly answer worth re-deciding; and whether
+`npm ci` installing 126 extra packages measurably slows every other CI
+job -- which is the cost the devDependency actually imposes, and it has
+not been measured.
 
 ### 4. Beyond `src/diff` and `src/mapping` (provisional: not yet grounded)
 
@@ -316,58 +378,71 @@ Widening multiplies a 16-minute run.
 - **Every refusal path verified red** via `npm run mutate`
   (assertion-audit rule 0), including the tree-dirty refusal.
 
-## Open decisions (for review)
+## Open decisions (all resolved 2026-09-10)
 
-1. **Use Stryker's own TypeScript checker instead of WS1?** The plugin
-   is verified to exist at a matching version
-   (`@stryker-mutator/typescript-checker@9.6.1`, peer
-   `@stryker-mutator/core: ~9.0.0`). Options: (a) add it, set
-   `checker: ["typescript"]`, and check whether Stryker's `CompileError`
-   status reproduces the 53/37 split -- if it does, WS1 becomes a report
-   reader; (b) build WS1 as specified, keeping the classifier independent
-   of Stryker's version and of a third package.
+1. **Use Stryker's own TypeScript checker instead of WS1? (resolved:
+   try it first, gated on the split.)** The plugin is verified to exist
+   at a matching version (`@stryker-mutator/typescript-checker@9.6.1`,
+   peer `@stryker-mutator/core: ~9.0.0`).
 
-   Recommended: **(a) first, with a hard gate.** Reproducing the measured
-   split is the acceptance test, not "it runs" -- a checker that marks a
-   different set is making a different claim, and taking it on trust
-   would replace a measurement with a configuration line. If it
-   reproduces, (a) wins on ownership: a status Stryker computes cannot
-   drift from what Stryker's own runner does.
+   WS1 begins by installing it `--no-save`, setting
+   `checkers: ["typescript"]`, and comparing Stryker's `CompileError`
+   count against the **53 / 37** measured above. **Reproducing that
+   split is the acceptance test, not "it runs"** -- a checker that marks
+   a different set is making a different claim, and taking it on trust
+   would replace a measurement with a configuration line. Reproduce and
+   WS1 collapses to a report reader; diverge and the discrepancy is
+   itself a finding that belongs in this spec before either path
+   continues.
 
-   The honest cost of (a): it is a **third** package, so it does not
-   dodge the dependency question, and it moves the classification behind
-   a version boundary this repository does not control. The prototype
-   behind this spec is evidence (b) works, not evidence it is necessary.
+   Accepted cost: it is a **third** package, so this does not dodge the
+   dependency question, and it moves the classification behind a version
+   boundary this repository does not control. What it buys is that the
+   status is Stryker's own, so it cannot drift from what Stryker's
+   runner does.
 
-2. **Cadence.** Options: (a) weekly; (b) nightly; (c) on push to main.
-   Recommended: **(a) weekly.** The score moves when tests or source
-   change, and a week of drift is a few PRs to bisect. Nightly buys
-   little for 7x the runner minutes; per-push-to-main makes a 16-minute
-   job part of the merge path.
+2. **Cadence (resolved: weekly.)** See the scheduling section above.
 
-3. **Does a score floor ride alongside the classification?** Options:
-   (a) classification only -- the count of open `tracked:` rows is the
-   number, and it can only go down; (b) also record the
-   suite-responsible percentage per directory and fail if it drops.
-   Recommended: **(a).** (b) reintroduces a number to optimise, and the
-   row count already fails on a regression. This is the same argument
-   that settled the coverage floors, applied before the mistake rather
-   than after.
+3. **Does a numeric score floor ride alongside the classification?
+   (resolved: no. Classification only.)** The number is the count of
+   open `tracked:` rows, and it can only go down. No percentage is
+   recorded and none is gated.
 
-4. **What does a scheduled finding do?** Options: (a) fail the workflow,
-   visible as a red badge on the default branch; (b) fail and open a
-   beads issue automatically; (c) fail and notify nobody, so it is seen
-   only by someone looking. Recommended: **(a)**, with (b) explicitly
-   deferred -- an auto-filed issue per run is how a tracker fills with
-   noise, and barwise-984 is a fresh reminder of what tracker noise
-   costs. Genuinely uncertain: a red badge on a branch nobody watches is
-   option (c) wearing a hat.
+   This is the coverage-floor argument applied before the mistake
+   instead of after: a percentage in a baseline file is a number to
+   optimise, and the cheapest way to move it is the test that cannot
+   fail. The row count has no such move -- the only way to remove a row
+   is to kill the mutant.
 
-5. **What happens to the four `NoCoverage` mutants?** Options: (a) treat
-   as suite-responsible, since no test reaches them; (b) a third
-   baseline status. Recommended: **(a)** -- it is the honest reading and
-   it needs no new vocabulary. Flagged because it is a real category the
-   measurement above did not examine.
+4. **What does a scheduled finding do? (resolved: fail the workflow, and
+   name one long-lived tracking issue. The run does NOT write to the
+   tracker -- see the narrowing below.)**
+
+   The workflow exits non-zero, which is the red badge, and writes its
+   findings to `$GITHUB_STEP_SUMMARY` so the run page carries the list
+   rather than making a reader open raw logs. It names a single
+   long-lived beads issue, created by hand in WS3, as the durable home.
+
+   **This is narrower than the option as chosen, deliberately, and the
+   difference is worth a sentence.** The choice was for the run to
+   update that issue. Grounding it found three costs the option did not
+   show: no workflow in this repository writes back to the repository
+   today, and none declares a `permissions:` block, so this would be the
+   first to need `contents: write` and a bot identity; and a CI process
+   committing to `.beads/issues.jsonl` on a schedule puts an automated
+   writer into exactly the id-allocation race barwise-984 documents,
+   weeks after closing it. One long-lived issue updated by a human costs
+   a manual step; an automated writer costs a new class of tracker
+   conflict.
+
+   If the auto-write is wanted anyway, it is a separate decision with
+   those three costs attached, and it should be its own workstream
+   rather than a line in WS3.
+
+5. **The four `NoCoverage` mutants (resolved: suite-responsible.)** No
+   test reaches them, so that is the honest bucket, and it needs no new
+   vocabulary. They enter the baseline like any other suite-responsible
+   survivor.
 
 ## Non-goals
 
