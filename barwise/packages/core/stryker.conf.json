@@ -1,0 +1,29 @@
+{
+  "packageManager": "npm",
+  "testRunner": "vitest",
+  "vitest": {
+    "configFile": "vitest.mutation.config.ts"
+  },
+  "mutate": [
+    "src/diff/**/*.ts",
+    "src/mapping/**/*.ts"
+  ],
+  "coverageAnalysis": "perTest",
+  "reporters": [
+    "clear-text",
+    "json"
+  ],
+  "jsonReporter": {
+    "fileName": "reports/mutation/diff-mapping.json"
+  },
+  "concurrency": 4,
+  "timeoutMS": 120000,
+  "disableTypeChecks": true,
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/coverage/**",
+    "**/.turbo/**",
+    "**/.stryker-tmp/**"
+  ],
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/api/schema/stryker-core.json"
+}

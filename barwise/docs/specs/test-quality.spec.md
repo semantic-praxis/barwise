@@ -1,6 +1,7 @@
 # Test quality: four evidence-side measures, and why coverage is not one of them
 
-Status: WS1 implemented; WS2 through WS5 open. Measure 4 was corrected
+Status: WS1 implemented; WS2's measurement taken (its ratchet is not);
+WS3 through WS5 open. Measure 4 was corrected
 after review (see "Measure 4, and how it avoids testing our own
 beliefs") -- the first draft would have manufactured its own diagnostics.
 Created: 2026-09-10
@@ -60,6 +61,22 @@ in 321,000 lines and found mutant detection does correlate with real
 fault detection, independently of coverage. Read together: the thing we
 currently measure is the weak proxy, and the thing we already own a
 tool for is the strong one.
+
+**And now our own measurement says the same thing, on our own code.**
+WS2 took the first mutation score over `src/diff` and `src/mapping` and
+put it beside the coverage of exactly those files:
+
+| Directory     | Line coverage | Function coverage | Mutation score |
+| ------------- | ------------: | ----------------: | -------------: |
+| `src/diff`    |        99.48% |            99.19% |         75.52% |
+| `src/mapping` |        99.55% |           100.00% |         75.20% |
+
+`src/mapping` has **100% function coverage and a 75.20% mutation
+score**. Nearly every line runs and one mutant in four survives, which
+is the twenty-four-point gap between "the tests execute this code" and
+"the tests would notice if it were wrong." The borrowed literature above
+predicted this; the table measures it here, and it is the strongest
+argument in this spec because it is not borrowed.
 
 Our own history says the instrument is not merely weak but unstable.
 `packages/core/CLAUDE.md` sets coverage targets of 95% for model,
@@ -272,12 +289,56 @@ script with a baseline, matching `audit:duplication` and `audit:rubric`.
 least one `fc.sample(`, and guards its own enumeration with a floor so
 an empty glob cannot make the other two pass. No law file is edited.
 
-### 2. Mutation score per directory (provisional: not yet grounded)
+### 2. Mutation score per directory (implemented: the number, not yet the ratchet)
 
-Take the first aggregate reading over `core/src/diff` and
-`core/src/mapping` -- the two directories the September omission defects
-lived in -- and record it per directory in a baseline that fails on a
-decrease. The point of the first pass is the number, which nobody has.
+Taken. Stryker 9 with the vitest runner and `coverageAnalysis: perTest`,
+over `src/diff` and `src/mapping`: **2,479 mutants, 1,867 killed, 584
+survived, 26 uncovered, 2 timeouts -- 75.39%**, in 16 minutes 12 seconds
+at concurrency 4, averaging 17.17 tests per mutant.
+
+| File                                      |   Score | Survived |
+| ----------------------------------------- | ------: | -------: |
+| `diff/breakingLevel.ts`                   | 100.00% |        0 |
+| `diff/changeDescription.ts`               |  92.03% |       10 |
+| `diff/deltas.ts`                          |  89.29% |        2 |
+| `mapping/renderers/avro.ts`               |  88.00% |        9 |
+| `mapping/RelationalMapper.ts`             |  79.27% |       93 |
+| `diff/synonyms.ts`                        |  78.81% |       30 |
+| `mapping/renderers/dbt.ts`                |  76.71% |       17 |
+| `mapping/renderers/DbtExportAnnotator.ts` |  75.00% |       12 |
+| `diff/ModelMerge.ts`                      |  74.17% |       81 |
+| `diff/elementDiff.ts`                     |  72.92% |      130 |
+| `diff/ModelDiff.ts`                       |  68.51% |       94 |
+| `mapping/renderers/ddl.ts`                |  66.67% |       24 |
+| `mapping/renderers/openapi.ts`            |  65.40% |       82 |
+
+**The operator breakdown says more than the score.** Of 584 survivors:
+`StringLiteral` 180, `ConditionalExpression` 147, `ArrayDeclaration` 54,
+`ObjectLiteral` 49, the rest in a long tail. Those first two are
+different findings and should not be read together:
+
+- The `StringLiteral` survivors concentrate in the renderers and in
+  `elementDiff`, and they are output. `openapi.ts:201` renders
+  `operationId: \`list${schemaName}\``-- replaceable with an empty
+  template string, no test notices.`operationId`is what an OpenAPI
+  client generator keys on.`elementDiff.ts:53`sets`change: "referenceMode"`; blanking it survives, in a module whose
+  sibling `changeDescription.ts` keeps a golden for every kind of change
+  the diff can emit.
+- The `ConditionalExpression` survivors concentrate in
+  `RelationalMapper.ts` (40 of its 93). `RelationalMapper.ts:81` filters
+  `ot.kind === "entity"`, and forcing that condition either way survives
+  -- the entity/value split feeding the mapper is unasserted at that
+  branch.
+
+Not every survivor is a defect: a mutation testing pass surfaces
+equivalent mutants, which are undecidable in general (Papadakis et al.
+2019), and some of the 180 string survivors will be log text no test
+should pin. Triage is the work this number makes possible, not work it
+replaces.
+
+**Still open: the ratchet.** The number exists; nothing yet fails when
+it drops. That is `mutation-baseline.json` plus a `--check` mode, and it
+depends on Open decision 1 below now that the decision has evidence.
 
 ### 3. Oracle classification (provisional: not yet grounded)
 
@@ -303,15 +364,29 @@ our own beliefs.
 
 ## Open decisions (for review)
 
-- **A mutation number, or a mutation engine?** Options: (a) a scoped
-  Stryker run as a devDependency, which gives a real score quickly and
-  brings a large tool and a slow job; (b) extend `mutate.mjs` into a
-  batch runner over a declared operator list, which owns no new
-  dependency and will be less capable than a mature engine for years.
-  Recommended: (a) first, scoped to two directories, to learn the
-  number -- and then decide, because the number tells us whether owning
-  an engine is worth it. Deciding the tool before seeing any score is
-  the order that wastes the effort.
+- **A mutation number, or a mutation engine? (the number is now in;
+  the decision is not)** WS2 ran Stryker without adding it to
+  `package.json` -- `npm install --no-save`, then `npm ci` to restore --
+  precisely so this decision stays open. What the run establishes: 16
+  minutes for 2,479 mutants at concurrency 4 is affordable on demand and
+  far too slow for CI, and the vitest runner needed only a standalone
+  config to work (`packages/core/vitest.mutation.config.ts`, because
+  Stryker sandboxes the cwd and the shared root config cannot resolve
+  from inside a sandbox).
+
+  What it costs: `@stryker-mutator/core` and `@stryker-mutator/vitest-runner`
+  pull **126 transitive packages**. This repository has
+  `docs/specs/supply-chain-hardening.spec.md` and sets
+  `ignore-scripts=true` for reasons that paragraph states, so 126
+  packages for a tool run by hand a few times a year is a real cost
+  rather than a rounding error, and it is the reviewer's call rather
+  than a detail to absorb. Options: (a) adopt it as a devDependency with
+  an `npm run mutation` script; (b) keep `stryker.conf.json` committed
+  and run via `npx` when wanted, paying the install each time and owning
+  nothing; (c) build the batch runner on `mutate.mjs` and own a worse
+  engine forever. Recommended: (b). It reproduces the number without
+  taking the dependency, and (a) becomes right only once the ratchet
+  runs often enough that the install cost is felt.
 
 - **Do the coverage thresholds stay?** Options: (a) keep them as a
   floor against catastrophe while ratcheting on measures 1 through 4;

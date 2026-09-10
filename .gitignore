@@ -171,3 +171,10 @@ barwise/optimizer/out/
 # path is printed so the operator can reach it, which a temp dir the
 # container discards would defeat.
 .mutate-backups/
+
+# Mutation testing (docs/specs/test-quality.spec.md, measure 1). Stryker's
+# sandbox and its per-mutant report are derived from a run, not inputs to
+# one: the report is 2.3M for two directories. The score that matters is
+# recorded in the spec and ratcheted in mutation-baseline.json.
+.stryker-tmp/
+**/reports/mutation/
