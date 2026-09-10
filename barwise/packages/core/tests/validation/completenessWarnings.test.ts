@@ -863,3 +863,101 @@ describe("identification through objectification", () => {
     expect(missingFor(model, "Beta")).toHaveLength(1);
   });
 });
+
+/**
+ * barwise-943: a frequency of "at least 1, at most unbounded" excludes
+ * nothing, and nothing said so. The min-0 spelling of the same emptiness
+ * is a hard error; this one was indistinguishable from a real
+ * constraint.
+ */
+describe("a frequency constraint that excludes nothing", () => {
+  function withFrequency(min: number, max: number | "unbounded"): OrmModel {
+    const model = new ModelBuilder("Freq")
+      .withEntityType("Order")
+      .withEntityType("Product")
+      .withBinaryFactType("Order includes Product", {
+        role1: { player: "Order", name: "includes" },
+        role2: { player: "Product", name: "is included in" },
+      })
+      .build();
+    const ft = model.getFactTypeByName("Order includes Product")!;
+    ft.addConstraint({ type: "frequency", roleIds: [ft.roles[0]!.id], min, max });
+    return model;
+  }
+
+  const warnsFor = (min: number, max: number | "unbounded") =>
+    completenessWarnings(withFrequency(min, max))
+      .filter((d) => d.ruleId === "completeness/frequency-without-effect");
+
+  it("warns on 1..unbounded, naming the fact type", () => {
+    const [warning, ...rest] = warnsFor(1, "unbounded");
+    expect(warning).toBeDefined();
+    expect(rest).toHaveLength(0);
+    expect(warning!.severity).toBe("warning");
+    expect(warning!.message).toContain("Order includes Product");
+    expect(warning!.message).toContain("excludes nothing");
+  });
+
+  it("stays silent on 1..5, which is how every shipped frequency is written", () => {
+    // The boundary is the whole rule. All six frequency constraints in
+    // this repository are min 1 with a finite max, so a rule that
+    // flagged them would be wrong six times over on its first run.
+    expect(warnsFor(1, 5)).toHaveLength(0);
+  });
+
+  it("stays silent on 2..unbounded, which genuinely excludes the singletons", () => {
+    expect(warnsFor(2, "unbounded")).toHaveLength(0);
+  });
+
+  it("warns on 0..unbounded too, without displacing the min-0 error", () => {
+    // A min of 0 is separately an error (constraint/frequency-invalid-min,
+    // barwise-830). This rule is about emptiness, not legality, so it
+    // reports the emptiness as well and neither rule swallows the other.
+    expect(warnsFor(0, "unbounded")).toHaveLength(1);
+  });
+
+  it("does not mistake a cardinality constraint for a vacuous frequency", () => {
+    // `CardinalityConstraint extends CardinalityRange`, so it carries the
+    // same `min` and `max: number | "unbounded"` shape this rule reads.
+    // Drop the `type !== "frequency"` gate and a perfectly ordinary
+    // unary-role cardinality of "at least 1, no maximum" is reported as
+    // a frequency constraint that says nothing. Found by mutation: no
+    // other test in this file distinguishes the gate.
+    // ModelBuilder has no unary helper, so the fact type is built
+    // directly rather than bending the builder for one case.
+    const model = new ModelBuilder("Card").withEntityType("Order").build();
+    const order = model.getObjectTypeByName("Order")!;
+    const ft = model.addFactType({
+      name: "Order is urgent",
+      roles: [{ name: "is urgent", playerId: order.id }],
+      readings: ["{0} is urgent"],
+    });
+    ft.addConstraint({
+      type: "cardinality",
+      roleId: ft.roles[0]!.id,
+      min: 1,
+      max: "unbounded",
+    });
+
+    expect(
+      completenessWarnings(model).filter(
+        (d) => d.ruleId === "completeness/frequency-without-effect",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("leaves a fact type with no frequency constraint alone", () => {
+    expect(
+      completenessWarnings(
+        new ModelBuilder("None")
+          .withEntityType("Order")
+          .withEntityType("Product")
+          .withBinaryFactType("Order includes Product", {
+            role1: { player: "Order", name: "includes" },
+            role2: { player: "Product", name: "is included in" },
+          })
+          .build(),
+      ).filter((d) => d.ruleId === "completeness/frequency-without-effect"),
+    ).toHaveLength(0);
+  });
+});

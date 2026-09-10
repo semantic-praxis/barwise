@@ -30,7 +30,7 @@ import { rescoreDirectory } from "../src/record/rescore.js";
 const ROUND = join(import.meta.dirname, "../../../eval-payloads/20260828-1647");
 const suite = loadSuite(defaultSuitePath());
 
-// Per arm: payload count and mean, under suite 2.11.0.
+// Per arm: payload count and mean, under suite 2.12.0.
 //
 // 2.9.0: every arm fell when must_validate left the rubric
 // (barwise-902), and the SHAPE of that fall was the point -- the
@@ -45,8 +45,21 @@ const suite = loadSuite(defaultSuitePath());
 // a role in. Only the arms holding one move; the other three are
 // unchanged to six places and none rises. Five different model arms
 // produced the shape, which is the finding.
+// 2.12.0 moves exactly one arm, and one is the shape.
+// `completeness/frequency-without-effect` is a new warning-severity
+// rule (barwise-943) for a frequency of "at least 1, no maximum", which
+// excludes nothing. One payload in 115 carries it --
+// default-haiku-dev/incident-response-run2.json, whose
+// inferred_constraints declare min 1 / max unbounded on "Service owns
+// Incident" with a prose description attached. default-haiku-dev falls
+// 0.907859 -> 0.906833; the other seven arms are unchanged to six
+// places and none rises.
+//
+// No model shipped in this repository writes that form -- all six
+// frequency constraints in the corpus are min 1 with a finite max -- so
+// the eval round is the only place it occurs.
 const EXPECTED: readonly (readonly [string, number, number])[] = [
-  ["default-haiku-dev", 13, 0.907859],
+  ["default-haiku-dev", 13, 0.906833],
   ["default-haiku-train", 18, 0.853031],
   ["default-sonnet-dev", 13, 0.838507],
   ["default-sonnet-train", 13, 0.938688],
