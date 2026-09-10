@@ -7,7 +7,7 @@
   "workspaces": {
     ".": { "entry": ["scripts/at-root.mjs"] },
     "packages/core": {
-      "ignore": ["scripts/**"]
+      "ignore": ["scripts/**", "vitest.mutation.config.ts"]
     },
     "packages/diagram": {},
     "packages/llm": {},

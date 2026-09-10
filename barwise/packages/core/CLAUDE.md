@@ -48,6 +48,27 @@ npx tsc --noEmit            # type-check only (no output)
 
 Lint is run from the repo root: `npm run lint`.
 
+**The mutation score is taken by hand, not by a dependency.**
+`stryker.conf.json` and `vitest.mutation.config.ts` are committed so the
+number is reproducible, but Stryker is deliberately NOT in
+`package.json` -- it pulls 126 transitive packages for a tool run a few
+times a year, which `docs/specs/supply-chain-hardening.spec.md` makes a
+decision rather than a detail (`docs/specs/test-quality.spec.md`, Open
+decision 1). Run it with `npx`, from this directory:
+
+```sh
+npx --yes @stryker-mutator/core@9 @stryker-mutator/vitest-runner@9 stryker run
+```
+
+Last taken 2026-09-10 over `src/diff` and `src/mapping`: 2,479 mutants,
+**75.39%**, 16m12s at concurrency 4. The same files carry 99.5% line
+coverage, which is the gap the score exists to show. The separate
+`vitest.mutation.config.ts` exists because Stryker sandboxes the working
+directory and the shared root config cannot resolve `../../` from inside
+a sandbox. It is listed in `knip.json`'s ignore for this package
+because `stryker.conf.json` names it as a string rather than importing
+it, so knip sees an unused file where there is a live edge.
+
 ## Key Conventions
 
 - Every model element gets a UUID default id at creation via
