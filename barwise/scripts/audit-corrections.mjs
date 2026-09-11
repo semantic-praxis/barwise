@@ -33,6 +33,7 @@
  *
  * Spec: docs/specs/correction-record-ratchet.spec.md.
  */
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -170,11 +171,57 @@ function detect() {
   return { specs, found };
 }
 
+/**
+ * Spec files on disk that git does not track.
+ *
+ * `--porcelain` rather than `ls-files --others` so the answer does not
+ * depend on the caller's cwd, and read from REPO_ROOT for the same
+ * reason the listing is.
+ */
+function untrackedSpecs() {
+  return execFileSync("git", [
+    "status",
+    "--porcelain",
+    "--untracked-files=all",
+    "--",
+    "barwise/docs/specs",
+  ], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+  })
+    .split("\n")
+    .filter((l) => l.startsWith("?? ") && l.endsWith(".spec.md"))
+    .map((l) => l.slice(3));
+}
+
 function main() {
   const mode = process.argv[2];
   const { specs, found } = detect();
 
   if (mode === "--write") {
+    // An untracked spec is invisible to trackedFiles(), so generating a
+    // baseline while one exists bakes in a corpus that is missing it --
+    // and --check then passes locally and fails the moment the spec is
+    // committed. That is not hypothetical: this gate's own baseline was
+    // generated while its own spec was unstaged, went green locally, and
+    // went red in CI on five records from that very file.
+    //
+    // --check does NOT refuse for this, deliberately. Its input is the
+    // TRACKED corpus by definition, the same blind spot check-no-nul
+    // pins as intended; refusing there would fail every session that has
+    // a spec in progress. Writing the baseline is the one operation
+    // where the incomplete reading gets persisted, so it is the one that
+    // refuses.
+    const untracked = untrackedSpecs();
+    if (untracked.length > 0) {
+      process.stderr.write(
+        "audit-corrections: refusing to write a baseline while spec files are untracked.\n"
+          + untracked.map((f) => `  ${f}\n`).join("")
+          + "  They are invisible to this gate, so the baseline would be missing their\n"
+          + "  records and --check would pass here and fail in CI. `git add` them first.\n",
+      );
+      process.exit(2);
+    }
     const records = {};
     for (const r of found) {
       records[r.id] = {

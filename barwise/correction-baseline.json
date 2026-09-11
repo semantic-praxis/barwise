@@ -366,6 +366,36 @@
       "excerpt": "status: implemented (ws1, ws2 and ws3). carryunmodelledelements carries diagram layouts and nothing else, which is the resolved decision rather than work outsta",
       "caught_by": "execution",
       "note": "The population key gained an ordinal the resolved decision did not anticipate; found on shipping WS3."
+    },
+    "correction-record-ratchet::d991e8800983": {
+      "spec": "correction-record-ratchet.spec.md",
+      "excerpt": "# ratchet the correction record: a new spec correction must say what caught it",
+      "caught_by": "not-a-correction",
+      "note": "This spec's own title. The detector matches its subject matter -- a spec about correction records is full of catch language -- which is the over-inclusion the design accepts and classifies rather than tunes away."
+    },
+    "correction-record-ratchet::44b7905b87d5": {
+      "spec": "correction-record-ratchet.spec.md",
+      "excerpt": "in one sentence: 28 specs already record what their drafts got wrong and what caught it, nothing reads that ba",
+      "caught_by": "not-a-correction",
+      "note": "The BLUF of this spec, describing the corpus it audits. No correction of its own."
+    },
+    "correction-record-ratchet::0d96891e4625": {
+      "spec": "correction-record-ratchet.spec.md",
+      "excerpt": "it does not judge whether a correction should have happened, and it cannot: a correction is a historical fact ",
+      "caught_by": "not-a-correction",
+      "note": "States what the gate does and does not judge. No correction recorded."
+    },
+    "correction-record-ratchet::7eb377fc978c": {
+      "spec": "correction-record-ratchet.spec.md",
+      "excerpt": "- judging whether a correction was avoidable. the classification says what caught the defect, not what should ",
+      "caught_by": "not-a-correction",
+      "note": "An out-of-scope bullet. No correction recorded."
+    },
+    "correction-record-ratchet::df2c17054e14": {
+      "spec": "correction-record-ratchet.spec.md",
+      "excerpt": "- a required \"what caught it\" section in the spec template. catches nothing retroactively, and a template sect",
+      "caught_by": "not-a-correction",
+      "note": "A rejected alternative (a required template section). Records a design choice, not a correction to this spec's own draft."
     }
   }
 }

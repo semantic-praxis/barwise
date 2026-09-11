@@ -1878,3 +1878,30 @@ test("audit-corrections refuses an empty spec corpus rather than reporting a mat
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("audit-corrections refuses to WRITE a baseline while a spec is untracked", () => {
+  // The defect this gate shipped with, pinned. Its own baseline was
+  // generated while its own spec was unstaged: the gate enumerates
+  // through trackedFiles(), so the spec was invisible, --check passed
+  // locally, and CI went red on five records from that very file the
+  // moment it was committed. --check still does not refuse here -- its
+  // input is the TRACKED corpus by definition, the same blind spot
+  // check-no-nul pins as intended -- but --write persists the
+  // incomplete reading, so that is the operation that refuses.
+  const dir = correctionRepo({ "tracked.spec.md": A_CORRECTION }, {});
+  try {
+    writeFileSync(join(dir, "barwise/docs/specs/draft.spec.md"), A_CORRECTION);
+
+    const write = gate("audit-corrections.mjs", dir, "--write");
+    assert.equal(write.status, 2, `expected refusal (2), got ${write.status}`);
+    assert.match(write.stderr, /draft\.spec\.md/);
+    assert.doesNotMatch(write.stdout, /wrote/);
+
+    // --check is unaffected: the untracked draft is simply out of scope.
+    const check = gate("audit-corrections.mjs", dir, "--check");
+    assert.equal(check.status, 1, "the tracked probe is still unclassified, so --check finds it");
+    assert.doesNotMatch(`${check.stdout}${check.stderr}`, /draft\.spec\.md/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
