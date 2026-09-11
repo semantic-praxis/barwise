@@ -133,14 +133,22 @@ what makes the claim falsifiable later.** That reason should replace the
 aesthetic one, and the ratio band should be stated as conditional on the
 input being padded rather than as a target.
 
-## The loop that is open
+## The loop that is open (closed 2026-09-11 by `audit:corrections`)
 
-Specs record their own corrections. Nothing aggregates them, and nothing
-feeds the aggregate back into how the next spec is written. Each spec
-learns its lesson; the corpus learns nothing.
+Specs record their own corrections. Nothing aggregated them, and nothing
+fed the aggregate back into how the next spec is written: each spec
+learned its lesson and the corpus learned nothing.
 
-This document does not close that -- CLAUDE.md: "A finding is not closed
-by a document." Closing it means a ratchet: extract the correction
-records, classify them, and fail when a new one appears unclassified,
-the way `audit:duplication` and `audit:rubric` already work. The
-classification above is the seed baseline, not the mechanism.
+`npm run audit:corrections -- --check` now closes that, per CLAUDE.md's
+"a finding is not closed by a document". The classification lives in
+`correction-baseline.json`, one row per record saying what caught it,
+and the gate fails on a new unclassified record AND on a row no longer
+detected (`docs/specs/correction-record-ratchet.spec.md`, barwise-1013).
+
+**The counts in this document are a dated reading, not the live ones.**
+They were taken by hand on 2026-09-11 over a narrower marker set than
+the gate now uses -- building the gate turned up a record the markers
+missed, which is why `provenance` has an entry at all. The baseline is
+the authority; restating its totals here would be a must-agree copy with
+nothing checking it, which is the defect this repository keeps finding.
+For current counts, run the gate.
