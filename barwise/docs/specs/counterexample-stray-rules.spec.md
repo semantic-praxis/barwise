@@ -2,8 +2,8 @@
 
 Status: Implemented
 Created: 2026-09-11
-Last-updated: 2026-09-11
-Tracking: barwise-995. Continues barwise-958 (the forbidding side read the
+Last-updated: 2026-09-11 (WS3 added)
+Tracking: barwise-995 (WS1, WS2) and barwise-999 (WS3). Continues barwise-958 (the forbidding side read the
 enumeration and ignored ranges), barwise-959 (the admitting side did the
 mirror of it), and barwise-945 (whose new value-type rules made a third
 layer visible). Leaves barwise-1017 (contradictory value types are a model
@@ -147,6 +147,39 @@ a contributor facing 56 diff lines regenerates the baseline rather than
 reading it, which is the ratchet-silencing failure `pr-review` names.
 Rule ids survive a reshuffle; the count still forces the number down.
 
+**WS3: the guards barwise-999 asked for.** barwise-999 was filed
+independently against the same first-source-wins arm, and WS1 closes its
+main clause -- "`mintValue` applies one predicate to every candidate from
+every source". Three things it asked for were not closed by that, and are
+here:
+
+- **Its five probe cases, committed.** Each is a LEGAL model: values
+  satisfying the role constraint and the player's declaration both
+  exist, so a probe over it has no excuse for tripping a value-type
+  rule. Three discriminate (a fractional role range under an integer
+  player; two overlapping ranges; an enumeration only partly admissible
+  to its player) and two are controls that must stay clean under any
+  fix. Verified by re-planting the first-source-wins arm with
+  `mutate.mjs`: the three fail, the two do not.
+- **A drift test over `mintValueOfType` and `dataTypeAdmits`.** They are
+  parallel switches over the same closed set and must agree on the
+  boolean spelling and the numeric shapes; nothing related them, and
+  minting a boolean as "yes" was planted and reported UNCAUGHT. Sharing
+  is not available -- one is a predicate over a value, the other a
+  generator over an index -- so it is a drift test, exhaustive over
+  `CONCEPTUAL_DATA_TYPE_NAMES` rather than illustrative, with a second
+  assertion naming which types mint at all so a deleted switch arm
+  cannot turn a row into a silent no-op.
+- **The sweep, in the repo.** barwise-995's count came from a sweep
+  nobody committed, so its number could not be reproduced or broken
+  down. `localStrays` is that instrument and the law runs it; WS3 adds
+  the (kind -> rule) breakdown to the ratchet's failure messages, so a
+  reader who moves the count sees what made it up without rebuilding
+  anything. The two pairs barwise-999 named as new --
+  `mandatory -> value-comparison-violation` and
+  `ring -> value-comparison-violation` -- are in that table and are
+  owned by barwise-1015.
+
 ## What does not change
 
 The residue is real and is filed, not fixed here:
@@ -181,3 +214,6 @@ which is constraint solving and not counterexample generation.
   each way, and a rule id was removed from the baseline and it failed
   again.
 - `npm run ci:local` before the push.
+- WS3: three mutations on `mintValueOfType` (boolean as "yes"/"no", an
+  integer as a fraction, the decimal arm deleted) -- all CAUGHT by the
+  drift test, including the exact one barwise-999 recorded as UNCAUGHT.

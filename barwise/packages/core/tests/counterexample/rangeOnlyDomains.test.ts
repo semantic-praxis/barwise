@@ -24,6 +24,8 @@ import { graphFor } from "../helpers/graphFor.js";
 interface Options {
   /** Declared as a role-level constraint on the Score role. */
   roleRanges?: ValueRange[];
+  /** An enumeration on the same role-level constraint. */
+  roleValues?: string[];
   /** Declared on the Score value type itself. */
   playerRanges?: ValueRange[];
   playerDataType?: "integer" | "boolean";
@@ -86,12 +88,12 @@ function makeModel(options: Options): OrmModel {
   const [personRole, scoreRole] = ft.roles;
   (ft.constraints[0] as { roleIds: string[]; }).roleIds = [personRole!.id];
   const ranges = options.roleRanges ?? options.roleRangesWithIntegerPlayer;
-  if (ranges) {
+  if (ranges || options.roleValues) {
     ft.addConstraint({
       type: "value_constraint",
       roleId: scoreRole!.id,
-      values: [],
-      ranges,
+      values: options.roleValues ?? [],
+      ranges: ranges ?? [],
     });
   }
   return model;
@@ -317,5 +319,55 @@ describe("a probe that puts one value in several roles asks all of them", () => 
       ...new Set(populationValidationRules(model, graphFor(model)).map((d) => d.ruleId)),
     ];
     expect(tripped).toEqual(["population/exclusion-violation"]);
+  });
+});
+
+describe("a role-level domain narrower than its player's is satisfied on both sides", () => {
+  /**
+   * barwise-999's four probe cases. Each is a LEGAL model -- values
+   * satisfying the role constraint and the player's own declaration
+   * both exist -- so a probe over it has no excuse for tripping a
+   * value-type rule.
+   *
+   * They are here rather than in a new file because the defect is the
+   * same one the cases above pin, seen from the other side: those vary
+   * the SHAPE of a single domain, and these vary how many domains apply
+   * at once. All five failed on `mintValue`'s first-source-wins arm,
+   * and `mutate.mjs` re-plants that arm to keep them honest.
+   */
+  const cases: [string, Options][] = [
+    // A role range admitting non-integers, under an integer player.
+    // 1..9 satisfy both; "0.5" is what the role domain alone offers.
+    ["a fractional role range under an integer player", {
+      roleRanges: [{ min: "0.5", max: "9" }],
+      playerDataType: "integer",
+    }],
+    // Two ranges that overlap on 5..9. The role's own lower bound is
+    // outside the player's.
+    ["a role range overlapping its player's", {
+      roleRanges: [{ min: "1", max: "9" }],
+      playerRanges: [{ min: "5", max: "20" }],
+    }],
+    // An enumeration every entry of which the player admits: the
+    // control for the pair below, and it must stay clean.
+    ["a role enumeration its player's type admits", {
+      roleValues: ["3", "4"],
+      playerDataType: "integer",
+    }],
+    // An enumeration only PARTLY admissible. The minter has to reach
+    // past the first entry, which rotation alone does not do.
+    ["a role enumeration only partly admissible to its player", {
+      roleValues: ["v1", "7"],
+      playerDataType: "integer",
+    }],
+    // No player-level declaration at all: the case that already worked,
+    // kept so a fix that breaks it is visible.
+    ["a role range with no player-level declaration", {
+      roleRanges: [{ min: "1", max: "9" }],
+    }],
+  ];
+
+  it.each(cases)("trips uniqueness alone with %s", (_name, options) => {
+    expect(rulesTripped(makeModel(options))).toEqual(["population/uniqueness-violation"]);
   });
 });
