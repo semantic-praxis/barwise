@@ -39,6 +39,13 @@
       "commits": [
         "58122dc1"
       ]
+    },
+    "mutation-ratchet.spec.md": {
+      "status": "Draft -- no workstream implemented. All five open decisions resolved 2026-09-10; the workstreams below reflect them.",
+      "note": "Genuinely unimplemented, and the header is right: this spec's deliverable is `scripts/mutation-baseline.mjs --classify`, a classifier that splits surviving mutants by whether the suite is the thing that should have caught them, plus a scheduled run. That file does not exist, no package.json script or workflow mentions a ratchet, and no Stryker checker is installed -- verified, not assumed. The commit below is barwise-998 fixing four defects in `scripts/mutate.mjs`, which this spec NAMES as an input the ratchet will drive rather than as something it implements: a signal-killed child that read as CAUGHT, a throw in the restore that read as UNCAUGHT, an unpinned restore-hash branch, and a spec sentence claiming a gate that does not exist. If anything, it makes this spec's own restore discipline cheaper to meet, since a killed run now refuses instead of reporting a result. This is the proxy false positive the gate's own header describes -- a spec naming a file that unrelated work touches. Remove this row when WS1 ships and the Status says so.",
+      "commits": [
+        "ec9ae74"
+      ]
     }
   }
 }
