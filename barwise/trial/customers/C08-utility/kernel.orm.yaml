@@ -1,0 +1,859 @@
+orm_version: "1.0"
+model:
+  name: Electric Distribution Utility
+  domain_context: distribution
+  note: >-
+    Seed kernel for trial customer C08. Names follow the IEC CIM public
+    vocabulary (ServicePoint, Meter, Feeder, Substation, UsagePoint idioms)
+    as a distribution utility's metering, network, customer and operations
+    teams use them. Invented data; no vendor schema.
+  object_types:
+    # ---- entity types -------------------------------------------------
+    - id: ot-service-point
+      name: ServicePoint
+      kind: entity
+      reference_mode: service_point_id
+      definition: The physical point of delivery where the utility's network connects to a premise, at which a meter is installed and service is agreed.
+    - id: ot-meter
+      name: Meter
+      kind: entity
+      reference_mode: meter_id
+      definition: A revenue metering device that measures energy delivered at a service point, identified by a utility-assigned meter id.
+    - id: ot-smart-meter
+      name: SmartMeter
+      kind: entity
+      reference_mode: meter_id
+      definition: A meter with two-way communication that can be read remotely over a head-end system.
+    - id: ot-interval-meter
+      name: IntervalMeter
+      kind: entity
+      reference_mode: meter_id
+      definition: A smart meter that records consumption in fixed-length intervals rather than as a single register read.
+    - id: ot-manufacturer
+      name: Manufacturer
+      kind: entity
+      reference_mode: manufacturer_code
+      definition: A company that makes meters, identified by the code the meter data management system assigns it.
+    - id: ot-premise
+      name: Premise
+      kind: entity
+      reference_mode: premise_id
+      definition: A building or parcel where the utility delivers service, identified by a premise id that outlives any customer at it.
+    - id: ot-customer
+      name: Customer
+      kind: entity
+      reference_mode: customer_number
+      definition: A person or organization that takes electric service from the utility.
+    - id: ot-account
+      name: Account
+      kind: entity
+      reference_mode: account_number
+      definition: A utility billing account to which charges for one or more service agreements are posted.
+    - id: ot-service-agreement
+      name: ServiceAgreement
+      kind: entity
+      reference_mode: agreement_number
+      definition: The agreement under which a customer takes service at a service point, carrying the tariff and billing cycle that apply.
+    - id: ot-feeder
+      name: Feeder
+      kind: entity
+      reference_mode: feeder_id
+      definition: A distribution circuit leaving a substation breaker that supplies transformers and, through them, service points.
+    - id: ot-substation
+      name: Substation
+      kind: entity
+      reference_mode: substation_code
+      definition: A facility where transmission voltage is stepped down and distribution feeders originate.
+    - id: ot-transformer
+      name: Transformer
+      kind: entity
+      reference_mode: transformer_id
+      definition: A distribution transformer on a feeder that steps voltage down to the service level for the service points it supplies.
+    - id: ot-interval-reading
+      name: IntervalReading
+      kind: entity
+      reference_mode: meter_and_interval
+      definition: One measured value from one meter for one interval, identified by the meter and the interval end timestamp.
+    - id: ot-outage
+      name: Outage
+      kind: entity
+      reference_mode: outage_id
+      definition: An unplanned or planned loss of supply on part of the network, tracked by the outage management system.
+    - id: ot-crew
+      name: Crew
+      kind: entity
+      reference_mode: crew_id
+      definition: A field team that can be dispatched to restore supply or perform work on the network.
+    - id: ot-tariff
+      name: Tariff
+      kind: entity
+      reference_mode: rate_code
+      definition: A regulator-approved rate schedule under which a service agreement is billed, identified by its rate code.
+    - id: ot-billing-cycle
+      name: BillingCycle
+      kind: entity
+      reference_mode: cycle_code
+      definition: A scheduled group of meters read and billed together in each billing month.
+    # ---- identifier value types ----------------------------------------
+    - id: ot-service-point-id
+      name: ServicePointId
+      kind: value
+      definition: The identifier of a service point.
+      data_type: { name: text, length: 20 }
+    - id: ot-meter-id
+      name: MeterId
+      kind: value
+      definition: The utility-assigned identifier of a meter, distinct from the manufacturer's serial number.
+      data_type: { name: text, length: 20 }
+    - id: ot-manufacturer-code
+      name: ManufacturerCode
+      kind: value
+      definition: The code identifying a meter manufacturer.
+      data_type: { name: text, length: 10 }
+    - id: ot-premise-id
+      name: PremiseId
+      kind: value
+      definition: The identifier of a premise.
+      data_type: { name: text, length: 20 }
+    - id: ot-customer-number
+      name: CustomerNumber
+      kind: value
+      definition: The identifier of a customer.
+      data_type: { name: text, length: 20 }
+    - id: ot-account-number
+      name: AccountNumber
+      kind: value
+      definition: The identifier of a billing account.
+      data_type: { name: text, length: 20 }
+    - id: ot-agreement-number
+      name: AgreementNumber
+      kind: value
+      definition: The identifier of a service agreement.
+      data_type: { name: text, length: 20 }
+    - id: ot-feeder-id
+      name: FeederId
+      kind: value
+      definition: The identifier of a feeder.
+      data_type: { name: text, length: 20 }
+    - id: ot-substation-code
+      name: SubstationCode
+      kind: value
+      definition: The code identifying a substation.
+      data_type: { name: text, length: 10 }
+    - id: ot-transformer-id
+      name: TransformerId
+      kind: value
+      definition: The identifier of a distribution transformer.
+      data_type: { name: text, length: 20 }
+    - id: ot-outage-id
+      name: OutageId
+      kind: value
+      definition: The identifier of an outage.
+      data_type: { name: text, length: 20 }
+    - id: ot-crew-id
+      name: CrewId
+      kind: value
+      definition: The identifier of a crew.
+      data_type: { name: text, length: 10 }
+    - id: ot-rate-code
+      name: RateCode
+      kind: value
+      definition: The regulator-filed code of a tariff.
+      data_type: { name: text, length: 12 }
+      value_constraint:
+        values:
+          - R-1
+          - R-2
+          - R-TOU
+          - R-TOU-2
+          - R-LI
+          - R-LI-TOU
+          - R-NEM
+          - R-NEM-TOU
+          - R-EV
+          - R-EV-TOU
+          - R-SOLAR
+          - R-HEAT
+          - R-SEASONAL
+          - GS-1
+          - GS-2
+          - GS-3
+          - GS-TOU
+          - GS-TOU-2
+          - GS-DEMAND
+          - GS-DEMAND-TOU
+          - GS-NEM
+          - GS-SEASONAL
+          - LP-1
+          - LP-2
+          - LP-TOU
+          - LP-INTERRUPTIBLE
+          - LP-PRIMARY
+          - LP-TRANSMISSION
+          - AG-1
+          - AG-TOU
+          - AG-PUMP
+          - SL-1
+          - SL-2
+          - SL-LED
+          - TL-1
+          - MUN-1
+          - MUN-TOU
+          - TEMP-1
+    - id: ot-cycle-code
+      name: CycleCode
+      kind: value
+      definition: The code of a billing cycle, one of the 20 read days in a month.
+      data_type: { name: text, length: 4 }
+    # ---- descriptive value types ----------------------------------------
+    - id: ot-serial-number
+      name: SerialNumber
+      kind: value
+      definition: The serial number the manufacturer stamped on a meter, unique only within that manufacturer.
+      data_type: { name: text, length: 30 }
+    - id: ot-meter-multiplier
+      name: MeterMultiplier
+      kind: value
+      definition: The factor applied to a meter's register or interval value to obtain delivered energy, 1 for a self-contained meter.
+      data_type: { name: decimal, length: 10, scale: 4 }
+    - id: ot-phase-code
+      name: PhaseCode
+      kind: value
+      definition: The phases a meter or service is connected to.
+      data_type: { name: text, length: 3 }
+      value_constraint:
+        values: [A, B, C, AB, BC, CA, ABC]
+    - id: ot-communication-protocol
+      name: CommunicationProtocol
+      kind: value
+      definition: The protocol a smart meter uses to talk to the head-end.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [rf-mesh, plc, cellular, ethernet]
+    - id: ot-firmware-version
+      name: FirmwareVersion
+      kind: value
+      definition: The firmware version loaded on a smart meter.
+      data_type: { name: text, length: 20 }
+    - id: ot-interval-length-minutes
+      name: IntervalLengthMinutes
+      kind: value
+      definition: The length of the interval an interval meter records, in minutes.
+      data_type: { name: integer }
+      value_constraint:
+        values: ["5", "15", "30", "60"]
+    - id: ot-interval-timestamp
+      name: IntervalTimestamp
+      kind: value
+      definition: The end of a metering interval, in UTC.
+      data_type: { name: timestamp }
+    - id: ot-reading-value
+      name: ReadingValue
+      kind: value
+      definition: Energy delivered during one interval, in kWh, before the multiplier is applied.
+      data_type: { name: decimal, length: 12, scale: 3 }
+    - id: ot-reading-quality
+      name: ReadingQuality
+      kind: value
+      definition: The validation status of an interval reading as the meter data management system classifies it.
+      data_type: { name: text, length: 12 }
+      value_constraint:
+        values: [actual, estimated, validated, edited, missing]
+    - id: ot-street-address
+      name: StreetAddress
+      kind: value
+      definition: The postal address of a premise.
+      data_type: { name: text, length: 200 }
+    - id: ot-customer-name
+      name: CustomerName
+      kind: value
+      definition: The name of a customer as it appears on the bill.
+      data_type: { name: text, length: 120 }
+    - id: ot-account-status
+      name: AccountStatus
+      kind: value
+      definition: The billing status of an account.
+      data_type: { name: text, length: 12 }
+      value_constraint:
+        values: [pending, active, final, closed]
+    - id: ot-service-status
+      name: ServiceStatus
+      kind: value
+      definition: Whether supply is currently connected at a service point.
+      data_type: { name: text, length: 14 }
+      value_constraint:
+        values: [connected, disconnected, pending]
+    - id: ot-nominal-voltage
+      name: NominalVoltage
+      kind: value
+      definition: The nominal operating voltage of a feeder, in volts.
+      data_type: { name: integer }
+    - id: ot-rated-kva
+      name: RatedKva
+      kind: value
+      definition: The nameplate rating of a transformer, in kVA.
+      data_type: { name: decimal, length: 8, scale: 1 }
+    - id: ot-outage-start-time
+      name: OutageStartTime
+      kind: value
+      definition: When an outage began, as the outage management system recorded it.
+      data_type: { name: timestamp }
+    - id: ot-outage-end-time
+      name: OutageEndTime
+      kind: value
+      definition: When supply was restored to the last customer affected by an outage.
+      data_type: { name: timestamp }
+    - id: ot-outage-cause
+      name: OutageCause
+      kind: value
+      definition: The cause code assigned to an outage after investigation.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [equipment-failure, vegetation, weather, animal-contact, vehicle-contact, planned, unknown]
+    - id: ot-affected-customer-count
+      name: AffectedCustomerCount
+      kind: value
+      definition: The number of customers without supply at the peak of an outage.
+      data_type: { name: integer }
+    - id: ot-crew-name
+      name: CrewName
+      kind: value
+      definition: The dispatch name of a crew.
+      data_type: { name: text, length: 60 }
+    - id: ot-crew-type
+      name: CrewType
+      kind: value
+      definition: The kind of work a crew is equipped for.
+      data_type: { name: text, length: 12 }
+      value_constraint:
+        values: [line, tree, service, contractor]
+    - id: ot-tariff-description
+      name: TariffDescription
+      kind: value
+      definition: The regulator's title for a tariff.
+      data_type: { name: text, length: 120 }
+    - id: ot-agreement-start-date
+      name: AgreementStartDate
+      kind: value
+      definition: The date a service agreement took effect.
+      data_type: { name: date }
+    - id: ot-legacy-route-code
+      name: LegacyRouteCode
+      kind: value
+      definition: The walking-route code from the pre-AMI meter reading system, retained for meters not yet migrated.
+      data_type: { name: text, length: 8 }
+  fact_types:
+    # ---- reference schemes ---------------------------------------------
+    - id: ft-service-point-has-id
+      name: ServicePoint has ServicePointId
+      roles:
+        - { id: r-sp-has-id-sp, player: ot-service-point, role_name: has }
+        - { id: r-sp-has-id-id, player: ot-service-point-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-sp-has-id-sp], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-sp-has-id-id] }
+        - { type: mandatory, role: r-sp-has-id-sp }
+    - id: ft-meter-has-id
+      name: Meter has MeterId
+      roles:
+        - { id: r-meter-has-id-meter, player: ot-meter, role_name: has }
+        - { id: r-meter-has-id-id, player: ot-meter-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-meter-has-id-meter], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-meter-has-id-id] }
+        - { type: mandatory, role: r-meter-has-id-meter }
+    - id: ft-manufacturer-has-code
+      name: Manufacturer has ManufacturerCode
+      roles:
+        - { id: r-mfr-has-code-mfr, player: ot-manufacturer, role_name: has }
+        - { id: r-mfr-has-code-code, player: ot-manufacturer-code, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-mfr-has-code-mfr], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-mfr-has-code-code] }
+        - { type: mandatory, role: r-mfr-has-code-mfr }
+    - id: ft-premise-has-id
+      name: Premise has PremiseId
+      roles:
+        - { id: r-premise-has-id-premise, player: ot-premise, role_name: has }
+        - { id: r-premise-has-id-id, player: ot-premise-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-premise-has-id-premise], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-premise-has-id-id] }
+        - { type: mandatory, role: r-premise-has-id-premise }
+    - id: ft-customer-has-number
+      name: Customer has CustomerNumber
+      roles:
+        - { id: r-cust-has-num-cust, player: ot-customer, role_name: has }
+        - { id: r-cust-has-num-num, player: ot-customer-number, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-cust-has-num-cust], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-cust-has-num-num] }
+        - { type: mandatory, role: r-cust-has-num-cust }
+    - id: ft-account-has-number
+      name: Account has AccountNumber
+      roles:
+        - { id: r-acct-has-num-acct, player: ot-account, role_name: has }
+        - { id: r-acct-has-num-num, player: ot-account-number, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-acct-has-num-acct], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-acct-has-num-num] }
+        - { type: mandatory, role: r-acct-has-num-acct }
+    - id: ft-agreement-has-number
+      name: ServiceAgreement has AgreementNumber
+      roles:
+        - { id: r-agr-has-num-agr, player: ot-service-agreement, role_name: has }
+        - { id: r-agr-has-num-num, player: ot-agreement-number, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-agr-has-num-agr], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-agr-has-num-num] }
+        - { type: mandatory, role: r-agr-has-num-agr }
+    - id: ft-feeder-has-id
+      name: Feeder has FeederId
+      roles:
+        - { id: r-feeder-has-id-feeder, player: ot-feeder, role_name: has }
+        - { id: r-feeder-has-id-id, player: ot-feeder-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-feeder-has-id-feeder], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-feeder-has-id-id] }
+        - { type: mandatory, role: r-feeder-has-id-feeder }
+    - id: ft-substation-has-code
+      name: Substation has SubstationCode
+      roles:
+        - { id: r-sub-has-code-sub, player: ot-substation, role_name: has }
+        - { id: r-sub-has-code-code, player: ot-substation-code, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-sub-has-code-sub], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-sub-has-code-code] }
+        - { type: mandatory, role: r-sub-has-code-sub }
+    - id: ft-transformer-has-id
+      name: Transformer has TransformerId
+      roles:
+        - { id: r-xfmr-has-id-xfmr, player: ot-transformer, role_name: has }
+        - { id: r-xfmr-has-id-id, player: ot-transformer-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-xfmr-has-id-xfmr], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-xfmr-has-id-id] }
+        - { type: mandatory, role: r-xfmr-has-id-xfmr }
+    - id: ft-outage-has-id
+      name: Outage has OutageId
+      roles:
+        - { id: r-outage-has-id-outage, player: ot-outage, role_name: has }
+        - { id: r-outage-has-id-id, player: ot-outage-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-outage-has-id-outage], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-outage-has-id-id] }
+        - { type: mandatory, role: r-outage-has-id-outage }
+    - id: ft-crew-has-id
+      name: Crew has CrewId
+      roles:
+        - { id: r-crew-has-id-crew, player: ot-crew, role_name: has }
+        - { id: r-crew-has-id-id, player: ot-crew-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-crew-has-id-crew], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-crew-has-id-id] }
+        - { type: mandatory, role: r-crew-has-id-crew }
+    - id: ft-tariff-has-rate-code
+      name: Tariff has RateCode
+      roles:
+        - { id: r-tariff-has-code-tariff, player: ot-tariff, role_name: has }
+        - { id: r-tariff-has-code-code, player: ot-rate-code, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-tariff-has-code-tariff], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-tariff-has-code-code] }
+        - { type: mandatory, role: r-tariff-has-code-tariff }
+    - id: ft-cycle-has-code
+      name: BillingCycle has CycleCode
+      roles:
+        - { id: r-cycle-has-code-cycle, player: ot-billing-cycle, role_name: has }
+        - { id: r-cycle-has-code-code, player: ot-cycle-code, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-cycle-has-code-cycle], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-cycle-has-code-code] }
+        - { type: mandatory, role: r-cycle-has-code-cycle }
+    # ---- metering --------------------------------------------------------
+    - id: ft-meter-has-serial
+      name: Meter has SerialNumber
+      definition: The serial number is stamped by the manufacturer and repeats across manufacturers, which is why it does not identify the meter on its own.
+      roles:
+        - { id: r-meter-has-serial-meter, player: ot-meter, role_name: has }
+        - { id: r-meter-has-serial-serial, player: ot-serial-number, role_name: is stamped on }
+      readings: ["{0} has {1}", "{1} is stamped on {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-meter-has-serial-meter] }
+        - { type: mandatory, role: r-meter-has-serial-meter }
+        - id: euc-meter-serial-manufacturer
+          type: external_uniqueness
+          roles: [r-meter-has-serial-serial, r-meter-made-by-mfr]
+    - id: ft-meter-made-by
+      name: Meter is made by Manufacturer
+      roles:
+        - { id: r-meter-made-by-meter, player: ot-meter, role_name: is made by }
+        - { id: r-meter-made-by-mfr, player: ot-manufacturer, role_name: makes }
+      readings: ["{0} is made by {1}", "{1} makes {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-meter-made-by-meter] }
+        - { type: mandatory, role: r-meter-made-by-meter }
+    - id: ft-meter-has-multiplier
+      name: Meter has MeterMultiplier
+      roles:
+        - { id: r-meter-has-mult-meter, player: ot-meter, role_name: has }
+        - { id: r-meter-has-mult-mult, player: ot-meter-multiplier, role_name: applies to }
+      readings: ["{0} has {1}", "{1} applies to {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-meter-has-mult-meter] }
+        - { type: mandatory, role: r-meter-has-mult-meter }
+    - id: ft-meter-has-phase
+      name: Meter has PhaseCode
+      roles:
+        - { id: r-meter-has-phase-meter, player: ot-meter, role_name: has }
+        - { id: r-meter-has-phase-phase, player: ot-phase-code, role_name: is phase of }
+      readings: ["{0} has {1}", "{1} is phase of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-meter-has-phase-meter] }
+    - id: ft-meter-installed-at
+      name: Meter is installed at ServicePoint
+      definition: A meter sits at no more than one service point at a time, and a service point carries no more than one revenue meter; spare meters in the warehouse sit at none.
+      roles:
+        - { id: r-meter-installed-meter, player: ot-meter, role_name: is installed at }
+        - { id: r-meter-installed-sp, player: ot-service-point, role_name: carries }
+      readings: ["{0} is installed at {1}", "{1} carries {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-meter-installed-meter] }
+        - { type: internal_uniqueness, roles: [r-meter-installed-sp] }
+    - id: ft-meter-has-legacy-route
+      name: Meter has LegacyRouteCode
+      roles:
+        - { id: r-meter-legacy-route-meter, player: ot-meter, role_name: has }
+        - { id: r-meter-legacy-route-code, player: ot-legacy-route-code, role_name: is route of }
+      readings: ["{0} has {1}", "{1} is route of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-meter-legacy-route-meter] }
+    - id: ft-smart-meter-uses-protocol
+      name: SmartMeter uses CommunicationProtocol
+      roles:
+        - { id: r-sm-uses-proto-sm, player: ot-smart-meter, role_name: uses }
+        - { id: r-sm-uses-proto-proto, player: ot-communication-protocol, role_name: is used by }
+      readings: ["{0} uses {1}", "{1} is used by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-sm-uses-proto-sm] }
+        - { type: mandatory, role: r-sm-uses-proto-sm }
+    - id: ft-smart-meter-runs-firmware
+      name: SmartMeter runs FirmwareVersion
+      roles:
+        - { id: r-sm-runs-fw-sm, player: ot-smart-meter, role_name: runs }
+        - { id: r-sm-runs-fw-fw, player: ot-firmware-version, role_name: runs on }
+      readings: ["{0} runs {1}", "{1} runs on {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-sm-runs-fw-sm] }
+    - id: ft-interval-meter-records-at
+      name: IntervalMeter records at IntervalLengthMinutes
+      roles:
+        - { id: r-im-records-at-im, player: ot-interval-meter, role_name: records at }
+        - { id: r-im-records-at-len, player: ot-interval-length-minutes, role_name: is interval of }
+      readings: ["{0} records at {1}", "{1} is interval of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-im-records-at-im] }
+        - { type: mandatory, role: r-im-records-at-im }
+    - id: ft-meter-records-reading
+      name: Meter records ReadingValue at IntervalTimestamp
+      definition: One meter yields at most one value per interval; two values for the same meter and interval are a duplicate delivery from the head-end, not two readings.
+      roles:
+        - { id: r-meter-records-meter, player: ot-meter, role_name: records }
+        - { id: r-meter-records-value, player: ot-reading-value, role_name: is recorded by }
+        - { id: r-meter-records-ts, player: ot-interval-timestamp, role_name: is interval of }
+      readings: ["{0} records {1} at {2}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-meter-records-meter, r-meter-records-ts] }
+    - id: ft-interval-reading-has-quality
+      name: IntervalReading has ReadingQuality
+      roles:
+        - { id: r-ir-has-quality-ir, player: ot-interval-reading, role_name: has }
+        - { id: r-ir-has-quality-q, player: ot-reading-quality, role_name: is quality of }
+      readings: ["{0} has {1}", "{1} is quality of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-ir-has-quality-ir] }
+        - { type: mandatory, role: r-ir-has-quality-ir }
+    - id: ft-meter-estimated-in-cycle
+      name: Meter was estimated in BillingCycle
+      definition: A meter was estimated in a billing cycle when its bill for that cycle was rendered from an estimated rather than an actual read; the regulator permits at most three such cycles before an actual read is required.
+      roles:
+        - { id: r-meter-estimated-meter, player: ot-meter, role_name: was estimated in }
+        - { id: r-meter-estimated-cycle, player: ot-billing-cycle, role_name: had estimate for }
+      readings: ["{0} was estimated in {1}", "{1} had estimate for {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-meter-estimated-meter, r-meter-estimated-cycle] }
+        - id: fc-estimated-read-limit
+          type: frequency
+          modality: deontic
+          roles: [r-meter-estimated-meter]
+          min: 1
+          max: 3
+    # ---- premises and service points ---------------------------------------
+    - id: ft-service-point-at-premise
+      name: ServicePoint is located at Premise
+      roles:
+        - { id: r-sp-at-premise-sp, player: ot-service-point, role_name: is located at }
+        - { id: r-sp-at-premise-premise, player: ot-premise, role_name: has }
+      readings: ["{0} is located at {1}", "{1} has {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-sp-at-premise-sp] }
+        - { type: mandatory, role: r-sp-at-premise-sp }
+    - id: ft-premise-has-address
+      name: Premise has StreetAddress
+      roles:
+        - { id: r-premise-has-addr-premise, player: ot-premise, role_name: has }
+        - { id: r-premise-has-addr-addr, player: ot-street-address, role_name: is address of }
+      readings: ["{0} has {1}", "{1} is address of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-premise-has-addr-premise] }
+        - { type: mandatory, role: r-premise-has-addr-premise }
+    - id: ft-service-point-served-by
+      name: ServicePoint is served by Transformer
+      roles:
+        - { id: r-sp-served-by-sp, player: ot-service-point, role_name: is served by }
+        - { id: r-sp-served-by-xfmr, player: ot-transformer, role_name: serves }
+      readings: ["{0} is served by {1}", "{1} serves {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-sp-served-by-sp] }
+    - id: ft-service-point-has-status
+      name: ServicePoint has ServiceStatus
+      roles:
+        - { id: r-sp-has-status-sp, player: ot-service-point, role_name: has }
+        - { id: r-sp-has-status-status, player: ot-service-status, role_name: is status of }
+      readings: ["{0} has {1}", "{1} is status of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-sp-has-status-sp] }
+        - { type: mandatory, role: r-sp-has-status-sp }
+    # ---- network ---------------------------------------------------------
+    - id: ft-transformer-on-feeder
+      name: Transformer is on Feeder
+      roles:
+        - { id: r-xfmr-on-feeder-xfmr, player: ot-transformer, role_name: is on }
+        - { id: r-xfmr-on-feeder-feeder, player: ot-feeder, role_name: supplies }
+      readings: ["{0} is on {1}", "{1} supplies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-xfmr-on-feeder-xfmr] }
+        - { type: mandatory, role: r-xfmr-on-feeder-xfmr }
+    - id: ft-transformer-has-rating
+      name: Transformer has RatedKva
+      roles:
+        - { id: r-xfmr-has-kva-xfmr, player: ot-transformer, role_name: has }
+        - { id: r-xfmr-has-kva-kva, player: ot-rated-kva, role_name: is rating of }
+      readings: ["{0} has {1}", "{1} is rating of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-xfmr-has-kva-xfmr] }
+    - id: ft-feeder-originates-at
+      name: Feeder originates at Substation
+      roles:
+        - { id: r-feeder-orig-feeder, player: ot-feeder, role_name: originates at }
+        - { id: r-feeder-orig-sub, player: ot-substation, role_name: is source of }
+      readings: ["{0} originates at {1}", "{1} is source of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-feeder-orig-feeder] }
+        - { type: mandatory, role: r-feeder-orig-feeder }
+    - id: ft-feeder-feeds-feeder
+      name: Feeder feeds Feeder
+      definition: A feeder feeds another when a closed tie switch lets it carry the other's load during switching; the chain of feeds must never loop back to its origin.
+      roles:
+        - { id: r-feeder-feeds-source, player: ot-feeder, role_name: feeds }
+        - { id: r-feeder-feeds-target, player: ot-feeder, role_name: is fed by }
+      readings: ["{0} feeds {1}", "{1} is fed by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-feeder-feeds-source, r-feeder-feeds-target] }
+        - { type: ring, role_1: r-feeder-feeds-source, role_2: r-feeder-feeds-target, ring_type: acyclic }
+    - id: ft-feeder-has-voltage
+      name: Feeder has NominalVoltage
+      roles:
+        - { id: r-feeder-has-volt-feeder, player: ot-feeder, role_name: has }
+        - { id: r-feeder-has-volt-volt, player: ot-nominal-voltage, role_name: is voltage of }
+      readings: ["{0} has {1}", "{1} is voltage of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-feeder-has-volt-feeder] }
+    # ---- customer and billing --------------------------------------------
+    - id: ft-customer-has-name
+      name: Customer has CustomerName
+      roles:
+        - { id: r-cust-has-name-cust, player: ot-customer, role_name: has }
+        - { id: r-cust-has-name-name, player: ot-customer-name, role_name: is name of }
+      readings: ["{0} has {1}", "{1} is name of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-cust-has-name-cust] }
+        - { type: mandatory, role: r-cust-has-name-cust }
+    - id: ft-customer-holds-account
+      name: Customer holds Account
+      definition: Every account is held by exactly one customer; a customer with several premises holds several accounts.
+      roles:
+        - { id: r-cust-holds-acct-cust, player: ot-customer, role_name: holds }
+        - { id: r-cust-holds-acct-acct, player: ot-account, role_name: is held by }
+      readings: ["{0} holds {1}", "{1} is held by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-cust-holds-acct-acct] }
+        - { type: mandatory, role: r-cust-holds-acct-acct }
+    - id: ft-account-has-status
+      name: Account has AccountStatus
+      roles:
+        - { id: r-acct-has-status-acct, player: ot-account, role_name: has }
+        - { id: r-acct-has-status-status, player: ot-account-status, role_name: is status of }
+      readings: ["{0} has {1}", "{1} is status of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-acct-has-status-acct] }
+        - { type: mandatory, role: r-acct-has-status-acct }
+    - id: ft-customer-takes-service
+      name: Customer takes service at ServicePoint
+      definition: The objectified relationship that a service agreement stands for; one customer takes service at one service point at most once at a time.
+      roles:
+        - { id: r-cust-takes-cust, player: ot-customer, role_name: takes service at }
+        - { id: r-cust-takes-sp, player: ot-service-point, role_name: is served for }
+      readings: ["{0} takes service at {1}", "{1} is served for {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-cust-takes-cust, r-cust-takes-sp] }
+    - id: ft-agreement-billed-under-tariff
+      name: ServiceAgreement is billed under Tariff
+      roles:
+        - { id: r-agr-tariff-agr, player: ot-service-agreement, role_name: is billed under }
+        - { id: r-agr-tariff-tariff, player: ot-tariff, role_name: applies to }
+      readings: ["{0} is billed under {1}", "{1} applies to {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-agr-tariff-agr] }
+        - { type: mandatory, role: r-agr-tariff-agr }
+    - id: ft-agreement-billed-to-account
+      name: ServiceAgreement is billed to Account
+      roles:
+        - { id: r-agr-acct-agr, player: ot-service-agreement, role_name: is billed to }
+        - { id: r-agr-acct-acct, player: ot-account, role_name: carries }
+      readings: ["{0} is billed to {1}", "{1} carries {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-agr-acct-agr] }
+        - { type: mandatory, role: r-agr-acct-agr }
+    - id: ft-agreement-started-on
+      name: ServiceAgreement started on AgreementStartDate
+      roles:
+        - { id: r-agr-start-agr, player: ot-service-agreement, role_name: started on }
+        - { id: r-agr-start-date, player: ot-agreement-start-date, role_name: is start of }
+      readings: ["{0} started on {1}", "{1} is start of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-agr-start-agr] }
+        - { type: mandatory, role: r-agr-start-agr }
+    - id: ft-agreement-read-in-cycle
+      name: ServiceAgreement is read in BillingCycle
+      roles:
+        - { id: r-agr-cycle-agr, player: ot-service-agreement, role_name: is read in }
+        - { id: r-agr-cycle-cycle, player: ot-billing-cycle, role_name: includes }
+      readings: ["{0} is read in {1}", "{1} includes {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-agr-cycle-agr] }
+    - id: ft-tariff-has-description
+      name: Tariff has TariffDescription
+      roles:
+        - { id: r-tariff-has-desc-tariff, player: ot-tariff, role_name: has }
+        - { id: r-tariff-has-desc-desc, player: ot-tariff-description, role_name: describes }
+      readings: ["{0} has {1}", "{1} describes {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-tariff-has-desc-tariff] }
+    # ---- operations --------------------------------------------------------
+    - id: ft-outage-affects-feeder
+      name: Outage affects Feeder
+      roles:
+        - { id: r-outage-feeder-outage, player: ot-outage, role_name: affects }
+        - { id: r-outage-feeder-feeder, player: ot-feeder, role_name: is affected by }
+      readings: ["{0} affects {1}", "{1} is affected by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-outage-feeder-outage] }
+        - { type: mandatory, role: r-outage-feeder-outage }
+    - id: ft-outage-started-at
+      name: Outage started at OutageStartTime
+      roles:
+        - { id: r-outage-start-outage, player: ot-outage, role_name: started at }
+        - { id: r-outage-start-time, player: ot-outage-start-time, role_name: is start of }
+      readings: ["{0} started at {1}", "{1} is start of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-outage-start-outage] }
+        - { type: mandatory, role: r-outage-start-outage }
+    - id: ft-outage-ended-at
+      name: Outage ended at OutageEndTime
+      roles:
+        - { id: r-outage-end-outage, player: ot-outage, role_name: ended at }
+        - { id: r-outage-end-time, player: ot-outage-end-time, role_name: is end of }
+      readings: ["{0} ended at {1}", "{1} is end of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-outage-end-outage] }
+    - id: ft-outage-has-cause
+      name: Outage has OutageCause
+      roles:
+        - { id: r-outage-cause-outage, player: ot-outage, role_name: has }
+        - { id: r-outage-cause-cause, player: ot-outage-cause, role_name: is cause of }
+      readings: ["{0} has {1}", "{1} is cause of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-outage-cause-outage] }
+    - id: ft-outage-affected-count
+      name: Outage affected AffectedCustomerCount
+      roles:
+        - { id: r-outage-count-outage, player: ot-outage, role_name: affected }
+        - { id: r-outage-count-count, player: ot-affected-customer-count, role_name: is peak count of }
+      readings: ["{0} affected {1}", "{1} is peak count of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-outage-count-outage] }
+    - id: ft-crew-dispatched-to-outage
+      name: Crew is dispatched to Outage
+      definition: Several crews may work one outage and one crew may move between outages in a storm; the pairing is what dispatch records.
+      roles:
+        - { id: r-crew-dispatch-crew, player: ot-crew, role_name: is dispatched to }
+        - { id: r-crew-dispatch-outage, player: ot-outage, role_name: is worked by }
+      readings: ["{0} is dispatched to {1}", "{1} is worked by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-crew-dispatch-crew, r-crew-dispatch-outage] }
+    - id: ft-crew-has-name
+      name: Crew has CrewName
+      roles:
+        - { id: r-crew-has-name-crew, player: ot-crew, role_name: has }
+        - { id: r-crew-has-name-name, player: ot-crew-name, role_name: is name of }
+      readings: ["{0} has {1}", "{1} is name of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-crew-has-name-crew] }
+        - { type: mandatory, role: r-crew-has-name-crew }
+    - id: ft-crew-has-type
+      name: Crew has CrewType
+      roles:
+        - { id: r-crew-has-type-crew, player: ot-crew, role_name: has }
+        - { id: r-crew-has-type-type, player: ot-crew-type, role_name: is type of }
+      readings: ["{0} has {1}", "{1} is type of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-crew-has-type-crew] }
+        - { type: mandatory, role: r-crew-has-type-crew }
+  subtype_facts:
+    - id: sf-smart-meter-is-meter
+      subtype: ot-smart-meter
+      supertype: ot-meter
+      provides_identification: true
+    - id: sf-interval-meter-is-smart-meter
+      subtype: ot-interval-meter
+      supertype: ot-smart-meter
+      provides_identification: true
+  objectified_fact_types:
+    - id: oft-service-agreement
+      fact_type: ft-customer-takes-service
+      object_type: ot-service-agreement
+    - id: oft-interval-reading
+      fact_type: ft-meter-records-reading
+      object_type: ot-interval-reading
+  definitions:
+    - term: read
+      definition: In metering, the value the meter reported for an interval or register; in billing, the quantity a bill was rendered from, which may be estimated.
+      context: metering
+    - term: estimated read
+      definition: A billing quantity computed from history when no actual read was available for the cycle.
+      context: customer

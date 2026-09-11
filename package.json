@@ -50,6 +50,11 @@
     "arch:triage": "npm --prefix barwise run arch:triage --",
     "regen:tutorial": "npm --prefix barwise run regen:tutorial --",
     "regen:builtins": "npm --prefix barwise run regen:builtins --",
-    "regen:references": "npm --prefix barwise run regen:references --"
+    "regen:references": "npm --prefix barwise run regen:references --",
+    "trial:generate": "npm --prefix barwise run trial:generate --",
+    "trial:offline": "npm --prefix barwise run trial:offline --",
+    "trial:keyed": "npm --prefix barwise run trial:keyed --",
+    "trial:gate": "npm --prefix barwise run trial:gate --",
+    "test:trial": "npm --prefix barwise run test:trial --"
   }
 }

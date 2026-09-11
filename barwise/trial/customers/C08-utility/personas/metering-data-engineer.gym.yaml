@@ -1,0 +1,76 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: "c08-metering-data-engineer"
+title: "Interval reads land as facts, not rows"
+transition:
+  from: "apprentice"
+  to: "journeyman"
+exitPerformance: >-
+  Model the meter hierarchy (Meter, SmartMeter, IntervalMeter), the
+  serial-plus-manufacturer composite key, and interval readings as a
+  ternary fact identified by meter and interval end.
+brief: |
+  You are the metering data engineer at a distribution utility. The meter
+  data management system delivers one value per meter per interval, and
+  the head-end sometimes delivers the same interval twice. Meters are
+  identified by a utility meter id; the manufacturer's serial number is
+  only unique within one manufacturer. Some meters are smart meters and
+  some of those record intervals. Model this so a duplicate delivery is
+  rejected and a serial number can be traced to one meter.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 6 (subtyping), ch. 4 (external uniqueness),
+  ch. 3 (n-ary fact types).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: "requires_element"
+    element:
+      entity: "IntervalMeter"
+    diagnosis: >-
+      If IntervalMeter is missing, the interval length ends up as a nullable
+      column on every meter and the loader cannot tell a register meter from
+      one it should expect 96 values a day from.
+  - kind: "requires_element"
+    element:
+      entity: "Manufacturer"
+    diagnosis: >-
+      Without Manufacturer as an object type, the serial number has nothing
+      to be unique within, and the composite key that resolves a field
+      report to one meter cannot be stated.
+  - kind: "requires_element"
+    element:
+      factTypeBetween: ["Meter", "IntervalTimestamp"]
+    diagnosis: >-
+      The reading fact is Meter records ReadingValue at IntervalTimestamp;
+      if the model has no fact type joining Meter to the interval timestamp,
+      reads have been pushed into a detached table with no conceptual key.
+  - kind: "must_validate"
+    diagnosis: >-
+      An invalid model usually means a meter type without an identification
+      scheme, and the MDM cannot load into a type it cannot key.
+  - kind: "forbids_population"
+    factType: "Meter records ReadingValue at IntervalTimestamp"
+    constraint: "internal_uniqueness"
+    hint: "Uniqueness spans the Meter and IntervalTimestamp roles, not all three."
+    diagnosis: >-
+      If two values for the same meter and interval are allowed, the head-end's
+      duplicate deliveries are stored as two readings and the daily total is
+      double-counted; the spanning uniqueness is the deduplication rule.
+  - kind: "forbids_population"
+    factType: "Meter has SerialNumber"
+    constraint: "internal_uniqueness"
+    hint: "Each meter carries one serial number; the number is not unique on its own."
+    diagnosis: >-
+      A meter with two serial numbers means a swap was recorded as an edit,
+      which loses the removed meter's history.
+  - kind: "forbids_population"
+    factType: "Meter is made by Manufacturer"
+    constraint: "mandatory"
+    hint: "Every meter is made by some manufacturer; the serial number is unique only within one."
+    diagnosis: >-
+      A meter with no manufacturer has a serial number that is unique within
+      nothing, so a field report quoting the serial cannot be resolved to
+      one asset.
+  - kind: "requires_verbalization"
+    sentence: "Each Meter has at most one MeterMultiplier."
+    diagnosis: >-
+      A meter with two multipliers bills the same interval twice at different
+      scales; the multiplier is a property of the installed meter, one per meter.

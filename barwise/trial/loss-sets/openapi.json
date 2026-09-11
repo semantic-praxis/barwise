@@ -1,0 +1,8 @@
+{
+  "$comment": "What a round trip through the OpenAPI exporter and importer may drop, from docs/IMPORT_EXPORT.md: composition (oneOf/anyOf/allOf) is not supported so subtypes do not come back, populations and reference schemes have no JSON Schema seat. A delta outside this list is a finding.",
+  "allowed": [
+    { "elementType": "population", "kind": "*" },
+    { "elementType": "subtype_fact", "kind": "removed" },
+    { "elementType": "objectified_fact_type", "kind": "removed" }
+  ]
+}

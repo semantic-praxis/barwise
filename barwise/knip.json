@@ -1,22 +1,48 @@
 {
   "$schema": "https://unpkg.com/knip@latest/schema.json",
   "ignoreExportsUsedInFile": true,
-  "ignore": ["test-plan/**"],
-  "ignoreBinaries": ["depcruise", "jscpd", "shellcheck", "uv"],
-  "ignoreDependencies": ["@dprint/json", "@dprint/markdown", "@dprint/typescript", "dependency-cruiser", "jscpd"],
+  "ignore": [
+    "test-plan/**",
+    "trial/**"
+  ],
+  "ignoreBinaries": [
+    "depcruise",
+    "jscpd",
+    "shellcheck",
+    "uv"
+  ],
+  "ignoreDependencies": [
+    "@dprint/json",
+    "@dprint/markdown",
+    "@dprint/typescript",
+    "dependency-cruiser",
+    "jscpd"
+  ],
   "workspaces": {
-    ".": { "entry": ["scripts/at-root.mjs"] },
+    ".": {
+      "entry": [
+        "scripts/at-root.mjs"
+      ]
+    },
     "packages/core": {
-      "ignore": ["scripts/**", "vitest.mutation.config.ts"]
+      "ignore": [
+        "scripts/**",
+        "vitest.mutation.config.ts"
+      ]
     },
     "packages/diagram": {},
     "packages/llm": {},
     "packages/promptlab": {},
     "packages/cli": {
-      "entry": ["src/bundle-entry.ts"]
+      "entry": [
+        "src/bundle-entry.ts"
+      ]
     },
     "packages/mcp": {
-      "entry": ["src/index.ts", "src/bundle-entry.ts"]
+      "entry": [
+        "src/index.ts",
+        "src/bundle-entry.ts"
+      ]
     },
     "packages/vscode": {
       "entry": [

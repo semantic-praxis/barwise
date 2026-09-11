@@ -1,0 +1,1629 @@
+orm_version: "1.1"
+model:
+  name: Discrete Manufacturing Master Data and Production
+  object_types:
+    - id: ot-material
+      name: Material
+      kind: entity
+      reference_mode: material_number
+      definition: An item that is procured, produced, stocked or sold, identified by the material number assigned when it is created.
+    - id: ot-material-number
+      name: MaterialNumber
+      kind: value
+      definition: The number that identifies a material across every plant and storage location.
+      data_type:
+        name: text
+        length: 18
+    - id: ot-raw-material
+      name: RawMaterial
+      kind: entity
+      reference_mode: material_number
+      definition: A material that is purchased from a supplier and consumed in production, never sold on its own.
+    - id: ot-assembly
+      name: Assembly
+      kind: entity
+      reference_mode: material_number
+      definition: A material that is produced in-house from components and consumed by a higher-level material.
+    - id: ot-finished-good
+      name: FinishedGood
+      kind: entity
+      reference_mode: material_number
+      definition: A material that is produced in-house and sold to customers without further processing.
+    - id: ot-configurable-product
+      name: ConfigurableProduct
+      kind: entity
+      reference_mode: material_number
+      definition: A finished good whose variant is fixed at order time by assigning values to its configuration characteristics.
+    - id: ot-material-description
+      name: MaterialDescription
+      kind: value
+      definition: The short text that describes a material to a person.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-material-type-code
+      name: MaterialTypeCode
+      kind: value
+      definition: The code that classes a material by its role in the business and controls which master-data views it carries.
+      value_constraint:
+        values:
+          - ROH
+          - HALB
+          - FERT
+          - HAWA
+          - VERP
+          - DIEN
+          - KMAT
+          - NLAG
+          - UNBW
+          - ERSA
+          - PIPE
+          - LEER
+      data_type:
+        name: text
+        length: 4
+    - id: ot-unit-of-measure
+      name: UnitOfMeasure
+      kind: entity
+      reference_mode: uom_code
+      definition: A unit in which a material quantity is expressed, identified by its unit code.
+    - id: ot-uom-code
+      name: UomCode
+      kind: value
+      definition: The internal three-character code of a unit of measure.
+      value_constraint:
+        values:
+          - EA
+          - PC
+          - ST
+          - KG
+          - G
+          - MG
+          - TO
+          - LB
+          - OZ
+          - M
+          - CM
+          - MM
+          - KM
+          - IN
+          - FT
+          - YD
+          - M2
+          - CM2
+          - MM2
+          - FT2
+          - M3
+          - CM3
+          - MM3
+          - L
+          - ML
+          - HL
+          - GAL
+          - FT3
+          - PAL
+          - CAR
+          - BOX
+          - DR
+          - ROL
+          - BAG
+          - SET
+          - PAA
+          - H
+          - MIN
+          - S
+          - D
+      data_type:
+        name: text
+        length: 3
+    - id: ot-quantity
+      name: Quantity
+      kind: value
+      definition: A count or measure of a material in its base unit of measure.
+      data_type:
+        name: decimal
+        length: 13
+        scale: 3
+    - id: ot-characteristic
+      name: Characteristic
+      kind: entity
+      reference_mode: characteristic_name
+      definition: A configurable attribute of a product, such as color or voltage, whose value is chosen when a configurable product is ordered.
+    - id: ot-characteristic-name
+      name: CharacteristicName
+      kind: value
+      definition: The name under which a characteristic is maintained in classification.
+      data_type:
+        name: text
+        length: 30
+    - id: ot-plant
+      name: Plant
+      kind: entity
+      reference_mode: plant_code
+      definition: An operating site where materials are produced or stocked, identified by a four-character plant code.
+    - id: ot-plant-code
+      name: PlantCode
+      kind: value
+      definition: The four-character code of a plant.
+      data_type:
+        name: text
+        length: 4
+    - id: ot-storage-location
+      name: StorageLocation
+      kind: entity
+      reference_mode: storage_location_code
+      definition: A place within a plant where stock is physically kept and counted.
+    - id: ot-storage-location-code
+      name: StorageLocationCode
+      kind: value
+      definition: The four-character code of a storage location.
+      data_type:
+        name: text
+        length: 4
+    - id: ot-material-plant-data
+      name: MaterialPlantData
+      kind: entity
+      reference_mode: material_plant_data_id
+      definition: The plant-specific view of a material, carrying the procurement and planning settings that apply at one plant.
+    - id: ot-material-plant-data-id
+      name: MaterialPlantDataId
+      kind: value
+      definition: The surrogate that identifies one material's data at one plant.
+      data_type:
+        name: auto_counter
+    - id: ot-procurement-type
+      name: ProcurementType
+      kind: value
+      definition: Whether a material at a plant is made in-house, bought externally, or either.
+      value_constraint:
+        values:
+          - in-house
+          - external
+          - both
+      data_type:
+        name: text
+        length: 12
+    - id: ot-lot-size
+      name: LotSize
+      kind: value
+      definition: The quantity a planning run proposes for one order of a material at a plant.
+      data_type:
+        name: decimal
+        length: 13
+        scale: 3
+    - id: ot-safety-stock
+      name: SafetyStock
+      kind: value
+      definition: The quantity of a material a plant keeps on hand to cover demand variation.
+      data_type:
+        name: decimal
+        length: 13
+        scale: 3
+    - id: ot-bill-of-material
+      name: BillOfMaterial
+      kind: entity
+      reference_mode: bom_number
+      definition: A structured list of the components and quantities needed to produce one material at one plant.
+    - id: ot-bom-number
+      name: BomNumber
+      kind: value
+      definition: The number that identifies a bill of material.
+      data_type:
+        name: text
+        length: 8
+    - id: ot-bom-usage
+      name: BomUsage
+      kind: value
+      definition: The business purpose a bill of material serves, which decides which departments read it.
+      value_constraint:
+        values:
+          - production
+          - engineering
+          - universal
+          - plant maintenance
+          - sales
+          - costing
+      data_type:
+        name: text
+        length: 20
+    - id: ot-routing
+      name: Routing
+      kind: entity
+      reference_mode: routing_number
+      definition: The ordered sequence of operations that produces a material, identified by its group number.
+    - id: ot-routing-number
+      name: RoutingNumber
+      kind: value
+      definition: The number that identifies a routing group.
+      data_type:
+        name: text
+        length: 8
+    - id: ot-operation
+      name: Operation
+      kind: entity
+      reference_mode: operation_number
+      definition: A single step in a routing, performed at one work center.
+    - id: ot-operation-number
+      name: OperationNumber
+      kind: value
+      definition: The number that identifies an operation.
+      data_type:
+        name: text
+        length: 4
+    - id: ot-work-center
+      name: WorkCenter
+      kind: entity
+      reference_mode: work_center_code
+      definition: A machine, line or crew at a plant where operations are carried out.
+    - id: ot-work-center-code
+      name: WorkCenterCode
+      kind: value
+      definition: The code that identifies a work center.
+      data_type:
+        name: text
+        length: 8
+    - id: ot-setup-time
+      name: SetupTime
+      kind: value
+      definition: The minutes needed to prepare a work center before an operation can run.
+      data_type:
+        name: decimal
+        length: 9
+        scale: 2
+    - id: ot-run-time
+      name: RunTime
+      kind: value
+      definition: The minutes an operation takes to process one base unit of material.
+      data_type:
+        name: decimal
+        length: 9
+        scale: 2
+    - id: ot-batch
+      name: Batch
+      kind: entity
+      reference_mode: batch_number
+      definition: A quantity of a material produced or received together and tracked as one unit for quality and traceability.
+    - id: ot-batch-number
+      name: BatchNumber
+      kind: value
+      definition: The number that identifies a batch.
+      data_type:
+        name: text
+        length: 10
+    - id: ot-stock-quantity
+      name: StockQuantity
+      kind: value
+      definition: The quantity of a batch on hand at one storage location.
+      data_type:
+        name: decimal
+        length: 13
+        scale: 3
+    - id: ot-expiry-date
+      name: ExpiryDate
+      kind: value
+      definition: The date after which a batch may no longer be used or sold.
+      data_type:
+        name: date
+    - id: ot-inspection-lot
+      name: InspectionLot
+      kind: entity
+      reference_mode: inspection_lot_number
+      definition: A request to inspect a specific quantity of a batch, which ends in a usage decision.
+    - id: ot-inspection-lot-number
+      name: InspectionLotNumber
+      kind: value
+      definition: The number that identifies an inspection lot.
+      data_type:
+        name: text
+        length: 12
+    - id: ot-usage-decision
+      name: UsageDecision
+      kind: value
+      definition: The quality outcome recorded on an inspection lot that decides what may be done with the inspected stock.
+      value_constraint:
+        values:
+          - accepted
+          - accepted with reservation
+          - rejected
+          - rework
+          - scrapped
+      data_type:
+        name: text
+        length: 30
+    - id: ot-work-order
+      name: WorkOrder
+      kind: entity
+      reference_mode: work_order_number
+      definition: An order to produce a quantity of a material at a plant, yielding one batch, identified by its order number.
+    - id: ot-work-order-number
+      name: WorkOrderNumber
+      kind: value
+      definition: The number that identifies a work order.
+      data_type:
+        name: text
+        length: 12
+    - id: ot-order-quantity
+      name: OrderQuantity
+      kind: value
+      definition: The quantity an order calls for, in the material's base unit of measure.
+      data_type:
+        name: decimal
+        length: 13
+        scale: 3
+    - id: ot-work-order-status
+      name: WorkOrderStatus
+      kind: value
+      definition: The system status that says how far a work order has progressed.
+      value_constraint:
+        values:
+          - created
+          - released
+          - partially confirmed
+          - confirmed
+          - delivered
+          - technically completed
+          - closed
+      data_type:
+        name: text
+        length: 24
+    - id: ot-basic-start-date
+      name: BasicStartDate
+      kind: value
+      definition: The date on which a work order is scheduled to start.
+      data_type:
+        name: date
+    - id: ot-basic-finish-date
+      name: BasicFinishDate
+      kind: value
+      definition: The date by which a work order is scheduled to finish.
+      data_type:
+        name: date
+    - id: ot-supplier
+      name: Supplier
+      kind: entity
+      reference_mode: supplier_number
+      definition: An external party from which materials are purchased, identified by its supplier number.
+    - id: ot-supplier-number
+      name: SupplierNumber
+      kind: value
+      definition: The number that identifies a supplier.
+      data_type:
+        name: text
+        length: 10
+    - id: ot-supplier-name
+      name: SupplierName
+      kind: value
+      definition: The legal name under which a supplier trades.
+      data_type:
+        name: text
+        length: 80
+    - id: ot-purchase-order
+      name: PurchaseOrder
+      kind: entity
+      reference_mode: purchase_order_number
+      definition: A commitment to a supplier to buy the materials on its items in the stated quantities.
+    - id: ot-purchase-order-number
+      name: PurchaseOrderNumber
+      kind: value
+      definition: The number that identifies a purchase order.
+      data_type:
+        name: text
+        length: 10
+    - id: ot-purchase-order-item
+      name: PurchaseOrderItem
+      kind: entity
+      reference_mode: purchase_order_item_id
+      definition: One line of a purchase order, ordering a quantity of a material for delivery to a plant.
+    - id: ot-purchase-order-item-id
+      name: PurchaseOrderItemId
+      kind: value
+      definition: The surrogate that identifies a purchase order item.
+      data_type:
+        name: auto_counter
+    - id: ot-item-number
+      name: ItemNumber
+      kind: value
+      definition: The position of an item within its purchase order, counted in tens.
+      data_type:
+        name: integer
+    - id: ot-delivery-date
+      name: DeliveryDate
+      kind: value
+      definition: The date on which a purchase order item is due to arrive.
+      data_type:
+        name: date
+    - id: ot-net-price
+      name: NetPrice
+      kind: value
+      definition: The agreed price of one unit of a purchase order item, net of tax.
+      data_type:
+        name: money
+  fact_types:
+    - id: ft-material-has-material-number
+      name: Material has MaterialNumber
+      roles:
+        - id: r-material-has-material-number-material
+          player: ot-material
+          role_name: has
+        - id: r-material-has-material-number-material-number
+          player: ot-material-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-material-has-material-number-material
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-material-has-material-number-material-number
+        - type: mandatory
+          role: r-material-has-material-number-material
+    - id: ft-unit-of-measure-has-uom-code
+      name: UnitOfMeasure has UomCode
+      roles:
+        - id: r-unit-of-measure-has-uom-code-unit-of-measure
+          player: ot-unit-of-measure
+          role_name: has
+        - id: r-unit-of-measure-has-uom-code-uom-code
+          player: ot-uom-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-unit-of-measure-has-uom-code-unit-of-measure
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-unit-of-measure-has-uom-code-uom-code
+        - type: mandatory
+          role: r-unit-of-measure-has-uom-code-unit-of-measure
+    - id: ft-characteristic-has-characteristic-name
+      name: Characteristic has CharacteristicName
+      roles:
+        - id: r-characteristic-has-characteristic-name-characteristic
+          player: ot-characteristic
+          role_name: has
+        - id: r-characteristic-has-characteristic-name-characteristic-name
+          player: ot-characteristic-name
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-characteristic-has-characteristic-name-characteristic
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-characteristic-has-characteristic-name-characteristic-name
+        - type: mandatory
+          role: r-characteristic-has-characteristic-name-characteristic
+    - id: ft-material-has-material-description
+      name: Material has MaterialDescription
+      roles:
+        - id: r-material-has-material-description-material
+          player: ot-material
+          role_name: has
+        - id: r-material-has-material-description-material-description
+          player: ot-material-description
+          role_name: describes
+      readings:
+        - "{0} has {1}"
+        - "{1} describes {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-material-has-material-description-material
+        - type: mandatory
+          role: r-material-has-material-description-material
+    - id: ft-material-has-material-type-code
+      name: Material has MaterialTypeCode
+      roles:
+        - id: r-material-has-material-type-code-material
+          player: ot-material
+          role_name: has
+        - id: r-material-has-material-type-code-material-type-code
+          player: ot-material-type-code
+          role_name: classes
+      readings:
+        - "{0} has {1}"
+        - "{1} classes {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-material-has-material-type-code-material
+        - type: mandatory
+          role: r-material-has-material-type-code-material
+    - id: ft-material-has-base-unit-of-measure
+      name: Material has base UnitOfMeasure
+      roles:
+        - id: r-material-has-base-unit-of-measure-material
+          player: ot-material
+          role_name: has base
+        - id: r-material-has-base-unit-of-measure-unit-of-measure
+          player: ot-unit-of-measure
+          role_name: is base unit of
+      readings:
+        - "{0} has base {1}"
+        - "{1} is base unit of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-material-has-base-unit-of-measure-material
+        - type: mandatory
+          role: r-material-has-base-unit-of-measure-material
+    - id: ft-material-is-component-of-material
+      name: Material is component of Material
+      definition: The parent-component relationship the bill of material structure is built from; a material never contains itself at any depth.
+      roles:
+        - id: r-material-is-component-of-material-material
+          player: ot-material
+          role_name: is component of
+        - id: r-material-is-component-of-material-material-2
+          player: ot-material
+          role_name: has component
+      readings:
+        - "{0} is component of {1}"
+        - "{1} has component {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-material-is-component-of-material-material
+            - r-material-is-component-of-material-material-2
+        - type: ring
+          role_1: r-material-is-component-of-material-material
+          role_2: r-material-is-component-of-material-material-2
+          ring_type: acyclic
+    - id: ft-material-uses-material-in-quantity
+      name: Material uses Material in Quantity
+      definition: How much of a component one unit of the parent material consumes.
+      roles:
+        - id: r-material-uses-material-in-quantity-material
+          player: ot-material
+          role_name: uses
+        - id: r-material-uses-material-in-quantity-material-2
+          player: ot-material
+          role_name: is used by
+        - id: r-material-uses-material-in-quantity-quantity
+          player: ot-quantity
+          role_name: is amount of
+      readings:
+        - "{0} uses {1} in {2}"
+        - "{1} is used by {0} in {2}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-material-uses-material-in-quantity-material
+            - r-material-uses-material-in-quantity-material-2
+    - id: ft-configurable-product-has-characteristic
+      name: ConfigurableProduct has Characteristic
+      roles:
+        - id: r-configurable-product-has-characteristic-configurable-product
+          player: ot-configurable-product
+          role_name: has
+        - id: r-configurable-product-has-characteristic-characteristic
+          player: ot-characteristic
+          role_name: configures
+      readings:
+        - "{0} has {1}"
+        - "{1} configures {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-configurable-product-has-characteristic-configurable-product
+            - r-configurable-product-has-characteristic-characteristic
+        - type: mandatory
+          role: r-configurable-product-has-characteristic-configurable-product
+    - id: ft-plant-has-plant-code
+      name: Plant has PlantCode
+      roles:
+        - id: r-plant-has-plant-code-plant
+          player: ot-plant
+          role_name: has
+        - id: r-plant-has-plant-code-plant-code
+          player: ot-plant-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-plant-has-plant-code-plant
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-plant-has-plant-code-plant-code
+        - type: mandatory
+          role: r-plant-has-plant-code-plant
+    - id: ft-storage-location-has-storage-location-code
+      name: StorageLocation has StorageLocationCode
+      roles:
+        - id: r-storage-location-has-storage-location-code-storage-location
+          player: ot-storage-location
+          role_name: has
+        - id: r-storage-location-has-storage-location-code-storage-location-code
+          player: ot-storage-location-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-storage-location-has-storage-location-code-storage-location
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-storage-location-has-storage-location-code-storage-location-code
+        - type: mandatory
+          role: r-storage-location-has-storage-location-code-storage-location
+    - id: ft-material-plant-data-has-material-plant-data-id
+      name: MaterialPlantData has MaterialPlantDataId
+      roles:
+        - id: r-material-plant-data-has-material-plant-data-id-material-plant-data
+          player: ot-material-plant-data
+          role_name: has
+        - id: r-material-plant-data-has-material-plant-data-id-material-plant-data-id
+          player: ot-material-plant-data-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-material-plant-data-has-material-plant-data-id-material-plant-data
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-material-plant-data-has-material-plant-data-id-material-plant-data-id
+        - type: mandatory
+          role: r-material-plant-data-has-material-plant-data-id-material-plant-data
+    - id: ft-storage-location-is-in-plant
+      name: StorageLocation is in Plant
+      roles:
+        - id: r-storage-location-is-in-plant-storage-location
+          player: ot-storage-location
+          role_name: is in
+        - id: r-storage-location-is-in-plant-plant
+          player: ot-plant
+          role_name: contains
+      readings:
+        - "{0} is in {1}"
+        - "{1} contains {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-storage-location-is-in-plant-storage-location
+        - type: mandatory
+          role: r-storage-location-is-in-plant-storage-location
+    - id: ft-material-plant-data-is-for-material
+      name: MaterialPlantData is for Material
+      roles:
+        - id: r-material-plant-data-is-for-material-material-plant-data
+          player: ot-material-plant-data
+          role_name: is for
+        - id: r-material-plant-data-is-for-material-material
+          player: ot-material
+          role_name: has plant data
+      readings:
+        - "{0} is for {1}"
+        - "{1} has plant data {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-material-plant-data-is-for-material-material-plant-data
+        - type: mandatory
+          role: r-material-plant-data-is-for-material-material-plant-data
+        - type: external_uniqueness
+          id: euc-material-plant
+          roles:
+            - r-material-plant-data-is-for-material-material
+            - r-material-plant-data-is-at-plant-plant
+    - id: ft-material-plant-data-is-at-plant
+      name: MaterialPlantData is at Plant
+      roles:
+        - id: r-material-plant-data-is-at-plant-material-plant-data
+          player: ot-material-plant-data
+          role_name: is at
+        - id: r-material-plant-data-is-at-plant-plant
+          player: ot-plant
+          role_name: holds
+      readings:
+        - "{0} is at {1}"
+        - "{1} holds {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-material-plant-data-is-at-plant-material-plant-data
+        - type: mandatory
+          role: r-material-plant-data-is-at-plant-material-plant-data
+    - id: ft-material-plant-data-has-procurement-type
+      name: MaterialPlantData has ProcurementType
+      roles:
+        - id: r-material-plant-data-has-procurement-type-material-plant-data
+          player: ot-material-plant-data
+          role_name: has
+        - id: r-material-plant-data-has-procurement-type-procurement-type
+          player: ot-procurement-type
+          role_name: applies to
+      readings:
+        - "{0} has {1}"
+        - "{1} applies to {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-material-plant-data-has-procurement-type-material-plant-data
+        - type: mandatory
+          role: r-material-plant-data-has-procurement-type-material-plant-data
+    - id: ft-material-plant-data-has-lot-size
+      name: MaterialPlantData has LotSize
+      roles:
+        - id: r-material-plant-data-has-lot-size-material-plant-data
+          player: ot-material-plant-data
+          role_name: has
+        - id: r-material-plant-data-has-lot-size-lot-size
+          player: ot-lot-size
+          role_name: is lot size of
+      readings:
+        - "{0} has {1}"
+        - "{1} is lot size of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-material-plant-data-has-lot-size-material-plant-data
+    - id: ft-material-plant-data-has-safety-stock
+      name: MaterialPlantData has SafetyStock
+      roles:
+        - id: r-material-plant-data-has-safety-stock-material-plant-data
+          player: ot-material-plant-data
+          role_name: has
+        - id: r-material-plant-data-has-safety-stock-safety-stock
+          player: ot-safety-stock
+          role_name: is safety stock of
+      readings:
+        - "{0} has {1}"
+        - "{1} is safety stock of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-material-plant-data-has-safety-stock-material-plant-data
+    - id: ft-bill-of-material-has-bom-number
+      name: BillOfMaterial has BomNumber
+      roles:
+        - id: r-bill-of-material-has-bom-number-bill-of-material
+          player: ot-bill-of-material
+          role_name: has
+        - id: r-bill-of-material-has-bom-number-bom-number
+          player: ot-bom-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-bill-of-material-has-bom-number-bill-of-material
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-bill-of-material-has-bom-number-bom-number
+        - type: mandatory
+          role: r-bill-of-material-has-bom-number-bill-of-material
+    - id: ft-bill-of-material-is-for-material
+      name: BillOfMaterial is for Material
+      roles:
+        - id: r-bill-of-material-is-for-material-bill-of-material
+          player: ot-bill-of-material
+          role_name: is for
+        - id: r-bill-of-material-is-for-material-material
+          player: ot-material
+          role_name: is built from
+      readings:
+        - "{0} is for {1}"
+        - "{1} is built from {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-bill-of-material-is-for-material-bill-of-material
+        - type: mandatory
+          role: r-bill-of-material-is-for-material-bill-of-material
+    - id: ft-bill-of-material-applies-at-plant
+      name: BillOfMaterial applies at Plant
+      roles:
+        - id: r-bill-of-material-applies-at-plant-bill-of-material
+          player: ot-bill-of-material
+          role_name: applies at
+        - id: r-bill-of-material-applies-at-plant-plant
+          player: ot-plant
+          role_name: uses
+      readings:
+        - "{0} applies at {1}"
+        - "{1} uses {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-bill-of-material-applies-at-plant-bill-of-material
+        - type: mandatory
+          role: r-bill-of-material-applies-at-plant-bill-of-material
+    - id: ft-bill-of-material-has-bom-usage
+      name: BillOfMaterial has BomUsage
+      roles:
+        - id: r-bill-of-material-has-bom-usage-bill-of-material
+          player: ot-bill-of-material
+          role_name: has
+        - id: r-bill-of-material-has-bom-usage-bom-usage
+          player: ot-bom-usage
+          role_name: is usage of
+      readings:
+        - "{0} has {1}"
+        - "{1} is usage of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-bill-of-material-has-bom-usage-bill-of-material
+        - type: mandatory
+          role: r-bill-of-material-has-bom-usage-bill-of-material
+    - id: ft-routing-has-routing-number
+      name: Routing has RoutingNumber
+      roles:
+        - id: r-routing-has-routing-number-routing
+          player: ot-routing
+          role_name: has
+        - id: r-routing-has-routing-number-routing-number
+          player: ot-routing-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-routing-has-routing-number-routing
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-routing-has-routing-number-routing-number
+        - type: mandatory
+          role: r-routing-has-routing-number-routing
+    - id: ft-operation-has-operation-number
+      name: Operation has OperationNumber
+      roles:
+        - id: r-operation-has-operation-number-operation
+          player: ot-operation
+          role_name: has
+        - id: r-operation-has-operation-number-operation-number
+          player: ot-operation-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-operation-has-operation-number-operation
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-operation-has-operation-number-operation-number
+        - type: mandatory
+          role: r-operation-has-operation-number-operation
+    - id: ft-work-center-has-work-center-code
+      name: WorkCenter has WorkCenterCode
+      roles:
+        - id: r-work-center-has-work-center-code-work-center
+          player: ot-work-center
+          role_name: has
+        - id: r-work-center-has-work-center-code-work-center-code
+          player: ot-work-center-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-work-center-has-work-center-code-work-center
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-work-center-has-work-center-code-work-center-code
+        - type: mandatory
+          role: r-work-center-has-work-center-code-work-center
+    - id: ft-routing-is-for-material
+      name: Routing is for Material
+      roles:
+        - id: r-routing-is-for-material-routing
+          player: ot-routing
+          role_name: is for
+        - id: r-routing-is-for-material-material
+          player: ot-material
+          role_name: is produced by
+      readings:
+        - "{0} is for {1}"
+        - "{1} is produced by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-routing-is-for-material-routing
+        - type: mandatory
+          role: r-routing-is-for-material-routing
+    - id: ft-operation-belongs-to-routing
+      name: Operation belongs to Routing
+      roles:
+        - id: r-operation-belongs-to-routing-operation
+          player: ot-operation
+          role_name: belongs to
+        - id: r-operation-belongs-to-routing-routing
+          player: ot-routing
+          role_name: has
+      readings:
+        - "{0} belongs to {1}"
+        - "{1} has {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-operation-belongs-to-routing-operation
+        - type: mandatory
+          role: r-operation-belongs-to-routing-operation
+        - type: frequency
+          roles:
+            - r-operation-belongs-to-routing-routing
+          min: 1
+          max: 99
+    - id: ft-operation-is-performed-at-work-center
+      name: Operation is performed at WorkCenter
+      roles:
+        - id: r-operation-is-performed-at-work-center-operation
+          player: ot-operation
+          role_name: is performed at
+        - id: r-operation-is-performed-at-work-center-work-center
+          player: ot-work-center
+          role_name: performs
+      readings:
+        - "{0} is performed at {1}"
+        - "{1} performs {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-operation-is-performed-at-work-center-operation
+        - type: mandatory
+          role: r-operation-is-performed-at-work-center-operation
+    - id: ft-operation-has-setup-time
+      name: Operation has SetupTime
+      roles:
+        - id: r-operation-has-setup-time-operation
+          player: ot-operation
+          role_name: has
+        - id: r-operation-has-setup-time-setup-time
+          player: ot-setup-time
+          role_name: is setup time of
+      readings:
+        - "{0} has {1}"
+        - "{1} is setup time of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-operation-has-setup-time-operation
+    - id: ft-operation-has-run-time
+      name: Operation has RunTime
+      roles:
+        - id: r-operation-has-run-time-operation
+          player: ot-operation
+          role_name: has
+        - id: r-operation-has-run-time-run-time
+          player: ot-run-time
+          role_name: is run time of
+      readings:
+        - "{0} has {1}"
+        - "{1} is run time of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-operation-has-run-time-operation
+    - id: ft-work-center-is-at-plant
+      name: WorkCenter is at Plant
+      roles:
+        - id: r-work-center-is-at-plant-work-center
+          player: ot-work-center
+          role_name: is at
+        - id: r-work-center-is-at-plant-plant
+          player: ot-plant
+          role_name: has
+      readings:
+        - "{0} is at {1}"
+        - "{1} has {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-work-center-is-at-plant-work-center
+        - type: mandatory
+          role: r-work-center-is-at-plant-work-center
+    - id: ft-batch-has-batch-number
+      name: Batch has BatchNumber
+      roles:
+        - id: r-batch-has-batch-number-batch
+          player: ot-batch
+          role_name: has
+        - id: r-batch-has-batch-number-batch-number
+          player: ot-batch-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-batch-has-batch-number-batch
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-batch-has-batch-number-batch-number
+        - type: mandatory
+          role: r-batch-has-batch-number-batch
+    - id: ft-inspection-lot-has-inspection-lot-number
+      name: InspectionLot has InspectionLotNumber
+      roles:
+        - id: r-inspection-lot-has-inspection-lot-number-inspection-lot
+          player: ot-inspection-lot
+          role_name: has
+        - id: r-inspection-lot-has-inspection-lot-number-inspection-lot-number
+          player: ot-inspection-lot-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-inspection-lot-has-inspection-lot-number-inspection-lot
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-inspection-lot-has-inspection-lot-number-inspection-lot-number
+        - type: mandatory
+          role: r-inspection-lot-has-inspection-lot-number-inspection-lot
+    - id: ft-batch-is-of-material
+      name: Batch is of Material
+      roles:
+        - id: r-batch-is-of-material-batch
+          player: ot-batch
+          role_name: is of
+        - id: r-batch-is-of-material-material
+          player: ot-material
+          role_name: has
+      readings:
+        - "{0} is of {1}"
+        - "{1} has {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-batch-is-of-material-batch
+        - type: mandatory
+          role: r-batch-is-of-material-batch
+    - id: ft-batch-has-expiry-date
+      name: Batch has ExpiryDate
+      roles:
+        - id: r-batch-has-expiry-date-batch
+          player: ot-batch
+          role_name: has
+        - id: r-batch-has-expiry-date-expiry-date
+          player: ot-expiry-date
+          role_name: is expiry of
+      readings:
+        - "{0} has {1}"
+        - "{1} is expiry of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-batch-has-expiry-date-batch
+    - id: ft-batch-is-stocked-at-storage-location-in-stock-quantity
+      name: Batch is stocked at StorageLocation in StockQuantity
+      definition: The on-hand quantity of a batch at a storage location.
+      roles:
+        - id: r-batch-is-stocked-at-storage-location-in-stock-quantity-batch
+          player: ot-batch
+          role_name: is stocked at
+        - id: r-batch-is-stocked-at-storage-location-in-stock-quantity-storage-location
+          player: ot-storage-location
+          role_name: stocks
+        - id: r-batch-is-stocked-at-storage-location-in-stock-quantity-stock-quantity
+          player: ot-stock-quantity
+          role_name: is quantity of
+      readings:
+        - "{0} is stocked at {1} in {2}"
+        - "{1} stocks {0} in {2}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-batch-is-stocked-at-storage-location-in-stock-quantity-batch
+            - r-batch-is-stocked-at-storage-location-in-stock-quantity-storage-location
+    - id: ft-inspection-lot-inspects-batch
+      name: InspectionLot inspects Batch
+      roles:
+        - id: r-inspection-lot-inspects-batch-inspection-lot
+          player: ot-inspection-lot
+          role_name: inspects
+        - id: r-inspection-lot-inspects-batch-batch
+          player: ot-batch
+          role_name: is inspected by
+      readings:
+        - "{0} inspects {1}"
+        - "{1} is inspected by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-inspection-lot-inspects-batch-inspection-lot
+        - type: mandatory
+          role: r-inspection-lot-inspects-batch-inspection-lot
+    - id: ft-inspection-lot-has-usage-decision
+      name: InspectionLot has UsageDecision
+      definition: Every inspection lot must end in a usage decision; the obligation is deontic because lots do sit open past their due date.
+      roles:
+        - id: r-inspection-lot-has-usage-decision-inspection-lot
+          player: ot-inspection-lot
+          role_name: has
+        - id: r-inspection-lot-has-usage-decision-usage-decision
+          player: ot-usage-decision
+          role_name: is decision of
+      readings:
+        - "{0} has {1}"
+        - "{1} is decision of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-inspection-lot-has-usage-decision-inspection-lot
+        - type: mandatory
+          modality: deontic
+          role: r-inspection-lot-has-usage-decision-inspection-lot
+    - id: ft-batch-is-released-to-storage-location
+      name: Batch is released to StorageLocation
+      definition: Quality release moves a batch from quality-inspection stock to unrestricted stock at a storage location; a batch may only be released once an inspection lot has inspected it.
+      roles:
+        - id: r-batch-is-released-to-storage-location-batch
+          player: ot-batch
+          role_name: is released to
+        - id: r-batch-is-released-to-storage-location-storage-location
+          player: ot-storage-location
+          role_name: receives released
+      readings:
+        - "{0} is released to {1}"
+        - "{1} receives released {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-batch-is-released-to-storage-location-batch
+            - r-batch-is-released-to-storage-location-storage-location
+        - type: subset
+          id: sub-release-requires-inspection
+          modality: deontic
+          subset_roles:
+            - r-batch-is-released-to-storage-location-batch
+          superset_roles:
+            - r-inspection-lot-inspects-batch-batch
+    - id: ft-work-order-has-work-order-number
+      name: WorkOrder has WorkOrderNumber
+      roles:
+        - id: r-work-order-has-work-order-number-work-order
+          player: ot-work-order
+          role_name: has
+        - id: r-work-order-has-work-order-number-work-order-number
+          player: ot-work-order-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-work-order-has-work-order-number-work-order
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-work-order-has-work-order-number-work-order-number
+        - type: mandatory
+          role: r-work-order-has-work-order-number-work-order
+    - id: ft-material-is-produced-at-plant-in-batch
+      name: Material is produced at Plant in Batch
+      definition: "One production run: a material produced at a plant into a batch; the run is what a work order objectifies."
+      roles:
+        - id: r-material-is-produced-at-plant-in-batch-material
+          player: ot-material
+          role_name: is produced at
+        - id: r-material-is-produced-at-plant-in-batch-plant
+          player: ot-plant
+          role_name: produces
+        - id: r-material-is-produced-at-plant-in-batch-batch
+          player: ot-batch
+          role_name: results from producing
+      readings:
+        - "{0} is produced at {1} in {2}"
+        - "{1} produces {0} in {2}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-material-is-produced-at-plant-in-batch-batch
+    - id: ft-work-order-has-order-quantity
+      name: WorkOrder has OrderQuantity
+      roles:
+        - id: r-work-order-has-order-quantity-work-order
+          player: ot-work-order
+          role_name: has
+        - id: r-work-order-has-order-quantity-order-quantity
+          player: ot-order-quantity
+          role_name: is quantity of
+      readings:
+        - "{0} has {1}"
+        - "{1} is quantity of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-work-order-has-order-quantity-work-order
+        - type: mandatory
+          role: r-work-order-has-order-quantity-work-order
+    - id: ft-work-order-has-work-order-status
+      name: WorkOrder has WorkOrderStatus
+      roles:
+        - id: r-work-order-has-work-order-status-work-order
+          player: ot-work-order
+          role_name: has
+        - id: r-work-order-has-work-order-status-work-order-status
+          player: ot-work-order-status
+          role_name: is status of
+      readings:
+        - "{0} has {1}"
+        - "{1} is status of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-work-order-has-work-order-status-work-order
+        - type: mandatory
+          role: r-work-order-has-work-order-status-work-order
+    - id: ft-work-order-is-scheduled-from-basic-start-date-to-basic-finish-date
+      name: WorkOrder is scheduled from BasicStartDate to BasicFinishDate
+      definition: The basic dates of a work order; the finish date is never earlier than the start date.
+      roles:
+        - id: r-work-order-is-scheduled-from-basic-start-date-to-basic-finish-date-work-order
+          player: ot-work-order
+          role_name: is scheduled from
+        - id: r-work-order-is-scheduled-from-basic-start-date-to-basic-finish-date-basic-start-date
+          player: ot-basic-start-date
+          role_name: starts
+        - id: r-work-order-is-scheduled-from-basic-start-date-to-basic-finish-date-basic-finish-date
+          player: ot-basic-finish-date
+          role_name: finishes
+      readings:
+        - "{0} is scheduled from {1} to {2}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-work-order-is-scheduled-from-basic-start-date-to-basic-finish-date-work-order
+        - type: mandatory
+          role: r-work-order-is-scheduled-from-basic-start-date-to-basic-finish-date-work-order
+        - type: value_comparison
+          id: vc-start-before-finish
+          role_1: r-work-order-is-scheduled-from-basic-start-date-to-basic-finish-date-basic-start-date
+          role_2: r-work-order-is-scheduled-from-basic-start-date-to-basic-finish-date-basic-finish-date
+          operator: <=
+    - id: ft-work-order-follows-routing
+      name: WorkOrder follows Routing
+      roles:
+        - id: r-work-order-follows-routing-work-order
+          player: ot-work-order
+          role_name: follows
+        - id: r-work-order-follows-routing-routing
+          player: ot-routing
+          role_name: is followed by
+      readings:
+        - "{0} follows {1}"
+        - "{1} is followed by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-work-order-follows-routing-work-order
+    - id: ft-supplier-has-supplier-number
+      name: Supplier has SupplierNumber
+      roles:
+        - id: r-supplier-has-supplier-number-supplier
+          player: ot-supplier
+          role_name: has
+        - id: r-supplier-has-supplier-number-supplier-number
+          player: ot-supplier-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-supplier-has-supplier-number-supplier
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-supplier-has-supplier-number-supplier-number
+        - type: mandatory
+          role: r-supplier-has-supplier-number-supplier
+    - id: ft-purchase-order-has-purchase-order-number
+      name: PurchaseOrder has PurchaseOrderNumber
+      roles:
+        - id: r-purchase-order-has-purchase-order-number-purchase-order
+          player: ot-purchase-order
+          role_name: has
+        - id: r-purchase-order-has-purchase-order-number-purchase-order-number
+          player: ot-purchase-order-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-purchase-order-has-purchase-order-number-purchase-order
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-purchase-order-has-purchase-order-number-purchase-order-number
+        - type: mandatory
+          role: r-purchase-order-has-purchase-order-number-purchase-order
+    - id: ft-purchase-order-item-has-purchase-order-item-id
+      name: PurchaseOrderItem has PurchaseOrderItemId
+      roles:
+        - id: r-purchase-order-item-has-purchase-order-item-id-purchase-order-item
+          player: ot-purchase-order-item
+          role_name: has
+        - id: r-purchase-order-item-has-purchase-order-item-id-purchase-order-item-id
+          player: ot-purchase-order-item-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-purchase-order-item-has-purchase-order-item-id-purchase-order-item
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-purchase-order-item-has-purchase-order-item-id-purchase-order-item-id
+        - type: mandatory
+          role: r-purchase-order-item-has-purchase-order-item-id-purchase-order-item
+    - id: ft-supplier-has-supplier-name
+      name: Supplier has SupplierName
+      roles:
+        - id: r-supplier-has-supplier-name-supplier
+          player: ot-supplier
+          role_name: has
+        - id: r-supplier-has-supplier-name-supplier-name
+          player: ot-supplier-name
+          role_name: is name of
+      readings:
+        - "{0} has {1}"
+        - "{1} is name of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-supplier-has-supplier-name-supplier
+        - type: mandatory
+          role: r-supplier-has-supplier-name-supplier
+    - id: ft-supplier-supplies-raw-material
+      name: Supplier supplies RawMaterial
+      roles:
+        - id: r-supplier-supplies-raw-material-supplier
+          player: ot-supplier
+          role_name: supplies
+        - id: r-supplier-supplies-raw-material-raw-material
+          player: ot-raw-material
+          role_name: is supplied by
+      readings:
+        - "{0} supplies {1}"
+        - "{1} is supplied by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-supplier-supplies-raw-material-supplier
+            - r-supplier-supplies-raw-material-raw-material
+    - id: ft-finished-good-has-sales-unit-of-measure
+      name: FinishedGood has sales UnitOfMeasure
+      roles:
+        - id: r-finished-good-has-sales-unit-of-measure-finished-good
+          player: ot-finished-good
+          role_name: has sales
+        - id: r-finished-good-has-sales-unit-of-measure-unit-of-measure
+          player: ot-unit-of-measure
+          role_name: is sales unit of
+      readings:
+        - "{0} has sales {1}"
+        - "{1} is sales unit of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-finished-good-has-sales-unit-of-measure-finished-good
+    - id: ft-assembly-is-assembled-at-work-center
+      name: Assembly is assembled at WorkCenter
+      roles:
+        - id: r-assembly-is-assembled-at-work-center-assembly
+          player: ot-assembly
+          role_name: is assembled at
+        - id: r-assembly-is-assembled-at-work-center-work-center
+          player: ot-work-center
+          role_name: assembles
+      readings:
+        - "{0} is assembled at {1}"
+        - "{1} assembles {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-assembly-is-assembled-at-work-center-assembly
+    - id: ft-purchase-order-is-placed-with-supplier
+      name: PurchaseOrder is placed with Supplier
+      roles:
+        - id: r-purchase-order-is-placed-with-supplier-purchase-order
+          player: ot-purchase-order
+          role_name: is placed with
+        - id: r-purchase-order-is-placed-with-supplier-supplier
+          player: ot-supplier
+          role_name: receives
+      readings:
+        - "{0} is placed with {1}"
+        - "{1} receives {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-purchase-order-is-placed-with-supplier-purchase-order
+        - type: mandatory
+          role: r-purchase-order-is-placed-with-supplier-purchase-order
+    - id: ft-purchase-order-item-belongs-to-purchase-order
+      name: PurchaseOrderItem belongs to PurchaseOrder
+      roles:
+        - id: r-purchase-order-item-belongs-to-purchase-order-purchase-order-item
+          player: ot-purchase-order-item
+          role_name: belongs to
+        - id: r-purchase-order-item-belongs-to-purchase-order-purchase-order
+          player: ot-purchase-order
+          role_name: has
+      readings:
+        - "{0} belongs to {1}"
+        - "{1} has {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-purchase-order-item-belongs-to-purchase-order-purchase-order-item
+        - type: mandatory
+          role: r-purchase-order-item-belongs-to-purchase-order-purchase-order-item
+    - id: ft-purchase-order-item-has-item-number
+      name: PurchaseOrderItem has ItemNumber
+      roles:
+        - id: r-purchase-order-item-has-item-number-purchase-order-item
+          player: ot-purchase-order-item
+          role_name: has
+        - id: r-purchase-order-item-has-item-number-item-number
+          player: ot-item-number
+          role_name: numbers
+      readings:
+        - "{0} has {1}"
+        - "{1} numbers {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-purchase-order-item-has-item-number-purchase-order-item
+        - type: mandatory
+          role: r-purchase-order-item-has-item-number-purchase-order-item
+        - type: external_uniqueness
+          id: euc-purchase-order-item
+          roles:
+            - r-purchase-order-item-belongs-to-purchase-order-purchase-order
+            - r-purchase-order-item-has-item-number-item-number
+    - id: ft-purchase-order-item-orders-material
+      name: PurchaseOrderItem orders Material
+      roles:
+        - id: r-purchase-order-item-orders-material-purchase-order-item
+          player: ot-purchase-order-item
+          role_name: orders
+        - id: r-purchase-order-item-orders-material-material
+          player: ot-material
+          role_name: is ordered by
+      readings:
+        - "{0} orders {1}"
+        - "{1} is ordered by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-purchase-order-item-orders-material-purchase-order-item
+        - type: mandatory
+          role: r-purchase-order-item-orders-material-purchase-order-item
+    - id: ft-purchase-order-item-has-order-quantity
+      name: PurchaseOrderItem has OrderQuantity
+      roles:
+        - id: r-purchase-order-item-has-order-quantity-purchase-order-item
+          player: ot-purchase-order-item
+          role_name: has
+        - id: r-purchase-order-item-has-order-quantity-order-quantity
+          player: ot-order-quantity
+          role_name: is quantity of
+      readings:
+        - "{0} has {1}"
+        - "{1} is quantity of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-purchase-order-item-has-order-quantity-purchase-order-item
+        - type: mandatory
+          role: r-purchase-order-item-has-order-quantity-purchase-order-item
+    - id: ft-purchase-order-item-is-delivered-to-plant
+      name: PurchaseOrderItem is delivered to Plant
+      roles:
+        - id: r-purchase-order-item-is-delivered-to-plant-purchase-order-item
+          player: ot-purchase-order-item
+          role_name: is delivered to
+        - id: r-purchase-order-item-is-delivered-to-plant-plant
+          player: ot-plant
+          role_name: receives
+      readings:
+        - "{0} is delivered to {1}"
+        - "{1} receives {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-purchase-order-item-is-delivered-to-plant-purchase-order-item
+        - type: mandatory
+          role: r-purchase-order-item-is-delivered-to-plant-purchase-order-item
+    - id: ft-purchase-order-item-has-delivery-date
+      name: PurchaseOrderItem has DeliveryDate
+      roles:
+        - id: r-purchase-order-item-has-delivery-date-purchase-order-item
+          player: ot-purchase-order-item
+          role_name: has
+        - id: r-purchase-order-item-has-delivery-date-delivery-date
+          player: ot-delivery-date
+          role_name: is due date of
+      readings:
+        - "{0} has {1}"
+        - "{1} is due date of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-purchase-order-item-has-delivery-date-purchase-order-item
+    - id: ft-purchase-order-item-has-net-price
+      name: PurchaseOrderItem has NetPrice
+      roles:
+        - id: r-purchase-order-item-has-net-price-purchase-order-item
+          player: ot-purchase-order-item
+          role_name: has
+        - id: r-purchase-order-item-has-net-price-net-price
+          player: ot-net-price
+          role_name: is price of
+      readings:
+        - "{0} has {1}"
+        - "{1} is price of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-purchase-order-item-has-net-price-purchase-order-item
+  subtype_facts:
+    - id: sf-raw-material-is-material
+      subtype: ot-raw-material
+      supertype: ot-material
+      is_exclusive: true
+    - id: sf-assembly-is-material
+      subtype: ot-assembly
+      supertype: ot-material
+      is_exclusive: true
+    - id: sf-finished-good-is-material
+      subtype: ot-finished-good
+      supertype: ot-material
+      is_exclusive: true
+    - id: sf-configurable-product-is-finished-good
+      subtype: ot-configurable-product
+      supertype: ot-finished-good
+  objectified_fact_types:
+    - id: oft-work-order
+      fact_type: ft-material-is-produced-at-plant-in-batch
+      object_type: ot-work-order

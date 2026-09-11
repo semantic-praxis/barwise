@@ -1,0 +1,84 @@
+id: C12
+slug: benefits
+name: State benefits agency
+industry: government
+summary: >-
+  A state agency that administers food, cash, medical and child care
+  assistance under statute, on a case management system written against
+  DB2 on the mainframe from COBOL copybooks. They are modeling because
+  the modernization needs the rules the copybooks flattened -- the
+  client status ladder, the determination per program per period, the
+  supersession history -- stated once, as rules, before the Postgres
+  platform is built against them.
+stressors: [K1, K2, K5, K15, K17, K18]
+personas:
+  - id: policy-analyst
+    name: Marguerite Okafor
+    role: Eligibility policy analyst, policy and procedures unit
+    wants: >-
+      Every "shall" and "must not" in the eligibility manual present as a
+      constraint on the right fact type, at the grain the statute uses.
+    acceptance: personas/policy-analyst.gym.yaml
+  - id: mainframe-dba
+    name: Len Prakash
+    role: Database administrator, DB2 for z/OS
+    wants: >-
+      The keys the nightly batch reads by, in the same parts and order,
+      with the office-plus-case-number composite intact.
+    acceptance: personas/mainframe-dba.gym.yaml
+  - id: modernization-architect
+    name: Tomas Reyes
+    role: Solution architect, modernization program
+    wants: >-
+      The concepts the copybooks flattened recovered as subtypes,
+      objectified facts and a one-way supersession chain the new
+      platform can build against.
+    acceptance: personas/modernization-architect.gym.yaml
+  - id: hearing-officer
+    name: Beverly Chen
+    role: Hearing officer, appeals unit
+    wants: >-
+      An appeal docketed against the determination it contests, with the
+      assignment and sanction rules the hearing turns on.
+    acceptance: personas/hearing-officer.gym.yaml
+artifacts:
+  - id: mainframe-ddl
+    generator: ddl
+    skin: skins/db2-mainframe.yaml
+    importer: sql
+    dialect: db2
+    expect: refusal
+    tiers: { small: 1, medium: 8, enterprise: 30 }
+  - id: modern-ddl
+    generator: ddl
+    skin: skins/postgres-modern.yaml
+    importer: sql
+    dialect: postgres
+    expect: import
+    tiers: { small: 1, medium: 8, enterprise: 30 }
+contexts:
+  intake: [Client, Applicant, Household, IncomeSource, VerificationDocument]
+  eligibility: [Case, Program, CertificationPeriod, Determination, StatuteReference, Recipient]
+  issuance: [Benefit, BenefitIssuance]
+  appeals: [Appeal, HearingOfficer, Sanction]
+  workforce: [Worker, EligibilityWorker, Supervisor, Office]
+history:
+  - { kind: rename_object_type, from: Recipient, to: Participant }
+  - { kind: add_value_constraint_value, object_type: ClosureReasonCode, value: "095 Closed at end of public health emergency" }
+  - { kind: add_fact_type, name: Appeal is reviewed by Worker, between: [Appeal, Worker] }
+  - { kind: remove_object_type, name: SanctionLevel }
+  - { kind: tighten_uniqueness, fact_type: Applicant applies for Program }
+  - { kind: rename_fact_type, from: Case is served by Office, to: Case is managed by Office }
+  - { kind: add_mandatory, fact_type: Appeal is scheduled for HearingDate, role_index: 0 }
+  - { kind: rename_object_type, from: CertificationPeriod, to: BenefitPeriod }
+  - { kind: add_value_constraint_value, object_type: IssuanceMethod, value: prepaid card }
+  - { kind: add_fact_type, name: Sanction is lifted by EligibilityWorker, between: [Sanction, EligibilityWorker] }
+  - { kind: add_subtype, subtype: Supervisor, supertype: Worker }
+  - { kind: add_mandatory, fact_type: Case is assigned to EligibilityWorker, role_index: 0 }
+transcripts:
+  - file: transcripts/session-01-eligibility.md
+    key: transcripts/session-01-eligibility.key.yaml
+budgets:
+  small: 30000
+  medium: 180000
+  enterprise: 900000

@@ -1,0 +1,83 @@
+id: C03
+slug: insurer
+name: Regional property and casualty carrier
+industry: insurance
+summary: >-
+  A regional property and casualty carrier writing personal and
+  commercial auto, homeowners and business owners on a Guidewire-style
+  core suite, with a Redshift warehouse loaded nightly from policy
+  administration and a claims dbt project on top. They are modeling
+  because the policy, claims and billing teams each keep their own
+  glossary, the actuaries reconcile across all three by hand, and the
+  next core upgrade needs one agreed conceptual model to test against.
+stressors: [K2, K3, K5, K8, K11, K18]
+personas:
+  - id: claims-data-steward
+    name: Dana Whitfield
+    role: Claims data steward
+    wants: >-
+      A model in which the exposure is the financial grain, every claim
+      keeps its loss cause typelist, and subrogation is its own pursuit
+      with its own adverse party.
+    acceptance: personas/claims-data-steward.gym.yaml
+    judges: [claims-dbt]
+  - id: actuarial-analyst
+    name: Tomas Reinholt
+    role: Actuarial analyst, reserving and rate indications
+    wants: >-
+      A model in which every loss can be placed on the policy period that
+      responds to it, indemnity and expense stay separable, and the
+      rating classes the triangles are cut by are still there.
+    acceptance: personas/actuarial-analyst.gym.yaml
+    judges: [claims-dbt]
+  - id: policy-admin-dba
+    name: Marcus Ellery
+    role: Database administrator, policy administration Redshift copy
+    wants: >-
+      A model in which the period is keyed by policy number and term
+      number, the supersession chain cannot loop, and every table the
+      nightly load joins on is still an entity.
+    acceptance: personas/policy-admin-dba.gym.yaml
+    judges: [pc-ddl]
+artifacts:
+  - id: pc-ddl
+    generator: ddl
+    skin: skins/redshift-pc.yaml
+    importer: sql
+    dialect: redshift
+    expect: import
+    tiers: { small: 1, medium: 8, enterprise: 30 }
+  - id: claims-dbt
+    generator: dbt
+    skin: skins/redshift-dbt.yaml
+    importer: dbt
+    expect: import
+    tiers: { small: 1, medium: 8, enterprise: 30 }
+contexts:
+  policy: [Policy, Term, PolicyPeriod, Coverage, Risk, VehicleRisk, CommercialVehicleRisk, PropertyRisk, Producer]
+  claims: [Claim, Exposure, Reserve, Payment, Subrogation, Adjuster]
+  billing: [Invoice, Account]
+  parties: [Contact, Person, Company]
+history:
+  - { kind: rename_object_type, from: Adjuster, to: ClaimHandler }
+  - { kind: add_value_constraint_value, object_type: LossCause, value: wildfire }
+  - { kind: add_fact_type, name: Exposure has Limit, between: [Exposure, Limit] }
+  - { kind: tighten_uniqueness, fact_type: Account is serviced by Producer }
+  - { kind: add_subtype, subtype: Producer, supertype: Company }
+  - { kind: remove_object_type, name: LegacyPolicyKey }
+  - { kind: rename_fact_type, from: Claim is reported by Contact, to: Claim was reported by Contact }
+  - { kind: add_mandatory, fact_type: Coverage has Limit, role_index: 0 }
+  - { kind: rename_object_type, from: Invoice, to: Statement }
+  - { kind: add_value_constraint_value, object_type: PeriodStatus, value: Reinstated }
+  - { kind: add_fact_type, name: Company is serviced by Producer, between: [Company, Producer] }
+  - { kind: add_value_constraint_value, object_type: ClaimStatus, value: Litigated }
+  - { kind: rename_object_type, from: Producer, to: Agency }
+  - { kind: add_mandatory, fact_type: Subrogation has RecoveryAmount, role_index: 0 }
+  - { kind: rename_fact_type, from: Payment is made to Contact, to: Payment is payable to Contact }
+transcripts:
+  - file: transcripts/session-01-subrogation.md
+    key: transcripts/session-01-subrogation.key.yaml
+budgets:
+  small: 30000
+  medium: 180000
+  enterprise: 900000

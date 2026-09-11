@@ -1,0 +1,77 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: "c08-billing-analyst"
+title: "A bill has one tariff, one account and a limit on estimates"
+transition:
+  from: "apprentice"
+  to: "journeyman"
+exitPerformance: >-
+  Model the service agreement as an objectified customer-at-service-point
+  relationship that carries the tariff and the account, and state the
+  regulator's estimated-read limit as an obligation rather than a
+  necessity.
+brief: |
+  You are the billing analyst at a distribution utility. A customer
+  takes service at a service point under a service agreement; the
+  agreement is billed under exactly one tariff to exactly one account,
+  and an account belongs to exactly one customer. Tariffs are identified
+  by a regulator-filed rate code from a fixed list. The regulator allows
+  a meter to be billed on an estimate for at most three billing cycles;
+  the utility breaks that rule sometimes and reports it, so the rule is
+  an obligation, not a law of the data. Model this.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 10 (objectification), ch. 4 (deontic modality),
+  ch. 5 (value constraints).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: "requires_element"
+    element:
+      entity: "ServiceAgreement"
+    diagnosis: >-
+      Without ServiceAgreement, the tariff and account get attached to the
+      customer or the service point, and a customer with two premises on
+      different tariffs cannot be represented.
+  - kind: "requires_element"
+    element:
+      entity: "Tariff"
+    diagnosis: >-
+      A tariff that is only a rate-code string on the agreement has no place
+      to carry its description or its regulatory history; it needs to be a
+      thing we can state facts about.
+  - kind: "requires_element"
+    element:
+      entity: "Account"
+    diagnosis: >-
+      The account is what receives charges and payments; folding it into
+      Customer makes a customer with a final-billed old account and an
+      active new one impossible.
+  - kind: "requires_element"
+    element:
+      factTypeBetween: ["ServiceAgreement", "Tariff"]
+    diagnosis: >-
+      The agreement is billed under a tariff; if no fact type links them the
+      rate has been attached to the wrong thing.
+  - kind: "must_validate"
+    diagnosis: >-
+      An invalid model here is usually the objectified agreement with no
+      identification, which the DDL export then cannot key.
+  - kind: "forbids_population"
+    factType: "ServiceAgreement is billed under Tariff"
+    constraint: "mandatory"
+    hint: "Every agreement is billed under some tariff."
+    diagnosis: >-
+      An agreement with no tariff cannot be billed at all; it shows up in the
+      unbilled report every month until someone notices.
+  - kind: "forbids_population"
+    factType: "Customer holds Account"
+    constraint: "internal_uniqueness"
+    hint: "Uniqueness on the Account role: each account is held by at most one customer."
+    diagnosis: >-
+      An account held by two customers means two people receive the same
+      bill and neither is responsible for it; the uniqueness on the account
+      role is the responsibility rule.
+  - kind: "requires_verbalization"
+    sentence: "It is obligatory that each Meter was estimated in at least 1 and at most 3 BillingCycle."
+    diagnosis: >-
+      If the estimated-read limit is written as an alethic constraint the
+      model rejects the very rows the regulator asks us to report; it has to
+      read as an obligation the data can violate and we can count.

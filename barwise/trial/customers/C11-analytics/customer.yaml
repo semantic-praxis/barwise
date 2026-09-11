@@ -1,0 +1,57 @@
+id: C11
+slug: analytics
+name: Product-analytics vendor
+industry: software
+summary: >-
+  A product-analytics SaaS with no legacy schema worth reading: the
+  model has to come from thirty hours of meetings, a Kotlin backend, and
+  a dbt project on an adapter barwise has never heard of. Every fact is
+  tenant-scoped.
+stressors: [K8, K12, K14, K16, K19]
+seed: 83
+personas:
+  - id: founding-engineer
+    name: Wei Zhang
+    role: Founding engineer
+    wants: Events, properties and sessions come back from the Kotlin code as the sealed hierarchy declares them, tenant-scoped.
+    acceptance: personas/founding-engineer.gym.yaml
+    judges: [backend-kotlin]
+  - id: data-platform-lead
+    name: Amara Osei
+    role: Data platform lead
+    wants: The dbt project on duckdb is imported with its adapter named, not silently treated as ANSI, and the funnel ordering ring holds.
+    acceptance: personas/data-platform-lead.gym.yaml
+    judges: [metrics-dbt]
+artifacts:
+  - id: backend-kotlin
+    generator: code
+    skin: skins/kotlin-ktor.yaml
+    importer: kotlin
+    expect: import
+    tiers: { small: 1, medium: 8, enterprise: 25 }
+  - id: metrics-dbt
+    generator: dbt
+    skin: skins/duckdb-dbt.yaml
+    importer: dbt
+    expect: import
+    tiers: { small: 1, medium: 5, enterprise: 12 }
+contexts:
+  tenancy: [Tenant, DataRegion, Workspace, Project, ApiKey, ServiceAccount]
+  billing: [Plan, Subscription]
+  events: [EventDefinition, Event, EventProperty, Session, User, AnonymousUser, IdentifiedUser, VerifiedUser]
+  analysis: [Cohort, Funnel, FunnelStep, Dashboard]
+history:
+  - { kind: rename_object_type, from: Workspace, to: Team }
+  - { kind: add_value_constraint_value, object_type: ReservedEventName, value: "$screen_view" }
+  - { kind: add_fact_type, name: Dashboard is pinned by User, between: [Dashboard, User] }
+  - { kind: add_subtype, subtype: ServiceAccount, supertype: User }
+  - { kind: rename_object_type, from: Team, to: Workspace }
+  - { kind: tighten_uniqueness, fact_type: Cohort contains User }
+  - { kind: remove_object_type, name: DataRegion }
+transcripts:
+  - file: transcripts/session-01-events.md
+    key: transcripts/session-01-events.key.yaml
+budgets:
+  small: 30000
+  medium: 180000
+  enterprise: 900000

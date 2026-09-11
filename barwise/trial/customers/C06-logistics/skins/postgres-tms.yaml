@@ -1,0 +1,45 @@
+# Postgres as a transport management system uses it: inheritance,
+# range partitions, enums, arrays, a composite type, a PostGIS column,
+# and a statement every seventh table that forgot its semicolon.
+dialect: postgres
+naming:
+  table_case: snake
+  column_case: snake
+idioms:
+  schema_qualified: "tms."
+  if_not_exists: true
+  quoting: none
+  check_constraints: true
+  comments: true
+  missing_semicolon_every: 7
+extra_tables:
+  - |
+    CREATE TYPE tms.movement_kind AS ENUM ('gate_in', 'gate_out', 'load', 'discharge', 'transship')
+  - |
+    CREATE TYPE tms.dimensions AS (length_mm integer, width_mm integer, height_mm integer)
+  - |
+    CREATE TABLE IF NOT EXISTS tms.tracking_event (
+      event_id bigint GENERATED ALWAYS AS IDENTITY,
+      container_no char(11) NOT NULL,
+      occurred_at timestamptz NOT NULL,
+      kind tms.movement_kind NOT NULL,
+      location geography(Point, 4326),
+      tags text[] DEFAULT '{}',
+      payload jsonb,
+      PRIMARY KEY (event_id, occurred_at)
+    ) PARTITION BY RANGE (occurred_at)
+  - |
+    CREATE TABLE IF NOT EXISTS tms.tracking_event_2026q3 PARTITION OF tms.tracking_event FOR VALUES FROM ('2026-07-01') TO ('2026-10-01')
+  - |
+    CREATE TABLE IF NOT EXISTS tms.reefer_container (
+      set_point_c numeric(4,1) NOT NULL,
+      humidity_pct smallint CHECK (humidity_pct BETWEEN 0 AND 100),
+      dims tms.dimensions
+    ) INHERITS (tms.container)
+  - |
+    CREATE TABLE tms.legacy_manifest (
+      manifest_no varchar(20) PRIMARY KEY,
+      voyage_no varchar(12),
+      leg_seq int,
+      lines text[]
+    )

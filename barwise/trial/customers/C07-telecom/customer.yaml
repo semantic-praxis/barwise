@@ -1,0 +1,76 @@
+id: C07
+slug: telecom
+name: Mobile network operator
+industry: telecommunications
+summary: >-
+  A national mobile network operator whose catalog, ordering, inventory
+  and party systems all claim to follow the TM Forum SID and disagree
+  about what a Product is. They are modeling to get one vocabulary
+  across the BigQuery warehouse, the TMF Open API facade and the number
+  portability gateway before a core network migration.
+stressors: [K3, K4, K6, K7, K10]
+personas:
+  - id: catalog-product-manager
+    name: Dana Whitfield
+    role: Product manager, catalog and tariffs
+    wants: >-
+      Specification, offering and product stay three things, every
+      offering carries exactly one rate plan code, and no bundle can
+      contain itself.
+    acceptance: personas/catalog-product-manager.gym.yaml
+    judges: [tmf-openapi]
+  - id: network-inventory-architect
+    name: Tomasz Wierzbicki
+    role: Network inventory architect
+    wants: >-
+      The five-level resource hierarchy keeps one identifier at the top,
+      every device sits at a site, and the service dependency graph
+      cannot loop.
+    acceptance: personas/network-inventory-architect.gym.yaml
+    judges: [bq-ddl]
+  - id: integration-engineer
+    name: Aisha Rahman
+    role: Integration engineer, order management and porting gateway
+    wants: >-
+      A mobile number is keyed with its country code, an order line has
+      its own identifier, and the letter of authorization is an
+      obligation the request can exist without.
+    acceptance: personas/integration-engineer.gym.yaml
+    judges: [tmf-openapi]
+artifacts:
+  - id: bq-ddl
+    generator: ddl
+    skin: skins/bigquery-dwh.yaml
+    importer: sql
+    dialect: bigquery
+    expect: import
+    tiers: { small: 1, medium: 8, enterprise: 30 }
+  - id: tmf-openapi
+    generator: openapi
+    skin: skins/tmf-openapi.yaml
+    importer: openapi
+    expect: import
+    tiers: { small: 1, medium: 8, enterprise: 30 }
+contexts:
+  catalog: [ProductSpecification, ProductOffering, Product, ServiceSpecification]
+  ordering: [ProductOrder, OrderItem, Subscription]
+  inventory: [Resource, PhysicalResource, LogicalResource, NetworkDevice, Router, EdgeRouter, Site, Service, CustomerFacingService, ResourceFacingService]
+  parties: [Party, Individual, Organization, Customer, Subscriber, Operator, Country, PortInRequest]
+history:
+  - { kind: rename_object_type, from: ProductOrder, to: CustomerOrder }
+  - { kind: add_value_constraint_value, object_type: RatePlanCode, value: POST-FAMILY-6 }
+  - { kind: add_fact_type, name: Customer is domiciled in Country, between: [Customer, Country] }
+  - { kind: remove_object_type, name: LogicalResource }
+  - { kind: tighten_uniqueness, fact_type: Router runs RoutingProtocol }
+  - { kind: add_subtype, subtype: Operator, supertype: Organization }
+  - { kind: add_mandatory, fact_type: ProductOffering has MonthlyRecurringCharge, role_index: 0 }
+  - { kind: rename_fact_type, from: Service depends on Service, to: Service requires Service }
+  - { kind: add_value_constraint_value, object_type: ProductOrderState, value: assessingCancellation }
+  - { kind: rename_object_type, from: EdgeRouter, to: ProviderEdgeRouter }
+transcripts:
+  - file: transcripts/session-01-catalog.md
+    key: transcripts/session-01-catalog.key.yaml
+budgets:
+  small: 30000
+  medium: 180000
+  enterprise: 900000

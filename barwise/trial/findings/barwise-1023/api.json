@@ -1,0 +1,27 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Two schemas, one property name", "version": "1.0.0" },
+  "paths": {},
+  "components": {
+    "schemas": {
+      "Provider": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "related": { "$ref": "#/components/schemas/Patient" }
+        }
+      },
+      "Payer": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "related": { "$ref": "#/components/schemas/Patient" }
+        }
+      },
+      "Patient": {
+        "type": "object",
+        "properties": { "name": { "type": "string" } }
+      }
+    }
+  }
+}

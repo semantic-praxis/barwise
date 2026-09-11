@@ -1,0 +1,93 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: hearing-officer
+title: "An appeal contests a determination, not a case"
+transition:
+  from: initiate
+  to: apprentice
+exitPerformance: >-
+  Read a conceptual model produced from the agency's artifacts and
+  confirm that the appeal is docketed against the determination it
+  contests, that a hearing officer is assigned to it, and that the
+  sanction rules the hearing turns on are present at the grain the
+  regulation states.
+brief: |
+  You are a hearing officer in the agency's appeals unit. A client
+  files an appeal against a determination -- a specific decision, for
+  a specific program, in a specific period -- and you must be assigned
+  within ten days and must not be the worker who made it. Half your
+  docket is sanctions, and the regulation is clear that a recipient is
+  under at most one sanction per program at a time. The appeals unit
+  calls its docketed matter a "case", which is not what the eligibility
+  workers mean by the word. Check that the model barwise produced
+  gives you an appeal against a determination, not against a case.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 5.4 (external
+  uniqueness), ch. 7.3 (deontic constraints).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: must_validate
+    diagnosis: >-
+      If the model does not validate nobody will show it to the
+      appeals unit, and the docket stays a spreadsheet.
+  - kind: requires_element
+    element:
+      entity: Appeal
+    diagnosis: >-
+      Without an Appeal the model has treated the fair hearing as a
+      case status. A withdrawn appeal and a closed case are not the
+      same event.
+  - kind: requires_element
+    element:
+      entity: HearingOfficer
+    diagnosis: >-
+      A hearing officer is a worker who must not be the deciding
+      worker. If the model has one Worker, the conflict rule cannot be
+      stated.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Appeal, Determination]
+    diagnosis: >-
+      The appeal contests a determination. If it is linked to the case
+      instead, a household approved for one program and denied another
+      has no way to say which decision it is appealing.
+  - kind: forbids_population
+    factType: Appeal contests Determination
+    constraint: mandatory
+    hint: "There is no appeal without a determination to contest."
+    diagnosis: >-
+      An appeal with nothing contested is a complaint, and the appeals
+      unit does not docket complaints.
+  - kind: forbids_population
+    factType: Appeal is filed by Client
+    constraint: mandatory
+    hint: "Every docketed appeal names the client who filed it."
+    diagnosis: >-
+      An appeal with no filer cannot be noticed, and a hearing nobody
+      was noticed for is a remand.
+  - kind: requires_verbalization
+    sentence: "It is obligatory that each Appeal is heard by at least one HearingOfficer."
+    hint: "An appeal shall be assigned to a hearing officer within ten days of filing; deontic, since the docket does carry unassigned appeals."
+    diagnosis: >-
+      If assignment is alethic the model cannot hold the appeal the
+      day it is filed; if it is missing altogether the ten-day rule is
+      nowhere.
+  - kind: requires_element
+    element:
+      entity: Sanction
+    diagnosis: >-
+      Half the docket is sanctions. If the sanction is a code on the
+      case, the appeal cannot say which sanction it contests.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Sanction, Recipient]
+    diagnosis: >-
+      A sanction is imposed on a recipient, not on a case. If the model
+      puts it on the case, a sanction on one household member reduces
+      the benefit of everyone in the unit, which is the reversal I
+      write most often.
+  - kind: requires_verbalization
+    sentence: "It is obligatory that The combination of Recipient and Program is unique across fact types."
+    hint: "At most one sanction per recipient per program at a time; the regulation says must not, so it is deontic."
+    diagnosis: >-
+      If the model allows two standing sanctions on one recipient for
+      one program, the second one is the thing the appeal reverses.

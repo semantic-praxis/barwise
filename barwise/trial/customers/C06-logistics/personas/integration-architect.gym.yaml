@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: integration-architect
+title: "Every class in the platform, not the first five hundred files"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Confirm the booking platform's domain classes are all present as
+  entities, including the event subtypes declared last in the tree.
+brief: |
+  You integrate the booking platform with carriers. The model has to
+  cover the event hierarchy the webhooks emit; a model that stops at
+  ShipmentEvent will map the gate scan to nothing.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 6 (subtyping).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: requires_element
+    element:
+      entity: Booking
+    diagnosis: >-
+      The booking is the platform's aggregate root.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.2."
+  - kind: requires_element
+    element:
+      entity: GateScan
+    diagnosis: >-
+      GateScan is the deepest event subtype and the one the yard emits
+      most; if it is missing, the importer stopped early.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 6, section 6.3."
+  - kind: requires_element
+    element:
+      entity: CustomsDeclaration
+    diagnosis: >-
+      Customs is the class declared last in the tree; its absence is the
+      file cap, not the domain.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.2."
+  - kind: requires_element
+    element:
+      factTypeBetween: [Shipment, Carrier]
+    diagnosis: >-
+      A shipment with no carrier cannot be booked; the objectified booking rests on this fact.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4."
+  - kind: must_validate
+    diagnosis: >-
+      A structurally invalid model cannot back the integration contract.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 5, section 5.3."

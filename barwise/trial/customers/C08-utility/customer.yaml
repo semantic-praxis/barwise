@@ -1,0 +1,64 @@
+id: C08
+slug: utility
+name: Electric distribution utility
+industry: energy
+summary: >-
+  A distribution utility whose network model is an IEC CIM export in
+  OWL that barwise cannot read, whose customer system is a MySQL schema
+  with every MySQL habit, and whose metering team records a reading
+  every fifteen minutes for a million meters.
+stressors: [K1, K8, K15, K16]
+seed: 61
+personas:
+  - id: c08-metering-data-engineer
+    name: Noor El-Sayed
+    role: Metering data engineer
+    wants: The meter hierarchy and the interval-reading ternary survive the CIS import, and the estimated-read rule is stated.
+    acceptance: personas/metering-data-engineer.gym.yaml
+    judges: [cis-ddl]
+  - id: c08-network-model-steward
+    name: Piotr Lewandowski
+    role: Network model steward
+    wants: When barwise cannot read the CIM export it says so in one line and does not hand back an empty model.
+    acceptance: personas/network-model-steward.gym.yaml
+    judges: [cim-owl]
+  - id: c08-billing-analyst
+    name: Grace Mbeki
+    role: Billing analyst
+    wants: Accounts, tariffs and billing cycles tie to service agreements with the right keys.
+    acceptance: personas/billing-analyst.gym.yaml
+    judges: [cis-ddl]
+artifacts:
+  - id: cim-owl
+    generator: owl
+    skin: skins/cim-owl.yaml
+    importer: owl
+    expect: refusal
+    tiers: { small: 1, medium: 4, enterprise: 40 }
+  - id: cis-ddl
+    generator: ddl
+    skin: skins/mysql-cis.yaml
+    importer: sql
+    dialect: mysql
+    expect: import
+    tiers: { small: 1, medium: 8, enterprise: 25 }
+contexts:
+  metering: [ServicePoint, Meter, SmartMeter, IntervalMeter, Manufacturer, IntervalReading]
+  network: [Feeder, Substation, Transformer]
+  customer: [Premise, Customer, Account, ServiceAgreement, Tariff, BillingCycle]
+  operations: [Outage, Crew]
+history:
+  - { kind: rename_object_type, from: Premise, to: ServiceLocation }
+  - { kind: add_value_constraint_value, object_type: RateCode, value: EV-TOU-2 }
+  - { kind: add_fact_type, name: Crew is based at Substation, between: [Crew, Substation] }
+  - { kind: add_subtype, subtype: Transformer, supertype: Feeder }
+  - { kind: rename_object_type, from: ServiceLocation, to: Premise }
+  - { kind: tighten_uniqueness, fact_type: Feeder feeds Feeder }
+  - { kind: remove_object_type, name: BillingCycle }
+transcripts:
+  - file: transcripts/session-01-reads.md
+    key: transcripts/session-01-reads.key.yaml
+budgets:
+  small: 30000
+  medium: 180000
+  enterprise: 900000

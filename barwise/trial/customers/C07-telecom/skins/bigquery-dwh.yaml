@@ -1,0 +1,99 @@
+# The inventory and catalog warehouse under telco_dwh: a BigQuery dataset
+# loaded nightly from the OSS/BSS stack. Lower snake case throughout,
+# backtick quoting, and a handful of hand-written tables in the idiom the
+# generator cannot invent: STRUCT and ARRAY columns for the nested CDR
+# and catalog payloads, PARTITION BY on the event date, CLUSTER BY on the
+# join keys.
+dialect: bigquery
+naming:
+  table_case: lower
+  column_case: snake
+  table_prefix: ""
+  abbreviate: false
+  max_identifier: 128
+idioms:
+  schema_qualified: "telco_dwh."
+  if_not_exists: true
+  quoting: backticks
+  inline_pk: false
+  check_constraints: false
+  engine_suffix: false
+  comments: true
+  missing_semicolon_every: 0
+  extension_tables: false
+  no_foreign_keys: true
+types:
+  text: STRING
+  integer: INT64
+  decimal: NUMERIC
+  date: DATE
+  datetime: TIMESTAMP
+  boolean: BOOL
+extra_tables:
+  - |
+    CREATE TABLE IF NOT EXISTS `telco_dwh`.`usage_cdr` (
+      `cdr_id` STRING NOT NULL,
+      `event_ts` TIMESTAMP NOT NULL,
+      `subscriber_id` STRING NOT NULL,
+      `msisdn` STRING,
+      `country_code` STRING,
+      `usage_type` STRING,
+      `cell` STRUCT<`cell_id` STRING, `lac` INT64, `rat` STRING>,
+      `volume` STRUCT<`uplink_bytes` INT64, `downlink_bytes` INT64, `duration_s` INT64>,
+      `rated_charges` ARRAY<STRUCT<`rate_plan_code` STRING, `amount` NUMERIC, `currency` STRING>>
+    )
+    PARTITION BY DATE(`event_ts`)
+    CLUSTER BY `subscriber_id`, `country_code`
+  - |
+    CREATE TABLE IF NOT EXISTS `telco_dwh`.`product_offering_snapshot` (
+      `snapshot_date` DATE NOT NULL,
+      `product_offering_id` STRING NOT NULL,
+      `offering_name` STRING,
+      `rate_plan_code` STRING,
+      `lifecycle_status` STRING,
+      `prices` ARRAY<STRUCT<`price_type` STRING, `amount` NUMERIC, `currency` STRING, `unit_of_measure` STRING>>,
+      `bundled_offering_ids` ARRAY<STRING>,
+      `characteristics` ARRAY<STRUCT<`name` STRING, `value` STRING>>
+    )
+    PARTITION BY `snapshot_date`
+    CLUSTER BY `product_offering_id`
+  - |
+    CREATE TABLE IF NOT EXISTS `telco_dwh`.`product_order_event` (
+      `event_id` STRING NOT NULL,
+      `event_ts` TIMESTAMP NOT NULL,
+      `product_order_id` STRING NOT NULL,
+      `customer_id` STRING,
+      `state` STRING,
+      `order_items` ARRAY<STRUCT<`order_item_id` STRING, `product_offering_id` STRING, `quantity` INT64, `action` STRING, `state` STRING>>,
+      `payload` JSON
+    )
+    PARTITION BY DATE(`event_ts`)
+    CLUSTER BY `product_order_id`, `customer_id`
+  - |
+    CREATE TABLE IF NOT EXISTS `telco_dwh`.`network_device_daily` (
+      `snapshot_date` DATE NOT NULL,
+      `resource_id` STRING NOT NULL,
+      `site_id` STRING,
+      `device_class` STRING,
+      `management_ip_address` STRING,
+      `serial_number` STRING,
+      `interfaces` ARRAY<STRUCT<`name` STRING, `admin_state` STRING, `oper_state` STRING, `speed_mbps` INT64>>,
+      `routing_protocols` ARRAY<STRING>,
+      `peer_operator_codes` ARRAY<STRING>
+    )
+    PARTITION BY `snapshot_date`
+    CLUSTER BY `site_id`, `resource_id`
+  - |
+    CREATE TABLE IF NOT EXISTS `telco_dwh`.`port_in_request_history` (
+      `port_request_id` STRING NOT NULL,
+      `changed_ts` TIMESTAMP NOT NULL,
+      `msisdn` STRING NOT NULL,
+      `country_code` STRING NOT NULL,
+      `subscriber_id` STRING,
+      `donor_operator_code` STRING,
+      `status` STRING,
+      `letter_of_authorization` STRUCT<`reference` STRING, `signed_date` DATE, `channel` STRING>,
+      `status_history` ARRAY<STRUCT<`status` STRING, `at` TIMESTAMP, `reason` STRING>>
+    )
+    PARTITION BY DATE(`changed_ts`)
+    CLUSTER BY `msisdn`, `country_code`

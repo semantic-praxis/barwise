@@ -1,0 +1,82 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: revenue-cycle-analyst
+title: "Every claim lands on one encounter"
+transition:
+  from: initiate
+  to: apprentice
+exitPerformance: >-
+  Read a conceptual model of billing and confirm that a claim is raised
+  against exactly one encounter, goes to exactly one payer, and that the
+  discharge disposition the payer adjudicates on is still a controlled
+  list, not free text.
+brief: |
+  You are a revenue-cycle analyst for a regional hospital network. Every
+  denial you work starts with the same three questions: which encounter
+  is this claim for, which payer got it, and what discharge status did
+  we send. The UB-04 patient status codes are a fixed list and the
+  payers reject anything outside it. Check that the model barwise built
+  from the Clarity DDL and the FHIR document keeps those answers.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 4 (uniqueness and
+  mandatory constraints), ch. 7 (value constraints).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: must_validate
+    diagnosis: >-
+      An invalid model cannot be exported to the billing mart, so it does
+      not matter what else it says.
+  - kind: requires_element
+    element:
+      entity: Claim
+    diagnosis: >-
+      If there is no Claim in the model, the billing side was read as an
+      attribute of the encounter, and a denied-and-resubmitted claim
+      becomes an overwrite instead of a second row.
+  - kind: requires_element
+    element:
+      entity: Payer
+    diagnosis: >-
+      A payer is a party we bill, with its own identifier and name; a
+      model that keeps only a payer name on the claim cannot roll denials
+      up by payer.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Claim, Encounter]
+    diagnosis: >-
+      A claim is for an encounter. Without that fact type I cannot answer
+      the first question on every denial worklist.
+  - kind: forbids_population
+    factType: Claim bills Encounter
+    constraint: internal_uniqueness
+    hint: "One claim, one encounter; a claim never spans two encounters."
+    diagnosis: >-
+      A claim billing two encounters is a split-bill error the clearinghouse
+      rejects; the model must not represent it as valid.
+  - kind: forbids_population
+    factType: Claim is submitted to Payer
+    constraint: mandatory
+    hint: "Every claim goes to a payer; a claim with no payer is not a claim yet."
+    diagnosis: >-
+      If a claim can exist with no payer, the unsubmitted work sits in the
+      claims table looking like revenue.
+  - kind: forbids_population
+    factType: Admission has DischargeDisposition
+    constraint: internal_uniqueness
+    hint: "One disposition per admission; the payer adjudicates on it."
+    diagnosis: >-
+      Two dispositions on one admission means two different DRG outcomes on
+      the same stay, and the payer will pick the cheaper one.
+  - kind: forbids_population
+    factType: Patient is covered by Payer
+    constraint: internal_uniqueness
+    hint: "Primary coverage is one payer; secondary coverage is out of scope for this model."
+    diagnosis: >-
+      If a patient can have two primary payers the eligibility check
+      cannot decide who to bill first, and the claim goes out to both.
+  - kind: requires_verbalization
+    sentence: "It is obligatory that each Admission has at least one DischargeDisposition."
+    hint: "A rule, not a fact: an open admission has none yet, but every closed one must."
+    diagnosis: >-
+      If the model makes the disposition strictly mandatory it rejects
+      every open admission; if it drops the rule, discharged patients go
+      out to the payer with no status. It has to be an obligation.

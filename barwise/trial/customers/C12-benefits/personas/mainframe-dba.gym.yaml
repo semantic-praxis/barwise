@@ -1,0 +1,95 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: mainframe-dba
+title: "OFFCD plus CASENBR is still the key"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Read a conceptual model produced from the DB2 DDL and confirm that
+  every table the nightly batch reads by key is still an entity with
+  the same key parts in the same order, that the surrogate the
+  modernization added has not replaced the legacy composite, and that
+  the issuance row has not been collapsed into the case.
+brief: |
+  You administer the DB2 for z/OS databases behind a state benefits
+  agency's case management system: about twelve hundred tables named
+  from COBOL copybooks, eight-character columns like CLNTNBR and
+  CASENBR, no foreign keys because the batch jobs enforce them, and an
+  EBCDIC tablespace the issuance batch has written every night since
+  the nineties. The case number is assigned by the office and is only
+  unique with the office code; CASEID is the surrogate the
+  modernization added in 2011. Check that the model barwise produced
+  from your DDL keeps the keys the batch uses.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 5 (reference schemes,
+  external uniqueness), ch. 11 (relational mapping).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: must_validate
+    diagnosis: >-
+      If the model does not validate I cannot map it back to tables,
+      and the batch stays on the copybooks.
+  - kind: requires_element
+    element:
+      entity: Client
+    diagnosis: >-
+      CLNTMSTR is the table every job starts from. A model without
+      Client has read something other than my database.
+  - kind: requires_element
+    element:
+      entity: Case
+    diagnosis: >-
+      CASEMSTR is the spine. If Case has been folded into Household,
+      every case-level join in the batch is gone.
+  - kind: forbids_population
+    factType: Client has ClientNumber
+    constraint: internal_uniqueness
+    hint: "CLNTNBR is the primary key of CLNTMSTR; one row per client."
+    diagnosis: >-
+      If two clients can share a client number the client master has
+      lost its key, and the data exchange match will attach one
+      person's wages to another.
+  - kind: forbids_population
+    factType: Case has CaseId
+    constraint: internal_uniqueness
+    hint: "CASEID is the surrogate; it is unique, but it is not the key the batch uses."
+    diagnosis: >-
+      A model that lets one CASEID appear on two cases has lost the
+      surrogate the modernization added, and the web front end joins on
+      nothing.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Case, Office]
+    diagnosis: >-
+      The office code is half of the legacy key. If it is not on the
+      case, CASENBR is ambiguous across offices and the statewide
+      extracts double count.
+  - kind: requires_verbalization
+    sentence: "The combination of CaseNumber and Office is unique across fact types."
+    hint: "OFFCD plus CASENBR: the case number is reused across offices."
+    diagnosis: >-
+      If the model says the case number alone is unique it has believed
+      the web front end rather than the copybook, and two offices'
+      cases collide on the first load.
+  - kind: forbids_population
+    factType: Case is for Household
+    constraint: mandatory
+    hint: "HHLDNBR on CASEMSTR is NOT NULL WITH DEFAULT and the batch rejects a zero."
+    diagnosis: >-
+      A case with no household is an orphan row the batch has never
+      allowed; if the model permits it, the round trip will emit a
+      nullable column I cannot load.
+  - kind: requires_element
+    element:
+      entity: BenefitIssuance
+    diagnosis: >-
+      ISSUHIST is its own table with its own three-part key. If the
+      issuance has been flattened onto the case as an amount column,
+      the EBT reconciliation loses a row per month per benefit.
+  - kind: forbids_population
+    factType: BenefitIssuance has IssuanceAmount
+    constraint: mandatory
+    hint: "ISSAMT is DECIMAL(9,2) NOT NULL; there is no issuance without an amount."
+    diagnosis: >-
+      An issuance with no amount would write a zero warrant, which the
+      treasury interface rejects and the batch abends on.

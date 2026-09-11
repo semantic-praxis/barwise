@@ -1,0 +1,43 @@
+# The customer information system in MySQL's own habits: backticks,
+# an engine clause on every table, unsigned integers, ENUM and SET
+# columns, a zero default date, and a reserved-word table name.
+dialect: mysql
+naming:
+  table_case: snake
+  column_case: snake
+idioms:
+  schema_qualified: "cis."
+  quoting: backticks
+  engine_suffix: true
+  check_constraints: false
+  comments: true
+extra_tables:
+  - |
+    CREATE TABLE `cis`.`meter_read_raw` (
+      `read_id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      `meter_serial` VARCHAR(24) NOT NULL,
+      `read_ts` DATETIME NOT NULL DEFAULT '0000-00-00 00:00:00',
+      `read_kind` ENUM('actual','estimated','customer') NOT NULL DEFAULT 'actual',
+      `flags` SET('reversed','tamper','outage','test') DEFAULT '',
+      `kwh` DECIMAL(12,3) UNSIGNED,
+      `is_billed` TINYINT(1) NOT NULL DEFAULT 0,
+      PRIMARY KEY (`read_id`),
+      KEY `ix_meter_ts` (`meter_serial`, `read_ts`)
+    ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+  - |
+    CREATE TABLE `cis`.`order` (
+      `order_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+      `account_no` VARCHAR(12) NOT NULL,
+      `order_type` ENUM('connect','disconnect','reread','exchange') NOT NULL,
+      `created` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (`order_id`)
+    ) ENGINE=MyISAM
+  - |
+    CREATE TABLE `cis`.`tariff_rate_block` (
+      `rate_code` CHAR(8) NOT NULL,
+      `block_no` TINYINT UNSIGNED NOT NULL,
+      `upto_kwh` INT UNSIGNED,
+      `price_cents` DECIMAL(8,4) NOT NULL,
+      `effective_from` DATE NOT NULL,
+      PRIMARY KEY (`rate_code`, `block_no`, `effective_from`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=latin1

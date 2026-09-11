@@ -1,0 +1,6 @@
+# An IEC CIM-shaped OWL/RDF export. barwise has no OWL importer
+# (barwise-e8c); this artifact grades the refusal, and at the enterprise
+# tier it is forty megabytes, which grades what the CLI does with a file
+# that size on a format it does not read.
+profile: cim
+size_mb_enterprise: 40

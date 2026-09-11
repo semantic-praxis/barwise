@@ -1,0 +1,164 @@
+# The agency's DB2 for z/OS idiom: tables named from COBOL copybooks,
+# eight-character identifiers, no foreign keys (the batch enforces
+# them), EBCDIC tablespaces. barwise does not read DB2 DDL; the
+# artifact that carries this skin expects a refusal that names the
+# dialect and the first construct it could not parse.
+dialect: db2
+naming:
+  table_case: upper
+  column_case: upper
+  table_prefix: ""
+  abbreviate: true
+  max_identifier: 8
+  abbreviations:
+    # Order matters: the generator applies each entry in turn, so a
+    # longer word must precede the shorter word it contains.
+    DateOfBirth: DOB
+    Officer: OFCR
+    Office: OFC
+    Monthly: MO
+    Month: MTH
+    Method: MTHD
+    Verification: VRFN
+    Certification: CERT
+    Determination: DETR
+    Eligibility: ELIG
+    Citizenship: CTZN
+    Household: HHLD
+    Applicant: APLCT
+    Recipient: RCPT
+    Issuance: ISS
+    Supervisor: SUPV
+    Sanction: SNCT
+    Statute: STAT
+    Reference: REF
+    Citation: CITN
+    Document: DOC
+    Received: RCVD
+    Decision: DCSN
+    Outcome: OUTC
+    Hearing: HRG
+    Benefit: BNFT
+    Program: PRGM
+    Client: CLNT
+    Worker: WRKR
+    Appeal: APPL
+    Income: INC
+    Source: SRC
+    Period: PRD
+    Number: NBR
+    Amount: AMT
+    Status: STS
+    Reason: RSN
+    Closure: CLSR
+    Case: CASE
+    Code: CD
+    Date: DT
+    Type: TYP
+    Level: LVL
+    Name: NM
+    Size: SZ
+    Start: STRT
+idioms:
+  schema_qualified: "PROD."
+  if_not_exists: false
+  quoting: none
+  no_foreign_keys: true
+  inline_pk: false
+  check_constraints: false
+  comments: true
+  named_constraints: false
+  table_suffix: "IN PRODDB.PRODTS CCSID EBCDIC"
+  preamble: |
+    --  DDL extracted from the DB2 catalog by the nightly DSNTIAD job.
+    --  Copybook lineage: CLNTMSTR, CASEMSTR, ISSUHIST, DETRHIST.
+    SET CURRENT SQLID = 'PRODDBA';
+types:
+  text: CHAR(40)
+  integer: INTEGER
+  decimal: DECIMAL(9,2)
+  date: DATE
+  datetime: TIMESTAMP
+  boolean: CHAR(1)
+  id: DECIMAL(9,0)
+extra_tables:
+  - |
+    CREATE TABLE PROD.CLNTMSTR (
+      CLNTNBR   CHAR(9)          NOT NULL,
+      SSN       CHAR(9)          NOT NULL WITH DEFAULT,
+      LSTNM     CHAR(20)         NOT NULL WITH DEFAULT,
+      FSTNM     CHAR(15)         NOT NULL WITH DEFAULT,
+      MIDINIT   CHAR(1)          NOT NULL WITH DEFAULT,
+      DOB       DATE             NOT NULL,
+      CTZNCD    CHAR(2)          NOT NULL WITH DEFAULT 'UN',
+      HHLDNBR   CHAR(10)         NOT NULL WITH DEFAULT,
+      STSCD     CHAR(2)          NOT NULL WITH DEFAULT 'CL',
+      LUPDTS    TIMESTAMP        NOT NULL WITH DEFAULT,
+      LUPDUSR   CHAR(8)          NOT NULL WITH DEFAULT,
+      FILLER    CHAR(30)         NOT NULL WITH DEFAULT
+    ) IN DATABASE PRODDB
+      CCSID EBCDIC
+      AUDIT NONE
+      DATA CAPTURE NONE
+  - |
+    CREATE TABLE PROD.CASEXREF (
+      OFFCD     CHAR(3)          NOT NULL,
+      CASENBR   CHAR(7)          NOT NULL,
+      CASEID    DECIMAL(9,0)     NOT NULL,
+      HHLDNBR   CHAR(10)         NOT NULL,
+      PRGMCD    CHAR(3)          NOT NULL,
+      CASESTS   CHAR(2)          NOT NULL WITH DEFAULT 'PN',
+      CLSRSNCD  CHAR(3)          NOT NULL WITH DEFAULT '000',
+      WRKRID    CHAR(8)          NOT NULL WITH DEFAULT,
+      OPENDT    DATE             NOT NULL,
+      CLOSEDT   DATE             NOT NULL WITH DEFAULT '9999-12-31',
+      PRIMARY KEY (OFFCD, CASENBR, PRGMCD)
+    ) IN PRODDB.PRODTS
+      CCSID EBCDIC
+      NOT VOLATILE
+  - |
+    CREATE TABLE PROD.ISSUHIST (
+      CASEID    DECIMAL(9,0)     NOT NULL,
+      BNFTCD    CHAR(4)          NOT NULL,
+      BNFTMTH   CHAR(6)          NOT NULL,
+      ISSSEQ    SMALLINT         NOT NULL WITH DEFAULT 1,
+      ISSAMT    DECIMAL(9,2)     NOT NULL,
+      ISSMTHD   CHAR(1)          NOT NULL WITH DEFAULT 'E',
+      ISSDT     DATE             NOT NULL,
+      EBTAUTH   CHAR(12)         NOT NULL WITH DEFAULT,
+      WARNBR    CHAR(10)         NOT NULL WITH DEFAULT,
+      RECONFLG  CHAR(1)          NOT NULL WITH DEFAULT 'N',
+      BATCHID   CHAR(8)          NOT NULL WITH DEFAULT,
+      PRIMARY KEY (CASEID, BNFTCD, BNFTMTH, ISSSEQ)
+    ) IN PRODDB.PRODTS
+      CCSID EBCDIC
+      APPEND YES
+  - |
+    CREATE TABLE PROD.DETRHIST (
+      CASEID    DECIMAL(9,0)     NOT NULL,
+      PRGMCD    CHAR(3)          NOT NULL,
+      PRDNBR    SMALLINT         NOT NULL,
+      DETRSEQ   SMALLINT         NOT NULL WITH DEFAULT 1,
+      OUTCCD    CHAR(2)          NOT NULL,
+      DETRDT    DATE             NOT NULL,
+      WRKRID    CHAR(8)          NOT NULL,
+      SUPVID    CHAR(8)          NOT NULL WITH DEFAULT,
+      CITN1     CHAR(30)         NOT NULL WITH DEFAULT,
+      CITN2     CHAR(30)         NOT NULL WITH DEFAULT,
+      PRIORSEQ  SMALLINT         NOT NULL WITH DEFAULT 0,
+      NOTCDT    DATE             NOT NULL WITH DEFAULT '0001-01-01',
+      PRIMARY KEY (CASEID, PRGMCD, PRDNBR, DETRSEQ)
+    ) IN PRODDB.PRODTS
+      CCSID EBCDIC
+  - |
+    CREATE TABLE PROD.CDTBL (
+      TBLID     CHAR(4)          NOT NULL,
+      CDVAL     CHAR(3)          NOT NULL,
+      CDDESC    VARCHAR(80)      NOT NULL WITH DEFAULT FOR SBCS DATA,
+      EFFDT     DATE             NOT NULL WITH DEFAULT '0001-01-01',
+      ENDDT     DATE             NOT NULL WITH DEFAULT '9999-12-31',
+      ACTVFLG   CHAR(1)          NOT NULL WITH DEFAULT 'Y',
+      PRIMARY KEY (TBLID, CDVAL, EFFDT)
+    ) IN DATABASE PRODDB
+      CCSID EBCDIC
+      VOLATILE

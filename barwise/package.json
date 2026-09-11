@@ -50,7 +50,12 @@
     "prepare": "cd .. && husky barwise/.husky",
     "regen:tutorial": "node scripts/regen-tutorial.mjs",
     "regen:builtins": "node scripts/regen-builtin-artifacts.mjs",
-    "regen:references": "node scripts/regen-references.mjs"
+    "regen:references": "node scripts/regen-references.mjs",
+    "trial:generate": "node trial/lib/run.mjs generate",
+    "trial:offline": "node trial/lib/run.mjs offline",
+    "trial:keyed": "node trial/lib/run.mjs keyed",
+    "trial:gate": "node trial/lib/gate.mjs",
+    "test:trial": "node --test trial/tests/*.test.mjs"
   },
   "devDependencies": {
     "@dprint/json": "0.23.0",
