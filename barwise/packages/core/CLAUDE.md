@@ -121,6 +121,14 @@ it, so knip sees an unused file where there is a live edge.
   LLM extraction marks its populations as samples; a transcript names
   far more entities than it gives complete facts about
   (`docs/specs/sample-populations.spec.md`).
+
+  That split answers "does this rule need data to be PRESENT", and it is
+  the wrong question for a partial population. A subset or equality
+  constraint reads populations directly, so it is present-data, and it
+  fires when the partner fact type is empty -- which is why counterexample
+  generation splits on LOCALITY (does the rule reach a fact type this
+  population left empty) rather than on this
+  (`docs/specs/counterexample-stray-rules.spec.md`).
 - Serialization round-trips must be lossless. Any new model field must
   have a corresponding serialization path and a round-trip test.
 - JSON Schemas in `schemas/` are first-class artifacts used for file
