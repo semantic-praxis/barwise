@@ -27,6 +27,13 @@ interface Options {
   /** Declared on the Score value type itself. */
   playerRanges?: ValueRange[];
   playerDataType?: "integer" | "boolean";
+  /**
+   * An enumeration AND a range on the value type, where only the range
+   * yields something the declared data type also admits.
+   */
+  playerEnumOverRange?: { values: string[]; ranges: ValueRange[]; dataType: "decimal"; };
+  /** An integer value type enumerating non-integers: nothing satisfies both. */
+  playerContradiction?: true;
   /** A role range AND an integer player, where only a whole number satisfies both. */
   roleRangesWithIntegerPlayer?: ValueRange[];
 }
@@ -44,6 +51,21 @@ function makeModel(options: Options): OrmModel {
     kind: "value",
     ...(options.playerRanges
       ? { valueConstraint: { values: [], ranges: options.playerRanges } }
+      : {}),
+    ...(options.playerContradiction
+      ? {
+        valueConstraint: { values: ["v1", "v2"] },
+        dataType: { name: "integer" as const },
+      }
+      : {}),
+    ...(options.playerEnumOverRange
+      ? {
+        valueConstraint: {
+          values: options.playerEnumOverRange.values,
+          ranges: options.playerEnumOverRange.ranges,
+        },
+        dataType: { name: options.playerEnumOverRange.dataType },
+      }
       : {}),
     ...(options.playerDataType ? { dataType: { name: options.playerDataType } } : {}),
     ...(options.roleRangesWithIntegerPlayer !== undefined
@@ -202,5 +224,98 @@ describe("a probe fills its other roles with values those roles accept", () => {
     // The pre-existing behaviour, unchanged: no domain means the
     // player-named token is right.
     expect(rulesTripped(makeModel({}))).toEqual(["population/uniqueness-violation"]);
+  });
+
+  it("prefers a value its enumeration AND its data type both admit", () => {
+    // barwise-995, the layer conjunction. Each layer used to be asked
+    // alone and the first that answered won: the enumeration answered
+    // "v1", which is in the enumeration and is not a decimal, and the
+    // data type never got to object. Only "10" clears both, and it is
+    // in the range the same constraint declares.
+    const tripped = rulesTripped(
+      makeModel({
+        playerEnumOverRange: {
+          values: ["v1", "v2"],
+          ranges: [{ max: "10" }],
+          dataType: "decimal",
+        },
+      }),
+    );
+    expect(tripped).toEqual(["population/uniqueness-violation"]);
+  });
+
+  it("mints the enumeration entry anyway when no value clears every layer", () => {
+    // The contradictory model: an integer value type enumerating
+    // non-integers admits nothing at all. The minter answers for the
+    // narrowest layer and leaves the contradiction visible, rather than
+    // choosing a value for no reason -- the model error is real and
+    // belongs in front of the modeller (barwise-1017).
+    expect(rulesTripped(makeModel({ playerContradiction: true }))).toEqual([
+      "population/uniqueness-violation",
+      "population/value-type-data-type-violation",
+    ]);
+  });
+});
+
+describe("a probe that puts one value in several roles asks all of them", () => {
+  /**
+   * Two unary fact types under one exclusion constraint. The probe puts
+   * the SAME value in both roles -- that is what an exclusion
+   * counterexample is -- and the two roles have different players, so
+   * the value has to clear both.
+   *
+   * Minted from the first role alone it was `Alpha#1`, a player-named
+   * token for an entity type with no domain at all, which the integer
+   * value type on the other side rejects. "1" clears both, and it is
+   * the second role's own candidate (barwise-995).
+   */
+  function exclusionModel(): OrmModel {
+    const model = new OrmModel({ name: "Probe" });
+    const alpha = model.addObjectType({
+      name: "Alpha",
+      kind: "entity",
+      referenceMode: "alpha_id",
+    });
+    const beta = model.addObjectType({
+      name: "Beta",
+      kind: "value",
+      dataType: { name: "integer" },
+    });
+
+    const flagged = model.addFactType({
+      name: "Alpha is flagged",
+      roles: [{ name: "is flagged", playerId: alpha.id }],
+      readings: ["{0} is flagged"],
+    });
+    const counted = model.addFactType({
+      name: "Beta is counted",
+      roles: [{ name: "is counted", playerId: beta.id }],
+      readings: ["{0} is counted"],
+    });
+
+    flagged.addConstraint({
+      type: "exclusion",
+      roleIds: [flagged.roles[0]!.id, counted.roles[0]!.id],
+    });
+    return model;
+  }
+
+  it("trips exclusion alone, not the other player's data type", () => {
+    const model = exclusionModel();
+    const exclusion = generateCounterexamples(model).find(
+      (ce: Counterexample) => ce.constraintType === "exclusion",
+    );
+    expect(exclusion, "the model must yield an exclusion counterexample").toBeDefined();
+
+    for (const forbidden of exclusion!.forbidden) {
+      const pop = model.addPopulation({ factTypeId: forbidden.factTypeId });
+      for (const inst of forbidden.instances) {
+        pop.addInstance({ roleValues: { ...inst.roleValues } });
+      }
+    }
+    const tripped = [
+      ...new Set(populationValidationRules(model, graphFor(model)).map((d) => d.ruleId)),
+    ];
+    expect(tripped).toEqual(["population/exclusion-violation"]);
   });
 });

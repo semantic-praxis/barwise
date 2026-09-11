@@ -113,8 +113,7 @@ export function dataTypeAdmits(type: ConceptualDataTypeName, val: string): boole
 }
 
 /**
- * A stable value the domain ADMITS, or undefined when this function
- * cannot construct one.
+ * Every value this domain suggests, most preferred first.
  *
  * The constructive twin of `valueDomainPredicate`, and the third corner
  * of a square whose fourth is `mintInvalidValue` in
@@ -135,31 +134,40 @@ export function dataTypeAdmits(type: ConceptualDataTypeName, val: string): boole
  * constraint too (barwise-959). It is the exact mirror of barwise-958,
  * where the forbidding side read the enumeration and ignored ranges.
  *
- * `index` cycles the enumeration, so a caller minting several values
- * for one role gets distinct ones where the domain allows it.
+ * CANDIDATES, NOT ANSWERS, and that is the whole interface decision.
+ * This used to return one value, already filtered by the domain it came
+ * from -- which is right until a role is governed by SEVERAL domains at
+ * once, as one is: its own value constraint, its player's, and its
+ * player's data type. Each was then consulted alone and the first to
+ * answer won, so a value type declaring `decimal` and enumerating
+ * {v1, v2} over a range of "at most 10" minted "v1", admitted by its own
+ * enumeration and rejected by its own data type, when "10" satisfies
+ * both. Offering the candidates lets the caller apply the CONJUNCTION
+ * and decide once (barwise-995); `mintValueForAll` is that caller.
  *
- * TOTALITY, stated honestly rather than claimed. The enumeration arm is
- * total: a non-empty enumeration always admits its own entries. The
- * range arm is a fixed candidate list checked against the predicate,
- * not a search, so a domain whose only admissible values lie between
- * the candidates -- an exclusive range narrower than 1 over
- * non-integers, say -- yields undefined. The caller then falls back to
- * the token it used before, which is the pre-existing behaviour rather
- * than a new failure. Under-generating is the safe direction here for
- * the same reason it is in `mintInvalidValue`.
+ * `index` rotates the enumeration and walks the ranges rather than
+ * indexing either, so a caller minting several values for one role gets
+ * distinct ones AND still sees every entry when the first few are
+ * inadmissible under another layer.
+ *
+ * TOTALITY, stated honestly rather than claimed. A non-empty enumeration
+ * always admits its own entries, so a domain carrying one always offers
+ * something its own predicate accepts. The range arm is a fixed
+ * candidate list, not a search, so a domain whose only admissible values
+ * lie between the candidates -- an exclusive range narrower than 1 over
+ * non-integers, say -- offers nothing admissible at all. The caller then
+ * falls back to the token it used before. Under-generating is the safe
+ * direction here for the same reason it is in `mintInvalidValue`.
  */
-export function mintAllowedValue(domain: ValueDomain, index: number): string | undefined {
-  if (domain.values.length > 0) {
-    return domain.values[index % domain.values.length];
-  }
-
-  const admits = valueDomainPredicate(domain);
-  for (const range of domain.ranges ?? []) {
-    for (const candidate of rangeCandidates(range, index)) {
-      if (admits(candidate)) return candidate;
-    }
-  }
-  return undefined;
+export function allowedValueCandidates(
+  domain: ValueDomain,
+  index: number,
+): readonly string[] {
+  const n = domain.values.length;
+  const enumerated = n === 0
+    ? []
+    : Array.from({ length: n }, (_, i) => domain.values[(index + i) % n] as string);
+  return [...enumerated, ...(domain.ranges ?? []).flatMap((r) => rangeCandidates(r, index))];
 }
 
 /**
@@ -178,7 +186,7 @@ export function mintAllowedValue(domain: ValueDomain, index: number): string | u
  * So a numeric bound is walked by the index rather than merely offered.
  * An inclusive bound yields the bound itself at index 0, which is also
  * the most readable value to show; an exclusive one starts one step in.
- * Each is only a CANDIDATE -- `mintAllowedValue` checks every one
+ * Each is only a CANDIDATE -- `mintValueForAll` checks every one
  * against the whole domain, so a step that leaves the range is
  * discarded and the next candidate tried.
  */
@@ -225,7 +233,7 @@ function rangeCandidates(range: ValueRange, index: number): readonly string[] {
  * whose admissible spellings `dataTypeAdmits` does not constrain.
  *
  * The constructive twin of `dataTypeAdmits`, and it exists for the same
- * reason `mintAllowedValue` does. Counterexample generation fills a
+ * reason `allowedValueCandidates` does. Counterexample generation fills a
  * fact type's other roles with player-named tokens like `Score#1`, and
  * a role played by a value type declaring `integer` does not admit
  * that. Before barwise-945 nothing checked it, so nothing noticed; the

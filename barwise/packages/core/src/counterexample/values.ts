@@ -1,10 +1,11 @@
 import { isValueConstraint } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
-import { dataTypeOf, valueConstraintOf } from "../model/ObjectType.js";
+import { type ConceptualDataTypeName, dataTypeOf, valueConstraintOf } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { Role } from "../model/Role.js";
 import {
-  mintAllowedValue,
+  allowedValueCandidates,
+  dataTypeAdmits,
   mintValueOfType,
   type ValueDomain,
   valueDomainPredicate,
@@ -39,45 +40,123 @@ export function playerName(role: Role, model: OrmModel): string {
 }
 
 /**
- * A stable placeholder value for a role at a given index. Within a role's
- * value-constraint domain when one exists and a value can be constructed
- * from it; otherwise a player-named token like `Customer#1`.
+ * One place a minted value has to be admissible: a role, in the fact
+ * type that declares it.
  *
- * The fallback is reached only when the role declares no domain, or when
- * `mintAllowedValue` cannot construct one from the ranges it declares --
- * not, as before, whenever the domain happened to be expressed as a
- * range rather than an enumeration.
+ * A counterexample often puts ONE value in several roles at once -- that
+ * is the whole shape of an exclusion, exclusive-or, subset or equality
+ * probe, and of the anchor population a mandatory probe builds in
+ * another fact type. Those roles need not share a player, so the value
+ * has to clear all of their domains and not just the first one's.
  */
+export interface RolePlacement {
+  readonly role: Role;
+  readonly ft: FactType;
+}
+
+/**
+ * Every domain that governs what a placement admits, narrowest first.
+ *
+ * Three of them, and a value has to satisfy ALL of them: the role's own
+ * value constraint is the most specific statement about this role, the
+ * player's value constraint governs every role it plays, and the
+ * player's data type is the weakest of the three.
+ */
+function placementDomains(
+  { role, ft }: RolePlacement,
+  model: OrmModel,
+): {
+  readonly domains: readonly ValueDomain[];
+  readonly dataType: ConceptualDataTypeName | undefined;
+} {
+  const domains: ValueDomain[] = [];
+  const roleDomain = roleValueDomain(role.id, ft);
+  if (roleDomain !== undefined) domains.push(roleDomain);
+
+  const player = model.getObjectType(role.playerId);
+  const playerDomain = player === undefined ? undefined : valueConstraintOf(player);
+  if (playerDomain !== undefined) domains.push(playerDomain);
+
+  const dataType = player === undefined ? undefined : dataTypeOf(player)?.name;
+  return { domains, dataType };
+}
+
+/**
+ * A stable placeholder value admissible in EVERY given placement, when
+ * one can be constructed, and otherwise the first placement's own best
+ * answer.
+ *
+ * THE CONJUNCTION IS THE POINT, twice over. Along one axis a single role
+ * is governed by three layers -- its value constraint, its player's, and
+ * its player's data type -- and each used to be consulted alone, the
+ * first that produced anything winning, with the winner never shown to
+ * the other two. A value type declaring `decimal` and enumerating
+ * {v1, v2} over a range of "at most 10" minted "v1", which its own
+ * enumeration admits and its own data type rejects, and the probe then
+ * reported `population/value-type-data-type-violation` beside the rule
+ * it was about. Along the other axis a probe places one value in several
+ * roles, and minting it from the first role alone leaves the rest to
+ * chance.
+ *
+ * Fixing this layer by layer is how the defect keeps coming back --
+ * barwise-959 for the role layer, then barwise-945's new rules exposing
+ * the player layer. Asking once, of everything that applies, is what
+ * stops the next layer from repeating it (barwise-995).
+ *
+ * The fallback is reached only when NO candidate satisfies everything,
+ * which means the placements are jointly contradictory: an enumeration
+ * whose members are not of the declared data type admits nothing at all,
+ * and two roles whose players have disjoint domains share no value.
+ * Nothing this function can mint is right there, so it mints what it
+ * always did and leaves the contradiction visible rather than hiding it
+ * behind a value chosen for no reason.
+ */
+export function mintValueForAll(
+  // A NON-EMPTY tuple, so "no placements" is not a case any caller has
+  // to handle or this function has to refuse at run time.
+  placements: readonly [RolePlacement, ...RolePlacement[]],
+  model: OrmModel,
+  index: number,
+): string {
+  const layered = placements.map((p) => placementDomains(p, model));
+  const predicates = layered.flatMap((l) => l.domains.map(valueDomainPredicate));
+  const dataTypes = layered.flatMap((l) => (l.dataType === undefined ? [] : [l.dataType]));
+  const admitsAll = (val: string): boolean =>
+    predicates.every((p) => p(val)) && dataTypes.every((t) => dataTypeAdmits(t, val));
+
+  const candidates = [
+    ...layered.flatMap((l) => l.domains.flatMap((d) => allowedValueCandidates(d, index))),
+    ...dataTypes.flatMap((t) => {
+      const v = mintValueOfType(t, index);
+      return v === undefined ? [] : [v];
+    }),
+    ...placements.map((p) => `${playerName(p.role, model)}#${index + 1}`),
+  ];
+
+  const agreed = candidates.find(admitsAll);
+  if (agreed !== undefined) return agreed;
+
+  // Nothing clears every placement. Answer for the first one alone,
+  // narrowest layer first, which is what this function did before it
+  // asked them together.
+  const first = placements[0];
+  const { domains, dataType } = placementDomains(first, model);
+  for (const domain of domains) {
+    const fallback = allowedValueCandidates(domain, index).find(valueDomainPredicate(domain));
+    if (fallback !== undefined) return fallback;
+  }
+  const fromType = dataType === undefined ? undefined : mintValueOfType(dataType, index);
+  return fromType ?? `${playerName(first.role, model)}#${index + 1}`;
+}
+
+/** `mintValueForAll` for the common case of a value used in one role. */
 export function mintValue(
   role: Role,
   factType: FactType,
   model: OrmModel,
   index: number,
 ): string {
-  // Three sources, narrowest first. A role-level constraint is the most
-  // specific statement about this role; the player's own value
-  // constraint governs every role it plays; its data type is the
-  // weakest of the three. Each was a separate way for a filler value to
-  // break a rule the probe was not about (barwise-959, and then
-  // barwise-945's new rules made the player-level half visible).
-  const roleDomain = roleValueDomain(role.id, factType);
-  const fromRole = roleDomain === undefined ? undefined : mintAllowedValue(roleDomain, index);
-  if (fromRole !== undefined) return fromRole;
-
-  const player = model.getObjectType(role.playerId);
-  if (player !== undefined) {
-    const playerDomain = valueConstraintOf(player);
-    const fromPlayer = playerDomain === undefined
-      ? undefined
-      : mintAllowedValue(playerDomain, index);
-    if (fromPlayer !== undefined) return fromPlayer;
-
-    const dataType = dataTypeOf(player);
-    const fromType = dataType === undefined ? undefined : mintValueOfType(dataType.name, index);
-    if (fromType !== undefined) return fromType;
-  }
-
-  return `${playerName(role, model)}#${index + 1}`;
+  return mintValueForAll([{ role, ft: factType }], model, index);
 }
 
 /**
