@@ -30,7 +30,7 @@
  * tells us not to take.
  */
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
@@ -650,6 +650,148 @@ test("mutate reports a failed restore on an UNTRACKED file, which git diff canno
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("mutate refuses a run whose command was KILLED rather than exiting", async () => {
+  // The reading this protects is `mutate ... && echo verified`. The
+  // status line used to be `run.status === null ? 1`, so a ctrl-c or a
+  // harness timeout SIGTERMing the process group sent the run down the
+  // CAUGHT branch: exit 0, "the command failed (exit 1)" naming a code
+  // the command never returned, and `verified` printed for a run that
+  // verified nothing (barwise-998, finding 1).
+  //
+  // The child hangs so the kill lands mid-run, which is when a real
+  // interruption arrives, and it is the CHILD that is killed rather
+  // than mutate itself -- what a timeout killing a process group does
+  // to the thing actually executing. The exit status is read from the
+  // process object rather than through a pipeline, for the reason the
+  // helper itself spawns without a shell.
+  const dir = mutateRepo({ subject: "value = GOOD\n" });
+  const marker = `mutate-kill-probe-${process.pid}.mjs`;
+  try {
+    writeFileSync(join(dir, marker), `setTimeout(() => {}, 60_000);\n`);
+
+    const child = spawn(process.execPath, [
+      join(SCRIPTS, "mutate.mjs"),
+      "--file",
+      "subject.txt",
+      "--old",
+      "GOOD",
+      "--new",
+      "BAD",
+      "--",
+      process.execPath,
+      marker,
+    ], { cwd: dir, stdio: ["ignore", "pipe", "pipe"] });
+
+    let stderr = "";
+    child.stderr.on("data", (c) => {
+      stderr += String(c);
+    });
+
+    const exited = new Promise((res) => child.on("exit", (code) => res(code)));
+
+    // Wait until the mutation is on disk, so the kill lands while the
+    // command runs rather than during setup. A fixed sleep would make
+    // this test time-dependent; the file content is the real signal.
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      if (readFileSync(join(dir, "subject.txt"), "utf8").includes("BAD")) break;
+      await new Promise((res) => setTimeout(res, 25));
+    }
+    assert.match(
+      readFileSync(join(dir, "subject.txt"), "utf8"),
+      /BAD/,
+      "the mutation never reached disk, so this test would kill the wrong phase",
+    );
+
+    // A marker unique to this run, so the kill cannot reach another
+    // test's child or a developer's unrelated process.
+    spawnSync("pkill", ["-TERM", "-f", marker], { stdio: "ignore" });
+
+    const status = await exited;
+
+    assert.equal(
+      status,
+      2,
+      `a killed run must refuse, not report CAUGHT. stderr:\n${stderr}`,
+    );
+    assert.match(stderr, /killed by SIG/);
+
+    // The tree is still restored, which is the other half of the
+    // guarantee and the reason the `finally` exists.
+    assert.equal(readFileSync(join(dir, "subject.txt"), "utf8"), "value = GOOD\n");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("mutate refuses, rather than reporting UNCAUGHT, when the restore THROWS", () => {
+  // An exception inside restoreOrDie used to propagate, and Node exits
+  // 1 on an uncaught throw -- which is this script's UNCAUGHT code. So
+  // a command that replaced the target with a directory printed a stack
+  // trace and then reported, in the one number a caller reads, that the
+  // suite had failed to notice the mutation (barwise-998).
+  const dir = mutateRepo({ subject: "value = GOOD\n" });
+  try {
+    writeFileSync(
+      join(dir, "check.mjs"),
+      `import { mkdirSync, rmSync } from "node:fs";\n`
+        + `rmSync("subject.txt");\n`
+        + `mkdirSync("subject.txt");\n`
+        + `process.exit(1);\n`,
+    );
+    const r = mutate(dir, [
+      "--file",
+      "subject.txt",
+      "--old",
+      "GOOD",
+      "--new",
+      "BAD",
+      "--",
+      process.execPath,
+      "check.mjs",
+    ]);
+
+    assert.equal(r.status, 2, `expected a refusal:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /RESTORE FAILED/);
+    assert.match(r.stderr, /EISDIR|illegal operation on a directory/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("every scripts/*.mjs path a skill cites exists", () => {
+  // mutation-verification-helper.spec.md claimed `check:book-citations`
+  // guarded these, so a rename that missed one would fail a gate. That
+  // checker resolves Halpin & Morgan SECTION NUMBERS and knows nothing
+  // about file paths, so the citations in session-review/SKILL.md and
+  // pr-review/checklist.md were an unguarded must-agree copy
+  // (barwise-998, finding 3). This is the guard the spec described.
+  const docs = execFileSync("git", ["ls-files", "--", ".claude/skills"], {
+    cwd: REPO,
+    encoding: "utf8",
+  }).split("\n").filter((f) => f.endsWith(".md"));
+
+  const missing = [];
+  let cited = 0;
+  for (const doc of docs) {
+    const text = readFileSync(join(REPO, doc), "utf8");
+    for (const m of text.matchAll(/\b((?:barwise\/)?scripts\/[\w./-]*\.mjs)\b/g)) {
+      cited++;
+      const rel = m[1].startsWith("barwise/") ? m[1] : join("barwise", m[1]);
+      if (!existsSync(join(REPO, rel))) missing.push(`${doc}: ${m[1]}`);
+    }
+  }
+
+  // The denominator beside the count, so an empty result cannot read as
+  // "nothing is broken" when the scan has stopped matching anything.
+  assert.ok(cited > 0, "no scripts/*.mjs citations found under .claude/skills -- scan broken");
+  assert.deepEqual(
+    missing,
+    [],
+    `skill docs cite scripts that do not exist:\n${missing.join("\n")}`,
+  );
 });
 
 test("check-root-scripts fails on drift in either direction", () => {

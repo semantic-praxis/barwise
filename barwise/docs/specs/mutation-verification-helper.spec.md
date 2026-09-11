@@ -228,11 +228,22 @@ Separate from WS1 because the command has to exist and be trusted
 before a rule points at it, and because a skill edit lands on a
 different review path than a script.
 
-The two files naming the same invocation is a copy, and the check it
-gets is the one already built for exactly this: `check:book-citations`
-resolves the paths a doc cites, so both amended rules cite
-`scripts/mutate.mjs` by path and a rename that misses one fails that
-gate. No new mechanism, and no "must match" comment.
+The two files naming the same invocation is a copy, and it needs a
+check that fails when a rename misses one.
+
+This paragraph originally said `check:book-citations` already provided
+it -- that it "resolves the paths a doc cites". It does not: that
+script resolves Halpin & Morgan SECTION NUMBERS against the transcribed
+table of contents and knows nothing about file paths. So the two
+citations shipped as an unguarded must-agree copy, protected by a
+sentence rather than by a gate, which is the exact shape
+`docs/specs/duplication-drift-guards.spec.md` exists to prevent
+(barwise-998, finding 3).
+
+The guard is a case in `scripts/tests/gates.test.mjs`: every
+`scripts/<name>.mjs` path cited by a tracked `.md` under `.claude/skills`
+must exist, with the number of citations asserted non-zero so a scan
+that stops matching cannot read as "nothing is broken".
 
 ### 3. A curated mutation manifest run in CI (provisional: not yet grounded)
 
