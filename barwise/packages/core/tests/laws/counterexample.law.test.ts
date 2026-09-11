@@ -23,6 +23,7 @@ import { arbOrmModel, RUNS, SEED } from "../arbitraries/model.js";
 import {
   counterexampleRoundTripFailure,
   expectedRuleFor,
+  type LocalStray,
   localStrays,
   rulesFromKind,
 } from "../helpers/counterexampleRules.js";
@@ -107,6 +108,28 @@ const LOCAL_STRAY_BASELINE = {
   } as Record<string, string>,
 };
 
+/**
+ * The (constraint kind -> stray rule) breakdown, most frequent first.
+ *
+ * Attached to the failure messages below rather than kept as a separate
+ * sweep script. barwise-995's number was produced by a sweep that was
+ * never committed, so the next reader could neither reproduce it nor
+ * see what made it up (barwise-999). A count that moves and a reader
+ * who then has to rebuild the instrument is the same problem as a count
+ * that goes stale.
+ */
+function strayTable(strays: readonly LocalStray[]): string {
+  const counts = new Map<string, number>();
+  for (const s of strays) {
+    const key = `${s.constraintType} -> ${s.ruleId}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([key, n]) => `  ${String(n).padStart(4)}  ${key}`)
+    .join("\n");
+}
+
 describe("ratchet: a counterexample's own filler values break less than they did", () => {
   const models = fc.sample(arbOrmModel(), { seed: SEED, numRuns: RUNS });
   const strays = models.flatMap((model) => localStrays(model));
@@ -116,14 +139,15 @@ describe("ratchet: a counterexample's own filler values break less than they did
     const named = Object.keys(LOCAL_STRAY_BASELINE.reasons).sort();
     // Both directions in one assertion: a new stray rule and a baseline
     // row that has been fixed are the same kind of staleness.
-    expect(seen).toEqual(named);
+    expect(seen, `local strays by (kind -> rule):\n${strayTable(strays)}`).toEqual(named);
   });
 
   it("trips exactly as many as the baseline records", () => {
     // Exact, not a ceiling. A ceiling lets an improvement go unrecorded,
     // and the next reader cannot tell whether 40 under a cap of 123 is
     // progress or a measurement that stopped working.
-    expect(strays.length).toBe(LOCAL_STRAY_BASELINE.occurrences);
+    expect(strays.length, `local strays by (kind -> rule):\n${strayTable(strays)}`)
+      .toBe(LOCAL_STRAY_BASELINE.occurrences);
   });
 });
 
