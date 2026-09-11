@@ -324,9 +324,9 @@
     },
     "C04/small/4/read-back:norma": {
       "severity": "S1",
-      "class": "norma-read-back-population-orphan",
+      "class": "norma-read-back-sample-flag",
       "issue": "barwise-1036",
-      "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation: role identity is rewritten across the round trip and the population rows no longer play the mandatory roles (barwise-1036, sibling of barwise-1028).",
+      "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation. The cause is the lost `sample: true` flag: NORMA has no seat for a sample instance, so the populations come back significant, their instances enter the object universe, and every mandatory role they must play reports a violation (barwise-1036). Restoring only that flag takes the round-tripped model from 49 errors to 0.",
       "detail": "the model the importer wrote has 49 structural error(s): population/mandatory-violation"
     },
     "C04/small/4/read-back:openapi": {
@@ -933,9 +933,9 @@
     },
     "C11/small/4/read-back:norma": {
       "severity": "S1",
-      "class": "norma-read-back-population-orphan",
+      "class": "norma-read-back-sample-flag",
       "issue": "barwise-1036",
-      "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation: role identity is rewritten across the round trip and the population rows no longer play the mandatory roles (barwise-1036, sibling of barwise-1028).",
+      "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation. The cause is the lost `sample: true` flag: NORMA has no seat for a sample instance, so the populations come back significant, their instances enter the object universe, and every mandatory role they must play reports a violation (barwise-1036). Restoring only that flag takes the round-tripped model from 49 errors to 0.",
       "detail": "the model the importer wrote has 37 structural error(s): population/mandatory-violation"
     },
     "C11/small/4/read-back:openapi": {

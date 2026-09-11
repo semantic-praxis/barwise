@@ -126,12 +126,12 @@
       "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-1028)."
     },
     {
-      "id": "norma-read-back-population-orphan",
+      "id": "norma-read-back-sample-flag",
       "issue": "barwise-1036",
       "severity": "S1",
       "step": "^read-back:norma$",
       "detail": "population/mandatory-violation",
-      "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation: role identity is rewritten across the round trip and the population rows no longer play the mandatory roles (barwise-1036, sibling of barwise-1028)."
+      "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation. The cause is the lost `sample: true` flag: NORMA has no seat for a sample instance, so the populations come back significant, their instances enter the object universe, and every mandatory role they must play reports a violation (barwise-1036). Restoring only that flag takes the round-tripped model from 49 errors to 0."
     },
     {
       "id": "diff-rename-no-synonym",
