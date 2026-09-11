@@ -208,6 +208,17 @@ jobs:
       # change.
       - run: npm run check:book-citations
 
+      # The correction ratchet: a spec that records what its draft got
+      # wrong carries a baseline row saying what CAUGHT it. The
+      # 2026-09-11 hand pass over 28 specs found roughly three quarters
+      # of spec defects were caught by executing something and that
+      # verbosity caused none -- a reading that started decaying the
+      # moment it was written, because the next spec to record a
+      # correction was outside it. Fails on a new unclassified record AND
+      # on a row no longer detected (barwise-1013). No docs-only skip: a
+      # spec edit IS the change this gate checks.
+      - run: npm run audit:corrections -- --check
+
       # The gates' own tests. Every enumerating gate is proven to report
       # the same coverage from three different cwds (barwise-905: one of
       # them silently scanned 1426 of 1483 files under `npm run`), and

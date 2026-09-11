@@ -108,6 +108,7 @@ const ROOT_DEPENDENT_GATES = [
   "check-book-citations.mjs",
   "check-core-purity.mjs",
   "check-file-size.mjs",
+  "audit-corrections.mjs",
 ];
 
 for (const script of ROOT_DEPENDENT_GATES) {
@@ -199,7 +200,7 @@ function stage(dir, name, contents) {
 
 const CWDS = [REPO, join(REPO, "barwise"), join(REPO, "barwise", "packages", "core", "src")];
 
-for (const script of ["check-no-nul.mjs", "check-shell.mjs"]) {
+for (const script of ["check-no-nul.mjs", "check-shell.mjs", "audit-corrections.mjs"]) {
   test(`${script} reports the same coverage from every cwd`, () => {
     const runs = CWDS.map((cwd) => ({ cwd, ...gate(script, cwd) }));
     for (const r of runs) {
@@ -1757,6 +1758,149 @@ test("check-beads says so out loud when it has no baseline to compare against", 
     const r = beadsCheckIn(dir);
     assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
     assert.match(r.stdout, /id-identity check DID NOT RUN/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- barwise-1013: the correction ratchet fails both ways ---
+
+/**
+ * A baseline that only fails on NEW records would let a fixed row sit
+ * forever; one that only fails on stale rows would let a new correction
+ * ship unclassified. Both halves are asserted, and both are established
+ * red here rather than argued -- the gate's whole subject is that a
+ * check nobody watched fail is not a check (assertion-audit rule 0).
+ *
+ * The probes are STAGED, not merely written: the gate enumerates through
+ * `trackedFiles()`, so a spec written to disk and never `git add`ed is
+ * invisible to it and the run would report a match having read nothing.
+ * That is barwise-906's shape, and it is the reason this file has the
+ * `stage` helper at all.
+ */
+function correctionRepo(specs, baselineRecords) {
+  const dir = tempRepo();
+  for (const [name, body] of Object.entries(specs)) {
+    stage(dir, `barwise/docs/specs/${name}`, body);
+  }
+  stage(
+    dir,
+    "barwise/correction-baseline.json",
+    JSON.stringify({ $comment: "test", records: baselineRecords }, null, 2) + "\n",
+  );
+  return dir;
+}
+
+/** The id the gate assigns, read from its own listing rather than recomputed. */
+function idOf(dir, excerptFragment) {
+  const listing = gate("audit-corrections.mjs", dir);
+  assert.equal(listing.status, 0, `listing failed:\n${listing.stdout}${listing.stderr}`);
+  const lines = listing.stdout.split("\n");
+  const i = lines.findIndex((l) => l.includes(excerptFragment));
+  assert.ok(i > 0, `no record matching ${excerptFragment} in:\n${listing.stdout}`);
+  return lines[i - 1].trim();
+}
+
+const A_CORRECTION =
+  "# Probe\n\nThe draft said the loader was pure, and implementing it showed the\n"
+  + "loader reads the environment, so the claim was wrong in kind.\n";
+
+test("audit-corrections fails on a correction record missing from the baseline", () => {
+  const dir = correctionRepo({ "probe.spec.md": A_CORRECTION }, {});
+  try {
+    const red = gate("audit-corrections.mjs", dir, "--check");
+    assert.equal(red.status, 1, `expected a finding (1), got ${red.status}`);
+    assert.match(`${red.stdout}${red.stderr}`, /NEW correction record/);
+    assert.match(`${red.stdout}${red.stderr}`, /probe/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("audit-corrections fails on a baseline entry no longer detected", () => {
+  const dir = correctionRepo({ "probe.spec.md": A_CORRECTION }, {});
+  try {
+    const id = idOf(dir, "the draft said the loader was pure");
+    const withRow = correctionRepo({ "probe.spec.md": A_CORRECTION }, {
+      [id]: { spec: "probe.spec.md", excerpt: "x", caught_by: "execution", note: "" },
+    });
+    try {
+      assert.equal(
+        gate("audit-corrections.mjs", withRow, "--check").status,
+        0,
+        "a classified record must pass before the stale half can mean anything",
+      );
+      // Rewrite the paragraph past recognition; the row now describes
+      // text that is not there.
+      stage(withRow, "barwise/docs/specs/probe.spec.md", "# Probe\n\nNothing here.\n");
+      const red = gate("audit-corrections.mjs", withRow, "--check");
+      assert.equal(red.status, 1, `expected a finding (1), got ${red.status}`);
+      assert.match(`${red.stdout}${red.stderr}`, /no longer detected/);
+    } finally {
+      rmSync(withRow, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("audit-corrections fails a row whose verdict is not a classification", () => {
+  const dir = correctionRepo({ "probe.spec.md": A_CORRECTION }, {});
+  try {
+    const id = idOf(dir, "the draft said the loader was pure");
+    const bad = correctionRepo({ "probe.spec.md": A_CORRECTION }, {
+      [id]: { spec: "probe.spec.md", excerpt: "x", caught_by: "TODO: classify", note: "" },
+    });
+    try {
+      const red = gate("audit-corrections.mjs", bad, "--check");
+      assert.equal(red.status, 1, `expected a finding (1), got ${red.status}`);
+      assert.match(`${red.stdout}${red.stderr}`, /no usable verdict/);
+    } finally {
+      rmSync(bad, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("audit-corrections refuses an empty spec corpus rather than reporting a match", () => {
+  // The reading that looks like success: every check filters the record
+  // list, so zero specs would print "baseline matches" having read
+  // nothing at all.
+  const dir = tempRepo();
+  try {
+    stage(dir, "README.md", "no specs here\n");
+    stage(dir, "barwise/correction-baseline.json", '{"records":{}}\n');
+    const r = gate("audit-corrections.mjs", dir, "--check");
+    assert.equal(r.status, 2, `expected refusal (2), got ${r.status}:\n${r.stdout}${r.stderr}`);
+    assert.doesNotMatch(r.stdout, /baseline matches/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("audit-corrections refuses to WRITE a baseline while a spec is untracked", () => {
+  // The defect this gate shipped with, pinned. Its own baseline was
+  // generated while its own spec was unstaged: the gate enumerates
+  // through trackedFiles(), so the spec was invisible, --check passed
+  // locally, and CI went red on five records from that very file the
+  // moment it was committed. --check still does not refuse here -- its
+  // input is the TRACKED corpus by definition, the same blind spot
+  // check-no-nul pins as intended -- but --write persists the
+  // incomplete reading, so that is the operation that refuses.
+  const dir = correctionRepo({ "tracked.spec.md": A_CORRECTION }, {});
+  try {
+    writeFileSync(join(dir, "barwise/docs/specs/draft.spec.md"), A_CORRECTION);
+
+    const write = gate("audit-corrections.mjs", dir, "--write");
+    assert.equal(write.status, 2, `expected refusal (2), got ${write.status}`);
+    assert.match(write.stderr, /draft\.spec\.md/);
+    assert.doesNotMatch(write.stdout, /wrote/);
+
+    // --check is unaffected: the untracked draft is simply out of scope.
+    const check = gate("audit-corrections.mjs", dir, "--check");
+    assert.equal(check.status, 1, "the tracked probe is still unclassified, so --check finds it");
+    assert.doesNotMatch(`${check.stdout}${check.stderr}`, /draft\.spec\.md/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
