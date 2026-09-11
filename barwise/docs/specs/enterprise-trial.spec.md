@@ -585,6 +585,17 @@ reality (the `spec-writer` convention).
   avro` writes one `.avsc` per record, not one file; the draft's
   consumer assumed a file and crashed the runner on the first customer
   that reached sprint 4.
+- **The corrections ratchet fires on this spec, and could not fire
+  before the spec was committed.** `audit:corrections` reads tracked
+  files, so an untracked spec is invisible to it: `ci:local` passed on
+  the very content CI then rejected. The six records this spec's
+  implementation notes produce are classified in
+  `correction-baseline.json`; two are the same correction recorded in
+  two sections, and three are the detector being deliberately
+  over-inclusive (a table row using "draft" to mean a draft model, a
+  section heading, a risk entry). Nothing to fix in the gate: run it
+  after committing, not before.
+
 - **`--samples`, `--thinking-budget` and the MCP parity of
   `describe` are not exercised.** The first two belong to the keyed
   lane (workstream 3). The third is blocked by the MCP inline-output

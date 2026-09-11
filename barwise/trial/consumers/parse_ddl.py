@@ -20,7 +20,8 @@ DIALECTS = {"ansi": None, "sqlserver": "tsql", "databricks": "databricks"}
 def main() -> int:
     path, dialect = sys.argv[1], sys.argv[2]
     read = DIALECTS.get(dialect, dialect)
-    text = open(path, encoding="utf-8-sig").read()
+    with open(path, encoding="utf-8-sig") as handle:
+        text = handle.read()
     statements = [s for s in split_statements(text) if s.strip()]
     failures = []
     parsed = 0
