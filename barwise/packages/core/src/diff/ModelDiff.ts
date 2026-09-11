@@ -23,8 +23,6 @@ import {
   diffSubtypeFact,
   factTypeName,
   instancesKey,
-  isDanglingFactType,
-  isDanglingPlayer,
   playerName,
 } from "./elementDiff.js";
 import { detectSynonymCandidates } from "./synonyms.js";
@@ -217,29 +215,34 @@ export function diffModels(
   // subtype therefore reads as removed-plus-added, exactly as a renamed
   // object type does.
   //
-  // The pair whose endpoints NEITHER model defines is skipped rather
-  // than reported. Such an element cannot exist in any merged model --
-  // `addableSubtypeFact` requires both ends to be present, and no
-  // acceptance set can conjure an object type neither side declares --
-  // so a delta for it offers a choice that is not one: accepting it
-  // does nothing, rejecting a removal keeps nothing, and its label
-  // names two UUIDs (barwise-957). The dangling reference itself is
-  // `ValidationEngine`'s to report, and it does.
+  // The pair whose endpoints NEITHER model defines IS reported, and
+  // this is a correction to the rule that shipped here in barwise-957.
+  //
+  // That rule skipped it, on the ground that "such an element cannot
+  // exist in any merged model". The premise is false. `OrmModel` holds
+  // it under `skipPlayerValidation` -- which is precisely how the
+  // lenient load put it in the incoming model in the first place -- and
+  // `structural/subtype-dangling-subtype` and its supertype twin report
+  // it at error severity, through `getStructuralErrors`, which is what
+  // `mergeAndValidate` already runs.
+  //
+  // So skipping it was not sparing the reviewer a false choice; it was
+  // deleting the evidence of a dangling reference before anything could
+  // report it (barwise-997, established on the population case and the
+  // same here). The delta's label may name an id no reader recognises,
+  // which is the cost, and an error they must resolve is worth more
+  // than a silent loss.
   const sfKey = (sf: SubtypeFact, model: OrmModel, other: OrmModel): string =>
     `${playerName(model, sf.subtypeId, other)}\u0000${playerName(model, sf.supertypeId, other)}`;
   const sfRefs = (sf: SubtypeFact, model: OrmModel, other: OrmModel) => ({
     subtype: { id: sf.subtypeId, name: playerName(model, sf.subtypeId, other) },
     supertype: { id: sf.supertypeId, name: playerName(model, sf.supertypeId, other) },
   });
-  const sfResolvable = (sf: SubtypeFact): boolean =>
-    !isDanglingPlayer(existing, incoming, sf.subtypeId)
-    && !isDanglingPlayer(existing, incoming, sf.supertypeId);
-
   const existingSfs = new Map(
-    existing.subtypeFacts.filter(sfResolvable).map((sf) => [sfKey(sf, existing, incoming), sf]),
+    existing.subtypeFacts.map((sf) => [sfKey(sf, existing, incoming), sf]),
   );
   const incomingSfs = new Map(
-    incoming.subtypeFacts.filter(sfResolvable).map((sf) => [sfKey(sf, incoming, existing), sf]),
+    incoming.subtypeFacts.map((sf) => [sfKey(sf, incoming, existing), sf]),
   );
 
   for (const [key, sf] of existingSfs) {
@@ -292,8 +295,8 @@ export function diffModels(
   // `kind` excludes "modified" -- and that is why this loop has no
   // `modified` branch to write.
   //
-  // The unresolvable pair is skipped here for the reason it is skipped
-  // above, against `addableObjectification`'s equivalent guard.
+  // The unresolvable pair is REPORTED here for the reason it is
+  // reported above, and the correction is the same one.
   const oftKey = (oft: ObjectifiedFactType, model: OrmModel, other: OrmModel): string =>
     `${playerName(model, oft.objectTypeId, other)}\u0000${
       factTypeName(model, oft.factTypeId, other)
@@ -302,19 +305,11 @@ export function diffModels(
     objectType: { id: oft.objectTypeId, name: playerName(model, oft.objectTypeId, other) },
     factType: { id: oft.factTypeId, name: factTypeName(model, oft.factTypeId, other) },
   });
-  const oftResolvable = (oft: ObjectifiedFactType): boolean =>
-    !isDanglingPlayer(existing, incoming, oft.objectTypeId)
-    && !isDanglingFactType(existing, incoming, oft.factTypeId);
-
   const existingOfts = new Map(
-    existing.objectifiedFactTypes
-      .filter(oftResolvable)
-      .map((oft) => [oftKey(oft, existing, incoming), oft]),
+    existing.objectifiedFactTypes.map((oft) => [oftKey(oft, existing, incoming), oft]),
   );
   const incomingOfts = new Map(
-    incoming.objectifiedFactTypes
-      .filter(oftResolvable)
-      .map((oft) => [oftKey(oft, incoming, existing), oft]),
+    incoming.objectifiedFactTypes.map((oft) => [oftKey(oft, incoming, existing), oft]),
   );
 
   for (const [key, oft] of existingOfts) {

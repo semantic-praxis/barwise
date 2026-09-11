@@ -1,0 +1,22 @@
+# A merge fragment whose population names a fact type that exists in
+# NEITHER model. It loads leniently (barwise merge passes lenient for the
+# incoming side) and used to be dropped by the merge without a word:
+# `barwise merge` exited 0 with the population gone (barwise-997).
+orm_version: "1.0"
+
+model:
+  name: "Simple Test"
+  domain_context: "testing"
+
+  object_types: []
+
+  fact_types: []
+
+  populations:
+    - id: "pop-typo"
+      fact_type: "ft-typo"
+      instances:
+        - id: "inst-1"
+          role_values:
+            r-customer-has: "C1"
+            r-name-of: "Ada"

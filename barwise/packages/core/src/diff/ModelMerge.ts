@@ -25,6 +25,7 @@ import type { Diagnostic } from "../validation/Diagnostic.js";
 import { referenceDiagnostics } from "../validation/referenceDiagnostics.js";
 import { report, RULE_ID } from "../validation/ruleId.js";
 import { structuralRules, structuralWellFormedness } from "../validation/rules/structural.js";
+import { isDanglingFactType, isDanglingPlayer } from "./elementDiff.js";
 import type {
   DefinitionDelta,
   FactTypeDelta,
@@ -228,7 +229,21 @@ export function mergeModels(
     // keeps the existing model's id. Phase 1 recorded the translation.
     const subtypeId = resolveObjectTypeId(merged, chosen.subtypeId, incomingIdToMergedId);
     const supertypeId = resolveObjectTypeId(merged, chosen.supertypeId, incomingIdToMergedId);
-    if (!addableSubtypeFact(merged, subtypeId, supertypeId)) continue;
+    if (!addableSubtypeFact(merged, subtypeId, supertypeId)) {
+      // The same split the population phase makes below: an accepted
+      // removal took the endpoint and the drop is the decision; a
+      // reference NEITHER model ever defined is a dangling reference,
+      // and deleting it here would delete the evidence before
+      // `structural/subtype-dangling-*` could report it (barwise-997).
+      const dangling = isDanglingPlayer(existing, incoming, chosen.subtypeId)
+        || isDanglingPlayer(existing, incoming, chosen.supertypeId);
+      if (!dangling) continue;
+      merged.addSubtypeFact(
+        { ...toSubtypeFactConfig(chosen), id: undefined, subtypeId, supertypeId },
+        { skipPlayerValidation: true },
+      );
+      continue;
+    }
     // An accepted modification keeps the existing id so anything holding
     // it still resolves. Otherwise the element's own id -- unless the
     // merged model already holds that id, in which case reusing it would
@@ -259,7 +274,20 @@ export function mergeModels(
     if (!chosen) continue;
     const objectTypeId = resolveObjectTypeId(merged, chosen.objectTypeId, incomingIdToMergedId);
     const factTypeId = resolveFactTypeId(merged, chosen.factTypeId, incomingFtIdToMergedId);
-    if (!addableObjectification(merged, objectTypeId, factTypeId)) continue;
+    if (!addableObjectification(merged, objectTypeId, factTypeId)) {
+      // As above. `addableObjectification` also refuses a pair whose
+      // halves are already objectified, which is a real conflict the
+      // merge resolves silently and deliberately; only the dangling
+      // case is carried through to be reported.
+      const dangling = isDanglingPlayer(existing, incoming, chosen.objectTypeId)
+        || isDanglingFactType(existing, incoming, chosen.factTypeId);
+      if (!dangling) continue;
+      merged.addObjectifiedFactType(
+        { ...toObjectifiedFactTypeConfig(chosen), objectTypeId, factTypeId },
+        { skipPlayerValidation: true },
+      );
+      continue;
+    }
     merged.addObjectifiedFactType({
       ...toObjectifiedFactTypeConfig(chosen),
       objectTypeId,
@@ -291,7 +319,43 @@ export function mergeModels(
     const factTypeId = fromIncoming
       ? resolveFactTypeId(merged, chosen.factTypeId, incomingFtIdToMergedId)
       : chosen.factTypeId;
-    if (!merged.getFactType(factTypeId)) continue;
+
+    // Two different reasons the merged model may not hold this fact
+    // type, and only one of them is the merge doing what it was asked.
+    //
+    // An ACCEPTED REMOVAL took it: dropping what depended on it is the
+    // decision the reviewer made, and it stays silent.
+    //
+    // NEITHER MODEL EVER DEFINED IT: a fragment naming `ft-typo`. That
+    // is a dangling reference, and dropping it is how `barwise merge`
+    // came to exit 0 with a population gone and nothing said
+    // (barwise-997). It reached here because PR #487 widened the
+    // lenient load to populations so the VALIDATOR could report such a
+    // reference -- and then the merge deleted the evidence before the
+    // validator ran.
+    //
+    // So the element is carried through with its reference intact, and
+    // `population/dangling-fact-type` reports it: an error-severity
+    // rule that already exists, already runs in `getStructuralErrors`,
+    // and already says exactly this. `mergeAndValidate` therefore
+    // returns isValid: false and the caller refuses to write. Inventing
+    // a second diagnostic here would have said the same thing twice,
+    // in a channel only this function knows about.
+    if (!merged.getFactType(factTypeId)) {
+      if (!isDanglingFactType(existing, incoming, chosen.factTypeId)) continue;
+      merged.addPopulation(
+        {
+          ...remapPopulationRoles(
+            toPopulationConfig(chosen),
+            fromIncoming ? incomingRoleIdToMergedId : roleIdMap,
+          ),
+          id: merged.populations.some((p) => p.id === chosen.id) ? undefined : chosen.id,
+          factTypeId,
+        },
+        { skipPlayerValidation: true },
+      );
+      continue;
+    }
 
     const preferredId = delta.kind === "modified" && isAccepted ? delta.existing!.id : chosen.id;
     const id = merged.populations.some((p) => p.id === preferredId) ? undefined : preferredId;

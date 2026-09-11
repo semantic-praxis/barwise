@@ -26,6 +26,21 @@ describe("barwise merge", () => {
     expect(result.stdout).toContain("orm_version");
   });
 
+  it("refuses a fragment whose population names a fact type nothing defines", async () => {
+    // barwise-997: `barwise merge` exited 0 with the population gone and
+    // nothing said. PR #487 widened the lenient load to populations so
+    // the VALIDATOR could report such a reference; the merge then
+    // deleted the evidence before the validator ran. The population is
+    // carried into the merged model now, so the rule that already
+    // existed for it fires and the command refuses to write.
+    const fragment = join(fixtures, "fragment-typo-population.orm.yaml");
+    const result = await runCli(["merge", base, fragment]);
+
+    expect(result.exitCode).not.toBe(0);
+    expect(`${result.stdout}${result.stderr}`).toContain("population/dangling-fact-type");
+    expect(`${result.stdout}${result.stderr}`).toContain("ft-typo");
+  });
+
   it("leaves both inputs untouched", async () => {
     // The destructive default is the risk this command carries, so the
     // absence of writes is asserted directly rather than assumed. The
