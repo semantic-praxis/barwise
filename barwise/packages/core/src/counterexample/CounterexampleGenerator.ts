@@ -29,7 +29,7 @@ import {
   type VerbalizationSegment,
 } from "../verbalization/Verbalization.js";
 import type { Counterexample } from "./Counterexample.js";
-import { mintInvalidValue, mintValue, playerName } from "./values.js";
+import { mintInvalidValue, mintValue, mintValueForAll, playerName } from "./values.js";
 
 type RoleValues = Record<string, string>;
 
@@ -294,7 +294,10 @@ function forMandatory(
   const anchor = findAnchorRole(model, role.playerId, new Set([mc.roleId]));
   if (!anchor) return undefined;
 
-  const value = mintValue(role, ft, model, 0);
+  // Minted against the anchor role as well as the constrained one: the
+  // value has to sit in the anchor's fact type, whose player may declare
+  // a narrower domain than this one's.
+  const value = mintValueForAll([{ role, ft }, anchor], model, 0);
   const forbidden = anchorPopulation(anchor, value, model);
   const reason = `a ${playerName(role, model)} that exists but never plays `
     + `"${ft.name}"`;
@@ -318,7 +321,7 @@ function forDisjunctive(
   const anchor = findAnchorRole(model, first.role.playerId, new Set(dc.roleIds));
   if (!anchor) return undefined;
 
-  const value = mintValue(first.role, first.ft, model, 0);
+  const value = mintValueForAll([first, anchor], model, 0);
   const forbidden = anchorPopulation(anchor, value, model);
   const reason = `a ${playerName(first.role, model)} that plays none of the `
     + `required roles`;
@@ -338,7 +341,10 @@ function valueInAllRoles(
 ): { populations: Population[]; value: string; } | undefined {
   const resolved = roleIds.map((rid) => findRoleById(model, rid));
   if (resolved.some((r) => r === undefined) || resolved.length < 2) return undefined;
-  const value = mintValue(resolved[0]!.role, resolved[0]!.ft, model, 0);
+  // Every one of these roles receives this same value, so every one of
+  // them has a say in what it may be.
+  const placements = resolved as AnchorRole[];
+  const value = mintValueForAll([placements[0]!, ...placements.slice(1)], model, 0);
 
   const byFactType = new Map<string, { ft: FactType; roleIds: string[]; }>();
   resolved.forEach((r, i) => {

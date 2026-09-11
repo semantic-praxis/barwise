@@ -149,17 +149,39 @@ export function dataTypeAdmits(type: ConceptualDataTypeName, val: string): boole
  * the same reason it is in `mintInvalidValue`.
  */
 export function mintAllowedValue(domain: ValueDomain, index: number): string | undefined {
-  if (domain.values.length > 0) {
-    return domain.values[index % domain.values.length];
-  }
-
   const admits = valueDomainPredicate(domain);
-  for (const range of domain.ranges ?? []) {
-    for (const candidate of rangeCandidates(range, index)) {
-      if (admits(candidate)) return candidate;
-    }
-  }
-  return undefined;
+  return allowedValueCandidates(domain, index).find(admits);
+}
+
+/**
+ * Every value this domain suggests, most preferred first, WITHOUT
+ * filtering by the domain itself.
+ *
+ * `mintAllowedValue` above is this list filtered by the domain's own
+ * predicate, and one caller needs the unfiltered list instead. A role is
+ * governed by up to three domains at once -- its own value constraint,
+ * its player's, and its player's data type -- and each of the three used
+ * to be consulted alone, the first one that produced anything winning.
+ * A value type declaring `decimal` and enumerating {v1, v2} over a range
+ * of "at most 10" therefore minted "v1", which the enumeration admits
+ * and the data type rejects, when "10" satisfies both. Offering the
+ * candidates and letting the caller apply the CONJUNCTION is what lets
+ * that be decided once rather than three times (barwise-995).
+ *
+ * The enumeration is rotated from `index` rather than indexed by it, for
+ * the reason `rangeCandidates` walks its bounds: a caller minting
+ * several values for one role needs distinct ones, and it must still see
+ * every entry when the first few are inadmissible under another layer.
+ */
+export function allowedValueCandidates(
+  domain: ValueDomain,
+  index: number,
+): readonly string[] {
+  const n = domain.values.length;
+  const enumerated = n === 0
+    ? []
+    : Array.from({ length: n }, (_, i) => domain.values[(index + i) % n] as string);
+  return [...enumerated, ...(domain.ranges ?? []).flatMap((r) => rangeCandidates(r, index))];
 }
 
 /**
