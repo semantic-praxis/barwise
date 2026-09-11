@@ -6,7 +6,7 @@ Last-updated: 2026-09-11
 Tracking: barwise-995. Continues barwise-958 (the forbidding side read the
 enumeration and ignored ranges), barwise-959 (the admitting side did the
 mirror of it), and barwise-945 (whose new value-type rules made a third
-layer visible). Leaves barwise-1013 (contradictory value types are a model
+layer visible). Leaves barwise-1017 (contradictory value types are a model
 error nothing reports), barwise-1014 (the arbitrary builds join
 constraints no population satisfies) and barwise-1015 (the minter knows
 what a role admits, not what the tuple owes).
@@ -151,7 +151,7 @@ Rule ids survive a reshuffle; the count still forces the number down.
 
 The residue is real and is filed, not fixed here:
 
-- **Jointly contradictory models** (barwise-1013): a value type
+- **Jointly contradictory models** (barwise-1017): a value type
   declaring `integer` and enumerating `{v3, v1, v2}` admits nothing, so
   no minted value can avoid `value-type-data-type-violation`. This is a
   MODEL error that nothing reports -- the sibling of barwise-945 that

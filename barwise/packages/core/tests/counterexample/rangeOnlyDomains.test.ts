@@ -249,7 +249,7 @@ describe("a probe fills its other roles with values those roles accept", () => {
     // non-integers admits nothing at all. The minter answers for the
     // narrowest layer and leaves the contradiction visible, rather than
     // choosing a value for no reason -- the model error is real and
-    // belongs in front of the modeller (barwise-1013).
+    // belongs in front of the modeller (barwise-1017).
     expect(rulesTripped(makeModel({ playerContradiction: true }))).toEqual([
       "population/uniqueness-violation",
       "population/value-type-data-type-violation",

@@ -82,7 +82,7 @@ describe("coverage: the law reaches every constraint kind that has a generator",
 const LOCAL_STRAY_BASELINE = {
   occurrences: 123,
   reasons: {
-    // barwise-1013: the MODEL is contradictory at that role. A value
+    // barwise-1017: the MODEL is contradictory at that role. A value
     // type declaring `integer` and enumerating {v3, v1, v2} admits
     // nothing, so no minted value avoids these two. Nothing reports the
     // contradiction itself, which is the missing validation rule.
