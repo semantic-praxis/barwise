@@ -109,8 +109,15 @@ word count.
   acceptance criteria, enumerated edge cases, error messages, licence
   text, an API's list of what it rejects. Compressing an enumeration
   into "handles the edge cases" is a loss wearing a win's clothes.
-- **Numbers, paths, dates, commands, and issue ids.** They are the
-  cheapest content per word in the document.
+- **Numbers, paths, dates, commands, and issue ids -- above all, the
+  command that produced a number.** Not because they are cheap per word,
+  but because the command is what makes the claim falsifiable later. In
+  this repo's own correction record, roughly three quarters of spec
+  defects were caught by re-running a claim rather than by reading one,
+  and a number whose instrument was cut cannot be re-run
+  (`barwise/docs/spec-correction-taxonomy-2026-09-11.md`). Cutting the
+  command keeps the claim and destroys the mechanism that would have
+  caught it being wrong.
 - **Named alternatives and why they lost.** A later implementer who
   trips a tripwire reads that section first.
 - **Stated uncertainty.** "We have not decided X" is a claim. Cutting
@@ -124,11 +131,19 @@ exactly where the compression came from dropping claims -- which makes
 it a shadow in the sense CLAUDE.md uses, useful as a diagnostic and
 wrong as a gate.
 
-LLM-drafted prose typically lands at 40-60% of its original length.
-Outside that band, re-read rather than adjust:
+**The band applies only to padded input, and judging that comes first.**
+Prose drafted without an editing pass typically lands at 40-60% of its
+original length. Prose already written to a style that bans the tics is
+claim-dense and should land far higher: measured once, a barwise spec
+distilled to 95%, which was the stopping rule working rather than a
+failed pass. A dense document that barely moves is a correct result, so
+do not treat the band as a target to reach.
 
-- **above 80%** -- you ran a word-level pass on a structural problem.
-  Go back to step 3; you almost certainly kept the draft's skeleton.
+Once the input is established as padded:
+
+- **above 80%** -- you may have run a word-level pass on a structural
+  problem. Go back to step 3 and check whether you kept the draft's
+  skeleton.
 - **below 25%** -- open the drop list. Either the document genuinely
   asserted very little, which is a finding, or you cut claims.
 
