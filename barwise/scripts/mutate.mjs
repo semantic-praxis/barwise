@@ -45,8 +45,10 @@
  * Exit codes:
  *   0  caught   -- the command failed with the mutation applied
  *   1  uncaught -- the command passed with the mutation applied
- *   2  refused  -- anchor absent or ambiguous, mutation is a no-op, or
- *                  the restore did not verify
+ *   2  refused  -- anchor absent or ambiguous, mutation is a no-op, the
+ *                  restore did not verify, or the command was KILLED by
+ *                  a signal rather than exiting (a killed run reports
+ *                  on nothing, so it is neither of the other two)
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -159,17 +161,47 @@ const mutatedHash = sha256(mutated);
  * an untracked file, and reports a nonzero count in both states for a
  * tracked file carrying unrelated uncommitted work.
  *
+ * NO TEST DRIVES THE `after !== originalHash` BRANCH, and that is a
+ * statement about the filesystem rather than an oversight. On a local
+ * POSIX filesystem, reading back the path just written returns what was
+ * written, so reaching it needs something outside this process: a
+ * writer the command left running that lands between the write and the
+ * read, or a mount that transforms content on the way through. Neither
+ * is drivable from a unit test without a race, and a racing test is
+ * worse than none. What CAN be driven, and is, are the two failures on
+ * either side of it -- the tampered check below, and the exception path
+ * above. Disabling this branch leaves the whole script suite green
+ * (barwise-998, finding 2); the branch stays because the class it names
+ * is real, not because a test says so.
+ *
  * A failure keeps the backup and names it. That is the one moment the
  * operator needs a path they can actually reach, which is why the
  * default backup directory is in the repo and not a temp dir the
  * container takes with it.
  */
 function restoreOrDie() {
-  const before = sha256(readFileSync(target, "utf8"));
+  let before, after;
+  try {
+    before = sha256(readFileSync(target, "utf8"));
+    writeFileSync(target, original, "utf8");
+    after = sha256(readFileSync(target, "utf8"));
+  } catch (err) {
+    // Anything thrown here used to propagate, and Node exits 1 on an
+    // uncaught throw -- which is this script's UNCAUGHT code. A command
+    // that replaced the target with a directory therefore printed a
+    // stack trace and reported, in the one number a caller reads, that
+    // the test suite had failed to notice the mutation (barwise-998).
+    // The tree is left as it is and the backup named, because that is
+    // the state an operator has to repair by hand.
+    process.stderr.write(
+      `mutate: RESTORE FAILED for ${flags.file}\n`
+        + `  ${err instanceof Error ? err.message : String(err)}\n`
+        + `  The file on disk may still hold the mutation. The original\n`
+        + `  content is at ${backup}.\n`,
+    );
+    process.exit(REFUSED);
+  }
   const tampered = before !== mutatedHash;
-
-  writeFileSync(target, original, "utf8");
-  const after = sha256(readFileSync(target, "utf8"));
 
   if (after !== originalHash) {
     process.stderr.write(
@@ -197,7 +229,12 @@ function restoreOrDie() {
   rmSync(backup, { force: true });
 }
 
-// A ctrl-c must not leave a mutated tree behind.
+// A ctrl-c must not leave a mutated tree behind. The `finally` below is
+// what actually guarantees that, because `spawnSync` blocks this process
+// and a queued signal handler cannot run until it returns -- by which
+// time the `finally` has already restored. These handlers cover the
+// narrow window before the child starts, and are a backstop rather than
+// the mechanism (barwise-998).
 let finished = false;
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {
@@ -210,6 +247,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 }
 
 let status;
+let refusal;
 try {
   writeFileSync(target, mutated, "utf8");
   // No shell, so the status is this process's own and not a pipeline's.
@@ -219,10 +257,20 @@ try {
     encoding: "utf8",
   });
   if (run.error) {
-    process.stderr.write(`mutate: could not run the command: ${run.error.message}\n`);
-    status = null;
+    refusal = `could not run the command: ${run.error.message}`;
+  } else if (run.signal) {
+    // A killed child is the third answer, not a failure. This line used
+    // to read `run.status === null ? 1`, which sent a ctrl-c or a
+    // harness timeout down the CAUGHT branch: `mutate ... && echo
+    // verified` printed verified for a run that verified nothing, and
+    // the exit code it named -- "exit 1" -- was one the command never
+    // returned. barwise-906's own class, inside the tool built to close
+    // it (barwise-998, finding 1).
+    refusal = `the command was killed by ${run.signal} rather than exiting.\n`
+      + `  A killed run is not a reading: the command never reported on the\n`
+      + `  mutation, so this is neither CAUGHT nor UNCAUGHT.`;
   } else {
-    status = run.status === null ? 1 : run.status; // killed by a signal counts as failed
+    status = run.status;
   }
 } finally {
   if (!finished) {
@@ -231,7 +279,10 @@ try {
   }
 }
 
-if (status === null) process.exit(REFUSED);
+if (refusal !== undefined) {
+  process.stderr.write(`mutate: ${refusal}\n`);
+  process.exit(REFUSED);
+}
 
 if (status !== 0) {
   process.stdout.write(
