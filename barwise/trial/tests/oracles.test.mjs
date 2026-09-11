@@ -16,6 +16,7 @@ import {
   gradeProducedModelValidation,
   gradeRoundTrip,
   gradeSplit,
+  gradeStaleness,
 } from "../lib/oracles/grade.mjs";
 
 const ok = {
@@ -216,4 +217,30 @@ test("evaluateGate: a new failure, a stale row and an unclassified row each fail
     findings: { "C01/small/1/a": { note: "open, issue filed" } },
   });
   assert.equal(v4.fresh.length + v4.stale.length + v4.unclassified.length, 0);
+});
+
+test("gradeStaleness: a real staleness report passes, a clean one after a change is S1, an unreadable payload refuses", () => {
+  const ok = { exit: 1, stdout: "", stderr: "", timedOut: false };
+  // The shape lineage status actually emits. The first version of this
+  // oracle read a field named `stale` and graded this very payload as a
+  // product failure; the test exists because nothing else caught that.
+  assert.equal(
+    gradeStaleness(ok, { staleArtifacts: [{ artifact: "a.sql" }], freshArtifacts: [] }).status,
+    "pass",
+  );
+  const clean = gradeStaleness(ok, { staleArtifacts: [], freshArtifacts: ["a.sql"] });
+  assert.equal(clean.status, "fail");
+  assert.equal(clean.severity, "S1");
+  // Neither a missing payload nor a differently shaped one may produce a
+  // verdict about the product.
+  assert.equal(gradeStaleness(ok, null).status, "could_not_answer");
+  assert.equal(gradeStaleness(ok, { stale: [] }).status, "could_not_answer");
+  assert.equal(
+    gradeStaleness({ ...ok, stderr: "no manifest found; run barwise export" }, null).severity,
+    "S1",
+  );
+  assert.equal(
+    gradeStaleness({ ...ok, stderr: "TypeError: x\n    at f (/a.js:1:1)" }, null).severity,
+    "S2",
+  );
 });

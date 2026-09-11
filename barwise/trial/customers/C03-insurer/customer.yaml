@@ -77,6 +77,11 @@ history:
 transcripts:
   - file: transcripts/session-01-subrogation.md
     key: transcripts/session-01-subrogation.key.yaml
+lateRequirement:
+  # Reinsurance asks for catastrophe coding once the first storm season lands.
+  note: "Reinsurance asks for catastrophe coding once the first storm season lands."
+  change: {"kind":"add_fact_type","name":"Claim has CatastropheCode","between":["Claim","ClaimNumber"]}
+  element: Claim
 budgets:
   small: 30000
   medium: 180000

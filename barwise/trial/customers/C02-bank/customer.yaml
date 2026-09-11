@@ -59,6 +59,12 @@ history:
 transcripts:
   - file: transcripts/session-01-account.md
     key: transcripts/session-01-account.key.yaml
+lateRequirement:
+  # The regulator adds a payment type after the mart is built.
+  note: "The regulator adds a payment type after the mart is built."
+  change: {"kind":"add_value_constraint_value","object_type":"TransactionType","value":"confirmation-of-payee"}
+  element: TransactionType
+  expectInExport: "confirmation"
 budgets:
   small: 30000
   medium: 180000

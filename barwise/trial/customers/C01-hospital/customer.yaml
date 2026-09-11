@@ -66,6 +66,12 @@ history:
 transcripts:
   - file: transcripts/session-01-encounter.md
     key: transcripts/session-01-encounter.key.yaml
+lateRequirement:
+  # Compliance rules a new discharge disposition into scope three weeks after sign-off.
+  note: "Compliance rules a new discharge disposition into scope three weeks after sign-off."
+  change: {"kind":"add_value_constraint_value","object_type":"DischargeDisposition","value":"hospice-home"}
+  element: DischargeDisposition
+  expectInExport: "hospice"
 budgets:
   small: 30000
   medium: 180000

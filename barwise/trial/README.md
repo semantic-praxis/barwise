@@ -38,7 +38,7 @@ finding, 2 the lane could not answer (no bundle, nothing generated).
 | `lib/oracles/grade.mjs`   | Pure graders; each has a planted-failure test in `tests/`                                           |
 | `lib/generators/`         | Kernel + skin + seed -> DDL, OpenAPI, dbt, code, NORMA, OWL, Avro, a scaled model, a history repo   |
 | `loss-sets/<format>.json` | What a round trip through that format may drop; a delta outside it is a finding                     |
-| `consumers/parse_ddl.py`  | The sprint-4 DDL consumer (sqlglot via `uv run --frozen --only-group sqlglot`)                      |
+| `loss-sets/<format>.json` | What a round trip through that format may drop; a delta outside it is a finding                     |
 | `findings/<issue>/`       | Minimal reproduction per open finding                                                               |
 | `results/<tier>.json`     | The latest run, gitignored                                                                          |
 

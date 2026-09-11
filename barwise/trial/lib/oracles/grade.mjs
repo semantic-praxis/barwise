@@ -366,6 +366,59 @@ export function gradeConsumer(report) {
  * person signs off. The exception is must_validate: an importer that
  * wrote a structurally invalid model is silent wrong output (S1).
  */
+/**
+ * After a late requirement lands, the artifacts exported before it are
+ * wrong. The property is that barwise SAYS SO: a team that has to
+ * notice staleness by eye will ship the stale artifact. `lineage status`
+ * exits 1 when anything is stale, which is the signal a CI gate would
+ * key on, so a clean report after a real model change is the finding.
+ */
+export function gradeStaleness(result, report) {
+  if (crashed(result)) {
+    return {
+      status: "fail",
+      severity: "S2",
+      detail: `lineage status crashed: ${firstLine(result.stderr)}`,
+    };
+  }
+  const text = `${result.stdout}${result.stderr}`;
+  if (/no manifest|not found|run .*export/i.test(text)) {
+    return {
+      status: "fail",
+      severity: "S1",
+      detail:
+        "lineage status found no manifest even though this model was exported a moment ago, so nothing tracks what the late requirement invalidated",
+    };
+  }
+  // The field is `staleArtifacts`, and reading it wrong is not a
+  // hypothetical: the first version of this oracle looked for `stale`
+  // and fell back to a /\bstale\b/ regex, which does not match
+  // "staleArtifacts" because the word boundary fails on the capital A.
+  // It graded a correct lineage report as a silent-staleness S1 against
+  // the product. Hence the explicit refusal below when the payload is
+  // not the shape this oracle knows: a grader that cannot read its input
+  // must not render a verdict about the thing it was measuring.
+  if (!report || !Array.isArray(report.staleArtifacts)) {
+    return {
+      status: "could_not_answer",
+      detail: `lineage status returned no staleArtifacts array to read: ${text.slice(0, 160)}`,
+    };
+  }
+  if (report.staleArtifacts.length > 0) {
+    return {
+      status: "pass",
+      detail:
+        `${report.staleArtifacts.length} artifact(s) reported stale after the requirement landed`,
+    };
+  }
+  return {
+    status: "fail",
+    severity: "S1",
+    detail:
+      "the model changed and lineage status reports nothing stale, so an export made before the requirement still reads as current",
+  };
+}
+
 export function gradeAcceptance(result, report) {
   if (crashed(result)) {
     return {

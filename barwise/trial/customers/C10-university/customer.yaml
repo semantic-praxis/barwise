@@ -69,6 +69,12 @@ history:
 transcripts:
   - file: transcripts/session-01-term.md
     key: transcripts/session-01-term.key.yaml
+lateRequirement:
+  # The faculty senate adds a grade two weeks before registration opens.
+  note: "The faculty senate adds a grade two weeks before registration opens."
+  change: {"kind":"add_value_constraint_value","object_type":"GradeCode","value":"NP"}
+  element: GradeCode
+  expectInExport: "NP"
 budgets:
   small: 30000
   medium: 180000

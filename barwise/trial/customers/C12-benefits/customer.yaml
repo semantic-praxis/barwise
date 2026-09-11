@@ -78,6 +78,12 @@ history:
 transcripts:
   - file: transcripts/session-01-eligibility.md
     key: transcripts/session-01-eligibility.key.yaml
+lateRequirement:
+  # A statute change adds a closure reason mid-implementation.
+  note: "A statute change adds a closure reason mid-implementation."
+  change: {"kind":"add_value_constraint_value","object_type":"ClosureReasonCode","value":"DISASTER-SNAP"}
+  element: ClosureReasonCode
+  expectInExport: "DISASTER"
 budgets:
   small: 30000
   medium: 180000

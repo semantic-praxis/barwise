@@ -70,6 +70,12 @@ history:
 transcripts:
   - file: transcripts/session-01-catalog.md
     key: transcripts/session-01-catalog.key.yaml
+lateRequirement:
+  # Product launches an eSIM roaming plan mid-build.
+  note: "Product launches an eSIM roaming plan mid-build."
+  change: {"kind":"add_value_constraint_value","object_type":"RatePlanCode","value":"ESIM-ROAM-01"}
+  element: RatePlanCode
+  expectInExport: "ESIM"
 budgets:
   small: 30000
   medium: 180000

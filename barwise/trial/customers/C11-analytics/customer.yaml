@@ -51,6 +51,12 @@ history:
 transcripts:
   - file: transcripts/session-01-events.md
     key: transcripts/session-01-events.key.yaml
+lateRequirement:
+  # Privacy counsel reserves an event name after the schema ships.
+  note: "Privacy counsel reserves an event name after the schema ships."
+  change: {"kind":"add_value_constraint_value","object_type":"ReservedEventName","value":"$consent_changed"}
+  element: ReservedEventName
+  expectInExport: "consent"
 budgets:
   small: 30000
   medium: 180000

@@ -585,6 +585,31 @@ reality (the `spec-writer` convention).
   avro` writes one `.avsc` per record, not one file; the draft's
   consumer assumed a file and crashed the runner on the first customer
   that reached sprint 4.
+- **The lane stopped carrying its own format validators.** Sprint 4
+  originally handed each export to a checker the lane owned: a sqlglot
+  sidecar for DDL, and hand-written readers for OpenAPI, Avro, dbt and
+  NORMA. That is scaffolding standing in for a product feature, and a
+  trial whose harness writes its own parser is measuring the harness.
+  The step is now `read-back:<format>`: export, then read it back with
+  barwise's own importer and validate what comes back. Avro has no
+  importer, so that step records could-not-answer rather than the lane
+  inventing one. The rewrite immediately found barwise-1036, which the
+  bespoke checkers could not have: they graded the file's syntax, and
+  the defect is that barwise cannot read its own NORMA output into a
+  valid model.
+
+- **Late-arriving requirements are their own sprint.** Nobody ever has
+  all the details in time, so a journey that models only the initial
+  build is not the journey. Sprint 4b exports first (so a lineage
+  manifest exists), lands one requirement the customer package declares,
+  then asks barwise what went stale, what depends on the changed
+  element, whether the change is visible to `diff`, whether it reached
+  the re-exported artifact, and whether the personas still accept the
+  model. Every command already ships, and `lineage` in particular was
+  exercised by nothing else in the lane. All 128 of these steps pass
+  across the twelve customers, which is the strongest single result the
+  trial has produced.
+
 - **The corrections ratchet fires on this spec, and could not fire
   before the spec was committed.** `audit:corrections` reads tracked
   files, so an untracked spec is invisible to it: `ci:local` passed on

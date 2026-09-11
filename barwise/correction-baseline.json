@@ -375,25 +375,25 @@
     },
     "correction-record-ratchet::44b7905b87d5": {
       "spec": "correction-record-ratchet.spec.md",
-      "excerpt": "in one sentence: 28 specs already record what their drafts got wrong and what caught it, nothing reads that ba",
+      "excerpt": "in one sentence: 28 specs already record what their drafts got wrong and what caught it, nothing reads that back, and a hand pass over it goes stale the same wa",
       "caught_by": "not-a-correction",
       "note": "The BLUF of this spec, describing the corpus it audits. No correction of its own."
     },
     "correction-record-ratchet::0d96891e4625": {
       "spec": "correction-record-ratchet.spec.md",
-      "excerpt": "it does not judge whether a correction should have happened, and it cannot: a correction is a historical fact ",
+      "excerpt": "it does not judge whether a correction should have happened, and it cannot: a correction is a historical fact about a draft that is already gone. what it enforc",
       "caught_by": "not-a-correction",
       "note": "States what the gate does and does not judge. No correction recorded."
     },
     "correction-record-ratchet::7eb377fc978c": {
       "spec": "correction-record-ratchet.spec.md",
-      "excerpt": "- judging whether a correction was avoidable. the classification says what caught the defect, not what should ",
+      "excerpt": "- judging whether a correction was avoidable. the classification says what caught the defect, not what should have. - reading git history for pre-correction dra",
       "caught_by": "not-a-correction",
       "note": "An out-of-scope bullet. No correction recorded."
     },
     "correction-record-ratchet::df2c17054e14": {
       "spec": "correction-record-ratchet.spec.md",
-      "excerpt": "- a required \"what caught it\" section in the spec template. catches nothing retroactively, and a template sect",
+      "excerpt": "- a required \"what caught it\" section in the spec template. catches nothing retroactively, and a template section is a rule in prose -- precisely what the taxon",
       "caught_by": "not-a-correction",
       "note": "A rejected alternative (a required template section). Records a design choice, not a correction to this spec's own draft."
     },
@@ -427,7 +427,7 @@
       "caught_by": "not-a-correction",
       "note": "A Risks-and-testing entry with its tripwire: an amplifier produces regular mess where a real schema's mess is irregular, so the skins carry hand-written irregularity. It states a risk the design carries and the signal that would reopen it; it records nothing the draft got wrong."
     },
-    "enterprise-trial::7e5d7b5faff5": {
+    "enterprise-trial::b20d229deee7": {
       "spec": "enterprise-trial.spec.md",
       "excerpt": "- the journey moved out of the package, and the acceptance oracles became gym exercises. see target architecture. - a finding class, not a free-text note, is wh",
       "caught_by": "execution",

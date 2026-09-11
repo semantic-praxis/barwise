@@ -51,6 +51,14 @@
       "note": "Consequence of barwise-1023: the persona's must_validate check fails on the importer's duplicate role ids. Closes with the parent."
     },
     {
+      "id": "read-back-duplicate-role-ids",
+      "issue": "barwise-1023",
+      "severity": "S1",
+      "step": "^read-back:",
+      "detail": "duplicate-role-id",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1023 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model."
+    },
+    {
       "id": "ddl-importer-duplicate-role-ids",
       "issue": "barwise-1023",
       "severity": "S1",
@@ -97,6 +105,13 @@
       "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-1026)."
     },
     {
+      "id": "read-back-dbt-duplicate-fact-type",
+      "issue": "barwise-1026",
+      "severity": "S3",
+      "step": "^read-back:dbt$",
+      "note": "Reading barwise's own dbt export back throws 'Fact type X already exists' (barwise-1026)."
+    },
+    {
       "id": "dbt-roundtrip",
       "issue": "barwise-1027",
       "severity": "S1",
@@ -109,6 +124,14 @@
       "severity": "S1",
       "step": "^model-roundtrip:norma$",
       "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-1028)."
+    },
+    {
+      "id": "norma-read-back-population-orphan",
+      "issue": "barwise-1036",
+      "severity": "S1",
+      "step": "^read-back:norma$",
+      "detail": "population/mandatory-violation",
+      "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation: role identity is rewritten across the round trip and the population rows no longer play the mandatory roles (barwise-1036, sibling of barwise-1028)."
     },
     {
       "id": "diff-rename-no-synonym",

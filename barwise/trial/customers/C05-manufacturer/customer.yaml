@@ -59,6 +59,12 @@ history:
 transcripts:
   - file: transcripts/session-01-bom.md
     key: transcripts/session-01-bom.key.yaml
+lateRequirement:
+  # Packaging introduces a unit of measure nobody mentioned in the workshops.
+  note: "Packaging introduces a unit of measure nobody mentioned in the workshops."
+  change: {"kind":"add_value_constraint_value","object_type":"UomCode","value":"KIT"}
+  element: UomCode
+  expectInExport: "KIT"
 budgets:
   small: 30000
   medium: 180000

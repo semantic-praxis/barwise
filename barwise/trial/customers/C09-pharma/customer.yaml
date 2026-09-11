@@ -61,6 +61,12 @@ history:
 transcripts:
   - file: transcripts/session-01-sae.md
     key: transcripts/session-01-sae.key.yaml
+lateRequirement:
+  # A protocol amendment adds a term after database lock planning.
+  note: "A protocol amendment adds a term after database lock planning."
+  change: {"kind":"add_value_constraint_value","object_type":"MeddraPreferredTermCode","value":"90000045"}
+  element: MeddraPreferredTermCode
+  expectInExport: "90000045"
 budgets:
   small: 30000
   medium: 180000

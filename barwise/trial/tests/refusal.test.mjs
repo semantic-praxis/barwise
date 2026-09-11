@@ -31,18 +31,23 @@ test("no such customer is refused, and says where it looked", () => {
 });
 
 test("a tier that was never generated is refused, and names the command that makes it", () => {
-  const r = run("run.mjs", "offline", "--customer", "C01", "--tier", "medium");
-  // Skipped rather than asserted when the tier happens to be generated:
-  // a test that silently passes on the wrong branch is the defect this
-  // whole file is about, so say which branch ran.
-  if (r.status === 2) {
+  // Make the condition rather than hoping for it. The first version of
+  // this test asserted against whichever tiers happened to exist, so it
+  // passed or failed on the order the suite ran in, and it graded a
+  // generated tier as "the refusal branch was not exercised".
+  const generated = fileURLToPath(
+    new URL("../customers/C01-hospital/generated/medium", import.meta.url),
+  );
+  const parked = existsSync(generated)
+    ? join(mkdtempSync(join(tmpdir(), "trial-tier-")), "medium")
+    : null;
+  if (parked) renameSync(generated, parked);
+  try {
+    const r = run("run.mjs", "offline", "--customer", "C01", "--tier", "medium");
+    assert.equal(r.status, 2);
     assert.match(r.stderr, /trial:generate/);
-  } else {
-    assert.notEqual(
-      r.status,
-      undefined,
-      "the medium tier is generated here; the refusal branch was not exercised",
-    );
+  } finally {
+    if (parked) renameSync(parked, generated);
   }
 });
 

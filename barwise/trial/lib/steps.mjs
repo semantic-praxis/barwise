@@ -23,9 +23,9 @@ import {
 import { join } from "node:path";
 import { parse, stringify } from "yaml";
 import { runCli } from "./exec.mjs";
-import { buildHistoryRepo } from "./generators/history.mjs";
+import { applyChange, buildHistoryRepo } from "./generators/history.mjs";
 import { withMcp } from "./mcp.mjs";
-import { byName, factTypes, objectTypes, readModel } from "./model.mjs";
+import { byName, factTypes, objectTypes, readModel, writeModel } from "./model.mjs";
 import * as grade from "./oracles/grade.mjs";
 import {
   BARWISE_DIR,
@@ -520,19 +520,35 @@ export function sprint4Downstream(customer, tier, record) {
       stderr: tail(res.stderr),
     });
     if (g.status !== "pass") continue;
+    // Read the export back with barwise's own SQL importer. This used to
+    // hand the file to a sqlglot sidecar the lane carried itself; that
+    // was scaffolding standing in for a product feature, and a trial
+    // that writes its own parser is no longer exercising the product.
+    const back = join(gen, `downstream.${dialect}.back.orm.yaml`);
+    rmSync(back, { force: true });
+    const r = runCli(["import", "sql", out, "--dialect", dialect, "--output", back], {
+      timeoutMs: budget,
+      cwd: gen,
+    });
     record({
       sprint: 4,
-      step: `consume-ddl:${dialect}`,
+      step: `read-back-ddl:${dialect}`,
       dialect,
-      ...grade.gradeConsumer(parseDdlWithSqlglot(out, dialect)),
+      importer: "sql",
+      ...grade.gradeCommand(r, { budgetMs: budget }),
+      ms: r.ms,
+      exit: r.exit,
+      stderr: tail(r.stderr),
     });
   }
+  // Every other format, read back the same way. Avro has no importer, so
+  // the step says so rather than the lane inventing one.
   for (
-    const [fmt, file, check] of [
-      ["openapi", "downstream.openapi.json", checkOpenApi],
-      ["avro", "downstream.avsc", checkAvro],
-      ["dbt", "downstream-dbt", checkDbt],
-      ["norma", "downstream.orm", checkXml],
+    const [fmt, file, importer] of [
+      ["openapi", "downstream.openapi.json", "openapi"],
+      ["dbt", "downstream-dbt", "dbt"],
+      ["norma", "downstream.orm", "norma"],
+      ["avro", "downstream.avsc", null],
     ]
   ) {
     const out = join(gen, file);
@@ -549,125 +565,239 @@ export function sprint4Downstream(customer, tier, record) {
       stderr: tail(res.stderr),
     });
     if (g.status !== "pass") continue;
-    record({ sprint: 4, step: `consume:${fmt}`, format: fmt, ...grade.gradeConsumer(check(out)) });
-  }
-}
-
-function parseDdlWithSqlglot(file, dialect) {
-  try {
-    const out = execFileSync("uv", [
-      "run",
-      "--frozen",
-      "--only-group",
-      "sqlglot",
-      "python",
-      join(TRIAL_DIR, "consumers", "parse_ddl.py"),
-      file,
-      dialect,
-    ], {
-      cwd: BARWISE_DIR,
-      encoding: "utf8",
-      timeout: 300_000,
-      maxBuffer: 64 * 1024 * 1024,
-      stdio: ["ignore", "pipe", "pipe"],
+    if (!importer) {
+      record({
+        sprint: 4,
+        step: `read-back:${fmt}`,
+        format: fmt,
+        status: "could_not_answer",
+        detail: "barwise registers no avro importer, so its own export cannot be read back",
+      });
+      continue;
+    }
+    const back = join(gen, `downstream.${fmt}.back.orm.yaml`);
+    rmSync(back, { force: true });
+    const r = runCli([...importCommand(importer, out), "--output", back], {
+      timeoutMs: budget,
+      cwd: gen,
     });
-    return JSON.parse(out);
+    const rg = grade.gradeCommand(r, { budgetMs: budget });
+    if (rg.status !== "pass" || !existsSync(back)) {
+      record({
+        sprint: 4,
+        step: `read-back:${fmt}`,
+        format: fmt,
+        importer,
+        ...rg,
+        ms: r.ms,
+        exit: r.exit,
+        stderr: tail(r.stderr),
+      });
+      continue;
+    }
+    const v = runCli(["validate", back, "--format", "json"], { timeoutMs: budget });
+    record({
+      sprint: 4,
+      step: `read-back:${fmt}`,
+      format: fmt,
+      importer,
+      ...grade.gradeProducedModelValidation(v, parseJson(v.stdout) ?? []),
+      ms: v.ms,
+      exit: v.exit,
+    });
+  }
+}
+
+/**
+ * Sprint 4b: a late-arriving requirement.
+ *
+ * Nobody ever has all the details in time. The requirement that lands
+ * after the model is signed off and the artifacts are generated is the
+ * normal case, not the exception, and it is the moment a modelling tool
+ * either earns its place or does not: the question is never "can you
+ * model this", it is "what downstream is now wrong, and does anything
+ * tell me".
+ *
+ * The step order is the order a real team hits it: export first, so a
+ * lineage manifest exists and the artifacts are real; then the
+ * requirement lands; then ask barwise what went stale, what depends on
+ * the changed element, and whether the personas still accept the model.
+ * Every command here already ships. `lineage` in particular is in the
+ * capability matrix and was exercised by nothing else in this lane.
+ */
+export function sprint4bLateRequirement(customer, tier, record) {
+  const gen = generatedDir(customer.dir, tier);
+  const budget = customer.budgets?.[tier] ?? 600_000;
+  const late = customer.lateRequirement;
+  if (!late) {
+    record({
+      sprint: 4.5,
+      step: "late-requirement",
+      status: "could_not_answer",
+      detail: "the customer package declares no lateRequirement",
+    });
+    return;
+  }
+  // Work on a copy: the late requirement must not edit the committed kernel.
+  const dir = join(gen, "late");
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  const before = join(dir, "model.orm.yaml");
+  const source = tier === "small" ? customer.kernelPath : join(gen, "scaled.orm.yaml");
+  if (!existsSync(source)) return;
+  writeFileSync(before, readFileSync(source, "utf8"));
+
+  // 1. Export first, so a lineage manifest exists to go stale.
+  const ddl = join(dir, "schema.sql");
+  const exported = runCli(["export", before, "--format", "ddl", "--output", ddl], {
+    timeoutMs: budget,
+    cwd: dir,
+  });
+  record({
+    sprint: 4.5,
+    step: "late:export-before",
+    ...grade.gradeCommand(exported, { budgetMs: budget }),
+    ms: exported.ms,
+    exit: exported.exit,
+    stderr: tail(exported.stderr),
+  });
+
+  const fresh = runCli(["lineage", "status", before, "--format", "json"], {
+    timeoutMs: budget,
+    cwd: dir,
+  });
+  record({
+    sprint: 4.5,
+    step: "late:lineage-before",
+    ...grade.gradeCommand(fresh, { budgetMs: budget, allowNonZero: true }),
+    ms: fresh.ms,
+    exit: fresh.exit,
+    stderr: tail(fresh.stderr),
+  });
+
+  // 2. The requirement lands, as an ordinary edit to the model.
+  let applied;
+  try {
+    applied = applyChange(readModel(before), late.change);
   } catch (e) {
-    return { unavailable: `sqlglot consumer could not run: ${String(e.message).split("\n")[0]}` };
+    record({
+      sprint: 4.5,
+      step: "late:apply",
+      status: "could_not_answer",
+      detail: `the declared late requirement could not be applied: ${e.message}`,
+    });
+    return;
   }
-}
+  const after = join(dir, "model.orm.yaml");
+  writeModel(after, applied.doc);
 
-function checkOpenApi(file) {
-  const doc = parseJson(readFileSync(file, "utf8"));
-  if (!doc) return { total: 1, failures: [{ error: "not valid JSON" }] };
-  const failures = [];
-  if (!doc.openapi) failures.push({ error: "no openapi version field" });
-  const schemas = doc.components?.schemas ?? {};
-  const refs = JSON.stringify(doc).match(/"\$ref":"#\/components\/schemas\/([^"]+)"/g) ?? [];
-  for (const r of refs) {
-    const name = r.slice(r.lastIndexOf("/") + 1, -1);
-    if (!schemas[name]) failures.push({ error: `dangling $ref to ${name}` });
+  const valid = runCli(["validate", after, "--format", "json"], { timeoutMs: budget });
+  record({
+    sprint: 4.5,
+    step: "late:validate",
+    ...grade.gradeProducedModelValidation(valid, parseJson(valid.stdout) ?? []),
+    ms: valid.ms,
+    exit: valid.exit,
+  });
+
+  // 3. Does anything tell the team what is now stale?
+  const stale = runCli(["lineage", "status", after, "--format", "json"], {
+    timeoutMs: budget,
+    cwd: dir,
+  });
+  record({
+    sprint: 4.5,
+    step: "late:lineage-stale",
+    ...grade.gradeStaleness(stale, parseJson(stale.stdout)),
+    ms: stale.ms,
+    exit: stale.exit,
+    stderr: tail(stale.stderr),
+  });
+
+  if (late.element) {
+    const impact = runCli(
+      ["lineage", "impact", after, "--element", late.element, "--format", "json"],
+      { timeoutMs: budget, cwd: dir },
+    );
+    record({
+      sprint: 4.5,
+      step: "late:impact",
+      element: late.element,
+      ...grade.gradeCommand(impact, { budgetMs: budget, allowNonZero: true }),
+      ms: impact.ms,
+      exit: impact.exit,
+      stderr: tail(impact.stderr),
+    });
   }
-  return {
-    total: Object.keys(schemas).length,
-    parsed: Object.keys(schemas).length,
-    failures: failures.slice(0, 20),
-  };
-}
 
-function checkAvro(file) {
-  // The exporter writes one .avsc per record into a directory; a single file is one schema.
-  const files = existsSync(file) && statSync(file).isDirectory()
-    ? readdirSync(file).filter((f) => f.endsWith(".avsc")).map((f) => join(file, f))
-    : [file];
-  const records = [];
-  for (const f of files) {
-    const doc = parseJson(readFileSync(f, "utf8"));
-    if (!doc) {
-      return {
-        total: files.length,
-        failures: [{ error: `${f.slice(f.lastIndexOf("/") + 1)} is not valid JSON` }],
-      };
-    }
-    records.push(...(Array.isArray(doc) ? doc : [doc]));
+  // 4. Is the requirement visible as a change at all?
+  const original = join(dir, "before.orm.yaml");
+  writeFileSync(original, readFileSync(source, "utf8"));
+  const d = runCli(["diff", original, after, "--format", "json"], { timeoutMs: budget });
+  const diff = parseJson(d.stdout);
+  record({
+    sprint: 4.5,
+    step: "late:diff",
+    change: late.change,
+    ...(diff ? grade.gradeHistoryStep(applied.expect, diff) : grade.gradeCommand(d)),
+    ms: d.ms,
+    exit: d.exit,
+  });
+
+  // 5. Re-export, and confirm the requirement reached the artifact.
+  const reexport = runCli(["export", after, "--format", "ddl", "--output", ddl], {
+    timeoutMs: budget,
+    cwd: dir,
+  });
+  record({
+    sprint: 4.5,
+    step: "late:export-after",
+    ...grade.gradeCommand(reexport, { budgetMs: budget }),
+    ms: reexport.ms,
+    exit: reexport.exit,
+    stderr: tail(reexport.stderr),
+  });
+  if (reexport.exit === 0 && late.expectInExport) {
+    const text = readFileSync(ddl, "utf8");
+    const present = text.toLowerCase().includes(String(late.expectInExport).toLowerCase());
+    record({
+      sprint: 4.5,
+      step: "late:reached-artifact",
+      status: present ? "pass" : "fail",
+      severity: present ? undefined : "S1",
+      detail: present
+        ? `the re-export carries "${late.expectInExport}"`
+        : `the re-export does not mention "${late.expectInExport}", so the late requirement did not reach the artifact`,
+    });
   }
-  const failures = [];
-  const defined = new Set();
-  for (const r of records) {
-    if (r.type !== "record" || !r.name || !Array.isArray(r.fields)) {
-      failures.push({ error: `record without name/fields: ${JSON.stringify(r).slice(0, 80)}` });
-    }
-    if (defined.has(r.name)) failures.push({ error: `duplicate record name ${r.name}` });
-    defined.add(r.name);
-    for (const f of r.fields ?? []) {
-      if (!f.name || f.type === undefined) {
-        failures.push({ error: `field without name/type in ${r.name}` });
-      }
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(f.name ?? "")) {
-        failures.push({ error: `field name not an Avro identifier: ${f.name} in ${r.name}` });
-      }
-    }
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(r.name ?? "")) {
-      failures.push({ error: `record name not an Avro identifier: ${r.name}` });
-    }
+
+  // 6. Do the people who signed off still accept it?
+  for (const p of customer.personas ?? []) {
+    const rubric = join(customer.dir, p.acceptance);
+    if (!existsSync(rubric)) continue;
+    const res = runCli(
+      [
+        "gym",
+        "check",
+        p.id,
+        after,
+        "--catalog",
+        join(customer.dir, "personas"),
+        "--no-state",
+        "--format",
+        "json",
+      ],
+      { timeoutMs: budget },
+    );
+    record({
+      sprint: 4.5,
+      step: `late:acceptance:${p.id}`,
+      persona: p.id,
+      ...grade.gradeAcceptance(res, parseJson(res.stdout)),
+      ms: res.ms,
+      exit: res.exit,
+    });
   }
-  return {
-    total: records.length,
-    parsed: records.length - failures.length,
-    failures: failures.slice(0, 20),
-  };
-}
-
-function checkDbt(dir) {
-  const failures = [];
-  let total = 0;
-  const walk = (d) => {
-    for (const f of readdirSync(d, { withFileTypes: true })) {
-      const p = join(d, f.name);
-      if (f.isDirectory()) walk(p);
-      else if (/\.ya?ml$/.test(f.name)) {
-        total++;
-        try {
-          parse(readFileSync(p, "utf8"));
-        } catch (e) {
-          failures.push({ error: `${f.name}: ${e.message.split("\n")[0]}` });
-        }
-      } else if (f.name.endsWith(".sql")) total++;
-    }
-  };
-  if (existsSync(dir)) walk(dir);
-  if (total === 0) failures.push({ error: "no files written" });
-  return { total, parsed: total - failures.length, failures };
-}
-
-function checkXml(file) {
-  const text = readFileSync(file, "utf8");
-  const failures = [];
-  if (!text.trim().startsWith("<?xml")) failures.push({ error: "no XML declaration" });
-  const open = (text.match(/<orm:[A-Za-z]+[\s>]/g) ?? []).length;
-  const close = (text.match(/<\/orm:[A-Za-z]+>/g) ?? []).length + (text.match(/\/>/g) ?? []).length;
-  if (Math.abs(open - close) > 2) failures.push({ error: `tag balance off by ${open - close}` });
-  return { total: 1, parsed: failures.length ? 0 : 1, failures };
 }
 
 /** Sprint 5: the change storm through history and diff. */

@@ -54,6 +54,12 @@ history:
 transcripts:
   - file: transcripts/session-01-customer.md
     key: transcripts/session-01-customer.key.yaml
+lateRequirement:
+  # A market launches and finance needs the currency the week before.
+  note: "A market launches and finance needs the currency the week before."
+  change: {"kind":"add_value_constraint_value","object_type":"CurrencyCode","value":"TRY"}
+  element: CurrencyCode
+  expectInExport: "TRY"
 budgets:
   small: 30000
   medium: 180000

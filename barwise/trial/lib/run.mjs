@@ -199,7 +199,10 @@ async function offline(customers, tier, sprints, opts) {
     }
     if (sprints.includes(2)) steps.sprint2Elicitation(customer, tier, record);
     if (sprints.includes(3)) steps.sprint3Governance(customer, tier, record);
-    if (sprints.includes(4)) steps.sprint4Downstream(customer, tier, record);
+    if (sprints.includes(4)) {
+      steps.sprint4Downstream(customer, tier, record);
+      steps.sprint4bLateRequirement(customer, tier, record);
+    }
     if (sprints.includes(5)) steps.sprint5ChangeStorm(customer, tier, record);
     if (sprints.includes(6)) await steps.sprint6Surfaces(customer, tier, record);
   }

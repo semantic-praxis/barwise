@@ -56,6 +56,20 @@
       "note": "The OpenAPI importer derives role ids from the property name, so two schemas with a 'related' or 'has' property collide and every imported model fails structural/duplicate-role-id (barwise-1023).",
       "detail": "the model the importer wrote has 57 structural error(s): structural/duplicate-role-id"
     },
+    "C01/small/4/read-back:dbt": {
+      "severity": "S3",
+      "class": "dbt-importer-duplicate-fact-type",
+      "issue": "barwise-1026",
+      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-1026).",
+      "detail": "exit 1: Error: Fact type \"OutpatientEncounter has Encounter\" already exists in model \"dbt Import\"."
+    },
+    "C01/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1023",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1023 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 26 structural error(s): structural/duplicate-role-id"
+    },
     "C01/small/5/diff:5:rename_object_type": {
       "severity": "S5",
       "class": "diff-rename-no-synonym",
@@ -68,7 +82,7 @@
       "class": "openapi-importer-duplicate-role-ids-acceptance",
       "issue": "barwise-1023",
       "note": "Consequence of barwise-1023: the persona's must_validate check fails on the importer's duplicate role ids. Closes with the parent.",
-      "detail": "5 of 9 persona checks fail: The model has 57 validation error(s): Role \"related\" in fact type \"Provider related Patient\" has id \"3fec1a29-9620-4225-9b44-a5818f9ab593-related-role\", which another role already uses. Role ids must be unique across the model. (and 56 more); Your model does not yet carry"
+      "detail": "5 of 9 persona checks fail: The model has 57 validation error(s): Role \"related\" in fact type \"Provider related Patient\" has id \"bc2abfcd-f073-4828-8dd5-6272c5232afd-related-role\", which another role already uses. Role ids must be unique across the model. (and 56 more); Your model does not yet carry"
     },
     "C01/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -132,6 +146,13 @@
       "issue": "barwise-1021",
       "note": "Consequence of barwise-1021: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "18 delta(s) outside the declared loss set: removed object_type Party; removed object_type Product; removed object_type Branch; removed object_type Currency; removed object_type LoanAccount; removed object_type GeneralLedgerAccount; removed object_type DepositAccount; removed object_type LegalEntity"
+    },
+    "C02/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1023",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1023 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 14 structural error(s): structural/duplicate-role-id"
     },
     "C02/small/6/acceptance:bank-data-architect:regmart-ddl": {
       "severity": "S5",
@@ -202,6 +223,13 @@
       "issue": "barwise-1021",
       "note": "Consequence of barwise-1021: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "13 delta(s) outside the declared loss set: removed object_type PcContact; removed object_type PcAccount; removed object_type PcProducer; removed object_type PcPolicyPeriod; removed object_type PcRisk; removed object_type PcVehicleRisk; removed object_type PcAdjuster; removed object_type PcClaim"
+    },
+    "C03/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1023",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1023 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 25 structural error(s): structural/duplicate-role-id"
     },
     "C03/small/5/diff:1:rename_object_type": {
       "severity": "S5",
@@ -294,6 +322,20 @@
       "note": "Consequence of barwise-1021: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "16 delta(s) outside the declared loss set: removed object_type Party; removed object_type Currency; removed object_type Category; removed object_type Product; removed object_type PhysicalProduct; removed object_type Seller; removed object_type ProductVariant; removed object_type Marketplace"
     },
+    "C04/small/4/read-back:norma": {
+      "severity": "S1",
+      "class": "norma-read-back-population-orphan",
+      "issue": "barwise-1036",
+      "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation: role identity is rewritten across the round trip and the population rows no longer play the mandatory roles (barwise-1036, sibling of barwise-1028).",
+      "detail": "the model the importer wrote has 49 structural error(s): population/mandatory-violation"
+    },
+    "C04/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1023",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1023 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 22 structural error(s): structural/duplicate-role-id"
+    },
     "C04/small/5/diff:1:rename_object_type": {
       "severity": "S5",
       "class": "diff-rename-no-synonym",
@@ -371,6 +413,13 @@
       "note": "Consequence of barwise-1021: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "15 delta(s) outside the declared loss set: removed object_type UnitOfMeasure; removed object_type Mat; removed object_type WorkCenter; removed object_type FinishedGood; removed object_type Werk; removed object_type Plko; removed object_type Charg; removed object_type Lifnr"
     },
+    "C05/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1023",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1023 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 30 structural error(s): structural/duplicate-role-id"
+    },
     "C05/small/5/merge:8:rename_fact_type": {
       "severity": "S3",
       "class": "merge-rename-structural-error",
@@ -433,6 +482,20 @@
       "issue": "barwise-1021",
       "note": "Consequence of barwise-1021: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "20 delta(s) outside the declared loss set: removed object_type Consignee; removed object_type Port; removed object_type Carrier; removed object_type Vehicle; removed object_type Container; removed object_type Voyage; removed object_type Leg; removed object_type Shipment"
+    },
+    "C06/small/4/read-back:dbt": {
+      "severity": "S3",
+      "class": "dbt-importer-duplicate-fact-type",
+      "issue": "barwise-1026",
+      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-1026).",
+      "detail": "exit 1: Error: Fact type \"Leg has Port\" already exists in model \"dbt Import\"."
+    },
+    "C06/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1023",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1023 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 17 structural error(s): structural/duplicate-role-id"
     },
     "C06/small/5/diff:1:rename_object_type": {
       "severity": "S5",
@@ -518,19 +581,26 @@
       "note": "The OpenAPI importer derives role ids from the property name, so two schemas with a 'related' or 'has' property collide and every imported model fails structural/duplicate-role-id (barwise-1023).",
       "detail": "the model the importer wrote has 48 structural error(s): structural/duplicate-role-id"
     },
+    "C07/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1023",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1023 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 31 structural error(s): structural/duplicate-role-id"
+    },
     "C07/small/6/acceptance:catalog-product-manager:tmf-openapi": {
       "severity": "S1",
       "class": "openapi-importer-duplicate-role-ids-acceptance",
       "issue": "barwise-1023",
       "note": "Consequence of barwise-1023: the persona's must_validate check fails on the importer's duplicate role ids. Closes with the parent.",
-      "detail": "5 of 9 persona checks fail: The model has 48 validation error(s): Role \"related\" in fact type \"Customer related Party\" has id \"3fa7f41e-df29-4ab7-8e9a-40d3ffcc9661-related-role\", which another role already uses. Role ids must be unique across the model. (and 47 more); Your model still allows what it"
+      "detail": "5 of 9 persona checks fail: The model has 48 validation error(s): Role \"related\" in fact type \"Customer related Party\" has id \"1ebc923b-ec6b-4c8b-bbf1-168ca3239ea0-related-role\", which another role already uses. Role ids must be unique across the model. (and 47 more); Your model still allows what it"
     },
     "C07/small/6/acceptance:integration-engineer:tmf-openapi": {
       "severity": "S1",
       "class": "openapi-importer-duplicate-role-ids-acceptance",
       "issue": "barwise-1023",
       "note": "Consequence of barwise-1023: the persona's must_validate check fails on the importer's duplicate role ids. Closes with the parent.",
-      "detail": "4 of 10 persona checks fail: The model has 48 validation error(s): Role \"related\" in fact type \"Customer related Party\" has id \"3fa7f41e-df29-4ab7-8e9a-40d3ffcc9661-related-role\", which another role already uses. Role ids must be unique across the model. (and 47 more); Your model still allows what i"
+      "detail": "4 of 10 persona checks fail: The model has 48 validation error(s): Role \"related\" in fact type \"Customer related Party\" has id \"1ebc923b-ec6b-4c8b-bbf1-168ca3239ea0-related-role\", which another role already uses. Role ids must be unique across the model. (and 47 more); Your model still allows what i"
     },
     "C07/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -580,6 +650,13 @@
       "issue": "barwise-1021",
       "note": "Consequence of barwise-1021: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "14 delta(s) outside the declared loss set: removed object_type Premise; removed object_type Transformer; removed object_type Manufacturer; removed object_type ServicePoint; removed object_type Meter; removed object_type SmartMeter; removed object_type Customer; removed object_type Tariff"
+    },
+    "C08/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1023",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1023 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 9 structural error(s): structural/duplicate-role-id"
     },
     "C08/small/5/diff:1:rename_object_type": {
       "severity": "S5",
@@ -658,6 +735,13 @@
       "note": "The DDL importer has the same role-id collision as the OpenAPI importer: role ids derived from column names collide across tables and the imported model fails structural/duplicate-role-id (barwise-1023, second importer).",
       "detail": "the model the importer wrote has 29 structural error(s): structural/duplicate-role-id"
     },
+    "C09/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1023",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1023 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 16 structural error(s): structural/duplicate-role-id"
+    },
     "C09/small/5/diff:1:rename_object_type": {
       "severity": "S5",
       "class": "diff-rename-no-synonym",
@@ -684,7 +768,7 @@
       "class": "ddl-importer-duplicate-role-ids-acceptance",
       "issue": "barwise-1023",
       "note": "Consequence of barwise-1023 in the DDL importer: the persona's must_validate check fails on duplicate role ids. Closes with the parent.",
-      "detail": "4 of 10 persona checks fail: The model has 29 validation error(s): Role \"study\" in fact type \"Subject study Study\" has id \"4ae182cc-247b-4446-a956-6e21e648b6b7-study-role\", which another role already uses. Role ids must be unique across the model. (and 28 more); The model does not verbalize as \"Rand"
+      "detail": "4 of 10 persona checks fail: The model has 29 validation error(s): Role \"study\" in fact type \"Subject study Study\" has id \"691c2b02-fe93-4b56-b90d-6055d6b5d0d1-study-role\", which another role already uses. Role ids must be unique across the model. (and 28 more); The model does not verbalize as \"Rand"
     },
     "C09/small/6/acceptance:clinical-data-manager:legacy-norma": {
       "severity": "S5",
@@ -698,7 +782,7 @@
       "class": "ddl-importer-duplicate-role-ids-acceptance",
       "issue": "barwise-1023",
       "note": "Consequence of barwise-1023 in the DDL importer: the persona's must_validate check fails on duplicate role ids. Closes with the parent.",
-      "detail": "6 of 10 persona checks fail: The model has 29 validation error(s): Role \"study\" in fact type \"Subject study Study\" has id \"4ae182cc-247b-4446-a956-6e21e648b6b7-study-role\", which another role already uses. Role ids must be unique across the model. (and 28 more); Your model does not yet carry the rel"
+      "detail": "6 of 10 persona checks fail: The model has 29 validation error(s): Role \"study\" in fact type \"Subject study Study\" has id \"691c2b02-fe93-4b56-b90d-6055d6b5d0d1-study-role\", which another role already uses. Role ids must be unique across the model. (and 28 more); Your model does not yet carry the rel"
     },
     "C09/small/6/acceptance:pharmacovigilance-lead:legacy-norma": {
       "severity": "S5",
@@ -712,7 +796,7 @@
       "class": "ddl-importer-duplicate-role-ids-acceptance",
       "issue": "barwise-1023",
       "note": "Consequence of barwise-1023 in the DDL importer: the persona's must_validate check fails on duplicate role ids. Closes with the parent.",
-      "detail": "7 of 10 persona checks fail: The model has 29 validation error(s): Role \"study\" in fact type \"Subject study Study\" has id \"4ae182cc-247b-4446-a956-6e21e648b6b7-study-role\", which another role already uses. Role ids must be unique across the model. (and 28 more); Your model does not yet carry the rel"
+      "detail": "7 of 10 persona checks fail: The model has 29 validation error(s): Role \"study\" in fact type \"Subject study Study\" has id \"691c2b02-fe93-4b56-b90d-6055d6b5d0d1-study-role\", which another role already uses. Role ids must be unique across the model. (and 28 more); Your model does not yet carry the rel"
     },
     "C09/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -762,6 +846,13 @@
       "issue": "barwise-1021",
       "note": "Consequence of barwise-1021: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "16 delta(s) outside the declared loss set: removed object_type Spriden; removed object_type Stvcamp; removed object_type Sgbstdn; removed object_type Sibinst; removed object_type Pebempl; removed object_type Stvcoll; removed object_type Stvdept; removed object_type Scbcrse"
+    },
+    "C10/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1023",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1023 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 19 structural error(s): structural/duplicate-role-id"
     },
     "C10/small/6/acceptance:financial-aid-director:sis-ddl": {
       "severity": "S5",
@@ -840,6 +931,20 @@
       "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-1034).",
       "detail": "170 delta(s) outside the declared loss set: modified object_type TenantId; modified object_type RegionCode; modified object_type WorkspaceId; modified object_type ProjectId; modified object_type ApiKeyId; modified object_type ServiceAccountId; modified object_type TenantName; modified object_type Ap"
     },
+    "C11/small/4/read-back:norma": {
+      "severity": "S1",
+      "class": "norma-read-back-population-orphan",
+      "issue": "barwise-1036",
+      "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation: role identity is rewritten across the round trip and the population rows no longer play the mandatory roles (barwise-1036, sibling of barwise-1028).",
+      "detail": "the model the importer wrote has 37 structural error(s): population/mandatory-violation"
+    },
+    "C11/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1023",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1023 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 15 structural error(s): structural/duplicate-role-id"
+    },
     "C11/small/5/diff:1:rename_object_type": {
       "severity": "S5",
       "class": "diff-rename-no-synonym",
@@ -916,6 +1021,13 @@
       "issue": "barwise-1021",
       "note": "Consequence of barwise-1021: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "29 delta(s) outside the declared loss set: removed object_type Hhld; removed object_type Clnt; removed object_type Aplct; removed object_type Ofc; removed object_type EligWrk; removed object_type Supv; removed object_type Detr; removed object_type Prgm"
+    },
+    "C12/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1023",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1023 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 32 structural error(s): structural/duplicate-role-id"
     },
     "C12/small/6/acceptance:hearing-officer:modern-ddl": {
       "severity": "S5",
