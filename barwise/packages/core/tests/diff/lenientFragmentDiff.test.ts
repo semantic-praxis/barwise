@@ -42,7 +42,7 @@
 
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
-import { mergeModels } from "../../src/diff/ModelMerge.js";
+import { mergeAndValidate, mergeModels } from "../../src/diff/ModelMerge.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 
 const lenient = { skipPlayerValidation: true };
@@ -83,9 +83,6 @@ function addWorks(m: OrmModel, id = "ft-works", name = "EmployeeWorksInDepartmen
 
 /** Three entity types, one fact type between two of them. */
 const base = (): OrmModel => addWorks(objectTypes());
-
-/** Every index in the diff, i.e. accept the lot. */
-const all = (n: number) => new Set(Array.from({ length: n }, (_, i) => i));
 
 const subtypeDeltas = (a: OrmModel, b: OrmModel) =>
   diffModels(a, b).deltas.filter((d) => d.elementType === "subtype_fact");
@@ -132,7 +129,21 @@ describe("a subtype fact in a lenient fragment", () => {
     expect(merged.getObjectType(merged.subtypeFacts[0]!.subtypeId)?.name).toBe("Manager");
   });
 
-  it("is not reported at all when neither model defines its endpoints", () => {
+  // THE FOUR TESTS BELOW ASSERTED THE OPPOSITE UNTIL barwise-997.
+  //
+  // They pinned a skip: a pair-keyed element neither model resolves
+  // produced no delta at all, on the ground that the merged model could
+  // not hold it. `OrmModel` holds it under `skipPlayerValidation` -- the
+  // very option the lenient load used to put it in the fragment -- and
+  // the `structural/subtype-dangling-*` rules report it at error
+  // severity. So the skip was deleting the evidence of a dangling
+  // reference rather than sparing a reviewer a false choice, which is
+  // the defect barwise-997 established on populations.
+  //
+  // Inverted rather than deleted, so the record shows a decision that
+  // changed and not a case that stopped being covered.
+
+  it("is reported when neither model defines its endpoints", () => {
     const existing = base();
     const incoming = fragment();
     incoming.addSubtypeFact(
@@ -140,22 +151,21 @@ describe("a subtype fact in a lenient fragment", () => {
       lenient,
     );
 
-    expect(subtypeDeltas(existing, incoming)).toEqual([]);
+    expect(subtypeDeltas(existing, incoming).map((d) => d.kind)).toEqual(["added"]);
   });
 
   it.each([
     ["its subtype", "ot-nowhere", "ot-emp"],
     ["its supertype", "ot-mgr", "ot-nowhere"],
-  ])("is not reported when %s alone is undefined", (_which, subtypeId, supertypeId) => {
-    // One end is enough: `addableSubtypeFact` needs BOTH, so a pair
-    // with one resolvable end is exactly as inert as one with neither.
-    // Two cases rather than one because a check of the subtype alone
-    // passes the first and not the second.
+  ])("is reported when %s alone is undefined", (_which, subtypeId, supertypeId) => {
+    // One end is enough to make it dangling, and two cases rather than
+    // one because a check of the subtype alone passes the first and not
+    // the second.
     const existing = base();
     const incoming = fragment();
     incoming.addSubtypeFact({ id: "sf-5", subtypeId, supertypeId }, lenient);
 
-    expect(subtypeDeltas(existing, incoming)).toEqual([]);
+    expect(subtypeDeltas(existing, incoming).map((d) => d.kind)).toEqual(["added"]);
   });
 
   it("names its endpoints from the incoming model when the EXISTING side is the fragment", () => {
@@ -175,35 +185,52 @@ describe("a subtype fact in a lenient fragment", () => {
     expect(deltas[0]!.supertype.name).toBe("Employee");
   });
 
-  it("is skipped on the existing side too, for the same reason", () => {
-    // The filter runs on both maps. An existing model can be lenient as
-    // well -- a `.orm.yaml` edited on disk into a dangling reference --
-    // and a `removed` delta for it would be the mirror of the inert
-    // `added` one: rejecting the removal keeps nothing, because the
-    // merged model cannot hold it either.
+  it("is reported on the existing side too, for the same reason", () => {
+    // An existing model can be lenient as well -- a `.orm.yaml` edited
+    // on disk into a dangling reference -- and the mirror case gets the
+    // mirror answer.
     const existing = base();
     existing.addSubtypeFact(
       { id: "sf-4", subtypeId: "ot-nowhere", supertypeId: "ot-elsewhere" },
       lenient,
     );
 
-    expect(subtypeDeltas(existing, base())).toEqual([]);
+    expect(subtypeDeltas(existing, base()).map((d) => d.kind)).toEqual(["removed"]);
   });
 
-  it("is inert if reported, which is why it is not", () => {
-    // The claim the skip rests on, stated as a test rather than as a
-    // comment: even accepting everything, the merged model cannot hold
-    // a relationship between two object types that do not exist.
-    const existing = base();
-    const incoming = fragment();
-    incoming.addSubtypeFact(
-      { id: "sf-3", subtypeId: "ot-nowhere", supertypeId: "ot-elsewhere" },
-      lenient,
-    );
+  it("reaches the merged model and is REPORTED there, rather than vanishing", () => {
+    // This test is the one that mattered. It used to assert the merged
+    // model "cannot hold a relationship between two object types that
+    // do not exist", and stated that claim as the ground for the skip.
+    // The claim is false: `skipPlayerValidation` holds it, which is how
+    // the fragment came to carry it, and the structural rules report
+    // it. The skip was therefore deleting a dangling reference instead
+    // of reporting one (barwise-997).
+    // Three endpoint shapes, because the guard is a disjunction: a
+    // fixture dangling BOTH ends lets either half alone account for it.
+    for (
+      const [subtypeId, supertypeId, expectedRule] of [
+        ["ot-nowhere", "ot-elsewhere", "structural/subtype-dangling-subtype"],
+        ["ot-nowhere", "ot-emp", "structural/subtype-dangling-subtype"],
+        ["ot-mgr", "ot-nowhere", "structural/subtype-dangling-supertype"],
+      ] as const
+    ) {
+      const existing = base();
+      const incoming = fragment();
+      incoming.addSubtypeFact({ id: "sf-3", subtypeId, supertypeId }, lenient);
 
-    const { deltas } = diffModels(existing, incoming);
-    const merged = mergeModels(existing, incoming, deltas, all(deltas.length));
-    expect(merged.subtypeFacts).toEqual([]);
+      const { deltas } = diffModels(existing, incoming);
+      // Accept only what the fragment adds: accepting the removals would
+      // empty the base model and confuse what is being asked.
+      const accepted = new Set(
+        deltas.map((d, i) => (d.kind === "added" ? i : -1)).filter((i) => i >= 0),
+      );
+      const result = mergeAndValidate(existing, incoming, deltas, accepted);
+
+      expect(result.model?.subtypeFacts).toHaveLength(1);
+      expect(result.isValid).toBe(false);
+      expect(result.diagnostics.map((d) => d.ruleId)).toContain(expectedRule);
+    }
   });
 });
 
@@ -247,14 +274,19 @@ describe("an objectified fact type in a lenient fragment", () => {
     ["neither reference is defined", "ot-nowhere", "ft-nowhere"],
     ["only its object type is undefined", "ot-nowhere", "ft-works"],
     ["only its fact type is undefined", "ot-mgr", "ft-nowhere"],
-  ])("is not reported when %s", (_which, objectTypeId, factTypeId) => {
-    // Three cases because `addableObjectification` needs both halves
-    // and a check of one half alone would pass two of these.
+  ])("is reported when %s", (_which, objectTypeId, factTypeId) => {
+    // Three cases because either half can be the dangling one, and a
+    // check of one half alone would pass two of these.
+    //
+    // Inverted with the subtype-fact block above and for the same
+    // reason: the merged model can hold this, and the
+    // `structural/objectified-dangling-*` rules report it
+    // (barwise-997).
     const existing = base();
     const incoming = fragment();
     incoming.addObjectifiedFactType({ id: "oft-2", objectTypeId, factTypeId }, lenient);
 
-    expect(oftDeltas(existing, incoming)).toEqual([]);
+    expect(oftDeltas(existing, incoming).map((d) => d.kind)).toEqual(["added"]);
   });
 
   it("names both references from the incoming model when the EXISTING side is the fragment", () => {
@@ -277,17 +309,16 @@ describe("an objectified fact type in a lenient fragment", () => {
     expect(deltas[0]!.factType.name).toBe("EmployeeWorksInDepartment");
   });
 
-  it("is skipped on the existing side too, for the same reason", () => {
-    // The mirror of the subtype-fact case: both maps are filtered,
-    // because an existing model can hold the dangling reference just as
-    // an incoming fragment can.
+  it("is reported on the existing side too, for the same reason", () => {
+    // The mirror of the subtype-fact case: an existing model can hold
+    // the dangling reference just as an incoming fragment can.
     const existing = base();
     existing.addObjectifiedFactType(
       { id: "oft-3", objectTypeId: "ot-nowhere", factTypeId: "ft-nowhere" },
       lenient,
     );
 
-    expect(oftDeltas(existing, base())).toEqual([]);
+    expect(oftDeltas(existing, base()).map((d) => d.kind)).toEqual(["removed"]);
   });
 });
 
@@ -314,6 +345,99 @@ describe("a fact type in a lenient fragment", () => {
     const ft = diffModels(existing, incoming).deltas.find((d) => d.elementType === "fact_type");
     expect(ft?.kind).toBe("unchanged");
     expect(ft?.changeDescriptions).toEqual([]);
+  });
+});
+
+describe("a lenient fragment element the merge used to drop", () => {
+  // barwise-997's core: `barwise merge` exited 0 with a population gone
+  // and nothing said. Each of the three pair-keyed kinds now reaches the
+  // merged model carrying its dangling reference, so the structural rule
+  // that already exists for it reports at error severity and
+  // mergeAndValidate returns isValid: false.
+  //
+  // Accepting only what the fragment ADDS throughout: accepting the
+  // removals as well would empty the base model, which is the fragment's
+  // own doing and not what these assert.
+  const acceptAdded = (deltas: readonly { kind: string; }[]) =>
+    new Set(deltas.map((d, i) => (d.kind === "added" ? i : -1)).filter((i) => i >= 0));
+
+  it("carries a population whose fact type NEITHER model has, and reports it", () => {
+    const existing = base();
+    const incoming = fragment();
+    incoming.addPopulation(
+      {
+        id: "pop-typo",
+        factTypeId: "ft-typo",
+        instances: [{ id: "i-1", roleValues: { "r-worker": "E1", "r-place": "D1" } }],
+      },
+      lenient,
+    );
+
+    const { deltas } = diffModels(existing, incoming);
+    const result = mergeAndValidate(existing, incoming, deltas, acceptAdded(deltas));
+
+    expect(result.model?.populations).toHaveLength(1);
+    expect(result.isValid).toBe(false);
+    expect(result.diagnostics.map((d) => d.ruleId)).toContain("population/dangling-fact-type");
+  });
+
+  it.each([
+    ["neither reference", "ot-nowhere", "ft-nowhere"],
+    ["its object type alone", "ot-nowhere", "ft-works"],
+    ["its fact type alone", "ot-mgr", "ft-nowhere"],
+  ])(
+    "carries an objectification dangling in %s, and reports it",
+    (_which, objectTypeId, factTypeId) => {
+      // Three cases because the guard is a disjunction and a fixture
+      // that dangles BOTH halves lets either half alone account for it.
+      const existing = base();
+      const incoming = fragment();
+      incoming.addObjectifiedFactType({ id: "oft-typo", objectTypeId, factTypeId }, lenient);
+
+      const { deltas } = diffModels(existing, incoming);
+      const result = mergeAndValidate(existing, incoming, deltas, acceptAdded(deltas));
+
+      expect(result.model?.objectifiedFactTypes).toHaveLength(1);
+      expect(result.isValid).toBe(false);
+      expect(result.diagnostics.some((d) => d.ruleId.startsWith("structural/objectified-dangling")))
+        .toBe(true);
+    },
+  );
+
+  it("still drops, silently, what an ACCEPTED REMOVAL took", () => {
+    // The other half of the split, and the reason the condition is
+    // `isDangling*` rather than `!merged.getFactType(...)`. Removing the
+    // fact type is the reviewer's decision; dropping the population that
+    // depended on it is the merge doing what it was asked, and it must
+    // stay quiet.
+    const existing = base();
+    existing.addPopulation({
+      id: "pop-1",
+      factTypeId: "ft-works",
+      instances: [{ id: "i-1", roleValues: { "r-worker": "E1", "r-place": "D1" } }],
+    });
+
+    // An incoming model that simply lacks the fact type, so the diff
+    // offers its removal.
+    const incoming = objectTypes();
+    const { deltas } = diffModels(existing, incoming);
+
+    // Accept the FACT TYPE's removal but REJECT the population's, so the
+    // population is still chosen when the guard runs. Accepting both --
+    // which an earlier version of this test did -- leaves `chosen`
+    // undefined and the guard is never reached, so the fixture could not
+    // see what it claimed to.
+    const accepted = new Set(
+      deltas
+        .map((d, i) => (d.kind === "removed" && d.elementType !== "population" ? i : -1))
+        .filter((i) => i >= 0),
+    );
+    const result = mergeAndValidate(existing, incoming, deltas, accepted);
+
+    expect(result.model?.factTypes).toHaveLength(0);
+    expect(result.model?.populations).toHaveLength(0);
+    expect(result.isValid).toBe(true);
+    expect(result.diagnostics).toEqual([]);
   });
 });
 

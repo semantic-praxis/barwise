@@ -104,9 +104,20 @@ export class OrmYamlSerializer {
   /**
    * @param yaml - The YAML string to deserialize.
    * @param options - Optional settings.
-   * @param options.lenient - When true, skip role player reference
-   *   validation.  Used for merge fragments that reference types from
-   *   a base model not present in the fragment.
+   * @param options.lenient - When true, skip the constructor checks
+   *   that a referenced element is present, on all FOUR kinds that make
+   *   them: a fact type's role players, a subtype fact's endpoints, an
+   *   objectification's object and fact types, and a population's fact
+   *   type. It began as role players alone and was widened to the other
+   *   three (barwise-977) so `ValidationEngine` could REPORT a dangling
+   *   reference instead of the loader refusing the file.
+   *
+   *   Two callers, and the difference matters. `barwise merge` uses it
+   *   for the incoming side, so a fragment may reference base elements
+   *   it does not redefine. `barwise validate` uses it so a broken file
+   *   is diagnosed rather than rejected -- which only works if nothing
+   *   downstream quietly discards what it let through, and the merge
+   *   used to (barwise-997).
    */
   deserialize(yaml: string, options?: { lenient?: boolean; }): OrmModel {
     const raw = parse(yaml) as unknown;

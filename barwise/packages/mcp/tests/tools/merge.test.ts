@@ -1,7 +1,7 @@
 /**
  * Tests for the merge_models tool.
  */
-import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -45,6 +45,28 @@ describe("merge_models tool", () => {
     expect(parsed.yaml).toBeDefined();
     // The modified fixture adds Email, so it should appear in merged output.
     expect(parsed.yaml).toContain("Email");
+  });
+
+  it("reports a fragment whose population names a fact type nothing defines", () => {
+    // barwise-997, the MCP half. This tool WRITES the merged model back
+    // to the base file, so a silent drop here does not just report
+    // success -- it persists the loss. The population is carried into
+    // the merged model now, the rule that already existed reports it,
+    // and the tool's valid/errorCount say so.
+    const result = executeMerge(
+      baseCopy,
+      `${fixtures}/fragment-typo-population.orm.yaml`,
+    );
+    const parsed = JSON.parse(result.content[0]!.text);
+
+    expect(parsed.valid).toBe(false);
+    expect(parsed.errorCount).toBeGreaterThan(0);
+    expect(JSON.stringify(parsed.diagnostics)).toContain("population/dangling-fact-type");
+
+    // And the base file is not overwritten with the broken result.
+    expect(readFileSync(baseCopy, "utf8")).toBe(
+      readFileSync(`${fixtures}/simple.orm.yaml`, "utf8"),
+    );
   });
 
   it("includes structural diagnostics array", () => {
