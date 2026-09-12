@@ -18,7 +18,6 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join, relative } from "node:path";
 import { parse, stringify } from "yaml";
 import { runGate } from "./gate.mjs";
-import { mergeResults } from "./results.mjs";
 import { generateCode } from "./generators/code.mjs";
 import { generateDbt } from "./generators/dbt.mjs";
 import { generateDdl } from "./generators/ddl.mjs";
@@ -37,6 +36,7 @@ import {
   TIERS,
   TRIAL_DIR,
 } from "./paths.mjs";
+import { mergeResults } from "./results.mjs";
 import * as steps from "./steps.mjs";
 
 function args(argv) {
