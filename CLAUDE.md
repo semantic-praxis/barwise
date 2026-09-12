@@ -471,27 +471,40 @@ skill (`.claude/skills/release/`).
   DEPENDS on the broken thing is measured (the `git` shim logs every
   call), not declared, so no list has to be kept in step. On demand,
   like `mutate`; not in CI.
-- **A leaked credential is rotated, never reverted.** `npm run
-  check:secrets` gates tracked content against ten vendor-anchored
-  detectors, at the pre-commit hook as well as in CI, because it is the
-  one gate whose failure a later commit cannot undo: reverting, deleting
-  the branch and rewriting history all leave the key valid and already
-  disclosed. Two rules follow and both are asserted in
-  `gates.test.mjs`. The gate never prints what it matched -- CI logs are
-  retained and searchable, so an echoing gate becomes a second durable
-  copy of the leak. And the detectors are anchored on issuer prefixes
-  rather than entropy, because this tree is full of lockfile integrity
-  hashes, prompt digests and golden SVG, and on the attribute an entropy
-  rule measures those are indistinguishable from a key. `.gitignore`
-  covering `.env` was what stood in for this, and it could not see the
-  three paths a secret actually arrives by here: machine-written tracked
-  files under `eval-payloads/` and `eval-runs/`, commands pasted into
-  documentation, and fixtures imitating real payloads
-  (`docs/specs/credential-scanning.spec.md`). `--history` scans the whole
-  object database, unreachable blobs included, and refuses on a shallow
-  clone -- which every fresh session clone is, so taking that reading
-  means `git fetch --unshallow` first. Taken once at 1593 commits: 6314
-  blobs, 0 findings (barwise-1022).
+- **A leaked credential is rotated, never reverted.** It is the one gate
+  whose failure a later commit cannot undo: reverting, deleting the branch
+  and rewriting history all leave the key valid and already disclosed.
+  `.gitignore` covering `.env` was what stood in for it, and could not see
+  the three paths a secret actually arrives by here -- machine-written
+  tracked files under `eval-payloads/` and `eval-runs/`, commands pasted
+  into documentation, and fixtures imitating real payloads
+  (`docs/specs/credential-scanning.spec.md`).
+
+  **Detection is gitleaks', not ours.** `npm run check:secrets -- --staged`
+  runs at the pre-commit hook (the index, depth-independent, ~0.15s) and
+  `npm run check:secrets` scans all reachable commits in CI. The first
+  version of this gate hand-wrote ten vendor regexes; they flagged AWS's
+  own documented example key, which is a false positive that fails every
+  commit quoting a manual. Do not add rules here -- `.gitleaks.toml` is
+  `[extend] useDefault = true` plus exactly ONE rule, for Anthropic keys,
+  which gitleaks 8.28.0 genuinely does not detect (measured: 0 of 3
+  realistic shapes, including a plain `ANTHROPIC_API_KEY=` assignment).
+  That is the credential this repo is most likely to leak, and
+  barwise-1028 tracks sending the rule upstream so we stop carrying it.
+
+  The wrapper exists for the gate contract, not for detection: exit `2`
+  when gitleaks is absent, when `.gitleaks.toml` is absent (its defaults
+  would silently drop the Anthropic rule), when a history scan is asked of
+  a shallow clone, or when gitleaks exits anything but 0 or 1. It always
+  passes `--redact`, because CI logs are retained and searchable so an
+  echoing gate becomes a second durable copy of the leak, and `--verbose`,
+  because without it the output is "leaks found: 1" with no rule, file or
+  line. The version is pinned with a verified digest in
+  `scripts/install-gitleaks.sh` -- one home, shared by `ci.yml` and the
+  session hook, because gitleaks ships RULES and two versions would apply
+  different rule sets to the same diff. A fresh session clone is shallow;
+  the hook unshallows it so the history scan can answer. Taken once over
+  1056 commits: 0 findings (barwise-1022).
 - ESLint config is shared at the repo root (`barwise/eslint.config.mjs`).
 - Turborepo (`barwise/turbo.json`) orchestrates build/test/lint with
   correct dependency ordering.

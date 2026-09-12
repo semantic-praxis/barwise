@@ -16,14 +16,15 @@ if git diff --cached --name-only | grep -qx '.beads/issues.jsonl'; then
   fi
 fi
 
-# 1. Refuse a credential in tracked content. This one is at the COMMIT and
-#    not the push, unlike the rest of the gate list, because it is the only
-#    check whose failure a later commit cannot undo: a leaked key has to be
-#    rotated, and the commit is the object that gets pushed, shared, stashed
-#    and copied into a worktree. It costs about 0.45s over 1602 files, which
-#    is the same order as the beads check above
+# 1. Refuse a credential in what is about to be committed. This one is at
+#    the COMMIT and not the push, unlike the rest of the gate list, because
+#    it is the only check whose failure a later commit cannot undo: a leaked
+#    key has to be rotated, and the commit is the object that gets pushed,
+#    shared, stashed and copied into a worktree. `--staged` scans the index,
+#    so it costs about 0.15s and -- unlike the history scan CI runs -- does
+#    not care whether this clone is shallow
 #    (docs/specs/credential-scanning.spec.md).
-if ! npm run --silent check:secrets; then
+if ! npm run --silent check:secrets -- --staged; then
   echo "pre-commit: credential-shaped content in the tree (see above)." >&2
   echo "  If it is a real key, ROTATE it -- amending the commit does not un-leak it." >&2
   exit 1
