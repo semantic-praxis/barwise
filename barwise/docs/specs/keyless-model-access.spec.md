@@ -1,8 +1,8 @@
 # Keyless by default: remove the places an API key can live
 
-Status: WS1 (the key leaves VS Code settings for the OS keychain) and WS3
-(`--api-key` refused) landed with this spec. WS2 (MCP sampling) is open --
-barwise-1030.
+Status: Implemented. All three workstreams landed -- WS1 (the key leaves VS
+Code settings for the OS keychain), WS3 (`--api-key` refused), and WS2 (the
+MCP server borrows the client's model through sampling).
 
 Created: 2026-09-12
 Last-updated: 2026-09-12
@@ -89,11 +89,11 @@ In scope, as requirements:
 - When an eval or extraction artifact is written, the system shall not write
   the value of `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` into it. (WS1, as a
   test over a sentinel.)
-- When the MCP client advertises the `sampling` capability, the MCP server
-  shall obtain completions through `server.createMessage` rather than an API
-  key. (WS2)
-- When the MCP client does not advertise `sampling`, the system shall fall
-  back to `createLlmClient()` and shall say which path it took. (WS2)
+- When the MCP client advertises the `sampling.tools` capability, the MCP
+  server shall obtain completions through `server.createMessage` rather than
+  an API key. (WS2)
+- When the MCP client does not advertise `sampling.tools`, the system shall
+  fall back to `createLlmClient()` and shall say which path it took. (WS2)
 - When a structured response is required over sampling, the system shall
   request it through sampling's tool support rather than by asking for JSON
   in prose. (WS2)
@@ -210,7 +210,7 @@ artifact write, and asserts the sentinel appears in no written file. That is a
 property rather than a detector -- it cannot go stale as providers change --
 and it pins the metadata-only shape `callLog.ts` already has.
 
-### 2. MCP: sampling, so the server needs no key (barwise-1030)
+### 2. MCP: sampling, so the server needs no key (barwise-1030 -- landed)
 
 `packages/mcp/src/SamplingLlmClient.ts` implements `LlmClient` over
 `server.createMessage(params)`. `CreateMessageRequestParams` carries
@@ -228,6 +228,36 @@ Verified available before this was written: the SDK is `^1.30.0`,
 `server/index.d.ts` exports `createMessage` in three overloads and
 `getClientCapabilities()`, and the SDK ships
 `examples/server/toolWithSampleServer.js` doing exactly this shape.
+
+**The draft said to check `sampling`, and that was wrong -- it is
+`sampling.tools`.** Reading `ClientCapabilities` showed tool use is a
+_separate_ capability nested under sampling, and the protocol states the
+client MUST return an error when `tools` is provided without it. Both of
+barwise's paths request structured output -- `processTranscript` builds a
+response schema and so does `reviewModel` -- so every call this server makes
+carries `tools`. Keying the decision on `sampling` alone would have replaced a
+working keyed path with a failing sampling one for any client that samples but
+does not support tool use. Caught by reading the capability type rather than by
+a test, and now pinned by one.
+
+Landed as specified otherwise. `packages/mcp/src/llm/SamplingLlmClient.ts` and
+`llm/resolveClient.ts`; `executeImport` and `executeReview` take the client as
+an optional last argument and build their own when it is omitted, so they stay
+callable standalone and their existing tests are untouched. 16 tests, and four
+mutations CAUGHT:
+
+| Mutation                                                          | Tests failing |
+| ----------------------------------------------------------------- | ------------- |
+| the capability check reads `sampling` instead of `sampling.tools` | 1             |
+| `toolChoice` becomes `auto` instead of `required`                 | 1             |
+| a prose answer to a structured request is returned, not refused   | 1             |
+| the client claims a model it cannot know                          | 1             |
+
+The third mutation is worth a note about method. Its first spelling produced
+code that did not compile, and `mutate` reported CAUGHT on a run where the
+suite never executed -- the false green barwise-1019 is about. Re-run with a
+compiling edit (`void 0;` in place of the throw), it failed the one intended
+test.
 
 ### 3. CLI: no key in argv (barwise-1031)
 
