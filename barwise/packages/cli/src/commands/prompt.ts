@@ -51,12 +51,12 @@ import { callLogSink } from "../workspace/callLogSink.js";
 import { loadModel, readFile } from "../workspace/io.js";
 import { artifactByVersion, artifactCandidates } from "../workspace/promptArtifacts.js";
 import { describeProvenance, resolveProvenance } from "../workspace/provenance.js";
+import { API_KEY_FLAG, API_KEY_FLAG_DESCRIPTION } from "./apiKeyFlag.js";
 import { renderReview } from "./review.js";
 
 interface ProviderOpts {
   provider?: string;
   model?: string;
-  apiKey?: string;
   baseUrl?: string;
 }
 
@@ -90,7 +90,7 @@ function registerEval(promptCmd: Command, version: string): void {
       `LLM provider (${PROVIDER_NAMES.join(", ")}). Auto-detects from env vars if omitted.`,
     )
     .option("--model <model>", "Model override for the LLM provider")
-    .option("--api-key <key>", "API key (falls back to env vars)")
+    .option(API_KEY_FLAG, API_KEY_FLAG_DESCRIPTION)
     .option("--base-url <url>", "Ollama server URL (only for ollama provider)")
     .option("--artifacts <dir>", "Load .prompt.yaml variants from this directory")
     .option(
@@ -208,7 +208,6 @@ function registerEval(promptCmd: Command, version: string): void {
           // nothing rather than a client and a sweep.
           const bare = createLlmClient({
             provider: opts.provider as ProviderName | undefined,
-            apiKey: opts.apiKey,
             model: opts.model,
             baseUrl: opts.baseUrl,
             ...(contextWindow !== undefined ? { contextWindow } : {}),
@@ -970,7 +969,7 @@ function registerRun(promptCmd: Command): void {
       `LLM provider (${PROVIDER_NAMES.join(", ")}). Auto-detects from env vars if omitted.`,
     )
     .option("--model <model>", "Model override for the LLM provider")
-    .option("--api-key <key>", "API key (falls back to env vars)")
+    .option(API_KEY_FLAG, API_KEY_FLAG_DESCRIPTION)
     .option("--base-url <url>", "Ollama server URL (only for ollama provider)")
     .option(
       "--thinking-budget <n>",
@@ -991,7 +990,6 @@ function registerRun(promptCmd: Command): void {
 
           const bare = createLlmClient({
             provider: opts.provider as ProviderName | undefined,
-            apiKey: opts.apiKey,
             model: opts.model,
             baseUrl: opts.baseUrl,
             ...(thinkingBudget !== undefined ? { thinkingBudget } : {}),

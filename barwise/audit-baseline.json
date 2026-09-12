@@ -111,11 +111,6 @@
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"Java project (annotations, types, validations)\" in packages/code-analysis/src/formats/JavaImportFormat.ts, packages/code-analysis/src/formats/registration.ts"
     },
-    "literal:7c9ed77763f0": {
-      "status": "accepted-benign",
-      "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
-      "detail": "\"API key (falls back to env vars)\" in packages/cli/src/commands/import/batch.ts, packages/cli/src/commands/import/transcript.ts, packages/cli/src/commands/prompt.ts, packages/cli/src/commands/review.ts"
-    },
     "literal:821bd1da5aa9": {
       "status": "accepted-benign",
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",

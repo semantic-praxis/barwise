@@ -1,17 +1,17 @@
-# barwise-1037: a rename reported as removal plus addition
+# barwise-1037: the dbt importer throws on two relationships to one model
 
 ```sh
-barwise diff trial/findings/barwise-1037/before.orm.yaml trial/findings/barwise-1037/after.orm.yaml --format json
+barwise import dbt trial/findings/barwise-1037
 ```
 
-`after` is `before` with the object type Listing renamed to Offer (and
-its fact-type names updated), nothing else.
+A leg has an origin port and a destination port: two relationships
+tests from `stg_leg` to `stg_port`.
 
-Expected: a synonym candidate Listing -> Offer, as the same command
-reports for Producer -> Agency and Encounter -> Visit in the trial's
-other histories.
+Expected: two fact types (Leg has origin Port, Leg has destination
+Port), or one named as skipped.
 
-Observed (1.7.0): REMOVED Object type Listing [breaking], ADDED Object
-type Offer, `synonymCandidates: []`. Six of the trial's fourteen
-object-type renames are reported this way; the rule that decides which
-is not stated.
+Observed (1.7.0): exit 1, `Error: Fact type "Leg has Port" already
+exists in model "dbt Import"`, no model written. barwise's own dbt
+export produces this shape from any ring constraint or any table with
+two foreign keys to the same table, so the dbt round trip fails on
+most models.

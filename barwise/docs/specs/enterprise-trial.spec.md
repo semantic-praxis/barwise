@@ -7,7 +7,7 @@ open. See "What the first run found" and "Implementation notes".
 
 Created: 2026-09-11
 Last-updated: 2026-09-11
-Tracking: barwise-1029 through barwise-1042 are the findings the first
+Tracking: barwise-1032 through barwise-1045 are the findings the first
 run produced, each with a reproduction under `trial/findings/`. Companions: `docs/specs/eval-transcript-realism.spec.md`
 (the transcript authoring rules the trial's corpus extends),
 `docs/specs/eval-difficulty-calibration.spec.md` (three of its five
@@ -512,24 +512,24 @@ The findings, by what a customer would have hit first:
 
 | Issue        | What a customer sees                                                                                                     | Sev                                          |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------- |
-| barwise-1029 | `import sql` returns the targets of FOREIGN KEY clauses, not the tables; 24% to 100% of tables dropped without a warning | S1                                           |
-| barwise-1030 | `import model --format ddl` is one regex: schema-qualified, bracketed, backticked and unterminated statements all miss   | S3                                           |
-| barwise-1031 | The OpenAPI and DDL importers write duplicate role ids, so every model they produce fails validation                     | S1                                           |
-| barwise-1032 | The OpenAPI export writes a `/* */` header into a .json file, which nothing can parse back                               | S1                                           |
-| barwise-1033 | DDL export then import is not a fixed point; the annotated export re-imports with zero fact types                        | S1                                           |
-| barwise-1034 | The dbt importer throws when two relationship tests derive one reading, which its own export produces                    | S3                                           |
-| barwise-1035 | dbt round trip loses value types and value constraints beyond the declared loss set                                      | S1                                           |
-| barwise-1036 | NORMA round trip re-homes subset, exclusion and external-uniqueness constraints onto sibling fact types                  | S1                                           |
-| barwise-1037 | `diff` reports six of fourteen object-type renames as a removal plus an addition, with no stated rule                    | S5                                           |
-| barwise-1038 | The Kotlin importer returns an empty model for data classes and sealed classes                                           | S1                                           |
-| barwise-1039 | `merge` exits 1 with "1 structural error(s)" on a fact-type rename and does not say which                                | S3                                           |
-| barwise-1040 | The release CLI bundle cannot find its own gym catalog: `gym list` fails with a Node path error                          | S3                                           |
-| barwise-1041 | `barwise diff a b                                                                                                        | head` ends in an unhandled EPIPE stack trace | S2 |
-| barwise-1042 | OpenAPI round trip drops every value type's length, definition and value constraint                                      | S1                                           |
+| barwise-1032 | `import sql` returns the targets of FOREIGN KEY clauses, not the tables; 24% to 100% of tables dropped without a warning | S1                                           |
+| barwise-1033 | `import model --format ddl` is one regex: schema-qualified, bracketed, backticked and unterminated statements all miss   | S3                                           |
+| barwise-1034 | The OpenAPI and DDL importers write duplicate role ids, so every model they produce fails validation                     | S1                                           |
+| barwise-1035 | The OpenAPI export writes a `/* */` header into a .json file, which nothing can parse back                               | S1                                           |
+| barwise-1036 | DDL export then import is not a fixed point; the annotated export re-imports with zero fact types                        | S1                                           |
+| barwise-1037 | The dbt importer throws when two relationship tests derive one reading, which its own export produces                    | S3                                           |
+| barwise-1038 | dbt round trip loses value types and value constraints beyond the declared loss set                                      | S1                                           |
+| barwise-1039 | NORMA round trip re-homes subset, exclusion and external-uniqueness constraints onto sibling fact types                  | S1                                           |
+| barwise-1040 | `diff` reports six of fourteen object-type renames as a removal plus an addition, with no stated rule                    | S5                                           |
+| barwise-1041 | The Kotlin importer returns an empty model for data classes and sealed classes                                           | S1                                           |
+| barwise-1042 | `merge` exits 1 with "1 structural error(s)" on a fact-type rename and does not say which                                | S3                                           |
+| barwise-1043 | The release CLI bundle cannot find its own gym catalog: `gym list` fails with a Node path error                          | S3                                           |
+| barwise-1044 | `barwise diff a b                                                                                                        | head` ends in an unhandled EPIPE stack trace | S2 |
+| barwise-1045 | OpenAPI round trip drops every value type's length, definition and value constraint                                      | S1                                           |
 
 Four of these are what the trial was built to find and nothing else
-would have: barwise-1029 and barwise-1038 are importers that exit zero
-on an empty or partial result, barwise-1032 and barwise-1040 are
+would have: barwise-1032 and barwise-1041 are importers that exit zero
+on an empty or partial result, barwise-1035 and barwise-1043 are
 artifacts the product itself writes that the product itself cannot
 read. The unit suites are green across all twelve packages while every
 one of these holds.
@@ -593,7 +593,7 @@ reality (the `spec-writer` convention).
   The step is now `read-back:<format>`: export, then read it back with
   barwise's own importer and validate what comes back. Avro has no
   importer, so that step records could-not-answer rather than the lane
-  inventing one. The rewrite immediately found barwise-1044, which the
+  inventing one. The rewrite immediately found barwise-1047, which the
   bespoke checkers could not have: they graded the file's syntax, and
   the defect is that barwise cannot read its own NORMA output into a
   valid model.
@@ -640,7 +640,7 @@ do not.
 | Week | Lands                                                       | Runs                                                | State                                    |
 | ---- | ----------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------- |
 | 1    | WS1, WS2, WS4; twelve kernels, 33 personas, 26 artifacts    | Small tier, sprints 1, 3, 4, 5, 6, twelve customers | Done: 788 steps, 136 findings, 14 issues |
-| 2    | Fixes for the S1 importers (barwise-1029, 1023, 1030)       | `trial:offline` per PR; baseline rows come out      | Next                                     |
+| 2    | Fixes for the S1 importers (barwise-1032, 1023, 1030)       | `trial:offline` per PR; baseline rows come out      | Next                                     |
 | 3    | WS3: the keyed lane, the recorder, the seeded-defect grader | Keyed sprint 2 for C01 and C11, then replay offline | Open; needs a provider key               |
 | 4    | Medium and enterprise tiers for all twelve                  | Sprint 1 and 5 at scale                             | Open; proven for C01 and C10 only        |
 | 5    | The agent journey (K19) and the C10 editor checklist        | Sprint 6 through the subagent channel               | Open                                     |

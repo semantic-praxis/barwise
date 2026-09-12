@@ -1,14 +1,17 @@
-# barwise-1041: unhandled EPIPE when stdout closes early
+# barwise-1041: the Kotlin importer returns nothing for data and sealed classes
 
 ```sh
-barwise diff trial/customers/C02-bank/kernel.orm.yaml trial/customers/C02-bank/generated/small/scaled.openapi.back.orm.yaml | head -5
+barwise import kotlin trial/findings/barwise-1041
 ```
 
-Any command that prints more than the reader wants will do; `diff` and
-`verbalize` piped to `head` were how this was found.
+Four files: three data classes and one sealed hierarchy, the way
+Kotlin domain code is written.
 
-Expected: the first five lines and a quiet exit.
+Expected: entity types Event, Tenant, EventProperty, User,
+AnonymousUser, IdentifiedUser with subtypes and fact types from the
+constructor properties.
 
-Observed (1.7.0): the first five lines, then `Error: write EPIPE` with
-a Node stack trace (`index.cjs:190802`) and an `Emitted 'error' event`
-block. Handle EPIPE on `process.stdout` once, in the CLI entry point.
+Observed (1.7.0): exit 0, "Imported 0 object types", confidence medium,
+no warning naming a class. The Java importer on the equivalent JPA
+entities and the TypeScript importer on the equivalent classes both
+import.

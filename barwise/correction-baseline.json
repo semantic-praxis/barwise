@@ -474,6 +474,12 @@
       "excerpt": "this spec's first draft said there was none, and that was wrong. codeql runs on every pr over javascript-types",
       "caught_by": "execution",
       "note": "The CodeQL Analyze check runs appearing on this PR, not review. The draft concluded \"no SAST\" from a grep over .github/workflows, which cannot see GitHub default setup because that configuration is not in the tree. The same spec makes this argument about push protection; the miss was not running it in the direction where a setting is ON without the tree saying so."
+    },
+    "keyless-model-access::95734f42d91c": {
+      "spec": "keyless-model-access.spec.md",
+      "excerpt": "the draft said to check sampling, and that was wrong -- it is sampling.tools. reading clientcapabilities showe",
+      "caught_by": "reasoning",
+      "note": "Reading the SDK's ClientCapabilities type before writing the check, not running anything: tool use is a separate capability nested under sampling, and the protocol says the client MUST error when tools arrives without it. Classified reasoning rather than execution because no probe was run -- the claim was checked against the type declaration. Had it shipped as drafted, any client that samples but does not support tool use would have had a working keyed path replaced by a failing sampling one; that case is now a test."
     }
   }
 }

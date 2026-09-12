@@ -1,16 +1,14 @@
-# barwise-1042: OpenAPI export then import drops lengths, definitions and value constraints
+# barwise-1042: merge fails on a fact-type rename without saying why
 
 ```sh
-barwise export trial/customers/C02-bank/kernel.orm.yaml --format openapi --no-annotate --output /tmp/bank.json
-barwise import model /tmp/bank.json --format openapi --output /tmp/bank-back.orm.yaml
-barwise diff trial/customers/C02-bank/kernel.orm.yaml /tmp/bank-back.orm.yaml | head -20
+barwise merge trial/findings/barwise-1042/base.orm.yaml trial/findings/barwise-1042/incoming.orm.yaml --output /tmp/merged.orm.yaml
 ```
 
-Expected: only the deltas `trial/loss-sets/openapi.json` declares
-(populations, subtypes, objectification).
+`incoming` is `base` with "Material is component of Material" renamed
+to "Material is part of Material" (a fact type carrying an acyclic ring
+constraint), nothing else.
 
-Observed (1.7.0): every value type reads `definition changed`,
-`data type: text(20) -> text`, and enumerated ones `value constraint
-changed`; 143 to 183 deltas per 55-object-type kernel. The exported
-document carries `maxLength`, `description` and `enum` for these
-properties, so the importer's property reader is what drops them.
+Expected: a merged model, or a diagnostic naming the structural error.
+
+Observed (1.7.0): exit 1, `Merge produced 1 structural error(s);
+nothing was written.` and no diagnostic.

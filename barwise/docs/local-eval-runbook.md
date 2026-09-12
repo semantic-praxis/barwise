@@ -55,7 +55,7 @@ cd barwise
 npm run build
 git status --short                      # must be empty; see "dirty tree" below
 (cd packages/cli && npx vitest run tests/commands/promptEvalOffline.test.ts)
-export ANTHROPIC_API_KEY=...            # never --api-key, which lands in shell history
+export ANTHROPIC_API_KEY=...            # the only way in; --api-key is refused
 ```
 
 The offline test drives the whole command -- flags, client construction,

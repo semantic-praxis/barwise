@@ -39,6 +39,7 @@ import {
   type SourceInput,
 } from "@barwise/mcp";
 import * as vscode from "vscode";
+import { getAnthropicApiKey } from "../llm/anthropicKey.js";
 import { CopilotLlmClient } from "../llm/CopilotLlmClient.js";
 import { getOpenModelSource } from "./openModel.js";
 
@@ -170,13 +171,19 @@ function resolveSourceParam(source: string | undefined): SourceInput {
 /**
  * Resolve the LLM client for the Copilot-backed tools: prefer Copilot
  * (no API key needed), fall back to Anthropic if the user configured it.
+ *
+ * The key comes from `ExtensionContext.secrets`, never from a settings
+ * string -- a settings value can be written to `.vscode/settings.json` and
+ * committed (docs/specs/keyless-model-access.spec.md). `secrets` is threaded
+ * in from the registration below rather than held in a module variable, so
+ * there is no initialisation order to get wrong.
  */
-async function resolveLlmClient(): Promise<LlmClient> {
+async function resolveLlmClient(secrets: vscode.SecretStorage): Promise<LlmClient> {
   const config = vscode.workspace.getConfiguration("barwise");
   const provider = config.get<string>("llmProvider") ?? "copilot";
 
   if (provider === "anthropic") {
-    const apiKey = config.get<string>("anthropicApiKey") || undefined;
+    const apiKey = await getAnthropicApiKey(secrets);
     const model = config.get<string>("anthropicModel") || undefined;
     return new AnthropicLlmClient({ apiKey, model });
   }
@@ -196,9 +203,10 @@ async function resolveLlmClient(): Promise<LlmClient> {
  */
 async function runImportTranscript(
   input: ImportTranscriptInput,
+  secrets: vscode.SecretStorage,
 ): Promise<vscode.LanguageModelToolResult> {
   const { transcript, modelName = "Extracted Model" } = input;
-  const client = await resolveLlmClient();
+  const client = await resolveLlmClient(secrets);
 
   let existingModelContext: string | undefined;
   const editor = vscode.window.activeTextEditor;
@@ -245,9 +253,10 @@ function runExportModel(input: ExportModelInput): vscode.LanguageModelToolResult
 /** review_model: Copilot-backed review, formatted as Markdown. */
 async function runReviewModel(
   input: ReviewModelInput,
+  secrets: vscode.SecretStorage,
 ): Promise<vscode.LanguageModelToolResult> {
   const source = resolveSourceParam(input.source);
-  const client = await resolveLlmClient();
+  const client = await resolveLlmClient(secrets);
   const model = resolveSource(source);
   const result = await reviewModel(model, client, { focus: input.focus });
 
@@ -336,7 +345,7 @@ export function registerLanguageModelTools(context: vscode.ExtensionContext): vo
   register<ImportTranscriptInput>(
     context,
     "barwise_import_transcript",
-    runImportTranscript,
+    (i) => runImportTranscript(i, context.secrets),
     "Extracting Barwise model from transcript...",
   );
   register<MergeInput>(
@@ -381,7 +390,7 @@ export function registerLanguageModelTools(context: vscode.ExtensionContext): vo
   register<ReviewModelInput>(
     context,
     "barwise_review_model",
-    runReviewModel,
+    (i) => runReviewModel(i, context.secrets),
     "Reviewing Barwise model...",
   );
   register<LineageStatusInput>(

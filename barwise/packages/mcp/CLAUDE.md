@@ -23,6 +23,9 @@ src/
   workspace/
     resolve.ts          Source resolution (file path / inline YAML / project)
     projectLoader.ts    Filesystem walk for a .orm-project.yaml manifest
+  llm/
+    SamplingLlmClient.ts  LlmClient over MCP sampling -- the host's model, no key
+    resolveClient.ts      Prefer sampling, fall back to a key, report which
   tools/
     index.ts            Tool registration barrel
     validate.ts         validate_model tool
@@ -72,6 +75,27 @@ npx tsc --noEmit            # type-check only
   combined per-domain view; a `domain` selects one).
 - Tool handlers return `{ content: [{ type: "text", text }] }` per
   MCP protocol.
+- **The LLM tools prefer the client's model over an API key.**
+  `import_transcript` and `review_model` resolve through
+  `llm/resolveClient.ts`: when the connected client advertises
+  `sampling.tools`, completions go through `server.createMessage` and this
+  server needs no credential; otherwise it falls back to
+  `createLlmClient()`. The route is appended to the tool result, because a
+  silent fallback would let an operator believe no key was used while one
+  was (`docs/specs/keyless-model-access.spec.md`).
+
+  **The capability to check is `sampling.tools`, not `sampling`.** Both
+  `processTranscript` and `reviewModel` request structured output, so every
+  call this server makes carries `tools` -- and the protocol says a client
+  MUST error when `tools` arrives without that capability. Keying on
+  `sampling` alone would swap a working keyed path for a failing one.
+
+  `executeImport` and `executeReview` take the client as an optional last
+  argument and build their own when it is omitted, so they stay callable
+  standalone; only the registration has the server handle sampling needs.
+  Neither is usable by promptlab: a sampling client reports no `model`
+  before the call, so a recorded `promptHash` would not be a function of
+  the model that answered.
 - Tests call tool handler functions directly with mock inputs (no
   transport needed).
 

@@ -13,9 +13,10 @@ import {
   processTranscript,
   sampleTranscript,
 } from "@barwise/llm";
-import type { CandidateFraming, ProviderName } from "@barwise/llm";
+import type { CandidateFraming, LlmClient, ProviderName } from "@barwise/llm";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { appendRouteNote, resolveLlmClient } from "../llm/resolveClient.js";
 import { readSource, resolveSource } from "../workspace/resolve.js";
 
 const serializer = new OrmYamlSerializer();
@@ -77,7 +78,14 @@ export function registerImportTool(server: McpServer): void {
       },
     },
     async ({ transcript, modelName, base, provider, model, alternatives, samples }) => {
-      return executeImport(
+      // Resolved HERE rather than inside executeImport, because only the
+      // registration has the server handle sampling needs. executeImport
+      // keeps its own fallback so it stays callable standalone.
+      const { client, route } = resolveLlmClient(server, {
+        ...(provider !== undefined ? { provider: provider as ProviderName } : {}),
+        ...(model !== undefined ? { model } : {}),
+      });
+      const result = await executeImport(
         transcript,
         modelName,
         provider as ProviderName | undefined,
@@ -85,7 +93,9 @@ export function registerImportTool(server: McpServer): void {
         base,
         alternatives,
         samples,
+        client,
       );
+      return appendRouteNote(result, route);
     },
   );
 }
@@ -98,10 +108,18 @@ export async function executeImport(
   base?: string,
   alternatives?: boolean,
   samples?: number,
+  /**
+   * The client to extract with. Omitted, one is built from `provider` and
+   * `model` as before -- so a standalone caller behaves exactly as it did.
+   * The MCP registration passes a `SamplingLlmClient` when the connected
+   * client advertises `sampling.tools`, which is how this surface stops
+   * needing a key of its own.
+   */
+  llmClient?: LlmClient,
 ): Promise<{ content: Array<{ type: "text"; text: string; }>; }> {
   const text = readSource(transcript);
 
-  const client = createLlmClient({
+  const client = llmClient ?? createLlmClient({
     provider,
     model,
   });

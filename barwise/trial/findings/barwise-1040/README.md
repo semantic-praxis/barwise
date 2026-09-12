@@ -1,15 +1,17 @@
-# barwise-1040: the release CLI bundle cannot find the gym catalog
+# barwise-1040: a rename reported as removal plus addition
 
 ```sh
-node packages/cli/dist/bundle/index.cjs gym list
-node packages/cli/dist/index.js gym list
+barwise diff trial/findings/barwise-1040/before.orm.yaml trial/findings/barwise-1040/after.orm.yaml --format json
 ```
 
-Expected: the packaged exercises listed, from either entry point.
+`after` is `before` with the object type Listing renamed to Offer (and
+its fact-type names updated), nothing else.
 
-Observed (1.7.0): the bundle exits 1 with `Error: The "path" argument
-must be of type string or an instance of URL. Received undefined`; the
-unbundled dist lists one exercise. `learn/src/exercise/catalog.ts`
-resolves the catalog from `import.meta.url`, which esbuild leaves empty
-in the cjs bundle (the build prints the warning). `--catalog <dir>`
-works. Every trial customer's sprint-6 release-bundle step records this.
+Expected: a synonym candidate Listing -> Offer, as the same command
+reports for Producer -> Agency and Encounter -> Visit in the trial's
+other histories.
+
+Observed (1.7.0): REMOVED Object type Listing [breaking], ADDED Object
+type Offer, `synonymCandidates: []`. Six of the trial's fourteen
+object-type renames are reported this way; the rule that decides which
+is not stated.

@@ -1,22 +1,18 @@
-# barwise-1033: DDL export then import is not a fixed point
+# barwise-1033: the `ddl` importer is one regex
 
 ```sh
-barwise export examples/transcripts/clinic-appointments.orm.yaml --format ddl --output /tmp/a.sql
-barwise import model /tmp/a.sql --format ddl --output /tmp/a.orm.yaml
-barwise diff examples/transcripts/clinic-appointments.orm.yaml /tmp/a.orm.yaml
-barwise export examples/transcripts/clinic-appointments.orm.yaml --format ddl --no-annotate --output /tmp/b.sql
-barwise import model /tmp/b.sql --format ddl --output /tmp/b.orm.yaml
-barwise diff examples/transcripts/clinic-appointments.orm.yaml /tmp/b.orm.yaml
+barwise import model trial/findings/barwise-1033/messy.sql --format ddl
 ```
 
-Expected: the re-imported model differs from the original only by the
-loss set in `trial/loss-sets/ddl.json` (definitions, populations,
-subtypes, objectification).
+Four CREATE TABLE statements: schema-qualified with IF NOT EXISTS,
+bracket-quoted, backtick-quoted, and one without a trailing semicolon.
 
-Observed (1.7.0) on a 57-object-type trial kernel: the annotated export
-re-imports with 24 entity types and zero fact types (the comments
-inside the column list break the importer's body regex); the
-unannotated export re-imports with 46 object types and 39 fact types,
-14 object types and 39 fact types removed, 21 fact types added under
-different readings. Also: the column comments in a DDL export read "Add
-one to the dbt YAML".
+Expected: four entity types, or a refusal naming each statement it
+could not parse.
+
+Observed (1.7.0): exit 0, "Imported 0 object types, 0 fact types",
+confidence low, one warning "No CREATE TABLE statements found in
+input". `DdlImportFormat.ts:149` is the regex. The same regex is what
+makes the DDL round trip re-import with zero fact types (barwise-1036):
+the exporter's own `-- TODO(barwise)` comments inside the column list
+break the body capture.

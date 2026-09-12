@@ -3,10 +3,11 @@
  */
 
 import { reviewModel } from "@barwise/llm";
-import type { ProviderName } from "@barwise/llm";
+import type { LlmClient, ProviderName } from "@barwise/llm";
 import { createLlmClient } from "@barwise/llm";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { appendRouteNote, resolveLlmClient } from "../llm/resolveClient.js";
 import { resolveModels, type SourceInput } from "../workspace/resolve.js";
 import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
@@ -45,13 +46,21 @@ export function registerReviewTool(server: McpServer): void {
       },
     },
     async ({ source, domain, focus, provider, model }) => {
-      return executeReview(
+      // Only the registration holds the server handle sampling needs; see
+      // the note in import.ts.
+      const { client, route } = resolveLlmClient(server, {
+        ...(provider !== undefined ? { provider: provider as ProviderName } : {}),
+        ...(model !== undefined ? { model } : {}),
+      });
+      const result = await executeReview(
         source,
         focus,
         provider as ProviderName | undefined,
         model,
         domain,
+        client,
       );
+      return appendRouteNote(result, route);
     },
   );
 }
@@ -62,10 +71,12 @@ export async function executeReview(
   provider?: ProviderName,
   model?: string,
   domain?: string,
+  /** See executeImport's `llmClient`: omitted, behaviour is unchanged. */
+  llmClient?: LlmClient,
 ): Promise<{ content: Array<{ type: "text"; text: string; }>; }> {
   const { resolved, problems } = resolveModels(source, domain);
 
-  const client = createLlmClient({ provider, model });
+  const client = llmClient ?? createLlmClient({ provider, model });
 
   const multi = resolved.length > 1;
   const sections: string[] = [];

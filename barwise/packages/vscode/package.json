@@ -117,6 +117,11 @@
       {
         "command": "barwise.analyzeRepository",
         "title": "ORM: Analyze Repository"
+      },
+      {
+        "command": "barwise.setAnthropicApiKey",
+        "title": "Set Anthropic API Key",
+        "category": "Barwise"
       }
     ],
     "menus": {
@@ -158,7 +163,9 @@
         "barwise.anthropicApiKey": {
           "type": "string",
           "default": "",
-          "description": "Anthropic API key (only used when llmProvider is 'anthropic'). Leave empty to use the ANTHROPIC_API_KEY environment variable."
+          "scope": "application",
+          "markdownDeprecationMessage": "**Deprecated.** A key in settings can be written to `.vscode/settings.json` and committed. Run **Barwise: Set Anthropic API Key** instead, which stores it in the OS keychain. An existing value here is migrated automatically on first use and then cleared.",
+          "description": "Deprecated: use the command \"Barwise: Set Anthropic API Key\". Only read to migrate an existing value into secret storage."
         },
         "barwise.anthropicModel": {
           "type": "string",

@@ -1,17 +1,14 @@
-# barwise-1038: the Kotlin importer returns nothing for data and sealed classes
+# barwise-1038: dbt export then import loses more than the loss set
 
 ```sh
-barwise import kotlin trial/findings/barwise-1038
+barwise export examples/transcripts/pii-redaction.orm.yaml --format dbt --output /tmp/pii-dbt
+barwise import dbt /tmp/pii-dbt --output /tmp/pii-back.orm.yaml
+barwise diff examples/transcripts/pii-redaction.orm.yaml /tmp/pii-back.orm.yaml
 ```
 
-Four files: three data classes and one sealed hierarchy, the way
-Kotlin domain code is written.
+Expected: only the deltas `trial/loss-sets/dbt.json` declares
+(populations, definitions, subtypes, objectification).
 
-Expected: entity types Event, Tenant, EventProperty, User,
-AnonymousUser, IdentifiedUser with subtypes and fact types from the
-constructor properties.
-
-Observed (1.7.0): exit 0, "Imported 0 object types", confidence medium,
-no warning naming a class. The Java importer on the equivalent JPA
-entities and the TypeScript importer on the equivalent classes both
-import.
+Observed (1.7.0) on the trial kernels where the importer did not throw
+(barwise-1037): 52 to 139 deltas, among them removed value types
+(PartyId, TransactionId, RateId) and changed value constraints.

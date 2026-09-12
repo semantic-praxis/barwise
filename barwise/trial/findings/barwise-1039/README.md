@@ -1,14 +1,18 @@
-# barwise-1039: merge fails on a fact-type rename without saying why
+# barwise-1039: NORMA export then import re-homes constraints
 
 ```sh
-barwise merge trial/findings/barwise-1039/base.orm.yaml trial/findings/barwise-1039/incoming.orm.yaml --output /tmp/merged.orm.yaml
+barwise export trial/customers/C02-bank/kernel.orm.yaml --format norma --output /tmp/bank.orm
+barwise import norma /tmp/bank.orm --output /tmp/bank-back.orm.yaml
+barwise diff trial/customers/C02-bank/kernel.orm.yaml /tmp/bank-back.orm.yaml
 ```
 
-`incoming` is `base` with "Material is component of Material" renamed
-to "Material is part of Material" (a fact type carrying an acyclic ring
-constraint), nothing else.
+Expected: no deltas, or only the population deltas
+`trial/loss-sets/norma.json` allows; the importer is documented as
+nearly lossless.
 
-Expected: a merged model, or a diagnostic naming the structural error.
-
-Observed (1.7.0): exit 1, `Merge produced 1 structural error(s);
-nothing was written.` and no diagnostic.
+Observed (1.7.0): "Party has KycStatus" gains a subset constraint and
+"Party borrows under LoanAccount" loses one; an external uniqueness
+moves from "DepositAccount has AccountNumber" to "DepositAccount is
+routed by RoutingNumber"; an exclusion on "Transaction affects
+DepositAccount" is removed and re-added. On C01 two definitions are
+dropped and aliases change. 5 to 47 deltas per kernel.

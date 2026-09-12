@@ -7,6 +7,7 @@ import { existsSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 import { callLogSink } from "../../workspace/callLogSink.js";
 import { readFile } from "../../workspace/io.js";
+import { API_KEY_FLAG, API_KEY_FLAG_DESCRIPTION } from "../apiKeyFlag.js";
 import { serializer, slugifyModel } from "./shared.js";
 
 export function addBatchSubcommand(importCmd: Command): void {
@@ -24,7 +25,7 @@ export function addBatchSubcommand(importCmd: Command): void {
       "--provider <provider>",
       `LLM provider (${PROVIDER_NAMES.join(", ")}). Auto-detects from env vars if omitted.`,
     )
-    .option("--api-key <key>", "API key (falls back to env vars)")
+    .option(API_KEY_FLAG, API_KEY_FLAG_DESCRIPTION)
     .option(
       "--base-url <url>",
       "Ollama server URL (only for ollama provider)",
@@ -40,7 +41,6 @@ export function addBatchSubcommand(importCmd: Command): void {
         opts: {
           model: string[];
           provider?: string;
-          apiKey?: string;
           baseUrl?: string;
           annotate: boolean;
           outputDir?: string;
@@ -127,7 +127,6 @@ export function addBatchSubcommand(importCmd: Command): void {
 
               const bare = createLlmClient({
                 provider: opts.provider as ProviderName | undefined,
-                apiKey: opts.apiKey,
                 model,
                 baseUrl: opts.baseUrl,
               });

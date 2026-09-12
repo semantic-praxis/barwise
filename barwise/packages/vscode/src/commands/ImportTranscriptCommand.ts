@@ -12,11 +12,24 @@ import { AnthropicLlmClient, processTranscript } from "@barwise/llm";
 import type { DraftModelResult, LlmClient } from "@barwise/llm";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { getAnthropicApiKey } from "../llm/anthropicKey.js";
 import { CopilotLlmClient } from "../llm/CopilotLlmClient.js";
 
 const serializer = new OrmYamlSerializer();
 
 export class ImportTranscriptCommand {
+  /**
+   * The secret store, threaded from `activate()`.
+   *
+   * The Anthropic key used to come from `config.get("anthropicApiKey")`, a
+   * settings string that can be committed in `.vscode/settings.json`
+   * (docs/specs/keyless-model-access.spec.md). Passed as a constructor
+   * argument rather than reached for globally so there is no way to
+   * construct this command without deciding where its credential comes
+   * from.
+   */
+  constructor(private readonly secrets: vscode.SecretStorage) {}
+
   async execute(): Promise<void> {
     // Step 1: Pick the transcript file.
     const files = await vscode.window.showOpenDialog({
@@ -43,7 +56,12 @@ export class ImportTranscriptCommand {
     const config = vscode.workspace.getConfiguration("barwise");
     const provider = config.get<string>("llmProvider") ?? "copilot";
     const defaultLlmModel = await getDefaultLlmModel();
-    const selection = await buildLlmClientWithPicker(provider, config, defaultLlmModel);
+    const selection = await buildLlmClientWithPicker(
+      provider,
+      config,
+      defaultLlmModel,
+      this.secrets,
+    );
     if (!selection) return; // User cancelled model selection.
     const { client, modelLabel } = selection;
 
@@ -421,9 +439,10 @@ async function buildLlmClientWithPicker(
   provider: string,
   config: vscode.WorkspaceConfiguration,
   defaultLlmModel: string | undefined,
+  secrets: vscode.SecretStorage,
 ): Promise<LlmClientSelection | undefined> {
   if (provider === "anthropic") {
-    const apiKey = config.get<string>("anthropicApiKey") || undefined;
+    const apiKey = await getAnthropicApiKey(secrets);
     const configModel = config.get<string>("anthropicModel") || undefined;
     const model = configModel ?? defaultLlmModel;
     return {

@@ -1,14 +1,17 @@
-# barwise-1035: dbt export then import loses more than the loss set
+# barwise-1035: the OpenAPI export writes a comment header into JSON
 
 ```sh
-barwise export examples/transcripts/pii-redaction.orm.yaml --format dbt --output /tmp/pii-dbt
-barwise import dbt /tmp/pii-dbt --output /tmp/pii-back.orm.yaml
-barwise diff examples/transcripts/pii-redaction.orm.yaml /tmp/pii-back.orm.yaml
+barwise export trial/findings/barwise-1035/one-reading.orm.yaml --format openapi --output /tmp/one.json
+head -3 /tmp/one.json
+barwise import model /tmp/one.json --format openapi
 ```
 
-Expected: only the deltas `trial/loss-sets/dbt.json` declares
-(populations, definitions, subtypes, objectification).
+The model has one warning (a binary fact type with a single reading).
 
-Observed (1.7.0) on the trial kernels where the importer did not throw
-(barwise-1034): 52 to 139 deltas, among them removed value types
-(PartyId, TransactionId, RateId) and changed value constraints.
+Expected: a JSON document a JSON reader accepts, and the importer reads
+it back.
+
+Observed (1.7.0): the file begins with `/* Validation warnings:`; the
+importer exits 0 and writes a model with no `object_types` key. With
+`--no-annotate` the file is JSON. A JSON target cannot carry comments;
+annotate through an `x-barwise-diagnostics` extension or refuse to.
