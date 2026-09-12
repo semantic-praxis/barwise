@@ -54,6 +54,9 @@ src/
                               populations) shipped to the webview; no vscode import
   llm/
     CopilotLlmClient.ts      LlmClient implementation using GitHub Copilot chat API
+    anthropicKey.ts          The Anthropic key's home: ExtensionContext.secrets (OS
+                             keychain), plus the one-time migration out of the
+                             deprecated barwise.anthropicApiKey setting
   mcp/
     ToolRegistration.ts      Registers tools via vscode.lm.registerTool() (in-process, Copilot access)
     McpServerProvider.ts     Registers bundled MCP stdio server for external MCP clients
@@ -94,7 +97,17 @@ bundle time.
   `@barwise/llm` using the VS Code Copilot chat API. This is the
   default provider so users do not need an API key.
 - Extension settings are declared in `package.json` under
-  `contributes.configuration` (LLM provider, API key, model selection).
+  `contributes.configuration` (LLM provider, model selection).
+- **The Anthropic key is NOT a setting.** It lives in
+  `ExtensionContext.secrets`, and `barwise.anthropicApiKey` is deprecated and
+  `application`-scoped. A setting with the default (`window`) scope can be
+  written to `.vscode/settings.json`, which people commit -- so the extension
+  was inviting a live credential into a tracked file. `src/llm/anthropicKey.ts`
+  owns reading it, and migrates an existing settings value once and clears it;
+  the **Barwise: Set Anthropic API Key** command is how a user supplies one.
+  A key that ever sat in a workspace file should be ROTATED, because deleting
+  it from the file does not un-publish it
+  (`docs/specs/keyless-model-access.spec.md`).
 - AI tool integration uses two complementary mechanisms:
   1. **Language Model Tools** (`vscode.lm.registerTool`) -- the primary
      integration. Runs in the extension host process with full access

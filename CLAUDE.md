@@ -505,6 +505,19 @@ skill (`.claude/skills/release/`).
   different rule sets to the same diff. A fresh session clone is shallow;
   the hook unshallows it so the history scan can answer. Taken once over
   1056 commits: 0 findings (barwise-1022).
+- **A key has nowhere to be written down.** Detection is the weaker half, so
+  the places a credential could sit are gone
+  (`docs/specs/keyless-model-access.spec.md`). `--api-key` is refused on
+  every CLI command -- argv reaches shell history, CI logs and
+  `/proc/<pid>/cmdline` -- and that refusal lives once on the root program,
+  so a newly added command cannot reintroduce it. In VS Code the key is in
+  `ExtensionContext.secrets`, not a setting `.vscode/settings.json` could
+  carry into a commit. The editor's default path needs no key at all
+  (`CopilotLlmClient` over `vscode.lm`), and the MCP server's does not either
+  where the client advertises sampling. The one lane that must hold a key is
+  promptlab and the optimizer: a host-mediated call has no attributable
+  model, so a score computed through one measures nothing. Give that lane a
+  workspace-scoped key with a spend limit, never a personal one.
 - ESLint config is shared at the repo root (`barwise/eslint.config.mjs`).
 - Turborepo (`barwise/turbo.json`) orchestrates build/test/lint with
   correct dependency ordering.

@@ -24,6 +24,7 @@ import type { Command } from "commander";
 import { randomUUID } from "node:crypto";
 import { callLogSink } from "../workspace/callLogSink.js";
 import { loadModel } from "../workspace/io.js";
+import { API_KEY_FLAG, API_KEY_FLAG_DESCRIPTION } from "./apiKeyFlag.js";
 
 export function registerReviewCommand(program: Command): void {
   program
@@ -36,7 +37,7 @@ export function registerReviewCommand(program: Command): void {
       `LLM provider (${PROVIDER_NAMES.join(", ")}). Auto-detects from env vars if omitted.`,
     )
     .option("--model <model>", "Model override for the LLM provider")
-    .option("--api-key <key>", "API key (falls back to env vars)")
+    .option(API_KEY_FLAG, API_KEY_FLAG_DESCRIPTION)
     .option("--base-url <url>", "Ollama server URL (only for ollama provider)")
     .option("--format <format>", "Output format (text or json)", "text")
     .action(
@@ -46,7 +47,6 @@ export function registerReviewCommand(program: Command): void {
           focus?: string;
           provider?: string;
           model?: string;
-          apiKey?: string;
           baseUrl?: string;
           format: string;
         },
@@ -64,7 +64,6 @@ export function registerReviewCommand(program: Command): void {
           const sink = callLogSink();
           const bare = createLlmClient({
             provider: opts.provider as ProviderName | undefined,
-            apiKey: opts.apiKey,
             model: opts.model,
             baseUrl: opts.baseUrl,
           });
