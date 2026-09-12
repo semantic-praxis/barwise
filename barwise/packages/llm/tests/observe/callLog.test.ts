@@ -197,3 +197,59 @@ describe("withCallLog prompt provenance", () => {
     expect(s.entries[0]!.promptHash).not.toBe(s.entries[1]!.promptHash);
   });
 });
+
+describe("a credential never reaches a record", () => {
+  // The sentinel property from docs/specs/keyless-model-access.spec.md WS1.
+  // `eval-payloads/` and `eval-runs/` are TRACKED and machine-written, so a
+  // recorder that echoed a provider's error message is one step from a
+  // credential in git. `errorKind` is a CLASSIFICATION for exactly this
+  // reason, and its comment says so -- this is the assertion that makes the
+  // comment load-bearing. A property rather than a detector: it does not
+  // care which providers exist or what their key formats are.
+  //
+  // Assembled, not a literal: `check:secrets` scans this repository's
+  // history including this file.
+  const KEY = "sk-ant-" + "api03-" + "7Kq2Vx9mTwRbN4yLp" + "Z3jHcF8sAdE6gUn1oIxBvCz";
+
+  it("keeps a key out of the row when the provider echoes it in an error", async () => {
+    const s = sink();
+    const wrapped = withCallLog(
+      client({
+        complete: () =>
+          Promise.reject(
+            new Error(
+              `401 Unauthorized: invalid x-api-key header: ${KEY} (request-id abc123)`,
+            ),
+          ),
+      }),
+      s,
+      { now: () => FIXED },
+    );
+
+    await expect(wrapped.complete(request)).rejects.toThrow(/401 Unauthorized/);
+
+    expect(s.entries).toHaveLength(1);
+    expect(s.entries[0]!.ok).toBe(false);
+    // The row still says a call failed and roughly why -- the point is not
+    // to record less, it is to record a kind rather than a message.
+    expect(s.entries[0]!.errorKind).toBeDefined();
+    expect(JSON.stringify(s.entries)).not.toContain(KEY);
+  });
+
+  it("keeps a key out of the row when it is the prompt that carries it", async () => {
+    // The other direction: a transcript or system prompt that happens to
+    // contain a credential. Content never reaches a record at all, so this
+    // holds for the same reason the DIFFERENT TRANSCRIPT case above does --
+    // asserted separately because a future field that logged a prompt
+    // excerpt would pass that test and fail this one.
+    const s = sink();
+    const wrapped = withCallLog(client(), s, { now: () => FIXED });
+
+    await wrapped.complete({
+      systemPrompt: `use ${KEY} when calling out`,
+      userMessage: `the key is ${KEY}`,
+    });
+
+    expect(JSON.stringify(s.entries)).not.toContain(KEY);
+  });
+});

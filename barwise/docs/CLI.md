@@ -211,7 +211,10 @@ Options:
 - `--focus <name>` -- review only this entity or fact type
 - `--provider <anthropic|openai|ollama>` -- auto-detects from env vars if omitted
 - `--model <model>` -- model override for the provider
-- `--api-key <key>` -- falls back to env vars
+- `--api-key <key>` -- **removed.** Supplying it exits 1; set
+  `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in the environment instead. A key
+  in argv reaches shell history, CI logs and `/proc/<pid>/cmdline`
+  (`docs/specs/keyless-model-access.spec.md`).
 - `--base-url <url>` -- Ollama server URL
 - `--format <text|json>` -- output format (default: text)
 
@@ -414,7 +417,10 @@ Options:
 - `--provider <anthropic|openai|ollama>` -- LLM provider (auto-detects
   from env vars if omitted)
 - `--model <name>` -- model override for the LLM provider
-- `--api-key <key>` -- API key (falls back to env vars)
+- `--api-key <key>` -- **removed.** Supplying it exits 1; set
+  `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in the environment instead. A key
+  in argv reaches shell history, CI logs and `/proc/<pid>/cmdline`
+  (`docs/specs/keyless-model-access.spec.md`).
 - `--base-url <url>` -- Ollama server URL (ollama provider only)
 - `--name <name>` -- model name (defaults to filename)
 - `--no-annotate` -- skip TODO/NOTE annotations in output
@@ -446,7 +452,10 @@ Options:
 - `--model <models...>` -- LLM model names to use, repeatable (required)
 - `--provider <anthropic|openai|ollama>` -- auto-detects from env vars
   if omitted
-- `--api-key <key>` -- falls back to env vars
+- `--api-key <key>` -- **removed.** Supplying it exits 1; set
+  `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in the environment instead. A key
+  in argv reaches shell history, CI logs and `/proc/<pid>/cmdline`
+  (`docs/specs/keyless-model-access.spec.md`).
 - `--base-url <url>` -- Ollama server URL
 - `--no-annotate` -- skip TODO/NOTE annotations in output
 - `--output-dir <dir>` -- write outputs to a different directory
@@ -579,7 +588,7 @@ barwise prompt compare --a 13 --b 9
 
 - `eval` -- run the eval suite against a live provider and record the
   scores. Options: `--suite <manifest>`, `--provider`, `--model`,
-  `--api-key`, `--base-url`, `--artifacts <dir>`,
+  `--base-url`, `--artifacts <dir>`,
   `--artifact-version <version|default>`, `--repeat <n>`
   (default: 1), `--concurrency <n>` (default: 1 -- cases run as
   parallel chains, repeats within a case stay serial, and the run's
@@ -606,8 +615,7 @@ barwise prompt compare --a 13 --b 9
   readable prompt.
 - `run` -- send a prompt artifact once against a live model and print
   the raw answer, unshipped candidates included. Options: `--surface`,
-  `--artifacts <dir>`, `--provider`, `--model`, `--api-key`,
-  `--base-url`. Takes a transcript file for extraction or a
+  `--artifacts <dir>`, `--provider`, `--model`, `--base-url`. Takes a transcript file for extraction or a
   `.orm.yaml` for review.
 - `history` -- show the suite's recorded eval scores. Options:
   `--suite <manifest>`, `--format <text|json>`.

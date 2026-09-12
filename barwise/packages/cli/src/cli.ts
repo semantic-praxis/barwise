@@ -6,6 +6,7 @@
 
 import { Command } from "commander";
 import { registerAnalyzeCommand } from "./commands/analyze.js";
+import { installApiKeyRefusal } from "./commands/apiKeyFlag.js";
 import { registerDescribeCommand } from "./commands/describe.js";
 import { registerDiagramCommand } from "./commands/diagram.js";
 import { registerDiffCommand } from "./commands/diff.js";
@@ -29,6 +30,12 @@ import { registerVerbalizeCommand } from "./commands/verbalize.js";
 // reads it from package.json, the bundle entry takes the injected value.
 export function createProgram(version = "0.0.0-dev"): Command {
   const program = new Command();
+
+  // Before any command body can see it. `--api-key` is declared on five
+  // commands so the failure can name its replacement, and refused here so no
+  // command -- including ones not yet written -- ever reads a credential out
+  // of argv (docs/specs/keyless-model-access.spec.md).
+  installApiKeyRefusal(program);
   program
     .name("barwise")
     .description("ORM 2 modeling tool for data engineers and architects")

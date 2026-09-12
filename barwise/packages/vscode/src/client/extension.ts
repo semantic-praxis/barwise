@@ -17,6 +17,7 @@ import { ShowDiagramCommand } from "../commands/ShowDiagramCommand.js";
 import { ValidateModelCommand } from "../commands/ValidateModelCommand.js";
 import { VerbalizeCommand } from "../commands/VerbalizeCommand.js";
 import { DiagramPanel } from "../diagram/DiagramPanel.js";
+import { setAnthropicApiKey } from "../llm/anthropicKey.js";
 import { registerMcpServerProvider } from "../mcp/McpServerProvider.js";
 import { registerLanguageModelTools } from "../mcp/ToolRegistration.js";
 import { ModelTreeProvider } from "../sidebar/ModelTreeProvider.js";
@@ -82,8 +83,28 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand(
       "barwise.import",
-      () => new ImportCommand().execute(),
+      () => new ImportCommand(context.secrets).execute(),
     ),
+    // The only way to supply an Anthropic key now that the setting is
+    // deprecated and `application`-scoped. `password: true` keeps it out of
+    // the input box's visible text and out of command history; the value
+    // goes to the OS keychain via SecretStorage, never to a settings file
+    // (docs/specs/keyless-model-access.spec.md).
+    vscode.commands.registerCommand("barwise.setAnthropicApiKey", async () => {
+      const entered = await vscode.window.showInputBox({
+        title: "Anthropic API key",
+        prompt: "Stored in the OS keychain. Leave empty to remove the stored key.",
+        password: true,
+        ignoreFocusOut: true,
+      });
+      if (entered === undefined) return; // cancelled, as distinct from cleared
+      await setAnthropicApiKey(context.secrets, entered);
+      vscode.window.showInformationMessage(
+        entered.trim() === ""
+          ? "Barwise: stored Anthropic API key removed."
+          : "Barwise: Anthropic API key stored in the OS keychain.",
+      );
+    }),
     vscode.commands.registerCommand(
       "barwise.analyzeRepository",
       () => new AnalyzeRepositoryCommand().execute(),

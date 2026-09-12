@@ -17,6 +17,7 @@ import { existsSync, writeFileSync } from "node:fs";
 import { basename, extname } from "node:path";
 import { callLogSink } from "../../workspace/callLogSink.js";
 import { readFile, writeOutput } from "../../workspace/io.js";
+import { API_KEY_FLAG, API_KEY_FLAG_DESCRIPTION } from "../apiKeyFlag.js";
 import { formatAlternativeFramings, serializer } from "./shared.js";
 
 export function addTranscriptSubcommand(importCmd: Command): void {
@@ -30,7 +31,7 @@ export function addTranscriptSubcommand(importCmd: Command): void {
       `LLM provider (${PROVIDER_NAMES.join(", ")}). Auto-detects from env vars if omitted.`,
     )
     .option("--model <model>", "Model override for the LLM provider")
-    .option("--api-key <key>", "API key (falls back to env vars)")
+    .option(API_KEY_FLAG, API_KEY_FLAG_DESCRIPTION)
     .option(
       "--base-url <url>",
       "Ollama server URL (only for ollama provider)",
@@ -58,7 +59,6 @@ export function addTranscriptSubcommand(importCmd: Command): void {
           output?: string;
           provider?: string;
           model?: string;
-          apiKey?: string;
           baseUrl?: string;
           name?: string;
           annotate: boolean;
@@ -94,7 +94,6 @@ export function addTranscriptSubcommand(importCmd: Command): void {
 
           const bare = createLlmClient({
             provider: opts.provider as ProviderName | undefined,
-            apiKey: opts.apiKey,
             model: opts.model,
             baseUrl: opts.baseUrl,
           });
