@@ -164,6 +164,23 @@ jobs:
       # eslint and oxlint all accept NUL, so nothing else catches it.
       - run: npm run check:no-nul
 
+      # A credential is the one defect in this list that a follow-up commit
+      # does not fix: reverting, deleting the branch and rewriting history
+      # all leave the key valid and already disclosed, so it has to be
+      # rotated by a person. It was also the only one with no gate --
+      # `.gitignore` covering `.env` stood in for it, and cannot see the
+      # three paths a secret actually arrives by here: machine-written
+      # tracked files under eval-payloads/ and eval-runs/, commands pasted
+      # into documentation, and fixtures imitating real payloads
+      # (docs/specs/credential-scanning.spec.md).
+      #
+      # No docs-only skip, deliberately: two of those three paths ARE
+      # docs-only changes. Anchored on vendor prefixes rather than entropy,
+      # because this tree is full of lockfile integrity hashes, prompt
+      # digests and golden SVG, and an entropy rule cannot tell those from
+      # a key. 1602 files in under half a second.
+      - run: npm run check:secrets
+
       # Shell scripts were the one artifact class with no gate: not
       # dprint, not oxlint, not tsc. Three portability bugs shipped in
       # compile-runner.sh before it was read adversarially, and shellcheck

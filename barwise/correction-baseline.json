@@ -396,6 +396,12 @@
       "excerpt": "- a required \"what caught it\" section in the spec template. catches nothing retroactively, and a template sect",
       "caught_by": "not-a-correction",
       "note": "A rejected alternative (a required template section). Records a design choice, not a correction to this spec's own draft."
+    },
+    "credential-scanning::771bb10e80cf": {
+      "spec": "credential-scanning.spec.md",
+      "excerpt": "the draft said \"every blob in every ref\", and building it showed that is the wrong set. a credential removed by an amend or a reset --hard is unreachable, not g",
+      "caught_by": "execution",
+      "note": "Running it, not reviewing it. A throwaway repo committed a probe, reset --hard past it, and `git cat-file --batch-all-objects` still listed the blob -- so the draft's ref walk would have reported clean on a repository that still hands the key to anyone who clones it. The mode reads the object database instead, and the case is now a test."
     }
   }
 }

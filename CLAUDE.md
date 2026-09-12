@@ -471,6 +471,27 @@ skill (`.claude/skills/release/`).
   DEPENDS on the broken thing is measured (the `git` shim logs every
   call), not declared, so no list has to be kept in step. On demand,
   like `mutate`; not in CI.
+- **A leaked credential is rotated, never reverted.** `npm run
+  check:secrets` gates tracked content against ten vendor-anchored
+  detectors, at the pre-commit hook as well as in CI, because it is the
+  one gate whose failure a later commit cannot undo: reverting, deleting
+  the branch and rewriting history all leave the key valid and already
+  disclosed. Two rules follow and both are asserted in
+  `gates.test.mjs`. The gate never prints what it matched -- CI logs are
+  retained and searchable, so an echoing gate becomes a second durable
+  copy of the leak. And the detectors are anchored on issuer prefixes
+  rather than entropy, because this tree is full of lockfile integrity
+  hashes, prompt digests and golden SVG, and on the attribute an entropy
+  rule measures those are indistinguishable from a key. `.gitignore`
+  covering `.env` was what stood in for this, and it could not see the
+  three paths a secret actually arrives by here: machine-written tracked
+  files under `eval-payloads/` and `eval-runs/`, commands pasted into
+  documentation, and fixtures imitating real payloads
+  (`docs/specs/credential-scanning.spec.md`). `--history` scans the whole
+  object database, unreachable blobs included, and refuses on a shallow
+  clone -- which every fresh session clone is, so taking that reading
+  means `git fetch --unshallow` first. Taken once at 1593 commits: 6314
+  blobs, 0 findings (barwise-1022).
 - ESLint config is shared at the repo root (`barwise/eslint.config.mjs`).
 - Turborepo (`barwise/turbo.json`) orchestrates build/test/lint with
   correct dependency ordering.

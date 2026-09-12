@@ -108,6 +108,7 @@ const ROOT_DEPENDENT_GATES = [
   "check-book-citations.mjs",
   "check-core-purity.mjs",
   "check-file-size.mjs",
+  "check-secrets.mjs",
   "audit-corrections.mjs",
 ];
 
@@ -200,7 +201,14 @@ function stage(dir, name, contents) {
 
 const CWDS = [REPO, join(REPO, "barwise"), join(REPO, "barwise", "packages", "core", "src")];
 
-for (const script of ["check-no-nul.mjs", "check-shell.mjs", "audit-corrections.mjs"]) {
+for (
+  const script of [
+    "check-no-nul.mjs",
+    "check-shell.mjs",
+    "check-secrets.mjs",
+    "audit-corrections.mjs",
+  ]
+) {
   test(`${script} reports the same coverage from every cwd`, () => {
     const runs = CWDS.map((cwd) => ({ cwd, ...gate(script, cwd) }));
     for (const r of runs) {
@@ -337,6 +345,239 @@ test("check-shell fails on a tracked script with a shellcheck finding", () => {
     const red = gate("check-shell.mjs", dir);
     assert.equal(red.status, 1, "a shellcheck finding must fail the gate");
     assert.match(`${red.stdout}${red.stderr}`, /bad\.sh/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- check-secrets: the one defect a follow-up commit cannot fix ---
+
+/**
+ * A credential-shaped probe per detector, assembled at RUNTIME.
+ *
+ * Every value below is written as concatenation rather than as a literal,
+ * for the same reason `NUL` at the top of this file is an escape:
+ * `check-secrets` scans every tracked file in this repository, including
+ * this one, so a literal sample here would make the gate fail on its own
+ * test. Each string is split across the exact position its detector
+ * anchors on, which is why the splits look arbitrary and are not.
+ *
+ * These are shapes, not keys. Nothing here has ever been valid anywhere.
+ */
+const FILL = "A".repeat(40);
+const SECRET_PROBES = {
+  "anthropic-api-key": "sk-" + "ant-" + "api03-" + FILL,
+  "openai-api-key": "sk-" + FILL,
+  "github-token": "ghp" + "_" + "A".repeat(36),
+  "github-pat": "github" + "_pat_" + "A".repeat(30),
+  "aws-access-key-id": "AKI" + "A" + "BCDEFGHIJKLMNOPQ",
+  "aws-secret-access-key": "aws_secret" + "_access_key = " + FILL,
+  "private-key-block": "-----BEGIN " + "RSA PRIVATE" + " KEY-----",
+  "slack-token": "xox" + "b-1234567890-abcdef",
+  "google-api-key": "AIz" + "a" + "A".repeat(35),
+  "npm-token": "npm" + "_" + "A".repeat(36),
+};
+
+function commitAll(dir, message) {
+  execFileSync("git", ["commit", "-qm", message], { cwd: dir });
+}
+
+/**
+ * Every detector shown RED on a staged probe of its own shape, and GREEN
+ * without one.
+ *
+ * The negative half of this is what makes the gate's clean reading on the
+ * real tree worth anything. A detector set measured only against a tree
+ * with no secrets in it is byte-identical to a detector set that cannot
+ * fire at all -- barwise-902, a check that banks a guaranteed point
+ * instead of measuring. Ten detectors, ten probes, asserted rather than
+ * run once by hand.
+ */
+for (const [detector, probe] of Object.entries(SECRET_PROBES)) {
+  test(`check-secrets fails on a staged ${detector}`, () => {
+    const dir = tempRepo();
+    try {
+      stage(dir, "clean.txt", "nothing credential-shaped here\n");
+      assert.equal(gate("check-secrets.mjs", dir).status, 0, "a clean tree must pass");
+
+      stage(dir, "probe.txt", `token: ${probe}\n`);
+      const red = gate("check-secrets.mjs", dir);
+      assert.equal(red.status, 1, `a staged ${detector} must fail the gate`);
+      const out = `${red.stdout}${red.stderr}`;
+      assert.match(out, /probe\.txt/);
+      assert.match(out, new RegExp(detector));
+
+      // The masking rule, asserted per detector rather than argued once.
+      // A gate that echoes what it found writes the credential into a CI
+      // log, which is retained, searchable and frequently public -- so a
+      // "print the match to help debugging" change would turn this gate
+      // into a second durable copy of the leak. This is the assertion
+      // that fails on it.
+      assert.ok(
+        !out.includes(probe),
+        `check-secrets printed the matched text for ${detector}`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+test("check-secrets does NOT see an untracked credential", () => {
+  // Pinning the blind spot, not the feature -- the barwise-906 shape,
+  // where a NUL probe was "verified" against a file the gate enumerating
+  // through `git ls-files` could never reach, and it reported OK. Anyone
+  // testing this gate by hand must STAGE the probe, and asserting the
+  // limit here is what stops the next person running that experiment and
+  // believing the green.
+  const dir = tempRepo();
+  try {
+    stage(dir, "clean.txt", "nothing here\n");
+    writeFileSync(join(dir, "untracked.txt"), `token: ${SECRET_PROBES["github-token"]}\n`);
+    assert.equal(
+      gate("check-secrets.mjs", dir).status,
+      0,
+      "untracked files are out of scope; a probe must be staged to test this gate",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * A copy of the gate with a patched ALLOWLIST, in a throwaway repo.
+ *
+ * The allowlist is a `const` in the script, so the only way to exercise
+ * it is to rewrite that declaration -- the `audit-gate` bare-copy
+ * precedent above, plus `lib/tracked.mjs` because this gate imports it.
+ * The scripts are written into the repo but never staged, so they are
+ * outside the scan they perform.
+ */
+function secretsRepo(allowlistLiteral) {
+  const dir = tempRepo();
+  mkdirSync(join(dir, "scripts", "lib"), { recursive: true });
+  const src = readFileSync(join(SCRIPTS, "check-secrets.mjs"), "utf8");
+  const patched = src.replace("const ALLOWLIST = [];", `const ALLOWLIST = ${allowlistLiteral};`);
+  // Without this the rename of a constant turns both allowlist tests into
+  // tests of the empty default, and they would keep passing.
+  assert.notEqual(patched, src, "the ALLOWLIST declaration moved; this test patches it by text");
+  writeFileSync(join(dir, "scripts", "check-secrets.mjs"), patched);
+  writeFileSync(
+    join(dir, "scripts", "lib", "tracked.mjs"),
+    readFileSync(join(SCRIPTS, "lib", "tracked.mjs")),
+  );
+  return dir;
+}
+
+function runSecretsCopy(dir, ...args) {
+  return spawnSync(process.execPath, [join(dir, "scripts", "check-secrets.mjs"), ...args], {
+    cwd: dir,
+    encoding: "utf8",
+  });
+}
+
+test("check-secrets suppresses an allowlisted finding", () => {
+  const dir = secretsRepo(
+    '[{ file: "probe.txt", detector: "openai-api-key", reason: "test fixture" }]',
+  );
+  try {
+    stage(dir, "probe.txt", `token: ${SECRET_PROBES["openai-api-key"]}\n`);
+    const r = runSecretsCopy(dir);
+    assert.equal(r.status, 0, `an allowlisted finding must pass:\n${r.stdout}${r.stderr}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-secrets fails on an ALLOWLIST entry that matches nothing", () => {
+  // The ratchet's second direction, the one audit-baseline.json and
+  // rubric-baseline.json both have: a list that only ever grows stops
+  // enumerating what is open. An exception outliving its file is how the
+  // next real finding gets suppressed by a line nobody reads.
+  const dir = secretsRepo(
+    '[{ file: "deleted.txt", detector: "openai-api-key", reason: "test fixture" }]',
+  );
+  try {
+    stage(dir, "clean.txt", "nothing here\n");
+    const r = runSecretsCopy(dir);
+    assert.equal(r.status, 1, `a stale allowlist entry must fail:\n${r.stdout}${r.stderr}`);
+    assert.match(`${r.stdout}${r.stderr}`, /matched nothing/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-secrets --history refuses a shallow clone rather than reporting it clean", () => {
+  // Every clone this project is developed in is shallow, including the
+  // one CI checks out, so this is the reading the mode actually gives
+  // today. Answering it would be a clean bill of health over the few
+  // commits present, which is the false green the gate-refusal contract
+  // exists to forbid (docs/specs/gate-refusal-contract.spec.md).
+  const src = tempRepo();
+  const parent = mkdtempSync(join(tmpdir(), "barwise-shallow-"));
+  try {
+    stage(src, "a.txt", "one\n");
+    commitAll(src, "one");
+    stage(src, "b.txt", "two\n");
+    commitAll(src, "two");
+
+    const clone = join(parent, "clone");
+    execFileSync("git", ["clone", "-q", "--depth", "1", `file://${src}`, clone]);
+    assert.equal(
+      execFileSync("git", ["rev-parse", "--is-shallow-repository"], {
+        cwd: clone,
+        encoding: "utf8",
+      }).trim(),
+      "true",
+      "the fixture must actually be shallow, or this test asserts nothing",
+    );
+
+    const r = gate("check-secrets.mjs", clone, "--history");
+    assert.equal(r.status, 2, `expected refusal, got ${r.status}:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /SHALLOW/);
+    assert.doesNotMatch(r.stdout, /OK/);
+
+    // The working-tree scan is unaffected: a shallow clone has the whole
+    // tree, only not the history. The two modes answer different
+    // questions and only one of them is unanswerable here.
+    assert.equal(gate("check-secrets.mjs", clone).status, 0);
+  } finally {
+    rmSync(src, { recursive: true, force: true });
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test("check-secrets --history finds a credential in an UNREACHABLE blob", () => {
+  // This is why the mode reads `--batch-all-objects` rather than
+  // `rev-list --all`. A credential "removed" by an amend or a reset is
+  // unreachable, not gone, and it is exactly the case a history audit
+  // exists for -- so a mode that only walked the refs would report clean
+  // on a repository that still hands the key to anyone who clones it.
+  const dir = tempRepo();
+  try {
+    stage(dir, "a.txt", "one\n");
+    commitAll(dir, "one");
+    stage(dir, "leak.txt", `token: ${SECRET_PROBES["aws-access-key-id"]}\n`);
+    commitAll(dir, "leak");
+    execFileSync("git", ["reset", "-q", "--hard", "HEAD~1"], { cwd: dir });
+
+    assert.equal(
+      gate("check-secrets.mjs", dir).status,
+      0,
+      "the working tree is clean again, which is the whole trap",
+    );
+
+    const red = gate("check-secrets.mjs", dir, "--history");
+    assert.equal(
+      red.status,
+      1,
+      `expected the unreachable blob to fail:\n${red.stdout}${red.stderr}`,
+    );
+    assert.match(`${red.stdout}${red.stderr}`, /aws-access-key-id/);
+    assert.ok(
+      !`${red.stdout}${red.stderr}`.includes(SECRET_PROBES["aws-access-key-id"]),
+      "--history must mask the match like the tree scan does",
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
