@@ -421,7 +421,7 @@
       "caught_by": "not-a-correction",
       "note": "A Risks-and-testing entry with its tripwire: an amplifier produces regular mess where a real schema's mess is irregular, so the skins carry hand-written irregularity. It states a risk the design carries and the signal that would reopen it; it records nothing the draft got wrong."
     },
-    "enterprise-trial::2e97ec924e21": {
+    "enterprise-trial::714e7e934891": {
       "spec": "enterprise-trial.spec.md",
       "excerpt": "- the journey moved out of the package, and the acceptance oracles became gym exercises. see target architecture. - a finding class, not a free-text note, is wh",
       "caught_by": "execution",

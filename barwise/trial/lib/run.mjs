@@ -18,6 +18,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join, relative } from "node:path";
 import { parse, stringify } from "yaml";
 import { runGate } from "./gate.mjs";
+import { mergeResults } from "./results.mjs";
 import { generateCode } from "./generators/code.mjs";
 import { generateDbt } from "./generators/dbt.mjs";
 import { generateDdl } from "./generators/ddl.mjs";
@@ -206,9 +207,7 @@ async function offline(customers, tier, sprints, opts) {
     if (sprints.includes(5)) steps.sprint5ChangeStorm(customer, tier, record);
     if (sprints.includes(6)) await steps.sprint6Surfaces(customer, tier, record);
   }
-  const results = [...kept, ...fresh].sort((a, b) =>
-    `${a.customer}/${a.sprint}/${a.step}`.localeCompare(`${b.customer}/${b.sprint}/${b.step}`)
-  );
+  const results = mergeResults(kept, fresh);
   mkdirSync(join(TRIAL_DIR, "results"), { recursive: true });
   writeFileSync(
     path,
@@ -225,7 +224,14 @@ function summarize(rows) {
     const k = r.status === "fail" ? `fail ${r.severity ?? "?"}` : r.status;
     by[k] = (by[k] ?? 0) + 1;
   }
-  console.log("\nSummary:", Object.entries(by).map(([k, v]) => `${k}=${v}`).join("  "));
+  // Say which population this is. It counts the rows THIS invocation ran,
+  // while the gate line printed under it counts the whole results file --
+  // equal on a full run, different on --customer or --sprint, and nothing
+  // said so.
+  console.log(
+    "\nSummary (this run):",
+    Object.entries(by).map(([k, v]) => `${k}=${v}`).join("  "),
+  );
 }
 
 async function main() {
