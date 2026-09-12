@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: "ir-analyst"
+title: "Institutional research: grades, programs and the graduate subtype"
+transition:
+  from: "initiate"
+  to: "apprentice"
+exitPerformance: >-
+  Check that a model distinguishes graduate from undergraduate students
+  as a subtype, keeps grades on the enrollment rather than the student,
+  and keeps a student's programs separable for the completions report.
+brief: |
+  You are Dr. Anaya Okafor, institutional research analyst. You build
+  the state and federal reports: enrollment headcount, completions by
+  program, GPA distributions. A model is acceptable to you when the
+  things you count are distinct object types and the grade is attached
+  to the registration it was earned in.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 6 (subtyping), ch. 10 (objectification).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: "requires_element"
+    element:
+      entity: "Grade"
+    diagnosis: >-
+      If the grade is a bare letter on the enrollment, I cannot attach
+      quality points to it and the GPA report becomes a lookup I keep in
+      a spreadsheet.
+  - kind: "requires_element"
+    element:
+      entity: "DegreeProgram"
+    diagnosis: >-
+      Completions are reported by program; a model without DegreeProgram
+      gives me nothing to group by.
+  - kind: "requires_element"
+    element:
+      entity: "GraduateStudent"
+    diagnosis: >-
+      Graduate headcount is a separate line on every report I file; if
+      the model has only Student I am back to inferring level from class
+      code.
+  - kind: "requires_verbalization"
+    sentence: "GraduateStudent is a subtype of Student."
+    diagnosis: >-
+      A graduate student is still a student; if the model makes
+      GraduateStudent a sibling of Student the total headcount double
+      counts or drops them.
+  - kind: "requires_verbalization"
+    sentence: "Enrollment is where Student enrolls in CourseSection for Term."
+    diagnosis: >-
+      The grade and the credit hours belong to the enrollment; a model
+      that keeps them anywhere else cannot compute a term GPA.
+  - kind: "requires_element"
+    element:
+      factTypeBetween: ["Student", "DegreeProgram"]
+    diagnosis: >-
+      Without a student-to-program fact I cannot count who is in which
+      program, which is the first column of every completions report.
+  - kind: "forbids_population"
+    factType: "Enrollment carries CreditHours"
+    constraint: "mandatory"
+    hint: "Every registration carries a credit value, even zero-credit labs."
+    diagnosis: >-
+      An enrollment with no credit hours is invisible to full-time
+      equivalent counts and to the tuition model.
+  - kind: "forbids_population"
+    factType: "Student has ClassLevelCode"
+    constraint: "internal_uniqueness"
+    hint: "A student has at most one class standing at a time."
+    diagnosis: >-
+      A student who is both a sophomore and a senior appears twice in
+      the headcount by level.
+  - kind: "must_validate"
+    diagnosis: >-
+      I extract from the model with generated SQL; an invalid model
+      produces no schema and no extract.

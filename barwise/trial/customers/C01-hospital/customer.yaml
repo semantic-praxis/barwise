@@ -1,0 +1,78 @@
+id: C01
+slug: hospital
+name: Regional hospital network
+industry: healthcare
+summary: >-
+  Four hospitals and forty clinics on one electronic health record whose
+  reporting warehouse is a two-thousand-table SQL Server export with
+  abbreviated names and lookup tables. They want a conceptual model the
+  clinical, scheduling and billing teams can all read, generated from
+  the warehouse DDL and the FHIR API, then kept in step with both.
+stressors: [K1, K2, K3, K4, K6, K8, K9, K15]
+seed: 11
+personas:
+  - id: clarity-dba
+    name: Priya Natarajan
+    role: Database administrator, reporting warehouse
+    wants: Every table the nightly ETL joins on is still an entity with the same key parts, and nothing was silently dropped.
+    acceptance: personas/clarity-dba.gym.yaml
+    judges: [clarity-ddl]
+  - id: clinical-informaticist
+    name: Dr. Samuel Okafor
+    role: Clinical informaticist
+    wants: Encounter, Admission and Diagnosis mean what clinicians mean by them, with the ranked-diagnosis and administration rules intact.
+    acceptance: personas/clinical-informaticist.gym.yaml
+    judges: [fhir-openapi]
+  - id: revenue-cycle-analyst
+    name: Dana Whitfield
+    role: Revenue-cycle analyst
+    wants: Claims tie to exactly one encounter and one payer, and the discharge dispositions billing keys on are all present.
+    acceptance: personas/revenue-cycle-analyst.gym.yaml
+    judges: [clarity-ddl]
+artifacts:
+  - id: clarity-ddl
+    generator: ddl
+    skin: skins/clarity-sqlserver.yaml
+    importer: sql
+    dialect: sqlserver
+    expect: refusal
+    tiers: { small: 1, medium: 8, enterprise: 30 }
+  - id: clarity-ddl-regex
+    generator: ddl
+    skin: skins/clarity-sqlserver.yaml
+    importer: ddl
+    dialect: sqlserver
+    expect: import
+    tiers: { small: 1, medium: 8, enterprise: 30 }
+  - id: fhir-openapi
+    generator: openapi
+    skin: skins/fhir-openapi.yaml
+    importer: openapi
+    expect: import
+    tiers: { small: 1, medium: 4, enterprise: 10 }
+contexts:
+  clinical: [Patient, Encounter, InpatientEncounter, OutpatientEncounter, EmergencyEncounter, TraumaEncounter, Admission, Diagnosis, Order, MedicationOrder, LabOrder, Medication]
+  scheduling: [Appointment, Provider, Department, Facility]
+  billing: [Claim, Payer]
+history:
+  - { kind: rename_object_type, from: Encounter, to: Visit }
+  - { kind: add_value_constraint_value, object_type: DischargeDisposition, value: telehealth-followup }
+  - { kind: add_fact_type, name: Patient has Payer, between: [Patient, Payer] }
+  - { kind: add_subtype, subtype: Appointment, supertype: Order }
+  - { kind: rename_object_type, from: Payer, to: InsurancePayer }
+  - { kind: add_mandatory, fact_type: Claim is submitted to InsurancePayer, role_index: 1 }
+  - { kind: remove_object_type, name: TraumaEncounter }
+  - { kind: rename_object_type, from: Visit, to: Encounter }
+transcripts:
+  - file: transcripts/session-01-encounter.md
+    key: transcripts/session-01-encounter.key.yaml
+lateRequirement:
+  # Compliance rules a new discharge disposition into scope three weeks after sign-off.
+  note: "Compliance rules a new discharge disposition into scope three weeks after sign-off."
+  change: {"kind":"add_value_constraint_value","object_type":"DischargeDisposition","value":"hospice-home"}
+  element: DischargeDisposition
+  expectInExport: "hospice"
+budgets:
+  small: 30000
+  medium: 180000
+  enterprise: 900000

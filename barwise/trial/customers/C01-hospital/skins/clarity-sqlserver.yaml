@@ -1,0 +1,100 @@
+# The public idiom of an EHR reporting warehouse on SQL Server: upper-case
+# abbreviated table names, ZC_ lookup tables for every coded value,
+# numbered 1:1 extension tables, bracket quoting, a schema prefix.
+dialect: sqlserver
+naming:
+  table_case: upper
+  column_case: upper
+  abbreviate: true
+  max_identifier: 30
+  abbreviations:
+    Patient: PAT
+    Encounter: ENC
+    Department: DEPT
+    Provider: PROV
+    Facility: FAC
+    Diagnosis: DX
+    Medication: MED
+    Appointment: APPT
+    Inpatient: IP
+    Outpatient: OP
+    Emergency: ED
+    Admission: ADM
+    Disposition: DISP
+    Discharge: DISCH
+    Number: NUM
+    Identifier: ID
+    DateTime: DTTM
+idioms:
+  schema_qualified: "CLARITY."
+  quoting: brackets
+  lookup_tables: ZC_
+  check_constraints: false
+  comments: true
+  extension_tables: true
+  named_constraints: true
+types:
+  text: NVARCHAR(254)
+  integer: NUMERIC(18,0)
+  decimal: NUMERIC(18,2)
+  date: DATETIME
+  datetime: DATETIME2
+  id: NUMERIC(18,0)
+extra_tables:
+  - |
+    CREATE TABLE [CLARITY].[ZC_PAT_CLASS] (
+      [PAT_CLASS_C] NUMERIC(18,0) NOT NULL,
+      [NAME] VARCHAR(254) NULL,
+      [ABBR] VARCHAR(254) NULL,
+      [INTERNAL_ID] NUMERIC(18,0) NULL,
+      CONSTRAINT [PK_ZC_PAT_CLASS] PRIMARY KEY CLUSTERED ([PAT_CLASS_C] ASC)
+    )
+  - |
+    CREATE TABLE [CLARITY].[PAT_ENC_DX] (
+      [PAT_ENC_CSN_ID] NUMERIC(18,0) NOT NULL,
+      [LINE] INT NOT NULL,
+      [CONTACT_DATE] DATETIME NULL,
+      [DX_ID] NUMERIC(18,0) NULL,
+      [PRIMARY_DX_YN] VARCHAR(1) NULL,
+      [ANNOTATION] VARCHAR(2000) NULL,
+      CONSTRAINT [PK_PAT_ENC_DX] PRIMARY KEY CLUSTERED ([PAT_ENC_CSN_ID] ASC, [LINE] ASC)
+    ) ON [PRIMARY]
+  - |
+    CREATE TABLE [CLARITY].[CLARITY_EDG] (
+      [DX_ID] NUMERIC(18,0) NOT NULL,
+      [DX_NAME] VARCHAR(200) NULL,
+      [CURRENT_ICD10_LIST] VARCHAR(254) NULL,
+      [RECORD_TYPE_C] NUMERIC(18,0) NULL
+    )
+  - |
+    CREATE TABLE [CLARITY].[HSP_ACCOUNT] (
+      [HSP_ACCOUNT_ID] NUMERIC(18,0) NOT NULL PRIMARY KEY,
+      [PAT_ID] VARCHAR(18) NULL,
+      [ACCT_CLASS_HA_C] NUMERIC(18,0) NULL,
+      [TOT_CHGS] NUMERIC(18,2) NULL,
+      [ADM_DATE_TIME] DATETIME NULL,
+      [DISCH_DATE_TIME] DATETIME NULL,
+      [PRIM_PYR_ID] NUMERIC(18,0) NULL
+    )
+  - |
+    CREATE TABLE CLARITY.PAT_ENC_HSP (
+      PAT_ENC_CSN_ID NUMERIC(18,0) NOT NULL,
+      HOSP_ADMSN_TIME DATETIME NULL,
+      HOSP_DISCH_TIME DATETIME NULL,
+      DISCH_DISP_C NUMERIC(18,0) NULL,
+      ADT_PAT_CLASS_C NUMERIC(18,0) NULL,
+      INP_ADM_DATE DATETIME NULL,
+      CONSTRAINT PK_PAT_ENC_HSP PRIMARY KEY CLUSTERED (PAT_ENC_CSN_ID ASC)
+    )
+  - |
+    CREATE TABLE [CLARITY].[ORDER_MED] (
+      [ORDER_MED_ID] NUMERIC(18,0) NOT NULL,
+      [PAT_ID] VARCHAR(18) NULL,
+      [PAT_ENC_CSN_ID] NUMERIC(18,0) NULL,
+      [MEDICATION_ID] NUMERIC(18,0) NULL,
+      [ORDERING_DATE] DATETIME NULL,
+      [QUANTITY] VARCHAR(254) NULL,
+      [ORDER_STATUS_C] NUMERIC(18,0) NULL,
+      [AUTHRZING_PROV_ID] VARCHAR(18) NULL,
+      CONSTRAINT [PK_ORDER_MED] PRIMARY KEY CLUSTERED ([ORDER_MED_ID] ASC) WITH (FILLFACTOR = 90)
+    )

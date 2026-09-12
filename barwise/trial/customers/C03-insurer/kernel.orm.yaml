@@ -1,0 +1,1019 @@
+orm_version: "1.1"
+model:
+  name: Property and Casualty Insurer
+  domain_context: insurance
+  note: >-
+    The hand-authored seed model for trial customer C03. A regional
+    property and casualty carrier on a Guidewire-style core suite, so the
+    vocabulary is the suite's public vocabulary: Account, Policy,
+    PolicyPeriod (the term-numbered slice of a policy that is actually in
+    force), Coverage, Risk, Claim, Exposure, Reserve, Payment,
+    Subrogation, and Contact for every party. The policy number is
+    stamped on the period, not the policy, because a rewrite renumbers;
+    the period's business key is the policy number plus the term number.
+
+  object_types:
+    # ---- parties ------------------------------------------------------
+    - id: ot-contact
+      name: Contact
+      kind: entity
+      reference_mode: contact_id
+      definition: Any person or organisation the carrier deals with, whether as insured, claimant, payee, adverse party or vendor; identified once in the contact system.
+      aliases: [Party]
+    - id: ot-person
+      name: Person
+      kind: entity
+      reference_mode: contact_id
+      definition: A contact that is a natural person, such as a named insured, a driver or a claimant.
+    - id: ot-company
+      name: Company
+      kind: entity
+      reference_mode: contact_id
+      definition: A contact that is an organisation, such as a commercial insured, a repair shop or another carrier.
+    - id: ot-account
+      name: Account
+      kind: entity
+      reference_mode: account_number
+      definition: The customer relationship that owns one or more policies and receives the invoices for them.
+    - id: ot-producer
+      name: Producer
+      kind: entity
+      reference_mode: producer_code
+      definition: An agent or agency authorised to sell and service the carrier's policies, identified by a producer code.
+      aliases: [Agent, Agency]
+    - id: ot-adjuster
+      name: Adjuster
+      kind: entity
+      reference_mode: adjuster_id
+      definition: A claims professional who is assigned claims, sets reserves and authorises payments within a granted authority limit.
+
+    # ---- policy -------------------------------------------------------
+    - id: ot-policy
+      name: Policy
+      kind: entity
+      reference_mode: policy_id
+      definition: The contract of insurance as a whole across all of its terms, identified by a system-assigned policy identifier.
+    - id: ot-term
+      name: Term
+      kind: entity
+      reference_mode: term_number
+      definition: A numbered cycle in the life of a policy; term 1 is the original issue and each renewal increments the number.
+    - id: ot-policy-period
+      name: PolicyPeriod
+      kind: entity
+      reference_mode: policy_period_id
+      definition: The slice of a policy that is in force for one term, carrying the effective dates, the printed policy number and everything bound for that term.
+      aliases: [Period]
+    - id: ot-coverage
+      name: Coverage
+      kind: entity
+      reference_mode: coverage_id
+      definition: A single insuring agreement bound on a policy period, such as collision or dwelling, with its own limit.
+    - id: ot-risk
+      name: Risk
+      kind: entity
+      reference_mode: risk_id
+      definition: A thing the policy insures and rates, such as a vehicle or a building, listed on a policy period.
+    - id: ot-vehicle-risk
+      name: VehicleRisk
+      kind: entity
+      reference_mode: risk_id
+      definition: A risk that is a motor vehicle, identified on the schedule by its vehicle identification number.
+    - id: ot-commercial-vehicle-risk
+      name: CommercialVehicleRisk
+      kind: entity
+      reference_mode: risk_id
+      definition: A vehicle risk rated for commercial use, which carries a gross vehicle weight class.
+    - id: ot-property-risk
+      name: PropertyRisk
+      kind: entity
+      reference_mode: risk_id
+      definition: A risk that is a building or its contents, rated by its construction class.
+
+    # ---- claims -------------------------------------------------------
+    - id: ot-claim
+      name: Claim
+      kind: entity
+      reference_mode: claim_number
+      definition: A reported loss made against a policy period, identified by the claim number the claims system assigns at first notice.
+    - id: ot-exposure
+      name: Exposure
+      kind: entity
+      reference_mode: exposure_id
+      definition: One claimant's demand under one coverage on a claim; reserves and payments are held at this level, never on the claim.
+    - id: ot-reserve
+      name: Reserve
+      kind: entity
+      reference_mode: reserve_id
+      definition: The amount set aside on an exposure for what the carrier expects to pay, by cost type.
+    - id: ot-payment
+      name: Payment
+      kind: entity
+      reference_mode: payment_id
+      definition: A disbursement to a payee drawn against a reserve on an exposure.
+    - id: ot-subrogation
+      name: Subrogation
+      kind: entity
+      reference_mode: subrogation_id
+      definition: The pursuit of recovery from a party held responsible for a paid loss, opened on a claim.
+      aliases: [Subro, Recovery]
+
+    # ---- billing ------------------------------------------------------
+    - id: ot-invoice
+      name: Invoice
+      kind: entity
+      reference_mode: invoice_number
+      definition: A bill issued to an account for the charges on a policy period, due on a stated date.
+
+    # ---- identifier value types --------------------------------------
+    - id: ot-contact-id
+      name: ContactId
+      kind: value
+      definition: The identifier the contact system assigns to a contact.
+      data_type: { name: text, length: 20 }
+    - id: ot-account-number
+      name: AccountNumber
+      kind: value
+      definition: The number under which an account is billed.
+      data_type: { name: text, length: 20 }
+    - id: ot-producer-code
+      name: ProducerCode
+      kind: value
+      definition: The code under which a producer writes business.
+      data_type: { name: text, length: 20 }
+    - id: ot-adjuster-id
+      name: AdjusterId
+      kind: value
+      definition: The identifier of an adjuster in the claims system.
+      data_type: { name: text, length: 20 }
+    - id: ot-policy-id
+      name: PolicyId
+      kind: value
+      definition: The system-assigned identifier of a policy, stable across rewrites.
+      data_type: { name: text, length: 20 }
+    - id: ot-term-number
+      name: TermNumber
+      kind: value
+      definition: The ordinal of a term within a policy, starting at 1.
+      data_type: { name: integer }
+    - id: ot-policy-period-id
+      name: PolicyPeriodId
+      kind: value
+      definition: The identifier the policy system assigns to a policy period.
+      data_type: { name: text, length: 20 }
+    - id: ot-coverage-id
+      name: CoverageId
+      kind: value
+      definition: The identifier of a bound coverage.
+      data_type: { name: text, length: 20 }
+    - id: ot-risk-id
+      name: RiskId
+      kind: value
+      definition: The identifier of a risk on the schedule.
+      data_type: { name: text, length: 20 }
+    - id: ot-claim-number
+      name: ClaimNumber
+      kind: value
+      definition: The number the claims system assigns to a claim at first notice of loss.
+      data_type: { name: text, length: 20 }
+    - id: ot-exposure-id
+      name: ExposureId
+      kind: value
+      definition: The identifier of an exposure on a claim.
+      data_type: { name: text, length: 20 }
+    - id: ot-reserve-id
+      name: ReserveId
+      kind: value
+      definition: The identifier of a reserve on an exposure.
+      data_type: { name: text, length: 20 }
+    - id: ot-payment-id
+      name: PaymentId
+      kind: value
+      definition: The identifier of a payment.
+      data_type: { name: text, length: 20 }
+    - id: ot-subrogation-id
+      name: SubrogationId
+      kind: value
+      definition: The identifier of a subrogation.
+      data_type: { name: text, length: 20 }
+    - id: ot-invoice-number
+      name: InvoiceNumber
+      kind: value
+      definition: The number printed on an invoice.
+      data_type: { name: text, length: 20 }
+
+    # ---- descriptive value types --------------------------------------
+    - id: ot-contact-name
+      name: ContactName
+      kind: value
+      definition: The name of a contact as it appears on documents.
+      data_type: { name: text, length: 200 }
+    - id: ot-date-of-birth
+      name: DateOfBirth
+      kind: value
+      definition: A person's date of birth, used in rating and identity checks.
+      data_type: { name: date }
+    - id: ot-reserve-authority-limit
+      name: ReserveAuthorityLimit
+      kind: value
+      definition: The largest reserve an adjuster may approve without escalation.
+      data_type: { name: money }
+    - id: ot-product-code
+      name: ProductCode
+      kind: value
+      definition: The line of business a policy is written under.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [PersonalAuto, Homeowners, CommercialAuto, BusinessOwners, GeneralLiability, WorkersComp, CommercialProperty, InlandMarine]
+    - id: ot-legacy-policy-key
+      name: LegacyPolicyKey
+      kind: value
+      definition: The key of the policy in the mainframe system that was retired at conversion; kept for lookups from old correspondence.
+      data_type: { name: text, length: 30 }
+    - id: ot-policy-number
+      name: PolicyNumber
+      kind: value
+      definition: The number printed on the declarations page; it is stamped on the period, and a rewrite issues a new one.
+      data_type: { name: text, length: 20 }
+    - id: ot-effective-date
+      name: EffectiveDate
+      kind: value
+      definition: The date from which a policy period is in force.
+      data_type: { name: date }
+    - id: ot-expiration-date
+      name: ExpirationDate
+      kind: value
+      definition: The date on which a policy period ends unless cancelled earlier.
+      data_type: { name: date }
+    - id: ot-period-status
+      name: PeriodStatus
+      kind: value
+      definition: Where the period is in its lifecycle.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [Draft, Quoted, Bound, InForce, Expired, Cancelled, Withdrawn]
+    - id: ot-coverage-code
+      name: CoverageCode
+      kind: value
+      definition: The coverage pattern a coverage is an instance of.
+      data_type: { name: text, length: 40 }
+      value_constraint:
+        values: [PALiabilityCov, PACollisionCov, PAComprehensiveCov, PAMedPayCov, PAUninsuredMotoristCov, HODwellingCov, HOPersonalPropertyCov, HOPersonalLiabilityCov, HOLossOfUseCov, CAAutoLiabilityCov, CAPhysicalDamageCov, BOPBuildingCov, BOPBusinessPersonalPropertyCov, GLPremisesOperationsCov]
+    - id: ot-limit
+      name: Limit
+      kind: value
+      definition: The most the carrier will pay under a coverage.
+      data_type: { name: money }
+    - id: ot-vin
+      name: Vin
+      kind: value
+      definition: The seventeen-character vehicle identification number.
+      data_type: { name: text, length: 17 }
+    - id: ot-gross-vehicle-weight
+      name: GrossVehicleWeight
+      kind: value
+      definition: The rated gross vehicle weight of a commercial vehicle in pounds.
+      data_type: { name: integer }
+
+    - id: ot-construction-type
+      name: ConstructionType
+      kind: value
+      definition: The construction class used to rate a building.
+      data_type: { name: text, length: 30 }
+      value_constraint:
+        values: [Frame, JoistedMasonry, NonCombustible, MasonryNonCombustible, ModifiedFireResistive, FireResistive]
+    - id: ot-loss-date
+      name: LossDate
+      kind: value
+      definition: The date on which the loss occurred; it decides which policy period responds.
+      data_type: { name: date }
+
+    - id: ot-loss-cause
+      name: LossCause
+      kind: value
+      definition: The typelist code for what caused the loss; the values are the carrier's own and every code below is in use.
+      data_type: { name: text, length: 30 }
+      value_constraint:
+        values:
+          - rearend
+          - leftturn
+          - rightturn
+          - lanechange
+          - backing
+          - headon
+          - sideswipe
+          - rollover
+          - pedestrian
+          - bicyclist
+          - animal
+          - hitandrun
+          - parkedvehicle
+          - singlevehicle
+          - mechanicalfailure
+          - theftentire
+          - theftpartial
+          - vandalism
+          - glassbreakage
+          - fire
+          - flood
+          - hail
+          - wind
+          - lightning
+          - earthquake
+          - waterdamage
+          - freeze
+          - smoke
+          - explosion
+          - riot
+          - collapse
+          - fallingobject
+          - burglary
+          - mold
+          - sewerbackup
+          - weightofice
+          - bodilyinjury
+          - propertydamage
+          - dogbite
+          - slipandfall
+          - productliability
+          - completedoperations
+          - equipmentbreakdown
+          - other
+    - id: ot-claim-status
+      name: ClaimStatus
+      kind: value
+      definition: Where the claim is in its lifecycle.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [Draft, Open, Closed, Reopened, Archived]
+    - id: ot-exposure-type
+      name: ExposureType
+      kind: value
+      definition: The kind of demand an exposure represents.
+      data_type: { name: text, length: 30 }
+      value_constraint:
+        values: [VehicleDamage, PropertyDamage, BodilyInjury, MedicalPayments, UninsuredMotorist, Liability, LossOfUse]
+    - id: ot-reserve-amount
+      name: ReserveAmount
+      kind: value
+      definition: The amount currently reserved.
+      data_type: { name: money }
+    - id: ot-cost-type
+      name: CostType
+      kind: value
+      definition: Whether a reserve holds indemnity for the claimant or expense for handling the claim.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [ClaimCost, AOExpense, DCCExpense]
+    - id: ot-payment-amount
+      name: PaymentAmount
+      kind: value
+      definition: The amount disbursed by a payment.
+      data_type: { name: money }
+    - id: ot-recovery-amount
+      name: RecoveryAmount
+      kind: value
+      definition: The amount recovered so far through a subrogation.
+      data_type: { name: money }
+    - id: ot-subrogation-status
+      name: SubrogationStatus
+      kind: value
+      definition: Where a subrogation is in its pursuit.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [Open, Demanded, InArbitration, Recovered, Closed]
+    - id: ot-due-date
+      name: DueDate
+      kind: value
+      definition: The date by which an invoice must be paid.
+      data_type: { name: date }
+    - id: ot-invoice-amount
+      name: InvoiceAmount
+      kind: value
+      definition: The total amount billed on an invoice.
+      data_type: { name: money }
+
+  fact_types:
+    # ---- reference schemes -------------------------------------------
+    - id: ft-contact-has-contact-id
+      name: Contact has ContactId
+      roles:
+        - { id: r-contact-has-id-contact, player: ot-contact, role_name: has }
+        - { id: r-contact-has-id-id, player: ot-contact-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-contact-has-id-contact], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-contact-has-id-id] }
+        - { type: mandatory, role: r-contact-has-id-contact }
+    - id: ft-account-has-account-number
+      name: Account has AccountNumber
+      roles:
+        - { id: r-account-has-number-account, player: ot-account, role_name: has }
+        - { id: r-account-has-number-number, player: ot-account-number, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-account-has-number-account], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-account-has-number-number] }
+        - { type: mandatory, role: r-account-has-number-account }
+    - id: ft-producer-has-producer-code
+      name: Producer has ProducerCode
+      roles:
+        - { id: r-producer-has-code-producer, player: ot-producer, role_name: has }
+        - { id: r-producer-has-code-code, player: ot-producer-code, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-producer-has-code-producer], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-producer-has-code-code] }
+        - { type: mandatory, role: r-producer-has-code-producer }
+    - id: ft-adjuster-has-adjuster-id
+      name: Adjuster has AdjusterId
+      roles:
+        - { id: r-adjuster-has-id-adjuster, player: ot-adjuster, role_name: has }
+        - { id: r-adjuster-has-id-id, player: ot-adjuster-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-adjuster-has-id-adjuster], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-adjuster-has-id-id] }
+        - { type: mandatory, role: r-adjuster-has-id-adjuster }
+    - id: ft-policy-has-policy-id
+      name: Policy has PolicyId
+      roles:
+        - { id: r-policy-has-id-policy, player: ot-policy, role_name: has }
+        - { id: r-policy-has-id-id, player: ot-policy-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-policy-has-id-policy], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-policy-has-id-id] }
+        - { type: mandatory, role: r-policy-has-id-policy }
+    - id: ft-term-has-term-number
+      name: Term has TermNumber
+      roles:
+        - { id: r-term-has-number-term, player: ot-term, role_name: has }
+        - { id: r-term-has-number-number, player: ot-term-number, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-term-has-number-term], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-term-has-number-number] }
+        - { type: mandatory, role: r-term-has-number-term }
+    - id: ft-policy-period-has-policy-period-id
+      name: PolicyPeriod has PolicyPeriodId
+      roles:
+        - { id: r-policy-period-has-id-period, player: ot-policy-period, role_name: has }
+        - { id: r-policy-period-has-id-id, player: ot-policy-period-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-policy-period-has-id-period], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-policy-period-has-id-id] }
+        - { type: mandatory, role: r-policy-period-has-id-period }
+    - id: ft-coverage-has-coverage-id
+      name: Coverage has CoverageId
+      roles:
+        - { id: r-coverage-has-id-coverage, player: ot-coverage, role_name: has }
+        - { id: r-coverage-has-id-id, player: ot-coverage-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-coverage-has-id-coverage], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-coverage-has-id-id] }
+        - { type: mandatory, role: r-coverage-has-id-coverage }
+    - id: ft-risk-has-risk-id
+      name: Risk has RiskId
+      roles:
+        - { id: r-risk-has-id-risk, player: ot-risk, role_name: has }
+        - { id: r-risk-has-id-id, player: ot-risk-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-risk-has-id-risk], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-risk-has-id-id] }
+        - { type: mandatory, role: r-risk-has-id-risk }
+    - id: ft-claim-has-claim-number
+      name: Claim has ClaimNumber
+      roles:
+        - { id: r-claim-has-number-claim, player: ot-claim, role_name: has }
+        - { id: r-claim-has-number-number, player: ot-claim-number, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-claim-has-number-claim], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-claim-has-number-number] }
+        - { type: mandatory, role: r-claim-has-number-claim }
+    - id: ft-exposure-has-exposure-id
+      name: Exposure has ExposureId
+      roles:
+        - { id: r-exposure-has-id-exposure, player: ot-exposure, role_name: has }
+        - { id: r-exposure-has-id-id, player: ot-exposure-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-exposure-has-id-exposure], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-exposure-has-id-id] }
+        - { type: mandatory, role: r-exposure-has-id-exposure }
+    - id: ft-reserve-has-reserve-id
+      name: Reserve has ReserveId
+      roles:
+        - { id: r-reserve-has-id-reserve, player: ot-reserve, role_name: has }
+        - { id: r-reserve-has-id-id, player: ot-reserve-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-reserve-has-id-reserve], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-reserve-has-id-id] }
+        - { type: mandatory, role: r-reserve-has-id-reserve }
+    - id: ft-payment-has-payment-id
+      name: Payment has PaymentId
+      roles:
+        - { id: r-payment-has-id-payment, player: ot-payment, role_name: has }
+        - { id: r-payment-has-id-id, player: ot-payment-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-payment-has-id-payment], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-payment-has-id-id] }
+        - { type: mandatory, role: r-payment-has-id-payment }
+    - id: ft-subrogation-has-subrogation-id
+      name: Subrogation has SubrogationId
+      roles:
+        - { id: r-subrogation-has-id-subrogation, player: ot-subrogation, role_name: has }
+        - { id: r-subrogation-has-id-id, player: ot-subrogation-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subrogation-has-id-subrogation], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-subrogation-has-id-id] }
+        - { type: mandatory, role: r-subrogation-has-id-subrogation }
+    - id: ft-invoice-has-invoice-number
+      name: Invoice has InvoiceNumber
+      roles:
+        - { id: r-invoice-has-number-invoice, player: ot-invoice, role_name: has }
+        - { id: r-invoice-has-number-number, player: ot-invoice-number, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-invoice-has-number-invoice], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-invoice-has-number-number] }
+        - { type: mandatory, role: r-invoice-has-number-invoice }
+
+    # ---- parties ------------------------------------------------------
+    - id: ft-contact-has-contact-name
+      name: Contact has ContactName
+      roles:
+        - { id: r-contact-has-name-contact, player: ot-contact, role_name: has }
+        - { id: r-contact-has-name-name, player: ot-contact-name, role_name: is of }
+      readings: ["{0} has {1}", "{1} is of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-contact-has-name-contact] }
+        - { type: mandatory, role: r-contact-has-name-contact }
+    - id: ft-person-was-born-on-date-of-birth
+      name: Person was born on DateOfBirth
+      roles:
+        - { id: r-person-born-on-person, player: ot-person, role_name: was born on }
+        - { id: r-person-born-on-date, player: ot-date-of-birth, role_name: is birth date of }
+      readings: ["{0} was born on {1}", "{1} is birth date of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-person-born-on-person] }
+    - id: ft-account-is-owned-by-contact
+      name: Account is owned by Contact
+      roles:
+        - { id: r-account-owned-by-account, player: ot-account, role_name: is owned by }
+        - { id: r-account-owned-by-contact, player: ot-contact, role_name: owns }
+      readings: ["{0} is owned by {1}", "{1} owns {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-account-owned-by-account] }
+        - { type: mandatory, role: r-account-owned-by-account }
+    - id: ft-account-is-serviced-by-producer
+      name: Account is serviced by Producer
+      definition: The producers of record on an account; an account moved between agencies keeps both until the book roll completes, which is why this is many-to-many today.
+      roles:
+        - { id: r-account-serviced-by-account, player: ot-account, role_name: is serviced by }
+        - { id: r-account-serviced-by-producer, player: ot-producer, role_name: services }
+      readings: ["{0} is serviced by {1}", "{1} services {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-account-serviced-by-account, r-account-serviced-by-producer] }
+    - id: ft-adjuster-has-reserve-authority-limit
+      name: Adjuster has ReserveAuthorityLimit
+      roles:
+        - { id: r-adjuster-has-authority-adjuster, player: ot-adjuster, role_name: has }
+        - { id: r-adjuster-has-authority-limit, player: ot-reserve-authority-limit, role_name: is granted to }
+      readings: ["{0} has {1}", "{1} is granted to {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-adjuster-has-authority-adjuster] }
+        - { type: mandatory, role: r-adjuster-has-authority-adjuster }
+
+    # ---- policy -------------------------------------------------------
+    - id: ft-policy-is-held-by-account
+      name: Policy is held by Account
+      roles:
+        - { id: r-policy-held-by-policy, player: ot-policy, role_name: is held by }
+        - { id: r-policy-held-by-account, player: ot-account, role_name: holds }
+      readings: ["{0} is held by {1}", "{1} holds {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-policy-held-by-policy] }
+        - { type: mandatory, role: r-policy-held-by-policy }
+    - id: ft-policy-is-written-under-product-code
+      name: Policy is written under ProductCode
+      roles:
+        - { id: r-policy-written-under-policy, player: ot-policy, role_name: is written under }
+        - { id: r-policy-written-under-product, player: ot-product-code, role_name: is line of }
+      readings: ["{0} is written under {1}", "{1} is line of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-policy-written-under-policy] }
+        - { type: mandatory, role: r-policy-written-under-policy }
+    - id: ft-policy-is-produced-by-producer
+      name: Policy is produced by Producer
+      roles:
+        - { id: r-policy-produced-by-policy, player: ot-policy, role_name: is produced by }
+        - { id: r-policy-produced-by-producer, player: ot-producer, role_name: produces }
+      readings: ["{0} is produced by {1}", "{1} produces {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-policy-produced-by-policy] }
+        - { type: mandatory, role: r-policy-produced-by-policy }
+    - id: ft-policy-has-legacy-policy-key
+      name: Policy has LegacyPolicyKey
+      roles:
+        - { id: r-policy-has-legacy-key-policy, player: ot-policy, role_name: has }
+        - { id: r-policy-has-legacy-key-key, player: ot-legacy-policy-key, role_name: was converted to }
+      readings: ["{0} has {1}", "{1} was converted to {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-policy-has-legacy-key-policy] }
+        - { type: internal_uniqueness, roles: [r-policy-has-legacy-key-key] }
+
+    # ---- policy period (objectified) ----------------------------------
+    - id: ft-policy-is-in-force-for-term
+      name: Policy is in force for Term
+      definition: A policy is in force for a numbered term; the pairing is what a policy period objectifies, so there is one period per policy per term.
+      roles:
+        - { id: r-policy-in-force-policy, player: ot-policy, role_name: is in force for }
+        - { id: r-policy-in-force-term, player: ot-term, role_name: is a term of }
+      readings: ["{0} is in force for {1}", "{1} is a term of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-policy-in-force-policy, r-policy-in-force-term] }
+    - id: ft-policy-period-has-policy-number
+      name: PolicyPeriod has PolicyNumber
+      definition: The printed policy number is carried on the period, and the pair (policy number, term) identifies a period the way the declarations page does.
+      roles:
+        - { id: r-policy-period-has-number-period, player: ot-policy-period, role_name: has }
+        - { id: r-policy-period-has-number-number, player: ot-policy-number, role_name: is printed on }
+      readings: ["{0} has {1}", "{1} is printed on {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-policy-period-has-number-period] }
+        - { type: mandatory, role: r-policy-period-has-number-period }
+        # The business key: policy number plus term number identifies a
+        # period; the same policy number recurs across terms, so neither
+        # part alone is enough.
+        - { type: external_uniqueness, roles: [r-policy-period-has-number-number, r-policy-in-force-term] }
+    - id: ft-policy-period-has-effective-date
+      name: PolicyPeriod has EffectiveDate
+      roles:
+        - { id: r-policy-period-has-effective-period, player: ot-policy-period, role_name: has }
+        - { id: r-policy-period-has-effective-date, player: ot-effective-date, role_name: starts }
+      readings: ["{0} has {1}", "{1} starts {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-policy-period-has-effective-period] }
+        - { type: mandatory, role: r-policy-period-has-effective-period }
+    - id: ft-policy-period-has-expiration-date
+      name: PolicyPeriod has ExpirationDate
+      roles:
+        - { id: r-policy-period-has-expiration-period, player: ot-policy-period, role_name: has }
+        - { id: r-policy-period-has-expiration-date, player: ot-expiration-date, role_name: ends }
+      readings: ["{0} has {1}", "{1} ends {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-policy-period-has-expiration-period] }
+        - { type: mandatory, role: r-policy-period-has-expiration-period }
+    - id: ft-policy-period-has-period-status
+      name: PolicyPeriod has PeriodStatus
+      roles:
+        - { id: r-policy-period-has-status-period, player: ot-policy-period, role_name: has }
+        - { id: r-policy-period-has-status-status, player: ot-period-status, role_name: is state of }
+      readings: ["{0} has {1}", "{1} is state of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-policy-period-has-status-period] }
+        - { type: mandatory, role: r-policy-period-has-status-period }
+    - id: ft-policy-period-supersedes-policy-period
+      name: PolicyPeriod supersedes PolicyPeriod
+      definition: A policy change or renewal issues a new period that supersedes the one before it; the chain never loops back and a period never supersedes the one that superseded it.
+      roles:
+        - { id: r-policy-period-supersedes-newer, player: ot-policy-period, role_name: supersedes }
+        - { id: r-policy-period-supersedes-older, player: ot-policy-period, role_name: is superseded by }
+      readings: ["{0} supersedes {1}", "{1} is superseded by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-policy-period-supersedes-newer] }
+        - { type: internal_uniqueness, roles: [r-policy-period-supersedes-older] }
+        - { type: ring, role_1: r-policy-period-supersedes-newer, role_2: r-policy-period-supersedes-older, ring_type: acyclic }
+        - { type: ring, role_1: r-policy-period-supersedes-newer, role_2: r-policy-period-supersedes-older, ring_type: asymmetric }
+
+    # ---- coverages and risks -----------------------------------------
+    - id: ft-coverage-has-coverage-code
+      name: Coverage has CoverageCode
+      roles:
+        - { id: r-coverage-has-code-coverage, player: ot-coverage, role_name: has }
+        - { id: r-coverage-has-code-code, player: ot-coverage-code, role_name: is pattern of }
+      readings: ["{0} has {1}", "{1} is pattern of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-coverage-has-code-coverage] }
+        - { type: mandatory, role: r-coverage-has-code-coverage }
+    - id: ft-coverage-has-limit
+      name: Coverage has Limit
+      roles:
+        - { id: r-coverage-has-limit-coverage, player: ot-coverage, role_name: has }
+        - { id: r-coverage-has-limit-limit, player: ot-limit, role_name: caps }
+      readings: ["{0} has {1}", "{1} caps {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-coverage-has-limit-coverage] }
+    - id: ft-risk-is-on-policy-period
+      name: Risk is on PolicyPeriod
+      roles:
+        - { id: r-risk-on-period-risk, player: ot-risk, role_name: is on }
+        - { id: r-risk-on-period-period, player: ot-policy-period, role_name: schedules }
+      readings: ["{0} is on {1}", "{1} schedules {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-risk-on-period-risk] }
+        - { type: mandatory, role: r-risk-on-period-risk }
+    - id: ft-coverage-applies-to-risk-under-policy-period
+      name: Coverage applies to Risk under PolicyPeriod
+      definition: Which coverage protects which scheduled risk on which period; a coverage and risk pair is attached under exactly one period, and a period may attach the same coverage to several risks.
+      roles:
+        - { id: r-coverage-applies-coverage, player: ot-coverage, role_name: applies to }
+        - { id: r-coverage-applies-risk, player: ot-risk, role_name: is protected by }
+        - { id: r-coverage-applies-period, player: ot-policy-period, role_name: under }
+      readings: ["{0} applies to {1} under {2}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-coverage-applies-coverage, r-coverage-applies-risk] }
+    - id: ft-vehicle-risk-has-vin
+      name: VehicleRisk has Vin
+      roles:
+        - { id: r-vehicle-risk-has-vin-risk, player: ot-vehicle-risk, role_name: has }
+        - { id: r-vehicle-risk-has-vin-vin, player: ot-vin, role_name: identifies vehicle of }
+      readings: ["{0} has {1}", "{1} identifies vehicle of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-vehicle-risk-has-vin-risk] }
+        - { type: mandatory, role: r-vehicle-risk-has-vin-risk }
+    - id: ft-commercial-vehicle-risk-has-gross-vehicle-weight
+      name: CommercialVehicleRisk has GrossVehicleWeight
+      roles:
+        - { id: r-commercial-vehicle-has-gvw-risk, player: ot-commercial-vehicle-risk, role_name: has }
+        - { id: r-commercial-vehicle-has-gvw-weight, player: ot-gross-vehicle-weight, role_name: rates }
+      readings: ["{0} has {1}", "{1} rates {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-commercial-vehicle-has-gvw-risk] }
+        - { type: mandatory, role: r-commercial-vehicle-has-gvw-risk }
+
+    - id: ft-property-risk-has-construction-type
+      name: PropertyRisk has ConstructionType
+      roles:
+        - { id: r-property-risk-has-construction-risk, player: ot-property-risk, role_name: has }
+        - { id: r-property-risk-has-construction-type, player: ot-construction-type, role_name: classifies }
+      readings: ["{0} has {1}", "{1} classifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-property-risk-has-construction-risk] }
+
+    # ---- claims -------------------------------------------------------
+    - id: ft-claim-is-against-policy-period
+      name: Claim is against PolicyPeriod
+      roles:
+        - { id: r-claim-against-claim, player: ot-claim, role_name: is against }
+        - { id: r-claim-against-period, player: ot-policy-period, role_name: responds to }
+      readings: ["{0} is against {1}", "{1} responds to {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-claim-against-claim] }
+        - { type: mandatory, role: r-claim-against-claim }
+    - id: ft-claim-has-loss-date
+      name: Claim has LossDate
+      roles:
+        - { id: r-claim-has-loss-date-claim, player: ot-claim, role_name: has }
+        - { id: r-claim-has-loss-date-date, player: ot-loss-date, role_name: is date of loss of }
+      readings: ["{0} has {1}", "{1} is date of loss of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-claim-has-loss-date-claim] }
+        - { type: mandatory, role: r-claim-has-loss-date-claim }
+
+    - id: ft-claim-has-loss-cause
+      name: Claim has LossCause
+      roles:
+        - { id: r-claim-has-loss-cause-claim, player: ot-claim, role_name: has }
+        - { id: r-claim-has-loss-cause-cause, player: ot-loss-cause, role_name: is cause of }
+      readings: ["{0} has {1}", "{1} is cause of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-claim-has-loss-cause-claim] }
+        - { type: mandatory, role: r-claim-has-loss-cause-claim }
+    - id: ft-claim-has-claim-status
+      name: Claim has ClaimStatus
+      roles:
+        - { id: r-claim-has-status-claim, player: ot-claim, role_name: has }
+        - { id: r-claim-has-status-status, player: ot-claim-status, role_name: is state of }
+      readings: ["{0} has {1}", "{1} is state of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-claim-has-status-claim] }
+        - { type: mandatory, role: r-claim-has-status-claim }
+    - id: ft-claim-is-assigned-to-adjuster
+      name: Claim is assigned to Adjuster
+      roles:
+        - { id: r-claim-assigned-to-claim, player: ot-claim, role_name: is assigned to }
+        - { id: r-claim-assigned-to-adjuster, player: ot-adjuster, role_name: handles }
+      readings: ["{0} is assigned to {1}", "{1} handles {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-claim-assigned-to-claim] }
+    - id: ft-claim-is-reported-by-contact
+      name: Claim is reported by Contact
+      roles:
+        - { id: r-claim-reported-by-claim, player: ot-claim, role_name: is reported by }
+        - { id: r-claim-reported-by-contact, player: ot-contact, role_name: reports }
+      readings: ["{0} is reported by {1}", "{1} reports {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-claim-reported-by-claim] }
+    - id: ft-exposure-is-on-claim
+      name: Exposure is on Claim
+      roles:
+        - { id: r-exposure-on-claim-exposure, player: ot-exposure, role_name: is on }
+        - { id: r-exposure-on-claim-claim, player: ot-claim, role_name: carries }
+      readings: ["{0} is on {1}", "{1} carries {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-exposure-on-claim-exposure] }
+        - { type: mandatory, role: r-exposure-on-claim-exposure }
+    - id: ft-exposure-has-exposure-type
+      name: Exposure has ExposureType
+      roles:
+        - { id: r-exposure-has-type-exposure, player: ot-exposure, role_name: has }
+        - { id: r-exposure-has-type-type, player: ot-exposure-type, role_name: classifies }
+      readings: ["{0} has {1}", "{1} classifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-exposure-has-type-exposure] }
+        - { type: mandatory, role: r-exposure-has-type-exposure }
+    - id: ft-exposure-is-under-coverage
+      name: Exposure is under Coverage
+      roles:
+        - { id: r-exposure-under-coverage-exposure, player: ot-exposure, role_name: is under }
+        - { id: r-exposure-under-coverage-coverage, player: ot-coverage, role_name: responds to }
+      readings: ["{0} is under {1}", "{1} responds to {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-exposure-under-coverage-exposure] }
+        - { type: mandatory, role: r-exposure-under-coverage-exposure }
+    - id: ft-exposure-is-claimed-by-contact
+      name: Exposure is claimed by Contact
+      roles:
+        - { id: r-exposure-claimed-by-exposure, player: ot-exposure, role_name: is claimed by }
+        - { id: r-exposure-claimed-by-contact, player: ot-contact, role_name: is claimant on }
+      readings: ["{0} is claimed by {1}", "{1} is claimant on {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-exposure-claimed-by-exposure] }
+        - { type: mandatory, role: r-exposure-claimed-by-exposure }
+
+    # ---- reserves and payments ---------------------------------------
+    - id: ft-reserve-is-on-exposure
+      name: Reserve is on Exposure
+      roles:
+        - { id: r-reserve-on-exposure-reserve, player: ot-reserve, role_name: is on }
+        - { id: r-reserve-on-exposure-exposure, player: ot-exposure, role_name: holds }
+      readings: ["{0} is on {1}", "{1} holds {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-reserve-on-exposure-reserve] }
+        - { type: mandatory, role: r-reserve-on-exposure-reserve }
+    - id: ft-reserve-has-reserve-amount
+      name: Reserve has ReserveAmount
+      roles:
+        - { id: r-reserve-has-amount-reserve, player: ot-reserve, role_name: has }
+        - { id: r-reserve-has-amount-amount, player: ot-reserve-amount, role_name: is held on }
+      readings: ["{0} has {1}", "{1} is held on {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-reserve-has-amount-reserve] }
+        - { type: mandatory, role: r-reserve-has-amount-reserve }
+    - id: ft-reserve-has-cost-type
+      name: Reserve has CostType
+      roles:
+        - { id: r-reserve-has-cost-type-reserve, player: ot-reserve, role_name: has }
+        - { id: r-reserve-has-cost-type-type, player: ot-cost-type, role_name: classifies }
+      readings: ["{0} has {1}", "{1} classifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-reserve-has-cost-type-reserve] }
+        - { type: mandatory, role: r-reserve-has-cost-type-reserve }
+    - id: ft-reserve-is-approved-by-adjuster
+      name: Reserve is approved by Adjuster
+      definition: Every reserve ought to be approved by an adjuster with authority for the amount; a reserve set at first notice sits unapproved until the desk adjuster picks it up, so this is an obligation, not a necessity.
+      roles:
+        - { id: r-reserve-approved-by-reserve, player: ot-reserve, role_name: is approved by }
+        - { id: r-reserve-approved-by-adjuster, player: ot-adjuster, role_name: approves }
+      readings: ["{0} is approved by {1}", "{1} approves {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-reserve-approved-by-reserve] }
+        - { type: mandatory, role: r-reserve-approved-by-reserve, modality: deontic }
+    - id: ft-payment-is-drawn-against-reserve
+      name: Payment is drawn against Reserve
+      roles:
+        - { id: r-payment-drawn-against-payment, player: ot-payment, role_name: is drawn against }
+        - { id: r-payment-drawn-against-reserve, player: ot-reserve, role_name: funds }
+      readings: ["{0} is drawn against {1}", "{1} funds {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-payment-drawn-against-payment] }
+        - { type: mandatory, role: r-payment-drawn-against-payment }
+    - id: ft-payment-has-payment-amount
+      name: Payment has PaymentAmount
+      roles:
+        - { id: r-payment-has-amount-payment, player: ot-payment, role_name: has }
+        - { id: r-payment-has-amount-amount, player: ot-payment-amount, role_name: is disbursed by }
+      readings: ["{0} has {1}", "{1} is disbursed by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-payment-has-amount-payment] }
+        - { type: mandatory, role: r-payment-has-amount-payment }
+    - id: ft-payment-is-made-to-contact
+      name: Payment is made to Contact
+      roles:
+        - { id: r-payment-made-to-payment, player: ot-payment, role_name: is made to }
+        - { id: r-payment-made-to-contact, player: ot-contact, role_name: is payee of }
+      readings: ["{0} is made to {1}", "{1} is payee of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-payment-made-to-payment] }
+        - { type: mandatory, role: r-payment-made-to-payment }
+
+    # ---- subrogation -------------------------------------------------
+    - id: ft-subrogation-is-pursued-on-claim
+      name: Subrogation is pursued on Claim
+      roles:
+        - { id: r-subrogation-pursued-on-subrogation, player: ot-subrogation, role_name: is pursued on }
+        - { id: r-subrogation-pursued-on-claim, player: ot-claim, role_name: has }
+      readings: ["{0} is pursued on {1}", "{1} has {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subrogation-pursued-on-subrogation] }
+        - { type: mandatory, role: r-subrogation-pursued-on-subrogation }
+    - id: ft-subrogation-targets-contact
+      name: Subrogation targets Contact
+      definition: The adverse party the carrier pursues; one subrogation names one adverse party, and a claim with two responsible parties opens two subrogations.
+      roles:
+        - { id: r-subrogation-targets-subrogation, player: ot-subrogation, role_name: targets }
+        - { id: r-subrogation-targets-contact, player: ot-contact, role_name: is adverse party on }
+      readings: ["{0} targets {1}", "{1} is adverse party on {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subrogation-targets-subrogation] }
+        - { type: mandatory, role: r-subrogation-targets-subrogation }
+        # Two theories against the same party go in one file, so a claim
+        # has at most one subrogation per adverse party.
+        - { type: external_uniqueness, roles: [r-subrogation-pursued-on-claim, r-subrogation-targets-contact] }
+    - id: ft-subrogation-has-recovery-amount
+      name: Subrogation has RecoveryAmount
+      roles:
+        - { id: r-subrogation-has-recovery-subrogation, player: ot-subrogation, role_name: has }
+        - { id: r-subrogation-has-recovery-amount, player: ot-recovery-amount, role_name: is recovered on }
+      readings: ["{0} has {1}", "{1} is recovered on {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subrogation-has-recovery-subrogation] }
+    - id: ft-subrogation-has-subrogation-status
+      name: Subrogation has SubrogationStatus
+      roles:
+        - { id: r-subrogation-has-status-subrogation, player: ot-subrogation, role_name: has }
+        - { id: r-subrogation-has-status-status, player: ot-subrogation-status, role_name: is state of }
+      readings: ["{0} has {1}", "{1} is state of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subrogation-has-status-subrogation] }
+        - { type: mandatory, role: r-subrogation-has-status-subrogation }
+
+    # ---- billing -----------------------------------------------------
+    - id: ft-invoice-is-issued-to-account
+      name: Invoice is issued to Account
+      roles:
+        - { id: r-invoice-issued-to-invoice, player: ot-invoice, role_name: is issued to }
+        - { id: r-invoice-issued-to-account, player: ot-account, role_name: receives }
+      readings: ["{0} is issued to {1}", "{1} receives {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-invoice-issued-to-invoice] }
+        - { type: mandatory, role: r-invoice-issued-to-invoice }
+    - id: ft-invoice-bills-policy-period
+      name: Invoice bills PolicyPeriod
+      roles:
+        - { id: r-invoice-bills-invoice, player: ot-invoice, role_name: bills }
+        - { id: r-invoice-bills-period, player: ot-policy-period, role_name: is billed by }
+      readings: ["{0} bills {1}", "{1} is billed by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-invoice-bills-invoice] }
+        - { type: mandatory, role: r-invoice-bills-invoice }
+    - id: ft-invoice-has-due-date
+      name: Invoice has DueDate
+      roles:
+        - { id: r-invoice-has-due-date-invoice, player: ot-invoice, role_name: has }
+        - { id: r-invoice-has-due-date-date, player: ot-due-date, role_name: is due date of }
+      readings: ["{0} has {1}", "{1} is due date of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-invoice-has-due-date-invoice] }
+        - { type: mandatory, role: r-invoice-has-due-date-invoice }
+    - id: ft-invoice-has-invoice-amount
+      name: Invoice has InvoiceAmount
+      roles:
+        - { id: r-invoice-has-amount-invoice, player: ot-invoice, role_name: has }
+        - { id: r-invoice-has-amount-amount, player: ot-invoice-amount, role_name: is billed on }
+      readings: ["{0} has {1}", "{1} is billed on {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-invoice-has-amount-invoice] }
+        - { type: mandatory, role: r-invoice-has-amount-invoice }
+
+  subtype_facts:
+    - { id: st-person, subtype: ot-person, supertype: ot-contact, is_exclusive: true, is_exhaustive: true }
+    - { id: st-company, subtype: ot-company, supertype: ot-contact, is_exclusive: true, is_exhaustive: true }
+    - { id: st-vehicle-risk, subtype: ot-vehicle-risk, supertype: ot-risk, is_exclusive: true }
+    - { id: st-property-risk, subtype: ot-property-risk, supertype: ot-risk, is_exclusive: true }
+    - { id: st-commercial-vehicle-risk, subtype: ot-commercial-vehicle-risk, supertype: ot-vehicle-risk }
+
+  objectified_fact_types:
+    - id: oft-policy-period
+      fact_type: ft-policy-is-in-force-for-term
+      object_type: ot-policy-period
+
+  definitions:
+    - term: Policy
+      definition: In policy administration, the contract across all its terms; in claims, the word usually means the period that responds to the loss date. The claims reading is PolicyPeriod here.
+      context: policy
+    - term: Claim
+      definition: In claims, the reported loss; in billing and actuarial reporting, "claim" is often used for a single exposure's payments. Reserves and payments hang on Exposure, never on Claim.
+      context: claims
+    - term: Recovery
+      definition: The claims teams' word for a subrogation and for the money it brings back; the model keeps Subrogation for the pursuit and RecoveryAmount for the money.
+      context: claims

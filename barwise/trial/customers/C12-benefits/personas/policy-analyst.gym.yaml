@@ -1,0 +1,89 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: policy-analyst
+title: "The rule is the statute, not the screen"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Read a conceptual model produced from the agency's artifacts and
+  confirm that every eligibility rule the statute states as "shall" or
+  "must not" is present as a constraint on the right fact type, at the
+  right grain (case, program, certification period), and not flattened
+  into a status column.
+brief: |
+  You write the eligibility policy manual for a state benefits agency
+  and sign off every change to the determination rules before it goes
+  to the mainframe team. The rules are statute: an applicant shall
+  name at least one program; a determination shall rely on verification,
+  never on the client's statement alone; a notice of adverse action
+  must not issue without a citation. The mainframe has always
+  represented "the determination" as one status code on the case row,
+  which is why the agency cannot say which program a household was
+  denied for. Check that the model barwise produced keeps the
+  determination at the grain the statute uses and carries the deontic
+  rules as rules, not as free text.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 7 (mandatory roles),
+  ch. 11.4 (deontic versus alethic modality).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: must_validate
+    diagnosis: >-
+      If the model does not validate I cannot walk it with the policy
+      unit, and the manual stays the only place the rules are written.
+  - kind: requires_element
+    element:
+      entity: Determination
+    diagnosis: >-
+      A model without a Determination has kept the mainframe's mistake:
+      eligibility as a status on the case, with no record of what was
+      decided, for which program, or when.
+  - kind: requires_element
+    element:
+      entity: CertificationPeriod
+    diagnosis: >-
+      Recertification is the whole rhythm of the program. Without a
+      certification period the model cannot say when a determination
+      expires, and every case looks eligible forever.
+  - kind: requires_verbalization
+    sentence: "Each combination of Case, Program and CertificationPeriod is unique in Case is determined for Program in CertificationPeriod."
+    hint: "A household can be approved for NAP and denied FCA in the same month; the determination is per case, per program, per period."
+    diagnosis: >-
+      If the determination is per case alone, the model has folded the
+      programs together and the agency is back to one status code that
+      cannot say which program was denied.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Determination, StatuteReference]
+    diagnosis: >-
+      The notice regulation requires the citation on the determination.
+      If nothing links a determination to a statute reference, the
+      notice generator has nothing to print and the appeal is lost on
+      procedure.
+  - kind: requires_verbalization
+    sentence: "It is obligatory that each Determination cites at least one StatuteReference."
+    hint: "A determination shall cite the statute or rule it relies on. The rule is deontic -- the mainframe holds determinations with no citation -- so it verbalizes as an obligation, not as a population the model rules out."
+    diagnosis: >-
+      A model that lets a determination stand with no citation has read
+      the rule as advice. The statute says shall.
+  - kind: requires_verbalization
+    sentence: "It is obligatory that each Determination relies on at least one VerificationDocument."
+    hint: "A worker must not approve eligibility on the client's statement alone; deontic, because the quality control sample finds violations."
+    diagnosis: >-
+      If a determination can exist with no verification behind it, the
+      model permits exactly the approval the quality control review
+      cites as an error.
+  - kind: requires_verbalization
+    sentence: "It is obligatory that each Applicant applies for at least one Program."
+    hint: "An office must not accept an application that names no program; the web form still lets one through, so it is an obligation."
+    diagnosis: >-
+      An applicant with no program is a screening, not an application,
+      and the thirty-day clock should never have started on it.
+  - kind: requires_element
+    element:
+      entity: Recipient
+    diagnosis: >-
+      Applicant and Recipient are different statutory statuses of the
+      same person, with different rights. If the model has one Client
+      with a flag, the sanction rules, which apply only to recipients,
+      have nowhere to attach.

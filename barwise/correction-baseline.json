@@ -369,27 +369,63 @@
     },
     "correction-record-ratchet::44b7905b87d5": {
       "spec": "correction-record-ratchet.spec.md",
-      "excerpt": "in one sentence: 28 specs already record what their drafts got wrong and what caught it, nothing reads that ba",
+      "excerpt": "in one sentence: 28 specs already record what their drafts got wrong and what caught it, nothing reads that back, and a hand pass over it goes stale the same wa",
       "caught_by": "not-a-correction",
       "note": "The BLUF of this spec, describing the corpus it audits. No correction of its own."
     },
     "correction-record-ratchet::0d96891e4625": {
       "spec": "correction-record-ratchet.spec.md",
-      "excerpt": "it does not judge whether a correction should have happened, and it cannot: a correction is a historical fact ",
+      "excerpt": "it does not judge whether a correction should have happened, and it cannot: a correction is a historical fact about a draft that is already gone. what it enforc",
       "caught_by": "not-a-correction",
       "note": "States what the gate does and does not judge. No correction recorded."
     },
     "correction-record-ratchet::7eb377fc978c": {
       "spec": "correction-record-ratchet.spec.md",
-      "excerpt": "- judging whether a correction was avoidable. the classification says what caught the defect, not what should ",
+      "excerpt": "- judging whether a correction was avoidable. the classification says what caught the defect, not what should have. - reading git history for pre-correction dra",
       "caught_by": "not-a-correction",
       "note": "An out-of-scope bullet. No correction recorded."
     },
     "correction-record-ratchet::df2c17054e14": {
       "spec": "correction-record-ratchet.spec.md",
-      "excerpt": "- a required \"what caught it\" section in the spec template. catches nothing retroactively, and a template sect",
+      "excerpt": "- a required \"what caught it\" section in the spec template. catches nothing retroactively, and a template section is a rule in prose -- precisely what the taxon",
       "caught_by": "not-a-correction",
       "note": "A rejected alternative (a required template section). Records a design choice, not a correction to this spec's own draft."
+    },
+    "enterprise-trial::f0d76fc11d13": {
+      "spec": "enterprise-trial.spec.md",
+      "excerpt": "| sprint | name | lane | steps | oracles | | ------ | ------------ | ------- | ---------------------------------------------------------------------------------",
+      "caught_by": "not-a-correction",
+      "note": "The six-sprint table. It matches on \"edit distance from the draft to a model the persona accepts\", where \"draft\" is the draft MODEL an extraction produces, not the draft of this spec. No correction is recorded here."
+    },
+    "enterprise-trial::4d8a47e338ba": {
+      "spec": "enterprise-trial.spec.md",
+      "excerpt": "the journey is not per-customer. the draft gave each package a journey.yaml listing its steps. twelve copies of one list is the must-agree duplication claude.md",
+      "caught_by": "execution",
+      "note": "Real correction. The draft gave every customer package a journey.yaml listing its steps; writing the runner for the first customer showed every sprint is the same six commands over whatever the package declares, so twelve copies would have been the must-agree duplication CLAUDE.md forbids. Caught by building it, not by reading the draft."
+    },
+    "enterprise-trial::3551935b55a1": {
+      "spec": "enterprise-trial.spec.md",
+      "excerpt": "deviations from the draft, recorded so the next workstream starts from reality (the spec-writer convention).",
+      "caught_by": "not-a-correction",
+      "note": "The heading sentence of the Implementation notes section, naming the spec-writer convention it follows. The corrections themselves are the bullets under it, recorded separately."
+    },
+    "enterprise-trial::6aa83b9e74b2": {
+      "spec": "enterprise-trial.spec.md",
+      "excerpt": "- twelve customers or six (resolved: twelve, built). all nineteen stressor rows are covered, across nine sql dialects, 686 object types and 710 fact types of ha",
+      "caught_by": "execution",
+      "note": "An Open decision the implementation resolved: the draft recommended twelve customers with six as a floor if authoring ran late. Twelve were built and the authoring cost was lower than the draft assumed, because the packages are independent. The counts in the row (nineteen stressors, nine dialects, 686 object types) were measured from the built packages, not estimated."
+    },
+    "enterprise-trial::0bc207e81633": {
+      "spec": "enterprise-trial.spec.md",
+      "excerpt": "- the generator produces regular mess. a generator that emits 1,500 tables from a 60-type kernel emits 25 variations of each type; a real erp has 1,500 differen",
+      "caught_by": "not-a-correction",
+      "note": "A Risks-and-testing entry with its tripwire: an amplifier produces regular mess where a real schema's mess is irregular, so the skins carry hand-written irregularity. It states a risk the design carries and the signal that would reopen it; it records nothing the draft got wrong."
+    },
+    "enterprise-trial::714e7e934891": {
+      "spec": "enterprise-trial.spec.md",
+      "excerpt": "- the journey moved out of the package, and the acceptance oracles became gym exercises. see target architecture. - a finding class, not a free-text note, is wh",
+      "caught_by": "execution",
+      "note": "The Implementation notes bullet for the same correction as enterprise-trial::4d8a47e338ba, plus its acceptance-oracle half (the draft's acceptance/ directory became personas/*.gym.yaml). Both were settled by implementing the first package and the runner. One correction, two records, because Target architecture and Implementation notes each need it."
     },
     "artifact-resolution-in-production::8603e5428a94": {
       "spec": "artifact-resolution-in-production.spec.md",

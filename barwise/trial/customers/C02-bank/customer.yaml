@@ -1,0 +1,71 @@
+id: C02
+slug: bank
+name: Tier-1 retail bank
+industry: banking
+summary: >-
+  A retail bank whose core system is an Oracle schema nobody has read
+  end to end since the vendor left, a Postgres regulatory data mart that
+  restates it, and an event stream in Avro that the platform team says is
+  the real system of record. Three teams mean three things by "account".
+stressors: [K1, K2, K4, K5, K7, K10, K13, K15]
+seed: 23
+personas:
+  - id: bank-data-architect
+    name: Marguerite Delacroix
+    role: Enterprise data architect, regulatory reporting
+    wants: Deposit, loan and ledger accounts are distinct entities with their own keys, and ownership and control rings survive into the mart.
+    acceptance: personas/bank-data-architect.gym.yaml
+    judges: [regmart-ddl]
+  - id: core-banking-dba
+    name: Tomasz Wierzbicki
+    role: Core-banking database administrator
+    wants: Every table in the core schema is either imported with its key or named as skipped, and nothing is invented.
+    acceptance: personas/core-banking-dba.gym.yaml
+    judges: [core-ddl]
+artifacts:
+  - id: core-ddl
+    generator: ddl
+    skin: skins/oracle-core.yaml
+    importer: sql
+    dialect: oracle
+    expect: refusal
+    tiers: { small: 1, medium: 8, enterprise: 25 }
+  - id: regmart-ddl
+    generator: ddl
+    skin: skins/postgres-regmart.yaml
+    importer: sql
+    dialect: postgres
+    expect: import
+    tiers: { small: 1, medium: 8, enterprise: 25 }
+  - id: events-avro
+    generator: avro
+    skin: skins/avro-events.yaml
+    importer: avro
+    expect: refusal
+    tiers: { small: 1, medium: 1, enterprise: 1 }
+contexts:
+  parties: [Party, LegalEntity, NaturalPerson]
+  deposits: [DepositAccount, AccountHolder, Branch, Product, Currency]
+  lending: [LoanAccount, InterestRate]
+  ledger: [GeneralLedgerAccount, Transaction]
+history:
+  - { kind: rename_object_type, from: DepositAccount, to: CurrentAccount }
+  - { kind: add_value_constraint_value, object_type: TransactionType, value: instant-payment }
+  - { kind: add_fact_type, name: Branch reports to Branch, between: [Branch, Branch] }
+  - { kind: add_subtype, subtype: Branch, supertype: Party }
+  - { kind: rename_object_type, from: CurrentAccount, to: DepositAccount }
+  - { kind: remove_object_type, name: InterestRate }
+  - { kind: rename_fact_type, from: Party holds DepositAccount, to: Party owns DepositAccount }
+transcripts:
+  - file: transcripts/session-01-account.md
+    key: transcripts/session-01-account.key.yaml
+lateRequirement:
+  # The regulator adds a payment type after the mart is built.
+  note: "The regulator adds a payment type after the mart is built."
+  change: {"kind":"add_value_constraint_value","object_type":"TransactionType","value":"confirmation-of-payee"}
+  element: TransactionType
+  expectInExport: "confirmation"
+budgets:
+  small: 30000
+  medium: 180000
+  enterprise: 900000

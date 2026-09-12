@@ -1,0 +1,73 @@
+id: C09
+slug: pharma
+name: Pharmaceutical sponsor
+industry: pharmaceutical
+summary: >-
+  A mid-size sponsor running phase 2 and 3 studies through a clinical
+  database that exports SDTM-shaped tables, with a legacy NORMA model
+  from the last data-standards initiative. They are modelling because the
+  safety, statistics and data-management teams each keep their own
+  definition of a subject, and the next submission needs one.
+stressors: [K3, K4, K5, K9, K11, K17]
+personas:
+  - id: clinical-data-manager
+    name: Mira Kessler
+    role: Clinical data manager, clinical database and SDTM mapping
+    wants: >-
+      The composite subject key and the visit number survive the model so the SDTM merges still work at lock.
+    acceptance: personas/clinical-data-manager.gym.yaml
+  - id: biostatistician
+    name: Tomas Reyes
+    role: Biostatistician, statistical analysis plan
+    wants: >-
+      Randomized, enrolled and exposed subjects stay distinct so the analysis populations derive without guessing.
+    acceptance: personas/biostatistician.gym.yaml
+  - id: pharmacovigilance-lead
+    name: Anneke Voss
+    role: Pharmacovigilance lead, safety reporting
+    wants: >-
+      Serious events are their own kind, the 24-hour reporting obligation is stated as an obligation, and follow-up chains cannot loop.
+    acceptance: personas/pharmacovigilance-lead.gym.yaml
+artifacts:
+  - id: legacy-norma
+    generator: norma
+    skin: skins/norma.yaml
+    importer: norma
+    expect: import
+    tiers: { small: 1, medium: 6, enterprise: 24 }
+  - id: sdtm-ddl
+    generator: ddl
+    skin: skins/sdtm-ansi.yaml
+    importer: ddl
+    dialect: ansi
+    expect: import
+    tiers: { small: 1, medium: 8, enterprise: 30 }
+contexts:
+  protocol: [Study, Protocol, ProtocolAmendment, Arm, Treatment, Site, Investigator]
+  subjects: [Subject, ScreenFailedSubject, EnrolledSubject, RandomizedSubject, Visit]
+  safety: [AdverseEvent, SeriousAdverseEvent, ConcomitantMedication]
+  data-management: [LabResult, LabTest, Dose, Exposure]
+history:
+  - { kind: rename_object_type, from: Treatment, to: InvestigationalProduct }
+  - { kind: add_value_constraint_value, object_type: StudyPhase, value: Phase 1/2 }
+  - { kind: add_fact_type, name: Investigator is assigned to Study, between: [Investigator, Study] }
+  - { kind: remove_object_type, name: LabUnit }
+  - { kind: tighten_uniqueness, fact_type: Site participates in Study }
+  - { kind: rename_fact_type, from: Visit occurred on VisitDate, to: Visit took place on VisitDate }
+  - { kind: add_mandatory, fact_type: AdverseEvent has AeOutcome, role_index: 0 }
+  - { kind: add_value_constraint_value, object_type: DoseUnit, value: PATCH }
+  - { kind: rename_object_type, from: Site, to: InvestigationalSite }
+  - { kind: add_fact_type, name: ConcomitantMedication was started at Visit, between: [ConcomitantMedication, Visit] }
+transcripts:
+  - file: transcripts/session-01-sae.md
+    key: transcripts/session-01-sae.key.yaml
+lateRequirement:
+  # A protocol amendment adds a term after database lock planning.
+  note: "A protocol amendment adds a term after database lock planning."
+  change: {"kind":"add_value_constraint_value","object_type":"MeddraPreferredTermCode","value":"90000045"}
+  element: MeddraPreferredTermCode
+  expectInExport: "90000045"
+budgets:
+  small: 30000
+  medium: 180000
+  enterprise: 900000

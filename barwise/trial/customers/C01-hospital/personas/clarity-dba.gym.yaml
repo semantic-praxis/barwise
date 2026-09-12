@@ -1,0 +1,82 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: clarity-dba
+title: "The Clarity warehouse still joins"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Read a conceptual model produced from the Clarity DDL and confirm that
+  every table the nightly ETL joins on is still an entity with the same
+  key parts, in the same order, and that nothing was silently dropped.
+brief: |
+  You administer the Clarity reporting warehouse for a regional hospital
+  network: roughly two thousand tables in the Epic-style idiom, PAT_ENC
+  and its _2 and _3 extension tables, ZC_ lookup tables for every
+  category column, and a nightly load that joins on PAT_ID, PAT_ENC_CSN_ID
+  and the (MRN, facility) pair the pre-merger registration systems left
+  behind. A model that renames a key or collapses an extension table
+  breaks the load. Check that the model barwise produced from your DDL
+  keeps the keys you join on.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 5 (reference schemes,
+  external uniqueness), ch. 11 (relational mapping).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: must_validate
+    diagnosis: >-
+      If the model does not validate I cannot map it to tables at all,
+      and the nightly load stays on the old DDL.
+  - kind: requires_element
+    element:
+      entity: Patient
+    diagnosis: >-
+      PATIENT is the table every extract starts from; a model without it
+      has read something other than my warehouse.
+  - kind: requires_element
+    element:
+      entity: Encounter
+    diagnosis: >-
+      PAT_ENC is the spine of Clarity. If Encounter is missing or has been
+      folded into Patient, every encounter-level join is gone.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Patient, Facility]
+    diagnosis: >-
+      The registration facility is half of the legacy composite key. If it
+      is not on the patient, the MRN column is ambiguous across the
+      network and the pre-merger extracts double count.
+  - kind: forbids_population
+    factType: Patient has PatientId
+    constraint: internal_uniqueness
+    hint: "PAT_ID is the primary key of PATIENT; one row per patient."
+    diagnosis: >-
+      A model that lets one PAT_ID appear on two patients has lost the
+      primary key of the table every join fans out from.
+  - kind: forbids_population
+    factType: Encounter has ContactSerialNumber
+    constraint: internal_uniqueness
+    hint: "PAT_ENC_CSN_ID is unique per encounter; it is what the _2 and _3 extension tables join back on."
+    diagnosis: >-
+      If the CSN is not unique the 1:1 extension tables cannot be joined
+      back to the base row, and PAT_ENC_2 and PAT_ENC_3 become many-to-one.
+  - kind: forbids_population
+    factType: Encounter is for Patient
+    constraint: mandatory
+    hint: "PAT_ID on PAT_ENC is NOT NULL; there is no encounter without a patient."
+    diagnosis: >-
+      An encounter with no patient is an orphan row in PAT_ENC, and the
+      load has never allowed one.
+  - kind: requires_element
+    element:
+      entity: Admission
+    diagnosis: >-
+      PAT_ENC_HSP is its own table with its own key; if the admission was
+      flattened onto the encounter the inpatient extracts lose a row per
+      transfer.
+  - kind: requires_verbalization
+    sentence: "The combination of MedicalRecordNumber and Facility is unique across fact types."
+    hint: "The legacy composite key: MRN is unique only within the facility that issued it."
+    diagnosis: >-
+      If the model says MRN alone is unique it has believed the FHIR facade
+      rather than the warehouse, and the North campus records will collide
+      with Main on the first load.

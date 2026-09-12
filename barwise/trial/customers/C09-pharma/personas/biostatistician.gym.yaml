@@ -1,0 +1,90 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: biostatistician
+title: "The analysis populations are derivable"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Read a conceptual model of the sponsor's clinical data and confirm that
+  the randomized set, the planned arm and the exposure record are each
+  distinct, so the ITT, safety and per-protocol populations can be
+  derived without guessing.
+brief: |
+  You write the statistical analysis plan and derive the analysis
+  populations. The intent-to-treat set is every randomized subject on
+  the arm they were randomized to; the safety set is every subject who
+  received at least one dose of anything, placebo included; and the two
+  differ. A model that merges enrolled and randomized subjects, or that
+  stores the actual treatment on the arm instead of the exposure, makes
+  the denominators wrong in every table. Check that the model keeps the
+  distinctions the SAP depends on.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 6 (subtyping), ch. 4
+  (n-ary fact types and uniqueness).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: must_validate
+    diagnosis: >-
+      A model that does not validate cannot be the source of the
+      derivation rules; I go back to reading the raw datasets.
+  - kind: requires_element
+    element:
+      entity: RandomizedSubject
+    diagnosis: >-
+      The ITT population is the randomized subjects. If randomized is not
+      its own thing, the denominator is every enrolled subject and the
+      efficacy tables are diluted by people who never got an arm.
+  - kind: requires_element
+    element:
+      entity: Arm
+    diagnosis: >-
+      Every efficacy table is by arm. A model without Arm has nothing to
+      put in the column headers.
+  - kind: requires_element
+    element:
+      factTypeBetween: [RandomizedSubject, Arm]
+    diagnosis: >-
+      The planned arm belongs to the randomized subject, not to the
+      subject or the exposure. If it hangs somewhere else the ITT
+      allocation cannot be recovered.
+  - kind: forbids_population
+    factType: RandomizedSubject is assigned to Arm
+    constraint: internal_uniqueness
+    hint: "One planned arm per randomized subject; the randomization system allocates once."
+    diagnosis: >-
+      A subject on two planned arms is counted twice in the ITT set, and
+      the arm totals no longer sum to the randomized total.
+  - kind: forbids_population
+    factType: RandomizedSubject is assigned to Arm
+    constraint: mandatory
+    hint: "Randomized means allocated; there is no randomized subject without an arm."
+    diagnosis: >-
+      A randomized subject with no arm cannot be placed in any column,
+      and the analysis population no longer partitions.
+  - kind: requires_verbalization
+    sentence: "RandomizedSubject is a subtype of EnrolledSubject."
+    hint: "Randomized implies enrolled; the chain is Subject, then EnrolledSubject, then RandomizedSubject."
+    diagnosis: >-
+      If randomized is not a subtype of enrolled, a subject can be
+      randomized without an enrollment date, and the SAP's population
+      flow diagram cannot be reconciled to the model.
+  - kind: requires_element
+    element:
+      entity: Exposure
+    diagnosis: >-
+      The safety population is derived from exposure, not from the arm.
+      If exposure is not its own thing, I cannot tell a randomized
+      subject who never dosed from one who did.
+  - kind: requires_verbalization
+    sentence: "For each Subject and Treatment combination, at most one Dose applies."
+    hint: "The exposure ternary: subject and treatment determine the dose level."
+    diagnosis: >-
+      If the model lets a subject be on two dose levels of one treatment
+      at once, the dose-response tables have no single dose to group by.
+  - kind: forbids_population
+    factType: Study is in StudyPhase
+    constraint: mandatory
+    hint: "Every study has a phase; the SAP template is chosen by it."
+    diagnosis: >-
+      A study with no phase does not tell me whether the primary analysis
+      is exploratory or confirmatory.

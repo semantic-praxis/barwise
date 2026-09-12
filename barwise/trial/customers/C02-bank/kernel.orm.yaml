@@ -1,0 +1,1575 @@
+orm_version: "1.1"
+model:
+  name: Northgate Bancorp core banking kernel
+  note: "Seed model for trial customer C02. Account is deliberately three different things here: a DepositAccount (deposits), a LoanAccount (lending) and a GeneralLedgerAccount (ledger). Readings in each context use the bare word Account so the collision is visible to anyone who merges the contexts without a mapping."
+  object_types:
+    - id: ot-party
+      name: Party
+      kind: entity
+      reference_mode: party_id
+      definition: A legal entity or natural person with which the bank has, or is assessing, a relationship.
+    - id: ot-legal-entity
+      name: LegalEntity
+      kind: entity
+      reference_mode: party_id
+      definition: A Party that is an organization recognized in law, such as a corporation, partnership or trust.
+    - id: ot-natural-person
+      name: NaturalPerson
+      kind: entity
+      reference_mode: party_id
+      definition: A Party that is an individual human being.
+    - id: ot-party-id
+      name: PartyId
+      kind: value
+      definition: The bank-assigned identifier of a Party, issued once at first contact and never reused.
+      data_type:
+        name: text
+        length: 20
+    - id: ot-legal-name
+      name: LegalName
+      kind: value
+      definition: The name under which a Party is legally known.
+      data_type:
+        name: text
+        length: 200
+    - id: ot-tax-identifier
+      name: TaxIdentifier
+      kind: value
+      definition: The tax identification number a Party reports to a tax authority; not unique, because affiliates may file under one number.
+      data_type:
+        name: text
+        length: 20
+    - id: ot-kyc-status
+      name: KycStatus
+      kind: value
+      definition: The outcome of know-your-customer due diligence on a Party.
+      value_constraint:
+        values:
+          - not_started
+          - pending
+          - verified
+          - refused
+          - expired
+      data_type:
+        name: text
+        length: 20
+    - id: ot-kyc-screening-date
+      name: KycScreeningDate
+      kind: value
+      definition: The date on which a Party was last screened against sanctions and watch lists.
+      data_type:
+        name: date
+    - id: ot-date-of-birth
+      name: DateOfBirth
+      kind: value
+      definition: The birth date of a NaturalPerson as evidenced by an identity document.
+      data_type:
+        name: date
+    - id: ot-given-name
+      name: GivenName
+      kind: value
+      definition: The given name of a NaturalPerson.
+      data_type:
+        name: text
+        length: 100
+    - id: ot-family-name
+      name: FamilyName
+      kind: value
+      definition: The family name of a NaturalPerson.
+      data_type:
+        name: text
+        length: 100
+    - id: ot-legal-entity-identifier
+      name: LegalEntityIdentifier
+      kind: value
+      definition: The 20-character ISO 17442 identifier assigned to a LegalEntity by a local operating unit.
+      data_type:
+        name: text
+        length: 20
+    - id: ot-incorporation-jurisdiction
+      name: IncorporationJurisdiction
+      kind: value
+      definition: The jurisdiction under whose law a LegalEntity was formed.
+      data_type:
+        name: text
+        length: 60
+    - id: ot-ownership-percent
+      name: OwnershipPercent
+      kind: value
+      definition: The percentage of a LegalEntity beneficially owned by a NaturalPerson.
+      value_constraint:
+        ranges:
+          - min: "0"
+            max: "100"
+            min_inclusive: false
+            max_inclusive: true
+      data_type:
+        name: decimal
+        length: 5
+        scale: 2
+    - id: ot-deposit-account
+      name: DepositAccount
+      kind: entity
+      reference_mode: deposit_account_id
+      definition: A contract under which the bank holds funds on behalf of one or more Parties and owes them the balance.
+    - id: ot-deposit-account-id
+      name: DepositAccountId
+      kind: value
+      definition: The internal surrogate identifier of a DepositAccount in the core banking system.
+      data_type:
+        name: text
+        length: 20
+    - id: ot-account-holder
+      name: AccountHolder
+      kind: entity
+      reference_mode: account_holder_id
+      definition: The relationship in which a Party holds a DepositAccount, carrying the role that Party plays on it.
+    - id: ot-account-holder-id
+      name: AccountHolderId
+      kind: value
+      definition: The identifier of an AccountHolder relationship.
+      data_type:
+        name: text
+        length: 20
+    - id: ot-holder-role
+      name: HolderRole
+      kind: value
+      definition: The capacity in which a Party holds a DepositAccount.
+      value_constraint:
+        values:
+          - primary
+          - joint
+          - authorized_signer
+          - custodian
+          - beneficiary
+      data_type:
+        name: text
+        length: 20
+    - id: ot-established-date
+      name: EstablishedDate
+      kind: value
+      definition: The date on which an AccountHolder relationship was established.
+      data_type:
+        name: date
+    - id: ot-routing-number
+      name: RoutingNumber
+      kind: value
+      definition: The nine-digit ABA routing transit number that identifies the Branch through which a DepositAccount is addressed for payments.
+      data_type:
+        name: text
+        length: 9
+    - id: ot-account-number
+      name: AccountNumber
+      kind: value
+      definition: The customer-facing number of a DepositAccount, unique only within a RoutingNumber.
+      data_type:
+        name: text
+        length: 17
+    - id: ot-account-status
+      name: AccountStatus
+      kind: value
+      definition: The lifecycle state of a DepositAccount or LoanAccount.
+      value_constraint:
+        values:
+          - pending
+          - open
+          - dormant
+          - frozen
+          - closed
+      data_type:
+        name: text
+        length: 20
+    - id: ot-ledger-balance
+      name: LedgerBalance
+      kind: value
+      definition: The balance of a DepositAccount after all posted transactions, before holds.
+      data_type: &a1
+        name: money
+        length: 18
+        scale: 2
+    - id: ot-open-date
+      name: OpenDate
+      kind: value
+      definition: The date on which an account was opened.
+      data_type:
+        name: date
+    - id: ot-close-date
+      name: CloseDate
+      kind: value
+      definition: The date on which an account was closed.
+      data_type:
+        name: date
+    - id: ot-branch
+      name: Branch
+      kind: entity
+      reference_mode: branch_code
+      definition: A physical or virtual office of the bank at which accounts are domiciled.
+    - id: ot-branch-code
+      name: BranchCode
+      kind: value
+      definition: The bank-assigned code of a Branch.
+      data_type:
+        name: text
+        length: 10
+    - id: ot-branch-name
+      name: BranchName
+      kind: value
+      definition: The public name of a Branch.
+      data_type:
+        name: text
+        length: 100
+    - id: ot-product
+      name: Product
+      kind: entity
+      reference_mode: product_code
+      definition: A deposit or loan offering with defined terms under which accounts are opened.
+    - id: ot-product-code
+      name: ProductCode
+      kind: value
+      definition: The code of a Product in the product catalog.
+      data_type:
+        name: text
+        length: 10
+    - id: ot-product-family
+      name: ProductFamily
+      kind: value
+      definition: The family a Product belongs to.
+      value_constraint:
+        values:
+          - checking
+          - savings
+          - time_deposit
+          - term_loan
+          - line_of_credit
+          - mortgage
+      data_type:
+        name: text
+        length: 20
+    - id: ot-currency
+      name: Currency
+      kind: entity
+      reference_mode: currency_code
+      definition: A currency in which accounts and transactions are denominated.
+    - id: ot-currency-code
+      name: CurrencyCode
+      kind: value
+      definition: The ISO 4217 three-letter code of a Currency.
+      data_type:
+        name: text
+        length: 3
+    - id: ot-loan-account
+      name: LoanAccount
+      kind: entity
+      reference_mode: loan_account_id
+      definition: A contract under which the bank has advanced funds to a Party and is owed principal and interest.
+    - id: ot-loan-account-id
+      name: LoanAccountId
+      kind: value
+      definition: The internal surrogate identifier of a LoanAccount in the lending system.
+      data_type:
+        name: text
+        length: 20
+    - id: ot-principal-amount
+      name: PrincipalAmount
+      kind: value
+      definition: The amount originally advanced under a LoanAccount.
+      data_type: *a1
+    - id: ot-maturity-date
+      name: MaturityDate
+      kind: value
+      definition: The date on which the outstanding balance of a LoanAccount falls due.
+      data_type:
+        name: date
+    - id: ot-interest-rate
+      name: InterestRate
+      kind: entity
+      reference_mode: rate_id
+      definition: A rate applied to a LoanAccount over a period of validity, recorded with the period during which the bank believed it to be in effect.
+    - id: ot-rate-id
+      name: RateId
+      kind: value
+      definition: The identifier of an InterestRate record.
+      data_type:
+        name: text
+        length: 20
+    - id: ot-rate-percent
+      name: RatePercent
+      kind: value
+      definition: The annual percentage rate of an InterestRate.
+      data_type:
+        name: decimal
+        length: 7
+        scale: 4
+    - id: ot-effective-from-date
+      name: EffectiveFromDate
+      kind: value
+      definition: The first date on which an InterestRate applies in the real world (valid time start).
+      data_type:
+        name: date
+    - id: ot-effective-to-date
+      name: EffectiveToDate
+      kind: value
+      definition: The last date on which an InterestRate applies in the real world (valid time end); absent while open-ended.
+      data_type:
+        name: date
+    - id: ot-recorded-from-date
+      name: RecordedFromDate
+      kind: value
+      definition: The date on which the bank's system first recorded an InterestRate as effective (transaction time start).
+      data_type:
+        name: date
+    - id: ot-recorded-to-date
+      name: RecordedToDate
+      kind: value
+      definition: The date on which the bank's system superseded its record of an InterestRate (transaction time end); absent while current.
+      data_type:
+        name: date
+    - id: ot-general-ledger-account
+      name: GeneralLedgerAccount
+      kind: entity
+      reference_mode: gl_account_code
+      definition: A line in the chart of accounts to which financial transactions are posted for financial reporting.
+    - id: ot-gl-account-code
+      name: GlAccountCode
+      kind: value
+      definition: The code of a GeneralLedgerAccount in the chart of accounts.
+      data_type:
+        name: text
+        length: 12
+    - id: ot-gl-account-name
+      name: GlAccountName
+      kind: value
+      definition: The descriptive name of a GeneralLedgerAccount.
+      data_type:
+        name: text
+        length: 100
+    - id: ot-gl-account-class
+      name: GlAccountClass
+      kind: value
+      definition: The financial statement class of a GeneralLedgerAccount.
+      value_constraint:
+        values:
+          - asset
+          - liability
+          - equity
+          - income
+          - expense
+      data_type:
+        name: text
+        length: 20
+    - id: ot-transaction
+      name: Transaction
+      kind: entity
+      reference_mode: transaction_id
+      definition: A single financial event recorded by the bank, posted to the general ledger and affecting at most one customer account.
+    - id: ot-transaction-id
+      name: TransactionId
+      kind: value
+      definition: The identifier of a Transaction, assigned by the posting engine.
+      data_type:
+        name: text
+        length: 32
+    - id: ot-transaction-type
+      name: TransactionType
+      kind: value
+      definition: The code that classifies a Transaction for posting and reporting.
+      value_constraint:
+        values:
+          - CASH_DEP
+          - CASH_WDL
+          - CHK_DEP
+          - CHK_PAID
+          - CHK_RETURN
+          - ACH_CREDIT
+          - ACH_DEBIT
+          - ACH_RETURN
+          - WIRE_IN
+          - WIRE_OUT
+          - WIRE_REVERSAL
+          - CARD_POS
+          - CARD_ATM
+          - CARD_REFUND
+          - CARD_CHARGEBACK
+          - INT_CREDIT
+          - INT_DEBIT
+          - FEE_MAINT
+          - FEE_OVERDRAFT
+          - FEE_WIRE
+          - FEE_REVERSAL
+          - LOAN_DISB
+          - LOAN_PMT_PRIN
+          - LOAN_PMT_INT
+          - LOAN_PMT_FEE
+          - LOAN_PAYOFF
+          - LOAN_CHARGEOFF
+          - XFER_INT
+          - XFER_EXT
+          - SWEEP_IN
+          - SWEEP_OUT
+          - HOLD_PLACE
+          - HOLD_RELEASE
+          - GL_ADJ
+          - GL_ACCRUAL
+          - GL_REVERSAL
+          - ESCHEAT
+          - DORMANCY_FEE
+      data_type:
+        name: text
+        length: 20
+    - id: ot-transaction-date
+      name: TransactionDate
+      kind: value
+      definition: The date and time at which a Transaction occurred.
+      data_type:
+        name: datetime
+    - id: ot-posting-direction
+      name: PostingDirection
+      kind: value
+      definition: Whether a Transaction debits or credits the account it posts to.
+      value_constraint:
+        values:
+          - debit
+          - credit
+      data_type:
+        name: text
+        length: 6
+    - id: ot-amount
+      name: Amount
+      kind: value
+      definition: A monetary amount in the currency of the Transaction that carries it.
+      data_type: *a1
+  fact_types:
+    - id: ft-party-has-party-id
+      name: Party has PartyId
+      roles:
+        - id: r-party-has-party-id-0
+          player: ot-party
+          role_name: has
+        - id: r-party-has-party-id-1
+          player: ot-party-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-party-has-party-id-0
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-party-has-party-id-1
+        - type: mandatory
+          role: r-party-has-party-id-0
+    - id: ft-deposit-account-has-deposit-account-id
+      name: DepositAccount has DepositAccountId
+      roles:
+        - id: r-deposit-account-has-deposit-account-id-0
+          player: ot-deposit-account
+          role_name: has
+        - id: r-deposit-account-has-deposit-account-id-1
+          player: ot-deposit-account-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-deposit-account-has-deposit-account-id-0
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-deposit-account-has-deposit-account-id-1
+        - type: mandatory
+          role: r-deposit-account-has-deposit-account-id-0
+    - id: ft-account-holder-has-account-holder-id
+      name: AccountHolder has AccountHolderId
+      roles:
+        - id: r-account-holder-has-account-holder-id-0
+          player: ot-account-holder
+          role_name: has
+        - id: r-account-holder-has-account-holder-id-1
+          player: ot-account-holder-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-account-holder-has-account-holder-id-0
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-account-holder-has-account-holder-id-1
+        - type: mandatory
+          role: r-account-holder-has-account-holder-id-0
+    - id: ft-branch-has-branch-code
+      name: Branch has BranchCode
+      roles:
+        - id: r-branch-has-branch-code-0
+          player: ot-branch
+          role_name: has
+        - id: r-branch-has-branch-code-1
+          player: ot-branch-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-branch-has-branch-code-0
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-branch-has-branch-code-1
+        - type: mandatory
+          role: r-branch-has-branch-code-0
+    - id: ft-product-has-product-code
+      name: Product has ProductCode
+      roles:
+        - id: r-product-has-product-code-0
+          player: ot-product
+          role_name: has
+        - id: r-product-has-product-code-1
+          player: ot-product-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-product-has-product-code-0
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-product-has-product-code-1
+        - type: mandatory
+          role: r-product-has-product-code-0
+    - id: ft-currency-has-currency-code
+      name: Currency has CurrencyCode
+      roles:
+        - id: r-currency-has-currency-code-0
+          player: ot-currency
+          role_name: has
+        - id: r-currency-has-currency-code-1
+          player: ot-currency-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-currency-has-currency-code-0
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-currency-has-currency-code-1
+        - type: mandatory
+          role: r-currency-has-currency-code-0
+    - id: ft-loan-account-has-loan-account-id
+      name: LoanAccount has LoanAccountId
+      roles:
+        - id: r-loan-account-has-loan-account-id-0
+          player: ot-loan-account
+          role_name: has
+        - id: r-loan-account-has-loan-account-id-1
+          player: ot-loan-account-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-loan-account-has-loan-account-id-0
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-loan-account-has-loan-account-id-1
+        - type: mandatory
+          role: r-loan-account-has-loan-account-id-0
+    - id: ft-interest-rate-has-rate-id
+      name: InterestRate has RateId
+      roles:
+        - id: r-interest-rate-has-rate-id-0
+          player: ot-interest-rate
+          role_name: has
+        - id: r-interest-rate-has-rate-id-1
+          player: ot-rate-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-interest-rate-has-rate-id-0
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-interest-rate-has-rate-id-1
+        - type: mandatory
+          role: r-interest-rate-has-rate-id-0
+    - id: ft-general-ledger-account-has-gl-account-code
+      name: GeneralLedgerAccount has GlAccountCode
+      roles:
+        - id: r-general-ledger-account-has-gl-account-code-0
+          player: ot-general-ledger-account
+          role_name: has
+        - id: r-general-ledger-account-has-gl-account-code-1
+          player: ot-gl-account-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-general-ledger-account-has-gl-account-code-0
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-general-ledger-account-has-gl-account-code-1
+        - type: mandatory
+          role: r-general-ledger-account-has-gl-account-code-0
+    - id: ft-transaction-has-transaction-id
+      name: Transaction has TransactionId
+      roles:
+        - id: r-transaction-has-transaction-id-0
+          player: ot-transaction
+          role_name: has
+        - id: r-transaction-has-transaction-id-1
+          player: ot-transaction-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-transaction-has-transaction-id-0
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-transaction-has-transaction-id-1
+        - type: mandatory
+          role: r-transaction-has-transaction-id-0
+    - id: ft-party-has-legal-name
+      name: Party has LegalName
+      roles:
+        - id: r-party-has-legal-name-0
+          player: ot-party
+          role_name: has
+        - id: r-party-has-legal-name-1
+          player: ot-legal-name
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is legal name of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-party-has-legal-name-0
+        - type: mandatory
+          role: r-party-has-legal-name-0
+    - id: ft-party-has-tax-identifier
+      name: Party has TaxIdentifier
+      roles:
+        - id: r-party-has-tax-identifier-0
+          player: ot-party
+          role_name: has
+        - id: r-party-has-tax-identifier-1
+          player: ot-tax-identifier
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is tax identifier of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-party-has-tax-identifier-0
+    - id: ft-party-has-kyc-status
+      name: Party has KycStatus
+      definition: Every Party ought to carry a KYC status; the obligation is deontic because legacy records predate the policy and are remediated over time.
+      roles:
+        - id: r-party-has-kyc-status-0
+          player: ot-party
+          role_name: has
+        - id: r-party-has-kyc-status-1
+          player: ot-kyc-status
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is KYC status of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-party-has-kyc-status-0
+        - type: mandatory
+          role: r-party-has-kyc-status-0
+          modality: deontic
+    - id: ft-party-was-screened-on-kyc-screening-date
+      name: Party was screened on KycScreeningDate
+      roles:
+        - id: r-party-was-screened-on-kyc-screening-date-0
+          player: ot-party
+          role_name: was screened on
+        - id: r-party-was-screened-on-kyc-screening-date-1
+          player: ot-kyc-screening-date
+          role_name: is screening date of
+      readings:
+        - "{0} was screened on {1}"
+        - "{1} is screening date of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-party-was-screened-on-kyc-screening-date-0
+    - id: ft-natural-person-has-date-of-birth
+      name: NaturalPerson has DateOfBirth
+      roles:
+        - id: r-natural-person-has-date-of-birth-0
+          player: ot-natural-person
+          role_name: has
+        - id: r-natural-person-has-date-of-birth-1
+          player: ot-date-of-birth
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is date of birth of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-natural-person-has-date-of-birth-0
+        - type: mandatory
+          role: r-natural-person-has-date-of-birth-0
+    - id: ft-natural-person-has-given-name
+      name: NaturalPerson has GivenName
+      roles:
+        - id: r-natural-person-has-given-name-0
+          player: ot-natural-person
+          role_name: has
+        - id: r-natural-person-has-given-name-1
+          player: ot-given-name
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is given name of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-natural-person-has-given-name-0
+        - type: mandatory
+          role: r-natural-person-has-given-name-0
+    - id: ft-natural-person-has-family-name
+      name: NaturalPerson has FamilyName
+      roles:
+        - id: r-natural-person-has-family-name-0
+          player: ot-natural-person
+          role_name: has
+        - id: r-natural-person-has-family-name-1
+          player: ot-family-name
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is family name of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-natural-person-has-family-name-0
+        - type: mandatory
+          role: r-natural-person-has-family-name-0
+    - id: ft-legal-entity-has-legal-entity-identifier
+      name: LegalEntity has LegalEntityIdentifier
+      roles:
+        - id: r-legal-entity-has-legal-entity-identifier-0
+          player: ot-legal-entity
+          role_name: has
+        - id: r-legal-entity-has-legal-entity-identifier-1
+          player: ot-legal-entity-identifier
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is LEI of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-legal-entity-has-legal-entity-identifier-0
+        - type: internal_uniqueness
+          roles:
+            - r-legal-entity-has-legal-entity-identifier-1
+    - id: ft-legal-entity-is-incorporated-in-incorporation-jurisdiction
+      name: LegalEntity is incorporated in IncorporationJurisdiction
+      roles:
+        - id: r-legal-entity-is-incorporated-in-incorporation-jurisdiction-0
+          player: ot-legal-entity
+          role_name: is incorporated in
+        - id: r-legal-entity-is-incorporated-in-incorporation-jurisdiction-1
+          player: ot-incorporation-jurisdiction
+          role_name: is jurisdiction of
+      readings:
+        - "{0} is incorporated in {1}"
+        - "{1} is jurisdiction of incorporation of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-legal-entity-is-incorporated-in-incorporation-jurisdiction-0
+        - type: mandatory
+          role: r-legal-entity-is-incorporated-in-incorporation-jurisdiction-0
+    - id: ft-legal-entity-is-controlled-by-legal-entity
+      name: LegalEntity is controlled by LegalEntity
+      definition: The chain of control among legal entities used to aggregate exposure; it cannot loop, because an entity cannot control itself through any chain.
+      roles:
+        - id: r-legal-entity-is-controlled-by-legal-entity-0
+          player: ot-legal-entity
+          role_name: is controlled by
+        - id: r-legal-entity-is-controlled-by-legal-entity-1
+          player: ot-legal-entity
+          role_name: controls
+      readings:
+        - "{0} is controlled by {1}"
+        - "{1} controls {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-legal-entity-is-controlled-by-legal-entity-0
+            - r-legal-entity-is-controlled-by-legal-entity-1
+        - type: ring
+          role_1: r-legal-entity-is-controlled-by-legal-entity-0
+          role_2: r-legal-entity-is-controlled-by-legal-entity-1
+          ring_type: acyclic
+    - id: ft-natural-person-beneficially-owns-legal-entity-with-ownership-percent
+      name: NaturalPerson beneficially owns LegalEntity with OwnershipPercent
+      roles:
+        - id: r-natural-person-beneficially-owns-legal-entity-with-ownership-percent-0
+          player: ot-natural-person
+          role_name: beneficially owns
+        - id: r-natural-person-beneficially-owns-legal-entity-with-ownership-percent-1
+          player: ot-legal-entity
+          role_name: is beneficially owned by
+        - id: r-natural-person-beneficially-owns-legal-entity-with-ownership-percent-2
+          player: ot-ownership-percent
+          role_name: is share of
+      readings:
+        - "{0} beneficially owns {1} with {2}"
+        - "{1} is beneficially owned by {0} with {2}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-natural-person-beneficially-owns-legal-entity-with-ownership-percent-0
+            - r-natural-person-beneficially-owns-legal-entity-with-ownership-percent-1
+    - id: ft-party-holds-deposit-account
+      name: Party holds DepositAccount
+      definition: The holding relationship between a Party and a DepositAccount; objectified as AccountHolder so the role and the date of the relationship can be recorded.
+      roles:
+        - id: r-party-holds-deposit-account-0
+          player: ot-party
+          role_name: holds
+        - id: r-party-holds-deposit-account-1
+          player: ot-deposit-account
+          role_name: is held by
+      readings:
+        - "{0} holds {1}"
+        - "{1} is an Account held by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-party-holds-deposit-account-0
+            - r-party-holds-deposit-account-1
+        - type: mandatory
+          role: r-party-holds-deposit-account-1
+    - id: ft-account-holder-has-holder-role
+      name: AccountHolder has HolderRole
+      roles:
+        - id: r-account-holder-has-holder-role-0
+          player: ot-account-holder
+          role_name: has
+        - id: r-account-holder-has-holder-role-1
+          player: ot-holder-role
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is the Account role of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-account-holder-has-holder-role-0
+        - type: mandatory
+          role: r-account-holder-has-holder-role-0
+    - id: ft-account-holder-was-established-on-established-date
+      name: AccountHolder was established on EstablishedDate
+      roles:
+        - id: r-account-holder-was-established-on-established-date-0
+          player: ot-account-holder
+          role_name: was established on
+        - id: r-account-holder-was-established-on-established-date-1
+          player: ot-established-date
+          role_name: is establishment date of
+      readings:
+        - "{0} was established on {1}"
+        - "{1} is establishment date of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-account-holder-was-established-on-established-date-0
+        - type: mandatory
+          role: r-account-holder-was-established-on-established-date-0
+    - id: ft-deposit-account-is-of-product
+      name: DepositAccount is of Product
+      roles:
+        - id: r-deposit-account-is-of-product-0
+          player: ot-deposit-account
+          role_name: is of
+        - id: r-deposit-account-is-of-product-1
+          player: ot-product
+          role_name: governs
+      readings:
+        - "{0} is of {1}"
+        - "{1} governs {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-deposit-account-is-of-product-0
+        - type: mandatory
+          role: r-deposit-account-is-of-product-0
+    - id: ft-deposit-account-is-domiciled-at-branch
+      name: DepositAccount is domiciled at Branch
+      roles:
+        - id: r-deposit-account-is-domiciled-at-branch-0
+          player: ot-deposit-account
+          role_name: is domiciled at
+        - id: r-deposit-account-is-domiciled-at-branch-1
+          player: ot-branch
+          role_name: domiciles
+      readings:
+        - "{0} is domiciled at {1}"
+        - "{1} domiciles Account {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-deposit-account-is-domiciled-at-branch-0
+        - type: mandatory
+          role: r-deposit-account-is-domiciled-at-branch-0
+    - id: ft-deposit-account-is-routed-by-routing-number
+      name: DepositAccount is routed by RoutingNumber
+      roles:
+        - id: r-deposit-account-is-routed-by-routing-number-0
+          player: ot-deposit-account
+          role_name: is routed by
+        - id: r-deposit-account-is-routed-by-routing-number-1
+          player: ot-routing-number
+          role_name: routes
+      readings:
+        - "{0} is routed by {1}"
+        - "{1} routes {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-deposit-account-is-routed-by-routing-number-0
+        - type: mandatory
+          role: r-deposit-account-is-routed-by-routing-number-0
+    - id: ft-deposit-account-has-account-number
+      name: DepositAccount has AccountNumber
+      definition: The customer-facing number; together with the routing number it identifies the account externally, which is the composite key every payment rail uses.
+      roles:
+        - id: r-deposit-account-has-account-number-0
+          player: ot-deposit-account
+          role_name: has
+        - id: r-deposit-account-has-account-number-1
+          player: ot-account-number
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is Account number of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-deposit-account-has-account-number-0
+        - type: mandatory
+          role: r-deposit-account-has-account-number-0
+        - type: external_uniqueness
+          roles:
+            - r-deposit-account-is-routed-by-routing-number-1
+            - r-deposit-account-has-account-number-1
+    - id: ft-deposit-account-has-account-status
+      name: DepositAccount has AccountStatus
+      roles:
+        - id: r-deposit-account-has-account-status-0
+          player: ot-deposit-account
+          role_name: has
+        - id: r-deposit-account-has-account-status-1
+          player: ot-account-status
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is the Account status of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-deposit-account-has-account-status-0
+        - type: mandatory
+          role: r-deposit-account-has-account-status-0
+    - id: ft-deposit-account-is-denominated-in-currency
+      name: DepositAccount is denominated in Currency
+      roles:
+        - id: r-deposit-account-is-denominated-in-currency-0
+          player: ot-deposit-account
+          role_name: is denominated in
+        - id: r-deposit-account-is-denominated-in-currency-1
+          player: ot-currency
+          role_name: denominates
+      readings:
+        - "{0} is denominated in {1}"
+        - "{1} denominates {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-deposit-account-is-denominated-in-currency-0
+        - type: mandatory
+          role: r-deposit-account-is-denominated-in-currency-0
+    - id: ft-deposit-account-has-ledger-balance
+      name: DepositAccount has LedgerBalance
+      roles:
+        - id: r-deposit-account-has-ledger-balance-0
+          player: ot-deposit-account
+          role_name: has
+        - id: r-deposit-account-has-ledger-balance-1
+          player: ot-ledger-balance
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is ledger balance of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-deposit-account-has-ledger-balance-0
+    - id: ft-deposit-account-was-opened-on-open-date
+      name: DepositAccount was opened on OpenDate
+      roles:
+        - id: r-deposit-account-was-opened-on-open-date-0
+          player: ot-deposit-account
+          role_name: was opened on
+        - id: r-deposit-account-was-opened-on-open-date-1
+          player: ot-open-date
+          role_name: is open date of
+      readings:
+        - "{0} was opened on {1}"
+        - "{1} is open date of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-deposit-account-was-opened-on-open-date-0
+        - type: mandatory
+          role: r-deposit-account-was-opened-on-open-date-0
+    - id: ft-deposit-account-was-closed-on-close-date
+      name: DepositAccount was closed on CloseDate
+      roles:
+        - id: r-deposit-account-was-closed-on-close-date-0
+          player: ot-deposit-account
+          role_name: was closed on
+        - id: r-deposit-account-was-closed-on-close-date-1
+          player: ot-close-date
+          role_name: is close date of
+      readings:
+        - "{0} was closed on {1}"
+        - "{1} is close date of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-deposit-account-was-closed-on-close-date-0
+    - id: ft-branch-has-routing-number
+      name: Branch has RoutingNumber
+      roles:
+        - id: r-branch-has-routing-number-0
+          player: ot-branch
+          role_name: has
+        - id: r-branch-has-routing-number-1
+          player: ot-routing-number
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is routing number of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-branch-has-routing-number-0
+        - type: internal_uniqueness
+          roles:
+            - r-branch-has-routing-number-1
+        - type: mandatory
+          role: r-branch-has-routing-number-0
+    - id: ft-branch-has-branch-name
+      name: Branch has BranchName
+      roles:
+        - id: r-branch-has-branch-name-0
+          player: ot-branch
+          role_name: has
+        - id: r-branch-has-branch-name-1
+          player: ot-branch-name
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is name of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-branch-has-branch-name-0
+        - type: mandatory
+          role: r-branch-has-branch-name-0
+    - id: ft-product-has-product-family
+      name: Product has ProductFamily
+      roles:
+        - id: r-product-has-product-family-0
+          player: ot-product
+          role_name: has
+        - id: r-product-has-product-family-1
+          player: ot-product-family
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is family of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-product-has-product-family-0
+        - type: mandatory
+          role: r-product-has-product-family-0
+    - id: ft-party-borrows-under-loan-account
+      name: Party borrows under LoanAccount
+      roles:
+        - id: r-party-borrows-under-loan-account-0
+          player: ot-party
+          role_name: borrows under
+        - id: r-party-borrows-under-loan-account-1
+          player: ot-loan-account
+          role_name: is borrowed under by
+      readings:
+        - "{0} borrows under {1}"
+        - "{1} is the Account on which {0} borrows"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-party-borrows-under-loan-account-1
+        - type: mandatory
+          role: r-party-borrows-under-loan-account-1
+        - type: subset
+          subset_roles:
+            - r-party-borrows-under-loan-account-0
+          superset_roles:
+            - r-party-has-kyc-status-0
+          modality: deontic
+    - id: ft-loan-account-is-of-product
+      name: LoanAccount is of Product
+      roles:
+        - id: r-loan-account-is-of-product-0
+          player: ot-loan-account
+          role_name: is of
+        - id: r-loan-account-is-of-product-1
+          player: ot-product
+          role_name: governs
+      readings:
+        - "{0} is of {1}"
+        - "{1} governs {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-loan-account-is-of-product-0
+        - type: mandatory
+          role: r-loan-account-is-of-product-0
+    - id: ft-loan-account-is-booked-at-branch
+      name: LoanAccount is booked at Branch
+      roles:
+        - id: r-loan-account-is-booked-at-branch-0
+          player: ot-loan-account
+          role_name: is booked at
+        - id: r-loan-account-is-booked-at-branch-1
+          player: ot-branch
+          role_name: books
+      readings:
+        - "{0} is booked at {1}"
+        - "{1} books Account {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-loan-account-is-booked-at-branch-0
+        - type: mandatory
+          role: r-loan-account-is-booked-at-branch-0
+    - id: ft-loan-account-has-principal-amount
+      name: LoanAccount has PrincipalAmount
+      roles:
+        - id: r-loan-account-has-principal-amount-0
+          player: ot-loan-account
+          role_name: has
+        - id: r-loan-account-has-principal-amount-1
+          player: ot-principal-amount
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is principal of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-loan-account-has-principal-amount-0
+        - type: mandatory
+          role: r-loan-account-has-principal-amount-0
+    - id: ft-loan-account-matures-on-maturity-date
+      name: LoanAccount matures on MaturityDate
+      roles:
+        - id: r-loan-account-matures-on-maturity-date-0
+          player: ot-loan-account
+          role_name: matures on
+        - id: r-loan-account-matures-on-maturity-date-1
+          player: ot-maturity-date
+          role_name: is maturity of
+      readings:
+        - "{0} matures on {1}"
+        - "{1} is maturity date of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-loan-account-matures-on-maturity-date-0
+    - id: ft-loan-account-has-account-status
+      name: LoanAccount has AccountStatus
+      roles:
+        - id: r-loan-account-has-account-status-0
+          player: ot-loan-account
+          role_name: has
+        - id: r-loan-account-has-account-status-1
+          player: ot-account-status
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is the Account status of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-loan-account-has-account-status-0
+        - type: mandatory
+          role: r-loan-account-has-account-status-0
+    - id: ft-loan-account-is-denominated-in-currency
+      name: LoanAccount is denominated in Currency
+      roles:
+        - id: r-loan-account-is-denominated-in-currency-0
+          player: ot-loan-account
+          role_name: is denominated in
+        - id: r-loan-account-is-denominated-in-currency-1
+          player: ot-currency
+          role_name: denominates
+      readings:
+        - "{0} is denominated in {1}"
+        - "{1} denominates {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-loan-account-is-denominated-in-currency-0
+        - type: mandatory
+          role: r-loan-account-is-denominated-in-currency-0
+    - id: ft-interest-rate-applies-to-loan-account
+      name: InterestRate applies to LoanAccount
+      roles:
+        - id: r-interest-rate-applies-to-loan-account-0
+          player: ot-interest-rate
+          role_name: applies to
+        - id: r-interest-rate-applies-to-loan-account-1
+          player: ot-loan-account
+          role_name: bears
+      readings:
+        - "{0} applies to {1}"
+        - "{1} bears {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-interest-rate-applies-to-loan-account-0
+        - type: mandatory
+          role: r-interest-rate-applies-to-loan-account-0
+    - id: ft-interest-rate-has-rate-percent
+      name: InterestRate has RatePercent
+      roles:
+        - id: r-interest-rate-has-rate-percent-0
+          player: ot-interest-rate
+          role_name: has
+        - id: r-interest-rate-has-rate-percent-1
+          player: ot-rate-percent
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is rate of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-interest-rate-has-rate-percent-0
+        - type: mandatory
+          role: r-interest-rate-has-rate-percent-0
+    - id: ft-interest-rate-is-effective-from-effective-from-date
+      name: InterestRate is effective from EffectiveFromDate
+      roles:
+        - id: r-interest-rate-is-effective-from-effective-from-date-0
+          player: ot-interest-rate
+          role_name: is effective from
+        - id: r-interest-rate-is-effective-from-effective-from-date-1
+          player: ot-effective-from-date
+          role_name: starts validity of
+      readings:
+        - "{0} is effective from {1}"
+        - "{1} starts validity of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-interest-rate-is-effective-from-effective-from-date-0
+        - type: mandatory
+          role: r-interest-rate-is-effective-from-effective-from-date-0
+    - id: ft-interest-rate-is-effective-to-effective-to-date
+      name: InterestRate is effective to EffectiveToDate
+      roles:
+        - id: r-interest-rate-is-effective-to-effective-to-date-0
+          player: ot-interest-rate
+          role_name: is effective to
+        - id: r-interest-rate-is-effective-to-effective-to-date-1
+          player: ot-effective-to-date
+          role_name: ends validity of
+      readings:
+        - "{0} is effective to {1}"
+        - "{1} ends validity of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-interest-rate-is-effective-to-effective-to-date-0
+    - id: ft-interest-rate-was-recorded-from-recorded-from-date
+      name: InterestRate was recorded from RecordedFromDate
+      roles:
+        - id: r-interest-rate-was-recorded-from-recorded-from-date-0
+          player: ot-interest-rate
+          role_name: was recorded from
+        - id: r-interest-rate-was-recorded-from-recorded-from-date-1
+          player: ot-recorded-from-date
+          role_name: starts record of
+      readings:
+        - "{0} was recorded from {1}"
+        - "{1} starts record of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-interest-rate-was-recorded-from-recorded-from-date-0
+        - type: mandatory
+          role: r-interest-rate-was-recorded-from-recorded-from-date-0
+    - id: ft-interest-rate-was-recorded-to-recorded-to-date
+      name: InterestRate was recorded to RecordedToDate
+      roles:
+        - id: r-interest-rate-was-recorded-to-recorded-to-date-0
+          player: ot-interest-rate
+          role_name: was recorded to
+        - id: r-interest-rate-was-recorded-to-recorded-to-date-1
+          player: ot-recorded-to-date
+          role_name: ends record of
+      readings:
+        - "{0} was recorded to {1}"
+        - "{1} ends record of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-interest-rate-was-recorded-to-recorded-to-date-0
+    - id: ft-transaction-posts-amount-to-general-ledger-account
+      name: Transaction posts Amount to GeneralLedgerAccount
+      definition: The posting of a transaction to the general ledger; each transaction posts at most one amount to a given ledger account, and a balanced transaction posts to at least two.
+      roles:
+        - id: r-transaction-posts-amount-to-general-ledger-account-0
+          player: ot-transaction
+          role_name: posts
+        - id: r-transaction-posts-amount-to-general-ledger-account-1
+          player: ot-amount
+          role_name: is posted by
+        - id: r-transaction-posts-amount-to-general-ledger-account-2
+          player: ot-general-ledger-account
+          role_name: receives
+      readings:
+        - "{0} posts {1} to Account {2}"
+        - Account {2} receives {1} from {0}
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-transaction-posts-amount-to-general-ledger-account-0
+            - r-transaction-posts-amount-to-general-ledger-account-2
+        - type: mandatory
+          role: r-transaction-posts-amount-to-general-ledger-account-0
+    - id: ft-transaction-has-transaction-type
+      name: Transaction has TransactionType
+      roles:
+        - id: r-transaction-has-transaction-type-0
+          player: ot-transaction
+          role_name: has
+        - id: r-transaction-has-transaction-type-1
+          player: ot-transaction-type
+          role_name: classifies
+      readings:
+        - "{0} has {1}"
+        - "{1} classifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-transaction-has-transaction-type-0
+        - type: mandatory
+          role: r-transaction-has-transaction-type-0
+    - id: ft-transaction-occurred-on-transaction-date
+      name: Transaction occurred on TransactionDate
+      roles:
+        - id: r-transaction-occurred-on-transaction-date-0
+          player: ot-transaction
+          role_name: occurred on
+        - id: r-transaction-occurred-on-transaction-date-1
+          player: ot-transaction-date
+          role_name: is date of
+      readings:
+        - "{0} occurred on {1}"
+        - "{1} is date of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-transaction-occurred-on-transaction-date-0
+        - type: mandatory
+          role: r-transaction-occurred-on-transaction-date-0
+    - id: ft-transaction-is-denominated-in-currency
+      name: Transaction is denominated in Currency
+      roles:
+        - id: r-transaction-is-denominated-in-currency-0
+          player: ot-transaction
+          role_name: is denominated in
+        - id: r-transaction-is-denominated-in-currency-1
+          player: ot-currency
+          role_name: denominates
+      readings:
+        - "{0} is denominated in {1}"
+        - "{1} denominates {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-transaction-is-denominated-in-currency-0
+        - type: mandatory
+          role: r-transaction-is-denominated-in-currency-0
+    - id: ft-transaction-has-posting-direction
+      name: Transaction has PostingDirection
+      roles:
+        - id: r-transaction-has-posting-direction-0
+          player: ot-transaction
+          role_name: has
+        - id: r-transaction-has-posting-direction-1
+          player: ot-posting-direction
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is direction of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-transaction-has-posting-direction-0
+        - type: mandatory
+          role: r-transaction-has-posting-direction-0
+    - id: ft-transaction-affects-deposit-account
+      name: Transaction affects DepositAccount
+      roles:
+        - id: r-transaction-affects-deposit-account-0
+          player: ot-transaction
+          role_name: affects
+        - id: r-transaction-affects-deposit-account-1
+          player: ot-deposit-account
+          role_name: is affected by
+      readings:
+        - "{0} affects {1}"
+        - "{1} is the Account affected by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-transaction-affects-deposit-account-0
+        - type: exclusion
+          roles:
+            - r-transaction-affects-deposit-account-0
+            - r-transaction-affects-loan-account-0
+    - id: ft-transaction-affects-loan-account
+      name: Transaction affects LoanAccount
+      roles:
+        - id: r-transaction-affects-loan-account-0
+          player: ot-transaction
+          role_name: affects
+        - id: r-transaction-affects-loan-account-1
+          player: ot-loan-account
+          role_name: is affected by
+      readings:
+        - "{0} affects {1}"
+        - "{1} is the Account affected by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-transaction-affects-loan-account-0
+    - id: ft-general-ledger-account-has-gl-account-name
+      name: GeneralLedgerAccount has GlAccountName
+      roles:
+        - id: r-general-ledger-account-has-gl-account-name-0
+          player: ot-general-ledger-account
+          role_name: has
+        - id: r-general-ledger-account-has-gl-account-name-1
+          player: ot-gl-account-name
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is name of Account {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-general-ledger-account-has-gl-account-name-0
+        - type: mandatory
+          role: r-general-ledger-account-has-gl-account-name-0
+    - id: ft-general-ledger-account-has-gl-account-class
+      name: GeneralLedgerAccount has GlAccountClass
+      roles:
+        - id: r-general-ledger-account-has-gl-account-class-0
+          player: ot-general-ledger-account
+          role_name: has
+        - id: r-general-ledger-account-has-gl-account-class-1
+          player: ot-gl-account-class
+          role_name: classifies
+      readings:
+        - "{0} has {1}"
+        - "{1} classifies Account {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-general-ledger-account-has-gl-account-class-0
+        - type: mandatory
+          role: r-general-ledger-account-has-gl-account-class-0
+    - id: ft-general-ledger-account-rolls-up-to-general-ledger-account
+      name: GeneralLedgerAccount rolls up to GeneralLedgerAccount
+      definition: The chart-of-accounts hierarchy; a ledger account rolls up to at most one parent and the hierarchy cannot loop.
+      roles:
+        - id: r-general-ledger-account-rolls-up-to-general-ledger-account-0
+          player: ot-general-ledger-account
+          role_name: rolls up to
+        - id: r-general-ledger-account-rolls-up-to-general-ledger-account-1
+          player: ot-general-ledger-account
+          role_name: summarizes
+      readings:
+        - "{0} rolls up to {1}"
+        - "{1} summarizes {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-general-ledger-account-rolls-up-to-general-ledger-account-0
+        - type: ring
+          role_1: r-general-ledger-account-rolls-up-to-general-ledger-account-0
+          role_2: r-general-ledger-account-rolls-up-to-general-ledger-account-1
+          ring_type: acyclic
+  subtype_facts:
+    - id: st-legal-entity-is-party
+      subtype: ot-legal-entity
+      supertype: ot-party
+      is_exclusive: true
+    - id: st-natural-person-is-party
+      subtype: ot-natural-person
+      supertype: ot-party
+      is_exclusive: true
+  objectified_fact_types:
+    - id: oft-account-holder
+      fact_type: ft-party-holds-deposit-account
+      object_type: ot-account-holder

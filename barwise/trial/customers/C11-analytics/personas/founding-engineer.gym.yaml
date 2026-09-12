@@ -1,0 +1,56 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: founding-engineer
+title: "The sealed hierarchy comes back tenant-scoped"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Confirm that events, properties, sessions and the user hierarchy are
+  entities and that an event carries its properties with values.
+brief: |
+  You wrote the backend. If the model does not know that a verified
+  user is an identified user is a user, the identity merge will be
+  modeled as three unrelated tables.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 6 (subtyping).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: requires_element
+    element:
+      entity: Tenant
+    diagnosis: >-
+      Every fact is scoped to a tenant; a model without Tenant is a
+      single-customer model.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 5, section 5.4."
+  - kind: requires_element
+    element:
+      entity: Event
+    diagnosis: >-
+      The product is events.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.2."
+  - kind: requires_element
+    element:
+      entity: VerifiedUser
+    diagnosis: >-
+      The deepest user subtype is where identity resolution lands; if it
+      is missing the importer stopped at the sealed root.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 6, section 6.3."
+  - kind: requires_element
+    element:
+      factTypeBetween: [Event, Session]
+    diagnosis: >-
+      Events belong to sessions; without the fact type funnels have no
+      ordering.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4."
+  - kind: must_validate
+    diagnosis: >-
+      A structurally invalid model cannot be diagrammed for the team.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 5, section 5.3."
+  - kind: forbids_population
+    factType: "Event carries EventProperty with PropertyValue"
+    constraint: internal_uniqueness
+    hint: "One value per event and property."
+    diagnosis: >-
+      Two values for one property on one event is the double-fire bug
+      the ternary's uniqueness prevents.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 4, section 4.4."

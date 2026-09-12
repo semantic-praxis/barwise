@@ -1,0 +1,1697 @@
+orm_version: "1.1"
+
+# Trial customer C11, Product Analytics Platform.
+# Hand-authored seed kernel for the enterprise trial (trial/AUTHORING.md).
+# Greenfield: this customer has no legacy schema, only meetings and a
+# Kotlin backend, so the kernel is what the transcripts converge on.
+#
+# Modeling difficulties carried on purpose:
+#   - Every fact about Event is tenant-scoped: Event belongs to Tenant is
+#     mandatory, and Tenant is a role in the external uniqueness keys
+#     (tenant + event name, tenant + insert id, tenant + property name).
+#   - User > IdentifiedUser > VerifiedUser is a three-level chain; the
+#     anonymous/identified split is exclusive and exhaustive, and the
+#     merge from anonymous to identified is a fact type of its own.
+#   - Event carries EventProperty with PropertyValue is a ternary.
+#   - Subscription objectifies Tenant subscribes to Plan.
+#   - FunnelStep precedes FunnelStep is an acyclic, intransitive ring.
+#   - The retention-expiry mandatory is deontic: policy, not fact.
+#   - ReservedEventName carries 33 values; RetentionWindow and
+#     ConversionWindow are ISO 8601 durations typed as `other`.
+
+model:
+  name: Product Analytics Platform
+  domain_context: product-analytics
+
+  object_types:
+    - id: ot-tenant
+      name: Tenant
+      kind: entity
+      reference_mode: tenant_id
+      definition: A paying customer organization whose data is isolated from every other tenant's.
+      source_context: tenancy
+    - id: ot-tenant-id
+      name: TenantId
+      kind: value
+      definition: The tenant id that identifies a Tenant.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-data-region
+      name: DataRegion
+      kind: entity
+      reference_mode: region_code
+      definition: A geographic deployment in which a tenant's event data is stored and never leaves.
+      source_context: tenancy
+    - id: ot-region-code
+      name: RegionCode
+      kind: value
+      definition: The region code that identifies a DataRegion.
+      data_type:
+        name: text
+        length: 40
+      value_constraint:
+        values:
+          - us-east
+          - us-west
+          - eu-central
+          - eu-west
+          - uk-south
+          - ap-southeast
+          - ap-northeast
+          - ca-central
+          - au-east
+    - id: ot-workspace
+      name: Workspace
+      kind: entity
+      reference_mode: workspace_id
+      definition: A team-level grouping of projects within a tenant that shares members and settings.
+      source_context: tenancy
+    - id: ot-workspace-id
+      name: WorkspaceId
+      kind: value
+      definition: The workspace id that identifies a Workspace.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-project
+      name: Project
+      kind: entity
+      reference_mode: project_id
+      definition: "The unit an SDK sends events to; owns its own event definitions, keys and dashboards."
+      source_context: tenancy
+    - id: ot-project-id
+      name: ProjectId
+      kind: value
+      definition: The project id that identifies a Project.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-api-key
+      name: ApiKey
+      kind: entity
+      reference_mode: api_key_id
+      definition: A credential issued to a project that authorizes ingestion or read access.
+      source_context: tenancy
+    - id: ot-api-key-id
+      name: ApiKeyId
+      kind: value
+      definition: The api key id that identifies a ApiKey.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-service-account
+      name: ServiceAccount
+      kind: entity
+      reference_mode: service_account_id
+      definition: "A non-human principal, such as a backend job, that sends events through an API key."
+      source_context: tenancy
+    - id: ot-service-account-id
+      name: ServiceAccountId
+      kind: value
+      definition: The service account id that identifies a ServiceAccount.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-tenant-name
+      name: TenantName
+      kind: value
+      definition: The organization name shown in the workspace switcher and on invoices.
+      data_type:
+        name: text
+        length: 200
+    - id: ot-api-key-scope
+      name: ApiKeyScope
+      kind: value
+      definition: What an API key is allowed to do.
+      data_type:
+        name: text
+        length: 10
+      value_constraint:
+        values:
+          - ingest
+          - read
+          - admin
+    - id: ot-api-key-hash
+      name: ApiKeyHash
+      kind: value
+      definition: "The SHA-256 digest of an API key secret; the secret itself is never stored."
+      data_type:
+        name: text
+        length: 64
+    - id: ot-plan
+      name: Plan
+      kind: entity
+      reference_mode: plan_code
+      definition: A priced tier that fixes a tenant's monthly event quota and feature set.
+      source_context: billing
+    - id: ot-plan-code
+      name: PlanCode
+      kind: value
+      definition: The plan code that identifies a Plan.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-subscription
+      name: Subscription
+      kind: entity
+      reference_mode: subscription_id
+      definition: "A tenant's subscription to a plan, from a start date until superseded."
+      source_context: billing
+    - id: ot-subscription-id
+      name: SubscriptionId
+      kind: value
+      definition: The subscription id that identifies a Subscription.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-monthly-event-quota
+      name: MonthlyEventQuota
+      kind: value
+      definition: The number of events a plan allows a tenant to ingest per calendar month.
+      data_type:
+        name: integer
+      value_constraint:
+        ranges:
+          - { min: "0" }
+    - id: ot-subscription-start
+      name: SubscriptionStart
+      kind: value
+      definition: "The date a subscription took effect, in the tenant's billing timezone."
+      data_type:
+        name: date
+    - id: ot-event-definition
+      name: EventDefinition
+      kind: entity
+      reference_mode: definition_id
+      definition: "A named kind of event within one tenant, such as button_clicked; the taxonomy, not an occurrence."
+      source_context: events
+    - id: ot-definition-id
+      name: DefinitionId
+      kind: value
+      definition: The definition id that identifies a EventDefinition.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-event
+      name: Event
+      kind: entity
+      reference_mode: event_id
+      definition: "One occurrence of an event definition, recorded within one tenant and never visible outside it."
+      source_context: events
+    - id: ot-event-id
+      name: EventId
+      kind: value
+      definition: The event id that identifies a Event.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-event-property
+      name: EventProperty
+      kind: entity
+      reference_mode: property_id
+      definition: A named attribute within one tenant that events of that tenant may carry a value for.
+      source_context: events
+    - id: ot-property-id
+      name: PropertyId
+      kind: value
+      definition: The property id that identifies a EventProperty.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-session
+      name: Session
+      kind: entity
+      reference_mode: session_id
+      definition: A bounded run of a user's activity that ends after thirty minutes of inactivity.
+      source_context: events
+    - id: ot-session-id
+      name: SessionId
+      kind: value
+      definition: The session id that identifies a Session.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-user
+      name: User
+      kind: entity
+      reference_mode: user_key
+      definition: "A person or device that performs events within one tenant, identified by an internal user key."
+      source_context: events
+    - id: ot-user-key
+      name: UserKey
+      kind: value
+      definition: The user key that identifies a User.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-anonymous-user
+      name: AnonymousUser
+      kind: entity
+      reference_mode: user_key
+      definition: "A user known only by a device identifier, before any identify call."
+      source_context: events
+    - id: ot-identified-user
+      name: IdentifiedUser
+      kind: entity
+      reference_mode: user_key
+      definition: A user the customer's application has named with its own distinct id.
+      source_context: events
+    - id: ot-verified-user
+      name: VerifiedUser
+      kind: entity
+      reference_mode: user_key
+      definition: An identified user whose email address the customer's application has confirmed.
+      source_context: events
+    - id: ot-event-name
+      name: EventName
+      kind: value
+      definition: "The event definition's name as sent by the SDK; unique within a tenant, reused freely across tenants."
+      data_type:
+        name: text
+        length: 200
+    - id: ot-reserved-event-name
+      name: ReservedEventName
+      kind: value
+      definition: "An event name the platform itself emits or reserves; a customer definition that collides with one is remapped rather than ingested."
+      data_type:
+        name: text
+        length: 40
+      value_constraint:
+        values:
+          - "$identify"
+          - "$pageview"
+          - "$pageleave"
+          - "$screen"
+          - "$session_start"
+          - "$session_end"
+          - "$autocapture"
+          - "$rageclick"
+          - "$deadclick"
+          - "$exception"
+          - "$feature_flag_called"
+          - "$set"
+          - "$set_once"
+          - "$unset"
+          - "$merge"
+          - "$alias"
+          - "$create_alias"
+          - "$groupidentify"
+          - "$opt_in"
+          - "$opt_out"
+          - "$web_vitals"
+          - "$heatmap"
+          - "$app_open"
+          - "$app_close"
+          - "$app_install"
+          - "$app_update"
+          - "$push_received"
+          - "$push_opened"
+          - "$survey_shown"
+          - "$survey_sent"
+          - "$survey_dismissed"
+          - "$experiment_exposure"
+          - "$performance_event"
+    - id: ot-insert-id
+      name: InsertId
+      kind: value
+      definition: "The SDK-generated idempotency key of an event; within a tenant the same insert id is the same event."
+      data_type:
+        name: text
+        length: 36
+    - id: ot-event-timestamp
+      name: EventTimestamp
+      kind: value
+      definition: "The moment the event occurred on the client, in UTC after clock-skew correction."
+      data_type:
+        name: timestamp
+    - id: ot-retention-expiry-timestamp
+      name: RetentionExpiryTimestamp
+      kind: value
+      definition: The moment after which an event must have been deleted under its tenant's retention window.
+      data_type:
+        name: timestamp
+    - id: ot-property-name
+      name: PropertyName
+      kind: value
+      definition: "The property's name as sent by the SDK; unique within a tenant."
+      data_type:
+        name: text
+        length: 200
+    - id: ot-property-type
+      name: PropertyType
+      kind: value
+      definition: The value type the platform enforces for a property once it has been seen.
+      data_type:
+        name: text
+        length: 10
+      value_constraint:
+        values:
+          - string
+          - number
+          - boolean
+          - datetime
+          - list
+          - object
+    - id: ot-property-value
+      name: PropertyValue
+      kind: value
+      definition: "The value an event carries for one property, stored as text and cast by the property's type."
+      data_type:
+        name: text
+        length: 4000
+    - id: ot-session-start
+      name: SessionStart
+      kind: value
+      definition: The timestamp of the first event in a session.
+      data_type:
+        name: timestamp
+    - id: ot-device-id
+      name: DeviceId
+      kind: value
+      definition: The SDK-generated identifier persisted on a device before the user is identified.
+      data_type:
+        name: text
+        length: 64
+    - id: ot-distinct-id
+      name: DistinctId
+      kind: value
+      definition: The identifier the customer's application assigns to a user in an identify call.
+      data_type:
+        name: text
+        length: 200
+    - id: ot-legacy-tracking-id
+      name: LegacyTrackingId
+      kind: value
+      definition: The identifier carried over from the previous analytics vendor during migration.
+      data_type:
+        name: text
+        length: 200
+    - id: ot-verified-email
+      name: VerifiedEmail
+      kind: value
+      definition: The email address confirmed by the customer's application for a verified user.
+      data_type:
+        name: text
+        length: 254
+    - id: ot-merged-at
+      name: MergedAt
+      kind: value
+      definition: The moment an anonymous user's history was folded into an identified user.
+      data_type:
+        name: timestamp
+    - id: ot-retention-window
+      name: RetentionWindow
+      kind: value
+      definition: An ISO 8601 duration after which a tenant's events are deleted.
+      data_type:
+        name: other
+        length: 8
+      value_constraint:
+        values:
+          - P30D
+          - P90D
+          - P180D
+          - P365D
+          - P730D
+          - P1095D
+    - id: ot-cohort
+      name: Cohort
+      kind: entity
+      reference_mode: cohort_id
+      definition: A saved set of users within a project defined by a filter over their events and properties.
+      source_context: analysis
+    - id: ot-cohort-id
+      name: CohortId
+      kind: value
+      definition: The cohort id that identifies a Cohort.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-funnel
+      name: Funnel
+      kind: entity
+      reference_mode: funnel_id
+      definition: An ordered sequence of steps within a project measuring how many users progress from first to last.
+      source_context: analysis
+    - id: ot-funnel-id
+      name: FunnelId
+      kind: value
+      definition: The funnel id that identifies a Funnel.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-funnel-step
+      name: FunnelStep
+      kind: entity
+      reference_mode: step_id
+      definition: "One step of a funnel, counting the users who performed a given event definition."
+      source_context: analysis
+    - id: ot-step-id
+      name: StepId
+      kind: value
+      definition: The step id that identifies a FunnelStep.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-dashboard
+      name: Dashboard
+      kind: entity
+      reference_mode: dashboard_id
+      definition: A saved arrangement of funnels and other insights within a project.
+      source_context: analysis
+    - id: ot-dashboard-id
+      name: DashboardId
+      kind: value
+      definition: The dashboard id that identifies a Dashboard.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-step-order
+      name: StepOrder
+      kind: value
+      definition: "The position of a step in its funnel, counted from one."
+      data_type:
+        name: integer
+      value_constraint:
+        ranges:
+          - { min: "1", max: "20" }
+    - id: ot-conversion-window
+      name: ConversionWindow
+      kind: value
+      definition: The ISO 8601 duration within which a user must complete a funnel to count as converted.
+      data_type:
+        name: other
+        length: 8
+      value_constraint:
+        values:
+          - PT1H
+          - PT24H
+          - P1D
+          - P7D
+          - P14D
+          - P30D
+          - P90D
+
+  fact_types:
+    - id: ft-tenant-has-tenantid
+      name: Tenant has TenantId
+      roles:
+        - id: r-tenant-has-tenantid-tenant
+          player: ot-tenant
+          role_name: has
+        - id: r-tenant-has-tenantid-tenant-id
+          player: ot-tenant-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-tenant-has-tenantid-tenant]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-tenant-has-tenantid-tenant-id]
+        - type: mandatory
+          role: r-tenant-has-tenantid-tenant
+    - id: ft-dataregion-has-regioncode
+      name: DataRegion has RegionCode
+      roles:
+        - id: r-dataregion-has-regioncode-data-region
+          player: ot-data-region
+          role_name: has
+        - id: r-dataregion-has-regioncode-region-code
+          player: ot-region-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-dataregion-has-regioncode-data-region]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-dataregion-has-regioncode-region-code]
+        - type: mandatory
+          role: r-dataregion-has-regioncode-data-region
+    - id: ft-workspace-has-workspaceid
+      name: Workspace has WorkspaceId
+      roles:
+        - id: r-workspace-has-workspaceid-workspace
+          player: ot-workspace
+          role_name: has
+        - id: r-workspace-has-workspaceid-workspace-id
+          player: ot-workspace-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-workspace-has-workspaceid-workspace]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-workspace-has-workspaceid-workspace-id]
+        - type: mandatory
+          role: r-workspace-has-workspaceid-workspace
+    - id: ft-project-has-projectid
+      name: Project has ProjectId
+      roles:
+        - id: r-project-has-projectid-project
+          player: ot-project
+          role_name: has
+        - id: r-project-has-projectid-project-id
+          player: ot-project-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-project-has-projectid-project]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-project-has-projectid-project-id]
+        - type: mandatory
+          role: r-project-has-projectid-project
+    - id: ft-apikey-has-apikeyid
+      name: ApiKey has ApiKeyId
+      roles:
+        - id: r-apikey-has-apikeyid-api-key
+          player: ot-api-key
+          role_name: has
+        - id: r-apikey-has-apikeyid-api-key-id
+          player: ot-api-key-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-apikey-has-apikeyid-api-key]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-apikey-has-apikeyid-api-key-id]
+        - type: mandatory
+          role: r-apikey-has-apikeyid-api-key
+    - id: ft-serviceaccount-has-serviceaccountid
+      name: ServiceAccount has ServiceAccountId
+      roles:
+        - id: r-serviceaccount-has-serviceaccountid-service-account
+          player: ot-service-account
+          role_name: has
+        - id: r-serviceaccount-has-serviceaccountid-service-account-id
+          player: ot-service-account-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-serviceaccount-has-serviceaccountid-service-account]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-serviceaccount-has-serviceaccountid-service-account-id]
+        - type: mandatory
+          role: r-serviceaccount-has-serviceaccountid-service-account
+    - id: ft-plan-has-plancode
+      name: Plan has PlanCode
+      roles:
+        - id: r-plan-has-plancode-plan
+          player: ot-plan
+          role_name: has
+        - id: r-plan-has-plancode-plan-code
+          player: ot-plan-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-plan-has-plancode-plan]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-plan-has-plancode-plan-code]
+        - type: mandatory
+          role: r-plan-has-plancode-plan
+    - id: ft-subscription-has-subscriptionid
+      name: Subscription has SubscriptionId
+      roles:
+        - id: r-subscription-has-subscriptionid-subscription
+          player: ot-subscription
+          role_name: has
+        - id: r-subscription-has-subscriptionid-subscription-id
+          player: ot-subscription-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-subscription-has-subscriptionid-subscription]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-subscription-has-subscriptionid-subscription-id]
+        - type: mandatory
+          role: r-subscription-has-subscriptionid-subscription
+    - id: ft-eventdefinition-has-definitionid
+      name: EventDefinition has DefinitionId
+      roles:
+        - id: r-eventdefinition-has-definitionid-event-definition
+          player: ot-event-definition
+          role_name: has
+        - id: r-eventdefinition-has-definitionid-definition-id
+          player: ot-definition-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-eventdefinition-has-definitionid-event-definition]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-eventdefinition-has-definitionid-definition-id]
+        - type: mandatory
+          role: r-eventdefinition-has-definitionid-event-definition
+    - id: ft-event-has-eventid
+      name: Event has EventId
+      roles:
+        - id: r-event-has-eventid-event
+          player: ot-event
+          role_name: has
+        - id: r-event-has-eventid-event-id
+          player: ot-event-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-event-has-eventid-event]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-event-has-eventid-event-id]
+        - type: mandatory
+          role: r-event-has-eventid-event
+    - id: ft-eventproperty-has-propertyid
+      name: EventProperty has PropertyId
+      roles:
+        - id: r-eventproperty-has-propertyid-event-property
+          player: ot-event-property
+          role_name: has
+        - id: r-eventproperty-has-propertyid-property-id
+          player: ot-property-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-eventproperty-has-propertyid-event-property]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-eventproperty-has-propertyid-property-id]
+        - type: mandatory
+          role: r-eventproperty-has-propertyid-event-property
+    - id: ft-session-has-sessionid
+      name: Session has SessionId
+      roles:
+        - id: r-session-has-sessionid-session
+          player: ot-session
+          role_name: has
+        - id: r-session-has-sessionid-session-id
+          player: ot-session-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-session-has-sessionid-session]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-session-has-sessionid-session-id]
+        - type: mandatory
+          role: r-session-has-sessionid-session
+    - id: ft-user-has-userkey
+      name: User has UserKey
+      roles:
+        - id: r-user-has-userkey-user
+          player: ot-user
+          role_name: has
+        - id: r-user-has-userkey-user-key
+          player: ot-user-key
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-user-has-userkey-user]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-user-has-userkey-user-key]
+        - type: mandatory
+          role: r-user-has-userkey-user
+    - id: ft-cohort-has-cohortid
+      name: Cohort has CohortId
+      roles:
+        - id: r-cohort-has-cohortid-cohort
+          player: ot-cohort
+          role_name: has
+        - id: r-cohort-has-cohortid-cohort-id
+          player: ot-cohort-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-cohort-has-cohortid-cohort]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-cohort-has-cohortid-cohort-id]
+        - type: mandatory
+          role: r-cohort-has-cohortid-cohort
+    - id: ft-funnel-has-funnelid
+      name: Funnel has FunnelId
+      roles:
+        - id: r-funnel-has-funnelid-funnel
+          player: ot-funnel
+          role_name: has
+        - id: r-funnel-has-funnelid-funnel-id
+          player: ot-funnel-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-funnel-has-funnelid-funnel]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-funnel-has-funnelid-funnel-id]
+        - type: mandatory
+          role: r-funnel-has-funnelid-funnel
+    - id: ft-funnelstep-has-stepid
+      name: FunnelStep has StepId
+      roles:
+        - id: r-funnelstep-has-stepid-funnel-step
+          player: ot-funnel-step
+          role_name: has
+        - id: r-funnelstep-has-stepid-step-id
+          player: ot-step-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-funnelstep-has-stepid-funnel-step]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-funnelstep-has-stepid-step-id]
+        - type: mandatory
+          role: r-funnelstep-has-stepid-funnel-step
+    - id: ft-dashboard-has-dashboardid
+      name: Dashboard has DashboardId
+      roles:
+        - id: r-dashboard-has-dashboardid-dashboard
+          player: ot-dashboard
+          role_name: has
+        - id: r-dashboard-has-dashboardid-dashboard-id
+          player: ot-dashboard-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-dashboard-has-dashboardid-dashboard]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-dashboard-has-dashboardid-dashboard-id]
+        - type: mandatory
+          role: r-dashboard-has-dashboardid-dashboard
+    - id: ft-tenant-has-tenantname
+      name: Tenant has TenantName
+      roles:
+        - id: r-tenant-has-tenantname-tenant
+          player: ot-tenant
+          role_name: has
+        - id: r-tenant-has-tenantname-tenant-name
+          player: ot-tenant-name
+          role_name: names
+      readings:
+        - "{0} has {1}"
+        - "{1} names {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-tenant-has-tenantname-tenant]
+        - type: internal_uniqueness
+          roles: [r-tenant-has-tenantname-tenant-name]
+        - type: mandatory
+          role: r-tenant-has-tenantname-tenant
+    - id: ft-tenant-resides-in-dataregion
+      name: Tenant resides in DataRegion
+      definition: "A tenant is pinned to one region for its whole life; moving regions is a new tenant and a migration."
+      roles:
+        - id: r-tenant-resides-in-dataregion-tenant
+          player: ot-tenant
+          role_name: resides in
+        - id: r-tenant-resides-in-dataregion-data-region
+          player: ot-data-region
+          role_name: hosts
+      readings:
+        - "{0} resides in {1}"
+        - "{1} hosts {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-tenant-resides-in-dataregion-tenant]
+        - type: mandatory
+          role: r-tenant-resides-in-dataregion-tenant
+    - id: ft-workspace-belongs-to-tenant
+      name: Workspace belongs to Tenant
+      roles:
+        - id: r-workspace-belongs-to-tenant-workspace
+          player: ot-workspace
+          role_name: belongs to
+        - id: r-workspace-belongs-to-tenant-tenant
+          player: ot-tenant
+          role_name: owns
+      readings:
+        - "{0} belongs to {1}"
+        - "{1} owns {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-workspace-belongs-to-tenant-workspace]
+        - type: mandatory
+          role: r-workspace-belongs-to-tenant-workspace
+    - id: ft-project-belongs-to-workspace
+      name: Project belongs to Workspace
+      roles:
+        - id: r-project-belongs-to-workspace-project
+          player: ot-project
+          role_name: belongs to
+        - id: r-project-belongs-to-workspace-workspace
+          player: ot-workspace
+          role_name: contains
+      readings:
+        - "{0} belongs to {1}"
+        - "{1} contains {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-project-belongs-to-workspace-project]
+        - type: mandatory
+          role: r-project-belongs-to-workspace-project
+    - id: ft-apikey-is-issued-to-project
+      name: ApiKey is issued to Project
+      roles:
+        - id: r-apikey-is-issued-to-project-api-key
+          player: ot-api-key
+          role_name: is issued to
+        - id: r-apikey-is-issued-to-project-project
+          player: ot-project
+          role_name: holds
+      readings:
+        - "{0} is issued to {1}"
+        - "{1} holds {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-apikey-is-issued-to-project-api-key]
+        - type: mandatory
+          role: r-apikey-is-issued-to-project-api-key
+    - id: ft-apikey-has-apikeyscope
+      name: ApiKey has ApiKeyScope
+      roles:
+        - id: r-apikey-has-apikeyscope-api-key
+          player: ot-api-key
+          role_name: has
+        - id: r-apikey-has-apikeyscope-api-key-scope
+          player: ot-api-key-scope
+          role_name: is scope of
+      readings:
+        - "{0} has {1}"
+        - "{1} is scope of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-apikey-has-apikeyscope-api-key]
+        - type: mandatory
+          role: r-apikey-has-apikeyscope-api-key
+    - id: ft-apikey-has-apikeyhash
+      name: ApiKey has ApiKeyHash
+      roles:
+        - id: r-apikey-has-apikeyhash-api-key
+          player: ot-api-key
+          role_name: has
+        - id: r-apikey-has-apikeyhash-api-key-hash
+          player: ot-api-key-hash
+          role_name: digests
+      readings:
+        - "{0} has {1}"
+        - "{1} digests {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-apikey-has-apikeyhash-api-key]
+        - type: internal_uniqueness
+          roles: [r-apikey-has-apikeyhash-api-key-hash]
+        - type: mandatory
+          role: r-apikey-has-apikeyhash-api-key
+    - id: ft-serviceaccount-uses-apikey
+      name: ServiceAccount uses ApiKey
+      roles:
+        - id: r-serviceaccount-uses-apikey-service-account
+          player: ot-service-account
+          role_name: uses
+        - id: r-serviceaccount-uses-apikey-api-key
+          player: ot-api-key
+          role_name: is used by
+      readings:
+        - "{0} uses {1}"
+        - "{1} is used by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-serviceaccount-uses-apikey-service-account]
+        - type: mandatory
+          role: r-serviceaccount-uses-apikey-service-account
+    - id: ft-tenant-retains-events-for-retentionwindow
+      name: Tenant retains events for RetentionWindow
+      definition: "Every tenant has exactly one retention window; the plan sets the default and privacy settings may shorten it."
+      roles:
+        - id: r-tenant-retains-events-for-retentionwindow-tenant
+          player: ot-tenant
+          role_name: retains events for
+        - id: r-tenant-retains-events-for-retentionwindow-retention-window
+          player: ot-retention-window
+          role_name: is retention window of
+      readings:
+        - "{0} retains events for {1}"
+        - "{1} is retention window of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-tenant-retains-events-for-retentionwindow-tenant]
+        - type: mandatory
+          role: r-tenant-retains-events-for-retentionwindow-tenant
+    - id: ft-tenant-subscribes-to-plan
+      name: Tenant subscribes to Plan
+      definition: "A tenant subscribes to plans over time; each tenant-plan pairing is one subscription."
+      roles:
+        - id: r-tenant-subscribes-to-plan-tenant
+          player: ot-tenant
+          role_name: subscribes to
+        - id: r-tenant-subscribes-to-plan-plan
+          player: ot-plan
+          role_name: is subscribed to by
+      readings:
+        - "{0} subscribes to {1}"
+        - "{1} is subscribed to by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-tenant-subscribes-to-plan-tenant, r-tenant-subscribes-to-plan-plan]
+    - id: ft-subscription-started-on-subscriptionstart
+      name: Subscription started on SubscriptionStart
+      roles:
+        - id: r-subscription-started-on-subscriptionstart-subscription
+          player: ot-subscription
+          role_name: started on
+        - id: r-subscription-started-on-subscriptionstart-subscription-start
+          player: ot-subscription-start
+          role_name: is start of
+      readings:
+        - "{0} started on {1}"
+        - "{1} is start of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-subscription-started-on-subscriptionstart-subscription]
+        - type: mandatory
+          role: r-subscription-started-on-subscriptionstart-subscription
+    - id: ft-plan-allows-monthlyeventquota
+      name: Plan allows MonthlyEventQuota
+      roles:
+        - id: r-plan-allows-monthlyeventquota-plan
+          player: ot-plan
+          role_name: allows
+        - id: r-plan-allows-monthlyeventquota-monthly-event-quota
+          player: ot-monthly-event-quota
+          role_name: is quota of
+      readings:
+        - "{0} allows {1}"
+        - "{1} is quota of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-plan-allows-monthlyeventquota-plan]
+        - type: mandatory
+          role: r-plan-allows-monthlyeventquota-plan
+    - id: ft-eventdefinition-belongs-to-tenant
+      name: EventDefinition belongs to Tenant
+      roles:
+        - id: r-eventdefinition-belongs-to-tenant-event-definition
+          player: ot-event-definition
+          role_name: belongs to
+        - id: r-eventdefinition-belongs-to-tenant-tenant
+          player: ot-tenant
+          role_name: defines
+      readings:
+        - "{0} belongs to {1}"
+        - "{1} defines {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-eventdefinition-belongs-to-tenant-event-definition]
+        - type: mandatory
+          role: r-eventdefinition-belongs-to-tenant-event-definition
+    - id: ft-eventdefinition-has-eventname
+      name: EventDefinition has EventName
+      definition: "An event name identifies a definition only together with its tenant; two tenants may both define signup_completed."
+      roles:
+        - id: r-eventdefinition-has-eventname-event-definition
+          player: ot-event-definition
+          role_name: has
+        - id: r-eventdefinition-has-eventname-event-name
+          player: ot-event-name
+          role_name: names
+      readings:
+        - "{0} has {1}"
+        - "{1} names {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-eventdefinition-has-eventname-event-definition]
+        - type: mandatory
+          role: r-eventdefinition-has-eventname-event-definition
+        - type: external_uniqueness
+          roles: [r-eventdefinition-has-eventname-event-name, r-eventdefinition-belongs-to-tenant-tenant]
+    - id: ft-eventdefinition-maps-to-reservedeventname
+      name: EventDefinition maps to ReservedEventName
+      definition: A customer definition whose name collides with a reserved name is remapped to the platform's own event rather than ingested as a new one.
+      roles:
+        - id: r-eventdefinition-maps-to-reservedeventname-event-definition
+          player: ot-event-definition
+          role_name: maps to
+        - id: r-eventdefinition-maps-to-reservedeventname-reserved-event-name
+          player: ot-reserved-event-name
+          role_name: is reserved for
+      readings:
+        - "{0} maps to {1}"
+        - "{1} is reserved for {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-eventdefinition-maps-to-reservedeventname-event-definition]
+    - id: ft-event-belongs-to-tenant
+      name: Event belongs to Tenant
+      definition: "Tenant scope on the occurrence itself, so no query, key or join can reach across tenants."
+      roles:
+        - id: r-event-belongs-to-tenant-event
+          player: ot-event
+          role_name: belongs to
+        - id: r-event-belongs-to-tenant-tenant
+          player: ot-tenant
+          role_name: owns event
+      readings:
+        - "{0} belongs to {1}"
+        - "{1} owns event {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-event-belongs-to-tenant-event]
+        - type: mandatory
+          role: r-event-belongs-to-tenant-event
+    - id: ft-event-has-insertid
+      name: Event has InsertId
+      definition: "Within one tenant an insert id names one event; the same insert id sent twice is one event, not two."
+      roles:
+        - id: r-event-has-insertid-event
+          player: ot-event
+          role_name: has
+        - id: r-event-has-insertid-insert-id
+          player: ot-insert-id
+          role_name: deduplicates
+      readings:
+        - "{0} has {1}"
+        - "{1} deduplicates {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-event-has-insertid-event]
+        - type: mandatory
+          role: r-event-has-insertid-event
+        - type: external_uniqueness
+          roles: [r-event-has-insertid-insert-id, r-event-belongs-to-tenant-tenant]
+    - id: ft-event-instantiates-eventdefinition
+      name: Event instantiates EventDefinition
+      definition: The definition an event instantiates belongs to the same tenant as the event.
+      roles:
+        - id: r-event-instantiates-eventdefinition-event
+          player: ot-event
+          role_name: instantiates
+        - id: r-event-instantiates-eventdefinition-event-definition
+          player: ot-event-definition
+          role_name: is instantiated by
+      readings:
+        - "{0} instantiates {1}"
+        - "{1} is instantiated by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-event-instantiates-eventdefinition-event]
+        - type: mandatory
+          role: r-event-instantiates-eventdefinition-event
+    - id: ft-event-occurred-at-eventtimestamp
+      name: Event occurred at EventTimestamp
+      roles:
+        - id: r-event-occurred-at-eventtimestamp-event
+          player: ot-event
+          role_name: occurred at
+        - id: r-event-occurred-at-eventtimestamp-event-timestamp
+          player: ot-event-timestamp
+          role_name: is time of
+      readings:
+        - "{0} occurred at {1}"
+        - "{1} is time of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-event-occurred-at-eventtimestamp-event]
+        - type: mandatory
+          role: r-event-occurred-at-eventtimestamp-event
+    - id: ft-event-expires-at-retentionexpirytimestamp
+      name: Event expires at RetentionExpiryTimestamp
+      definition: "Policy obliges every event to carry the expiry derived from its tenant's retention window; events ingested before the policy have none, so the rule is deontic."
+      roles:
+        - id: r-event-expires-at-retentionexpirytimestamp-event
+          player: ot-event
+          role_name: expires at
+        - id: r-event-expires-at-retentionexpirytimestamp-retention-expiry-timestamp
+          player: ot-retention-expiry-timestamp
+          role_name: is expiry of
+      readings:
+        - "{0} expires at {1}"
+        - "{1} is expiry of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-event-expires-at-retentionexpirytimestamp-event]
+        - type: mandatory
+          role: r-event-expires-at-retentionexpirytimestamp-event
+          modality: deontic
+    - id: ft-event-occurred-in-session
+      name: Event occurred in Session
+      definition: "Server-side events have no session; client events do."
+      roles:
+        - id: r-event-occurred-in-session-event
+          player: ot-event
+          role_name: occurred in
+        - id: r-event-occurred-in-session-session
+          player: ot-session
+          role_name: contains
+      readings:
+        - "{0} occurred in {1}"
+        - "{1} contains {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-event-occurred-in-session-event]
+    - id: ft-event-was-performed-by-user
+      name: Event was performed by User
+      roles:
+        - id: r-event-was-performed-by-user-event
+          player: ot-event
+          role_name: was performed by
+        - id: r-event-was-performed-by-user-user
+          player: ot-user
+          role_name: performed
+      readings:
+        - "{0} was performed by {1}"
+        - "{1} performed {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-event-was-performed-by-user-event]
+        - type: mandatory
+          role: r-event-was-performed-by-user-event
+    - id: ft-event-carries-eventproperty-with-propertyvalue
+      name: Event carries EventProperty with PropertyValue
+      definition: "An event carries each property at most once, with the value it was sent with."
+      roles:
+        - id: r-event-carries-eventproperty-with-propertyvalue-event
+          player: ot-event
+          role_name: carries
+        - id: r-event-carries-eventproperty-with-propertyvalue-event-property
+          player: ot-event-property
+          role_name: is carried by
+        - id: r-event-carries-eventproperty-with-propertyvalue-property-value
+          player: ot-property-value
+          role_name: is value in
+      readings:
+        - "{0} carries {1} with {2}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-event-carries-eventproperty-with-propertyvalue-event, r-event-carries-eventproperty-with-propertyvalue-event-property]
+    - id: ft-eventproperty-belongs-to-tenant
+      name: EventProperty belongs to Tenant
+      roles:
+        - id: r-eventproperty-belongs-to-tenant-event-property
+          player: ot-event-property
+          role_name: belongs to
+        - id: r-eventproperty-belongs-to-tenant-tenant
+          player: ot-tenant
+          role_name: defines property
+      readings:
+        - "{0} belongs to {1}"
+        - "{1} defines property {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-eventproperty-belongs-to-tenant-event-property]
+        - type: mandatory
+          role: r-eventproperty-belongs-to-tenant-event-property
+    - id: ft-eventproperty-has-propertyname
+      name: EventProperty has PropertyName
+      definition: A property name identifies a property only within its tenant.
+      roles:
+        - id: r-eventproperty-has-propertyname-event-property
+          player: ot-event-property
+          role_name: has
+        - id: r-eventproperty-has-propertyname-property-name
+          player: ot-property-name
+          role_name: names
+      readings:
+        - "{0} has {1}"
+        - "{1} names {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-eventproperty-has-propertyname-event-property]
+        - type: mandatory
+          role: r-eventproperty-has-propertyname-event-property
+        - type: external_uniqueness
+          roles: [r-eventproperty-has-propertyname-property-name, r-eventproperty-belongs-to-tenant-tenant]
+    - id: ft-eventproperty-has-propertytype
+      name: EventProperty has PropertyType
+      definition: "The first value seen fixes the type; later values of another type are rejected at ingestion."
+      roles:
+        - id: r-eventproperty-has-propertytype-event-property
+          player: ot-event-property
+          role_name: has
+        - id: r-eventproperty-has-propertytype-property-type
+          player: ot-property-type
+          role_name: types
+      readings:
+        - "{0} has {1}"
+        - "{1} types {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-eventproperty-has-propertytype-event-property]
+        - type: mandatory
+          role: r-eventproperty-has-propertytype-event-property
+    - id: ft-session-belongs-to-user
+      name: Session belongs to User
+      roles:
+        - id: r-session-belongs-to-user-session
+          player: ot-session
+          role_name: belongs to
+        - id: r-session-belongs-to-user-user
+          player: ot-user
+          role_name: has session
+      readings:
+        - "{0} belongs to {1}"
+        - "{1} has session {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-session-belongs-to-user-session]
+        - type: mandatory
+          role: r-session-belongs-to-user-session
+    - id: ft-session-started-at-sessionstart
+      name: Session started at SessionStart
+      roles:
+        - id: r-session-started-at-sessionstart-session
+          player: ot-session
+          role_name: started at
+        - id: r-session-started-at-sessionstart-session-start
+          player: ot-session-start
+          role_name: is start of
+      readings:
+        - "{0} started at {1}"
+        - "{1} is start of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-session-started-at-sessionstart-session]
+        - type: mandatory
+          role: r-session-started-at-sessionstart-session
+    - id: ft-user-belongs-to-tenant
+      name: User belongs to Tenant
+      roles:
+        - id: r-user-belongs-to-tenant-user
+          player: ot-user
+          role_name: belongs to
+        - id: r-user-belongs-to-tenant-tenant
+          player: ot-tenant
+          role_name: owns user
+      readings:
+        - "{0} belongs to {1}"
+        - "{1} owns user {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-user-belongs-to-tenant-user]
+        - type: mandatory
+          role: r-user-belongs-to-tenant-user
+    - id: ft-anonymoususer-has-deviceid
+      name: AnonymousUser has DeviceId
+      roles:
+        - id: r-anonymoususer-has-deviceid-anonymous-user
+          player: ot-anonymous-user
+          role_name: has
+        - id: r-anonymoususer-has-deviceid-device-id
+          player: ot-device-id
+          role_name: identifies device of
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies device of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-anonymoususer-has-deviceid-anonymous-user]
+        - type: mandatory
+          role: r-anonymoususer-has-deviceid-anonymous-user
+    - id: ft-anonymoususer-is-merged-into-identifieduser
+      name: AnonymousUser is merged into IdentifiedUser
+      definition: "Identity resolution: an anonymous user's history is folded into at most one identified user, and the merge is never undone."
+      roles:
+        - id: r-anonymoususer-is-merged-into-identifieduser-anonymous-user
+          player: ot-anonymous-user
+          role_name: is merged into
+        - id: r-anonymoususer-is-merged-into-identifieduser-identified-user
+          player: ot-identified-user
+          role_name: absorbs
+      readings:
+        - "{0} is merged into {1}"
+        - "{1} absorbs {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-anonymoususer-is-merged-into-identifieduser-anonymous-user]
+    - id: ft-anonymoususer-was-merged-at-mergedat
+      name: AnonymousUser was merged at MergedAt
+      roles:
+        - id: r-anonymoususer-was-merged-at-mergedat-anonymous-user
+          player: ot-anonymous-user
+          role_name: was merged at
+        - id: r-anonymoususer-was-merged-at-mergedat-merged-at
+          player: ot-merged-at
+          role_name: is merge time of
+      readings:
+        - "{0} was merged at {1}"
+        - "{1} is merge time of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-anonymoususer-was-merged-at-mergedat-anonymous-user]
+    - id: ft-identifieduser-has-distinctid
+      name: IdentifiedUser has DistinctId
+      definition: "Distinct ids are prefixed with the tenant id at ingestion, which is why they are unique platform-wide."
+      roles:
+        - id: r-identifieduser-has-distinctid-identified-user
+          player: ot-identified-user
+          role_name: has
+        - id: r-identifieduser-has-distinctid-distinct-id
+          player: ot-distinct-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-identifieduser-has-distinctid-identified-user]
+        - type: internal_uniqueness
+          roles: [r-identifieduser-has-distinctid-distinct-id]
+        - type: mandatory
+          role: r-identifieduser-has-distinctid-identified-user
+    - id: ft-identifieduser-has-legacytrackingid
+      name: IdentifiedUser has LegacyTrackingId
+      roles:
+        - id: r-identifieduser-has-legacytrackingid-identified-user
+          player: ot-identified-user
+          role_name: has
+        - id: r-identifieduser-has-legacytrackingid-legacy-tracking-id
+          player: ot-legacy-tracking-id
+          role_name: was previous id of
+      readings:
+        - "{0} has {1}"
+        - "{1} was previous id of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-identifieduser-has-legacytrackingid-identified-user]
+    - id: ft-verifieduser-has-verifiedemail
+      name: VerifiedUser has VerifiedEmail
+      roles:
+        - id: r-verifieduser-has-verifiedemail-verified-user
+          player: ot-verified-user
+          role_name: has
+        - id: r-verifieduser-has-verifiedemail-verified-email
+          player: ot-verified-email
+          role_name: is confirmed for
+      readings:
+        - "{0} has {1}"
+        - "{1} is confirmed for {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-verifieduser-has-verifiedemail-verified-user]
+        - type: internal_uniqueness
+          roles: [r-verifieduser-has-verifiedemail-verified-email]
+        - type: mandatory
+          role: r-verifieduser-has-verifiedemail-verified-user
+    - id: ft-cohort-belongs-to-project
+      name: Cohort belongs to Project
+      roles:
+        - id: r-cohort-belongs-to-project-cohort
+          player: ot-cohort
+          role_name: belongs to
+        - id: r-cohort-belongs-to-project-project
+          player: ot-project
+          role_name: has cohort
+      readings:
+        - "{0} belongs to {1}"
+        - "{1} has cohort {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-cohort-belongs-to-project-cohort]
+        - type: mandatory
+          role: r-cohort-belongs-to-project-cohort
+    - id: ft-cohort-contains-user
+      name: Cohort contains User
+      roles:
+        - id: r-cohort-contains-user-cohort
+          player: ot-cohort
+          role_name: contains
+        - id: r-cohort-contains-user-user
+          player: ot-user
+          role_name: is member of
+      readings:
+        - "{0} contains {1}"
+        - "{1} is member of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-cohort-contains-user-cohort, r-cohort-contains-user-user]
+    - id: ft-funnel-belongs-to-project
+      name: Funnel belongs to Project
+      roles:
+        - id: r-funnel-belongs-to-project-funnel
+          player: ot-funnel
+          role_name: belongs to
+        - id: r-funnel-belongs-to-project-project
+          player: ot-project
+          role_name: has funnel
+      readings:
+        - "{0} belongs to {1}"
+        - "{1} has funnel {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-funnel-belongs-to-project-funnel]
+        - type: mandatory
+          role: r-funnel-belongs-to-project-funnel
+    - id: ft-funnel-has-conversionwindow
+      name: Funnel has ConversionWindow
+      roles:
+        - id: r-funnel-has-conversionwindow-funnel
+          player: ot-funnel
+          role_name: has
+        - id: r-funnel-has-conversionwindow-conversion-window
+          player: ot-conversion-window
+          role_name: is window of
+      readings:
+        - "{0} has {1}"
+        - "{1} is window of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-funnel-has-conversionwindow-funnel]
+        - type: mandatory
+          role: r-funnel-has-conversionwindow-funnel
+    - id: ft-funnelstep-belongs-to-funnel
+      name: FunnelStep belongs to Funnel
+      roles:
+        - id: r-funnelstep-belongs-to-funnel-funnel-step
+          player: ot-funnel-step
+          role_name: belongs to
+        - id: r-funnelstep-belongs-to-funnel-funnel
+          player: ot-funnel
+          role_name: has step
+      readings:
+        - "{0} belongs to {1}"
+        - "{1} has step {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-funnelstep-belongs-to-funnel-funnel-step]
+        - type: mandatory
+          role: r-funnelstep-belongs-to-funnel-funnel-step
+    - id: ft-funnelstep-counts-eventdefinition
+      name: FunnelStep counts EventDefinition
+      roles:
+        - id: r-funnelstep-counts-eventdefinition-funnel-step
+          player: ot-funnel-step
+          role_name: counts
+        - id: r-funnelstep-counts-eventdefinition-event-definition
+          player: ot-event-definition
+          role_name: is counted by
+      readings:
+        - "{0} counts {1}"
+        - "{1} is counted by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-funnelstep-counts-eventdefinition-funnel-step]
+        - type: mandatory
+          role: r-funnelstep-counts-eventdefinition-funnel-step
+    - id: ft-funnelstep-has-steporder
+      name: FunnelStep has StepOrder
+      definition: Within a funnel each position is held by one step.
+      roles:
+        - id: r-funnelstep-has-steporder-funnel-step
+          player: ot-funnel-step
+          role_name: has
+        - id: r-funnelstep-has-steporder-step-order
+          player: ot-step-order
+          role_name: orders
+      readings:
+        - "{0} has {1}"
+        - "{1} orders {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-funnelstep-has-steporder-funnel-step]
+        - type: mandatory
+          role: r-funnelstep-has-steporder-funnel-step
+        - type: external_uniqueness
+          roles: [r-funnelstep-has-steporder-step-order, r-funnelstep-belongs-to-funnel-funnel]
+    - id: ft-funnelstep-precedes-funnelstep
+      name: FunnelStep precedes FunnelStep
+      definition: "Only the immediate predecessor is recorded, so the relation is intransitive, and steps never loop back, so it is acyclic."
+      roles:
+        - id: r-funnelstep-precedes-funnelstep-funnel-step
+          player: ot-funnel-step
+          role_name: precedes
+        - id: r-funnelstep-precedes-funnelstep-funnel-step-1
+          player: ot-funnel-step
+          role_name: follows
+      readings:
+        - "{0} precedes {1}"
+        - "{1} follows {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-funnelstep-precedes-funnelstep-funnel-step, r-funnelstep-precedes-funnelstep-funnel-step-1]
+        - type: ring
+          role_1: r-funnelstep-precedes-funnelstep-funnel-step
+          role_2: r-funnelstep-precedes-funnelstep-funnel-step-1
+          ring_type: acyclic
+        - type: ring
+          role_1: r-funnelstep-precedes-funnelstep-funnel-step
+          role_2: r-funnelstep-precedes-funnelstep-funnel-step-1
+          ring_type: intransitive
+    - id: ft-dashboard-belongs-to-project
+      name: Dashboard belongs to Project
+      roles:
+        - id: r-dashboard-belongs-to-project-dashboard
+          player: ot-dashboard
+          role_name: belongs to
+        - id: r-dashboard-belongs-to-project-project
+          player: ot-project
+          role_name: has dashboard
+      readings:
+        - "{0} belongs to {1}"
+        - "{1} has dashboard {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-dashboard-belongs-to-project-dashboard]
+        - type: mandatory
+          role: r-dashboard-belongs-to-project-dashboard
+    - id: ft-dashboard-shows-funnel
+      name: Dashboard shows Funnel
+      roles:
+        - id: r-dashboard-shows-funnel-dashboard
+          player: ot-dashboard
+          role_name: shows
+        - id: r-dashboard-shows-funnel-funnel
+          player: ot-funnel
+          role_name: is shown on
+      readings:
+        - "{0} shows {1}"
+        - "{1} is shown on {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-dashboard-shows-funnel-dashboard, r-dashboard-shows-funnel-funnel]
+
+  subtype_facts:
+    - id: sf-anonymous-user-is-user
+      subtype: ot-anonymous-user
+      supertype: ot-user
+      is_exclusive: true
+      is_exhaustive: true
+    - id: sf-identified-user-is-user
+      subtype: ot-identified-user
+      supertype: ot-user
+      is_exclusive: true
+      is_exhaustive: true
+    - id: sf-verified-user-is-identified-user
+      subtype: ot-verified-user
+      supertype: ot-identified-user
+
+  objectified_fact_types:
+    - id: oft-subscription
+      fact_type: ft-tenant-subscribes-to-plan
+      object_type: ot-subscription
+
+  populations:
+    - id: pop-event-carries-eventproperty-with-propertyvalue
+      fact_type: ft-event-carries-eventproperty-with-propertyvalue
+      description: "One checkout event carrying three properties; values are text and cast by property type."
+      sample: true
+      instances:
+        - id: inst-event-carries-eventproperty-with-propertyvalue-1
+          role_values:
+            r-event-carries-eventproperty-with-propertyvalue-event: "evt-01J7Q4M3"
+            r-event-carries-eventproperty-with-propertyvalue-event-property: "prop-cart_value"
+            r-event-carries-eventproperty-with-propertyvalue-property-value: "129.90"
+        - id: inst-event-carries-eventproperty-with-propertyvalue-2
+          role_values:
+            r-event-carries-eventproperty-with-propertyvalue-event: "evt-01J7Q4M3"
+            r-event-carries-eventproperty-with-propertyvalue-event-property: "prop-currency"
+            r-event-carries-eventproperty-with-propertyvalue-property-value: "EUR"
+        - id: inst-event-carries-eventproperty-with-propertyvalue-3
+          role_values:
+            r-event-carries-eventproperty-with-propertyvalue-event: "evt-01J7Q4M3"
+            r-event-carries-eventproperty-with-propertyvalue-event-property: "prop-is_first_order"
+            r-event-carries-eventproperty-with-propertyvalue-property-value: "true"
+    - id: pop-funnelstep-precedes-funnelstep
+      fact_type: ft-funnelstep-precedes-funnelstep
+      description: "A three-step signup funnel; only immediate predecessors are stored."
+      sample: true
+      instances:
+        - id: inst-funnelstep-precedes-funnelstep-1
+          role_values:
+            r-funnelstep-precedes-funnelstep-funnel-step: "step-1"
+            r-funnelstep-precedes-funnelstep-funnel-step-1: "step-2"
+        - id: inst-funnelstep-precedes-funnelstep-2
+          role_values:
+            r-funnelstep-precedes-funnelstep-funnel-step: "step-2"
+            r-funnelstep-precedes-funnelstep-funnel-step-1: "step-3"
+
+  definitions:
+    - term: Event
+      definition: "An occurrence, not a kind: one button click, one page view, inside one tenant."
+      context: events
+    - term: Event definition
+      definition: "The kind of an event, named by the customer and unique within the tenant."
+      context: events
+    - term: Identify
+      definition: The SDK call that turns an anonymous user into an identified user and merges the anonymous history.
+      context: events
+    - term: Retention window
+      definition: "How long a tenant's events are kept before deletion; obligatory on every event by policy, absent on pre-policy events in fact."
+      context: tenancy
+    - term: Tenant
+      definition: "The isolation boundary; nothing about an event is meaningful outside its tenant."
+      context: tenancy

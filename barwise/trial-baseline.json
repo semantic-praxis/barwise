@@ -1,0 +1,1068 @@
+{
+  "findings": {
+    "C01/small/1/import:clarity-ddl": {
+      "severity": "S3",
+      "class": "sql-importer-fk-targets",
+      "issue": "barwise-1032",
+      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-1032). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
+      "detail": "exit 0 and an empty model for a format barwise does not read (sqlserver); the refusal is invisible"
+    },
+    "C01/small/1/import:clarity-ddl-regex": {
+      "severity": "S3",
+      "class": "ddl-regex-importer",
+      "issue": "barwise-1033",
+      "note": "import model --format ddl is a single regex; schema-qualified, bracket-quoted, backtick-quoted and unterminated statements do not match and the only warning claims the file has no CREATE TABLE at all (barwise-1033).",
+      "detail": "exit 0 and an empty model from an artifact with 65 expected names; the only signal is 1 warning(s): - No CREATE TABLE statements found in input"
+    },
+    "C01/small/1/model-roundtrip:dbt": {
+      "severity": "S3",
+      "class": "dbt-importer-duplicate-fact-type",
+      "issue": "barwise-1037",
+      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-1037).",
+      "detail": "exit 1: Error: Fact type \"OutpatientEncounter has Encounter\" already exists in model \"dbt Import\"."
+    },
+    "C01/small/1/model-roundtrip:ddl": {
+      "severity": "S1",
+      "class": "ddl-roundtrip",
+      "issue": "barwise-1036",
+      "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-1036).",
+      "detail": "117 delta(s) outside the declared loss set: removed object_type SpecimenType; removed object_type PatientId; removed object_type MedicalRecordNumber; removed object_type NationalProviderIdentifier; removed object_type PayerId; removed object_type FacilityCode; removed object_type DepartmentId; remov"
+    },
+    "C01/small/1/model-roundtrip:norma": {
+      "severity": "S1",
+      "class": "norma-roundtrip",
+      "issue": "barwise-1039",
+      "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-1039).",
+      "detail": "7 delta(s) outside the declared loss set: modified object_type Patient; modified object_type Provider; modified object_type Payer; modified fact_type Patient has MedicalRecordNumber; modified fact_type Appointment is with Provider; removed definition Encounter; removed definition Visit"
+    },
+    "C01/small/1/model-roundtrip:openapi": {
+      "severity": "S1",
+      "class": "openapi-roundtrip-loss",
+      "issue": "barwise-1045",
+      "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-1045).",
+      "detail": "163 delta(s) outside the declared loss set: modified object_type SpecimenType; modified object_type PatientId; modified object_type MedicalRecordNumber; modified object_type NationalProviderIdentifier; modified object_type PayerId; modified object_type FacilityCode; modified object_type DepartmentId"
+    },
+    "C01/small/1/roundtrip-diff:fhir-openapi": {
+      "severity": "S1",
+      "class": "openapi-export-comment-header",
+      "issue": "barwise-1035",
+      "note": "The default OpenAPI export writes a /* comment */ header when the model has diagnostics (which it always has after barwise-1034), so the .json is not JSON and the importer returns an empty model with exit 0 (barwise-1035).",
+      "detail": "145 delta(s) outside the declared loss set: removed object_type Patient; removed object_type Provider; removed object_type Payer; removed object_type Facility; removed object_type Department; removed object_type Encounter; removed object_type InpatientEncounter; removed object_type OutpatientEncount"
+    },
+    "C01/small/1/validate-imported:fhir-openapi": {
+      "severity": "S1",
+      "class": "openapi-importer-duplicate-role-ids",
+      "issue": "barwise-1034",
+      "note": "The OpenAPI importer derives role ids from the property name, so two schemas with a 'related' or 'has' property collide and every imported model fails structural/duplicate-role-id (barwise-1034).",
+      "detail": "the model the importer wrote has 57 structural error(s): structural/duplicate-role-id"
+    },
+    "C01/small/4/read-back:dbt": {
+      "severity": "S3",
+      "class": "dbt-importer-duplicate-fact-type",
+      "issue": "barwise-1037",
+      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-1037).",
+      "detail": "exit 1: Error: Fact type \"OutpatientEncounter has Encounter\" already exists in model \"dbt Import\"."
+    },
+    "C01/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1034",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1034 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 26 structural error(s): structural/duplicate-role-id"
+    },
+    "C01/small/5/diff:5:rename_object_type": {
+      "severity": "S5",
+      "class": "diff-rename-no-synonym",
+      "issue": "barwise-1040",
+      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-1040).",
+      "detail": "rename Payer -> InsurancePayer reported as a removal plus an addition with no synonym candidate"
+    },
+    "C01/small/6/acceptance:clinical-informaticist:fhir-openapi": {
+      "severity": "S1",
+      "class": "openapi-importer-duplicate-role-ids-acceptance",
+      "issue": "barwise-1034",
+      "note": "Consequence of barwise-1034: the persona's must_validate check fails on the importer's duplicate role ids. Closes with the parent.",
+      "detail": "5 of 9 persona checks fail: The model has 57 validation error(s): Role \"related\" in fact type \"Provider related Patient\" has id \"bc2abfcd-f073-4828-8dd5-6272c5232afd-related-role\", which another role already uses. Role ids must be unique across the model. (and 56 more); Your model does not yet carry"
+    },
+    "C01/small/6/release-bundle:gym-list": {
+      "severity": "S3",
+      "class": "bundle-gym-catalog",
+      "issue": "barwise-1043",
+      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-1043).",
+      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
+    },
+    "C02/small/1/import:core-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets",
+      "issue": "barwise-1032",
+      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-1032). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
+      "detail": "exit 0 and 19 object types from a oracle artifact barwise does not support; nothing says which statements were understood"
+    },
+    "C02/small/1/import:regmart-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets",
+      "issue": "barwise-1032",
+      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-1032). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
+      "detail": "exit 0 but 5 of 18 expected names are absent from the model and 5 of them are not mentioned on stderr (28% silently dropped)"
+    },
+    "C02/small/1/model-roundtrip:dbt": {
+      "severity": "S1",
+      "class": "dbt-roundtrip",
+      "issue": "barwise-1038",
+      "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-1038).",
+      "detail": "139 delta(s) outside the declared loss set: removed object_type PartyId; modified object_type LegalName; modified object_type TaxIdentifier; modified object_type KycStatus; modified object_type KycScreeningDate; modified object_type DateOfBirth; modified object_type GivenName; modified object_type F"
+    },
+    "C02/small/1/model-roundtrip:ddl": {
+      "severity": "S1",
+      "class": "ddl-roundtrip",
+      "issue": "barwise-1036",
+      "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-1036).",
+      "detail": "117 delta(s) outside the declared loss set: removed object_type PartyId; removed object_type LegalName; removed object_type TaxIdentifier; removed object_type KycStatus; removed object_type KycScreeningDate; removed object_type DateOfBirth; removed object_type GivenName; removed object_type FamilyNa"
+    },
+    "C02/small/1/model-roundtrip:norma": {
+      "severity": "S1",
+      "class": "norma-roundtrip",
+      "issue": "barwise-1039",
+      "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-1039).",
+      "detail": "5 delta(s) outside the declared loss set: modified fact_type Party has KycStatus; modified fact_type DepositAccount is routed by RoutingNumber; modified fact_type DepositAccount has AccountNumber; modified fact_type Party borrows under LoanAccount; modified fact_type Transaction affects DepositAccou"
+    },
+    "C02/small/1/model-roundtrip:openapi": {
+      "severity": "S1",
+      "class": "openapi-roundtrip-loss",
+      "issue": "barwise-1045",
+      "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-1045).",
+      "detail": "151 delta(s) outside the declared loss set: modified object_type PartyId; modified object_type LegalName; modified object_type TaxIdentifier; modified object_type KycStatus; modified object_type KycScreeningDate; modified object_type DateOfBirth; modified object_type GivenName; modified object_type "
+    },
+    "C02/small/1/roundtrip-diff:core-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets-roundtrip",
+      "issue": "barwise-1032",
+      "note": "Consequence of barwise-1032: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "detail": "19 delta(s) outside the declared loss set: removed object_type Cbs.party; removed object_type Cbs.prod; removed object_type Cbs.brch; removed object_type Cbs.ccy; removed object_type Cbs.loanAcct; removed object_type Cbs.generalLedgerAcct; removed object_type Cbs.depAcct; removed object_type Cbs.leg"
+    },
+    "C02/small/1/roundtrip-diff:regmart-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets-roundtrip",
+      "issue": "barwise-1032",
+      "note": "Consequence of barwise-1032: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "detail": "18 delta(s) outside the declared loss set: removed object_type Party; removed object_type Product; removed object_type Branch; removed object_type Currency; removed object_type LoanAccount; removed object_type GeneralLedgerAccount; removed object_type DepositAccount; removed object_type LegalEntity"
+    },
+    "C02/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1034",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1034 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 14 structural error(s): structural/duplicate-role-id"
+    },
+    "C02/small/6/acceptance:bank-data-architect:regmart-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "2 of 7 persona checks fail: The model has no fact type connecting \"Transaction\" and \"GeneralLedgerAccount\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Party holds DepositAccount\"), so it cannot rule out: Rules out: two facts of Party holds DepositAccount"
+    },
+    "C02/small/6/acceptance:core-banking-dba:core-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "4 of 5 persona checks fail: The model has no object type named \"Transaction\".; The model has no object type named \"Branch\".; The model has no object type named \"Currency\".; The model has no fact type connecting \"DepositAccount\" and \"Branch\"."
+    },
+    "C02/small/6/release-bundle:gym-list": {
+      "severity": "S3",
+      "class": "bundle-gym-catalog",
+      "issue": "barwise-1043",
+      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-1043).",
+      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
+    },
+    "C03/small/1/import:pc-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets",
+      "issue": "barwise-1032",
+      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-1032). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
+      "detail": "exit 0 but 15 of 28 expected names are absent from the model and 15 of them are not mentioned on stderr (54% silently dropped)"
+    },
+    "C03/small/1/model-roundtrip:dbt": {
+      "severity": "S1",
+      "class": "dbt-roundtrip",
+      "issue": "barwise-1038",
+      "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-1038).",
+      "detail": "149 delta(s) outside the declared loss set: removed object_type ContactId; removed object_type AccountNumber; removed object_type ProducerCode; removed object_type AdjusterId; modified object_type PolicyId; modified object_type TermNumber; removed object_type PolicyPeriodId; removed object_type Cove"
+    },
+    "C03/small/1/model-roundtrip:ddl": {
+      "severity": "S1",
+      "class": "ddl-roundtrip",
+      "issue": "barwise-1036",
+      "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-1036).",
+      "detail": "125 delta(s) outside the declared loss set: removed object_type ContactId; removed object_type AccountNumber; removed object_type ProducerCode; removed object_type AdjusterId; removed object_type PolicyId; removed object_type TermNumber; removed object_type PolicyPeriodId; removed object_type Covera"
+    },
+    "C03/small/1/model-roundtrip:norma": {
+      "severity": "S1",
+      "class": "norma-roundtrip",
+      "issue": "barwise-1039",
+      "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-1039).",
+      "detail": "11 delta(s) outside the declared loss set: modified object_type Contact; modified object_type Producer; modified object_type PolicyPeriod; modified object_type Subrogation; modified fact_type Policy is in force for Term; modified fact_type PolicyPeriod has PolicyNumber; modified fact_type Subrogatio"
+    },
+    "C03/small/1/model-roundtrip:openapi": {
+      "severity": "S1",
+      "class": "openapi-roundtrip-loss",
+      "issue": "barwise-1045",
+      "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-1045).",
+      "detail": "168 delta(s) outside the declared loss set: modified object_type ContactId; modified object_type AccountNumber; modified object_type ProducerCode; modified object_type AdjusterId; modified object_type PolicyId; modified object_type TermNumber; modified object_type PolicyPeriodId; modified object_typ"
+    },
+    "C03/small/1/roundtrip-diff:claims-dbt": {
+      "severity": "S1",
+      "class": "dbt-roundtrip",
+      "issue": "barwise-1038",
+      "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-1038).",
+      "detail": "52 delta(s) outside the declared loss set: modified object_type Account; modified object_type Producer; modified object_type Adjuster; modified object_type Policy; modified object_type Term; modified object_type PolicyPeriod; modified object_type Coverage; modified object_type Risk"
+    },
+    "C03/small/1/roundtrip-diff:pc-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets-roundtrip",
+      "issue": "barwise-1032",
+      "note": "Consequence of barwise-1032: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "detail": "13 delta(s) outside the declared loss set: removed object_type PcContact; removed object_type PcAccount; removed object_type PcProducer; removed object_type PcPolicyPeriod; removed object_type PcRisk; removed object_type PcVehicleRisk; removed object_type PcAdjuster; removed object_type PcClaim"
+    },
+    "C03/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1034",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1034 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 25 structural error(s): structural/duplicate-role-id"
+    },
+    "C03/small/5/diff:1:rename_object_type": {
+      "severity": "S5",
+      "class": "diff-rename-no-synonym",
+      "issue": "barwise-1040",
+      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-1040).",
+      "detail": "rename Adjuster -> ClaimHandler reported as a removal plus an addition with no synonym candidate"
+    },
+    "C03/small/5/diff:9:rename_object_type": {
+      "severity": "S5",
+      "class": "diff-rename-no-synonym",
+      "issue": "barwise-1040",
+      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-1040).",
+      "detail": "rename Invoice -> Statement reported as a removal plus an addition with no synonym candidate"
+    },
+    "C03/small/6/acceptance:actuarial-analyst:claims-dbt": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "4 of 9 persona checks fail: Your model does not yet carry the relationship this rule guards (no fact type matching \"Claim has LossDate\"), so it cannot rule out: Rules out: a Claim that exists but never plays \"Claim has LossDate\" -- e.g. Claim#1 appears in Claim has ClaimNumber but not in Claim has L"
+    },
+    "C03/small/6/acceptance:claims-data-steward:claims-dbt": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "5 of 10 persona checks fail: Your model does not yet carry the relationship this rule guards (no fact type matching \"Claim has ClaimNumber\"), so it cannot rule out: Rules out: two facts of Claim has ClaimNumber that agree on Claim -- e.g. {Claim=Claim#1, ClaimNumber=ClaimNumber#1}; {Claim=Claim#1, C"
+    },
+    "C03/small/6/acceptance:policy-admin-dba:pc-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "9 of 10 persona checks fail: The model has no object type named \"Policy\".; The model has no object type named \"PolicyPeriod\".; The model has no object type named \"Term\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"PolicyPeriod has PolicyPeriodId\"), so it "
+    },
+    "C03/small/6/release-bundle:gym-list": {
+      "severity": "S3",
+      "class": "bundle-gym-catalog",
+      "issue": "barwise-1043",
+      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-1043).",
+      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
+    },
+    "C04/small/1/import:snowflake-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets",
+      "issue": "barwise-1032",
+      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-1032). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
+      "detail": "exit 0 but 9 of 29 expected names are absent from the model and 9 of them are not mentioned on stderr (31% silently dropped)"
+    },
+    "C04/small/1/import:warehouse-dbt": {
+      "severity": "S3",
+      "class": "dbt-importer-duplicate-fact-type",
+      "issue": "barwise-1037",
+      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-1037).",
+      "detail": "exit 1: Error: Fact type \"ProductBundlesProduct has Product\" already exists in model \"dbt Import\"."
+    },
+    "C04/small/1/model-roundtrip:dbt": {
+      "severity": "S1",
+      "class": "dbt-roundtrip",
+      "issue": "barwise-1038",
+      "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-1038).",
+      "detail": "149 delta(s) outside the declared loss set: removed object_type PartyId; modified object_type PartyName; modified object_type EmailAddress; removed object_type MarketplaceCode; removed object_type CategoryCode; removed object_type ProductId; modified object_type VariantId; removed object_type Listin"
+    },
+    "C04/small/1/model-roundtrip:ddl": {
+      "severity": "S1",
+      "class": "ddl-roundtrip",
+      "issue": "barwise-1036",
+      "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-1036).",
+      "detail": "120 delta(s) outside the declared loss set: removed object_type PartyId; removed object_type PartyName; removed object_type EmailAddress; removed object_type MarketplaceCode; removed object_type CategoryCode; removed object_type ProductId; removed object_type VariantId; removed object_type ListingId"
+    },
+    "C04/small/1/model-roundtrip:norma": {
+      "severity": "S1",
+      "class": "norma-roundtrip",
+      "issue": "barwise-1039",
+      "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-1039).",
+      "detail": "47 delta(s) outside the declared loss set: modified object_type Party; modified object_type Buyer; modified object_type Seller; modified object_type Marketplace; modified object_type Category; modified object_type Product; modified object_type PhysicalProduct; modified object_type HazmatProduct"
+    },
+    "C04/small/1/model-roundtrip:openapi": {
+      "severity": "S1",
+      "class": "openapi-roundtrip-loss",
+      "issue": "barwise-1045",
+      "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-1045).",
+      "detail": "165 delta(s) outside the declared loss set: modified object_type PartyId; modified object_type PartyName; modified object_type EmailAddress; modified object_type MarketplaceCode; modified object_type CategoryCode; modified object_type ProductId; modified object_type VariantId; modified object_type L"
+    },
+    "C04/small/1/roundtrip-diff:snowflake-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets-roundtrip",
+      "issue": "barwise-1032",
+      "note": "Consequence of barwise-1032: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "detail": "16 delta(s) outside the declared loss set: removed object_type Party; removed object_type Currency; removed object_type Category; removed object_type Product; removed object_type PhysicalProduct; removed object_type Seller; removed object_type ProductVariant; removed object_type Marketplace"
+    },
+    "C04/small/4/read-back:norma": {
+      "severity": "S1",
+      "class": "norma-read-back-sample-flag",
+      "issue": "barwise-1047",
+      "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation. The cause is the lost `sample: true` flag: NORMA has no seat for a sample instance, so the populations come back significant, their instances enter the object universe, and every mandatory role they must play reports a violation (barwise-1047). Restoring only that flag takes the round-tripped model from 49 errors to 0.",
+      "detail": "the model the importer wrote has 49 structural error(s): population/mandatory-violation"
+    },
+    "C04/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1034",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1034 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 22 structural error(s): structural/duplicate-role-id"
+    },
+    "C04/small/5/diff:1:rename_object_type": {
+      "severity": "S5",
+      "class": "diff-rename-no-synonym",
+      "issue": "barwise-1040",
+      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-1040).",
+      "detail": "rename Listing -> Offer reported as a removal plus an addition with no synonym candidate"
+    },
+    "C04/small/5/diff:5:rename_object_type": {
+      "severity": "S5",
+      "class": "diff-rename-no-synonym",
+      "issue": "barwise-1040",
+      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-1040).",
+      "detail": "rename Offer -> Listing reported as a removal plus an addition with no synonym candidate"
+    },
+    "C04/small/6/acceptance:catalog-steward:snowflake-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "3 of 5 persona checks fail: The model has no object type named \"HazmatProduct\".; The model has no object type named \"Listing\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Product bundles Product\"), so it cannot rule out: Rules out: a acyclic ring violatio"
+    },
+    "C04/small/6/release-bundle:gym-list": {
+      "severity": "S3",
+      "class": "bundle-gym-catalog",
+      "issue": "barwise-1043",
+      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-1043).",
+      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
+    },
+    "C05/small/1/import:erp-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets",
+      "issue": "barwise-1032",
+      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-1032). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
+      "detail": "exit 0 but 17 of 33 expected names are absent from the model and 17 of them are not mentioned on stderr (52% silently dropped)"
+    },
+    "C05/small/1/import:scheduling-kotlin": {
+      "severity": "S1",
+      "class": "kotlin-importer-empty",
+      "issue": "barwise-1041",
+      "note": "The Kotlin importer returns an empty model for data classes and sealed classes with constructor properties, exit 0, no warning naming a class (barwise-1041).",
+      "detail": "exit 0 but 20 of 20 expected names are absent from the model and 20 of them are not mentioned on stderr (100% silently dropped)"
+    },
+    "C05/small/1/model-roundtrip:dbt": {
+      "severity": "S1",
+      "class": "dbt-roundtrip",
+      "issue": "barwise-1038",
+      "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-1038).",
+      "detail": "138 delta(s) outside the declared loss set: removed object_type MaterialNumber; modified object_type MaterialDescription; modified object_type MaterialTypeCode; removed object_type UomCode; removed object_type Quantity; removed object_type CharacteristicName; removed object_type PlantCode; removed o"
+    },
+    "C05/small/1/model-roundtrip:ddl": {
+      "severity": "S1",
+      "class": "ddl-roundtrip",
+      "issue": "barwise-1036",
+      "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-1036).",
+      "detail": "123 delta(s) outside the declared loss set: removed object_type MaterialNumber; removed object_type MaterialDescription; removed object_type MaterialTypeCode; removed object_type UomCode; removed object_type Quantity; removed object_type CharacteristicName; removed object_type PlantCode; removed obj"
+    },
+    "C05/small/1/model-roundtrip:norma": {
+      "severity": "S1",
+      "class": "norma-roundtrip",
+      "issue": "barwise-1039",
+      "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-1039).",
+      "detail": "5 delta(s) outside the declared loss set: modified fact_type MaterialPlantData is for Material; modified fact_type InspectionLot inspects Batch; modified fact_type Batch is released to StorageLocation; modified fact_type PurchaseOrderItem belongs to PurchaseOrder; modified fact_type PurchaseOrderIte"
+    },
+    "C05/small/1/model-roundtrip:openapi": {
+      "severity": "S1",
+      "class": "openapi-roundtrip-loss",
+      "issue": "barwise-1045",
+      "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-1045).",
+      "detail": "164 delta(s) outside the declared loss set: modified object_type MaterialNumber; modified object_type MaterialDescription; modified object_type MaterialTypeCode; modified object_type UomCode; removed object_type Quantity; modified object_type CharacteristicName; modified object_type PlantCode; modif"
+    },
+    "C05/small/1/roundtrip-diff:erp-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets-roundtrip",
+      "issue": "barwise-1032",
+      "note": "Consequence of barwise-1032: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "detail": "15 delta(s) outside the declared loss set: removed object_type UnitOfMeasure; removed object_type Mat; removed object_type WorkCenter; removed object_type FinishedGood; removed object_type Werk; removed object_type Plko; removed object_type Charg; removed object_type Lifnr"
+    },
+    "C05/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1034",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1034 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 30 structural error(s): structural/duplicate-role-id"
+    },
+    "C05/small/5/merge:8:rename_fact_type": {
+      "severity": "S3",
+      "class": "merge-rename-structural-error",
+      "issue": "barwise-1042",
+      "note": "merge exits 1 with 'Merge produced 1 structural error(s)' on a fact-type rename and does not say which error (barwise-1042).",
+      "detail": "exit 1: Merge produced 1 structural error(s); nothing was written."
+    },
+    "C05/small/6/acceptance:master-data-lead:erp-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "5 of 6 persona checks fail: The model has no object type named \"Material\".; The model has no object type named \"Plant\".; The model has no object type named \"MaterialPlantData\".; The model has no fact type connecting \"Material\" and \"Plant\"."
+    },
+    "C05/small/6/release-bundle:gym-list": {
+      "severity": "S3",
+      "class": "bundle-gym-catalog",
+      "issue": "barwise-1043",
+      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-1043).",
+      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
+    },
+    "C06/small/1/import:tms-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets",
+      "issue": "barwise-1032",
+      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-1032). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
+      "detail": "exit 0 but 11 of 33 expected names are absent from the model and 9 of them are not mentioned on stderr (33% silently dropped)"
+    },
+    "C06/small/1/model-roundtrip:dbt": {
+      "severity": "S3",
+      "class": "dbt-importer-duplicate-fact-type",
+      "issue": "barwise-1037",
+      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-1037).",
+      "detail": "exit 1: Error: Fact type \"Leg has Port\" already exists in model \"dbt Import\"."
+    },
+    "C06/small/1/model-roundtrip:ddl": {
+      "severity": "S1",
+      "class": "ddl-roundtrip",
+      "issue": "barwise-1036",
+      "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-1036).",
+      "detail": "114 delta(s) outside the declared loss set: removed object_type ShipperId; removed object_type ConsigneeId; removed object_type ScacCode; removed object_type ShipmentNumber; removed object_type BookingNumber; removed object_type BookingStatus; removed object_type Incoterm; removed object_type UnLoco"
+    },
+    "C06/small/1/model-roundtrip:norma": {
+      "severity": "S1",
+      "class": "norma-roundtrip",
+      "issue": "barwise-1039",
+      "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-1039).",
+      "detail": "5 delta(s) outside the declared loss set: modified object_type EventId; modified fact_type Container has OwnerCode; modified fact_type Container has CheckDigit; modified fact_type ContainerMovement moves Container; modified fact_type ContainerMovement has SequenceNumber"
+    },
+    "C06/small/1/model-roundtrip:openapi": {
+      "severity": "S1",
+      "class": "openapi-roundtrip-loss",
+      "issue": "barwise-1045",
+      "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-1045).",
+      "detail": "148 delta(s) outside the declared loss set: modified object_type ShipperId; modified object_type ConsigneeId; modified object_type ScacCode; modified object_type ShipmentNumber; modified object_type BookingNumber; modified object_type BookingStatus; modified object_type Incoterm; modified object_typ"
+    },
+    "C06/small/1/roundtrip-diff:tms-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets-roundtrip",
+      "issue": "barwise-1032",
+      "note": "Consequence of barwise-1032: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "detail": "20 delta(s) outside the declared loss set: removed object_type Consignee; removed object_type Port; removed object_type Carrier; removed object_type Vehicle; removed object_type Container; removed object_type Voyage; removed object_type Leg; removed object_type Shipment"
+    },
+    "C06/small/4/read-back:dbt": {
+      "severity": "S3",
+      "class": "dbt-importer-duplicate-fact-type",
+      "issue": "barwise-1037",
+      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-1037).",
+      "detail": "exit 1: Error: Fact type \"Leg has Port\" already exists in model \"dbt Import\"."
+    },
+    "C06/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1034",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1034 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 17 structural error(s): structural/duplicate-role-id"
+    },
+    "C06/small/5/diff:1:rename_object_type": {
+      "severity": "S5",
+      "class": "diff-rename-no-synonym",
+      "issue": "barwise-1040",
+      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-1040).",
+      "detail": "rename Vehicle -> Conveyance reported as a removal plus an addition with no synonym candidate"
+    },
+    "C06/small/5/diff:5:rename_object_type": {
+      "severity": "S5",
+      "class": "diff-rename-no-synonym",
+      "issue": "barwise-1040",
+      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-1040).",
+      "detail": "rename Conveyance -> Vehicle reported as a removal plus an addition with no synonym candidate"
+    },
+    "C06/small/6/acceptance:integration-architect:platform-typescript": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "1 of 5 persona checks fail: The model has no fact type connecting \"Shipment\" and \"Carrier\"."
+    },
+    "C06/small/6/acceptance:tms-dba:tms-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "2 of 6 persona checks fail: The model has no fact type connecting \"Shipment\" and \"Container\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Shipment travels Leg on Vehicle\"), so it cannot rule out: Rules out: two facts of Shipment travels Leg on Vehicle tha"
+    },
+    "C06/small/6/release-bundle:gym-list": {
+      "severity": "S3",
+      "class": "bundle-gym-catalog",
+      "issue": "barwise-1043",
+      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-1043).",
+      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
+    },
+    "C07/small/1/import:bq-ddl": {
+      "severity": "S3",
+      "class": "sql-importer-fk-targets",
+      "issue": "barwise-1032",
+      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-1032). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
+      "detail": "exit 0 and an empty model from an artifact with 38 expected names; the only signal is 0 warning(s): (none)"
+    },
+    "C07/small/1/model-roundtrip:dbt": {
+      "severity": "S1",
+      "class": "dbt-roundtrip",
+      "issue": "barwise-1038",
+      "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-1038).",
+      "detail": "146 delta(s) outside the declared loss set: removed object_type PartyId; removed object_type CustomerId; removed object_type SubscriberId; removed object_type CountryCode; removed object_type OperatorCode; removed object_type ProductSpecificationId; removed object_type ProductOfferingId; removed obj"
+    },
+    "C07/small/1/model-roundtrip:ddl": {
+      "severity": "S1",
+      "class": "ddl-roundtrip",
+      "issue": "barwise-1036",
+      "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-1036).",
+      "detail": "126 delta(s) outside the declared loss set: removed object_type PartyId; removed object_type CustomerId; removed object_type SubscriberId; removed object_type CountryCode; removed object_type OperatorCode; removed object_type ProductSpecificationId; removed object_type ProductOfferingId; removed obj"
+    },
+    "C07/small/1/model-roundtrip:norma": {
+      "severity": "S1",
+      "class": "norma-roundtrip",
+      "issue": "barwise-1039",
+      "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-1039).",
+      "detail": "13 delta(s) outside the declared loss set: modified object_type Individual; modified object_type Customer; modified object_type Subscriber; modified object_type Operator; modified object_type ProductOffering; modified object_type CustomerFacingService; modified object_type ResourceFacingService; mod"
+    },
+    "C07/small/1/model-roundtrip:openapi": {
+      "severity": "S1",
+      "class": "openapi-roundtrip-loss",
+      "issue": "barwise-1045",
+      "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-1045).",
+      "detail": "181 delta(s) outside the declared loss set: modified object_type PartyId; modified object_type CustomerId; modified object_type SubscriberId; modified object_type CountryCode; modified object_type OperatorCode; modified object_type ProductSpecificationId; modified object_type ProductOfferingId; modi"
+    },
+    "C07/small/1/roundtrip-diff:tmf-openapi": {
+      "severity": "S1",
+      "class": "openapi-export-comment-header",
+      "issue": "barwise-1035",
+      "note": "The default OpenAPI export writes a /* comment */ header when the model has diagnostics (which it always has after barwise-1034), so the .json is not JSON and the importer returns an empty model with exit 0 (barwise-1035).",
+      "detail": "140 delta(s) outside the declared loss set: removed object_type Party; removed object_type Individual; removed object_type Organization; removed object_type Customer; removed object_type Subscriber; removed object_type Country; removed object_type Operator; removed object_type ProductSpecification"
+    },
+    "C07/small/1/validate-imported:tmf-openapi": {
+      "severity": "S1",
+      "class": "openapi-importer-duplicate-role-ids",
+      "issue": "barwise-1034",
+      "note": "The OpenAPI importer derives role ids from the property name, so two schemas with a 'related' or 'has' property collide and every imported model fails structural/duplicate-role-id (barwise-1034).",
+      "detail": "the model the importer wrote has 48 structural error(s): structural/duplicate-role-id"
+    },
+    "C07/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1034",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1034 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 31 structural error(s): structural/duplicate-role-id"
+    },
+    "C07/small/6/acceptance:catalog-product-manager:tmf-openapi": {
+      "severity": "S1",
+      "class": "openapi-importer-duplicate-role-ids-acceptance",
+      "issue": "barwise-1034",
+      "note": "Consequence of barwise-1034: the persona's must_validate check fails on the importer's duplicate role ids. Closes with the parent.",
+      "detail": "5 of 9 persona checks fail: The model has 48 validation error(s): Role \"related\" in fact type \"Customer related Party\" has id \"1ebc923b-ec6b-4c8b-bbf1-168ca3239ea0-related-role\", which another role already uses. Role ids must be unique across the model. (and 47 more); Your model still allows what it"
+    },
+    "C07/small/6/acceptance:integration-engineer:tmf-openapi": {
+      "severity": "S1",
+      "class": "openapi-importer-duplicate-role-ids-acceptance",
+      "issue": "barwise-1034",
+      "note": "Consequence of barwise-1034: the persona's must_validate check fails on the importer's duplicate role ids. Closes with the parent.",
+      "detail": "4 of 10 persona checks fail: The model has 48 validation error(s): Role \"related\" in fact type \"Customer related Party\" has id \"1ebc923b-ec6b-4c8b-bbf1-168ca3239ea0-related-role\", which another role already uses. Role ids must be unique across the model. (and 47 more); Your model still allows what i"
+    },
+    "C07/small/6/release-bundle:gym-list": {
+      "severity": "S3",
+      "class": "bundle-gym-catalog",
+      "issue": "barwise-1043",
+      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-1043).",
+      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
+    },
+    "C08/small/1/import:cis-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets",
+      "issue": "barwise-1032",
+      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-1032). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
+      "detail": "exit 0 but 6 of 25 expected names are absent from the model and 6 of them are not mentioned on stderr (24% silently dropped)"
+    },
+    "C08/small/1/model-roundtrip:dbt": {
+      "severity": "S1",
+      "class": "dbt-roundtrip",
+      "issue": "barwise-1038",
+      "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-1038).",
+      "detail": "123 delta(s) outside the declared loss set: removed object_type ServicePointId; removed object_type MeterId; removed object_type ManufacturerCode; removed object_type PremiseId; removed object_type CustomerNumber; removed object_type AccountNumber; removed object_type AgreementNumber; removed object"
+    },
+    "C08/small/1/model-roundtrip:ddl": {
+      "severity": "S1",
+      "class": "ddl-roundtrip",
+      "issue": "barwise-1036",
+      "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-1036).",
+      "detail": "111 delta(s) outside the declared loss set: removed object_type ServicePointId; removed object_type MeterId; removed object_type ManufacturerCode; removed object_type PremiseId; removed object_type CustomerNumber; removed object_type AccountNumber; removed object_type AgreementNumber; removed object"
+    },
+    "C08/small/1/model-roundtrip:norma": {
+      "severity": "S1",
+      "class": "norma-roundtrip",
+      "issue": "barwise-1039",
+      "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-1039).",
+      "detail": "3 delta(s) outside the declared loss set: modified fact_type Meter has SerialNumber; removed definition read; removed definition estimated read"
+    },
+    "C08/small/1/model-roundtrip:openapi": {
+      "severity": "S1",
+      "class": "openapi-roundtrip-loss",
+      "issue": "barwise-1045",
+      "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-1045).",
+      "detail": "143 delta(s) outside the declared loss set: modified object_type ServicePointId; modified object_type MeterId; modified object_type ManufacturerCode; modified object_type PremiseId; modified object_type CustomerNumber; modified object_type AccountNumber; modified object_type AgreementNumber; modifie"
+    },
+    "C08/small/1/roundtrip-diff:cis-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets-roundtrip",
+      "issue": "barwise-1032",
+      "note": "Consequence of barwise-1032: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "detail": "14 delta(s) outside the declared loss set: removed object_type Premise; removed object_type Transformer; removed object_type Manufacturer; removed object_type ServicePoint; removed object_type Meter; removed object_type SmartMeter; removed object_type Customer; removed object_type Tariff"
+    },
+    "C08/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1034",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1034 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 9 structural error(s): structural/duplicate-role-id"
+    },
+    "C08/small/5/diff:1:rename_object_type": {
+      "severity": "S5",
+      "class": "diff-rename-no-synonym",
+      "issue": "barwise-1040",
+      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-1040).",
+      "detail": "rename Premise -> ServiceLocation reported as a removal plus an addition with no synonym candidate"
+    },
+    "C08/small/5/diff:5:rename_object_type": {
+      "severity": "S5",
+      "class": "diff-rename-no-synonym",
+      "issue": "barwise-1040",
+      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-1040).",
+      "detail": "rename ServiceLocation -> Premise reported as a removal plus an addition with no synonym candidate"
+    },
+    "C08/small/6/acceptance:c08-billing-analyst:cis-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "5 of 8 persona checks fail: The model has no object type named \"ServiceAgreement\".; The model has no fact type connecting \"ServiceAgreement\" and \"Tariff\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"ServiceAgreement is billed under Tariff\"), so it cannot "
+    },
+    "C08/small/6/acceptance:c08-metering-data-engineer:cis-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "6 of 8 persona checks fail: The model has no object type named \"IntervalMeter\".; The model has no fact type connecting \"Meter\" and \"IntervalTimestamp\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Meter records ReadingValue at IntervalTimestamp\"), so it ca"
+    },
+    "C08/small/6/release-bundle:gym-list": {
+      "severity": "S3",
+      "class": "bundle-gym-catalog",
+      "issue": "barwise-1043",
+      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-1043).",
+      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
+    },
+    "C09/small/1/model-roundtrip:dbt": {
+      "severity": "S1",
+      "class": "dbt-roundtrip",
+      "issue": "barwise-1038",
+      "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-1038).",
+      "detail": "143 delta(s) outside the declared loss set: removed object_type StudyId; removed object_type ProtocolNumber; removed object_type AmendmentNumber; removed object_type SiteId; removed object_type InvestigatorId; removed object_type ArmCode; removed object_type TreatmentCode; removed object_type Unique"
+    },
+    "C09/small/1/model-roundtrip:ddl": {
+      "severity": "S1",
+      "class": "ddl-roundtrip",
+      "issue": "barwise-1036",
+      "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-1036).",
+      "detail": "122 delta(s) outside the declared loss set: removed object_type StudyId; removed object_type ProtocolNumber; removed object_type AmendmentNumber; removed object_type SiteId; removed object_type InvestigatorId; removed object_type ArmCode; removed object_type TreatmentCode; removed object_type Unique"
+    },
+    "C09/small/1/model-roundtrip:norma": {
+      "severity": "S1",
+      "class": "norma-roundtrip",
+      "issue": "barwise-1039",
+      "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-1039).",
+      "detail": "14 delta(s) outside the declared loss set: modified object_type Study; modified object_type Site; modified object_type Treatment; modified object_type Subject; modified object_type AdverseEvent; modified object_type SeriousAdverseEvent; modified object_type ConcomitantMedication; modified fact_type "
+    },
+    "C09/small/1/model-roundtrip:openapi": {
+      "severity": "S1",
+      "class": "openapi-roundtrip-loss",
+      "issue": "barwise-1045",
+      "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-1045).",
+      "detail": "166 delta(s) outside the declared loss set: modified object_type StudyId; modified object_type ProtocolNumber; removed object_type AmendmentNumber; modified object_type SiteId; modified object_type InvestigatorId; modified object_type ArmCode; modified object_type TreatmentCode; modified object_type"
+    },
+    "C09/small/1/roundtrip-diff:sdtm-ddl": {
+      "severity": "S1",
+      "class": "ddl-regex-roundtrip",
+      "issue": "barwise-1036",
+      "note": "Consequence of barwise-1036 and barwise-1033: the DDL export of the imported model is not readable back by the regex importer. Closes with the parents.",
+      "detail": "503 delta(s) outside the declared loss set: removed object_type StudyTitle; removed object_type StudyPhase; removed object_type ProtocolTitle; removed object_type AmendmentApprovalDate; removed object_type CountryCode; removed object_type InvestigatorName; removed object_type SubjectNumber; removed "
+    },
+    "C09/small/1/validate-imported:sdtm-ddl": {
+      "severity": "S1",
+      "class": "ddl-importer-duplicate-role-ids",
+      "issue": "barwise-1034",
+      "note": "The DDL importer has the same role-id collision as the OpenAPI importer: role ids derived from column names collide across tables and the imported model fails structural/duplicate-role-id (barwise-1034, second importer).",
+      "detail": "the model the importer wrote has 29 structural error(s): structural/duplicate-role-id"
+    },
+    "C09/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1034",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1034 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 16 structural error(s): structural/duplicate-role-id"
+    },
+    "C09/small/5/diff:1:rename_object_type": {
+      "severity": "S5",
+      "class": "diff-rename-no-synonym",
+      "issue": "barwise-1040",
+      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-1040).",
+      "detail": "rename Treatment -> InvestigationalProduct reported as a removal plus an addition with no synonym candidate"
+    },
+    "C09/small/5/diff:9:rename_object_type": {
+      "severity": "S5",
+      "class": "diff-rename-no-synonym",
+      "issue": "barwise-1040",
+      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-1040).",
+      "detail": "rename Site -> InvestigationalSite reported as a removal plus an addition with no synonym candidate"
+    },
+    "C09/small/6/acceptance:biostatistician:legacy-norma": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "2 of 10 persona checks fail: Your model still allows what it should forbid: Rules out: two facts of RandomizedSubject is assigned to Arm that agree on RandomizedSubject -- e.g. {RandomizedSubject=RandomizedSubject#1, Arm=Arm#1}; {RandomizedSubject=RandomizedSubject#1, Arm=Arm#2}; The model does not "
+    },
+    "C09/small/6/acceptance:biostatistician:sdtm-ddl": {
+      "severity": "S1",
+      "class": "ddl-importer-duplicate-role-ids-acceptance",
+      "issue": "barwise-1034",
+      "note": "Consequence of barwise-1034 in the DDL importer: the persona's must_validate check fails on duplicate role ids. Closes with the parent.",
+      "detail": "4 of 10 persona checks fail: The model has 29 validation error(s): Role \"study\" in fact type \"Subject study Study\" has id \"691c2b02-fe93-4b56-b90d-6055d6b5d0d1-study-role\", which another role already uses. Role ids must be unique across the model. (and 28 more); The model does not verbalize as \"Rand"
+    },
+    "C09/small/6/acceptance:clinical-data-manager:legacy-norma": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "4 of 10 persona checks fail: Your model still allows what it should forbid: Rules out: two facts of Subject has UniqueSubjectId that agree on Subject -- e.g. {Subject=Subject#1, UniqueSubjectId=UniqueSubjectId#1}; {Subject=Subject#1, UniqueSubjectId=UniqueSubjectId#2}; The model does not verbalize a"
+    },
+    "C09/small/6/acceptance:clinical-data-manager:sdtm-ddl": {
+      "severity": "S1",
+      "class": "ddl-importer-duplicate-role-ids-acceptance",
+      "issue": "barwise-1034",
+      "note": "Consequence of barwise-1034 in the DDL importer: the persona's must_validate check fails on duplicate role ids. Closes with the parent.",
+      "detail": "6 of 10 persona checks fail: The model has 29 validation error(s): Role \"study\" in fact type \"Subject study Study\" has id \"691c2b02-fe93-4b56-b90d-6055d6b5d0d1-study-role\", which another role already uses. Role ids must be unique across the model. (and 28 more); Your model does not yet carry the rel"
+    },
+    "C09/small/6/acceptance:pharmacovigilance-lead:legacy-norma": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "3 of 10 persona checks fail: The model does not verbalize as \"It is obligatory that each SeriousAdverseEvent was reported at at least one SaeReportDateTime.\". Check the fact type, its reading, and its constraints.; Your model still allows what it should forbid: Rules out: a acyclic ring violation am"
+    },
+    "C09/small/6/acceptance:pharmacovigilance-lead:sdtm-ddl": {
+      "severity": "S1",
+      "class": "ddl-importer-duplicate-role-ids-acceptance",
+      "issue": "barwise-1034",
+      "note": "Consequence of barwise-1034 in the DDL importer: the persona's must_validate check fails on duplicate role ids. Closes with the parent.",
+      "detail": "7 of 10 persona checks fail: The model has 29 validation error(s): Role \"study\" in fact type \"Subject study Study\" has id \"691c2b02-fe93-4b56-b90d-6055d6b5d0d1-study-role\", which another role already uses. Role ids must be unique across the model. (and 28 more); Your model does not yet carry the rel"
+    },
+    "C09/small/6/release-bundle:gym-list": {
+      "severity": "S3",
+      "class": "bundle-gym-catalog",
+      "issue": "barwise-1043",
+      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-1043).",
+      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
+    },
+    "C10/small/1/import:sis-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets",
+      "issue": "barwise-1032",
+      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-1032). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
+      "detail": "exit 0 but 10 of 31 expected names are absent from the model and 10 of them are not mentioned on stderr (32% silently dropped)"
+    },
+    "C10/small/1/model-roundtrip:dbt": {
+      "severity": "S1",
+      "class": "dbt-roundtrip",
+      "issue": "barwise-1038",
+      "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-1038).",
+      "detail": "147 delta(s) outside the declared loss set: removed object_type Pidm; modified object_type StudentNumber; removed object_type CampusCode; removed object_type CollegeCode; removed object_type DepartmentCode; removed object_type CourseId; removed object_type Crn; removed object_type TermCode"
+    },
+    "C10/small/1/model-roundtrip:ddl": {
+      "severity": "S1",
+      "class": "ddl-roundtrip",
+      "issue": "barwise-1036",
+      "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-1036).",
+      "detail": "125 delta(s) outside the declared loss set: removed object_type Pidm; removed object_type StudentNumber; removed object_type CampusCode; removed object_type CollegeCode; removed object_type DepartmentCode; removed object_type CourseId; removed object_type Crn; removed object_type TermCode"
+    },
+    "C10/small/1/model-roundtrip:norma": {
+      "severity": "S1",
+      "class": "norma-roundtrip",
+      "issue": "barwise-1039",
+      "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-1039).",
+      "detail": "9 delta(s) outside the declared loss set: modified fact_type Student has StudentNumber; modified fact_type Student has home Campus; modified fact_type Course has SubjectCode; modified fact_type Student holds FerpaRestriction; modified fact_type DirectoryInformationRelease discloses Student; modified"
+    },
+    "C10/small/1/model-roundtrip:openapi": {
+      "severity": "S1",
+      "class": "openapi-roundtrip-loss",
+      "issue": "barwise-1045",
+      "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-1045).",
+      "detail": "167 delta(s) outside the declared loss set: modified object_type Pidm; modified object_type StudentNumber; modified object_type CampusCode; modified object_type CollegeCode; modified object_type DepartmentCode; modified object_type CourseId; modified object_type Crn; modified object_type TermCode"
+    },
+    "C10/small/1/roundtrip-diff:sis-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets-roundtrip",
+      "issue": "barwise-1032",
+      "note": "Consequence of barwise-1032: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "detail": "16 delta(s) outside the declared loss set: removed object_type Spriden; removed object_type Stvcamp; removed object_type Sgbstdn; removed object_type Sibinst; removed object_type Pebempl; removed object_type Stvcoll; removed object_type Stvdept; removed object_type Scbcrse"
+    },
+    "C10/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1034",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1034 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 19 structural error(s): structural/duplicate-role-id"
+    },
+    "C10/small/6/acceptance:financial-aid-director:sis-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "6 of 9 persona checks fail: The model has no object type named \"FinancialAidAward\".; The model has no fact type connecting \"FinancialAidAward\" and \"Student\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"FinancialAidAward is awarded to Student\"), so it cann"
+    },
+    "C10/small/6/acceptance:ir-analyst:sis-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "7 of 9 persona checks fail: The model has no object type named \"Grade\".; The model has no object type named \"GraduateStudent\".; The model does not verbalize as \"GraduateStudent is a subtype of Student.\". Check the fact type, its reading, and its constraints.; The model does not verbalize as \"Enrollm"
+    },
+    "C10/small/6/acceptance:registrar-data-steward:sis-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "8 of 9 persona checks fail: The model has no object type named \"Term\".; The model has no object type named \"Enrollment\".; The model has no fact type connecting \"Student\" and \"CourseSection\".; The model has no fact type connecting \"Course\" and \"Course\"."
+    },
+    "C10/small/6/acceptance:sis-dba:sis-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "8 of 9 persona checks fail: The model has no object type named \"Person\".; The model has no fact type connecting \"Person\" and \"Pidm\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Person has Pidm\"), so it cannot rule out: Rules out: two facts of Person has P"
+    },
+    "C10/small/6/release-bundle:gym-list": {
+      "severity": "S3",
+      "class": "bundle-gym-catalog",
+      "issue": "barwise-1043",
+      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-1043).",
+      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
+    },
+    "C11/small/1/import:backend-kotlin": {
+      "severity": "S1",
+      "class": "kotlin-importer-empty",
+      "issue": "barwise-1041",
+      "note": "The Kotlin importer returns an empty model for data classes and sealed classes with constructor properties, exit 0, no warning naming a class (barwise-1041).",
+      "detail": "exit 0 but 20 of 20 expected names are absent from the model and 18 of them are not mentioned on stderr (100% silently dropped)"
+    },
+    "C11/small/1/import:metrics-dbt": {
+      "severity": "S3",
+      "class": "dbt-importer-duplicate-fact-type",
+      "issue": "barwise-1037",
+      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-1037).",
+      "detail": "exit 1: Error: Fact type \"FunnelStepPrecedesFunnelStep has FunnelStep\" already exists in model \"dbt Import\"."
+    },
+    "C11/small/1/model-roundtrip:dbt": {
+      "severity": "S1",
+      "class": "dbt-roundtrip",
+      "issue": "barwise-1038",
+      "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-1038).",
+      "detail": "150 delta(s) outside the declared loss set: removed object_type TenantId; removed object_type RegionCode; removed object_type WorkspaceId; removed object_type ProjectId; removed object_type ApiKeyId; removed object_type ServiceAccountId; modified object_type TenantName; modified object_type ApiKeySc"
+    },
+    "C11/small/1/model-roundtrip:ddl": {
+      "severity": "S1",
+      "class": "ddl-roundtrip",
+      "issue": "barwise-1036",
+      "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-1036).",
+      "detail": "125 delta(s) outside the declared loss set: removed object_type TenantId; removed object_type RegionCode; removed object_type WorkspaceId; removed object_type ProjectId; removed object_type ApiKeyId; removed object_type ServiceAccountId; removed object_type TenantName; removed object_type ApiKeyScop"
+    },
+    "C11/small/1/model-roundtrip:norma": {
+      "severity": "S1",
+      "class": "norma-roundtrip",
+      "issue": "barwise-1039",
+      "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-1039).",
+      "detail": "45 delta(s) outside the declared loss set: modified object_type RetentionWindow; modified object_type ConversionWindow; modified object_type Tenant; modified object_type DataRegion; modified object_type Workspace; modified object_type Project; modified object_type ApiKey; modified object_type Servic"
+    },
+    "C11/small/1/model-roundtrip:openapi": {
+      "severity": "S1",
+      "class": "openapi-roundtrip-loss",
+      "issue": "barwise-1045",
+      "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-1045).",
+      "detail": "170 delta(s) outside the declared loss set: modified object_type TenantId; modified object_type RegionCode; modified object_type WorkspaceId; modified object_type ProjectId; modified object_type ApiKeyId; modified object_type ServiceAccountId; modified object_type TenantName; modified object_type Ap"
+    },
+    "C11/small/4/read-back:norma": {
+      "severity": "S1",
+      "class": "norma-read-back-sample-flag",
+      "issue": "barwise-1047",
+      "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation. The cause is the lost `sample: true` flag: NORMA has no seat for a sample instance, so the populations come back significant, their instances enter the object universe, and every mandatory role they must play reports a violation (barwise-1047). Restoring only that flag takes the round-tripped model from 49 errors to 0.",
+      "detail": "the model the importer wrote has 37 structural error(s): population/mandatory-violation"
+    },
+    "C11/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1034",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1034 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 15 structural error(s): structural/duplicate-role-id"
+    },
+    "C11/small/5/diff:1:rename_object_type": {
+      "severity": "S5",
+      "class": "diff-rename-no-synonym",
+      "issue": "barwise-1040",
+      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-1040).",
+      "detail": "rename Workspace -> Team reported as a removal plus an addition with no synonym candidate"
+    },
+    "C11/small/5/diff:5:rename_object_type": {
+      "severity": "S5",
+      "class": "diff-rename-no-synonym",
+      "issue": "barwise-1040",
+      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-1040).",
+      "detail": "rename Team -> Workspace reported as a removal plus an addition with no synonym candidate"
+    },
+    "C11/small/6/acceptance:founding-engineer:backend-kotlin": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "5 of 6 persona checks fail: The model has no object type named \"Tenant\".; The model has no object type named \"Event\".; The model has no object type named \"VerifiedUser\".; The model has no fact type connecting \"Event\" and \"Session\"."
+    },
+    "C11/small/6/release-bundle:gym-list": {
+      "severity": "S3",
+      "class": "bundle-gym-catalog",
+      "issue": "barwise-1043",
+      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-1043).",
+      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
+    },
+    "C12/small/1/import:mainframe-ddl": {
+      "severity": "S3",
+      "class": "sql-importer-fk-targets",
+      "issue": "barwise-1032",
+      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-1032). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
+      "detail": "exit 0 and an empty model for a format barwise does not read (db2); the refusal is invisible"
+    },
+    "C12/small/1/import:modern-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets",
+      "issue": "barwise-1032",
+      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-1032). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
+      "detail": "exit 0 but 10 of 26 expected names are absent from the model and 10 of them are not mentioned on stderr (38% silently dropped)"
+    },
+    "C12/small/1/model-roundtrip:dbt": {
+      "severity": "S1",
+      "class": "dbt-roundtrip",
+      "issue": "barwise-1038",
+      "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-1038).",
+      "detail": "147 delta(s) outside the declared loss set: removed object_type ClientNumber; removed object_type HouseholdNumber; removed object_type IncomeSourceId; modified object_type CaseId; modified object_type CaseNumber; modified object_type ProgramCode; modified object_type PeriodNumber; removed object_typ"
+    },
+    "C12/small/1/model-roundtrip:ddl": {
+      "severity": "S1",
+      "class": "ddl-roundtrip",
+      "issue": "barwise-1036",
+      "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-1036).",
+      "detail": "126 delta(s) outside the declared loss set: removed object_type ClientNumber; removed object_type HouseholdNumber; removed object_type IncomeSourceId; removed object_type CaseId; removed object_type CaseNumber; removed object_type ProgramCode; removed object_type PeriodNumber; removed object_type Be"
+    },
+    "C12/small/1/model-roundtrip:norma": {
+      "severity": "S1",
+      "class": "norma-roundtrip",
+      "issue": "barwise-1039",
+      "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-1039).",
+      "detail": "8 delta(s) outside the declared loss set: modified object_type Client; modified object_type Recipient; modified object_type Household; modified object_type EligibilityWorker; modified fact_type Case has CaseNumber; modified fact_type Sanction is imposed on Recipient; removed definition Case; removed"
+    },
+    "C12/small/1/model-roundtrip:openapi": {
+      "severity": "S1",
+      "class": "openapi-roundtrip-loss",
+      "issue": "barwise-1045",
+      "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-1045).",
+      "detail": "183 delta(s) outside the declared loss set: modified object_type ClientNumber; modified object_type HouseholdNumber; modified object_type IncomeSourceId; modified object_type CaseId; modified object_type CaseNumber; modified object_type ProgramCode; modified object_type PeriodNumber; modified object"
+    },
+    "C12/small/1/roundtrip-diff:modern-ddl": {
+      "severity": "S1",
+      "class": "sql-importer-fk-targets-roundtrip",
+      "issue": "barwise-1032",
+      "note": "Consequence of barwise-1032: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "detail": "29 delta(s) outside the declared loss set: removed object_type Hhld; removed object_type Clnt; removed object_type Aplct; removed object_type Ofc; removed object_type EligWrk; removed object_type Supv; removed object_type Detr; removed object_type Prgm"
+    },
+    "C12/small/4/read-back:openapi": {
+      "severity": "S1",
+      "class": "read-back-duplicate-role-ids",
+      "issue": "barwise-1034",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-1034 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
+      "detail": "the model the importer wrote has 32 structural error(s): structural/duplicate-role-id"
+    },
+    "C12/small/6/acceptance:hearing-officer:modern-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "9 of 10 persona checks fail: The model has no object type named \"Appeal\".; The model has no object type named \"HearingOfficer\".; The model has no fact type connecting \"Appeal\" and \"Determination\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Appeal contest"
+    },
+    "C12/small/6/acceptance:mainframe-dba:modern-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "8 of 10 persona checks fail: The model has no object type named \"Client\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Client has ClientNumber\"), so it cannot rule out: Rules out: two facts of Client has ClientNumber that agree on Client -- e.g. {Client=Cl"
+    },
+    "C12/small/6/acceptance:modernization-architect:modern-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "9 of 10 persona checks fail: The model has no object type named \"Applicant\".; The model has no object type named \"Recipient\".; The model has no object type named \"Household\".; The model has no fact type connecting \"Client\" and \"Household\"."
+    },
+    "C12/small/6/acceptance:policy-analyst:modern-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance",
+      "issue": "barwise-1032",
+      "note": "Edit distance to acceptance: the persona's checks fail because the model barwise produced from their artifact is missing the entities the importer dropped (barwise-1032 for sql, barwise-1041 for kotlin, barwise-1034 for openapi). A consequence row; closes with the importer issue it names.",
+      "detail": "8 of 9 persona checks fail: The model has no object type named \"Determination\".; The model has no object type named \"CertificationPeriod\".; The model does not verbalize as \"Each combination of Case, Program and CertificationPeriod is unique in Case is determined for Program in CertificationPeriod.\"."
+    },
+    "C12/small/6/release-bundle:gym-list": {
+      "severity": "S3",
+      "class": "bundle-gym-catalog",
+      "issue": "barwise-1043",
+      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-1043).",
+      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
+    }
+  }
+}

@@ -1,0 +1,81 @@
+id: C10
+slug: university
+name: State university system
+industry: education
+summary: >-
+  Eight campuses on one student information system whose Postgres
+  schema kept the seven-character table names and PIDM columns of the
+  system it replaced, and whose model has been renamed, split and
+  re-merged every term for years.
+stressors: [K2, K10, K11, K13, K14, K18]
+seed: 71
+scale: { small: 1, medium: 12, enterprise: 40 }
+personas:
+  - id: registrar-data-steward
+    name: Helen Marchetti
+    role: Registrar data steward
+    wants: Enrollment is an objectified fact, terms are not semesters, and the prerequisite chain cannot loop.
+    acceptance: personas/registrar-data-steward.gym.yaml
+    judges: [sis-ddl]
+  - id: sis-dba
+    name: Derek Okonkwo
+    role: SIS database administrator
+    wants: Every cryptic table comes back as a named entity or is listed as skipped, with its PIDM-based key.
+    acceptance: personas/sis-dba.gym.yaml
+    judges: [sis-ddl]
+  - id: ir-analyst
+    name: Sofia Lindqvist
+    role: Institutional-research analyst
+    wants: Student, section and term line up so a headcount by campus and term is a path query, not a guess.
+    acceptance: personas/ir-analyst.gym.yaml
+    judges: [sis-ddl]
+  - id: financial-aid-director
+    name: Marcus Bell
+    role: Financial-aid director
+    wants: Awards tie to a student, a fund and an aid year, and the FERPA release rule is visibly deontic.
+    acceptance: personas/financial-aid-director.gym.yaml
+    judges: [sis-ddl]
+artifacts:
+  - id: sis-ddl
+    generator: ddl
+    skin: skins/postgres-banner.yaml
+    importer: sql
+    dialect: postgres
+    expect: import
+    tiers: { small: 1, medium: 8, enterprise: 30 }
+contexts:
+  identity: [Person, Student, GraduateStudent, Employee, Faculty]
+  academics: [Campus, College, Department, Course, DegreeProgram]
+  registration: [CourseSection, Term, Enrollment, Grade]
+  financial-aid: [FinancialAidAward, AidFund, AidYear]
+  records: [TranscriptRecord, FerpaRestriction, DirectoryInformationRelease]
+  hr: [Position]
+  facilities: [Building, Room]
+history:
+  - { kind: rename_object_type, from: Term, to: Semester }
+  - { kind: add_value_constraint_value, object_type: GradeCode, value: "W" }
+  - { kind: add_fact_type, name: Course is offered by Department, between: [Course, Department] }
+  - { kind: rename_object_type, from: Semester, to: Term }
+  - { kind: add_mandatory, fact_type: Student is advised by Faculty, role_index: 0 }
+  - { kind: rename_object_type, from: CourseSection, to: Section }
+  - { kind: tighten_uniqueness, fact_type: Student pursues DegreeProgram }
+  - { kind: remove_object_type, name: Position }
+  - { kind: rename_object_type, from: Section, to: CourseSection }
+  - { kind: rename_fact_type, from: Faculty teaches CourseSection, to: Faculty instructs CourseSection }
+  - { kind: add_fact_type, name: Campus has Building, between: [Campus, Building] }
+  - { kind: rename_object_type, from: FinancialAidAward, to: AidAward }
+  - { kind: add_value_constraint_value, object_type: RegistrationStatusCode, value: "WL" }
+  - { kind: rename_object_type, from: AidAward, to: FinancialAidAward }
+transcripts:
+  - file: transcripts/session-01-term.md
+    key: transcripts/session-01-term.key.yaml
+lateRequirement:
+  # The faculty senate adds a grade two weeks before registration opens.
+  note: "The faculty senate adds a grade two weeks before registration opens."
+  change: {"kind":"add_value_constraint_value","object_type":"GradeCode","value":"NP"}
+  element: GradeCode
+  expectInExport: "NP"
+budgets:
+  small: 30000
+  medium: 180000
+  enterprise: 900000

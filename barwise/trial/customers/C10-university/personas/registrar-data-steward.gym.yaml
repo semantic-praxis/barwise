@@ -1,0 +1,76 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: "registrar-data-steward"
+title: "Registrar data steward: registration is a term-scoped fact"
+transition:
+  from: "apprentice"
+  to: "journeyman"
+exitPerformance: >-
+  Read a model produced from the SIS DDL and confirm that registration
+  is keyed by student, section and term together, that the student
+  number is scoped to a campus, and that the prerequisite chain cannot
+  loop.
+brief: |
+  You are Marisol Duarte, registrar data steward for the eight-campus
+  system. You own the registration tables and the term calendar. A model
+  is acceptable to you when it says what the registration table already
+  says: one student, one CRN, one term, one row; a student number that
+  means nothing without its campus; a prerequisite graph with no cycles.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 4 (uniqueness on n-ary fact types),
+  ch. 7 (ring constraints), ch. 5 (external uniqueness).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: "requires_element"
+    element:
+      entity: "Term"
+    diagnosis: >-
+      If Term is not an object type, the model has folded it into the
+      CRN, and I will be asked why Fall and Spring share a section.
+  - kind: "requires_element"
+    element:
+      entity: "Enrollment"
+    diagnosis: >-
+      Registration status and grade hang off the enrollment, not the
+      student; without Enrollment as a thing the grade lands on the
+      wrong record.
+  - kind: "requires_element"
+    element:
+      factTypeBetween: ["Student", "CourseSection"]
+    diagnosis: >-
+      A model that never relates a student to a section has not modeled
+      registration at all, whatever else it has.
+  - kind: "requires_element"
+    element:
+      factTypeBetween: ["Course", "Course"]
+    diagnosis: >-
+      Prerequisites are courses requiring courses; if the ring is missing,
+      degree audit has nothing to walk.
+  - kind: "must_validate"
+    diagnosis: >-
+      A model I cannot validate is one I cannot hand to the DBA; every
+      entity needs its reference scheme before I sign off.
+  - kind: "forbids_population"
+    factType: "Student has StudentNumber"
+    constraint: "mandatory"
+    hint: "Every student record carries a student number from admission onward."
+    diagnosis: >-
+      A student without a student number cannot be printed on a roster,
+      billed, or looked up at a service window.
+  - kind: "forbids_population"
+    factType: "CourseSection is offered in Term"
+    constraint: "internal_uniqueness"
+    hint: "A CRN belongs to exactly one term."
+    diagnosis: >-
+      If a section could be offered in two terms the term calendar stops
+      meaning anything and I cannot roll CRNs forward.
+  - kind: "requires_verbalization"
+    sentence: "The combination of Campus and StudentNumber is unique across fact types."
+    diagnosis: >-
+      Two campuses both issue 900012345; the number identifies a student
+      only with its campus, and a model that makes the number unique on
+      its own will reject the second campus's students.
+  - kind: "requires_verbalization"
+    sentence: "Each combination of Student, CourseSection and Term is unique in Student enrolls in CourseSection for Term."
+    diagnosis: >-
+      The registration table is keyed by PIDM, term and CRN; a model
+      with a narrower key will merge two terms' registrations.

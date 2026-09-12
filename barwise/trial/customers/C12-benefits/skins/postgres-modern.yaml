@@ -1,0 +1,75 @@
+# The modernization platform's Postgres schema. The naming carried the
+# mainframe's eight-character abbreviations across in lower snake case,
+# because the migration scripts mapped columns one to one; the
+# constraints are the part that changed.
+dialect: postgres
+naming:
+  table_case: lower
+  column_case: lower
+  table_prefix: ""
+  abbreviate: true
+  max_identifier: 8
+  abbreviations:
+    DateOfBirth: DOB
+    Officer: OFCR
+    Office: OFC
+    Monthly: MO
+    Month: MTH
+    Method: MTHD
+    Verification: VRFN
+    Certification: CERT
+    Determination: DETR
+    Eligibility: ELIG
+    Citizenship: CTZN
+    Household: HHLD
+    Applicant: APLCT
+    Recipient: RCPT
+    Issuance: ISS
+    Supervisor: SUPV
+    Sanction: SNCT
+    Statute: STAT
+    Reference: REF
+    Citation: CITN
+    Document: DOC
+    Received: RCVD
+    Decision: DCSN
+    Outcome: OUTC
+    Hearing: HRG
+    Benefit: BNFT
+    Program: PRGM
+    Client: CLNT
+    Worker: WRKR
+    Appeal: APPL
+    Income: INC
+    Source: SRC
+    Period: PRD
+    Number: NBR
+    Amount: AMT
+    Status: STS
+    Reason: RSN
+    Closure: CLSR
+    Case: CASE
+    Code: CD
+    Date: DT
+    Type: TYP
+    Level: LVL
+    Name: NM
+    Size: SZ
+    Start: STRT
+idioms:
+  schema_qualified: "benefits."
+  if_not_exists: true
+  quoting: none
+  no_foreign_keys: false
+  inline_pk: false
+  check_constraints: true
+  comments: true
+  named_constraints: true
+types:
+  text: text
+  integer: integer
+  decimal: numeric(9,2)
+  date: date
+  datetime: timestamptz
+  boolean: boolean
+  id: bigint

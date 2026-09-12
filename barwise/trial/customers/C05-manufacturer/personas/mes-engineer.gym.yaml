@@ -1,0 +1,45 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: mes-engineer
+title: "The execution entities come back from the code"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Confirm that work orders, routings, operations and work centers are
+  entities and that a work order produces a material.
+brief: |
+  You maintain the execution system. The model must say what the Java
+  entities say, including the ones behind the five-hundredth file.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 3 (fact types).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: requires_element
+    element:
+      entity: WorkOrder
+    diagnosis: >-
+      The work order is the unit of execution; a model without it is a
+      catalog, not a factory.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.2."
+  - kind: requires_element
+    element:
+      entity: Routing
+    diagnosis: >-
+      Routings say how a material is made; without them operations float.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4."
+  - kind: requires_element
+    element:
+      entity: WorkCenter
+    diagnosis: >-
+      Capacity is planned per work center.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.2."
+  - kind: requires_element
+    element:
+      factTypeBetween: [WorkOrder, Routing]
+    diagnosis: >-
+      A work order that follows no routing has no operations to execute.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4."
+  - kind: must_validate
+    diagnosis: >-
+      A structurally invalid model cannot be exported to the MES schema.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 5, section 5.3."

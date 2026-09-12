@@ -1,0 +1,91 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: modernization-architect
+title: "The subtypes the copybooks never had"
+transition:
+  from: journeyman
+  to: expert
+exitPerformance: >-
+  Read a conceptual model produced from the legacy artifacts and
+  confirm that it has recovered the concepts the mainframe flattened:
+  the client status ladder as a subtype chain, the determination as an
+  objectified fact with a one-way supersession chain, and the
+  household as a thing of its own rather than a repeating group.
+brief: |
+  You are the architect for the agency's move off the mainframe to a
+  Postgres service platform. The copybooks carry a client with a
+  two-character status field where the statute has three concepts
+  (client, applicant, recipient); a case row with a determination
+  status where the statute has a decision per program per period; and
+  a redetermination that overwrites the row it replaces, so the history
+  of what was decided is gone. Check that the model barwise produced
+  has the concepts the new platform needs, not the columns the old one
+  had.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 6 (subtyping),
+  ch. 10 (objectification, ring constraints).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: must_validate
+    diagnosis: >-
+      A model that does not validate cannot be split into the service
+      contexts, and the platform team will draw its own.
+  - kind: requires_element
+    element:
+      entity: Applicant
+    diagnosis: >-
+      If Applicant is missing the model has kept the status field. The
+      application-date rule applies to applicants and nothing else, and
+      it has nowhere to attach.
+  - kind: requires_element
+    element:
+      entity: Recipient
+    diagnosis: >-
+      Recipient is the third rung. Without it the sanction rules attach
+      to every client, including household members who never applied.
+  - kind: requires_element
+    element:
+      entity: Household
+    diagnosis: >-
+      The copybook carries the household as a repeating group on the
+      case. If the model has done the same, the platform cannot move a
+      client between households without rewriting cases.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Client, Household]
+    diagnosis: >-
+      Membership is the fact the household exists for. If the client is
+      not linked to a household the household is an empty number.
+  - kind: requires_element
+    element:
+      entity: Determination
+    diagnosis: >-
+      The determination must be a thing that can be appealed,
+      superseded and cited. A status on the case is none of those.
+  - kind: requires_verbalization
+    sentence: "Determination is where Case is determined for Program in CertificationPeriod."
+    hint: "The determination is the objectification of the ternary; it has no identity of its own."
+    diagnosis: >-
+      If Determination is a free-standing entity with its own number,
+      the model has invented a surrogate and lost the rule that there
+      is one decision per case, program and period.
+  - kind: forbids_population
+    factType: Determination supersedes Determination
+    constraint: ring
+    hint: "Supersession is a chain that runs one way; a determination may never supersede one that supersedes it."
+    diagnosis: >-
+      Without the acyclic ring the platform can record two
+      redeterminations that supersede each other, and the notice
+      generator loops.
+  - kind: requires_verbalization
+    sentence: "No Determination supersedes that same Determination, directly or through a chain of such relationships."
+    hint: "The ring constraint is acyclic, not merely irreflexive."
+    diagnosis: >-
+      An irreflexive ring stops A superseding A and nothing else; a
+      cycle of three still loops. The chain has to be acyclic.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Benefit, Program]
+    diagnosis: >-
+      Benefits belong to programs. If the issuance service cannot ask
+      which program a benefit type is under, funding attribution is a
+      lookup table someone maintains by hand.

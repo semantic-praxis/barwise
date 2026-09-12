@@ -1,0 +1,6 @@
+# duckdb is not in barwise's adapter map (DbtDialectDetector.ts); the
+# importer falls through to ANSI. Whether it says so is the question.
+adapter: duckdb
+compiled: false
+jinja_macros: [custom_event_window]
+models_without_keys: 2

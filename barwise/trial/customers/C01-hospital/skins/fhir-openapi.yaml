@@ -1,0 +1,8 @@
+# A FHIR-style API description: resource polymorphism through a
+# discriminator on resourceType, references that point back at each
+# other, and nested metadata objects.
+polymorphism: discriminator
+discriminator: resourceType
+circular_refs: true
+version: "3.1.0"
+nesting_depth: 3

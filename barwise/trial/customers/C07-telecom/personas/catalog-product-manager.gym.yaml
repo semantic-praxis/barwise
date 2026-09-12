@@ -1,0 +1,86 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: catalog-product-manager
+title: "The tariff sheet still says what we sell"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Read a conceptual model produced from the TMF-style product catalog API
+  and confirm that specification, offering and product are still three
+  things, that every offering still carries exactly one rate plan code,
+  and that bundles cannot contain themselves.
+brief: |
+  You manage the product catalog for a mobile network operator. The
+  catalog follows the TM Forum SID: a ProductSpecification says what a
+  thing is, a ProductOffering says how it is sold and priced, and a
+  Product is one customer's instance of an offering. Billing rates every
+  offering by a RatePlanCode, and there are close to forty of them on the
+  tariff sheet. Bundles are offerings made of offerings. Check that the
+  model barwise produced from the catalog API keeps those distinctions,
+  because every downstream team collapses two of the three and then asks
+  you why the numbers disagree.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 7 (ring constraints),
+  ch. 6 (value constraints); TM Forum GB922 Product domain.
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: must_validate
+    diagnosis: >-
+      A model that does not validate cannot be published to the catalog
+      API, and the tariff sheet stays a spreadsheet.
+  - kind: requires_element
+    element:
+      entity: ProductSpecification
+    diagnosis: >-
+      Without ProductSpecification the model has folded what a thing is
+      into how it is priced, and the next price change becomes a new
+      product in every downstream system.
+  - kind: requires_element
+    element:
+      entity: ProductOffering
+    diagnosis: >-
+      ProductOffering is the tariff sheet. If it is missing, or has been
+      merged into Product, there is nothing for a customer to order.
+  - kind: requires_element
+    element:
+      entity: Product
+    diagnosis: >-
+      Product is the customer's copy of the offering; without it "how
+      many customers are on this plan" has no answer.
+  - kind: requires_element
+    element:
+      factTypeBetween: [ProductOffering, ProductSpecification]
+    diagnosis: >-
+      An offering that is not tied to its specification is a price with
+      nothing behind it; service design cannot tell what to provision.
+  - kind: forbids_population
+    factType: ProductOffering has RatePlanCode
+    constraint: internal_uniqueness
+    hint: "One rate plan code per offering, and one offering per code; billing keys on the code."
+    diagnosis: >-
+      If an offering can carry two rate plan codes, or a code can rate
+      two offerings, billing cannot tell which charge applies and the
+      invoice run fails on the first ambiguous line.
+  - kind: forbids_population
+    factType: ProductOffering has OfferingLifecycleStatus
+    constraint: mandatory
+    hint: "Every offering is somewhere in its lifecycle; a status-less offering is neither sellable nor retired."
+    diagnosis: >-
+      An offering with no lifecycle status can be sold and retired at the
+      same time; the catalog gate that stops a retired plan from being
+      ordered has nothing to check.
+  - kind: forbids_population
+    factType: ProductOffering bundles ProductOffering
+    constraint: ring
+    hint: "A bundle cannot contain itself through any chain of components."
+    diagnosis: >-
+      If a bundle can include itself the price calculator recurses
+      forever, which is exactly what happened the last time someone
+      built the family plan out of the family plan.
+  - kind: requires_verbalization
+    sentence: "Each RatePlanCode rates at most one ProductOffering."
+    hint: "The rate plan code is unique across offerings, not just present on each."
+    diagnosis: >-
+      A model that only says each offering has one code has missed half
+      the rule; billing also needs the code to point back at exactly one
+      offering.

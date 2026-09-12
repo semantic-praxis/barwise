@@ -1,0 +1,8 @@
+# What the dbt generator needs to make the kernel look like the claims
+# dbt project: a Redshift adapter, uncompiled Jinja that calls a
+# dbt_utils macro and the project's own generate_schema_name override,
+# and three staging models with no identifiable key.
+adapter: redshift
+compiled: false
+jinja_macros: [dbt_utils.surrogate_key, generate_schema_name]
+models_without_keys: 3
