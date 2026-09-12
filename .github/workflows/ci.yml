@@ -164,6 +164,41 @@ jobs:
       # eslint and oxlint all accept NUL, so nothing else catches it.
       - run: npm run check:no-nul
 
+      # A credential is the one defect in this list that a follow-up commit
+      # does not fix: reverting, deleting the branch and rewriting history
+      # all leave the key valid and already disclosed, so it has to be
+      # rotated by a person. It was also the only one with no gate --
+      # `.gitignore` covering `.env` stood in for it, and cannot see the
+      # three paths a secret actually arrives by here: machine-written
+      # tracked files under eval-payloads/ and eval-runs/, commands pasted
+      # into documentation, and fixtures imitating real payloads
+      # (docs/specs/credential-scanning.spec.md).
+      #
+      # Detection is gitleaks': ~150 maintained rules, an entropy model and
+      # per-rule allowlists, none of which this project should be writing.
+      # The pin is a release tarball with a verified digest rather than a
+      # third-party action, which keeps this workflow first-party `actions/*`
+      # only -- the same shape as the pinned `pip install uv` above. The
+      # version is pinned because gitleaks ships RULES, so it decides what is
+      # found; the install script is the single home for it, shared with the
+      # session bootstrap.
+      # Installed under $HOME rather than /usr/local/bin: that needs no
+      # privileges on a hosted runner, so the step cannot fail on a
+      # permission question unrelated to what it is doing. $GITHUB_PATH is
+      # how the following steps see it -- each `run:` is its own shell, so
+      # exporting PATH here would not carry.
+      - name: Secret scanner (gitleaks)
+        run: |
+          bash scripts/install-gitleaks.sh "${HOME}/.local/bin"
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+
+      # No docs-only skip, deliberately: two of the three paths above ARE
+      # docs-only changes. The gate scans all reachable commits, which the
+      # `fetch-depth: 0` checkout above makes a real history scan rather than
+      # a clean bill of health over a shallow range -- it refuses outright on
+      # a shallow clone. About two seconds over 1056 commits.
+      - run: npm run check:secrets
+
       # Shell scripts were the one artifact class with no gate: not
       # dprint, not oxlint, not tsc. Three portability bugs shipped in
       # compile-runner.sh before it was read adversarially, and shellcheck

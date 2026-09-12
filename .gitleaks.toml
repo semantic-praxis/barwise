@@ -1,0 +1,35 @@
+# gitleaks configuration for barwise.
+#
+# `useDefault` is the point: gitleaks' ~150 maintained rules, its entropy
+# model and its per-rule allowlists do the detecting, and this file adds
+# only what a measurement showed missing. It is not a place to accumulate
+# private rules -- a rule table nobody upstream maintains is the thing this
+# gate was rewritten to stop carrying
+# (docs/specs/credential-scanning.spec.md).
+[extend]
+useDefault = true
+
+# MEASURED GAP, and the one that matters most here: gitleaks 8.28.0 detects
+# no Anthropic key. Three realistic shapes were staged into a throwaway repo
+# -- `ANTHROPIC_API_KEY=sk-ant-api03-<48>`, a `key:` assignment, and an
+# `x-api-key` header with an admin key -- and it reported "no leaks found"
+# for all three, including the plain environment-variable assignment that
+# its own `generic-api-key` rule catches for OpenAI and Slack.
+#
+# barwise is an Anthropic-facing toolkit: `@barwise/llm` calls the API, the
+# CLI reads ANTHROPIC_API_KEY, and an eval round writes TRACKED files under
+# eval-payloads/ and eval-runs/. The single most likely credential to leak
+# from this repository is precisely the one the scanner does not know.
+#
+# No `entropy` floor. The seven-character vendor prefix plus a 32-character
+# body is specific enough on its own, and an entropy threshold is what made
+# gitleaks miss low-entropy-but-real-looking probes during that measurement.
+# A documentation placeholder (`sk-ant-api03-REDACTED`) falls below the
+# length floor and so does not match.
+#
+# This belongs upstream rather than here; barwise-1028 tracks sending it.
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic API key"
+regex = '''sk-ant-(?:api|admin)[0-9]{2}-[A-Za-z0-9_\-]{32,}'''
+keywords = ["sk-ant-"]
