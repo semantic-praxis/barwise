@@ -182,8 +182,15 @@ jobs:
       # version is pinned because gitleaks ships RULES, so it decides what is
       # found; the install script is the single home for it, shared with the
       # session bootstrap.
+      # Installed under $HOME rather than /usr/local/bin: that needs no
+      # privileges on a hosted runner, so the step cannot fail on a
+      # permission question unrelated to what it is doing. $GITHUB_PATH is
+      # how the following steps see it -- each `run:` is its own shell, so
+      # exporting PATH here would not carry.
       - name: Secret scanner (gitleaks)
-        run: bash scripts/install-gitleaks.sh
+        run: |
+          bash scripts/install-gitleaks.sh "${HOME}/.local/bin"
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
 
       # No docs-only skip, deliberately: two of the three paths above ARE
       # docs-only changes. The gate scans all reachable commits, which the

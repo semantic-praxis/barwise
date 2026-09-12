@@ -32,7 +32,12 @@ SHA256_darwin_arm64="d942f3ad147250c9edbaab3fed9e482f98d3b59ba10ae97b8d75647e3ad
 # shellcheck disable=SC2034
 SHA256_darwin_x64="edf5a507008b0d2ef4959575772772770586409c1f6f74dabf19cbe7ec341ced"
 
+# Caller-chosen, because "somewhere on PATH" is not the same question on a
+# root container as on a hosted CI runner: the session hook takes the default,
+# while ci.yml passes a directory under $HOME that needs no privileges and
+# adds it to $GITHUB_PATH.
 BIN_DIR="${1:-/usr/local/bin}"
+mkdir -p "${BIN_DIR}"
 
 if command -v gitleaks >/dev/null 2>&1; then
   have="$(gitleaks version 2>/dev/null || echo unknown)"
@@ -103,5 +108,9 @@ fi
 
 tar -xzf "${tmp}/${tarball}" -C "${tmp}" gitleaks
 install -m 0755 "${tmp}/gitleaks" "${BIN_DIR}/gitleaks"
-installed="$(gitleaks version)"
+# By absolute path, NOT through PATH. When BIN_DIR is not on PATH -- which is
+# exactly the CI case, where $GITHUB_PATH is updated by the caller afterwards
+# -- a bare `gitleaks version` here exits 127 and fails the step on a
+# successful install.
+installed="$("${BIN_DIR}/gitleaks" version)"
 echo "install-gitleaks: installed ${installed} to ${BIN_DIR}."
