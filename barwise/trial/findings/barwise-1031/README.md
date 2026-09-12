@@ -1,14 +1,14 @@
-# barwise-1031: merge fails on a fact-type rename without saying why
+# barwise-1031: the OpenAPI importer writes duplicate role ids
 
 ```sh
-barwise merge trial/findings/barwise-1031/base.orm.yaml trial/findings/barwise-1031/incoming.orm.yaml --output /tmp/merged.orm.yaml
+barwise import model trial/findings/barwise-1031/api.json --format openapi --output /tmp/api.orm.yaml
+barwise validate /tmp/api.orm.yaml
 ```
 
-`incoming` is `base` with "Material is component of Material" renamed
-to "Material is part of Material" (a fact type carrying an acyclic ring
-constraint), nothing else.
+Expected: a valid draft model, three entity types, two fact types.
 
-Expected: a merged model, or a diagnostic naming the structural error.
-
-Observed (1.7.0): exit 1, `Merge produced 1 structural error(s);
-nothing was written.` and no diagnostic.
+Observed (1.7.0): the import exits 0 with confidence medium; validate
+reports `structural/duplicate-role-id` because both `related` roles
+carry the id `<patientUuid>-related-role`. On a FHIR-shaped document
+this is 57 errors at 55 schemas and 444 at 550. The DDL importer has
+the same collision on column names (C09 sdtm-ddl, 29 errors).

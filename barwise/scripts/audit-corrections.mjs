@@ -158,7 +158,21 @@ function detect() {
     for (const para of text.split("\n\n")) {
       const p = para.trim();
       if (p.split(/\s+/).length < MIN_WORDS) continue;
-      const hits = markersIn(p);
+      // Matched against the NORMALISED paragraph, not the raw one, because
+      // dprint owns the line wrapping in these files and twelve of the
+      // markers are multi-word. A paragraph reading "-1025 turned\nout not
+      // to be a gap" does not match /\bturned out\b/ -- so whether a
+      // correction record was detected depended on where the formatter
+      // happened to break the line, which the author does not control and
+      // cannot see. Five real records across four specs were invisible this
+      // way, two of them in gate-refusal-contract.spec.md, the spec about
+      // gates that cannot see their input.
+      //
+      // `normalise` already existed and was already used for the id, for
+      // this same reason stated one step further on ("reflow does not move
+      // it, an edited word does"). The reasoning was applied to the id and
+      // not to the detection.
+      const hits = markersIn(normalise(p));
       if (hits.length === 0) continue;
       found.push({
         id: recordId(name, p),

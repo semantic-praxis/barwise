@@ -16,15 +16,29 @@ if git diff --cached --name-only | grep -qx '.beads/issues.jsonl'; then
   fi
 fi
 
-# 1. Lint staged files (dprint, eslint, oxlint).
+# 1. Refuse a credential in what is about to be committed. This one is at
+#    the COMMIT and not the push, unlike the rest of the gate list, because
+#    it is the only check whose failure a later commit cannot undo: a leaked
+#    key has to be rotated, and the commit is the object that gets pushed,
+#    shared, stashed and copied into a worktree. `--staged` scans the index,
+#    so it costs about 0.15s and -- unlike the history scan CI runs -- does
+#    not care whether this clone is shallow
+#    (docs/specs/credential-scanning.spec.md).
+if ! npm run --silent check:secrets -- --staged; then
+  echo "pre-commit: credential-shaped content in the tree (see above)." >&2
+  echo "  If it is a real key, ROTATE it -- amending the commit does not un-leak it." >&2
+  exit 1
+fi
+
+# 2. Lint staged files (dprint, eslint, oxlint).
 npx lint-staged
 
-# 2. Build all packages to catch cross-package type errors.
+# 3. Build all packages to catch cross-package type errors.
 #    Turbo caches unchanged packages, so this is fast (~1s) in the
 #    common case and ~3s on a full rebuild.
 npm run build
 
-# 3. Run tests in packages affected by uncommitted changes.
+# 4. Run tests in packages affected by uncommitted changes.
 #    The ...[HEAD] filter selects changed packages and their dependents.
 npx turbo run test --filter='...[HEAD]'
 

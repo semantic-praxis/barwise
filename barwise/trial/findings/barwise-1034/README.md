@@ -1,16 +1,17 @@
-# barwise-1034: OpenAPI export then import drops lengths, definitions and value constraints
+# barwise-1034: the dbt importer throws on two relationships to one model
 
 ```sh
-barwise export trial/customers/C02-bank/kernel.orm.yaml --format openapi --no-annotate --output /tmp/bank.json
-barwise import model /tmp/bank.json --format openapi --output /tmp/bank-back.orm.yaml
-barwise diff trial/customers/C02-bank/kernel.orm.yaml /tmp/bank-back.orm.yaml | head -20
+barwise import dbt trial/findings/barwise-1034
 ```
 
-Expected: only the deltas `trial/loss-sets/openapi.json` declares
-(populations, subtypes, objectification).
+A leg has an origin port and a destination port: two relationships
+tests from `stg_leg` to `stg_port`.
 
-Observed (1.7.0): every value type reads `definition changed`,
-`data type: text(20) -> text`, and enumerated ones `value constraint
-changed`; 143 to 183 deltas per 55-object-type kernel. The exported
-document carries `maxLength`, `description` and `enum` for these
-properties, so the importer's property reader is what drops them.
+Expected: two fact types (Leg has origin Port, Leg has destination
+Port), or one named as skipped.
+
+Observed (1.7.0): exit 1, `Error: Fact type "Leg has Port" already
+exists in model "dbt Import"`, no model written. barwise's own dbt
+export produces this shape from any ring constraint or any table with
+two foreign keys to the same table, so the dbt round trip fails on
+most models.

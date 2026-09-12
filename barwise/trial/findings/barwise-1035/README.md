@@ -1,4 +1,4 @@
-# barwise-1027: dbt export then import loses more than the loss set
+# barwise-1035: dbt export then import loses more than the loss set
 
 ```sh
 barwise export examples/transcripts/pii-redaction.orm.yaml --format dbt --output /tmp/pii-dbt
@@ -10,5 +10,5 @@ Expected: only the deltas `trial/loss-sets/dbt.json` declares
 (populations, definitions, subtypes, objectification).
 
 Observed (1.7.0) on the trial kernels where the importer did not throw
-(barwise-1026): 52 to 139 deltas, among them removed value types
+(barwise-1034): 52 to 139 deltas, among them removed value types
 (PartyId, TransactionId, RateId) and changed value constraints.

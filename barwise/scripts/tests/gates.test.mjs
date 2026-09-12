@@ -108,6 +108,7 @@ const ROOT_DEPENDENT_GATES = [
   "check-book-citations.mjs",
   "check-core-purity.mjs",
   "check-file-size.mjs",
+  "check-secrets.mjs",
   "audit-corrections.mjs",
 ];
 
@@ -200,6 +201,9 @@ function stage(dir, name, contents) {
 
 const CWDS = [REPO, join(REPO, "barwise"), join(REPO, "barwise", "packages", "core", "src")];
 
+// `check-secrets` has the same property but is asserted separately, below:
+// its history mode depends on clone depth, so the invariance test uses
+// `--staged` and cannot share this loop's argument-free call.
 for (const script of ["check-no-nul.mjs", "check-shell.mjs", "audit-corrections.mjs"]) {
   test(`${script} reports the same coverage from every cwd`, () => {
     const runs = CWDS.map((cwd) => ({ cwd, ...gate(script, cwd) }));
@@ -340,6 +344,260 @@ test("check-shell fails on a tracked script with a shellcheck finding", () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// --- check-secrets: the one defect a follow-up commit cannot fix ---
+
+/**
+ * Credential-shaped probes, assembled at RUNTIME.
+ *
+ * Every value is concatenation rather than a literal, for the same reason
+ * `NUL` at the top of this file is an escape: `check-secrets` scans this
+ * repository's whole history, including this file, so a literal here would
+ * make the gate fail on its own test forever after. Each string is split at
+ * the exact position its rule anchors on, which is why the splits look
+ * arbitrary and are not.
+ *
+ * These are shapes, not keys. Nothing here has ever been valid anywhere.
+ *
+ * Three rules, chosen because they cover the three cases that matter:
+ * gitleaks' own vendor rule, gitleaks' structural rule, and the ONE rule
+ * this repository adds in `.gitleaks.toml` because the default set has
+ * none.
+ *
+ * The bodies are high-entropy on purpose. gitleaks applies an entropy
+ * model, and a first attempt at these probes used sequential alphabets
+ * ("0123456789abcdef...") which fell below its threshold and were not
+ * detected -- so the test would have proved the wrapper silent rather than
+ * the scanner working.
+ */
+/**
+ * `probe` is the credential itself; `content` is the file it sits in.
+ *
+ * The field is named `probe` and every value is split, because naming it
+ * `secret` made this table match gitleaks' own `generic-api-key` rule --
+ * `secret: "<high-entropy string>"` is precisely that rule's shape -- and
+ * the gate failed on its own test file at this line. Caught by the gate,
+ * once the file was staged and it could see it.
+ *
+ * They are separate fields because the redaction assertion below needs the
+ * CREDENTIAL ITSELF, and asserting on the whole surrounding line instead let a real
+ * regression through. With `--redact` removed, gitleaks prints
+ * `Finding: aws_key = "<ESC>[1;3;mAKIA...` -- the key in the clear, but with
+ * an ANSI sequence between the quote and the key and no closing quote. A
+ * check for the surrounding line therefore did not match, `npm run mutate`
+ * reported UNCAUGHT, and the one property this gate exists to hold was
+ * unasserted while reading as covered.
+ */
+const GITLEAKS_PROBES = {
+  "aws-access-token": {
+    probe: "AKIA" + "3QT7XKVBZ2WRMNPL",
+    content: (s) => `aws_key = "${s}"\n`,
+  },
+  "anthropic-api-key": {
+    probe: "sk-ant-" + "api03-"
+      + "7Kq2Vx9mTwRbN4yLp" + "Z3jHcF8sAdE6gUn1oIx" + "BvCzMlQeRtYuWiHgFdSaPoKjNm-QwErTy",
+    content: (s) => `ANTHROPIC_API_KEY=${s}\n`,
+  },
+  // BOTH armour lines are split, not just the opening one: gitleaks'
+  // private-key rule needs the closing marker too (a probe without it was
+  // measured undetected), and the rule matches from BEGIN across to the
+  // closing KEY-----, so leaving either intact in this source file would
+  // make the gate flag its own test.
+  "private-key": {
+    probe: "MIIBOgIBAAJBAK7" + "xYzQdJhFyUcEaSbNi" + "OkRtLwVmXpYq4H3G8" + "DZgT7xKvBz2WrMnPl",
+    content: (s) =>
+      "-----BEGIN RSA PRIVATE" + ` KEY-----\n${s}\n` + "-----END RSA PRIVATE" + " KEY-----\n",
+  },
+};
+
+/**
+ * A throwaway repo carrying THIS repository's real `.gitleaks.toml`.
+ *
+ * The real config rather than a fixture, deliberately: the Anthropic rule
+ * is the one piece of detection barwise owns, so a test against a
+ * hand-written config would be testing the fixture. The wrapper refuses
+ * when the config is missing, so the copy is also what makes these repos
+ * scannable at all.
+ */
+function secretsRepo() {
+  const dir = tempRepo();
+  // Staged and committed, not merely written: the shallow-clone test below
+  // clones this repo, and `git clone` does not carry untracked files -- so an
+  // unstaged config made the clone refuse for a missing config rather than
+  // for being shallow, which is a different question and passed for the
+  // wrong reason.
+  stage(dir, ".gitleaks.toml", readFileSync(join(REPO, ".gitleaks.toml"), "utf8"));
+  stage(dir, "clean.txt", "nothing credential-shaped here\n");
+  execFileSync("git", ["commit", "-qm", "base"], { cwd: dir });
+  return dir;
+}
+
+function commitAll(dir, message) {
+  execFileSync("git", ["commit", "-qm", message], { cwd: dir });
+}
+
+/**
+ * Each rule shown RED on a staged probe of its own shape, and GREEN
+ * without one.
+ *
+ * The negative half is what makes the gate's clean reading on the real
+ * repository worth anything: a scanner that cannot fire is
+ * byte-indistinguishable from a repository with no secrets in it --
+ * barwise-902's shape, a check that banks a guaranteed point instead of
+ * measuring.
+ */
+for (const [rule, { probe, content }] of Object.entries(GITLEAKS_PROBES)) {
+  test(`check-secrets fails on a staged ${rule}`, () => {
+    const dir = secretsRepo();
+    try {
+      assert.equal(
+        gate("check-secrets.mjs", dir, "--staged").status,
+        0,
+        "a clean index must pass",
+      );
+
+      stage(dir, "probe.txt", content(probe));
+      const red = gate("check-secrets.mjs", dir, "--staged");
+      assert.equal(red.status, 1, `a staged ${rule} must fail the gate`);
+      const out = `${red.stdout}${red.stderr}`;
+      assert.match(out, new RegExp(rule));
+      assert.match(out, /ROTATE IT FIRST/);
+
+      // The redaction rule, asserted per rule rather than argued once. CI
+      // logs are retained and searchable, so a gate that echoes its
+      // finding becomes a second durable copy of the leak.
+      assert.ok(
+        !out.includes(probe),
+        `check-secrets printed the credential for ${rule}`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+test("check-secrets refuses when gitleaks is absent rather than reporting clean", () => {
+  // The container this project develops in does not ship gitleaks, so this
+  // is the reading a fresh session gets until the bootstrap installs it.
+  const dir = secretsRepo();
+  const stubDir = mkdtempSync(join(tmpdir(), "barwise-nogl-"));
+  try {
+    writeFileSync(join(stubDir, "gitleaks"), "#!/bin/sh\nexit 127\n");
+    chmodSync(join(stubDir, "gitleaks"), 0o755);
+    const r = spawnSync(process.execPath, [join(SCRIPTS, "check-secrets.mjs"), "--staged"], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${stubDir}:${process.env.PATH ?? ""}` },
+    });
+    assert.equal(r.status, 2, `expected refusal, got ${r.status}:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /not installed/);
+    assert.doesNotMatch(r.stdout, /OK/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(stubDir, { recursive: true, force: true });
+  }
+});
+
+test("check-secrets refuses a gitleaks status that is neither clean nor a finding", () => {
+  // The distinction the wrapper exists for. gitleaks uses 1 for findings,
+  // so any OTHER non-zero status is the tool failing to run -- and
+  // reporting that as a finding would send the reader hunting a credential
+  // that was never there, while reporting it as clean is the false green
+  // the refusal contract forbids.
+  const dir = secretsRepo();
+  const stubDir = mkdtempSync(join(tmpdir(), "barwise-glbad-"));
+  try {
+    writeFileSync(
+      join(stubDir, "gitleaks"),
+      "#!/bin/sh\ncase \"$1\" in version) echo 8.28.0;; *) echo 'boom' >&2; exit 3;; esac\n",
+    );
+    chmodSync(join(stubDir, "gitleaks"), 0o755);
+    const r = spawnSync(process.execPath, [join(SCRIPTS, "check-secrets.mjs"), "--staged"], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${stubDir}:${process.env.PATH ?? ""}` },
+    });
+    assert.equal(r.status, 2, `expected refusal, got ${r.status}:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /neither clean nor a finding/);
+    assert.doesNotMatch(r.stdout, /OK/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(stubDir, { recursive: true, force: true });
+  }
+});
+
+test("check-secrets refuses when .gitleaks.toml is missing", () => {
+  // Without this, gitleaks falls back to its bundled defaults: it would
+  // still find most things and would silently drop the Anthropic rule,
+  // which is the credential this repository is most likely to leak and the
+  // one the default set does not have. A gate running a weaker rule set
+  // than it claims is this spec's own subject.
+  const dir = secretsRepo();
+  try {
+    rmSync(join(dir, ".gitleaks.toml"));
+    const r = gate("check-secrets.mjs", dir, "--staged");
+    assert.equal(r.status, 2, `expected refusal, got ${r.status}:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /no \.gitleaks\.toml/);
+    assert.doesNotMatch(r.stdout, /OK/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-secrets refuses a history scan of a shallow clone, but --staged still works", () => {
+  // Every fresh session clone of this project is shallow. A history scan
+  // there would report a clean bill of health over whatever few commits
+  // arrived, which is why the default mode refuses -- while `--staged`
+  // reads the index, which a shallow clone has in full, so the pre-commit
+  // path keeps working regardless (docs/specs/gate-refusal-contract.spec.md).
+  const src = secretsRepo();
+  const parent = mkdtempSync(join(tmpdir(), "barwise-shallow-"));
+  try {
+    stage(src, "b.txt", "two\n");
+    commitAll(src, "two");
+
+    const clone = join(parent, "clone");
+    execFileSync("git", ["clone", "-q", "--depth", "1", `file://${src}`, clone]);
+    assert.equal(
+      execFileSync("git", ["rev-parse", "--is-shallow-repository"], {
+        cwd: clone,
+        encoding: "utf8",
+      }).trim(),
+      "true",
+      "the fixture must actually be shallow, or this test asserts nothing",
+    );
+
+    const deep = gate("check-secrets.mjs", clone);
+    assert.equal(deep.status, 2, `expected refusal, got ${deep.status}:\n${deep.stderr}`);
+    assert.match(deep.stderr, /SHALLOW/);
+    assert.doesNotMatch(deep.stdout, /OK/);
+
+    assert.equal(
+      gate("check-secrets.mjs", clone, "--staged").status,
+      0,
+      "--staged does not depend on clone depth",
+    );
+  } finally {
+    rmSync(src, { recursive: true, force: true });
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test("check-secrets gives the same reading from every cwd", () => {
+  // barwise-905's property. `--staged` rather than the history mode so the
+  // test does not depend on whether this clone happens to be shallow.
+  const runs = CWDS.map((cwd) => ({ cwd, ...gate("check-secrets.mjs", cwd, "--staged") }));
+  for (const r of runs) {
+    assert.equal(r.status, 0, `check-secrets failed in ${r.cwd}:\n${r.stdout}${r.stderr}`);
+  }
+  assert.equal(
+    new Set(runs.map((r) => r.stdout.trim())).size,
+    1,
+    `check-secrets' reading depends on cwd:\n${
+      runs.map((r) => `  ${r.cwd}\n    ${r.stdout.trim()}`).join("\n")
+    }`,
+  );
 });
 
 // --- check-beads: a note that says "shipped" on an issue that is not closed ---
@@ -1901,6 +2159,36 @@ test("audit-corrections refuses to WRITE a baseline while a spec is untracked", 
     const check = gate("audit-corrections.mjs", dir, "--check");
     assert.equal(check.status, 1, "the tracked probe is still unclassified, so --check finds it");
     assert.doesNotMatch(`${check.stdout}${check.stderr}`, /draft\.spec\.md/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("audit-corrections detects a marker the formatter wrapped across a line break", () => {
+  // The detector matched the RAW paragraph, so `turned\nout` did not match
+  // /\bturned out\b/ and the record was invisible. Twelve of the seventeen
+  // markers are multi-word and dprint owns the wrapping in docs/specs, so
+  // whether a correction record was detected depended on where the
+  // formatter happened to break the line -- which the author does not
+  // choose and cannot see in the source. Five real records across four
+  // specs were being missed, two of them in gate-refusal-contract.spec.md,
+  // the spec about gates that cannot see their input.
+  //
+  // The split is the whole test: "turned out" is the only marker in this
+  // probe, and it straddles the newline. Passing it means normalisation
+  // happens before matching, not after.
+  const wrapped = "# Probe\n\nThe estimate of what workstream 2 touches turned\n"
+    + "out to be mistaken once the packages were counted, so the figure is\n"
+    + "restated here with the real set.\n";
+  const dir = correctionRepo({ "probe.spec.md": wrapped }, {});
+  try {
+    const red = gate("audit-corrections.mjs", dir, "--check");
+    assert.equal(
+      red.status,
+      1,
+      `a wrapped marker must still be detected:\n${red.stdout}${red.stderr}`,
+    );
+    assert.match(`${red.stdout}${red.stderr}`, /NEW correction record/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -1,15 +1,17 @@
-# barwise-1032: the release CLI bundle cannot find the gym catalog
+# barwise-1032: the OpenAPI export writes a comment header into JSON
 
 ```sh
-node packages/cli/dist/bundle/index.cjs gym list
-node packages/cli/dist/index.js gym list
+barwise export trial/findings/barwise-1032/one-reading.orm.yaml --format openapi --output /tmp/one.json
+head -3 /tmp/one.json
+barwise import model /tmp/one.json --format openapi
 ```
 
-Expected: the packaged exercises listed, from either entry point.
+The model has one warning (a binary fact type with a single reading).
 
-Observed (1.7.0): the bundle exits 1 with `Error: The "path" argument
-must be of type string or an instance of URL. Received undefined`; the
-unbundled dist lists one exercise. `learn/src/exercise/catalog.ts`
-resolves the catalog from `import.meta.url`, which esbuild leaves empty
-in the cjs bundle (the build prints the warning). `--catalog <dir>`
-works. Every trial customer's sprint-6 release-bundle step records this.
+Expected: a JSON document a JSON reader accepts, and the importer reads
+it back.
+
+Observed (1.7.0): the file begins with `/* Validation warnings:`; the
+importer exits 0 and writes a model with no `object_types` key. With
+`--no-annotate` the file is JSON. A JSON target cannot carry comments;
+annotate through an `x-barwise-diagnostics` extension or refuse to.

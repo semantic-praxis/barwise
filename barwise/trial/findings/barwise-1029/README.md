@@ -1,17 +1,18 @@
-# barwise-1029: a rename reported as removal plus addition
+# barwise-1029: `import sql` reads foreign-key targets, not tables
 
 ```sh
-barwise diff trial/findings/barwise-1029/before.orm.yaml trial/findings/barwise-1029/after.orm.yaml --format json
+barwise import sql trial/findings/barwise-1029/schema.sql --dialect postgres
+barwise import sql trial/findings/barwise-1029/schema.sql --dialect oracle
 ```
 
-`after` is `before` with the object type Listing renamed to Offer (and
-its fact-type names updated), nothing else.
+Expected: three entity types (Customers, Orders, AuditLog) with their
+keys, or a refusal naming what was not read; `--dialect oracle` refused
+the way `export --dialect oracle` is.
 
-Expected: a synonym candidate Listing -> Offer, as the same command
-reports for Producer -> Agency and Encounter -> Visit in the trial's
-other histories.
-
-Observed (1.7.0): REMOVED Object type Listing [breaking], ADDED Object
-type Offer, `synonymCandidates: []`. Six of the trial's fourteen
-object-type renames are reported this way; the rule that decides which
-is not stated.
+Observed (1.7.0): exit 0, "Imported 2 object types, 0 fact types",
+confidence medium, one warning "Foreign key references customers
+(customer_id)". The two object types are `Customers` (the FK target)
+and `Status`; `orders` and `audit_log` are absent and unmentioned.
+`--dialect oracle` gives the same result with no complaint. Across the
+trial: 24% to 54% of tables silently dropped per customer, 100% on the
+BigQuery-idiom file with zero warnings.
