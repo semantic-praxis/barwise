@@ -1561,7 +1561,17 @@ function tempCiRepo() {
       'console.log("MARKER-FIRST-LINE");',
       "for (let i = 1; i <= 200; i++) console.log(`filler ${i}`);",
       "console.log(`COVERAGE_DIR=${process.env.BARWISE_COVERAGE_DIR}`);",
-      "process.exit(1);",
+      // `process.exitCode`, never `process.exit()`. console.log to a PIPE is
+      // asynchronous, and process.exit() does not flush what is still queued --
+      // so this fixture, whose whole job is to have its LAST line read back,
+      // silently drops it. Measured on this container: 300 spawns of each form
+      // with eight CPU-burning processes alongside, 197 of 300 truncated with
+      // process.exit() against 0 of 300 with process.exitCode, identical exit
+      // status either way. Idle, both forms are clean 300 of 300, which is why
+      // it passed here twice and failed on the third run; a single write before
+      // process.exit() survives 400 of 400 under the same load, so the hazard
+      // is the queue depth, not the pattern.
+      "process.exitCode = 1;",
       "",
     ].join("\n"),
   );
