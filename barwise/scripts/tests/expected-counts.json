@@ -1,0 +1,8 @@
+{
+  "$comment": "Registered test count per gate-test file, from scripts/run-script-tests.mjs. `node --test` reports the tests that REGISTERED, so a module-scope failure partway down a file silently drops every test below it and still prints a complete-looking summary (barwise-1027). A mismatch here exits 2 -- could not answer -- because the run's own pass and fail numbers describe a different suite. Adding or removing a test means updating this file in the same commit: `npm run test:scripts -- --write`, which refuses to record a run that failed or printed no summary. Spec: docs/specs/test-run-completeness.spec.md.",
+  "counts": {
+    "at-root.test.mjs": 3,
+    "baseline-merge.test.mjs": 14,
+    "gates.test.mjs": 127
+  }
+}

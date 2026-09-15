@@ -457,6 +457,24 @@
       "caught_by": "reasoning",
       "note": "The fc.sample marker was added after asking what a lazy compliance would look like."
     },
+    "test-run-completeness::08111a3dc691": {
+      "spec": "test-run-completeness.spec.md",
+      "excerpt": "each child is a fresh top-level run, so inheriting that marker was wrong independently of the tests: the fix deletes nodetestcontext from the child environment,",
+      "caught_by": "execution",
+      "note": "The same finding's resolution: the draft never considered where the wrapper itself runs. Probed NODE_TEST_CONTEXT directly to confirm it was the nesting guard before changing anything, rather than inferring it from the warning text."
+    },
+    "test-run-completeness::0935a8ada97b": {
+      "spec": "test-run-completeness.spec.md",
+      "excerpt": "node --test refuses to nest, and the wrapper had to say so explicitly. the draft has the wrapper spawn node --test <file> per file and never considered where th",
+      "caught_by": "execution",
+      "note": "Running the wrapper's own tests. node --test refuses to nest, so the children inherited NODE_TEST_CONTEXT and printed no summary at all -- four of eight new tests failed, and the symptom (the gate reporting 'could not be counted') pointed at the manifest while the cause was in the child environment."
+    },
+    "test-run-completeness::3eff3ca4612e": {
+      "spec": "test-run-completeness.spec.md",
+      "excerpt": "status: implemented. ws1 shipped; one thing the draft did not anticipate is recorded in implementation notes below",
+      "caught_by": "not-a-correction",
+      "note": "The Status header announcing that corrections are recorded below. It points at the record; it is not one. Same shape as the row in baseline-write-preserves-verdicts.spec.md."
+    },
     "tracker-quick-wins::ae1c4c3cc7ab": {
       "spec": "tracker-quick-wins.spec.md",
       "excerpt": "- ws2, splitmodel: the fallback was dead, not stale. the draft said to redirect doc.ormversion ?? \"1.0\" to currentormversion. writing the test showed the path c",

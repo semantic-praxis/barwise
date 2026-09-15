@@ -2470,3 +2470,189 @@ test("audit-duplication.mjs still has no baseline writer", () => {
       + "through scripts/lib/baseline-merge.mjs and update both documents.",
   );
 });
+
+/*
+ * ---------------------------------------------------------------------------
+ * run-script-tests: a run that did not finish must not read as one that did.
+ *
+ * `node --test` reports the tests that REGISTERED, and `test()` registers as
+ * the module executes -- so a module-scope failure partway down a file drops
+ * every test below it and still prints a complete-looking summary. Measured on
+ * this repository's own suite: plain `node --test` said
+ * `tests 117 / pass 116 / fail 1` with one test silently not existing, where
+ * the manifest says 118 (barwise-1027,
+ * docs/specs/test-run-completeness.spec.md).
+ * ---------------------------------------------------------------------------
+ */
+
+/** A throwaway repo holding gate-test files and (optionally) a count manifest. */
+function testRunRepo(files, counts) {
+  const dir = tempRepo();
+  for (const [name, body] of Object.entries(files)) {
+    stage(dir, `barwise/scripts/tests/${name}`, body);
+  }
+  if (counts !== undefined) {
+    stage(
+      dir,
+      "barwise/scripts/tests/expected-counts.json",
+      JSON.stringify({ $comment: "test", counts }, null, 2) + "\n",
+    );
+  }
+  return dir;
+}
+
+const TWO_PASSING = 'import { test } from "node:test";\n'
+  + 'test("one", () => {});\ntest("two", () => {});\n';
+
+// Three registered, a module-scope throw, then two that never register. The
+// measured shape: the runner reports 4 (three plus the file's own failure).
+const TRUNCATES = 'import { test } from "node:test";\n'
+  + 'test("t1", () => {});\ntest("t2", () => {});\ntest("t3", () => {});\n'
+  + 'await import("node:nonexistent-module-xyz");\n'
+  + 'test("t4", () => {});\ntest("t5", () => {});\n';
+
+const ONE_FAILING = 'import { test } from "node:test";\n'
+  + 'import assert from "node:assert/strict";\n'
+  + 'test("passes", () => {});\ntest("fails", () => { assert.equal(1, 2); });\n';
+
+test("run-script-tests passes when every count matches", () => {
+  const dir = testRunRepo({ "a.test.mjs": TWO_PASSING }, { "a.test.mjs": 2 });
+  try {
+    const r = gate("run-script-tests.mjs", dir);
+    assert.equal(r.status, 0, `expected a pass:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stdout, /every count matching the manifest/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests REFUSES when registration stopped early", () => {
+  // The whole point. node --test exits 1 here with a plausible summary; the
+  // difference is that this says the run was incomplete and by how much.
+  const dir = testRunRepo({ "a.test.mjs": TRUNCATES }, { "a.test.mjs": 6 });
+  try {
+    const r = gate("run-script-tests.mjs", dir);
+    assert.equal(r.status, 2, `expected a refusal (2):\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /a\.test\.mjs/);
+    assert.match(r.stderr, /manifest says 6/);
+    assert.match(r.stderr, /describe a different suite/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests FAILS, not refuses, when the counts match and a test fails", () => {
+  // The distinction the third exit code exists for: this run answered the
+  // question and the answer was no. Reporting 2 here would be as wrong as
+  // reporting 1 for the truncation above.
+  const dir = testRunRepo({ "a.test.mjs": ONE_FAILING }, { "a.test.mjs": 2 });
+  try {
+    const r = gate("run-script-tests.mjs", dir);
+    assert.equal(r.status, 1, `expected a failure (1):\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /1 failing of 2, all counts verified/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests refuses when the manifest is absent", () => {
+  const dir = testRunRepo({ "a.test.mjs": TWO_PASSING }, undefined);
+  try {
+    const r = gate("run-script-tests.mjs", dir);
+    assert.equal(r.status, 2, `expected a refusal:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /no manifest/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests refuses a file the manifest does not name", () => {
+  // Otherwise a new file's tests run unchecked, which is the blind spot this
+  // gate exists to close rather than relocate.
+  const dir = testRunRepo(
+    { "a.test.mjs": TWO_PASSING, "b.test.mjs": TWO_PASSING },
+    { "a.test.mjs": 2 },
+  );
+  try {
+    const r = gate("run-script-tests.mjs", dir);
+    assert.equal(r.status, 2, `expected a refusal:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /b\.test\.mjs: not in the manifest/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests refuses a manifest row whose file is gone", () => {
+  // The stale-entry half, matching audit:duplication and audit:corrections: a
+  // deleted suite must not leave a row that quietly describes nothing.
+  const dir = testRunRepo(
+    { "a.test.mjs": TWO_PASSING },
+    { "a.test.mjs": 2, "deleted.test.mjs": 9 },
+  );
+  try {
+    const r = gate("run-script-tests.mjs", dir);
+    assert.equal(r.status, 2, `expected a refusal:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /deleted\.test\.mjs: in the manifest but no longer on disk/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests --write refuses to record a truncated run", () => {
+  // The barwise-1026 shape, one file over: a writer that records whatever ran
+  // would bake the short count in and the manifest would then certify the very
+  // truncation it exists to detect.
+  const dir = testRunRepo({ "a.test.mjs": TRUNCATES }, undefined);
+  try {
+    const r = gate("run-script-tests.mjs", dir, "--write");
+    assert.equal(r.status, 2, `expected a refusal:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /refusing to record counts/);
+    assert.ok(
+      !existsSync(join(dir, "barwise/scripts/tests/expected-counts.json")),
+      "no manifest may be written from a run that did not come back clean",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests refuses an empty suite rather than reporting a pass", () => {
+  // Zero files means zero failures means green, over a suite nobody ran --
+  // the same empty-corpus reading audit-corrections refuses.
+  const dir = testRunRepo({}, {});
+  try {
+    const r = gate("run-script-tests.mjs", dir);
+    assert.equal(r.status, 2, `expected a refusal:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /no \*\.test\.mjs found/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests refuses when a child could not report at all", () => {
+  // The branch the NODE_TEST_CONTEXT bug actually hit during development, and
+  // the one a mutation showed no test reached. It is NOT a truncated run: there
+  // the child reports a SHORT count, here it reports none, and treating "no
+  // summary" as "zero tests" would let a child that never ran satisfy a
+  // manifest entry of 0.
+  //
+  // The lever is a reporter forced through NODE_OPTIONS, which is also the
+  // realistic way this happens: the children then emit junit XML with no
+  // `# tests N` line, and the count cannot be read. Two levers were tried and
+  // rejected first -- an invalid NODE_OPTIONS flag kills the wrapper itself
+  // (exit 9, it is a node process too), and killing the file's own process does
+  // not work because even a SIGKILL at module scope leaves the runner PARENT to
+  // print a summary.
+  const dir = testRunRepo({ "a.test.mjs": TWO_PASSING }, { "a.test.mjs": 2 });
+  try {
+    const r = spawnSync(process.execPath, [join(SCRIPTS, "run-script-tests.mjs")], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, NODE_OPTIONS: "--test-reporter=junit" },
+    });
+    assert.equal(r.status, 2, `expected a refusal (2):\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /printed no summary, so its run cannot be counted/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
