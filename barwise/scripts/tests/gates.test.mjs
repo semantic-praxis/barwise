@@ -2629,20 +2629,18 @@ test("run-script-tests refuses an empty suite rather than reporting a pass", () 
   }
 });
 
-test("run-script-tests refuses when a child could not report at all", () => {
-  // The branch the NODE_TEST_CONTEXT bug actually hit during development, and
-  // the one a mutation showed no test reached. It is NOT a truncated run: there
-  // the child reports a SHORT count, here it reports none, and treating "no
-  // summary" as "zero tests" would let a child that never ran satisfy a
-  // manifest entry of 0.
+test("run-script-tests counts correctly despite a reporter forced through NODE_OPTIONS", () => {
+  // The defect CI caught, generalised. This script reads TAP's `# tests N`,
+  // and the child's reporter is not something the environment gets to choose:
+  // CI printed the spec reporter's `i tests N` instead, because CI runs the
+  // Node `.nvmrc` pins (26) and the default reporter differs from the Node this
+  // was developed on (22). Every healthy suite then read as "printed no
+  // summary".
   //
-  // The lever is a reporter forced through NODE_OPTIONS, which is also the
-  // realistic way this happens: the children then emit junit XML with no
-  // `# tests N` line, and the count cannot be read. Two levers were tried and
-  // rejected first -- an invalid NODE_OPTIONS flag kills the wrapper itself
-  // (exit 9, it is a node process too), and killing the file's own process does
-  // not work because even a SIGKILL at module scope leaves the runner PARENT to
-  // print a summary.
+  // So the wrapper forces `--test-reporter=tap` and strips any inherited one.
+  // Stripping rather than overriding matters: the flag ACCUMULATES between
+  // NODE_OPTIONS and argv, and node refuses the whole run with "must match the
+  // number of specified --test-reporter-destination".
   const dir = testRunRepo({ "a.test.mjs": TWO_PASSING }, { "a.test.mjs": 2 });
   try {
     const r = spawnSync(process.execPath, [join(SCRIPTS, "run-script-tests.mjs")], {
@@ -2650,8 +2648,12 @@ test("run-script-tests refuses when a child could not report at all", () => {
       encoding: "utf8",
       env: { ...process.env, NODE_OPTIONS: "--test-reporter=junit" },
     });
-    assert.equal(r.status, 2, `expected a refusal (2):\n${r.stdout}${r.stderr}`);
-    assert.match(r.stderr, /printed no summary, so its run cannot be counted/);
+    assert.equal(
+      r.status,
+      0,
+      `a hostile NODE_OPTIONS reporter must not change the count:\n${r.stdout}${r.stderr}`,
+    );
+    assert.match(r.stdout, /every count matching the manifest/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

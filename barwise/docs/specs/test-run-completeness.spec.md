@@ -240,8 +240,8 @@ environment, which is a correctness fix rather than a seam opened for a test.
 Worth recording because the symptom pointed at the manifest and the cause was
 in the environment two layers away.
 
-**The "child reported nothing" branch had no test, and finding a probe for it
-took three tries.** A mutation deleting it came back UNCAUGHT: the truncation
+**The "child reported nothing" branch ended up with no test at all, and that
+is stated rather than papered over.** A mutation deleting it came back UNCAUGHT: the truncation
 test does not reach it, because a truncated child reports a SHORT count, not no
 count. Two levers were tried and rejected on measurement -- an invalid
 `NODE_OPTIONS` flag kills the wrapper itself (exit 9; it is a node process too),
@@ -250,6 +250,27 @@ and killing the test file's own process does not work either, because even a
 lever that works is forcing a different reporter through `NODE_OPTIONS`, which
 is also the realistic way an operator meets this: the children emit junit XML,
 no `# tests N` line exists to read, and the wrapper refuses rather than guessing.
+
+**CI runs a different Node than this session did, and that is what broke the
+parser.** `.nvmrc` pins **26.7.0**; the container this was developed in has only
+Node 20, 21 and 22 available, and ran 22. The default `node --test` reporter is
+not the same across those versions: piped output on 22 is TAP, so `# tests N`
+parsed; CI printed the spec reporter's `i tests N` and every healthy suite read
+as "printed no summary". All 32 gates were green locally and the gate suite went
+red in CI.
+
+The fix is not a second parser. The wrapper now forces `--test-reporter=tap` on
+its children and STRIPS any reporter inherited through `NODE_OPTIONS` --
+stripping rather than overriding, because the flag accumulates between
+`NODE_OPTIONS` and argv and node then refuses the run outright with "must match
+the number of specified --test-reporter-destination". Forcing the format makes
+the count independent of which Node is running, which is the portability
+argument `.nvmrc` itself exists for, applied one level in.
+
+The ninth test was rewritten to pin exactly this: with a hostile
+`NODE_OPTIONS=--test-reporter=junit` the wrapper must still count correctly.
+That replaced a test that used the same lever to prove the opposite, and is the
+better assertion -- it covers the defect that actually happened.
 
 **The gate's first act was to refuse its own commit**, which is the ratchet
 working: adding eight tests took `gates.test.mjs` from 118 to 126 and

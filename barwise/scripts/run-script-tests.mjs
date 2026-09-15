@@ -63,18 +63,37 @@ function testFiles() {
  */
 function runFile(file) {
   return new Promise((resolveRun) => {
-    // `NODE_TEST_CONTEXT` is how `node --test` recognises that it is already
-    // inside a test run; with it set, a child prints
-    // "run() is being called recursively ... skipping running files" and no
-    // summary at all. Each child here IS a fresh top-level run, so inheriting
-    // that marker is simply wrong -- and the failure it causes is the one this
-    // script exists to refuse, so without this the wrapper would report
-    // "could not be counted" for a suite that is perfectly fine.
+    // Two pieces of inherited state are wrong for a child that IS a fresh
+    // top-level run, and both were found by a run going red rather than by
+    // reading the docs.
+    //
+    // `NODE_TEST_CONTEXT` is how `node --test` recognises it is already inside
+    // a test run; with it set a child prints "run() is being called
+    // recursively ... skipping running files" and no summary at all -- which
+    // this script would then correctly refuse, for a suite that is fine.
+    //
+    // A reporter inherited through `NODE_OPTIONS` changes the output format
+    // out from under the parser below. That is not hypothetical: the summary
+    // this script reads is TAP's `# tests N`, and CI printed the spec
+    // reporter's `i tests N` instead, because CI runs the Node that `.nvmrc`
+    // pins and the default reporter is not the same across versions. Forcing
+    // the format makes the count independent of which Node is running, which
+    // is the same portability argument `.nvmrc` itself exists for.
     const { NODE_TEST_CONTEXT: _nested, ...env } = process.env;
-    const child = spawn(process.execPath, ["--test", join(TESTS_DIR, file)], {
-      cwd: resolve(REPO_ROOT, "barwise"),
-      env,
-    });
+    if (typeof env.NODE_OPTIONS === "string") {
+      // Stripped rather than overridden: `--test-reporter` ACCUMULATES between
+      // NODE_OPTIONS and argv, and node then refuses the run outright with
+      // "must match the number of specified --test-reporter-destination".
+      env.NODE_OPTIONS = env.NODE_OPTIONS
+        .split(/\s+/)
+        .filter((tok) => !tok.startsWith("--test-reporter"))
+        .join(" ");
+    }
+    const child = spawn(
+      process.execPath,
+      ["--test", "--test-reporter=tap", join(TESTS_DIR, file)],
+      { cwd: resolve(REPO_ROOT, "barwise"), env },
+    );
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     let out = "";
@@ -93,6 +112,18 @@ function runFile(file) {
  * us nothing, and treating that as "zero tests" would let a crashed run satisfy
  * a manifest entry of 0 -- the same could-not-answer-reads-as-an-answer defect
  * this file exists to remove.
+ *
+ * TAP's shape is safe to depend on because the caller FORCES `--test-reporter=tap`
+ * and strips any inherited one. Without that this parser silently returned
+ * `undefined` for every healthy suite on a Node whose default reporter differs.
+ *
+ * NOTE ON COVERAGE: the `undefined` branch is a real guard -- a child killed by
+ * the OOM killer reaches it -- but with the format pinned there is no
+ * deterministic probe for it, and several were tried and rejected on
+ * measurement (a hostile reporter, an invalid node flag, SIGKILL at module
+ * scope, a directory in place of a file; each either still prints a summary or
+ * kills this process too). It is therefore asserted by no test, said plainly
+ * here rather than left for a reader to assume otherwise.
  */
 function summarise(out) {
   const read = (label) => {
