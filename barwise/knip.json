@@ -5,7 +5,7 @@
   "ignoreBinaries": ["depcruise", "jscpd", "shellcheck", "uv"],
   "ignoreDependencies": ["@dprint/json", "@dprint/markdown", "@dprint/typescript", "dependency-cruiser", "jscpd"],
   "workspaces": {
-    ".": { "entry": ["scripts/at-root.mjs"] },
+    ".": { "entry": ["scripts/at-root.mjs", "scripts/tests/*.test.mjs"] },
     "packages/core": {
       "ignore": ["scripts/**", "vitest.mutation.config.ts"]
     },
