@@ -469,11 +469,11 @@
       "caught_by": "execution",
       "note": "Running the wrapper's own tests. node --test refuses to nest, so the children inherited NODE_TEST_CONTEXT and printed no summary at all -- four of eight new tests failed, and the symptom (the gate reporting 'could not be counted') pointed at the manifest while the cause was in the child environment."
     },
-    "test-run-completeness::3eff3ca4612e": {
+    "test-run-completeness::30724aefdd67": {
       "spec": "test-run-completeness.spec.md",
-      "excerpt": "status: implemented. ws1 shipped; one thing the draft did not anticipate is recorded in implementation notes below",
+      "excerpt": "status: implemented. ws1 shipped; four things the draft did not anticipate are recorded in implementation notes below, two of them found reviewing this change's",
       "caught_by": "not-a-correction",
-      "note": "The Status header announcing that corrections are recorded below. It points at the record; it is not one. Same shape as the row in baseline-write-preserves-verdicts.spec.md."
+      "note": "The Status header announcing that corrections are recorded below. It points at the records; it is not one. Re-keyed from ::3eff3ca4612e when the header was corrected during this change's own review -- the id is a hash of the normalised text, so editing the sentence drops the old row and adds this one."
     },
     "tracker-quick-wins::ae1c4c3cc7ab": {
       "spec": "tracker-quick-wins.spec.md",

@@ -47,8 +47,24 @@ const MANIFEST_COMMENT =
   + "run that failed or printed no summary. "
   + "Spec: docs/specs/test-run-completeness.spec.md.";
 
-/** Every gate-test file, by basename, sorted so output order is stable. */
+/**
+ * Every gate-test file, by basename, sorted so output order is stable.
+ *
+ * An absent directory is a REFUSAL, not a throw. `readdirSync` on a missing
+ * path raises ENOENT, which leaves this script exiting 1 with a stack trace --
+ * and exit 1 is this gate's word for "tests failed", a wrong answer rather than
+ * an admission that it could not look. That is precisely the confusion
+ * `docs/specs/gate-refusal-contract.spec.md` exists to remove, in the script
+ * whose header cites it.
+ */
 function testFiles() {
+  if (!existsSync(TESTS_DIR)) {
+    refuse([
+      `no directory at ${TESTS_DIR}.`,
+      "Refusing rather than reporting a failure: there is nothing to count,",
+      "which is not the same as a suite that ran and failed.",
+    ]);
+  }
   return readdirSync(TESTS_DIR)
     .filter((f) => f.endsWith(".test.mjs"))
     .sort();

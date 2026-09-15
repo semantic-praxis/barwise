@@ -1,7 +1,8 @@
 # A test run that did not finish must not print a plausible summary
 
-Status: Implemented. WS1 shipped; one thing the draft did not anticipate is
-recorded in Implementation notes below
+Status: Implemented. WS1 shipped; four things the draft did not anticipate are
+recorded in Implementation notes below, two of them found reviewing this
+change's own diff
 
 Created: 2026-09-15
 Last-updated: 2026-09-15

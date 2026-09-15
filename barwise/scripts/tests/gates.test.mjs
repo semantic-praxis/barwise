@@ -2658,3 +2658,22 @@ test("run-script-tests counts correctly despite a reporter forced through NODE_O
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("run-script-tests refuses an absent tests directory rather than failing", () => {
+  // Found reviewing this PR's own diff. `readdirSync` on a missing path raises
+  // ENOENT, which left the script exiting 1 with a stack trace -- and exit 1 is
+  // this gate's word for "tests failed", a wrong answer rather than an
+  // admission that it could not look. The distinction is the whole point of
+  // docs/specs/gate-refusal-contract.spec.md, which this script's own header
+  // cites.
+  const dir = tempRepo();
+  try {
+    mkdirSync(join(dir, "barwise"), { recursive: true });
+    const r = gate("run-script-tests.mjs", dir);
+    assert.equal(r.status, 2, `expected a refusal (2):\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /no directory at/);
+    assert.doesNotMatch(r.stderr, /ENOENT/, "a stack trace is not a refusal");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
