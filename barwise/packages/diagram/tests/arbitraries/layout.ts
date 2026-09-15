@@ -117,9 +117,25 @@ const arbPlan: fc.Arbitrary<Plan> = fc
       };
     });
 
-    // Subtyping is entity-to-entity, irreflexive, and acyclic by construction:
-    // only a lower index may be the supertype, so no cycle can be generated and
-    // no run is wasted on a model `core` would reject.
+    // Subtyping is entity-to-entity, irreflexive and acyclic BY CONSTRUCTION:
+    // only a lower index may be the supertype, so no cycle can be generated.
+    //
+    // Two of those three are workarounds and one is not, and the difference is
+    // worth stating because it is the marker `pr-review/checklist.md` names --
+    // an arbitrary that hand-avoids a state rather than constructing it and
+    // asserting refusal. `addSubtypeFact` DOES refuse a dangling reference, a
+    // non-entity player and a duplicate pair, so the entity filter and the
+    // `seen` set just stay inside what the constructor already enforces. It
+    // does NOT refuse a CYCLE -- only `validate()` does, one layer later -- so
+    // the index ordering is standing in for a check that is not there.
+    //
+    // What would remove it: `addSubtypeFact` rejecting an edge that closes a
+    // cycle, as it already rejects the other three. Until then this generator
+    // cannot produce a cyclic hierarchy, and a layout defect reachable only
+    // through one would go unseen here. Recorded rather than fixed: that is a
+    // change to `core`'s public behaviour and belongs in its own spec, not
+    // smuggled into a test-only workstream. `core/tests/arbitraries/model.ts`
+    // carries the identical workaround for the identical reason.
     const entities = objectTypes.flatMap((o, i) => (o.entity ? [i] : []));
     const seen = new Set<string>();
     const subtypes: { subIdx: number; superIdx: number; }[] = [];

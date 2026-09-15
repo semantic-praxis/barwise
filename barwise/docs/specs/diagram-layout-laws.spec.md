@@ -212,7 +212,7 @@ Accepted only when a planted layout defect makes the laws fail -- see Risks.
   chosen against measured runtime rather than copied from `core`, because a
   layout is orders of magnitude more expensive per case than a mapper call.
 
-## Open decisions (for review)
+## Open decisions (all three resolved by WS1; recorded as asked)
 
 - **How many runs.** `core` pins `RUNS = 250`. A layout invokes ELK and is far
   slower, so the same number may not be affordable. Recommend measuring and
@@ -227,6 +227,12 @@ Accepted only when a planted layout defect makes the laws fail -- see Risks.
 - **Whether barwise-1023 should stay open.** Recommend yes, narrowed to the
   text-metric half with this spec named. Closing it would record a coverage
   claim broader than what landed.
+
+**Resolved.** Runs: 60, measured at roughly 25ms per model through ELK,
+which keeps the law suite near two seconds -- the recommendation asked for
+the largest number under ten, and the pre-commit hook's budget is the
+tighter constraint. Tolerance: exact, as recommended, on the measured 0px.
+barwise-1023: stays open, narrowed to the text-metric half.
 
 ## Risks and testing
 
