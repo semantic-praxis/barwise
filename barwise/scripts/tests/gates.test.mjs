@@ -2193,3 +2193,280 @@ test("audit-corrections detects a marker the formatter wrapped across a line bre
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+/*
+ * ---------------------------------------------------------------------------
+ * Baseline writers merge the verdicts they find.
+ *
+ * All three writers built their row map from the detector alone, stamping a
+ * placeholder into every row -- so the documented way to add ONE row was the
+ * way to destroy every judgment in the file. Measured before the fix: 90 of 90
+ * verdicts replaced and 74 notes blanked, from the spellings the scripts
+ * advertise (barwise-1026, docs/specs/baseline-write-preserves-verdicts.spec.md).
+ *
+ * The loss was silent: the only reason it was ever noticed is that a later
+ * `--check` happened to fail on an untouched row. So these tests assert the
+ * write path directly rather than trusting `--check` to catch a clobber.
+ * ---------------------------------------------------------------------------
+ */
+
+/** The three writers, their baseline file, and the fields a human owns in it. */
+const BASELINE_WRITERS = [
+  {
+    script: "audit-corrections.mjs",
+    args: ["--write"],
+    file: "barwise/correction-baseline.json",
+    key: "records",
+    human: ["caught_by", "note"],
+    placeholder: "TODO: classify",
+  },
+  {
+    script: "audit-rubric.mjs",
+    args: ["--write-baseline"],
+    file: "barwise/rubric-baseline.json",
+    key: "checks",
+    human: ["verdict"],
+    placeholder: "TODO",
+    // Reads packages/promptlab/dist, which `npm test` builds before it gets
+    // here. Skipped rather than failed when absent: a test that cannot see its
+    // input must not report either verdict.
+    needsDist: "packages/promptlab/dist/index.js",
+  },
+  {
+    script: "audit-spec-status.mjs",
+    args: ["--write"],
+    file: "barwise/spec-status-baseline.json",
+    key: "specs",
+    human: ["note"],
+    placeholder: "TODO: classify",
+  },
+];
+
+for (const w of BASELINE_WRITERS) {
+  test(`${w.script} rewrites without changing a committed verdict`, (t) => {
+    if (w.needsDist !== undefined && !existsSync(join(REPO, "barwise", w.needsDist))) {
+      t.skip(`${w.needsDist} not built; run npm run build first`);
+      return;
+    }
+
+    const path = join(REPO, w.file);
+    const before = readFileSync(path, "utf8");
+    try {
+      const r = gate(w.script, REPO, ...w.args);
+      assert.equal(r.status, 0, `writer failed:\n${r.stdout}${r.stderr}`);
+      const after = readFileSync(path, "utf8");
+
+      // The property, stated over the human-owned fields rather than over the
+      // bytes. An earlier version of this test asserted the file came back
+      // byte-identical to the committed one, which is NOT a property of
+      // audit-spec-status: its `commits` field is derived from `git log`, so it
+      // legitimately changes the moment any commit touches a spec's named
+      // sources. That test passed locally and failed in CI on this PR's own
+      // first commit, because locally it ran before the commit existed -- green
+      // for a reason unrelated to what it verified (barwise-906's shape).
+      const oldRows = JSON.parse(before)[w.key];
+      const newRows = JSON.parse(after)[w.key];
+      for (const [id, row] of Object.entries(oldRows)) {
+        assert.ok(id in newRows, `${w.file}: row ${id} was dropped by a rewrite`);
+        for (const field of w.human) {
+          assert.deepEqual(
+            newRows[id][field],
+            row[field],
+            `${w.file}: ${id}.${field} changed when rewritten over itself. Before the`
+              + ` fix this was every verdict in the file replaced by a placeholder.`,
+          );
+        }
+      }
+
+      // And the writer is a function of its inputs: whatever the first write
+      // absorbed from a moved history, a second must be a no-op. This is the
+      // byte-level half, stated where it is actually true.
+      const again = gate(w.script, REPO, ...w.args);
+      assert.equal(again.status, 0, `second write failed:\n${again.stdout}${again.stderr}`);
+      assert.equal(
+        readFileSync(path, "utf8"),
+        after,
+        `${w.file}: writing twice gave two different files, so the output depends`
+          + ` on something other than the findings (row order, most likely).`,
+      );
+    } finally {
+      // Restored unconditionally: a failing assertion must not leave the
+      // repository's own baseline rewritten.
+      writeFileSync(path, before);
+    }
+  });
+
+  test(`${w.file} has no unclassified row, so the round trip is not vacuous`, () => {
+    // The round-trip test above is strong because every row in the committed
+    // tree carries a real verdict: a placeholder row would survive a clobber
+    // unchanged and the assertion would pass over exactly the data it exists
+    // to protect. This is the guard on that precondition.
+    const rows = JSON.parse(readFileSync(join(REPO, w.file), "utf8"))[w.key];
+    const unclassified = Object.entries(rows).filter(([, row]) =>
+      w.human.every((f) => row[f] === w.placeholder || row[f] === "")
+    );
+    assert.deepEqual(
+      unclassified.map(([id]) => id),
+      [],
+      `${w.file} carries unclassified rows, which weakens the round-trip test above`,
+    );
+  });
+}
+
+test("audit-corrections --write keeps a classified verdict and its note", () => {
+  const dir = correctionRepo({ "probe.spec.md": A_CORRECTION }, {});
+  try {
+    const id = idOf(dir, "the draft said the loader was pure");
+    stage(
+      dir,
+      "barwise/correction-baseline.json",
+      JSON.stringify(
+        {
+          $comment: "test",
+          records: {
+            [id]: {
+              spec: "probe.spec.md",
+              excerpt: "stale excerpt, refreshed by the writer",
+              caught_by: "execution",
+              note: "Implementing it is what showed the loader reads the environment.",
+            },
+          },
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+
+    const w = gate("audit-corrections.mjs", dir, "--write");
+    assert.equal(w.status, 0, `--write failed:\n${w.stdout}${w.stderr}`);
+
+    const rows = JSON.parse(
+      readFileSync(join(dir, "barwise/correction-baseline.json"), "utf8"),
+    ).records;
+    assert.equal(rows[id].caught_by, "execution", "the verdict must survive a rewrite");
+    assert.match(rows[id].note, /reads the environment/, "the note must survive too");
+    // The derived half still refreshes: the detector owns the excerpt, so a
+    // stale one is replaced rather than preserved alongside the verdict.
+    assert.match(rows[id].excerpt, /the draft said the loader was pure/);
+    assert.match(w.stdout, /1 verdict\(s\) kept/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("audit-corrections --write stamps the placeholder on a new record only", () => {
+  const second = "# Probe two\n\nThe second estimate turned out to be mistaken once the\n"
+    + "packages were counted, so the figure is restated with the real set here.\n";
+  const dir = correctionRepo({ "probe.spec.md": A_CORRECTION }, {});
+  try {
+    const id = idOf(dir, "the draft said the loader was pure");
+    stage(
+      dir,
+      "barwise/correction-baseline.json",
+      JSON.stringify(
+        {
+          $comment: "test",
+          records: {
+            [id]: { spec: "probe.spec.md", excerpt: "x", caught_by: "reasoning", note: "kept" },
+          },
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+    stage(dir, "barwise/docs/specs/two.spec.md", second);
+
+    const w = gate("audit-corrections.mjs", dir, "--write");
+    assert.equal(w.status, 0, `--write failed:\n${w.stdout}${w.stderr}`);
+
+    const rows = JSON.parse(
+      readFileSync(join(dir, "barwise/correction-baseline.json"), "utf8"),
+    ).records;
+    assert.equal(rows[id].caught_by, "reasoning");
+    assert.equal(rows[id].note, "kept");
+    const fresh = Object.entries(rows).find(([rid]) => rid !== id);
+    assert.ok(fresh, "the new record must be written");
+    assert.equal(fresh[1].caught_by, "TODO: classify", "a NEW row gets the placeholder");
+    assert.match(w.stdout, /1 verdict\(s\) kept, 1 new/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/*
+ * The "empty note survives" case is NOT here: corrections' own placeholder for
+ * `note` is `""`, so at this level the merge rule and a naive `||` fallthrough
+ * are indistinguishable -- a mutation swapping them passed all 118 tests. It is
+ * asserted against the helper instead, in baseline-merge.test.mjs, which is the
+ * level where the distinction is observable.
+ */
+
+test("audit-corrections --write reports a row it dropped rather than dropping it silently", () => {
+  const dir = correctionRepo({ "probe.spec.md": A_CORRECTION }, {});
+  try {
+    const id = idOf(dir, "the draft said the loader was pure");
+    stage(
+      dir,
+      "barwise/correction-baseline.json",
+      JSON.stringify(
+        {
+          $comment: "test",
+          records: {
+            [id]: { spec: "probe.spec.md", excerpt: "x", caught_by: "execution", note: "n" },
+            "gone::deadbeef0000": {
+              spec: "gone.spec.md",
+              excerpt: "text that is no longer anywhere",
+              caught_by: "reasoning",
+              note: "n",
+            },
+          },
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+
+    const w = gate("audit-corrections.mjs", dir, "--write");
+    assert.equal(w.status, 0, `--write failed:\n${w.stdout}${w.stderr}`);
+    assert.match(w.stdout, /1 no longer detected/);
+    assert.match(w.stdout, /gone::deadbeef0000/);
+    const rows = JSON.parse(
+      readFileSync(join(dir, "barwise/correction-baseline.json"), "utf8"),
+    ).records;
+    assert.ok(!("gone::deadbeef0000" in rows), "an undetected row is not written back");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("audit-spec-status writes nothing without --write", () => {
+  // The write path used to be the `else` of `--check`, so bare
+  // `npm run audit:specs` -- the spelling a reader tries first to see what the
+  // gate says -- rewrote the baseline and blanked every note. The operator
+  // never asked to write anything.
+  const path = join(REPO, "barwise/spec-status-baseline.json");
+  const before = readFileSync(path, "utf8");
+  try {
+    const r = gate("audit-spec-status.mjs", REPO);
+    assert.equal(r.status, 0, `survey failed:\n${r.stdout}${r.stderr}`);
+    assert.equal(readFileSync(path, "utf8"), before, "a bare invocation must not write");
+    assert.match(r.stdout, /Nothing written/);
+  } finally {
+    writeFileSync(path, before);
+  }
+});
+
+test("audit-duplication.mjs still has no baseline writer", () => {
+  // CLAUDE.md and baseline-write-preserves-verdicts.spec.md both say this gate
+  // never had the clobber defect BECAUSE it has no writer -- its 48 candidates
+  // are hand-maintained. That is a claim about code, so it is checked here
+  // rather than asserted in prose: adding a writer to this script would make
+  // both documents quietly false, and would reintroduce exactly the hazard the
+  // other three just had removed.
+  const src = readFileSync(join(SCRIPTS, "audit-duplication.mjs"), "utf8");
+  assert.ok(
+    !src.includes("writeFileSync"),
+    "audit-duplication.mjs gained a writer. If that is deliberate, route it "
+      + "through scripts/lib/baseline-merge.mjs and update both documents.",
+  );
+});

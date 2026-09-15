@@ -37,6 +37,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { mergeBaselineRows, mergeSummary, readExistingRows } from "./lib/baseline-merge.mjs";
 import { REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
 
 const BASELINE = resolve(REPO_ROOT, "barwise", "correction-baseline.json");
@@ -236,20 +237,29 @@ function main() {
       );
       process.exit(2);
     }
-    const records = {};
-    for (const r of found) {
-      records[r.id] = {
-        spec: r.spec,
-        excerpt: r.excerpt,
-        caught_by: "TODO: classify",
-        note: "",
-      };
-    }
+    const fresh = {};
+    for (const r of found) fresh[r.id] = { spec: r.spec, excerpt: r.excerpt };
+
+    // Merged, not regenerated. `caught_by` and `note` are the closure record
+    // for each finding; rebuilding the map from the detector alone replaced 66
+    // of them with the placeholder to add one row (barwise-1026).
+    const { rows: records, ...counts } = mergeBaselineRows({
+      fresh,
+      existing: readExistingRows(BASELINE, "records"),
+      preserve: { caught_by: "TODO: classify", note: "" },
+    });
+
     writeFileSync(
       BASELINE,
       JSON.stringify({ $comment: BASELINE_COMMENT, records }, null, 2) + "\n",
     );
-    console.log(`audit-corrections: wrote ${found.length} record(s) to correction-baseline.json`);
+    console.log(
+      `audit-corrections: wrote ${found.length} record(s) to correction-baseline.json`
+        + ` -- ${mergeSummary(counts)}`,
+    );
+    for (const id of counts.dropped) {
+      console.log(`  dropped (no longer detected): ${id}`);
+    }
     return;
   }
 

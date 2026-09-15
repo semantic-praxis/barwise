@@ -240,6 +240,11 @@
       "status": "accepted-benign",
       "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
       "detail": "RingType restated as record in packages/core/src/validation/rules/population/ring.ts"
+    },
+    "prose:ef826c8adbf8": {
+      "status": "accepted-benign",
+      "note": "CLAUDE.md's convention summary restating the spec's reason. Kept because this file's job is the convention with its reason attached, and the one half that is a CODE claim -- that audit-duplication.mjs has no writer -- is drift-tested in scripts/tests/gates.test.mjs rather than left to prose.",
+      "detail": "../CLAUDE.md: hand-maintained, which is why it never had this defect."
     }
   }
 }
