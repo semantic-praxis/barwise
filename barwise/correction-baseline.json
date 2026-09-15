@@ -175,6 +175,24 @@
       "caught_by": "reasoning",
       "note": "A reviewer's objection, in one sentence -- do not build what others have built better -- before anything was re-run. The draft had rejected gitleaks on two grounds that both turn out weak: CLAUDE.md's no-trivial-dependencies rule is about what Node core provides, and the first-party-actions constraint is satisfied by a pinned tarball with a verified digest."
     },
+    "diagram-layout-laws::6cdf956a0090": {
+      "spec": "diagram-layout-laws.spec.md",
+      "excerpt": "the draft gave a different first reason and it was wrong. it said reuse would require either reaching into another package's tests/, \"which depcruise exists to ",
+      "caught_by": "execution",
+      "note": "The draft invented an architectural objection -- that reusing core's arbitrary would mean reaching into another package's tests/, 'which depcruise exists to prevent'. Caught by reading packages/diagram/CLAUDE.md, which documents the opposite practice, then confirming with a grep: three diagram tests already import ../../../core/tests/helpers/ModelBuilder.js across exactly that boundary. The conclusion survived on the measured reason instead (core names every object type T0 and every fact type F0, so node widths never vary and the corpus cannot crowd a layout), which is the stronger argument. Worth the row because an invented objection would have told a reviewer the option was closed when it was merely wrong."
+    },
+    "diagram-layout-laws::8cb6b58e7db0": {
+      "spec": "diagram-layout-laws.spec.md",
+      "excerpt": "one of the four laws as drafted was a tautology, and reading the code is what showed it. the draft's second law was \"every node lies inside the declared viewbox",
+      "caught_by": "execution",
+      "note": "The draft made \"every node lies inside the declared viewBox\" a law. It surfaced in the act of writing that law: computeBounds takes the min and max over the node rectangles and adds padding, so the box is DERIVED from the nodes and the assertion has no reachable failure path -- a check that cannot fail, shipped in the suite meant to add coverage. Filed as execution on the precedent of model-lint::a2ee0bc18c2f, and with the same softness: it was the read, not a run, that showed it, and implementing the test is what forced the read. The restatement over all drawn geometry was then confirmed by execution without qualification -- negating the padding shrinks the box below its content and exactly that law fires."
+    },
+    "diagram-layout-laws::b4bd2deb6f90": {
+      "spec": "diagram-layout-laws.spec.md",
+      "excerpt": "status: implemented. ws1 shipped; two things the draft had wrong are recorded in implementation notes below",
+      "caught_by": "not-a-correction",
+      "note": "The spec's Status line, which says two things the draft had wrong are recorded below and points at them. It records no correction of its own -- both are detected separately, as this spec's other two rows -- so giving it a verdict would count one finding twice. The detector over-matched on the pointer, which is what an over-inclusive detector is built to do."
+    },
     "eval-metric-readiness::7a846f091cfc": {
       "spec": "eval-metric-readiness.spec.md",
       "excerpt": "nothing in the harness would have caught it, because every case is a training case. a search that runs hundreds of candidates against the same seven, with no he",
