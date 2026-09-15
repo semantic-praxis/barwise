@@ -33,6 +33,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { mergeBaselineRows, mergeSummary, readExistingRows } from "./lib/baseline-merge.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(here, "..");
@@ -190,20 +191,28 @@ function main() {
   const mode = process.argv[2];
 
   if (mode === "--write-baseline") {
-    const entries = {};
+    const fresh = {};
     for (const r of open) {
-      entries[r.id] = {
-        case: r.caseId,
-        kind: r.kind,
-        message: r.message.slice(0, 120),
-        verdict: "TODO",
-      };
+      fresh[r.id] = { case: r.caseId, kind: r.kind, message: r.message.slice(0, 120) };
     }
+
+    // Merged, not regenerated: `verdict` is the recorded judgment on a check
+    // with no reachable failure path, and rebuilding from the audit alone
+    // stamped "TODO" over all ten of them (barwise-1026).
+    const { rows: entries, ...counts } = mergeBaselineRows({
+      fresh,
+      existing: readExistingRows(BASELINE, "checks"),
+      preserve: { verdict: "TODO" },
+    });
+
     writeFileSync(
       BASELINE,
       JSON.stringify({ $comment: BASELINE_COMMENT, checks: entries }, null, 2) + "\n",
     );
-    console.log(`wrote ${Object.keys(entries).length} entries; set each verdict`);
+    console.log(
+      `wrote ${Object.keys(entries).length} entries -- ${mergeSummary(counts)}`,
+    );
+    for (const id of counts.dropped) console.log(`  dropped (now discriminates): ${id}`);
     return;
   }
 

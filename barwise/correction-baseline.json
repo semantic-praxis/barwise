@@ -7,6 +7,12 @@
       "caught_by": "execution",
       "note": "Re-grounding against the code showed the pin already existed and was exported; byte-equality checked, not argued."
     },
+    "artifact-resolution-in-production::8603e5428a94": {
+      "spec": "artifact-resolution-in-production.spec.md",
+      "excerpt": "- correction: the blast-radius estimate names the wrong packages. workstream 2 says it updates \"every mock client in the llm, cli, mcp, and vscode test suites.\"",
+      "caught_by": "execution",
+      "note": "Counting the actual files. The spec named llm, cli, mcp and vscode; cli and vscode have no mock clients at all and promptlab has two the spec never mentioned. The design was unaffected -- only the estimate of what WS2 touches was wrong."
+    },
     "artifact-resolution-parity::a8aed8a10e2a": {
       "spec": "artifact-resolution-parity.spec.md",
       "excerpt": "all three workstreams shipped in one session, in the specified order. re-grounding first confirmed every load-bearing claim against the code at c844ad5; main ha",
@@ -19,17 +25,53 @@
       "caught_by": "execution",
       "note": "A surviving mutant, recorded rather than papered over."
     },
-    "core-branching-load::a9d4e20d14bf": {
-      "spec": "core-branching-load.spec.md",
-      "excerpt": "the second half of this bullet turned out to be wrong, and is worth keeping for that reason: it predicted that typing the ids would make core-model-laws.spec.md",
+    "baseline-write-preserves-verdicts::2600bdc4a1f8": {
+      "spec": "baseline-write-preserves-verdicts.spec.md",
+      "excerpt": "readexistingrows was three copies before it was one. the draft put the merge in a shared module and left each writer to read its own file. writing the second on",
       "caught_by": "execution",
-      "note": "A prediction about a downstream decision, falsified when WS4 was resolved the other way."
+      "note": "Writing the second call site is what surfaced it: the ENOENT-versus-malformed reading came out as a verbatim copy of the first writer's, which is a must-agree pair created in the same commit whose spec argues against them. Moved into the helper as a second export."
     },
-    "core-branching-load::f04daed342a9": {
-      "spec": "core-branching-load.spec.md",
-      "excerpt": "construction and mutation outside core, measured because it is ws1's radius. re-measured on main 96369f8 (2026-09-08); the earlier figures are corrected rather ",
+    "baseline-write-preserves-verdicts::2e323d3c125d": {
+      "spec": "baseline-write-preserves-verdicts.spec.md",
+      "excerpt": "status: implemented. both workstreams shipped together; three things the draft had wrong or missing are recorded in implementation notes below",
+      "caught_by": "not-a-correction",
+      "note": "The Status header announcing that corrections are recorded below. It points at the records; it is not one."
+    },
+    "baseline-write-preserves-verdicts::5f3925319fa7": {
+      "spec": "baseline-write-preserves-verdicts.spec.md",
+      "excerpt": "sorting was missing, and the round-trip test cannot exist without it. the draft specified the merge and stopped. running it showed the writers emit rows in dete",
       "caught_by": "execution",
-      "note": "Re-measured on main 96369f8; one figure was wrong in kind, not only magnitude."
+      "note": "Running --write and reading the diff: 73 of 74 rows moved while nothing changed, because the writers emit in detector-traversal order and the committed file was in an older one. The draft specified the merge and stopped, and the byte-identical round-trip test it leans on is not available without sorting."
+    },
+    "baseline-write-preserves-verdicts::86ae2f58dd3f": {
+      "spec": "baseline-write-preserves-verdicts.spec.md",
+      "excerpt": "three things the draft did not have right. each is here rather than silently fixed, so the next reader starts from what the code does.",
+      "caught_by": "not-a-correction",
+      "note": "The Implementation notes section lede, same as the Status line: it says three records follow. The records are the three paragraphs after it, each detected separately."
+    },
+    "baseline-write-preserves-verdicts::df0be9a45df0": {
+      "spec": "baseline-write-preserves-verdicts.spec.md",
+      "excerpt": "no, and the reason is that the detector has no opinion about the fields it would be overwriting. recordid() is spec-name::sha256(normalised text) truncated to 1",
+      "caught_by": "not-a-correction",
+      "note": "The detector matched `caught it` where the paragraph NAMES the verdict vocabulary -- \"has learned nothing new about whether reasoning or execution caught it\" -- rather than recording a correction. The over-match is the designed behaviour; this row is the designed response to it."
+    },
+    "baseline-write-preserves-verdicts::ec24dfc180ad": {
+      "spec": "baseline-write-preserves-verdicts.spec.md",
+      "excerpt": "the three baseline files are listed because a reviewer will want to see what this change does to them: no verdict is edited, and one row is added (a correction ",
+      "caught_by": "not-a-correction",
+      "note": "An Inventory note about what the diff does to the baseline files. The detector matched `caught it` inside prose NAMING the verdict vocabulary, which is the same over-match this spec's first row records."
+    },
+    "closed-sets-as-unions::640fb4210c1b": {
+      "spec": "closed-sets-as-unions.spec.md",
+      "excerpt": "making the drift testable needed one refactor the workstream did not anticipate: classifychange returned the literal \"caution\" both for a deliberate caution and",
+      "caught_by": "execution",
+      "note": "Writing the test is what surfaced it: classifyChange returned the literal \"caution\" for both a deliberate caution and an unrecognized string, so no test could distinguish them. Split into classifyKnownChange returning BreakingLevel | undefined."
+    },
+    "core-branching-load::09caa79b9010": {
+      "spec": "core-branching-load.spec.md",
+      "excerpt": "shipped (barwise-935). ringproperty and ringproperties sit beside ringtype; population/ring.ts holds one checker per property and words findings from a record<r",
+      "caught_by": "not-a-correction",
+      "note": "Three claims argued from reading were checked first and all held -- a verification that found nothing."
     },
     "core-branching-load::2e0eaff5bfe7": {
       "spec": "core-branching-load.spec.md",
@@ -37,17 +79,17 @@
       "caught_by": "not-a-correction",
       "note": "Prescribes the test that would catch each defect; records no correction of its own."
     },
+    "core-branching-load::a9d4e20d14bf": {
+      "spec": "core-branching-load.spec.md",
+      "excerpt": "the second half of this bullet turned out to be wrong, and is worth keeping for that reason: it predicted that typing the ids would make core-model-laws.spec.md",
+      "caught_by": "execution",
+      "note": "A prediction about a downstream decision, falsified when WS4 was resolved the other way."
+    },
     "core-branching-load::aa0049994409": {
       "spec": "core-branching-load.spec.md",
       "excerpt": "only the first is this workstream's, and it is the one the draft already named: a guard chain ending in a fallback cannot fail, so the five kinds with no genera",
       "caught_by": "execution",
       "note": "A guard chain ending in a fallback cannot fail; the probe now fails at seven sites where it failed at six."
-    },
-    "core-branching-load::09caa79b9010": {
-      "spec": "core-branching-load.spec.md",
-      "excerpt": "shipped (barwise-935). ringproperty and ringproperties sit beside ringtype; population/ring.ts holds one checker per property and words findings from a record<r",
-      "caught_by": "not-a-correction",
-      "note": "Three claims argued from reading were checked first and all held -- a verification that found nothing."
     },
     "core-branching-load::c8b2475519b8": {
       "spec": "core-branching-load.spec.md",
@@ -60,6 +102,12 @@
       "excerpt": "one thing the step cost that the spec did not anticipate: objecttype no longer extends modelelement, so it stopped inheriting that class's name validation and i",
       "caught_by": "execution",
       "note": "Deleting the requireName call left the whole core suite green, exposing the inherited-coverage hole."
+    },
+    "core-branching-load::f04daed342a9": {
+      "spec": "core-branching-load.spec.md",
+      "excerpt": "construction and mutation outside core, measured because it is ws1's radius. re-measured on main 96369f8 (2026-09-08); the earlier figures are corrected rather ",
+      "caught_by": "execution",
+      "note": "Re-measured on main 96369f8; one figure was wrong in kind, not only magnitude."
     },
     "core-model-laws::02ed13496cab": {
       "spec": "core-model-laws.spec.md",
@@ -78,6 +126,54 @@
       "excerpt": "- the law was red on its first run, on a defect nobody had filed. a value constraint may carry both an enumeration and ranges; mintinvalidvalue read only the en",
       "caught_by": "execution",
       "note": "The law was red on its first run, on a defect nobody had filed."
+    },
+    "correction-record-ratchet::0d96891e4625": {
+      "spec": "correction-record-ratchet.spec.md",
+      "excerpt": "it does not judge whether a correction should have happened, and it cannot: a correction is a historical fact about a draft that is already gone. what it enforc",
+      "caught_by": "not-a-correction",
+      "note": "States what the gate does and does not judge. No correction recorded."
+    },
+    "correction-record-ratchet::44b7905b87d5": {
+      "spec": "correction-record-ratchet.spec.md",
+      "excerpt": "in one sentence: 28 specs already record what their drafts got wrong and what caught it, nothing reads that back, and a hand pass over it goes stale the same wa",
+      "caught_by": "not-a-correction",
+      "note": "The BLUF of this spec, describing the corpus it audits. No correction of its own."
+    },
+    "correction-record-ratchet::7eb377fc978c": {
+      "spec": "correction-record-ratchet.spec.md",
+      "excerpt": "- judging whether a correction was avoidable. the classification says what caught the defect, not what should have. - reading git history for pre-correction dra",
+      "caught_by": "not-a-correction",
+      "note": "An out-of-scope bullet. No correction recorded."
+    },
+    "correction-record-ratchet::d991e8800983": {
+      "spec": "correction-record-ratchet.spec.md",
+      "excerpt": "# ratchet the correction record: a new spec correction must say what caught it",
+      "caught_by": "not-a-correction",
+      "note": "This spec's own title. The detector matches its subject matter -- a spec about correction records is full of catch language -- which is the over-inclusion the design accepts and classifies rather than tunes away."
+    },
+    "correction-record-ratchet::df2c17054e14": {
+      "spec": "correction-record-ratchet.spec.md",
+      "excerpt": "- a required \"what caught it\" section in the spec template. catches nothing retroactively, and a template section is a rule in prose -- precisely what the taxon",
+      "caught_by": "not-a-correction",
+      "note": "A rejected alternative (a required template section). Records a design choice, not a correction to this spec's own draft."
+    },
+    "credential-scanning::22378f081fa0": {
+      "spec": "credential-scanning.spec.md",
+      "excerpt": "this spec's first draft said there was none, and that was wrong. codeql runs on every pr over javascript-typescript and python under github's default setup -- n",
+      "caught_by": "execution",
+      "note": "The CodeQL Analyze check runs appearing on this PR, not review. The draft concluded \"no SAST\" from a grep over .github/workflows, which cannot see GitHub default setup because that configuration is not in the tree. The same spec makes this argument about push protection; the miss was not running it in the direction where a setting is ON without the tree saying so."
+    },
+    "credential-scanning::42e89b8bedd7": {
+      "spec": "credential-scanning.spec.md",
+      "excerpt": "what the draft could not see is the thing that settles it. a private rule table has to track the providers of the world forever, and measurement showed it losin",
+      "caught_by": "execution",
+      "note": "Measuring both detector sets against the same probes. The hand-rolled regexes flagged AWS's own documented example key (a false positive that fails any commit quoting a manual) while gitleaks allowlists it by name; gitleaks in turn missed Anthropic keys, which is why one rule survives in .gitleaks.toml."
+    },
+    "credential-scanning::a04aec5878a7": {
+      "spec": "credential-scanning.spec.md",
+      "excerpt": "no, and this is the spec's largest correction. the first version of this gate shipped ten hand-written vendor-prefix regexes and an entropy argument for preferr",
+      "caught_by": "reasoning",
+      "note": "A reviewer's objection, in one sentence -- do not build what others have built better -- before anything was re-run. The draft had rejected gitleaks on two grounds that both turn out weak: CLAUDE.md's no-trivial-dependencies rule is about what Node core provides, and the first-party-actions constraint is satisfied by a pinned tarball with a verified digest."
     },
     "eval-metric-readiness::7a846f091cfc": {
       "spec": "eval-metric-readiness.spec.md",
@@ -103,29 +199,11 @@
       "caught_by": "execution",
       "note": "The Inventory was wrong about the mechanism and right about the count; found on implementing."
     },
-    "gate-refusal-contract::c0e531b5c7ac": {
+    "gate-refusal-contract::0926e4350604": {
       "spec": "gate-refusal-contract.spec.md",
-      "excerpt": "### 2. the contract for the remaining gates (implemented; the draft's design was wrong)",
+      "excerpt": "status: implemented. ws2's and ws3's designs were both corrected during grounding -- see their sections created: 2026-09-10 last-updated: 2026-09-10 tracking: b",
       "caught_by": "not-a-correction",
-      "note": "A heading announcing the correction recorded in the paragraph that follows."
-    },
-    "gate-refusal-contract::6e7229118de6": {
-      "spec": "gate-refusal-contract.spec.md",
-      "excerpt": "the draft said nine small changes, not a shared helper, on the grounds that a shared assertprecondition would be a shallow module. grounding it showed the share",
-      "caught_by": "execution",
-      "note": "Grounding showed the shared owner already existed in lib/tracked.mjs."
-    },
-    "gate-refusal-contract::681ca4d95c91": {
-      "spec": "gate-refusal-contract.spec.md",
-      "excerpt": "### 3. the fault matrix as a harness (implemented; the draft was under-specified)",
-      "caught_by": "not-a-correction",
-      "note": "A heading announcing the correction recorded below it."
-    },
-    "gate-refusal-contract::252b980c87e4": {
-      "spec": "gate-refusal-contract.spec.md",
-      "excerpt": "the draft said \"assert each either answers correctly or exits 2\", and that is not decidable as written. a gate exiting 0 under a broken git is not thereby defec",
-      "caught_by": "execution",
-      "note": "'Assert each either answers correctly or exits 2' proved undecidable when the harness was written."
+      "note": "The Status header, which defers (\"see their sections\") and records no specific correction; the WS2 and WS3 records are detected and classified separately. Same verdict as tracker-quick-wins::bf97709c0160, the other Status header in the corpus. Newly visible because the marker was split across a line."
     },
     "gate-refusal-contract::0b13cccc39d0": {
       "spec": "gate-refusal-contract.spec.md",
@@ -139,11 +217,47 @@
       "caught_by": "reasoning",
       "note": "Dropped by reasoning about where the guard belongs: with the root pinned, an empty result means the acceptance genuinely is stale."
     },
+    "gate-refusal-contract::252b980c87e4": {
+      "spec": "gate-refusal-contract.spec.md",
+      "excerpt": "the draft said \"assert each either answers correctly or exits 2\", and that is not decidable as written. a gate exiting 0 under a broken git is not thereby defec",
+      "caught_by": "execution",
+      "note": "'Assert each either answers correctly or exits 2' proved undecidable when the harness was written."
+    },
+    "gate-refusal-contract::39f7b827be9f": {
+      "spec": "gate-refusal-contract.spec.md",
+      "excerpt": "this is why the risks section says to establish red first. review did not catch it; the mutation did, and the difference between some and every is one word in a",
+      "caught_by": "execution",
+      "note": "Names its own catch mechanism: review passed over a `some` that should have been `every`, and npm run mutate returned UNCAUGHT. Newly visible because \"did not catch\" was split across a line."
+    },
     "gate-refusal-contract::3f77115bc10c": {
       "spec": "gate-refusal-contract.spec.md",
       "excerpt": "- the first version of the cwd test could not fail. it skipped when some run exited 2. under npm run mutate restoring the defect, the un-pinned spawn made npm a",
       "caught_by": "execution",
       "note": "The cwd test could not fail; npm run mutate said UNCAUGHT."
+    },
+    "gate-refusal-contract::681ca4d95c91": {
+      "spec": "gate-refusal-contract.spec.md",
+      "excerpt": "### 3. the fault matrix as a harness (implemented; the draft was under-specified)",
+      "caught_by": "not-a-correction",
+      "note": "A heading announcing the correction recorded below it."
+    },
+    "gate-refusal-contract::6e7229118de6": {
+      "spec": "gate-refusal-contract.spec.md",
+      "excerpt": "the draft said nine small changes, not a shared helper, on the grounds that a shared assertprecondition would be a shallow module. grounding it showed the share",
+      "caught_by": "execution",
+      "note": "Grounding showed the shared owner already existed in lib/tracked.mjs."
+    },
+    "gate-refusal-contract::c0e531b5c7ac": {
+      "spec": "gate-refusal-contract.spec.md",
+      "excerpt": "### 2. the contract for the remaining gates (implemented; the draft's design was wrong)",
+      "caught_by": "not-a-correction",
+      "note": "A heading announcing the correction recorded in the paragraph that follows."
+    },
+    "identification-declared-once::42858a310ffb": {
+      "spec": "identification-declared-once.spec.md",
+      "excerpt": "the draft rule was wrong, and the eval payloads said so. \"more than one kind\" fired on 13 of 115 recorded payloads, all of them an objectified type carrying its",
+      "caught_by": "execution",
+      "note": "The eval payloads said so; measured by dumping payloads, with per-arm deltas."
     },
     "identification-declared-once::a90c6228d882": {
       "spec": "identification-declared-once.spec.md",
@@ -151,23 +265,23 @@
       "caught_by": "execution",
       "note": "The recorded eval round said so before the rule shipped."
     },
-    "identification-declared-once::c4f829dc5151": {
-      "spec": "identification-declared-once.spec.md",
-      "excerpt": "orm lets an objectified fact type carry a simple reference scheme: \"review has reviewid\" on a review that objectifies \"reviewer reviews paper\" is ordinary, not ",
-      "caught_by": "execution",
-      "note": "Rescoring the committed 20260828-1647 round moved 13 of 115 payloads, all one legitimate ORM shape."
-    },
     "identification-declared-once::b18d4447abd2": {
       "spec": "identification-declared-once.spec.md",
       "excerpt": "- the risk is a rule that cannot fire, since nothing shipped exercises it. the fixtures are therefore hand-built for both firing pairs and for the pair that mus",
       "caught_by": "execution",
       "note": "The recorded eval round is named as the check that caught the over-firing rule."
     },
-    "identification-declared-once::42858a310ffb": {
+    "identification-declared-once::c4f829dc5151": {
       "spec": "identification-declared-once.spec.md",
-      "excerpt": "the draft rule was wrong, and the eval payloads said so. \"more than one kind\" fired on 13 of 115 recorded payloads, all of them an objectified type carrying its",
+      "excerpt": "orm lets an objectified fact type carry a simple reference scheme: \"review has reviewid\" on a review that objectifies \"reviewer reviews paper\" is ordinary, not ",
       "caught_by": "execution",
-      "note": "The eval payloads said so; measured by dumping payloads, with per-arm deltas."
+      "note": "Rescoring the committed 20260828-1647 round moved 13 of 115 payloads, all one legitimate ORM shape."
+    },
+    "keyless-model-access::95734f42d91c": {
+      "spec": "keyless-model-access.spec.md",
+      "excerpt": "the draft said to check sampling, and that was wrong -- it is sampling.tools. reading clientcapabilities showed tool use is a separate capability nested under s",
+      "caught_by": "reasoning",
+      "note": "Reading the SDK's ClientCapabilities type before writing the check, not running anything: tool use is a separate capability nested under sampling, and the protocol says the client MUST error when tools arrives without it. Classified reasoning rather than execution because no probe was run -- the claim was checked against the type declaration. Had it shipped as drafted, any client that samples but does not support tool use would have had a working keyed path replaced by a failing sampling one; that case is now a test."
     },
     "learning-design::4791731ff208": {
       "spec": "learning-design.spec.md",
@@ -181,6 +295,18 @@
       "caught_by": "execution",
       "note": "Measured directly: the env var was dropped under strict env mode, so the run looked isolated and was not."
     },
+    "model-graph-and-id-spaces::1ca8e3cb770b": {
+      "spec": "model-graph-and-id-spaces.spec.md",
+      "excerpt": "its premise is false for most of its cases, and that is now measured rather than suspected (barwise-979). the draft below said \"once the graph is total, that pr",
+      "caught_by": "execution",
+      "note": "The premise is false for most cases, now measured rather than suspected (barwise-979)."
+    },
+    "model-graph-and-id-spaces::3f8ab513f9ee": {
+      "spec": "model-graph-and-id-spaces.spec.md",
+      "excerpt": "two claims in the draft of this section were wrong, and both cost something a reader should not pay twice.",
+      "caught_by": "execution",
+      "note": "Two draft claims wrong; both established against the built graph (barwise-978)."
+    },
     "model-graph-and-id-spaces::583148debbf2": {
       "spec": "model-graph-and-id-spaces.spec.md",
       "excerpt": "and writing it down is what caught it being wrong. the glob is rules/.ts, one directory level, and rules/population/ holds eleven more files. the same pattern o",
@@ -192,18 +318,6 @@
       "excerpt": "not every lookup in validation/rules/ is a prologue, and this is the workstream where that distinction decides the design. the draft of this section named three",
       "caught_by": "execution",
       "note": "Implementing it showed two of the three lookups are not reference checks at all."
-    },
-    "model-graph-and-id-spaces::3f8ab513f9ee": {
-      "spec": "model-graph-and-id-spaces.spec.md",
-      "excerpt": "two claims in the draft of this section were wrong, and both cost something a reader should not pay twice.",
-      "caught_by": "execution",
-      "note": "Two draft claims wrong; both established against the built graph (barwise-978)."
-    },
-    "model-graph-and-id-spaces::1ca8e3cb770b": {
-      "spec": "model-graph-and-id-spaces.spec.md",
-      "excerpt": "its premise is false for most of its cases, and that is now measured rather than suspected (barwise-979). the draft below said \"once the graph is total, that pr",
-      "caught_by": "execution",
-      "note": "The premise is false for most cases, now measured rather than suspected (barwise-979)."
     },
     "model-graph-and-id-spaces::9217db0f39b5": {
       "spec": "model-graph-and-id-spaces.spec.md",
@@ -277,17 +391,17 @@
       "caught_by": "not-a-correction",
       "note": "Risks section on observability that must not fail the operation it observes."
     },
-    "pr-skills::84fc83257b74": {
-      "spec": "pr-skills.spec.md",
-      "excerpt": "- when a session prepares to open a pr, the pr-creation skill shall give it the readiness gate ci cannot run, the cut that separates mechanical from semantic ch",
-      "caught_by": "not-a-correction",
-      "note": "EARS requirements for the two skills; no correction recorded."
-    },
     "pr-skills::120439d49a37": {
       "spec": "pr-skills.spec.md",
       "excerpt": ".claude/skills/pr-creation/skill.md speaks for the author 1 readiness gate (ci-blind items) -> points at spec-writer, steward, claude.md 2 cut for reading mecha",
       "caught_by": "not-a-correction",
       "note": "A structure diagram of the two skills."
+    },
+    "pr-skills::84fc83257b74": {
+      "spec": "pr-skills.spec.md",
+      "excerpt": "- when a session prepares to open a pr, the pr-creation skill shall give it the readiness gate ci cannot run, the cut that separates mechanical from semantic ch",
+      "caught_by": "not-a-correction",
+      "note": "EARS requirements for the two skills; no correction recorded."
     },
     "prompt-optimization-harness::37e62e911094": {
       "spec": "prompt-optimization-harness.spec.md",
@@ -301,17 +415,17 @@
       "caught_by": "not-a-correction",
       "note": "Describes the distill method; the marker matched its own subject matter."
     },
-    "prose-distillation::83265c41424d": {
-      "spec": "prose-distillation.spec.md",
-      "excerpt": "1. inventory every claim, reason, instruction, and piece of evidence, with its location. falsifiability is the test for a claim. 2. classify what the inventory ",
-      "caught_by": "not-a-correction",
-      "note": "The method block of the distill spec."
-    },
     "prose-distillation::45f427df91e3": {
       "spec": "prose-distillation.spec.md",
       "excerpt": "- whether distill gets an evals/evals.json. pr-creation and pr-review have one; the rest of the skills do not. distillation is gradeable (a fixture document wit",
       "caught_by": "not-a-correction",
       "note": "An open decision about whether the skill gets an eval."
+    },
+    "prose-distillation::83265c41424d": {
+      "spec": "prose-distillation.spec.md",
+      "excerpt": "1. inventory every claim, reason, instruction, and piece of evidence, with its location. falsifiability is the test for a claim. 2. classify what the inventory ",
+      "caught_by": "not-a-correction",
+      "note": "The method block of the distill spec."
     },
     "recorded-evidence-commands::d67a46537382": {
       "spec": "recorded-evidence-commands.spec.md",
@@ -343,107 +457,29 @@
       "caught_by": "reasoning",
       "note": "The fc.sample marker was added after asking what a lazy compliance would look like."
     },
-    "tracker-quick-wins::bf97709c0160": {
-      "spec": "tracker-quick-wins.spec.md",
-      "excerpt": "status: implemented -- all six workstreams, 2026-09-06 (one pr, six commits; ws2 landed differently from the draft, see implementation notes) created: 2026-09-0",
-      "caught_by": "not-a-correction",
-      "note": "A status header pointing at the implementation notes where the correction lives."
-    },
     "tracker-quick-wins::ae1c4c3cc7ab": {
       "spec": "tracker-quick-wins.spec.md",
       "excerpt": "- ws2, splitmodel: the fallback was dead, not stale. the draft said to redirect doc.ormversion ?? \"1.0\" to currentormversion. writing the test showed the path c",
       "caught_by": "execution",
       "note": "Writing the test showed the fallback path cannot run: schema validation refuses the document first."
     },
+    "tracker-quick-wins::bf97709c0160": {
+      "spec": "tracker-quick-wins.spec.md",
+      "excerpt": "status: implemented -- all six workstreams, 2026-09-06 (one pr, six commits; ws2 landed differently from the draft, see implementation notes) created: 2026-09-0",
+      "caught_by": "not-a-correction",
+      "note": "A status header pointing at the implementation notes where the correction lives."
+    },
+    "tracker-quick-wins::d3081048dd1a": {
+      "spec": "tracker-quick-wins.spec.md",
+      "excerpt": "each of the six is a small instance of one of the audit findings this project keeps producing: a declared thing nothing produces (858), a constant that should d",
+      "caught_by": "not-a-correction",
+      "note": "Framing for the batch: it restates the root CLAUDE.md rule that a finding is closed by a check or a fix rather than a document, and records no correction of its own. The per-workstream records are classified separately."
+    },
     "typed-diff-all-element-kinds::dc5fd807b527": {
       "spec": "typed-diff-all-element-kinds.spec.md",
       "excerpt": "status: implemented (ws1, ws2 and ws3). carryunmodelledelements carries diagram layouts and nothing else, which is the resolved decision rather than work outsta",
       "caught_by": "execution",
       "note": "The population key gained an ordinal the resolved decision did not anticipate; found on shipping WS3."
-    },
-    "correction-record-ratchet::d991e8800983": {
-      "spec": "correction-record-ratchet.spec.md",
-      "excerpt": "# ratchet the correction record: a new spec correction must say what caught it",
-      "caught_by": "not-a-correction",
-      "note": "This spec's own title. The detector matches its subject matter -- a spec about correction records is full of catch language -- which is the over-inclusion the design accepts and classifies rather than tunes away."
-    },
-    "correction-record-ratchet::44b7905b87d5": {
-      "spec": "correction-record-ratchet.spec.md",
-      "excerpt": "in one sentence: 28 specs already record what their drafts got wrong and what caught it, nothing reads that ba",
-      "caught_by": "not-a-correction",
-      "note": "The BLUF of this spec, describing the corpus it audits. No correction of its own."
-    },
-    "correction-record-ratchet::0d96891e4625": {
-      "spec": "correction-record-ratchet.spec.md",
-      "excerpt": "it does not judge whether a correction should have happened, and it cannot: a correction is a historical fact ",
-      "caught_by": "not-a-correction",
-      "note": "States what the gate does and does not judge. No correction recorded."
-    },
-    "correction-record-ratchet::7eb377fc978c": {
-      "spec": "correction-record-ratchet.spec.md",
-      "excerpt": "- judging whether a correction was avoidable. the classification says what caught the defect, not what should ",
-      "caught_by": "not-a-correction",
-      "note": "An out-of-scope bullet. No correction recorded."
-    },
-    "correction-record-ratchet::df2c17054e14": {
-      "spec": "correction-record-ratchet.spec.md",
-      "excerpt": "- a required \"what caught it\" section in the spec template. catches nothing retroactively, and a template sect",
-      "caught_by": "not-a-correction",
-      "note": "A rejected alternative (a required template section). Records a design choice, not a correction to this spec's own draft."
-    },
-    "artifact-resolution-in-production::8603e5428a94": {
-      "spec": "artifact-resolution-in-production.spec.md",
-      "excerpt": "- correction: the blast-radius estimate names the wrong packages. workstream 2 says it updates \"every mock cli",
-      "caught_by": "execution",
-      "note": "Counting the actual files. The spec named llm, cli, mcp and vscode; cli and vscode have no mock clients at all and promptlab has two the spec never mentioned. The design was unaffected -- only the estimate of what WS2 touches was wrong."
-    },
-    "closed-sets-as-unions::640fb4210c1b": {
-      "spec": "closed-sets-as-unions.spec.md",
-      "excerpt": "making the drift testable needed one refactor the workstream did not anticipate: classifychange returned the l",
-      "caught_by": "execution",
-      "note": "Writing the test is what surfaced it: classifyChange returned the literal \"caution\" for both a deliberate caution and an unrecognized string, so no test could distinguish them. Split into classifyKnownChange returning BreakingLevel | undefined."
-    },
-    "gate-refusal-contract::0926e4350604": {
-      "spec": "gate-refusal-contract.spec.md",
-      "excerpt": "status: implemented. ws2's and ws3's designs were both corrected during grounding -- see their sections create",
-      "caught_by": "not-a-correction",
-      "note": "The Status header, which defers (\"see their sections\") and records no specific correction; the WS2 and WS3 records are detected and classified separately. Same verdict as tracker-quick-wins::bf97709c0160, the other Status header in the corpus. Newly visible because the marker was split across a line."
-    },
-    "gate-refusal-contract::39f7b827be9f": {
-      "spec": "gate-refusal-contract.spec.md",
-      "excerpt": "this is why the risks section says to establish red first. review did not catch it; the mutation did, and the ",
-      "caught_by": "execution",
-      "note": "Names its own catch mechanism: review passed over a `some` that should have been `every`, and npm run mutate returned UNCAUGHT. Newly visible because \"did not catch\" was split across a line."
-    },
-    "tracker-quick-wins::d3081048dd1a": {
-      "spec": "tracker-quick-wins.spec.md",
-      "excerpt": "each of the six is a small instance of one of the audit findings this project keeps producing: a declared thin",
-      "caught_by": "not-a-correction",
-      "note": "Framing for the batch: it restates the root CLAUDE.md rule that a finding is closed by a check or a fix rather than a document, and records no correction of its own. The per-workstream records are classified separately."
-    },
-    "credential-scanning::a04aec5878a7": {
-      "spec": "credential-scanning.spec.md",
-      "excerpt": "no, and this is the spec's largest correction. the first version of this gate shipped ten hand-written vendor-",
-      "caught_by": "reasoning",
-      "note": "A reviewer's objection, in one sentence -- do not build what others have built better -- before anything was re-run. The draft had rejected gitleaks on two grounds that both turn out weak: CLAUDE.md's no-trivial-dependencies rule is about what Node core provides, and the first-party-actions constraint is satisfied by a pinned tarball with a verified digest."
-    },
-    "credential-scanning::42e89b8bedd7": {
-      "spec": "credential-scanning.spec.md",
-      "excerpt": "what the draft could not see is the thing that settles it. a private rule table has to track the providers of ",
-      "caught_by": "execution",
-      "note": "Measuring both detector sets against the same probes. The hand-rolled regexes flagged AWS's own documented example key (a false positive that fails any commit quoting a manual) while gitleaks allowlists it by name; gitleaks in turn missed Anthropic keys, which is why one rule survives in .gitleaks.toml."
-    },
-    "credential-scanning::22378f081fa0": {
-      "spec": "credential-scanning.spec.md",
-      "excerpt": "this spec's first draft said there was none, and that was wrong. codeql runs on every pr over javascript-types",
-      "caught_by": "execution",
-      "note": "The CodeQL Analyze check runs appearing on this PR, not review. The draft concluded \"no SAST\" from a grep over .github/workflows, which cannot see GitHub default setup because that configuration is not in the tree. The same spec makes this argument about push protection; the miss was not running it in the direction where a setting is ON without the tree saying so."
-    },
-    "keyless-model-access::95734f42d91c": {
-      "spec": "keyless-model-access.spec.md",
-      "excerpt": "the draft said to check sampling, and that was wrong -- it is sampling.tools. reading clientcapabilities showe",
-      "caught_by": "reasoning",
-      "note": "Reading the SDK's ClientCapabilities type before writing the check, not running anything: tool use is a separate capability nested under sampling, and the protocol says the client MUST error when tools arrives without it. Classified reasoning rather than execution because no probe was run -- the claim was checked against the type declaration. Had it shipped as drafted, any client that samples but does not support tool use would have had a working keyed path replaced by a failing sampling one; that case is now a test."
     }
   }
 }
