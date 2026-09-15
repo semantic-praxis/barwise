@@ -2243,7 +2243,7 @@ const BASELINE_WRITERS = [
 ];
 
 for (const w of BASELINE_WRITERS) {
-  test(`${w.script} writes its baseline back byte-identical`, (t) => {
+  test(`${w.script} rewrites without changing a committed verdict`, (t) => {
     if (w.needsDist !== undefined && !existsSync(join(REPO, "barwise", w.needsDist))) {
       t.skip(`${w.needsDist} not built; run npm run build first`);
       return;
@@ -2254,12 +2254,40 @@ for (const w of BASELINE_WRITERS) {
     try {
       const r = gate(w.script, REPO, ...w.args);
       assert.equal(r.status, 0, `writer failed:\n${r.stdout}${r.stderr}`);
+      const after = readFileSync(path, "utf8");
+
+      // The property, stated over the human-owned fields rather than over the
+      // bytes. An earlier version of this test asserted the file came back
+      // byte-identical to the committed one, which is NOT a property of
+      // audit-spec-status: its `commits` field is derived from `git log`, so it
+      // legitimately changes the moment any commit touches a spec's named
+      // sources. That test passed locally and failed in CI on this PR's own
+      // first commit, because locally it ran before the commit existed -- green
+      // for a reason unrelated to what it verified (barwise-906's shape).
+      const oldRows = JSON.parse(before)[w.key];
+      const newRows = JSON.parse(after)[w.key];
+      for (const [id, row] of Object.entries(oldRows)) {
+        assert.ok(id in newRows, `${w.file}: row ${id} was dropped by a rewrite`);
+        for (const field of w.human) {
+          assert.deepEqual(
+            newRows[id][field],
+            row[field],
+            `${w.file}: ${id}.${field} changed when rewritten over itself. Before the`
+              + ` fix this was every verdict in the file replaced by a placeholder.`,
+          );
+        }
+      }
+
+      // And the writer is a function of its inputs: whatever the first write
+      // absorbed from a moved history, a second must be a no-op. This is the
+      // byte-level half, stated where it is actually true.
+      const again = gate(w.script, REPO, ...w.args);
+      assert.equal(again.status, 0, `second write failed:\n${again.stdout}${again.stderr}`);
       assert.equal(
         readFileSync(path, "utf8"),
-        before,
-        `${w.file} changed when rewritten over itself. Before the fix this diff\n`
-          + `was every verdict in the file replaced by a placeholder; now any diff\n`
-          + `at all means the writer is not a function of the findings alone.`,
+        after,
+        `${w.file}: writing twice gave two different files, so the output depends`
+          + ` on something other than the findings (row order, most likely).`,
       );
     } finally {
       // Restored unconditionally: a failing assertion must not leave the
