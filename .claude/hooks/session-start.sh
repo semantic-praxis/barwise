@@ -10,8 +10,63 @@ fi
 
 cd "${CLAUDE_PROJECT_DIR}/barwise"
 
-npm install --no-audit --no-fund
-npm run build
+# SessionStart hands this script a JSON payload on stdin whose `source` is one
+# of startup, resume, clear, compact. Only `startup` is a cold container, where
+# the install and the build do real work and their log is what a failure has to
+# be read from. The other three re-run against a warm container, so the build is
+# a cache hit -- measured at ~110ms, twelve "cache hit, replaying logs" lines and
+# a FULL TURBO footer -- and that output is reprinted into the agent's context
+# every resume and every compaction. Six resumes in one session paid for it six
+# times to learn nothing.
+#
+# Read with a bounded `timeout`, never a bare `cat`: if the harness leaves the
+# pipe open, an unbounded read hangs the whole session start. And skipped
+# entirely on a TTY, so running this by hand (as the session-start-hook skill's
+# validation step does) does not sit waiting for input.
+payload=""
+if [[ ! -t 0 ]]; then
+  payload="$(timeout 2 cat 2>/dev/null || true)"
+fi
+
+# Parsed with bash's own regex rather than node or jq. `source` is a four-value
+# enum in machine-written JSON, so there is nothing to escape, and this runs
+# BEFORE `npm install` -- reaching for an interpreter here would make the
+# verbosity decision depend on the thing the script exists to set up.
+source_kind="unknown"
+if [[ "${payload}" =~ \"source\"[[:space:]]*:[[:space:]]*\"([a-z]+)\" ]]; then
+  source_kind="${BASH_REMATCH[1]}"
+fi
+
+# Loud is the default, and `unknown` deliberately lands there: a payload this
+# script could not read must not silently choose the quiet path, for the same
+# reason a gate that cannot see its input must not print PASS
+# (docs/specs/gate-refusal-contract.spec.md).
+quiet=0
+case "${source_kind}" in
+  resume | clear | compact) quiet=1 ;;
+esac
+
+# Quiet means "say nothing while it works", never "say nothing when it breaks":
+# output is buffered and replayed to stderr on a non-zero exit, so a resume that
+# actually fails is as legible as a cold start that does. Without that this
+# would trade context for the ability to diagnose, which is the wrong trade.
+run() {
+  if ((quiet == 0)); then
+    "$@"
+    return
+  fi
+  local log status=0
+  log="$(mktemp)"
+  "$@" >"${log}" 2>&1 || status=$?
+  if ((status != 0)); then
+    cat "${log}" >&2
+  fi
+  rm -f "${log}"
+  return "${status}"
+}
+
+run npm install --no-audit --no-fund
+run npm run build
 
 # The linter behind `npm run check:shell`, one of the 32 gates ci:local
 # derives from ci.yml. GitHub's runners ship it and this container does not,
@@ -36,7 +91,13 @@ fi
 # The secret scanner behind `npm run check:secrets`, pinned and digest-
 # verified by the script (one home for the version, shared with ci.yml).
 # Non-fatal for the same reason as the linter above.
-bash "${CLAUDE_PROJECT_DIR}/barwise/scripts/install-gitleaks.sh" \
+# shellcheck disable=SC2310  # `set -e` being disabled inside `run` is the
+# point on THIS line and only this one: gitleaks is non-fatal by design (see
+# above), so the caller's `||` is what must see the status. `run` tracks its
+# own with `status=$?` and returns it, so nothing is swallowed -- and the
+# unconditional `run` calls earlier are NOT in an `||`, so there `set -e`
+# still aborts the bootstrap as it did before.
+run bash "${CLAUDE_PROJECT_DIR}/barwise/scripts/install-gitleaks.sh" \
   || echo "session-start: gitleaks unavailable; check:secrets will refuse (exit 2)." >&2
 
 # A session clone arrives SHALLOW, and `check:secrets` refuses a history
