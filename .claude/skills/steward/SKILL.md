@@ -115,4 +115,41 @@ Close the issues it resolved via
 tracker-only follow-up commit -- not in the code PR, whose body should
 say the closures follow. Then push and verify per the Session
 Completion section of the root `CLAUDE.md`: work is not done until
-`git status` shows up to date with origin.
+`git status` shows up to date with origin. If the merge deleted the
+branch, prune first -- see 6, because until you do that is a question
+about a ref the remote no longer has.
+
+## 6. After the branch is deleted: `git remote prune origin`
+
+Merging with "delete branch" leaves this clone holding
+`refs/remotes/origin/<branch>` pointing at a commit the remote no
+longer has. **Naming a branch on a `fetch --prune` does not remove
+it.** Measured on git 2.43.0 against a throwaway remote with two
+deleted branches:
+
+| Command                                                          | Stale refs removed          |
+| ---------------------------------------------------------------- | --------------------------- |
+| `git fetch --prune origin feat-one`                              | none -- not even `feat-one` |
+| `git fetch --prune origin feat-one:refs/remotes/origin/feat-one` | none                        |
+| `git fetch --prune origin`                                       | both                        |
+
+Naming a ref narrows the refspec, and a ref the remote has already
+deleted cannot be fetched, so the fetch errors out before the prune
+half runs at all. The bare `git fetch --prune origin`, or
+`git remote prune origin`, is what clears them. `git fetch origin
+<branch>` is the form the harness's git rules ask for, so this is the
+one place to deviate -- or rather, to add a second command after it.
+
+Three symptoms, one cause, and none of them says "stale ref":
+
+- `git push` on a branch that plainly exists reports `[new branch]`.
+- `--force-with-lease` is rejected for "stale info" against a ref
+  nobody else has touched.
+- A session hook reports unpushed commits on a branch whose work is
+  pushed -- the expensive one, because the remedy it suggests (push
+  again) is the one that cannot work.
+
+So prune when a PR merges, before reading any of those three as
+evidence about the remote. Nothing checks this; barwise-1033 carries
+the question of whether a check is worth it and where one could
+usefully run.
