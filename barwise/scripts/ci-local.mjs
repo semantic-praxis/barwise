@@ -169,6 +169,14 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 
 console.log(`Running ${list.length} gates from ci.yml, in order.\n`);
 const failed = [];
+// A gate that exits 2 could not answer; it did not find anything. Reported
+// apart from a failure because conflating them is the defect
+// docs/specs/gate-refusal-contract.spec.md exists to remove -- and this runner
+// was committing it about the gates it reports: `check-shell` and
+// `check-secrets` refuse for want of shellcheck and gitleaks in any fresh
+// container, and both read as "gates failed", indistinguishable from a real
+// shellcheck finding or a staged credential (barwise-1012).
+const refused = [];
 for (const g of list) {
   process.stdout.write(`  ${g.padEnd(34)} `);
   const started = Date.now();
@@ -180,6 +188,11 @@ for (const g of list) {
   const secs = ((Date.now() - started) / 1000).toFixed(0);
   if (r.status === 0) {
     console.log(`ok    ${secs}s`);
+  } else if (r.status === 2) {
+    console.log(`REFUSED  ${secs}s`);
+    const log = join(LOG_DIR, logName(g));
+    writeFileSync(log, `${r.stdout ?? ""}${r.stderr ?? ""}`);
+    refused.push({ gate: g, out: `${r.stdout ?? ""}${r.stderr ?? ""}`, log });
   } else {
     console.log(`FAIL  ${secs}s`);
     const out = `${r.stdout ?? ""}${r.stderr ?? ""}`;
@@ -198,15 +211,31 @@ for (const g of list) {
 // reads it after the run; the logs are the part worth keeping.
 rmSync(COVERAGE_DIR, { recursive: true, force: true });
 
+for (const f of [...failed, ...refused]) {
+  console.error(`\n${"=".repeat(60)}\nnpm ${f.gate}\n${"=".repeat(60)}`);
+  console.error(f.out.trimEnd().split("\n").slice(-25).join("\n"));
+  console.error(`\nfull output: ${f.log}`);
+}
+
+// Exit 1 only for a real finding. Refusals alone exit 2, so a caller can tell
+// "this tree has a problem" from "this container cannot check everything" --
+// and neither prints that all gates passed, because they did not.
 if (failed.length > 0) {
-  for (const f of failed) {
-    console.error(`\n${"=".repeat(60)}\nnpm ${f.gate}\n${"=".repeat(60)}`);
-    console.error(f.out.trimEnd().split("\n").slice(-25).join("\n"));
-    console.error(`\nfull output: ${f.log}`);
-  }
   console.error(`\n${failed.length} of ${list.length} gates failed.`);
+  if (refused.length > 0) {
+    console.error(`${refused.length} could not answer: ${refused.map((r) => r.gate).join(", ")}`);
+  }
   console.error(`Logs: ${LOG_DIR}`);
   process.exit(1);
+}
+if (refused.length > 0) {
+  console.error(
+    `\n${refused.length} of ${list.length} gates COULD NOT ANSWER; the rest passed.`,
+  );
+  console.error(`  ${refused.map((r) => r.gate).join("\n  ")}`);
+  console.error(`Install what they name, or accept that much is unchecked.`);
+  console.error(`Logs: ${LOG_DIR}`);
+  process.exit(2);
 }
 rmSync(RUN_DIR, { recursive: true, force: true });
 console.log(`\nAll ${list.length} gates passed.`);

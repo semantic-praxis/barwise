@@ -115,3 +115,51 @@ export function trackedFiles() {
   }
   return files;
 }
+
+/**
+ * Refuse when the input a baseline writer is about to freeze is incomplete.
+ *
+ * `trackedFiles()` cannot see a file git does not track, which is correct for
+ * a gate that CHECKS -- its corpus is the tracked tree by definition, the same
+ * blind spot `check-no-nul` pins as intended. It is wrong for a gate that
+ * WRITES: a baseline generated while an input file is unstaged bakes in a
+ * corpus missing it, `--check` then passes locally, and the rows appear the
+ * moment the file is committed.
+ *
+ * That is not hypothetical. `audit-corrections` shipped with exactly this in
+ * PR #505 -- its baseline was generated while its own spec was unstaged, the
+ * gate reported a match, `ci:local` agreed, and CI failed on five records from
+ * that one file. barwise-906's form (1), in a gate whose own tests stage their
+ * probes for that reason.
+ *
+ * Here rather than in each writer because both writers that enumerate tracked
+ * files need the identical rule, and a second copy is what
+ * `docs/specs/duplication-drift-guards.spec.md` forbids. `audit-rubric` is not
+ * a caller: its input is the promptlab suite loaded from `dist`, so it is out
+ * of this class rather than an unfixed instance of it.
+ *
+ * @param {object} args
+ * @param {string} args.pathspec Root-relative directory to inspect.
+ * @param {string} args.suffix Only files ending in this count as input.
+ * @param {string} args.gate Name used in the refusal message.
+ */
+export function refuseUntrackedInput({ pathspec, suffix, gate }) {
+  const untracked = execFileSync(
+    "git",
+    ["status", "--porcelain", "--untracked-files=all", "--", pathspec],
+    { cwd: REPO_ROOT, encoding: "utf8" },
+  )
+    .split("\n")
+    .filter((l) => l.startsWith("?? ") && l.endsWith(suffix))
+    .map((l) => l.slice(3));
+
+  if (untracked.length === 0) return;
+
+  process.stderr.write(
+    `${gate}: refusing to write a baseline while input files are untracked.\n`
+      + untracked.map((f) => `  ${f}\n`).join("")
+      + `  They are invisible to this gate, so the baseline would be missing their\n`
+      + `  rows and --check would pass here and fail in CI. \`git add\` them first.\n`,
+  );
+  process.exit(2);
+}

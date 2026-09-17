@@ -49,7 +49,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { mergeBaselineRows, mergeSummary, readExistingRows } from "./lib/baseline-merge.mjs";
-import { REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
+import { refuseUntrackedInput, REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
 
 /**
  * `--at <commit>` runs the same audit against a historical tree. It is
@@ -339,6 +339,18 @@ if (!check && !process.argv.includes("--write")) {
 }
 
 if (!check) {
+  // An untracked spec is invisible to trackedFiles(), so writing the baseline
+  // here would freeze a corpus missing it: --check passes locally and fails
+  // once the spec is committed. audit-corrections shipped exactly that
+  // (barwise-1018, barwise-906's form). --check does not refuse -- its input is
+  // the tracked corpus by definition. Rule shared with audit-corrections in
+  // lib/tracked.mjs rather than copied, per duplication-drift-guards.
+  refuseUntrackedInput({
+    pathspec: "barwise/docs/specs",
+    suffix: ".spec.md",
+    gate: "audit-spec-status",
+  });
+
   const fresh = Object.fromEntries(
     found.map((f) => [f.id, { status: f.status, commits: f.commits }]),
   );
