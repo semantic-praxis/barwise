@@ -3,6 +3,6 @@
   "counts": {
     "at-root.test.mjs": 3,
     "baseline-merge.test.mjs": 14,
-    "gates.test.mjs": 128
+    "gates.test.mjs": 131
   }
 }

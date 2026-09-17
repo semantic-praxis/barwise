@@ -46,9 +46,12 @@
  *   0  caught   -- the command failed with the mutation applied
  *   1  uncaught -- the command passed with the mutation applied
  *   2  refused  -- anchor absent or ambiguous, mutation is a no-op, the
- *                  restore did not verify, or the command was KILLED by
- *                  a signal rather than exiting (a killed run reports
- *                  on nothing, so it is neither of the other two)
+ *                  restore did not verify, the command was KILLED by a
+ *                  signal rather than exiting (a killed run reports on
+ *                  nothing, so it is neither of the other two), or the
+ *                  command ALREADY FAILS unmutated (CAUGHT is read from
+ *                  the exit status, so a red command reports CAUGHT for
+ *                  every mutation -- barwise-1019)
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -244,6 +247,46 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
     }
     process.exit(REFUSED);
   });
+}
+
+// The command must fail BECAUSE of the mutation, and CAUGHT is decided from
+// its exit status alone -- so a command that already fails unmutated reports
+// CAUGHT for every mutation, including ones nothing catches. Not hypothetical:
+// `gates.test.mjs` exited 1 in any container without shellcheck or gitleaks,
+// and five readings in PR #505 were recorded as CAUGHT on a suite that was
+// already red. `mutate ... && echo verified` printed verified each time.
+// barwise-906's class again, in the tool built to close it (barwise-1019).
+//
+// So the baseline run is unconditional. It costs a second execution of the
+// command, which is the same bargain every other refusal here makes: a reading
+// you did not earn is worth less than no reading.
+const before = spawnSync(command[0], command.slice(1), {
+  cwd: process.cwd(),
+  stdio: "inherit",
+  encoding: "utf8",
+});
+if (before.error) {
+  process.stderr.write(
+    `mutate: could not run the command: ${before.error.message}\n`
+      + `  Nothing was mutated.\n`,
+  );
+  process.exit(REFUSED);
+}
+if (before.signal) {
+  process.stderr.write(
+    `mutate: the baseline run was killed by ${before.signal} rather than exiting.\n`
+      + `  Nothing was mutated.\n`,
+  );
+  process.exit(REFUSED);
+}
+if (before.status !== 0) {
+  process.stderr.write(
+    `mutate: the command already fails (exit ${before.status}) WITHOUT the mutation.\n`
+      + `  Every mutation would then report CAUGHT, whether or not anything catches\n`
+      + `  it, so this is not a reading. Fix the command or the tree first.\n`
+      + `  Nothing was mutated.\n`,
+  );
+  process.exit(REFUSED);
 }
 
 let status;

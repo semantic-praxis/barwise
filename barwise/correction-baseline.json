@@ -271,6 +271,12 @@
       "caught_by": "not-a-correction",
       "note": "A heading announcing the correction recorded in the paragraph that follows."
     },
+    "gate-refusal-contract::cdb043922b83": {
+      "spec": "gate-refusal-contract.spec.md",
+      "excerpt": "- ci-local.mjs was binary. status 0 or fail, so check-shell and check-secrets refusing for want of shellcheck and gitleaks read as \"gates failed\" -- indistingui",
+      "caught_by": "execution",
+      "note": "Running ci:local in a container without shellcheck or gitleaks is what showed the runner reporting two refusals as failures; the conflation is invisible in the code, which reads correctly, and only the output distinguishes them. The same run also exposed that mutate's CAUGHT readings had been taken against an already-red suite."
+    },
     "identification-declared-once::42858a310ffb": {
       "spec": "identification-declared-once.spec.md",
       "excerpt": "the draft rule was wrong, and the eval payloads said so. \"more than one kind\" fired on 13 of 115 recorded payloads, all of them an objectified type carrying its",

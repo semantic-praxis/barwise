@@ -197,6 +197,32 @@ function stage(dir, name, contents) {
   execFileSync("git", ["add", "--", name], { cwd: dir });
 }
 
+/**
+ * A gate that REFUSED did not fail, and a test that reads the two the same
+ * way is the defect the refusal contract exists to prevent, one level up.
+ *
+ * `check-shell` needs shellcheck and `check-secrets` needs gitleaks. Neither
+ * is installed in a fresh remote container, both correctly exit 2 saying they
+ * cannot answer -- and eight tests here asserted exit 0 or 1, so `ci:local`
+ * went red on a missing tool with the same reading it gives for a real
+ * finding (barwise-1012). Worse, it made every `npm run mutate` against this
+ * file report CAUGHT unconditionally: the command already failed without any
+ * mutation, and CAUGHT is decided from the command's status alone.
+ *
+ * The skip is `every`, not `some`, and that is the whole distinction -- the
+ * same one `audit-gate`'s test above spells out. With the tool absent every
+ * run refuses together; a PARTIAL refusal is not an environment fact, it is
+ * the defect, and it must still fail here.
+ */
+function skippedForMissingTool(t, runs, tool) {
+  const rs = Array.isArray(runs) ? runs : [runs];
+  if (rs.length > 0 && rs.every((r) => r.status === 2)) {
+    t.skip(`${tool} is not installed (exit 2 from every run is refusal, not failure)`);
+    return true;
+  }
+  return false;
+}
+
 // --- barwise-905: coverage must not depend on where the gate is invoked ---
 
 const CWDS = [REPO, join(REPO, "barwise"), join(REPO, "barwise", "packages", "core", "src")];
@@ -205,8 +231,9 @@ const CWDS = [REPO, join(REPO, "barwise"), join(REPO, "barwise", "packages", "co
 // its history mode depends on clone depth, so the invariance test uses
 // `--staged` and cannot share this loop's argument-free call.
 for (const script of ["check-no-nul.mjs", "check-shell.mjs", "audit-corrections.mjs"]) {
-  test(`${script} reports the same coverage from every cwd`, () => {
+  test(`${script} reports the same coverage from every cwd`, (t) => {
     const runs = CWDS.map((cwd) => ({ cwd, ...gate(script, cwd) }));
+    if (skippedForMissingTool(t, runs, `${script}'s tool`)) return;
     for (const r of runs) {
       assert.equal(r.status, 0, `${script} failed in ${r.cwd}:\n${r.stdout}${r.stderr}`);
     }
@@ -328,11 +355,13 @@ test("check-no-nul does NOT see an untracked NUL file", () => {
   }
 });
 
-test("check-shell fails on a tracked script with a shellcheck finding", () => {
+test("check-shell fails on a tracked script with a shellcheck finding", (t) => {
   const dir = tempRepo();
   try {
     stage(dir, "ok.sh", "#!/usr/bin/env bash\nset -euo pipefail\necho hi\n");
-    assert.equal(gate("check-shell.mjs", dir).status, 0, "a clean script must pass");
+    const clean = gate("check-shell.mjs", dir);
+    if (skippedForMissingTool(t, clean, "shellcheck")) return;
+    assert.equal(clean.status, 0, "a clean script must pass");
 
     // SC2164, a `cd` whose failure leaves every later command running
     // somewhere unintended. Chosen because it is a DEFAULT check, so this
@@ -448,14 +477,12 @@ function commitAll(dir, message) {
  * measuring.
  */
 for (const [rule, { probe, content }] of Object.entries(GITLEAKS_PROBES)) {
-  test(`check-secrets fails on a staged ${rule}`, () => {
+  test(`check-secrets fails on a staged ${rule}`, (t) => {
     const dir = secretsRepo();
     try {
-      assert.equal(
-        gate("check-secrets.mjs", dir, "--staged").status,
-        0,
-        "a clean index must pass",
-      );
+      const clean = gate("check-secrets.mjs", dir, "--staged");
+      if (skippedForMissingTool(t, clean, "gitleaks")) return;
+      assert.equal(clean.status, 0, "a clean index must pass");
 
       stage(dir, "probe.txt", content(probe));
       const red = gate("check-secrets.mjs", dir, "--staged");
@@ -527,7 +554,7 @@ test("check-secrets refuses a gitleaks status that is neither clean nor a findin
   }
 });
 
-test("check-secrets refuses when .gitleaks.toml is missing", () => {
+test("check-secrets refuses when .gitleaks.toml is missing", (t) => {
   // Without this, gitleaks falls back to its bundled defaults: it would
   // still find most things and would silently drop the Anthropic rule,
   // which is the credential this repository is most likely to leak and the
@@ -535,6 +562,10 @@ test("check-secrets refuses when .gitleaks.toml is missing", () => {
   // than it claims is this spec's own subject.
   const dir = secretsRepo();
   try {
+    // With gitleaks absent the gate refuses for THAT reason instead, and
+    // this test cannot tell the two refusals apart -- so it is skipped
+    // rather than passing on the wrong one.
+    if (skippedForMissingTool(t, gate("check-secrets.mjs", dir, "--staged"), "gitleaks")) return;
     rmSync(join(dir, ".gitleaks.toml"));
     const r = gate("check-secrets.mjs", dir, "--staged");
     assert.equal(r.status, 2, `expected refusal, got ${r.status}:\n${r.stdout}${r.stderr}`);
@@ -545,7 +576,7 @@ test("check-secrets refuses when .gitleaks.toml is missing", () => {
   }
 });
 
-test("check-secrets refuses a history scan of a shallow clone, but --staged still works", () => {
+test("check-secrets refuses a history scan of a shallow clone, but --staged still works", (t) => {
   // Every fresh session clone of this project is shallow. A history scan
   // there would report a clean bill of health over whatever few commits
   // arrived, which is why the default mode refuses -- while `--staged`
@@ -568,6 +599,7 @@ test("check-secrets refuses a history scan of a shallow clone, but --staged stil
       "the fixture must actually be shallow, or this test asserts nothing",
     );
 
+    if (skippedForMissingTool(t, gate("check-secrets.mjs", clone, "--staged"), "gitleaks")) return;
     const deep = gate("check-secrets.mjs", clone);
     assert.equal(deep.status, 2, `expected refusal, got ${deep.status}:\n${deep.stderr}`);
     assert.match(deep.stderr, /SHALLOW/);
@@ -584,10 +616,11 @@ test("check-secrets refuses a history scan of a shallow clone, but --staged stil
   }
 });
 
-test("check-secrets gives the same reading from every cwd", () => {
+test("check-secrets gives the same reading from every cwd", (t) => {
   // barwise-905's property. `--staged` rather than the history mode so the
   // test does not depend on whether this clone happens to be shallow.
   const runs = CWDS.map((cwd) => ({ cwd, ...gate("check-secrets.mjs", cwd, "--staged") }));
+  if (skippedForMissingTool(t, runs, "gitleaks")) return;
   for (const r of runs) {
     assert.equal(r.status, 0, `check-secrets failed in ${r.cwd}:\n${r.stdout}${r.stderr}`);
   }
@@ -866,6 +899,11 @@ test("mutate refuses a no-op replacement", () => {
   }
 });
 
+// The three fixtures below pass on the ORIGINAL and act only on the mutated
+// text, which is what a real check command does -- and is required since
+// mutate takes a baseline reading before mutating (barwise-1019). A fixture
+// failing unconditionally trips that refusal instead of reaching the path
+// under test.
 test("mutate reports a failed restore on an UNTRACKED file, which git diff cannot", () => {
   // barwise-906's acceptance criteria name this case specifically. The
   // instrument that failed was `git diff --stat` on an untracked file:
@@ -878,7 +916,8 @@ test("mutate reports a failed restore on an UNTRACKED file, which git diff canno
   try {
     writeFileSync(
       join(dir, "check.mjs"),
-      `import { writeFileSync } from "node:fs";\n`
+      `import { readFileSync, writeFileSync } from "node:fs";\n`
+        + `if (!readFileSync("subject.txt", "utf8").includes("BAD")) process.exit(0);\n`
         + `writeFileSync("subject.txt", "SABOTAGED\\n");\n`
         + `process.exit(1);\n`,
     );
@@ -911,6 +950,40 @@ test("mutate reports a failed restore on an UNTRACKED file, which git diff canno
   }
 });
 
+test("mutate refuses a command that already fails WITHOUT the mutation", () => {
+  // CAUGHT is decided from the command's exit status alone, so a command
+  // that is already red reports CAUGHT for every mutation -- including ones
+  // nothing catches. Five readings in PR #505 were recorded that way: the
+  // suite exited 1 in any container without shellcheck or gitleaks, and
+  // `mutate ... && echo verified` printed verified each time (barwise-1019).
+  // The baseline run is what makes CAUGHT mean anything, so it is asserted
+  // here rather than trusted.
+  const dir = mutateRepo({ subject: "value = GOOD\n" });
+  try {
+    writeFileSync(join(dir, "check.mjs"), `process.exit(3);\n`);
+    const r = mutate(dir, [
+      "--file",
+      "subject.txt",
+      "--old",
+      "GOOD",
+      "--new",
+      "BAD",
+      "--",
+      process.execPath,
+      "check.mjs",
+    ]);
+
+    assert.equal(r.status, 2, `expected refusal (2), got ${r.status}:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /already fails \(exit 3\) WITHOUT the mutation/);
+    assert.doesNotMatch(r.stdout, /CAUGHT/);
+
+    // And nothing was written: the refusal lands before the mutation.
+    assert.equal(readFileSync(join(dir, "subject.txt"), "utf8"), "value = GOOD\n");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("mutate refuses a run whose command was KILLED rather than exiting", async () => {
   // The reading this protects is `mutate ... && echo verified`. The
   // status line used to be `run.status === null ? 1`, so a ctrl-c or a
@@ -928,7 +1001,12 @@ test("mutate refuses a run whose command was KILLED rather than exiting", async 
   const dir = mutateRepo({ subject: "value = GOOD\n" });
   const marker = `mutate-kill-probe-${process.pid}.mjs`;
   try {
-    writeFileSync(join(dir, marker), `setTimeout(() => {}, 60_000);\n`);
+    writeFileSync(
+      join(dir, marker),
+      `import { readFileSync } from "node:fs";\n`
+        + `if (!readFileSync("subject.txt", "utf8").includes("BAD")) process.exit(0);\n`
+        + `setTimeout(() => {}, 60_000);\n`,
+    );
 
     const child = spawn(process.execPath, [
       join(SCRIPTS, "mutate.mjs"),
@@ -995,7 +1073,8 @@ test("mutate refuses, rather than reporting UNCAUGHT, when the restore THROWS", 
   try {
     writeFileSync(
       join(dir, "check.mjs"),
-      `import { mkdirSync, rmSync } from "node:fs";\n`
+      `import { mkdirSync, readFileSync, rmSync } from "node:fs";\n`
+        + `if (!readFileSync("subject.txt", "utf8").includes("BAD")) process.exit(0);\n`
         + `rmSync("subject.txt");\n`
         + `mkdirSync("subject.txt");\n`
         + `process.exit(1);\n`,
@@ -1602,6 +1681,36 @@ function runCiLocal(repo, ...args) {
   return { ...r, all: `${r.stdout}${r.stderr}` };
 }
 
+test("ci-local reports a REFUSED gate apart from a failure, and exits 2", () => {
+  // The runner was binary -- status 0 or FAIL -- so the two gates that refuse
+  // for want of shellcheck and gitleaks in any fresh container read as "3 of
+  // 32 gates failed", indistinguishable from a real shellcheck finding or a
+  // staged credential. That is the conflation gate-refusal-contract.spec.md
+  // exists to remove, committed by the instrument that reports the gates
+  // (barwise-1012). Exit 2 rather than 1 so a caller can tell "this tree has a
+  // problem" from "this container cannot check everything"; neither prints
+  // that all gates passed.
+  const repo = tempCiRepo();
+  try {
+    // Replace the failing gate with a refusing one, so refusal is the ONLY
+    // non-zero outcome -- otherwise exit 1 would be correct and this test
+    // could not tell the two apart.
+    writeFileSync(
+      join(repo.root, "scripts", "boom.mjs"),
+      'console.error("cannot answer: the tool is absent");\nprocess.exit(2);\n',
+    );
+
+    const r = runCiLocal(repo);
+    assert.equal(r.status, 2, `expected refusal (2), got ${r.status}:\n${r.all}`);
+    assert.match(r.all, /REFUSED/);
+    assert.match(r.all, /COULD NOT ANSWER/);
+    assert.doesNotMatch(r.all, /gates failed/);
+    assert.doesNotMatch(r.all, /All \d+ gates passed/);
+  } finally {
+    rmSync(repo.dir, { recursive: true, force: true });
+  }
+});
+
 /**
  * The log of ONE named gate, selected by name rather than by being the
  * first `full output:` line in the summary. Written that way after a
@@ -2169,6 +2278,34 @@ test("audit-corrections refuses to WRITE a baseline while a spec is untracked", 
     const check = gate("audit-corrections.mjs", dir, "--check");
     assert.equal(check.status, 1, "the tracked probe is still unclassified, so --check finds it");
     assert.doesNotMatch(`${check.stdout}${check.stderr}`, /draft\.spec\.md/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("audit-spec-status refuses to WRITE a baseline while a spec is untracked", () => {
+  // The SECOND caller of the shared guard, pinned separately -- because
+  // mutating lib/tracked.mjs is caught by the audit-corrections test above
+  // whether or not this gate calls it at all. Removing the call here was
+  // UNCAUGHT until this test existed, which is barwise-1018's own shape:
+  // a fix nothing would notice losing.
+  const dir = correctionRepo({ "tracked.spec.md": A_CORRECTION }, {});
+  try {
+    stage(
+      dir,
+      "barwise/spec-status-baseline.json",
+      JSON.stringify({ $comment: "test", specs: {} }, null, 2) + "\n",
+    );
+    execFileSync("git", ["commit", "-qm", "base"], { cwd: dir });
+    writeFileSync(join(dir, "barwise/docs/specs/draft.spec.md"), A_CORRECTION);
+
+    const write = gate("audit-spec-status.mjs", dir, "--write");
+    assert.equal(
+      write.status,
+      2,
+      `expected refusal (2), got ${write.status}:\n${write.stdout}${write.stderr}`,
+    );
+    assert.match(write.stderr, /draft\.spec\.md/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
