@@ -143,7 +143,7 @@ Out of scope:
 
 | File                                    | Current state                                                        | Verdict                                                                                                                         |
 | --------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `.claude/skills/pr-review/checklist.md` | 341 lines, 14 trigger headings, prose                                | authority; gains no globs, gains a completeness gate                                                                            |
+| `.claude/skills/pr-review/checklist.md` | 341 lines, 13 trigger headings, prose                                | authority; gains no globs, gains a completeness gate                                                                            |
 | `.github/copilot-instructions.md`       | 31 hand-written lines, all about ORM tool usage, no review guidance  | becomes generated; current content is preserved as a hand-authored preamble section                                             |
 | `.github/instructions/`                 | absent                                                               | new: one generated `*.instructions.md` per tier heading                                                                         |
 | `.github/workflows/ci.yml`              | one `ci` job; inline path classification for docs-only and optimizer | gains a `review` job; the two existing classifiers stay as they are                                                             |
@@ -156,35 +156,68 @@ which is why no workstream below runs the monorepo build for its own sake.
 
 ## Target architecture
 
+The shape to check is the fan-out in the middle and the fan-out at the
+end: one authority derived once into one parser that two consumers read,
+and one gate with three results rather than two.
+
+```mermaid
+flowchart TD
+    subgraph Derivation["One authority, derived once"]
+        CL["checklist.md\nAUTHORITY: 341 lines, 13 trigger headings\nprose, human-read"]
+        RT["review-tiers.json\nREGISTERED PAIR\nheading, tier, globs"]
+        PARSER["scripts/lib/review-tiers.mjs\nONE PARSER, TWO CONSUMERS"]
+    end
+
+    CRT{{"check:review-tiers\nfails on a heading with no row\nAND on a row naming no heading"}}
+
+    subgraph Consumer1["Consumer 1: what Copilot reads"]
+        REGEN["regen-copilot-instructions.mjs"]
+        OUT1[".github/copilot-instructions.md"]
+        OUT2[".github/instructions/SLUG.instructions.md\napplyTo: the same globs"]
+    end
+
+    CCI{{"check:copilot-instructions\nfails when either output is stale"}}
+
+    subgraph Consumer2["Consumer 2: does this PR block"]
+        RISK["scripts/pr-risk.mjs\nroutine, high-risk, or cannot see the diff"]
+    end
+
+    subgraph OnPR["On every pull request"]
+        WF["copilot-review.yml\non: opened, reopened, ready_for_review"]
+        BOT["copilot-pull-request-reviewer bot"]
+        GATE{"ci.yml job: review"}
+    end
+
+    R0["exit 0 -- merge allowed\nroutine tier, or high-risk reviewed\nwith no blocking finding"]
+    R1["exit 1 -- merge blocked\nblocking finding open, or the\nrecorded verdict is cannot tell"]
+    R2["exit 2 -- merge blocked\nno Copilot review recorded, or the API\ncould not be read. The only path that\npages a human."]
+
+    CL -->|headings| RT
+    RT --> PARSER
+    CL -.-> CRT
+    RT -.-> CRT
+    PARSER --> REGEN
+    PARSER --> RISK
+    REGEN --> OUT1
+    REGEN --> OUT2
+    OUT1 -.-> CCI
+    OUT2 -.-> CCI
+    OUT1 --> BOT
+    OUT2 --> BOT
+    WF -->|POST requested_reviewers| BOT
+    RISK --> GATE
+    BOT -->|its review, or its silence| GATE
+    GATE --> R0
+    GATE --> R1
+    GATE --> R2
 ```
-.claude/skills/pr-review/checklist.md        AUTHORITY (prose, human-read)
-        |  headings
-        v
-barwise/review-tiers.json                    REGISTERED PAIR
-        |  { heading, tier, globs[] }        check:review-tiers fails both ways
-        v
-barwise/scripts/lib/review-tiers.mjs         ONE PARSER, TWO CONSUMERS
-        |                    |
-        |                    +--> scripts/regen-copilot-instructions.mjs
-        |                    |      -> .github/copilot-instructions.md
-        |                    |      -> .github/instructions/<slug>.instructions.md
-        |                    |         (applyTo: the same globs)
-        |                    |      guarded by check:copilot-instructions
-        |                    |
-        +--> scripts/pr-risk.mjs             routine | high-risk | exit 2
-                    |
-                    v
-        .github/workflows/ci.yml  job: review
-                    |
-                    +-- routine ------------------------> exit 0
-                    +-- high-risk --> read PR reviews --> 0 / 1 / 2
-                                          ^
-.github/workflows/copilot-review.yml      |
-  on: pull_request [opened, reopened,      |
-      ready_for_review]                    |
-  POST .../requested_reviewers ------------+
-      copilot-pull-request-reviewer[bot]
-```
+
+The dotted edges are checks, not data flow: `check:review-tiers` reads
+both `checklist.md` and `review-tiers.json` because it fails in both
+directions, and `check:copilot-instructions` reads the generated outputs
+to fail when they are stale. The edge from the bot to the gate is
+labelled "its review, or its silence" because those two are the same
+observable, which is what the third exit code exists to separate.
 
 ## Alternatives considered
 
@@ -214,7 +247,14 @@ barwise/scripts/lib/review-tiers.mjs         ONE PARSER, TWO CONSUMERS
 
 ## Workstreams (each independently shippable)
 
-**WS1 -- Copilot reviews every pull request.** Add
+**WS1 -- Copilot reviews every pull request. Its precondition is NOT
+established.** Requesting a Copilot review on PR #525 on 2026-09-17
+produced no review in over eight hours, and nothing available
+distinguishes "Copilot code review is disabled for this repository" from
+"the request silently failed" (barwise-1036). Establish that Copilot code
+review is enabled here and posts, BEFORE building the workflow: if it is
+not, WS1 cannot ship, the first tier of this design is empty, and WS3 and
+WS4 are moot. Then add
 `.github/workflows/copilot-review.yml` requesting
 `copilot-pull-request-reviewer[bot]` as a reviewer on `opened`,
 `reopened`, `ready_for_review`. No gate, no tier, nothing blocks. This
@@ -273,6 +313,15 @@ instructions too long to absorb, a pointer to `checklist.md` it did not
 follow, a diff too large for its context. The gate can verify Copilot
 _answered_; nothing in this design verifies it answered _well_. WS5 is
 the instrument, and its findings belong in this spec, not in a comment.
+
+**The whole design rests on a third-party capability this spec has not
+seen work.** Every tier, gate and generated instruction below assumes
+Copilot code review runs on this repository. One measurement exists and
+it is negative: no review in eight hours from an explicit request. That
+is not evidence Copilot is unavailable -- it is evidence the question is
+unanswered, which is the weaker position of the two. WS1 exists to settle
+it first, and no later workstream should be built on the assumption until
+it is.
 
 **Prompt injection reaches the reviewer.** Copilot reads diff content,
 and a pull request can contain text addressed to it. This is an
