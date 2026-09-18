@@ -161,13 +161,26 @@ nothing, not merely one that did not happen.
 evidence a reviewer looked, never evidence the change is sound, which is
 why the review job reads tier, CI and review state together.
 
-**The cost the design had not priced.** Copilot code review carries a
-model multiplier of 13 -- each review deducts 13 premium requests -- and
-on private repositories it also consumes Actions minutes from the same
-pool as CI. At this repository's rate of roughly 216 merged pull requests
-a month, "Copilot reviews every pull request" is on the order of 2,800
-premium requests a month before a single Chat or agent call. See Risks;
-this may invert WS1's central choice.
+**The cost the design had not priced. (UNVERIFIED -- confirm before
+acting on it.)** Secondary sources report that Copilot code review
+carries a premium-request multiplier of 13 from 2026-06-01, and that on
+private repositories it additionally consumes Actions minutes from the
+same pool as CI. **This spec has not verified either figure**:
+`docs.github.com` is unreachable from the session that wrote this
+section (blocked by the network egress proxy), so the numbers come from
+search-result summaries rather than from GitHub's billing documentation,
+and no command in this repository reproduces them. Whether this
+repository is private in GitHub's sense is also unestablished -- the
+`"private": true` in `barwise/package.json` is the npm publish flag
+and says nothing about repository visibility.
+
+If the multiplier of 13 holds, then at this repository's measured rate
+of 216 merged pull requests a month (`git log --merges --since="30 days
+ago" --format="%s" | grep -c '^Merge pull request'`), "Copilot reviews
+every pull request" is on the order of 2,800 premium requests a month
+before a single Chat or agent call. That conditional is the whole of the
+cost argument, and it rests on a number nobody here has checked against
+its source. Verify it first; it may invert WS1's central choice.
 
 ## Scope
 
@@ -445,12 +458,18 @@ which is what keeps that bound meaningful.
    $2.50/$15, 87.1%, 71.4%; Luna $1/$6, 83.2%, 41.3%. Context is 1.05M on
    all three, so the instruction-absorption risk this spec worried about
    -- 341 checklist lines plus generated instructions -- does not
-   discriminate between them. **Recommended: Terra.** Luna is
-   disqualified by the spread: it trails Terra by 3.9 points on
-   Terminal-Bench but by 30.1 on Nerova, and a reviewer that gates
-   merges should not be chosen on the benchmark that hides a collapse.
-   Terra is within 1.7 points of Sol on Terminal-Bench at half the token
-   price, and OpenAI positions it for first-pass review specifically.
+   discriminate between them. (Figures as supplied by the repository
+   owner from the model picker, 2026-09-18; not independently verified
+   against a vendor publication.) **Recommended: Terra.** Luna is
+   disqualified by the SPREAD rather than by either score: it trails
+   Terra by 3.9 points on Terminal-Bench and by 30.1 on Nerova, and two
+   benchmarks disagreeing by 26 points about the same model means one of
+   them is insensitive to something Luna lacks. Which one is relevant to
+   reviewing a diff against a written checklist is not established here
+   -- what this spec has is the shape, not a reading of Nerova -- and a
+   reviewer that gates merges is the wrong place to bet on the
+   optimistic benchmark. Terra is within 1.7 points of Sol on
+   Terminal-Bench at half the token price.
 
    Two things this recommendation does NOT settle. First, Copilot bills
    by premium request with a per-model multiplier, not by token, so the
