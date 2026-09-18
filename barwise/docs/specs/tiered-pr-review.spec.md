@@ -1,0 +1,372 @@
+# Tiered PR review: Copilot on every PR, a blocking tier for the changes that carry liability
+
+Status: Draft -- no workstream implemented
+
+Created: 2026-09-17
+Last-updated: 2026-09-17
+Tracking: barwise-1036 (WS1, the Copilot review workflow); barwise-1037 (WS2,
+the tier table and its completeness gate); barwise-1038 (WS3, the
+classifier); barwise-1041 (WS4, the blocking gate); barwise-1040 (WS5,
+generated instructions and the measurement). Closes nothing on its own.
+The finding is barwise-953 (the instance: PR skills exist, are discoverable,
+and are not invoked -- two recorded occurrences, and now the steady
+state). Extends `docs/specs/pr-skills.spec.md`, which wrote the review
+down, and applies `docs/specs/gate-refusal-contract.spec.md`, which is
+the reason the gate here has three results instead of two.
+
+In one sentence: every pull request gets a Copilot review driven by
+repository instructions generated from the files that already own the
+rules, a path-derived tier decides whether that review blocks the merge,
+and a reviewer that could not answer blocks too -- because "found
+nothing" and "did not run" must not look the same.
+
+## Principle
+
+**Define errors out of existence**, pointed at the review itself.
+
+`pr-skills.spec.md` gave this repository a review discipline that works.
+Its one run on PR #475 disproved the PR's own central behavioural claim
+with a single CLI command -- the class of defect no gate in `ci.yml` can
+reach. The discipline is not the problem.
+
+The problem is that invoking it is a caller's responsibility. barwise-953
+records two occurrences and states the remedy that was tried and failed:
+"A restatement in prose that the skills should be run does NOT close this
+-- that is what exists now, and it has a 0-for-2 record." Measured across
+eight merged pull requests sampled on 2026-09-17, seven carry no recorded
+review of any kind; the eighth is PR #475, the skill's own first run. Over
+the preceding thirty days 216 pull requests merged, several within three
+minutes of opening. The finding has stopped being an incident.
+
+A caller who must remember to ask for a review is the failure case to
+design away. The review becomes a thing that happens to a pull request
+rather than a thing someone starts.
+
+**Explicit over implicit** decides where the rules live. Copilot cannot
+know barwise's invariants, and the 341 lines that state them already have
+exactly one home in `pr-review/checklist.md`. Restating them for Copilot
+creates the must-agree copy CLAUDE.md forbids, so the instructions
+Copilot reads are generated from that file and a drift gate fails when
+they diverge.
+
+## Should the review gate trust a silent Copilot? (resolved: no -- it refuses)
+
+A review check that passes when Copilot posted nothing is the defect
+`gate-refusal-contract.spec.md` spent a month removing, one layer out.
+
+Copilot reviewing a diff and finding nothing, and Copilot never running
+because the request failed, the bot was unavailable, or the API read
+returned empty, produce the same observable: no findings on the pull
+request. A gate that reads "no findings" as "pass" prints PASS on a
+question it never asked. That is barwise-906's shape -- six occurrences
+-- and `audit-gate`'s false green, which is the one the fault matrix
+caught.
+
+So the gate has three results, the same three every other gate here has:
+
+| Situation                                                | Exit | Merge   |
+| -------------------------------------------------------- | ---: | ------- |
+| Routine tier                                             |    0 | allowed |
+| High-risk tier, Copilot reviewed, no blocking finding    |    0 | allowed |
+| High-risk tier, blocking finding open                    |    1 | blocked |
+| Recorded barwise verdict is "cannot tell"                |    1 | blocked |
+| No Copilot review recorded, or the API could not be read |    2 | blocked |
+
+Exit 2 is not a failure of the pull request. It is the gate saying it
+could not see its input, which is the signal that routes to a person --
+and it is the only path in this design that pages one. The paper this
+was argued from proposes calibrated abstention as the mitigation for
+agent false negatives; this repository already built abstention for its
+gates, and this spec extends it to the reviewer.
+
+## Should the tier table live inside checklist.md? (resolved: no -- a registered pair)
+
+`checklist.md`'s section headings already are the risk triggers: "When a
+surface changed", "When `@barwise/core` changed", "When a skill, agent
+brief, CLAUDE.md, AGENTS.md, or prompt artifact changed". What they lack
+is a machine-readable path.
+
+Putting globs into `checklist.md` keeps one owner at the cost of the
+document a human actually reads. The alternative -- a table that names
+the headings -- is a copy, so it gets the treatment CLAUDE.md prescribes
+for copies: register the pair and make agreement loud. `review-tiers.json`
+names each heading verbatim and carries its globs, and
+`check:review-tiers` fails **both** on a heading with no row and on a row
+naming a heading that no longer exists. That bidirectional shape is
+`check:root-scripts`, which already fails both ways for the same reason.
+
+One derivation then feeds two consumers: the tier classifier reads it to
+decide whether a pull request blocks, and the Copilot instruction
+generator reads it to emit path-scoped instructions. Two parsers over one
+table would be the copy the rule forbids, so the table is parsed once in
+`scripts/lib/review-tiers.mjs` -- the shape `lib/ci-gates.mjs` already
+uses for `ci.yml`.
+
+## Scope
+
+In scope:
+
+- When a pull request is opened, reopened, or marked ready for review,
+  the system shall request a Copilot code review on it.
+- When `.github/copilot-instructions.md` or any file under
+  `.github/instructions/` differs from its regenerator's output,
+  `npm run check:copilot-instructions` shall exit 1 and name the stale
+  file.
+- When a regenerator or gate in this spec cannot read `checklist.md`,
+  `review-tiers.json`, or the changed-file list, it shall exit 2 and
+  shall not print a tier or a verdict.
+- When a diff touches a glob in `review-tiers.json`, `scripts/pr-risk.mjs`
+  shall classify the pull request as high-risk and print every triggering
+  heading.
+- When a heading in `checklist.md` has no row in `review-tiers.json`, or
+  a row names a heading absent from `checklist.md`,
+  `npm run check:review-tiers` shall exit 1.
+- When a high-risk pull request has no Copilot review recorded on its head
+  commit, the review gate shall exit 2.
+- When a high-risk pull request carries an unresolved blocking finding, or
+  a recorded barwise verdict of "cannot tell", the review gate shall exit 1.
+
+Out of scope:
+
+- **Running the `pr-review` skill in CI.** It needs a model, and a model
+  needs a key, and `docs/specs/keyless-model-access.spec.md` removed the
+  places a key can sit. Copilot is the keyless reviewer; the deep review
+  stays a session activity whose verdict this gate reads. Revisit only if
+  the measurement in WS5 shows generated instructions cannot carry the
+  invariants.
+- **Retiring any `ci.yml` gate.** Nothing here replaces a deterministic
+  check. `checklist.md` is scoped by construction to what CI cannot reach.
+- **Enforcing the required check.** Branch protection is a repository
+  setting, not a file. See Open decisions.
+
+## Inventory
+
+| File                                    | Current state                                                        | Verdict                                                                                                                         |
+| --------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/skills/pr-review/checklist.md` | 341 lines, 13 trigger headings, prose                                | authority; gains no globs, gains a completeness gate                                                                            |
+| `.github/copilot-instructions.md`       | 31 hand-written lines, all about ORM tool usage, no review guidance  | becomes generated; current content is preserved as a hand-authored preamble section                                             |
+| `.github/instructions/`                 | absent                                                               | new: one generated `*.instructions.md` per tier heading                                                                         |
+| `.github/workflows/ci.yml`              | one `ci` job; inline path classification for docs-only and optimizer | gains a `review` job; the two existing classifiers stay as they are                                                             |
+| `barwise/scripts/lib/ci-gates.mjs`      | parses `ci.yml` into the gate list                                   | untouched; the model this spec copies                                                                                           |
+| `barwise/parity.manifest.json`          | 8 declared sets, byte-checked                                        | untouched -- the generated pair is guarded by a regenerator and a drift gate, which the rule accepts in place of a manifest row |
+| `barwise/audit-baseline.json`           | duplication ratchet                                                  | untouched, but WS3 must classify any candidate the new scripts raise                                                            |
+
+Nothing in `packages/` changes. This spec touches repository process only,
+which is why no workstream below runs the monorepo build for its own sake.
+
+## Target architecture
+
+The shape to check is the fan-out in the middle and the fan-out at the
+end: one authority derived once into one parser that two consumers read,
+and one gate with three results rather than two.
+
+```mermaid
+flowchart TD
+    subgraph Derivation["One authority, derived once"]
+        CL["checklist.md\nAUTHORITY: 341 lines, 13 trigger headings\nprose, human-read"]
+        RT["review-tiers.json\nREGISTERED PAIR\nheading, tier, globs"]
+        PARSER["scripts/lib/review-tiers.mjs\nONE PARSER, TWO CONSUMERS"]
+    end
+
+    CRT{{"check:review-tiers\nfails on a heading with no row\nAND on a row naming no heading"}}
+
+    subgraph Consumer1["Consumer 1: what Copilot reads"]
+        REGEN["regen-copilot-instructions.mjs"]
+        OUT1[".github/copilot-instructions.md"]
+        OUT2[".github/instructions/SLUG.instructions.md\napplyTo: the same globs"]
+    end
+
+    CCI{{"check:copilot-instructions\nfails when either output is stale"}}
+
+    subgraph Consumer2["Consumer 2: does this PR block"]
+        RISK["scripts/pr-risk.mjs\nroutine, high-risk, or cannot see the diff"]
+    end
+
+    subgraph OnPR["On every pull request"]
+        WF["copilot-review.yml\non: opened, reopened, ready_for_review"]
+        BOT["copilot-pull-request-reviewer bot"]
+        GATE{"ci.yml job: review"}
+    end
+
+    R0["exit 0 -- merge allowed\nroutine tier, or high-risk reviewed\nwith no blocking finding"]
+    R1["exit 1 -- merge blocked\nblocking finding open, or the\nrecorded verdict is cannot tell"]
+    R2["exit 2 -- merge blocked\nno Copilot review recorded, or the API\ncould not be read. The only path that\npages a human."]
+
+    CL -->|headings| RT
+    RT --> PARSER
+    CL -.-> CRT
+    RT -.-> CRT
+    PARSER --> REGEN
+    PARSER --> RISK
+    REGEN --> OUT1
+    REGEN --> OUT2
+    OUT1 -.-> CCI
+    OUT2 -.-> CCI
+    OUT1 --> BOT
+    OUT2 --> BOT
+    WF -->|POST requested_reviewers| BOT
+    RISK --> GATE
+    BOT -->|its review, or its silence| GATE
+    GATE --> R0
+    GATE --> R1
+    GATE --> R2
+```
+
+The dotted edges are checks, not data flow: `check:review-tiers` reads
+both `checklist.md` and `review-tiers.json` because it fails in both
+directions, and `check:copilot-instructions` reads the generated outputs
+to fail when they are stale. The edge from the bot to the gate is
+labelled "its review, or its silence" because those two are the same
+observable, which is what the third exit code exists to separate.
+
+## Alternatives considered
+
+- **A hand-written `copilot-instructions.md` that restates the
+  checklist.** Fastest, and it is the thing CLAUDE.md names as the
+  failure: an unchecked must-agree copy. The checklist changes when an
+  invariant is learned, and the copy would not, so Copilot would be
+  reviewing against last month's rules with nothing to say so.
+
+- **Blocking only on abstention, never on the tier.** Cheaper in merge
+  latency and it still closes the false-green hole. Rejected by the
+  requester in favour of blocking the whole high-risk tier: an open
+  blocking finding on a change to `core`'s public API should not merge
+  because the reviewer was confident about it. The cost is real and is
+  stated in Risks.
+
+- **Run `pr-review` in GitHub Actions via a model API.** Closes
+  barwise-953 at the root with no reliance on Copilot absorbing generated
+  instructions. It puts a second credential-holding lane in the
+  repository against `keyless-model-access.spec.md`, which deliberately
+  left exactly one. Held in reserve for WS5's measurement.
+
+- **Enable automatic Copilot review in repository settings.** One toggle,
+  no code. Invisible to the tree: nothing in a diff shows it exists, and
+  no gate can assert it is still on. Rejected on the same ground the
+  requester chose a workflow file.
+
+## Workstreams (each independently shippable)
+
+**WS1 -- Copilot reviews every pull request. Its precondition is NOT
+established.** Requesting a Copilot review on PR #525 on 2026-09-17
+produced no review in over eight hours, and nothing available
+distinguishes "Copilot code review is disabled for this repository" from
+"the request silently failed" (barwise-1036). Establish that Copilot code
+review is enabled here and posts, BEFORE building the workflow: if it is
+not, WS1 cannot ship, the first tier of this design is empty, and WS3 and
+WS4 are moot. Then add
+`.github/workflows/copilot-review.yml` requesting
+`copilot-pull-request-reviewer[bot]` as a reviewer on `opened`,
+`reopened`, `ready_for_review`. No gate, no tier, nothing blocks. This
+ships value on its own and produces the review corpus WS5 measures.
+Acceptance: a pull request opened after this lands carries a Copilot
+review, observed, with the request visible in the workflow log.
+
+**WS2 -- The tier table and its completeness gate.** Add
+`barwise/review-tiers.json`, `scripts/lib/review-tiers.mjs`, and
+`npm run check:review-tiers`. No consumer yet. Acceptance: the gate is
+watched going red three ways -- a heading added to `checklist.md` with no
+row, a row naming a deleted heading, and `checklist.md` made unreadable
+(exit 2) -- each with the exit status read directly, per the
+`session-review` rule that a gate seen only passing is not verified.
+
+**WS3 -- The classifier.** Add `scripts/pr-risk.mjs` over
+`review-tiers.mjs`, plus `test:scripts` coverage. Prints the tier and
+every triggering heading; exits 2 when it cannot obtain the changed-file
+list. Acceptance: classifies the last 20 merged pull requests, and the
+distribution is reported in this spec's revision -- if high-risk exceeds
+roughly a third, the globs are wrong and WS4 does not proceed.
+
+**WS4 -- The blocking gate.** Add the `review` job to `ci.yml` reading
+the pull request's reviews through the API, with the five-row table
+above as its contract. Acceptance: watched producing each of 0, 1 and 2
+on a real pull request before it is made required.
+
+**WS5 -- Generated Copilot instructions, and the measurement that decides
+whether they work (provisional: not yet grounded).** Add
+`scripts/regen-copilot-instructions.mjs` and
+`npm run check:copilot-instructions`. The generated instructions cannot
+be unit-tested -- the reviewer is a third party and its output is not
+deterministic -- so this workstream's real deliverable is a measurement:
+plant a known checklist violation in a scratch pull request, one per
+tier heading, and record whether Copilot flags it. A heading Copilot
+misses is a heading the deep review still owns, recorded in this spec
+rather than assumed away.
+
+Coupling: WS4 depends on WS3, which depends on WS2. WS1 and WS5 are
+independent of all three; WS1 should land first because WS5 needs its
+corpus.
+
+## Risks
+
+**Blocking the tier makes roughly one or two pull requests a day wait.**
+At 216 merges in thirty days, a tier catching a third of them is about
+two per day held until a review is recorded. That is the requester's
+decision and the point of the design, but it is also the shape that gets
+gates disabled. WS3's distribution check exists to catch a tier that is
+too wide before WS4 makes it binding.
+
+**Copilot finding nothing is a shadow, not a property.** It correlates
+with the diff being clean through a mechanism -- Copilot read the diff
+and had an opinion -- and diverges exactly where the mechanism is bypassed:
+instructions too long to absorb, a pointer to `checklist.md` it did not
+follow, a diff too large for its context. The gate can verify Copilot
+_answered_; nothing in this design verifies it answered _well_. WS5 is
+the instrument, and its findings belong in this spec, not in a comment.
+
+**The whole design rests on a third-party capability this spec has not
+seen work.** Every tier, gate and generated instruction below assumes
+Copilot code review runs on this repository. One measurement exists and
+it is negative: no review in eight hours from an explicit request. That
+is not evidence Copilot is unavailable -- it is evidence the question is
+unanswered, which is the weaker position of the two. WS1 exists to settle
+it first, and no later workstream should be built on the assumption until
+it is.
+
+**Prompt injection reaches the reviewer.** Copilot reads diff content,
+and a pull request can contain text addressed to it. This is an
+unsolved class, acknowledged as such in the literature. It bounds what
+the gate may conclude: a Copilot review is evidence that a review
+happened, never authority to merge. The high-risk tier ends at a human,
+which is what keeps that bound meaningful.
+
+## Open decisions
+
+1. **Where required-check enforcement is recorded.** Branch protection is
+   a repository setting; nothing in the tree shows it exists or is still
+   on -- the objection that decided WS1's mechanism. Options: (a) accept
+   it and document it in CLAUDE.md; (b) add a gate that reads the
+   repository ruleset through the API and fails when the `review` check
+   is not required. **Recommended: (b).** The repository's own standard
+   is that a convention with no check is not landed, and (a) recreates
+   for enforcement the exact hole the requester rejected for Copilot.
+   The cost is a gate that needs network and a token, so it refuses with
+   exit 2 offline -- which is the contract working, not a defect.
+
+2. **What counts as a blocking finding from Copilot.** Claude Code Review
+   marks severity; Copilot's review comments are not known to carry a
+   comparable marker. Options: (a) treat every unresolved Copilot comment
+   as blocking, which will block on nits; (b) treat only `CHANGES_REQUESTED`
+   review state as blocking and leave comments advisory; (c) require the
+   author to resolve each thread, making resolution the signal.
+   **Recommended: (b) for WS4, revisited once WS1's corpus shows what
+   Copilot actually emits here.** Deciding this before the corpus exists
+   is guessing.
+
+3. **Where a barwise deep-review verdict is recorded so a gate can read
+   it.** The "cannot tell" row needs a machine-readable home. Options:
+   (a) a review posted through the API whose first line carries the
+   verdict, parsed by the gate; (b) a `review-verdict.json` committed to
+   the branch; (c) a label. **Recommended: (a).** The `pr-review` skill
+   already specifies the recommendation as the first line of the review
+   body, so the format exists and needs no second authority -- but it
+   makes the gate a parser of prose, which is the weak part of the
+   recommendation and the reason this is open rather than decided.
+
+4. **Whether `.github/instructions/*.instructions.md` path-scoped
+   instructions are supported by Copilot code review at the time WS5
+   lands.** The mechanism is documented for Copilot, and its `applyTo`
+   globs map onto the tier table exactly, which is why the architecture
+   reaches for it. It is a third-party capability and this spec has not
+   verified it. WS5 grounds it first and falls back to a single generated
+   `copilot-instructions.md` if path scoping is unavailable.
