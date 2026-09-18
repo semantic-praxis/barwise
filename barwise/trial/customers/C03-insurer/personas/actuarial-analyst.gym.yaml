@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: actuarial-analyst
+title: "Losses land on the period that responds"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Read a conceptual model produced from the claims dbt project and
+  confirm that every loss can be placed on the policy period that
+  responds to it, that indemnity and expense are separable, and that the
+  rating dimensions the loss triangles are cut by are still there.
+brief: |
+  You build loss development triangles and rate indications for a
+  regional property and casualty carrier. Every number you publish is a
+  paid or incurred amount placed on an accident date, matched to the
+  policy period in force on that date, and split indemnity from expense.
+  A model that loses the loss date, blurs reserve cost types, or drops
+  the commercial vehicle class means a triangle that cannot be cut the
+  way the filing requires. Check that the model barwise produced from
+  the dbt project keeps the dimensions you slice on.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 7 (mandatory roles),
+  ch. 4 (n-ary fact types and uniqueness).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: must_validate
+    diagnosis: >-
+      A model that does not validate is not something I can hand to the
+      reserving committee as the documented basis of the triangles.
+  - kind: requires_element
+    element:
+      entity: PolicyPeriod
+    diagnosis: >-
+      Earned premium is by period, and so is the loss that matches it.
+      Without PolicyPeriod the loss ratio has no denominator.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Claim, PolicyPeriod]
+    diagnosis: >-
+      If the claim is tied to the policy and not the period, a loss on a
+      renewed policy lands in the wrong accident year.
+  - kind: forbids_population
+    factType: Claim has LossDate
+    constraint: mandatory
+    hint: "Every claim has a date of loss; it is what places the claim in an accident period."
+    diagnosis: >-
+      A claim with no loss date cannot be placed in a triangle at all, and
+      I would find out when the diagonal does not sum.
+  - kind: forbids_population
+    factType: Reserve has CostType
+    constraint: mandatory
+    hint: "Every reserve is either claim cost or one of the two expense buckets."
+    diagnosis: >-
+      A reserve with no cost type is money I cannot classify as indemnity
+      or expense, and the filing requires them separately.
+  - kind: forbids_population
+    factType: Payment is drawn against Reserve
+    constraint: mandatory
+    hint: "Every payment reduces exactly one reserve; there is no payment outside the reserve."
+    diagnosis: >-
+      A payment with no reserve is paid money that never appears in
+      incurred, and the paid-to-incurred ratio drifts for no reason.
+  - kind: requires_element
+    element:
+      entity: CommercialVehicleRisk
+    diagnosis: >-
+      Commercial auto is rated by weight class. If the commercial vehicle
+      has been folded into VehicleRisk, the class relativities cannot be
+      indicated from the model.
+  - kind: requires_verbalization
+    sentence: "For each Coverage and Risk combination, at most one PolicyPeriod applies."
+    hint: "The ternary: a coverage protects a risk under one period; the period is determined by the pair."
+    diagnosis: >-
+      If the model allows the same coverage-risk pair under two periods
+      the exposure base is counted twice and the pure premium is halved.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Exposure, Coverage]
+    diagnosis: >-
+      A loss is developed by coverage. Without the exposure-to-coverage
+      link every claim is an unallocated lump.

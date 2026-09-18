@@ -1,0 +1,35 @@
+orm_version: "1.0"
+model:
+  name: One reading
+  object_types:
+    - id: ot-widget
+      name: Widget
+      kind: entity
+      reference_mode: code
+    - id: ot-code
+      name: WidgetCode
+      kind: value
+      data_type: { name: text }
+    - id: ot-color
+      name: Color
+      kind: value
+      data_type: { name: text }
+  fact_types:
+    - id: ft-widget-code
+      name: Widget has WidgetCode
+      roles:
+        - { id: r-wc-w, player: ot-widget, role_name: has }
+        - { id: r-wc-c, player: ot-code, role_name: is of }
+      readings: ["{0} has {1}", "{1} is of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-wc-w], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-wc-c] }
+        - { type: mandatory, role: r-wc-w }
+    - id: ft-widget-color
+      name: Widget has Color
+      roles:
+        - { id: r-col-w, player: ot-widget, role_name: has }
+        - { id: r-col-c, player: ot-color, role_name: is of }
+      readings: ["{0} has {1}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-col-w] }

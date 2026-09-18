@@ -1,0 +1,92 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: pharmacovigilance-lead
+title: "The SAE clock is in the model"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Read a conceptual model of the sponsor's safety data and confirm that
+  serious adverse events are distinguishable from the rest, that the
+  24-hour reporting obligation is stated as an obligation and not as a
+  structural rule, and that follow-up chains cannot loop.
+brief: |
+  You lead pharmacovigilance for the sponsor. Every serious adverse
+  event must reach your desk within 24 hours of the site becoming aware
+  of it; the regulator audits the clock, and an SAE with no report time
+  is a finding. Follow-up reports chain forward from the initial event
+  and never back. Concomitant medications given for an event are the
+  first thing a medical reviewer asks for. A model that treats every AE
+  as serious, or none, or that makes the report time a hard constraint
+  so sites cannot enter the event before they phone it in, is worse
+  than the spreadsheet. Check that the model keeps the safety rules the
+  way the regulator reads them.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 7 (ring constraints),
+  ch. 4 (deontic versus alethic modality).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: must_validate
+    diagnosis: >-
+      If the model does not validate nobody will sign it off as the
+      basis for the safety database specification.
+  - kind: requires_element
+    element:
+      entity: SeriousAdverseEvent
+    diagnosis: >-
+      If serious events are not their own kind, the 24-hour rule applies
+      to every headache or to nothing, and either way the audit fails.
+  - kind: requires_element
+    element:
+      factTypeBetween: [AdverseEvent, Subject]
+    diagnosis: >-
+      An event without a subject cannot be reported; there is no case
+      without a patient behind it.
+  - kind: forbids_population
+    factType: AdverseEvent is experienced by Subject
+    constraint: mandatory
+    hint: "USUBJID on AE is NOT NULL; every event belongs to exactly one subject."
+    diagnosis: >-
+      An orphan adverse event is a case I cannot file, and a case that
+      exists in the database but not in the safety system is exactly
+      what an inspector looks for.
+  - kind: forbids_population
+    factType: AdverseEvent has AeSeverity
+    constraint: mandatory
+    hint: "AESEV is required on every event; the investigator grades it at entry."
+    diagnosis: >-
+      An event without a severity cannot be triaged, and the medical
+      reviewer has to phone the site to ask.
+  - kind: requires_verbalization
+    sentence: "It is obligatory that each SeriousAdverseEvent was reported at at least one SaeReportDateTime."
+    hint: "Deontic, not alethic: the site ought to have reported it, but the event exists in the database before it has."
+    diagnosis: >-
+      Stated as a hard rule, the site cannot enter the SAE until it has
+      been reported, which inverts the workflow; left out, the 24-hour
+      clock has no start and no end in the model.
+  - kind: forbids_population
+    factType: AdverseEvent is follow-up of AdverseEvent
+    constraint: ring
+    hint: "Follow-up reports chain forward in time; an event can never be a follow-up of itself, directly or through a chain."
+    diagnosis: >-
+      A follow-up loop means a case that follows up on itself, and the
+      narrative generator never terminates.
+  - kind: requires_verbalization
+    sentence: "No AdverseEvent is follow-up of that same AdverseEvent, directly or through a chain of such relationships."
+    hint: "The acyclic ring on follow-up."
+    diagnosis: >-
+      Without the acyclicity stated, a data entry error can make the
+      initial report a follow-up of its own follow-up, and the case
+      history reads in a circle.
+  - kind: requires_element
+    element:
+      factTypeBetween: [ConcomitantMedication, AdverseEvent]
+    diagnosis: >-
+      What was given for the event is the first question on every
+      medical review; if the medication is not linked to the event it
+      treats, the answer is a free-text search.
+  - kind: requires_element
+    element:
+      entity: ConcomitantMedication
+    diagnosis: >-
+      Without the CM domain, drug interactions cannot be assessed and the
+      causality assessment has one arm tied.

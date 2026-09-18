@@ -1,0 +1,56 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: master-data-lead
+title: "Composite keys hold and the BOM cannot contain itself"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Confirm that material, plant and storage location are distinct
+  entities with their keys, and that the component relationship on
+  Material is acyclic.
+brief: |
+  You own master data. A material that is its own component brings
+  the MRP run down; a plant-level record that lost its plant is a
+  stock figure nobody can locate.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 5 (reference schemes), ch. 7 (rings).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: requires_element
+    element:
+      entity: Material
+    diagnosis: >-
+      Everything in manufacturing is a material or is made of one.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.2."
+  - kind: requires_element
+    element:
+      entity: Plant
+    diagnosis: >-
+      Plant is half of the material-plant key; without it MaterialPlantData
+      has no identity.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 5, section 5.4."
+  - kind: requires_element
+    element:
+      entity: MaterialPlantData
+    diagnosis: >-
+      The plant-level view of a material is where MRP parameters live;
+      collapsing it into Material loses the per-plant values.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 5, section 5.4."
+  - kind: requires_element
+    element:
+      factTypeBetween: [Material, Plant]
+    diagnosis: >-
+      Materials are extended to plants; no fact type, no extension.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4."
+  - kind: must_validate
+    diagnosis: >-
+      A structurally invalid model cannot be loaded into the governance tool.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 5, section 5.3."
+  - kind: forbids_population
+    factType: "Material is component of Material"
+    constraint: ring
+    hint: "Component-of is acyclic: no material is, through any chain, a component of itself."
+    diagnosis: >-
+      Without the acyclic constraint the model accepts a bill of materials
+      that loops, which the MRP run cannot explode.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 7, section 7.3."

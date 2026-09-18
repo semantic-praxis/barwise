@@ -1,0 +1,91 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: claims-data-steward
+title: "Reserves live on the exposure"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Read a conceptual model produced from the claims dbt project and
+  confirm that the financial grain is the exposure, not the claim, that
+  every claim keeps its typelist codes, and that subrogation is its own
+  thing with its own adverse party.
+brief: |
+  You are the data steward for claims at a regional property and casualty
+  carrier on a Guidewire-style core suite. Downstream, the claims dbt
+  project builds stg_ and mart models over cc_claim, cc_exposure,
+  cc_reserve, cc_check and cc_subrogation, and every financial number the
+  business trusts is summed at the exposure level and rolled up. A model
+  that hangs reserves on the claim, drops the loss cause typelist, or
+  folds subrogation into payments will produce a mart that reconciles
+  to nothing. Check that the model barwise produced from the dbt project
+  keeps the grain you steward.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 5 (reference schemes),
+  ch. 6 (value constraints), ch. 7 (mandatory roles).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: must_validate
+    diagnosis: >-
+      If the model does not validate I cannot even put it in front of the
+      claims leads, and the dbt project stays undocumented.
+  - kind: requires_element
+    element:
+      entity: Claim
+    diagnosis: >-
+      Claim is the first thing anyone in claims looks for. A model without
+      it has read some other project.
+  - kind: requires_element
+    element:
+      entity: Exposure
+    diagnosis: >-
+      Exposure is the financial grain. If it has been collapsed into
+      Claim, every reserve and payment total in the mart is at the wrong
+      level and the claimant split is gone.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Reserve, Exposure]
+    diagnosis: >-
+      Reserves hang on exposures, never on claims. A model that ties
+      Reserve straight to Claim will double count on any multi-claimant
+      loss.
+  - kind: forbids_population
+    factType: Claim has ClaimNumber
+    constraint: internal_uniqueness
+    hint: "The claim number is assigned once at first notice and is the key of cc_claim."
+    diagnosis: >-
+      Two claims with one claim number is the one thing the intake team
+      cannot recover from; every downstream join is on it.
+  - kind: forbids_population
+    factType: Exposure is on Claim
+    constraint: mandatory
+    hint: "An exposure without a claim is an orphan row; the system cannot create one."
+    diagnosis: >-
+      An orphan exposure carries money that rolls up to no claim, and the
+      month-end reserve reconciliation will not tie.
+  - kind: forbids_population
+    factType: Claim has LossCause
+    constraint: mandatory
+    hint: "Every claim carries exactly one loss cause code; the intake desk cannot submit without it."
+    diagnosis: >-
+      A claim with no loss cause is invisible to the cat-code reporting
+      and the reinsurance bordereau, both of which are keyed on it.
+  - kind: requires_verbalization
+    sentence: "It is obligatory that each Reserve is approved by at least one Adjuster."
+    hint: "Approval is an obligation, not a database rule: an FNOL reserve sits unapproved until the desk adjuster picks it up."
+    diagnosis: >-
+      If the model makes approval alethic the import of yesterday's open
+      FNOL reserves fails; if it drops approval altogether the authority
+      audit has nothing to check.
+  - kind: requires_element
+    element:
+      entity: Subrogation
+    diagnosis: >-
+      Subrogation is a pursuit with its own status and adverse party. If
+      it has become a negative payment, recoveries are invisible until
+      the money arrives.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Subrogation, Contact]
+    diagnosis: >-
+      The adverse party is what a subrogation is against. Without it the
+      recovery team has a list of amounts and nobody to demand them from.

@@ -1,0 +1,6 @@
+{
+  "$comment": "What a round trip through the NORMA exporter and importer may drop, from docs/IMPORT_EXPORT.md and docs/NORMA_VS_ORM_YAML.md: diagram layout, value ranges and open bounds (barwise-5t9.1), NORMA extensions. The importer is documented as nearly lossless, so this list is short on purpose: a delta here is the finding the round trip exists to catch.",
+  "allowed": [
+    { "elementType": "population", "kind": "modified" }
+  ]
+}

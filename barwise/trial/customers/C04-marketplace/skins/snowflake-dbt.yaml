@@ -1,0 +1,5 @@
+adapter: snowflake
+compiled: false
+jinja_macros: [dbt_utils.star, custom_scd2]
+models_without_keys: 4
+semi_structured: true

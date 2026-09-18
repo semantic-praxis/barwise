@@ -1,0 +1,77 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: "financial-aid-director"
+title: "Financial aid director: awards belong to an aid year, not a term"
+transition:
+  from: "initiate"
+  to: "apprentice"
+exitPerformance: >-
+  Confirm that a model packages aid by aid year with one student, one
+  fund and one amount per award, and that the FERPA release rule is
+  present as an obligation rather than lost.
+brief: |
+  You are Devon Whitfield, director of financial aid for the system.
+  You package aid by aid year and reconcile disbursements against the
+  fund ledger. A model is acceptable to you when every award names its
+  student, its fund and its aid year, when the amount is never missing,
+  and when the directory-information rule that governs what your
+  counselors may confirm to a parent is stated.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 4 (mandatory roles), ch. 8 (deontic
+  modality).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: "requires_element"
+    element:
+      entity: "FinancialAidAward"
+    diagnosis: >-
+      An award is a record with a status and a history; a model that
+      makes it an amount on the student cannot show an offer that was
+      declined.
+  - kind: "requires_element"
+    element:
+      entity: "AidFund"
+    diagnosis: >-
+      Every dollar traces to a fund; without AidFund the ledger
+      reconciliation has no source column.
+  - kind: "requires_element"
+    element:
+      entity: "AidYear"
+    diagnosis: >-
+      Aid is packaged by aid year, not by term; a model keyed on Term
+      splits one award across fall and spring.
+  - kind: "requires_element"
+    element:
+      factTypeBetween: ["FinancialAidAward", "Student"]
+    diagnosis: >-
+      An award not tied to a student is a fund balance, not aid.
+  - kind: "forbids_population"
+    factType: "FinancialAidAward is awarded to Student"
+    constraint: "mandatory"
+    hint: "Every award is awarded to some student."
+    diagnosis: >-
+      Unassigned awards are how a fund gets overcommitted; the model
+      must not allow an award with no student.
+  - kind: "forbids_population"
+    factType: "FinancialAidAward is for AidYear"
+    constraint: "internal_uniqueness"
+    hint: "One award, one aid year."
+    diagnosis: >-
+      An award spanning two aid years would be counted in both years'
+      federal reports.
+  - kind: "forbids_population"
+    factType: "FinancialAidAward has OfferedAmount"
+    constraint: "mandatory"
+    hint: "An award is always offered at some amount, even zero."
+    diagnosis: >-
+      An award with no amount cannot be accepted or declined, and it
+      sits in the queue until someone notices.
+  - kind: "requires_verbalization"
+    sentence: "It is obligatory that each DirectoryInformationRelease is authorized by at least one Employee."
+    diagnosis: >-
+      Counselors confirm enrollment to lenders every day; if the model
+      does not state that a release is authorized by a named employee,
+      the audit trail is gone.
+  - kind: "must_validate"
+    diagnosis: >-
+      A model I cannot validate is one I cannot get the DBA to load
+      before packaging opens in March.

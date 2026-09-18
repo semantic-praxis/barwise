@@ -1,0 +1,71 @@
+# The student information system after a migration that kept every
+# name: upper-case seven-character tables with a module prefix,
+# TABLE_FIELD column names, audit columns everywhere, a schema prefix,
+# no check constraints anywhere.
+dialect: postgres
+naming:
+  table_case: upper
+  column_case: upper
+  abbreviate: true
+  max_identifier: 30
+  abbreviations:
+    Person: SPRIDEN
+    Student: SGBSTDN
+    CourseSection: SSBSECT
+    Enrollment: SFRSTCR
+    Course: SCBCRSE
+    Term: STVTERM
+    Campus: STVCAMP
+    College: STVCOLL
+    Department: STVDEPT
+    Grade: SHRGRDE
+    FinancialAidAward: RPRAWRD
+    Faculty: SIBINST
+    Employee: PEBEMPL
+    Building: SLBBLDG
+    Room: SLBRDEF
+    DegreeProgram: SMRPRLE
+    TranscriptRecord: SHRTCKN
+idioms:
+  schema_qualified: "saturn."
+  quoting: none
+  check_constraints: false
+  comments: true
+  named_constraints: true
+extra_tables:
+  - |
+    CREATE TABLE saturn.SPRIDEN (
+      SPRIDEN_PIDM NUMERIC(8,0) NOT NULL,
+      SPRIDEN_ID VARCHAR(9) NOT NULL,
+      SPRIDEN_LAST_NAME VARCHAR(60) NOT NULL,
+      SPRIDEN_FIRST_NAME VARCHAR(60),
+      SPRIDEN_CHANGE_IND VARCHAR(1),
+      SPRIDEN_ENTITY_IND VARCHAR(1) NOT NULL,
+      SPRIDEN_ACTIVITY_DATE TIMESTAMP NOT NULL,
+      SPRIDEN_USER VARCHAR(30),
+      CONSTRAINT PK_SPRIDEN PRIMARY KEY (SPRIDEN_PIDM, SPRIDEN_ID, SPRIDEN_ENTITY_IND)
+    )
+  - |
+    CREATE TABLE saturn.SFRSTCR (
+      SFRSTCR_TERM_CODE VARCHAR(6) NOT NULL,
+      SFRSTCR_PIDM NUMERIC(8,0) NOT NULL,
+      SFRSTCR_CRN VARCHAR(5) NOT NULL,
+      SFRSTCR_RSTS_CODE VARCHAR(2) NOT NULL,
+      SFRSTCR_RSTS_DATE DATE NOT NULL,
+      SFRSTCR_CREDIT_HR NUMERIC(7,3),
+      SFRSTCR_GRDE_CODE VARCHAR(6),
+      SFRSTCR_ACTIVITY_DATE TIMESTAMP NOT NULL,
+      SFRSTCR_USER VARCHAR(30),
+      CONSTRAINT PK_SFRSTCR PRIMARY KEY (SFRSTCR_TERM_CODE, SFRSTCR_PIDM, SFRSTCR_CRN)
+    )
+  - |
+    CREATE TABLE saturn.STVTERM (
+      STVTERM_CODE VARCHAR(6) NOT NULL,
+      STVTERM_DESC VARCHAR(30) NOT NULL,
+      STVTERM_START_DATE DATE NOT NULL,
+      STVTERM_END_DATE DATE NOT NULL,
+      STVTERM_FA_PROC_YR VARCHAR(4),
+      STVTERM_ACTIVITY_DATE TIMESTAMP NOT NULL,
+      STVTERM_TRMT_CODE VARCHAR(1) NOT NULL,
+      CONSTRAINT PK_STVTERM PRIMARY KEY (STVTERM_CODE)
+    )

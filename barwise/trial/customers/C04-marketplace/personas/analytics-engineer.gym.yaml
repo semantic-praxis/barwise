@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: analytics-engineer
+title: "The dbt project comes back whole"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Confirm that the staging models with keys are entities, that the
+  relationship tests became fact types, and that the order-line ternary
+  kept its rule.
+brief: |
+  You own the dbt project. The model is only useful if it says what the
+  tests already say, and says it about every model, not the ones the
+  importer happened to like.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 4 (uniqueness constraints).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: requires_element
+    element:
+      entity: Order
+    diagnosis: >-
+      Every mart starts from orders.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4."
+  - kind: requires_element
+    element:
+      entity: ProductVariant
+    diagnosis: >-
+      Inventory is kept per variant, not per product; a model at product
+      grain cannot reconcile stock.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.2."
+  - kind: requires_element
+    element:
+      entity: Seller
+    diagnosis: >-
+      Payouts go to sellers; if the seller subtype is gone, "customer"
+      has already swallowed it.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 6, section 6.1."
+  - kind: requires_element
+    element:
+      factTypeBetween: [Order, Buyer]
+    diagnosis: >-
+      The relationship test from orders to buyers is the first join in
+      every model; it must come back as a fact type.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4."
+  - kind: must_validate
+    diagnosis: >-
+      A model with structural errors cannot be exported back to dbt.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 5, section 5.3."
+  - kind: forbids_population
+    factType: "Order includes ProductVariant in Quantity"
+    constraint: internal_uniqueness
+    hint: "One quantity per order and variant."
+    diagnosis: >-
+      Two quantities for one order and variant is the duplicate-line bug
+      the unique test exists to stop.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 4, section 4.4."

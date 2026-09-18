@@ -1,0 +1,1034 @@
+orm_version: "1.0"
+
+# C10: state university system, eight campuses, one student information
+# system. The kernel carries the Banner-idiom difficulties the trial
+# declares for this customer: cryptic naming lands in the skin, the
+# ternary registration fact (PIDM + term + CRN) is irreducible, the
+# student number is unique only within a campus, and FERPA is a deontic
+# rule rather than a structural one.
+model:
+  name: "State University System"
+  domain_context: "higher-education"
+  note: >-
+    Person is the single identity record (Banner's PIDM); Student,
+    Employee, Faculty and GraduateStudent are subtypes that inherit it.
+    The student number is a campus-scoped identifier, not a key.
+
+  object_types:
+    # ---- identity ---------------------------------------------------
+    - id: "ot-person"
+      name: "Person"
+      kind: "entity"
+      reference_mode: "pidm"
+      definition: "Any individual the university system holds a record for, identified by a system-generated PIDM that never changes."
+    - id: "ot-student"
+      name: "Student"
+      kind: "entity"
+      reference_mode: "pidm"
+      definition: "A person who has been admitted to and holds a student record at one of the eight campuses."
+    - id: "ot-graduate-student"
+      name: "GraduateStudent"
+      kind: "entity"
+      reference_mode: "pidm"
+      definition: "A student pursuing a master's, doctoral, or graduate certificate program."
+    - id: "ot-employee"
+      name: "Employee"
+      kind: "entity"
+      reference_mode: "pidm"
+      definition: "A person who holds or has held a paid position with the university system."
+    - id: "ot-faculty"
+      name: "Faculty"
+      kind: "entity"
+      reference_mode: "pidm"
+      definition: "An employee appointed to an instructional or research rank who may teach sections and advise students."
+    - id: "ot-campus"
+      name: "Campus"
+      kind: "entity"
+      reference_mode: "campus_code"
+      definition: "One of the eight physical campuses of the state university system, each with its own registrar."
+    # ---- academics --------------------------------------------------
+    - id: "ot-college"
+      name: "College"
+      kind: "entity"
+      reference_mode: "college_code"
+      definition: "An academic division of a campus that owns departments and degree programs."
+    - id: "ot-department"
+      name: "Department"
+      kind: "entity"
+      reference_mode: "department_code"
+      definition: "An academic unit within a college that owns courses and employs faculty."
+    - id: "ot-course"
+      name: "Course"
+      kind: "entity"
+      reference_mode: "course_id"
+      definition: "A catalog entry such as MATH 1010, defined by subject and course number, that sections are offered against."
+    - id: "ot-course-section"
+      name: "CourseSection"
+      kind: "entity"
+      reference_mode: "crn"
+      definition: "A scheduled offering of a course in a term, identified by a course reference number (CRN) that is reused across terms."
+    - id: "ot-term"
+      name: "Term"
+      kind: "entity"
+      reference_mode: "term_code"
+      definition: "An academic period such as Fall 2026 (202610) during which sections are offered and enrollments are recorded."
+    - id: "ot-grade"
+      name: "Grade"
+      kind: "entity"
+      reference_mode: "grade_code"
+      definition: "A mark from the grading scale, such as A- or W, that carries quality points and a GPA treatment."
+    - id: "ot-degree-program"
+      name: "DegreeProgram"
+      kind: "entity"
+      reference_mode: "program_code"
+      definition: "A credential-bearing curriculum, such as BS-CHEM, offered by a college."
+    - id: "ot-enrollment"
+      name: "Enrollment"
+      kind: "entity"
+      reference_mode: "enrollment_id"
+      definition: "The objectified fact that a student is registered in a section for a term; it carries the status, credit hours and grade."
+    # ---- financial aid ----------------------------------------------
+    - id: "ot-financial-aid-award"
+      name: "FinancialAidAward"
+      kind: "entity"
+      reference_mode: "award_number"
+      definition: "An offer of aid from one fund to one student for one aid year."
+    - id: "ot-aid-fund"
+      name: "AidFund"
+      kind: "entity"
+      reference_mode: "fund_code"
+      definition: "A source of financial aid money, such as the federal Pell grant or a campus scholarship fund."
+    - id: "ot-aid-year"
+      name: "AidYear"
+      kind: "entity"
+      reference_mode: "aid_year_code"
+      definition: "The July-to-June award year, such as 2627, that financial aid is packaged for."
+    # ---- records ----------------------------------------------------
+    - id: "ot-transcript-record"
+      name: "TranscriptRecord"
+      kind: "entity"
+      reference_mode: "transcript_request_number"
+      definition: "A request for and issuance of a student's academic transcript, official or unofficial."
+    - id: "ot-ferpa-restriction"
+      name: "FerpaRestriction"
+      kind: "entity"
+      reference_mode: "restriction_id"
+      definition: "A student's standing request under FERPA that the university withhold directory information."
+    - id: "ot-directory-information-release"
+      name: "DirectoryInformationRelease"
+      kind: "entity"
+      reference_mode: "release_id"
+      definition: "A recorded disclosure of a student's directory information to a party outside the university."
+    # ---- facilities and hr ------------------------------------------
+    - id: "ot-building"
+      name: "Building"
+      kind: "entity"
+      reference_mode: "building_code"
+      definition: "A named structure on a campus in which rooms are scheduled."
+    - id: "ot-room"
+      name: "Room"
+      kind: "entity"
+      reference_mode: "room_id"
+      definition: "A schedulable space, known by its number within a building."
+    - id: "ot-position"
+      name: "Position"
+      kind: "entity"
+      reference_mode: "position_number"
+      definition: "A budgeted job slot in a department that one employee holds at a time."
+
+    # ---- reference-mode value types ---------------------------------
+    - id: "vt-pidm"
+      name: "Pidm"
+      kind: "value"
+      definition: "The internal person identifier assigned once and never reused."
+      data_type: { name: "integer" }
+    - id: "vt-student-number"
+      name: "StudentNumber"
+      kind: "value"
+      definition: "The nine-character number printed on a student's ID card, unique within a campus."
+      data_type: { name: "text", length: 9 }
+    - id: "vt-campus-code"
+      name: "CampusCode"
+      kind: "value"
+      definition: "A one-character code for a campus."
+      data_type: { name: "text", length: 1 }
+      value_constraint:
+        values: ["A", "B", "C", "D", "E", "F", "G", "H"]
+    - id: "vt-college-code"
+      name: "CollegeCode"
+      kind: "value"
+      definition: "A two-character code for a college."
+      data_type: { name: "text", length: 2 }
+    - id: "vt-department-code"
+      name: "DepartmentCode"
+      kind: "value"
+      definition: "A four-character code for a department."
+      data_type: { name: "text", length: 4 }
+    - id: "vt-course-id"
+      name: "CourseId"
+      kind: "value"
+      definition: "The surrogate catalog identifier of a course."
+      data_type: { name: "integer" }
+    - id: "vt-crn"
+      name: "Crn"
+      kind: "value"
+      definition: "The five-digit course reference number of a section, unique within a term."
+      data_type: { name: "text", length: 5 }
+    - id: "vt-term-code"
+      name: "TermCode"
+      kind: "value"
+      definition: "A six-digit code of the form YYYYNN, such as 202610 for Fall 2026."
+      data_type: { name: "text", length: 6 }
+    - id: "vt-grade-code"
+      name: "GradeCode"
+      kind: "value"
+      definition: "A code from the grading scale."
+      data_type: { name: "text", length: 2 }
+      value_constraint:
+        values:
+          - "A+"
+          - "A"
+          - "A-"
+          - "B+"
+          - "B"
+          - "B-"
+          - "C+"
+          - "C"
+          - "C-"
+          - "D+"
+          - "D"
+          - "D-"
+          - "F"
+          - "FN"
+          - "FX"
+          - "I"
+          - "IP"
+          - "W"
+          - "WF"
+          - "WN"
+          - "WM"
+          - "P"
+          - "NP"
+          - "S"
+          - "U"
+          - "CR"
+          - "NC"
+          - "AU"
+          - "NR"
+          - "NG"
+          - "TR"
+          - "X"
+    - id: "vt-program-code"
+      name: "ProgramCode"
+      kind: "value"
+      definition: "A code such as BS-CHEM naming a degree program."
+      data_type: { name: "text", length: 12 }
+    - id: "vt-award-number"
+      name: "AwardNumber"
+      kind: "value"
+      definition: "The sequence number of a financial aid award."
+      data_type: { name: "integer" }
+    - id: "vt-fund-code"
+      name: "FundCode"
+      kind: "value"
+      definition: "A six-character code for an aid fund."
+      data_type: { name: "text", length: 6 }
+    - id: "vt-aid-year-code"
+      name: "AidYearCode"
+      kind: "value"
+      definition: "A four-digit code for an aid year, such as 2627."
+      data_type: { name: "text", length: 4 }
+    - id: "vt-transcript-request-number"
+      name: "TranscriptRequestNumber"
+      kind: "value"
+      definition: "The sequence number of a transcript request."
+      data_type: { name: "integer" }
+    - id: "vt-restriction-id"
+      name: "RestrictionId"
+      kind: "value"
+      definition: "The sequence number of a FERPA restriction."
+      data_type: { name: "integer" }
+    - id: "vt-release-id"
+      name: "ReleaseId"
+      kind: "value"
+      definition: "The sequence number of a directory information release."
+      data_type: { name: "integer" }
+    - id: "vt-building-code"
+      name: "BuildingCode"
+      kind: "value"
+      definition: "A six-character code for a building."
+      data_type: { name: "text", length: 6 }
+    - id: "vt-room-id"
+      name: "RoomId"
+      kind: "value"
+      definition: "The surrogate identifier of a room."
+      data_type: { name: "integer" }
+    - id: "vt-position-number"
+      name: "PositionNumber"
+      kind: "value"
+      definition: "The six-character budgeted position number."
+      data_type: { name: "text", length: 6 }
+
+    # ---- attribute value types --------------------------------------
+    - id: "vt-last-name"
+      name: "LastName"
+      kind: "value"
+      definition: "A person's legal last name."
+      data_type: { name: "text", length: 60 }
+    - id: "vt-first-name"
+      name: "FirstName"
+      kind: "value"
+      definition: "A person's legal first name."
+      data_type: { name: "text", length: 60 }
+    - id: "vt-birth-date"
+      name: "BirthDate"
+      kind: "value"
+      definition: "A person's date of birth."
+      data_type: { name: "date" }
+    - id: "vt-legacy-banner-id"
+      name: "LegacyBannerId"
+      kind: "value"
+      definition: "The identifier a person carried in a campus system before the eight campuses were merged into one SIS."
+      data_type: { name: "text", length: 9 }
+    - id: "vt-employee-number"
+      name: "EmployeeNumber"
+      kind: "value"
+      definition: "The payroll number of an employee, unique across the system."
+      data_type: { name: "text", length: 9 }
+    - id: "vt-class-level-code"
+      name: "ClassLevelCode"
+      kind: "value"
+      definition: "A student's class standing."
+      data_type: { name: "text", length: 2 }
+      value_constraint:
+        values: ["FR", "SO", "JR", "SR", "GR", "PB", "PR", "ND"]
+    - id: "vt-subject-code"
+      name: "SubjectCode"
+      kind: "value"
+      definition: "The four-letter subject of a course, such as MATH."
+      data_type: { name: "text", length: 4 }
+    - id: "vt-course-number"
+      name: "CourseNumber"
+      kind: "value"
+      definition: "The four-digit number of a course within its subject, such as 1010."
+      data_type: { name: "text", length: 4 }
+    - id: "vt-registration-status-code"
+      name: "RegistrationStatusCode"
+      kind: "value"
+      definition: "The registration status of an enrollment."
+      data_type: { name: "text", length: 2 }
+      value_constraint:
+        values:
+          - "RE"
+          - "RW"
+          - "RC"
+          - "RD"
+          - "RA"
+          - "WL"
+          - "WD"
+          - "WC"
+          - "WF"
+          - "WN"
+          - "WM"
+          - "WX"
+          - "DD"
+          - "DW"
+          - "DC"
+          - "DA"
+          - "DN"
+          - "AU"
+          - "AW"
+          - "CN"
+          - "CD"
+          - "CA"
+          - "CX"
+          - "NR"
+          - "NS"
+          - "PN"
+          - "PW"
+          - "TR"
+          - "GC"
+          - "GW"
+    - id: "vt-credit-hours"
+      name: "CreditHours"
+      kind: "value"
+      definition: "The credit hours an enrollment carries, usually 1 to 6."
+      data_type: { name: "decimal", length: 4, scale: 1 }
+    - id: "vt-quality-points"
+      name: "QualityPoints"
+      kind: "value"
+      definition: "The grade points per credit hour a grade earns, such as 3.7 for A-."
+      data_type: { name: "decimal", length: 3, scale: 2 }
+    - id: "vt-offered-amount"
+      name: "OfferedAmount"
+      kind: "value"
+      definition: "The dollar amount of an award as offered."
+      data_type: { name: "money" }
+    - id: "vt-award-status-code"
+      name: "AwardStatusCode"
+      kind: "value"
+      definition: "Where an award stands in the offer-accept-disburse cycle."
+      data_type: { name: "text", length: 4 }
+      value_constraint:
+        values: ["OFFR", "ACPT", "DECL", "CANC", "PAID", "PEND"]
+    - id: "vt-request-date"
+      name: "RequestDate"
+      kind: "value"
+      definition: "The date a transcript was requested."
+      data_type: { name: "date" }
+    - id: "vt-transcript-type-code"
+      name: "TranscriptTypeCode"
+      kind: "value"
+      definition: "Whether a transcript is official or unofficial."
+      data_type: { name: "text", length: 4 }
+      value_constraint:
+        values: ["OFFC", "UNOF"]
+    - id: "vt-release-date"
+      name: "ReleaseDate"
+      kind: "value"
+      definition: "The date directory information was released."
+      data_type: { name: "date" }
+    - id: "vt-room-number"
+      name: "RoomNumber"
+      kind: "value"
+      definition: "The number of a room, unique within its building."
+      data_type: { name: "text", length: 6 }
+
+  fact_types:
+    # ---- identity ---------------------------------------------------
+    - id: "ft-person-has-pidm"
+      name: "Person has Pidm"
+      roles:
+        - { id: "r-person-has-pidm", player: "ot-person", role_name: "has" }
+        - { id: "r-pidm-identifies-person", player: "vt-pidm", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-person-has-pidm"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-pidm-identifies-person"] }
+        - { type: "mandatory", role: "r-person-has-pidm" }
+    - id: "ft-person-has-last-name"
+      name: "Person has LastName"
+      roles:
+        - { id: "r-person-has-last-name", player: "ot-person", role_name: "has" }
+        - { id: "r-last-name-is-of-person", player: "vt-last-name", role_name: "is of" }
+      readings: ["{0} has {1}", "{1} is last name of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-person-has-last-name"] }
+        - { type: "mandatory", role: "r-person-has-last-name" }
+    - id: "ft-person-has-first-name"
+      name: "Person has FirstName"
+      roles:
+        - { id: "r-person-has-first-name", player: "ot-person", role_name: "has" }
+        - { id: "r-first-name-is-of-person", player: "vt-first-name", role_name: "is of" }
+      readings: ["{0} has {1}", "{1} is first name of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-person-has-first-name"] }
+    - id: "ft-person-has-birth-date"
+      name: "Person has BirthDate"
+      roles:
+        - { id: "r-person-has-birth-date", player: "ot-person", role_name: "was born on" }
+        - { id: "r-birth-date-is-of-person", player: "vt-birth-date", role_name: "is birth date of" }
+      readings: ["{0} was born on {1}", "{1} is birth date of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-person-has-birth-date"] }
+    - id: "ft-person-has-legacy-banner-id"
+      name: "Person has LegacyBannerId"
+      definition: "The pre-merger campus identifier, kept for reconciliation and scheduled for retirement."
+      roles:
+        - { id: "r-person-has-legacy-banner-id", player: "ot-person", role_name: "has" }
+        - { id: "r-legacy-banner-id-is-of-person", player: "vt-legacy-banner-id", role_name: "is legacy id of" }
+      readings: ["{0} has {1}", "{1} is legacy id of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-person-has-legacy-banner-id"] }
+
+    # ---- student ----------------------------------------------------
+    - id: "ft-student-has-student-number"
+      name: "Student has StudentNumber"
+      definition: "The student number is unique only within the home campus; two campuses may both have student 900012345."
+      roles:
+        - { id: "r-student-has-student-number", player: "ot-student", role_name: "has" }
+        - { id: "r-student-number-is-of-student", player: "vt-student-number", role_name: "is number of" }
+      readings: ["{0} has {1}", "{1} is student number of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-student-has-student-number"] }
+        - { type: "mandatory", role: "r-student-has-student-number" }
+    - id: "ft-student-has-home-campus"
+      name: "Student has home Campus"
+      roles:
+        - { id: "r-student-has-home-campus", player: "ot-student", role_name: "has home" }
+        - { id: "r-campus-is-home-of-student", player: "ot-campus", role_name: "is home campus of" }
+      readings: ["{0} has home {1}", "{1} is home campus of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-student-has-home-campus"] }
+        - { type: "mandatory", role: "r-student-has-home-campus" }
+        # Campus code plus student number identifies a student.
+        - { type: "external_uniqueness", roles: ["r-campus-is-home-of-student", "r-student-number-is-of-student"] }
+    - id: "ft-student-has-class-level-code"
+      name: "Student has ClassLevelCode"
+      roles:
+        - { id: "r-student-has-class-level", player: "ot-student", role_name: "has" }
+        - { id: "r-class-level-is-of-student", player: "vt-class-level-code", role_name: "is class level of" }
+      readings: ["{0} has {1}", "{1} is class level of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-student-has-class-level"] }
+    - id: "ft-student-pursues-degree-program"
+      name: "Student pursues DegreeProgram"
+      definition: "Double majors and dual degrees mean a student may pursue more than one program at once."
+      roles:
+        - { id: "r-student-pursues-program", player: "ot-student", role_name: "pursues" }
+        - { id: "r-program-is-pursued-by-student", player: "ot-degree-program", role_name: "is pursued by" }
+      readings: ["{0} pursues {1}", "{1} is pursued by {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-student-pursues-program", "r-program-is-pursued-by-student"] }
+    - id: "ft-student-is-advised-by-faculty"
+      name: "Student is advised by Faculty"
+      definition: "Every student should have at least one assigned advisor; the policy is stated, not enforced by the SIS."
+      roles:
+        - { id: "r-student-is-advised-by", player: "ot-student", role_name: "is advised by" }
+        - { id: "r-faculty-advises-student", player: "ot-faculty", role_name: "advises" }
+      readings: ["{0} is advised by {1}", "{1} advises {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-student-is-advised-by", "r-faculty-advises-student"] }
+        - { type: "mandatory", role: "r-student-is-advised-by", modality: "deontic" }
+    - id: "ft-graduate-student-has-thesis-advisor"
+      name: "GraduateStudent has thesis advisor Faculty"
+      roles:
+        - { id: "r-graduate-student-has-thesis-advisor", player: "ot-graduate-student", role_name: "has thesis advisor" }
+        - { id: "r-faculty-is-thesis-advisor-of", player: "ot-faculty", role_name: "is thesis advisor of" }
+      readings: ["{0} has {1} as thesis advisor", "{1} is thesis advisor of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-graduate-student-has-thesis-advisor"] }
+
+    # ---- employee and hr --------------------------------------------
+    - id: "ft-employee-has-employee-number"
+      name: "Employee has EmployeeNumber"
+      roles:
+        - { id: "r-employee-has-employee-number", player: "ot-employee", role_name: "has" }
+        - { id: "r-employee-number-is-of-employee", player: "vt-employee-number", role_name: "is number of" }
+      readings: ["{0} has {1}", "{1} is employee number of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-employee-has-employee-number"] }
+        - { type: "internal_uniqueness", roles: ["r-employee-number-is-of-employee"] }
+        - { type: "mandatory", role: "r-employee-has-employee-number" }
+    - id: "ft-employee-holds-position"
+      name: "Employee holds Position"
+      roles:
+        - { id: "r-employee-holds-position", player: "ot-employee", role_name: "holds" }
+        - { id: "r-position-is-held-by-employee", player: "ot-position", role_name: "is held by" }
+      readings: ["{0} holds {1}", "{1} is held by {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-position-is-held-by-employee"] }
+    - id: "ft-position-has-position-number"
+      name: "Position has PositionNumber"
+      roles:
+        - { id: "r-position-has-position-number", player: "ot-position", role_name: "has" }
+        - { id: "r-position-number-identifies-position", player: "vt-position-number", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-position-has-position-number"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-position-number-identifies-position"] }
+        - { type: "mandatory", role: "r-position-has-position-number" }
+    - id: "ft-position-is-in-department"
+      name: "Position is in Department"
+      roles:
+        - { id: "r-position-is-in-department", player: "ot-position", role_name: "is in" }
+        - { id: "r-department-has-position", player: "ot-department", role_name: "has" }
+      readings: ["{0} is in {1}", "{1} has {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-position-is-in-department"] }
+        - { type: "mandatory", role: "r-position-is-in-department" }
+    - id: "ft-faculty-teaches-course-section"
+      name: "Faculty teaches CourseSection"
+      definition: "Team-taught sections have more than one instructor of record."
+      roles:
+        - { id: "r-faculty-teaches-section", player: "ot-faculty", role_name: "teaches" }
+        - { id: "r-section-is-taught-by-faculty", player: "ot-course-section", role_name: "is taught by" }
+      readings: ["{0} teaches {1}", "{1} is taught by {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-faculty-teaches-section", "r-section-is-taught-by-faculty"] }
+
+    # ---- organization -----------------------------------------------
+    - id: "ft-campus-has-campus-code"
+      name: "Campus has CampusCode"
+      roles:
+        - { id: "r-campus-has-campus-code", player: "ot-campus", role_name: "has" }
+        - { id: "r-campus-code-identifies-campus", player: "vt-campus-code", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-campus-has-campus-code"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-campus-code-identifies-campus"] }
+        - { type: "mandatory", role: "r-campus-has-campus-code" }
+    - id: "ft-college-has-college-code"
+      name: "College has CollegeCode"
+      roles:
+        - { id: "r-college-has-college-code", player: "ot-college", role_name: "has" }
+        - { id: "r-college-code-identifies-college", player: "vt-college-code", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-college-has-college-code"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-college-code-identifies-college"] }
+        - { type: "mandatory", role: "r-college-has-college-code" }
+    - id: "ft-college-is-on-campus"
+      name: "College is on Campus"
+      roles:
+        - { id: "r-college-is-on-campus", player: "ot-college", role_name: "is on" }
+        - { id: "r-campus-has-college", player: "ot-campus", role_name: "has" }
+      readings: ["{0} is on {1}", "{1} has {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-college-is-on-campus"] }
+        - { type: "mandatory", role: "r-college-is-on-campus" }
+    - id: "ft-department-has-department-code"
+      name: "Department has DepartmentCode"
+      roles:
+        - { id: "r-department-has-department-code", player: "ot-department", role_name: "has" }
+        - { id: "r-department-code-identifies-department", player: "vt-department-code", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-department-has-department-code"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-department-code-identifies-department"] }
+        - { type: "mandatory", role: "r-department-has-department-code" }
+    - id: "ft-department-belongs-to-college"
+      name: "Department belongs to College"
+      roles:
+        - { id: "r-department-belongs-to-college", player: "ot-department", role_name: "belongs to" }
+        - { id: "r-college-has-department", player: "ot-college", role_name: "has" }
+      readings: ["{0} belongs to {1}", "{1} has {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-department-belongs-to-college"] }
+        - { type: "mandatory", role: "r-department-belongs-to-college" }
+
+    # ---- catalog ----------------------------------------------------
+    - id: "ft-course-has-course-id"
+      name: "Course has CourseId"
+      roles:
+        - { id: "r-course-has-course-id", player: "ot-course", role_name: "has" }
+        - { id: "r-course-id-identifies-course", player: "vt-course-id", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-course-has-course-id"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-course-id-identifies-course"] }
+        - { type: "mandatory", role: "r-course-has-course-id" }
+    - id: "ft-course-has-subject-code"
+      name: "Course has SubjectCode"
+      roles:
+        - { id: "r-course-has-subject-code", player: "ot-course", role_name: "has" }
+        - { id: "r-subject-code-is-of-course", player: "vt-subject-code", role_name: "is subject of" }
+      readings: ["{0} has {1}", "{1} is subject of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-course-has-subject-code"] }
+        - { type: "mandatory", role: "r-course-has-subject-code" }
+        # Subject plus course number is how the catalog names a course.
+        - { type: "external_uniqueness", roles: ["r-subject-code-is-of-course", "r-course-number-is-of-course"] }
+    - id: "ft-course-has-course-number"
+      name: "Course has CourseNumber"
+      roles:
+        - { id: "r-course-has-course-number", player: "ot-course", role_name: "has" }
+        - { id: "r-course-number-is-of-course", player: "vt-course-number", role_name: "is number of" }
+      readings: ["{0} has {1}", "{1} is course number of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-course-has-course-number"] }
+        - { type: "mandatory", role: "r-course-has-course-number" }
+    - id: "ft-course-is-owned-by-department"
+      name: "Course is owned by Department"
+      roles:
+        - { id: "r-course-is-owned-by-department", player: "ot-course", role_name: "is owned by" }
+        - { id: "r-department-owns-course", player: "ot-department", role_name: "owns" }
+      readings: ["{0} is owned by {1}", "{1} owns {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-course-is-owned-by-department"] }
+        - { type: "mandatory", role: "r-course-is-owned-by-department" }
+    - id: "ft-course-is-prerequisite-of-course"
+      name: "Course is prerequisite of Course"
+      definition: "A course may require another to have been passed first; the chain never loops and only direct prerequisites are recorded."
+      roles:
+        - { id: "r-course-is-prerequisite-of", player: "ot-course", role_name: "is prerequisite of" }
+        - { id: "r-course-requires", player: "ot-course", role_name: "requires" }
+      readings: ["{0} is prerequisite of {1}", "{1} requires {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-course-is-prerequisite-of", "r-course-requires"] }
+        - { type: "ring", role_1: "r-course-is-prerequisite-of", role_2: "r-course-requires", ring_type: "acyclic" }
+        - { type: "ring", role_1: "r-course-is-prerequisite-of", role_2: "r-course-requires", ring_type: "intransitive" }
+
+    # ---- sections and terms -----------------------------------------
+    - id: "ft-course-section-has-crn"
+      name: "CourseSection has Crn"
+      roles:
+        - { id: "r-course-section-has-crn", player: "ot-course-section", role_name: "has" }
+        - { id: "r-crn-identifies-course-section", player: "vt-crn", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-course-section-has-crn"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-crn-identifies-course-section"] }
+        - { type: "mandatory", role: "r-course-section-has-crn" }
+    - id: "ft-course-section-is-section-of-course"
+      name: "CourseSection is section of Course"
+      roles:
+        - { id: "r-course-section-is-section-of", player: "ot-course-section", role_name: "is section of" }
+        - { id: "r-course-has-section", player: "ot-course", role_name: "has section" }
+      readings: ["{0} is section of {1}", "{1} has section {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-course-section-is-section-of"] }
+        - { type: "mandatory", role: "r-course-section-is-section-of" }
+    - id: "ft-course-section-is-offered-in-term"
+      name: "CourseSection is offered in Term"
+      roles:
+        - { id: "r-course-section-is-offered-in-term", player: "ot-course-section", role_name: "is offered in" }
+        - { id: "r-term-offers-course-section", player: "ot-term", role_name: "offers" }
+      readings: ["{0} is offered in {1}", "{1} offers {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-course-section-is-offered-in-term"] }
+        - { type: "mandatory", role: "r-course-section-is-offered-in-term" }
+    - id: "ft-course-section-meets-in-room"
+      name: "CourseSection meets in Room"
+      roles:
+        - { id: "r-course-section-meets-in-room", player: "ot-course-section", role_name: "meets in" }
+        - { id: "r-room-hosts-course-section", player: "ot-room", role_name: "hosts" }
+      readings: ["{0} meets in {1}", "{1} hosts {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-course-section-meets-in-room"] }
+    - id: "ft-term-has-term-code"
+      name: "Term has TermCode"
+      roles:
+        - { id: "r-term-has-term-code", player: "ot-term", role_name: "has" }
+        - { id: "r-term-code-identifies-term", player: "vt-term-code", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-term-has-term-code"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-term-code-identifies-term"] }
+        - { type: "mandatory", role: "r-term-has-term-code" }
+
+    # ---- registration (the irreducible ternary, objectified) --------
+    - id: "ft-student-enrolls-in-course-section-for-term"
+      name: "Student enrolls in CourseSection for Term"
+      definition: "Because a CRN is reused from term to term, the registration is identified by student, section and term together, exactly as the registration table is keyed."
+      roles:
+        - { id: "r-student-enrolls", player: "ot-student", role_name: "enrolls in" }
+        - { id: "r-course-section-enrolls", player: "ot-course-section", role_name: "is enrolled in by" }
+        - { id: "r-term-of-enrollment", player: "ot-term", role_name: "is term of" }
+      readings: ["{0} enrolls in {1} for {2}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-student-enrolls", "r-course-section-enrolls", "r-term-of-enrollment"] }
+    - id: "ft-enrollment-has-registration-status-code"
+      name: "Enrollment has RegistrationStatusCode"
+      roles:
+        - { id: "r-enrollment-has-status", player: "ot-enrollment", role_name: "has" }
+        - { id: "r-status-is-of-enrollment", player: "vt-registration-status-code", role_name: "is status of" }
+      readings: ["{0} has {1}", "{1} is status of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-enrollment-has-status"] }
+        - { type: "mandatory", role: "r-enrollment-has-status" }
+    - id: "ft-enrollment-has-grade"
+      name: "Enrollment has Grade"
+      definition: "A grade is posted once the term closes; an in-progress enrollment has none."
+      roles:
+        - { id: "r-enrollment-has-grade", player: "ot-enrollment", role_name: "has" }
+        - { id: "r-grade-is-of-enrollment", player: "ot-grade", role_name: "is grade of" }
+      readings: ["{0} has {1}", "{1} is grade of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-enrollment-has-grade"] }
+    - id: "ft-enrollment-carries-credit-hours"
+      name: "Enrollment carries CreditHours"
+      roles:
+        - { id: "r-enrollment-carries-credit-hours", player: "ot-enrollment", role_name: "carries" }
+        - { id: "r-credit-hours-are-of-enrollment", player: "vt-credit-hours", role_name: "are carried by" }
+      readings: ["{0} carries {1}", "{1} are carried by {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-enrollment-carries-credit-hours"] }
+        - { type: "mandatory", role: "r-enrollment-carries-credit-hours" }
+
+    # ---- grades and programs ----------------------------------------
+    - id: "ft-grade-has-grade-code"
+      name: "Grade has GradeCode"
+      roles:
+        - { id: "r-grade-has-grade-code", player: "ot-grade", role_name: "has" }
+        - { id: "r-grade-code-identifies-grade", player: "vt-grade-code", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-grade-has-grade-code"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-grade-code-identifies-grade"] }
+        - { type: "mandatory", role: "r-grade-has-grade-code" }
+    - id: "ft-grade-has-quality-points"
+      name: "Grade has QualityPoints"
+      definition: "Non-GPA grades such as W and AU carry no quality points."
+      roles:
+        - { id: "r-grade-has-quality-points", player: "ot-grade", role_name: "earns" }
+        - { id: "r-quality-points-are-of-grade", player: "vt-quality-points", role_name: "are earned by" }
+      readings: ["{0} earns {1}", "{1} are earned by {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-grade-has-quality-points"] }
+    - id: "ft-degree-program-has-program-code"
+      name: "DegreeProgram has ProgramCode"
+      roles:
+        - { id: "r-degree-program-has-program-code", player: "ot-degree-program", role_name: "has" }
+        - { id: "r-program-code-identifies-degree-program", player: "vt-program-code", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-degree-program-has-program-code"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-program-code-identifies-degree-program"] }
+        - { type: "mandatory", role: "r-degree-program-has-program-code" }
+    - id: "ft-degree-program-is-offered-by-college"
+      name: "DegreeProgram is offered by College"
+      roles:
+        - { id: "r-degree-program-is-offered-by-college", player: "ot-degree-program", role_name: "is offered by" }
+        - { id: "r-college-offers-degree-program", player: "ot-college", role_name: "offers" }
+      readings: ["{0} is offered by {1}", "{1} offers {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-degree-program-is-offered-by-college"] }
+        - { type: "mandatory", role: "r-degree-program-is-offered-by-college" }
+
+    # ---- financial aid ----------------------------------------------
+    - id: "ft-financial-aid-award-has-award-number"
+      name: "FinancialAidAward has AwardNumber"
+      roles:
+        - { id: "r-award-has-award-number", player: "ot-financial-aid-award", role_name: "has" }
+        - { id: "r-award-number-identifies-award", player: "vt-award-number", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-award-has-award-number"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-award-number-identifies-award"] }
+        - { type: "mandatory", role: "r-award-has-award-number" }
+    - id: "ft-financial-aid-award-is-awarded-to-student"
+      name: "FinancialAidAward is awarded to Student"
+      roles:
+        - { id: "r-award-is-awarded-to-student", player: "ot-financial-aid-award", role_name: "is awarded to" }
+        - { id: "r-student-receives-award", player: "ot-student", role_name: "receives" }
+      readings: ["{0} is awarded to {1}", "{1} receives {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-award-is-awarded-to-student"] }
+        - { type: "mandatory", role: "r-award-is-awarded-to-student" }
+    - id: "ft-financial-aid-award-is-from-aid-fund"
+      name: "FinancialAidAward is from AidFund"
+      roles:
+        - { id: "r-award-is-from-fund", player: "ot-financial-aid-award", role_name: "is from" }
+        - { id: "r-fund-funds-award", player: "ot-aid-fund", role_name: "funds" }
+      readings: ["{0} is from {1}", "{1} funds {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-award-is-from-fund"] }
+        - { type: "mandatory", role: "r-award-is-from-fund" }
+    - id: "ft-financial-aid-award-is-for-aid-year"
+      name: "FinancialAidAward is for AidYear"
+      definition: "Aid is packaged by aid year, not by term; a fall term and its spring term fall in one aid year."
+      roles:
+        - { id: "r-award-is-for-aid-year", player: "ot-financial-aid-award", role_name: "is for" }
+        - { id: "r-aid-year-has-award", player: "ot-aid-year", role_name: "has" }
+      readings: ["{0} is for {1}", "{1} has {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-award-is-for-aid-year"] }
+        - { type: "mandatory", role: "r-award-is-for-aid-year" }
+    - id: "ft-financial-aid-award-has-offered-amount"
+      name: "FinancialAidAward has OfferedAmount"
+      roles:
+        - { id: "r-award-has-offered-amount", player: "ot-financial-aid-award", role_name: "has" }
+        - { id: "r-offered-amount-is-of-award", player: "vt-offered-amount", role_name: "is offered amount of" }
+      readings: ["{0} has {1}", "{1} is offered amount of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-award-has-offered-amount"] }
+        - { type: "mandatory", role: "r-award-has-offered-amount" }
+    - id: "ft-financial-aid-award-has-award-status-code"
+      name: "FinancialAidAward has AwardStatusCode"
+      roles:
+        - { id: "r-award-has-award-status", player: "ot-financial-aid-award", role_name: "has" }
+        - { id: "r-award-status-is-of-award", player: "vt-award-status-code", role_name: "is status of" }
+      readings: ["{0} has {1}", "{1} is status of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-award-has-award-status"] }
+        - { type: "mandatory", role: "r-award-has-award-status" }
+    - id: "ft-aid-fund-has-fund-code"
+      name: "AidFund has FundCode"
+      roles:
+        - { id: "r-aid-fund-has-fund-code", player: "ot-aid-fund", role_name: "has" }
+        - { id: "r-fund-code-identifies-aid-fund", player: "vt-fund-code", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-aid-fund-has-fund-code"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-fund-code-identifies-aid-fund"] }
+        - { type: "mandatory", role: "r-aid-fund-has-fund-code" }
+    - id: "ft-aid-year-has-aid-year-code"
+      name: "AidYear has AidYearCode"
+      roles:
+        - { id: "r-aid-year-has-aid-year-code", player: "ot-aid-year", role_name: "has" }
+        - { id: "r-aid-year-code-identifies-aid-year", player: "vt-aid-year-code", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-aid-year-has-aid-year-code"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-aid-year-code-identifies-aid-year"] }
+        - { type: "mandatory", role: "r-aid-year-has-aid-year-code" }
+
+    # ---- records and FERPA ------------------------------------------
+    - id: "ft-transcript-record-has-transcript-request-number"
+      name: "TranscriptRecord has TranscriptRequestNumber"
+      roles:
+        - { id: "r-transcript-record-has-request-number", player: "ot-transcript-record", role_name: "has" }
+        - { id: "r-request-number-identifies-transcript-record", player: "vt-transcript-request-number", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-transcript-record-has-request-number"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-request-number-identifies-transcript-record"] }
+        - { type: "mandatory", role: "r-transcript-record-has-request-number" }
+    - id: "ft-transcript-record-is-for-student"
+      name: "TranscriptRecord is for Student"
+      roles:
+        - { id: "r-transcript-record-is-for-student", player: "ot-transcript-record", role_name: "is for" }
+        - { id: "r-student-has-transcript-record", player: "ot-student", role_name: "has" }
+      readings: ["{0} is for {1}", "{1} has {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-transcript-record-is-for-student"] }
+        - { type: "mandatory", role: "r-transcript-record-is-for-student" }
+    - id: "ft-transcript-record-was-requested-on-request-date"
+      name: "TranscriptRecord was requested on RequestDate"
+      roles:
+        - { id: "r-transcript-record-was-requested-on", player: "ot-transcript-record", role_name: "was requested on" }
+        - { id: "r-request-date-is-of-transcript-record", player: "vt-request-date", role_name: "is request date of" }
+      readings: ["{0} was requested on {1}", "{1} is request date of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-transcript-record-was-requested-on"] }
+        - { type: "mandatory", role: "r-transcript-record-was-requested-on" }
+    - id: "ft-transcript-record-has-transcript-type-code"
+      name: "TranscriptRecord has TranscriptTypeCode"
+      roles:
+        - { id: "r-transcript-record-has-type", player: "ot-transcript-record", role_name: "has" }
+        - { id: "r-transcript-type-is-of-transcript-record", player: "vt-transcript-type-code", role_name: "is type of" }
+      readings: ["{0} has {1}", "{1} is type of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-transcript-record-has-type"] }
+        - { type: "mandatory", role: "r-transcript-record-has-type" }
+    - id: "ft-ferpa-restriction-has-restriction-id"
+      name: "FerpaRestriction has RestrictionId"
+      roles:
+        - { id: "r-ferpa-restriction-has-restriction-id", player: "ot-ferpa-restriction", role_name: "has" }
+        - { id: "r-restriction-id-identifies-ferpa-restriction", player: "vt-restriction-id", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-ferpa-restriction-has-restriction-id"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-restriction-id-identifies-ferpa-restriction"] }
+        - { type: "mandatory", role: "r-ferpa-restriction-has-restriction-id" }
+    - id: "ft-student-holds-ferpa-restriction"
+      name: "Student holds FerpaRestriction"
+      roles:
+        - { id: "r-student-holds-ferpa-restriction", player: "ot-student", role_name: "holds" }
+        - { id: "r-ferpa-restriction-is-held-by-student", player: "ot-ferpa-restriction", role_name: "is held by" }
+      readings: ["{0} holds {1}", "{1} is held by {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-ferpa-restriction-is-held-by-student"] }
+        - { type: "mandatory", role: "r-ferpa-restriction-is-held-by-student" }
+    - id: "ft-directory-information-release-has-release-id"
+      name: "DirectoryInformationRelease has ReleaseId"
+      roles:
+        - { id: "r-release-has-release-id", player: "ot-directory-information-release", role_name: "has" }
+        - { id: "r-release-id-identifies-release", player: "vt-release-id", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-release-has-release-id"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-release-id-identifies-release"] }
+        - { type: "mandatory", role: "r-release-has-release-id" }
+    - id: "ft-directory-information-release-discloses-student"
+      name: "DirectoryInformationRelease discloses Student"
+      definition: "FERPA: directory information of a student who holds a restriction must not be released; the SIS warns, the registrar decides."
+      roles:
+        - { id: "r-release-discloses-student", player: "ot-directory-information-release", role_name: "discloses" }
+        - { id: "r-student-is-disclosed-by-release", player: "ot-student", role_name: "is disclosed by" }
+      readings: ["{0} discloses {1}", "{1} is disclosed by {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-release-discloses-student"] }
+        - { type: "mandatory", role: "r-release-discloses-student" }
+        - { type: "exclusion", roles: ["r-student-is-disclosed-by-release", "r-student-holds-ferpa-restriction"], modality: "deontic" }
+    - id: "ft-directory-information-release-was-made-on-release-date"
+      name: "DirectoryInformationRelease was made on ReleaseDate"
+      roles:
+        - { id: "r-release-was-made-on", player: "ot-directory-information-release", role_name: "was made on" }
+        - { id: "r-release-date-is-of-release", player: "vt-release-date", role_name: "is date of" }
+      readings: ["{0} was made on {1}", "{1} is date of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-release-was-made-on"] }
+        - { type: "mandatory", role: "r-release-was-made-on" }
+    - id: "ft-directory-information-release-is-authorized-by-employee"
+      name: "DirectoryInformationRelease is authorized by Employee"
+      definition: "Policy says every release shall be authorized by a named employee; legacy releases predate the field."
+      roles:
+        - { id: "r-release-is-authorized-by-employee", player: "ot-directory-information-release", role_name: "is authorized by" }
+        - { id: "r-employee-authorizes-release", player: "ot-employee", role_name: "authorizes" }
+      readings: ["{0} is authorized by {1}", "{1} authorizes {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-release-is-authorized-by-employee"] }
+        - { type: "mandatory", role: "r-release-is-authorized-by-employee", modality: "deontic" }
+
+    # ---- facilities -------------------------------------------------
+    - id: "ft-building-has-building-code"
+      name: "Building has BuildingCode"
+      roles:
+        - { id: "r-building-has-building-code", player: "ot-building", role_name: "has" }
+        - { id: "r-building-code-identifies-building", player: "vt-building-code", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-building-has-building-code"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-building-code-identifies-building"] }
+        - { type: "mandatory", role: "r-building-has-building-code" }
+    - id: "ft-building-is-on-campus"
+      name: "Building is on Campus"
+      roles:
+        - { id: "r-building-is-on-campus", player: "ot-building", role_name: "is on" }
+        - { id: "r-campus-has-building", player: "ot-campus", role_name: "has" }
+      readings: ["{0} is on {1}", "{1} has {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-building-is-on-campus"] }
+        - { type: "mandatory", role: "r-building-is-on-campus" }
+    - id: "ft-room-has-room-id"
+      name: "Room has RoomId"
+      roles:
+        - { id: "r-room-has-room-id", player: "ot-room", role_name: "has" }
+        - { id: "r-room-id-identifies-room", player: "vt-room-id", role_name: "identifies" }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-room-has-room-id"], is_preferred: true }
+        - { type: "internal_uniqueness", roles: ["r-room-id-identifies-room"] }
+        - { type: "mandatory", role: "r-room-has-room-id" }
+    - id: "ft-room-is-in-building"
+      name: "Room is in Building"
+      roles:
+        - { id: "r-room-is-in-building", player: "ot-room", role_name: "is in" }
+        - { id: "r-building-contains-room", player: "ot-building", role_name: "contains" }
+      readings: ["{0} is in {1}", "{1} contains {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-room-is-in-building"] }
+        - { type: "mandatory", role: "r-room-is-in-building" }
+        # Building plus room number is how facilities names a room.
+        - { type: "external_uniqueness", roles: ["r-building-contains-room", "r-room-number-is-of-room"] }
+    - id: "ft-room-has-room-number"
+      name: "Room has RoomNumber"
+      roles:
+        - { id: "r-room-has-room-number", player: "ot-room", role_name: "has" }
+        - { id: "r-room-number-is-of-room", player: "vt-room-number", role_name: "is number of" }
+      readings: ["{0} has {1}", "{1} is room number of {0}"]
+      constraints:
+        - { type: "internal_uniqueness", roles: ["r-room-has-room-number"] }
+        - { type: "mandatory", role: "r-room-has-room-number" }
+
+  subtype_facts:
+    - id: "st-student-is-person"
+      subtype: "ot-student"
+      supertype: "ot-person"
+    - id: "st-graduate-student-is-student"
+      subtype: "ot-graduate-student"
+      supertype: "ot-student"
+    - id: "st-employee-is-person"
+      subtype: "ot-employee"
+      supertype: "ot-person"
+    - id: "st-faculty-is-employee"
+      subtype: "ot-faculty"
+      supertype: "ot-employee"
+
+  objectified_fact_types:
+    - id: "oft-enrollment"
+      fact_type: "ft-student-enrolls-in-course-section-for-term"
+      object_type: "ot-enrollment"
+
+  definitions:
+    - term: "Term"
+      definition: "The registrar's word for an academic period; the catalog and the faculty senate say semester, the SIS says term, and the code is the same six digits either way."
+      context: "registration"
+    - term: "Directory information"
+      definition: "The FERPA-defined set of student data the university may release without consent unless the student has restricted it: name, enrollment status, degrees, dates of attendance."
+      context: "records"
+    - term: "PIDM"
+      definition: "The internal person identifier; never shown to a student, never reused, and the only key that survives a campus transfer."
+      context: "identity"
