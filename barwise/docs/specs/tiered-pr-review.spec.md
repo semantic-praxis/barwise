@@ -1,10 +1,12 @@
 # Tiered PR review: Copilot on every PR, a blocking tier for the changes that carry liability
 
-Status: Draft -- no workstream implemented. WS1's precondition is now
-SETTLED (Copilot code review works here; see "What the live test
-measured"), Open decision 2 is RESOLVED against this spec's own
-recommendation, and Open decision 5 raises a cost question that may
-invert WS1's premise. No code, workflow, script or gate has been built.
+Status: WS2 IMPLEMENTED (the tier table, its shared parser, and
+`check:review-tiers`, wired into ci.yml). WS1's precondition is SETTLED
+(Copilot code review works here; see "What the live test measured") but
+WS1 is NOT built -- its cost question is open. Open decision 2 is
+RESOLVED against this spec's own recommendation; Open decision 5's model
+half is decided (the org Copilot policy now enables only GPT-5.6 Terra)
+and its cost half is open. WS3, WS4 and WS5 are unbuilt.
 
 Created: 2026-09-17
 Last-updated: 2026-09-18
@@ -342,13 +344,35 @@ ships value on its own and produces the review corpus WS5 measures.
 Acceptance: a pull request opened after this lands carries a Copilot
 review, observed, with the request visible in the workflow log.
 
-**WS2 -- The tier table and its completeness gate.** Add
-`barwise/review-tiers.json`, `scripts/lib/review-tiers.mjs`, and
-`npm run check:review-tiers`. No consumer yet. Acceptance: the gate is
-watched going red three ways -- a heading added to `checklist.md` with no
-row, a row naming a deleted heading, and `checklist.md` made unreadable
-(exit 2) -- each with the exit status read directly, per the
-`session-review` rule that a gate seen only passing is not verified.
+**WS2 -- The tier table and its completeness gate. (IMPLEMENTED
+2026-09-18.)** `barwise/review-tiers.json`, `scripts/lib/review-tiers.mjs`,
+`scripts/check-review-tiers.mjs`, `npm run check:review-tiers`, wired into
+`ci.yml` so `ci-local` derives it. Seven tests in
+`scripts/tests/gates.test.mjs`. The acceptance criterion was met: the gate
+was watched going red on the real files first -- exit 1 on a planted
+heading with no row, exit 1 on a renamed heading leaving a stale row,
+exit 2 on a checklist moved out of reach (moved rather than chmod, since
+the session runs as root and 000 does not stop it) -- each exit status
+read directly with nothing in between, then the checklist restored
+byte-identical and the gate green again. The tests pin the same four
+readings against fixtures, through `--checklist`/`--table` overrides that
+exist so the suite never perturbs the live checklist.
+
+**What WS2 found that this spec assumed away: three of thirteen headings
+are not path-shaped.** "When a type was introduced, or a field's type
+chosen", "When a module, function, or interface was introduced, or a
+signature widened" and "When a copy was added or a copy was edited"
+trigger on what a hunk DOES, not where it lives; a copy is a relation
+between two files, which no single-path glob expresses. Forcing them a
+glob would mean matching every `.ts` file, making almost every code
+change high-risk and blowing WS3's distribution budget on a rule nobody
+believes. They carry tier `not-path-derivable` instead: the row exists so
+the completeness gate still accounts for the heading, and the tier says
+in the artifact that the classifier cannot reach it and the deep review
+still owns it. This is the spec's "explicit over implicit" rather than a
+gap -- but it does mean the tier can never be the whole of the checklist,
+and WS4 must not read a routine classification as "the checklist is
+satisfied".
 
 **WS3 -- The classifier.** Add `scripts/pr-risk.mjs` over
 `review-tiers.mjs`, plus `test:scripts` coverage. Prints the tier and
@@ -460,7 +484,14 @@ which is what keeps that bound meaningful.
    -- 341 checklist lines plus generated instructions -- does not
    discriminate between them. (Figures as supplied by the repository
    owner from the model picker, 2026-09-18; not independently verified
-   against a vendor publication.) **Recommended: Terra.** Luna is
+   against a vendor publication.) **The model half is DECIDED as of
+   2026-09-18: the org Copilot policy enables only GPT-5.6 Terra.** That
+   also closes the model-provenance gap by construction -- if only Terra
+   can run, every Copilot review was Terra, and WS4 never needs to assert
+   it. The closure is an INFERENCE, not an observation: it holds only if
+   code review honours the org model policy, which is unverified, and the
+   review body does not name the model, so the artifact cannot settle it
+   either way. The cost half below stays open. **Recommended: Terra.** Luna is
    disqualified by the SPREAD rather than by either score: it trails
    Terra by 3.9 points on Terminal-Bench and by 30.1 on Nerova, and two
    benchmarks disagreeing by 26 points about the same model means one of
