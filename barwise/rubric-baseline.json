@@ -1,32 +1,8 @@
 {
   "$comment": "Rubric checks with no reachable failure path, from scripts/audit-rubric.mjs (npm run audit:rubric -- --check; CI runs it). A check that passes on an answer key with the thing it asks about removed banks a guaranteed point instead of measuring. Every entry carries a verdict: tracked:<issue> for an open finding, or accepted-benign with the reason. --check fails on a check missing here AND on an entry that now discriminates, so fixing one forces its row out and the file always enumerates exactly the open findings. Method: docs/prompt-optimization-log.md.",
   "checks": {
-    "order-management::must_validate::bf1f8ae6beaf": {
-      "case": "order-management",
-      "kind": "must_validate",
-      "message": "The model is structurally valid.",
-      "verdict": "accepted-benign: enforceConformance repairs ahead of validation, so this cannot fail on structure. Resolved by excluding it from the rubric fraction rather than by making it discriminate (docs/specs/must-validate-outside-the-rubric.spec.md); it still guards a population that contradicts its own constraints."
-    },
-    "university-enrollment::must_validate::bf1f8ae6beaf": {
-      "case": "university-enrollment",
-      "kind": "must_validate",
-      "message": "The model is structurally valid.",
-      "verdict": "accepted-benign: enforceConformance repairs ahead of validation, so this cannot fail on structure. Resolved by excluding it from the rubric fraction rather than by making it discriminate (docs/specs/must-validate-outside-the-rubric.spec.md); it still guards a population that contradicts its own constraints."
-    },
     "clinic-appointments::must_validate::bf1f8ae6beaf": {
       "case": "clinic-appointments",
-      "kind": "must_validate",
-      "message": "The model is structurally valid.",
-      "verdict": "accepted-benign: enforceConformance repairs ahead of validation, so this cannot fail on structure. Resolved by excluding it from the rubric fraction rather than by making it discriminate (docs/specs/must-validate-outside-the-rubric.spec.md); it still guards a population that contradicts its own constraints."
-    },
-    "employee-hierarchy::must_validate::bf1f8ae6beaf": {
-      "case": "employee-hierarchy",
-      "kind": "must_validate",
-      "message": "The model is structurally valid.",
-      "verdict": "accepted-benign: enforceConformance repairs ahead of validation, so this cannot fail on structure. Resolved by excluding it from the rubric fraction rather than by making it discriminate (docs/specs/must-validate-outside-the-rubric.spec.md); it still guards a population that contradicts its own constraints."
-    },
-    "project-staffing::must_validate::bf1f8ae6beaf": {
-      "case": "project-staffing",
       "kind": "must_validate",
       "message": "The model is structurally valid.",
       "verdict": "accepted-benign: enforceConformance repairs ahead of validation, so this cannot fail on structure. Resolved by excluding it from the rubric fraction rather than by making it discriminate (docs/specs/must-validate-outside-the-rubric.spec.md); it still guards a population that contradicts its own constraints."
@@ -37,14 +13,32 @@
       "message": "The model is structurally valid.",
       "verdict": "accepted-benign: enforceConformance repairs ahead of validation, so this cannot fail on structure. Resolved by excluding it from the rubric fraction rather than by making it discriminate (docs/specs/must-validate-outside-the-rubric.spec.md); it still guards a population that contradicts its own constraints."
     },
+    "employee-hierarchy::must_validate::bf1f8ae6beaf": {
+      "case": "employee-hierarchy",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "accepted-benign: enforceConformance repairs ahead of validation, so this cannot fail on structure. Resolved by excluding it from the rubric fraction rather than by making it discriminate (docs/specs/must-validate-outside-the-rubric.spec.md); it still guards a population that contradicts its own constraints."
+    },
     "freight-corrections::must_validate::bf1f8ae6beaf": {
       "case": "freight-corrections",
       "kind": "must_validate",
       "message": "The model is structurally valid.",
       "verdict": "accepted-benign: enforceConformance repairs ahead of validation, so this cannot fail on structure. Resolved by excluding it from the rubric fraction rather than by making it discriminate (docs/specs/must-validate-outside-the-rubric.spec.md); it still guards a population that contradicts its own constraints."
     },
-    "vendor-onboarding::must_validate::bf1f8ae6beaf": {
-      "case": "vendor-onboarding",
+    "incident-response::must_validate::bf1f8ae6beaf": {
+      "case": "incident-response",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "accepted-benign: enforceConformance repairs ahead of validation, so this cannot fail on structure. Resolved by excluding it from the rubric fraction rather than by making it discriminate (docs/specs/must-validate-outside-the-rubric.spec.md); it still guards a population that contradicts its own constraints."
+    },
+    "order-management::must_validate::bf1f8ae6beaf": {
+      "case": "order-management",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "accepted-benign: enforceConformance repairs ahead of validation, so this cannot fail on structure. Resolved by excluding it from the rubric fraction rather than by making it discriminate (docs/specs/must-validate-outside-the-rubric.spec.md); it still guards a population that contradicts its own constraints."
+    },
+    "project-staffing::must_validate::bf1f8ae6beaf": {
+      "case": "project-staffing",
       "kind": "must_validate",
       "message": "The model is structurally valid.",
       "verdict": "accepted-benign: enforceConformance repairs ahead of validation, so this cannot fail on structure. Resolved by excluding it from the rubric fraction rather than by making it discriminate (docs/specs/must-validate-outside-the-rubric.spec.md); it still guards a population that contradicts its own constraints."
@@ -55,8 +49,14 @@
       "message": "The model is structurally valid.",
       "verdict": "accepted-benign: enforceConformance repairs ahead of validation, so this cannot fail on structure. Resolved by excluding it from the rubric fraction rather than by making it discriminate (docs/specs/must-validate-outside-the-rubric.spec.md); it still guards a population that contradicts its own constraints."
     },
-    "incident-response::must_validate::bf1f8ae6beaf": {
-      "case": "incident-response",
+    "university-enrollment::must_validate::bf1f8ae6beaf": {
+      "case": "university-enrollment",
+      "kind": "must_validate",
+      "message": "The model is structurally valid.",
+      "verdict": "accepted-benign: enforceConformance repairs ahead of validation, so this cannot fail on structure. Resolved by excluding it from the rubric fraction rather than by making it discriminate (docs/specs/must-validate-outside-the-rubric.spec.md); it still guards a population that contradicts its own constraints."
+    },
+    "vendor-onboarding::must_validate::bf1f8ae6beaf": {
+      "case": "vendor-onboarding",
       "kind": "must_validate",
       "message": "The model is structurally valid.",
       "verdict": "accepted-benign: enforceConformance repairs ahead of validation, so this cannot fail on structure. Resolved by excluding it from the rubric fraction rather than by making it discriminate (docs/specs/must-validate-outside-the-rubric.spec.md); it still guards a population that contradicts its own constraints."

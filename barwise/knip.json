@@ -19,11 +19,7 @@
     "jscpd"
   ],
   "workspaces": {
-    ".": {
-      "entry": [
-        "scripts/at-root.mjs"
-      ]
-    },
+    ".": { "entry": ["scripts/at-root.mjs", "scripts/tests/*.test.mjs"] },
     "packages/core": {
       "ignore": [
         "scripts/**",

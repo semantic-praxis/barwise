@@ -488,6 +488,43 @@ Two deviations, both found by verification rather than review:
   not catch it; the mutation did, and the difference between `some` and
   `every` is one word in a guard that read as obviously correct.
 
+## Amendment 2026-09-17: the contract held; three readers of it did not
+
+Every gate ci.yml runs refuses correctly. What did not was the machinery
+that READS a refusal, in three places, and the cost was not cosmetic.
+
+- **`ci-local.mjs` was binary.** Status 0 or FAIL, so `check-shell` and
+  `check-secrets` refusing for want of shellcheck and gitleaks read as
+  "gates failed" -- indistinguishable from a real shellcheck finding or a
+  staged credential. It now reports REFUSED apart from FAIL and exits `2`
+  when refusal is the only non-zero outcome, so a caller can tell "this
+  tree has a problem" from "this container cannot check everything".
+  Neither path prints that all gates passed.
+- **Eight tests in `gates.test.mjs` asserted exit 0 or 1** from those two
+  gates, so the suite was red in any fresh container. They now skip when
+  EVERY run refuses, which is the `audit-gate` idiom already in the file;
+  a partial refusal still fails, because that is the defect rather than an
+  environment fact.
+- **`mutate.mjs` decided CAUGHT from the command's exit status alone.**
+  With the suite already red, every mutation reported CAUGHT whether or
+  not anything caught it. It now takes a baseline reading first and
+  refuses with `2` when the command already fails unmutated.
+
+**The third one invalidated evidence already merged.** PR #505 recorded
+five mutations as CAUGHT against `node --test scripts/tests/gates.test.mjs`
+in a container without shellcheck, where that command exited 1 before any
+mutation was applied. `mutate ... && echo verified` printed verified five
+times over nothing. Re-run here with the suite genuinely green, all five
+are CAUGHT for real, plus a sixth that was UNCAUGHT and is now pinned --
+so the conclusion held and the evidence for it did not. barwise-906's
+form, in the tool built to close it, read by the runner built to report
+it. Tracked as barwise-1012 and barwise-1019.
+
+A fourth reader was swept for and is clean: `audit-rubric` writes a
+baseline but its input is the promptlab suite loaded from `dist`, so it is
+outside the class rather than an unfixed instance of it. `audit-spec-status`
+was inside it and is fixed (barwise-1018).
+
 ## Non-goals
 
 - No new capability on any surface; the capability matrix is untouched.

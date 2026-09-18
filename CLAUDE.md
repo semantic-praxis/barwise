@@ -455,6 +455,25 @@ skill (`.claude/skills/release/`).
   sweep run by hand runs once, and the next edit reintroduces what it
   found. The `assertion-audit` skill carries the three mutation passes
   and the method rules.
+- **A baseline's verdicts are merged on write, never regenerated.**
+  Every `--write` path goes through
+  `scripts/lib/baseline-merge.mjs`: it preserves the human-owned
+  fields of any row the detector still produces, refreshes the derived
+  ones, and stamps the placeholder only on genuinely new ids. Before
+  that, all three writers rebuilt their row map from the detector
+  alone, so the documented way to add ONE row was the way to destroy
+  every judgment in the file -- measured, 90 of 90 verdicts replaced
+  and 74 notes blanked, from the spellings the scripts advertise. The
+  loss was silent: it surfaced only because a later `--check` happened
+  to fail on an untouched row. `audit-spec-status` was the worst of
+  the three, because its write was the `else` of `--check` and so bare
+  `npm run audit:specs` -- the spelling you try first to see what the
+  gate says -- rewrote the baseline; it now surveys, and `--write`
+  writes. Rows are written sorted by id, so a rerun is a no-op instead
+  of a 73-row reshuffle nobody can review
+  (`docs/specs/baseline-write-preserves-verdicts.spec.md`).
+  `audit-duplication` has no writer and needs none; its baseline is
+  hand-maintained, which is why it never had this defect.
 - **A gate that cannot see its input must not print PASS.** Pass, fail,
   and **could not answer** -- exit `2` for the third, which is what
   `mutate.mjs` and `audit-gate.mjs` already used and what every gate now

@@ -48,7 +48,8 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
+import { mergeBaselineRows, mergeSummary, readExistingRows } from "./lib/baseline-merge.mjs";
+import { refuseUntrackedInput, REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
 
 /**
  * `--at <commit>` runs the same audit against a historical tree. It is
@@ -318,18 +319,64 @@ if (AT !== undefined && !check) {
   process.exit(0);
 }
 
+// A bare invocation SURVEYS; only `--write` writes. It used to be the other
+// way round: the write path was the `else` of `--check`, so plain
+// `npm run audit:specs` -- the spelling a reader tries first to see what the
+// gate says -- silently rewrote the baseline, stamping "TODO: classify" over
+// every recorded note. That is a worse instance of barwise-1026's shape than
+// the one filed, because the operator never asked to write anything. Nothing
+// in the repository depended on the old default: every CI step and hook passes
+// `--check`.
+if (!check && !process.argv.includes("--write")) {
+  console.log(
+    `audit-spec-status: ${found.length} spec(s) claiming no implementation with commits since`,
+  );
+  for (const f of found) {
+    console.log(`  ${f.id}\n    Status: ${f.status}\n    since: ${f.commits.join(", ")}`);
+  }
+  console.log("\nNothing written. `--write` updates the baseline, `--check` ratchets it.");
+  process.exit(0);
+}
+
 if (!check) {
+  // An untracked spec is invisible to trackedFiles(), so writing the baseline
+  // here would freeze a corpus missing it: --check passes locally and fails
+  // once the spec is committed. audit-corrections shipped exactly that
+  // (barwise-1018, barwise-906's form). --check does not refuse -- its input is
+  // the tracked corpus by definition. Rule shared with audit-corrections in
+  // lib/tracked.mjs rather than copied, per duplication-drift-guards.
+  refuseUntrackedInput({
+    pathspec: "barwise/docs/specs",
+    suffix: ".spec.md",
+    gate: "audit-spec-status",
+  });
+
+  const fresh = Object.fromEntries(
+    found.map((f) => [f.id, { status: f.status, commits: f.commits }]),
+  );
+
+  // Merged, not regenerated: the `note` is why a stale-looking header is
+  // actually right, and rebuilding from the detector alone stamped the
+  // placeholder over all six of them (barwise-1026).
+  const { rows: specs, ...counts } = mergeBaselineRows({
+    fresh,
+    existing: readExistingRows(BASELINE, "specs"),
+    preserve: { note: "TODO: classify" },
+  });
+
   const baseline = {
     $comment: "Specs whose Status claims no implementation while commits have landed on "
       + "the source files they name. Each row needs a note saying why the header "
       + "is still right, or what it should say instead. Ratcheted by "
       + "`npm run audit:specs -- --check` (scripts/audit-spec-status.mjs).",
-    specs: Object.fromEntries(
-      found.map((f) => [f.id, { status: f.status, note: "TODO: classify", commits: f.commits }]),
-    ),
+    specs,
   };
   writeFileSync(BASELINE, `${JSON.stringify(baseline, null, 2)}\n`);
-  console.log(`audit-spec-status: wrote ${found.length} row(s) to spec-status-baseline.json`);
+  console.log(
+    `audit-spec-status: wrote ${found.length} row(s) to spec-status-baseline.json`
+      + ` -- ${mergeSummary(counts)}`,
+  );
+  for (const id of counts.dropped) console.log(`  dropped (no longer stale): ${id}`);
   process.exit(0);
 }
 

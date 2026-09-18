@@ -197,6 +197,32 @@ function stage(dir, name, contents) {
   execFileSync("git", ["add", "--", name], { cwd: dir });
 }
 
+/**
+ * A gate that REFUSED did not fail, and a test that reads the two the same
+ * way is the defect the refusal contract exists to prevent, one level up.
+ *
+ * `check-shell` needs shellcheck and `check-secrets` needs gitleaks. Neither
+ * is installed in a fresh remote container, both correctly exit 2 saying they
+ * cannot answer -- and eight tests here asserted exit 0 or 1, so `ci:local`
+ * went red on a missing tool with the same reading it gives for a real
+ * finding (barwise-1012). Worse, it made every `npm run mutate` against this
+ * file report CAUGHT unconditionally: the command already failed without any
+ * mutation, and CAUGHT is decided from the command's status alone.
+ *
+ * The skip is `every`, not `some`, and that is the whole distinction -- the
+ * same one `audit-gate`'s test above spells out. With the tool absent every
+ * run refuses together; a PARTIAL refusal is not an environment fact, it is
+ * the defect, and it must still fail here.
+ */
+function skippedForMissingTool(t, runs, tool) {
+  const rs = Array.isArray(runs) ? runs : [runs];
+  if (rs.length > 0 && rs.every((r) => r.status === 2)) {
+    t.skip(`${tool} is not installed (exit 2 from every run is refusal, not failure)`);
+    return true;
+  }
+  return false;
+}
+
 // --- barwise-905: coverage must not depend on where the gate is invoked ---
 
 const CWDS = [REPO, join(REPO, "barwise"), join(REPO, "barwise", "packages", "core", "src")];
@@ -205,8 +231,9 @@ const CWDS = [REPO, join(REPO, "barwise"), join(REPO, "barwise", "packages", "co
 // its history mode depends on clone depth, so the invariance test uses
 // `--staged` and cannot share this loop's argument-free call.
 for (const script of ["check-no-nul.mjs", "check-shell.mjs", "audit-corrections.mjs"]) {
-  test(`${script} reports the same coverage from every cwd`, () => {
+  test(`${script} reports the same coverage from every cwd`, (t) => {
     const runs = CWDS.map((cwd) => ({ cwd, ...gate(script, cwd) }));
+    if (skippedForMissingTool(t, runs, `${script}'s tool`)) return;
     for (const r of runs) {
       assert.equal(r.status, 0, `${script} failed in ${r.cwd}:\n${r.stdout}${r.stderr}`);
     }
@@ -328,11 +355,13 @@ test("check-no-nul does NOT see an untracked NUL file", () => {
   }
 });
 
-test("check-shell fails on a tracked script with a shellcheck finding", () => {
+test("check-shell fails on a tracked script with a shellcheck finding", (t) => {
   const dir = tempRepo();
   try {
     stage(dir, "ok.sh", "#!/usr/bin/env bash\nset -euo pipefail\necho hi\n");
-    assert.equal(gate("check-shell.mjs", dir).status, 0, "a clean script must pass");
+    const clean = gate("check-shell.mjs", dir);
+    if (skippedForMissingTool(t, clean, "shellcheck")) return;
+    assert.equal(clean.status, 0, "a clean script must pass");
 
     // SC2164, a `cd` whose failure leaves every later command running
     // somewhere unintended. Chosen because it is a DEFAULT check, so this
@@ -448,14 +477,12 @@ function commitAll(dir, message) {
  * measuring.
  */
 for (const [rule, { probe, content }] of Object.entries(GITLEAKS_PROBES)) {
-  test(`check-secrets fails on a staged ${rule}`, () => {
+  test(`check-secrets fails on a staged ${rule}`, (t) => {
     const dir = secretsRepo();
     try {
-      assert.equal(
-        gate("check-secrets.mjs", dir, "--staged").status,
-        0,
-        "a clean index must pass",
-      );
+      const clean = gate("check-secrets.mjs", dir, "--staged");
+      if (skippedForMissingTool(t, clean, "gitleaks")) return;
+      assert.equal(clean.status, 0, "a clean index must pass");
 
       stage(dir, "probe.txt", content(probe));
       const red = gate("check-secrets.mjs", dir, "--staged");
@@ -527,7 +554,7 @@ test("check-secrets refuses a gitleaks status that is neither clean nor a findin
   }
 });
 
-test("check-secrets refuses when .gitleaks.toml is missing", () => {
+test("check-secrets refuses when .gitleaks.toml is missing", (t) => {
   // Without this, gitleaks falls back to its bundled defaults: it would
   // still find most things and would silently drop the Anthropic rule,
   // which is the credential this repository is most likely to leak and the
@@ -535,6 +562,10 @@ test("check-secrets refuses when .gitleaks.toml is missing", () => {
   // than it claims is this spec's own subject.
   const dir = secretsRepo();
   try {
+    // With gitleaks absent the gate refuses for THAT reason instead, and
+    // this test cannot tell the two refusals apart -- so it is skipped
+    // rather than passing on the wrong one.
+    if (skippedForMissingTool(t, gate("check-secrets.mjs", dir, "--staged"), "gitleaks")) return;
     rmSync(join(dir, ".gitleaks.toml"));
     const r = gate("check-secrets.mjs", dir, "--staged");
     assert.equal(r.status, 2, `expected refusal, got ${r.status}:\n${r.stdout}${r.stderr}`);
@@ -545,7 +576,7 @@ test("check-secrets refuses when .gitleaks.toml is missing", () => {
   }
 });
 
-test("check-secrets refuses a history scan of a shallow clone, but --staged still works", () => {
+test("check-secrets refuses a history scan of a shallow clone, but --staged still works", (t) => {
   // Every fresh session clone of this project is shallow. A history scan
   // there would report a clean bill of health over whatever few commits
   // arrived, which is why the default mode refuses -- while `--staged`
@@ -568,6 +599,7 @@ test("check-secrets refuses a history scan of a shallow clone, but --staged stil
       "the fixture must actually be shallow, or this test asserts nothing",
     );
 
+    if (skippedForMissingTool(t, gate("check-secrets.mjs", clone, "--staged"), "gitleaks")) return;
     const deep = gate("check-secrets.mjs", clone);
     assert.equal(deep.status, 2, `expected refusal, got ${deep.status}:\n${deep.stderr}`);
     assert.match(deep.stderr, /SHALLOW/);
@@ -584,10 +616,11 @@ test("check-secrets refuses a history scan of a shallow clone, but --staged stil
   }
 });
 
-test("check-secrets gives the same reading from every cwd", () => {
+test("check-secrets gives the same reading from every cwd", (t) => {
   // barwise-905's property. `--staged` rather than the history mode so the
   // test does not depend on whether this clone happens to be shallow.
   const runs = CWDS.map((cwd) => ({ cwd, ...gate("check-secrets.mjs", cwd, "--staged") }));
+  if (skippedForMissingTool(t, runs, "gitleaks")) return;
   for (const r of runs) {
     assert.equal(r.status, 0, `check-secrets failed in ${r.cwd}:\n${r.stdout}${r.stderr}`);
   }
@@ -866,6 +899,11 @@ test("mutate refuses a no-op replacement", () => {
   }
 });
 
+// The three fixtures below pass on the ORIGINAL and act only on the mutated
+// text, which is what a real check command does -- and is required since
+// mutate takes a baseline reading before mutating (barwise-1019). A fixture
+// failing unconditionally trips that refusal instead of reaching the path
+// under test.
 test("mutate reports a failed restore on an UNTRACKED file, which git diff cannot", () => {
   // barwise-906's acceptance criteria name this case specifically. The
   // instrument that failed was `git diff --stat` on an untracked file:
@@ -878,7 +916,8 @@ test("mutate reports a failed restore on an UNTRACKED file, which git diff canno
   try {
     writeFileSync(
       join(dir, "check.mjs"),
-      `import { writeFileSync } from "node:fs";\n`
+      `import { readFileSync, writeFileSync } from "node:fs";\n`
+        + `if (!readFileSync("subject.txt", "utf8").includes("BAD")) process.exit(0);\n`
         + `writeFileSync("subject.txt", "SABOTAGED\\n");\n`
         + `process.exit(1);\n`,
     );
@@ -911,6 +950,40 @@ test("mutate reports a failed restore on an UNTRACKED file, which git diff canno
   }
 });
 
+test("mutate refuses a command that already fails WITHOUT the mutation", () => {
+  // CAUGHT is decided from the command's exit status alone, so a command
+  // that is already red reports CAUGHT for every mutation -- including ones
+  // nothing catches. Five readings in PR #505 were recorded that way: the
+  // suite exited 1 in any container without shellcheck or gitleaks, and
+  // `mutate ... && echo verified` printed verified each time (barwise-1019).
+  // The baseline run is what makes CAUGHT mean anything, so it is asserted
+  // here rather than trusted.
+  const dir = mutateRepo({ subject: "value = GOOD\n" });
+  try {
+    writeFileSync(join(dir, "check.mjs"), `process.exit(3);\n`);
+    const r = mutate(dir, [
+      "--file",
+      "subject.txt",
+      "--old",
+      "GOOD",
+      "--new",
+      "BAD",
+      "--",
+      process.execPath,
+      "check.mjs",
+    ]);
+
+    assert.equal(r.status, 2, `expected refusal (2), got ${r.status}:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /already fails \(exit 3\) WITHOUT the mutation/);
+    assert.doesNotMatch(r.stdout, /CAUGHT/);
+
+    // And nothing was written: the refusal lands before the mutation.
+    assert.equal(readFileSync(join(dir, "subject.txt"), "utf8"), "value = GOOD\n");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("mutate refuses a run whose command was KILLED rather than exiting", async () => {
   // The reading this protects is `mutate ... && echo verified`. The
   // status line used to be `run.status === null ? 1`, so a ctrl-c or a
@@ -928,7 +1001,12 @@ test("mutate refuses a run whose command was KILLED rather than exiting", async 
   const dir = mutateRepo({ subject: "value = GOOD\n" });
   const marker = `mutate-kill-probe-${process.pid}.mjs`;
   try {
-    writeFileSync(join(dir, marker), `setTimeout(() => {}, 60_000);\n`);
+    writeFileSync(
+      join(dir, marker),
+      `import { readFileSync } from "node:fs";\n`
+        + `if (!readFileSync("subject.txt", "utf8").includes("BAD")) process.exit(0);\n`
+        + `setTimeout(() => {}, 60_000);\n`,
+    );
 
     const child = spawn(process.execPath, [
       join(SCRIPTS, "mutate.mjs"),
@@ -995,7 +1073,8 @@ test("mutate refuses, rather than reporting UNCAUGHT, when the restore THROWS", 
   try {
     writeFileSync(
       join(dir, "check.mjs"),
-      `import { mkdirSync, rmSync } from "node:fs";\n`
+      `import { mkdirSync, readFileSync, rmSync } from "node:fs";\n`
+        + `if (!readFileSync("subject.txt", "utf8").includes("BAD")) process.exit(0);\n`
         + `rmSync("subject.txt");\n`
         + `mkdirSync("subject.txt");\n`
         + `process.exit(1);\n`,
@@ -1561,7 +1640,17 @@ function tempCiRepo() {
       'console.log("MARKER-FIRST-LINE");',
       "for (let i = 1; i <= 200; i++) console.log(`filler ${i}`);",
       "console.log(`COVERAGE_DIR=${process.env.BARWISE_COVERAGE_DIR}`);",
-      "process.exit(1);",
+      // `process.exitCode`, never `process.exit()`. console.log to a PIPE is
+      // asynchronous, and process.exit() does not flush what is still queued --
+      // so this fixture, whose whole job is to have its LAST line read back,
+      // silently drops it. Measured on this container: 300 spawns of each form
+      // with eight CPU-burning processes alongside, 197 of 300 truncated with
+      // process.exit() against 0 of 300 with process.exitCode, identical exit
+      // status either way. Idle, both forms are clean 300 of 300, which is why
+      // it passed here twice and failed on the third run; a single write before
+      // process.exit() survives 400 of 400 under the same load, so the hazard
+      // is the queue depth, not the pattern.
+      "process.exitCode = 1;",
       "",
     ].join("\n"),
   );
@@ -1591,6 +1680,36 @@ function runCiLocal(repo, ...args) {
   });
   return { ...r, all: `${r.stdout}${r.stderr}` };
 }
+
+test("ci-local reports a REFUSED gate apart from a failure, and exits 2", () => {
+  // The runner was binary -- status 0 or FAIL -- so the two gates that refuse
+  // for want of shellcheck and gitleaks in any fresh container read as "3 of
+  // 32 gates failed", indistinguishable from a real shellcheck finding or a
+  // staged credential. That is the conflation gate-refusal-contract.spec.md
+  // exists to remove, committed by the instrument that reports the gates
+  // (barwise-1012). Exit 2 rather than 1 so a caller can tell "this tree has a
+  // problem" from "this container cannot check everything"; neither prints
+  // that all gates passed.
+  const repo = tempCiRepo();
+  try {
+    // Replace the failing gate with a refusing one, so refusal is the ONLY
+    // non-zero outcome -- otherwise exit 1 would be correct and this test
+    // could not tell the two apart.
+    writeFileSync(
+      join(repo.root, "scripts", "boom.mjs"),
+      'console.error("cannot answer: the tool is absent");\nprocess.exit(2);\n',
+    );
+
+    const r = runCiLocal(repo);
+    assert.equal(r.status, 2, `expected refusal (2), got ${r.status}:\n${r.all}`);
+    assert.match(r.all, /REFUSED/);
+    assert.match(r.all, /COULD NOT ANSWER/);
+    assert.doesNotMatch(r.all, /gates failed/);
+    assert.doesNotMatch(r.all, /All \d+ gates passed/);
+  } finally {
+    rmSync(repo.dir, { recursive: true, force: true });
+  }
+});
 
 /**
  * The log of ONE named gate, selected by name rather than by being the
@@ -2164,6 +2283,34 @@ test("audit-corrections refuses to WRITE a baseline while a spec is untracked", 
   }
 });
 
+test("audit-spec-status refuses to WRITE a baseline while a spec is untracked", () => {
+  // The SECOND caller of the shared guard, pinned separately -- because
+  // mutating lib/tracked.mjs is caught by the audit-corrections test above
+  // whether or not this gate calls it at all. Removing the call here was
+  // UNCAUGHT until this test existed, which is barwise-1018's own shape:
+  // a fix nothing would notice losing.
+  const dir = correctionRepo({ "tracked.spec.md": A_CORRECTION }, {});
+  try {
+    stage(
+      dir,
+      "barwise/spec-status-baseline.json",
+      JSON.stringify({ $comment: "test", specs: {} }, null, 2) + "\n",
+    );
+    execFileSync("git", ["commit", "-qm", "base"], { cwd: dir });
+    writeFileSync(join(dir, "barwise/docs/specs/draft.spec.md"), A_CORRECTION);
+
+    const write = gate("audit-spec-status.mjs", dir, "--write");
+    assert.equal(
+      write.status,
+      2,
+      `expected refusal (2), got ${write.status}:\n${write.stdout}${write.stderr}`,
+    );
+    assert.match(write.stderr, /draft\.spec\.md/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("audit-corrections detects a marker the formatter wrapped across a line break", () => {
   // The detector matched the RAW paragraph, so `turned\nout` did not match
   // /\bturned out\b/ and the record was invisible. Twelve of the seventeen
@@ -2189,6 +2336,490 @@ test("audit-corrections detects a marker the formatter wrapped across a line bre
       `a wrapped marker must still be detected:\n${red.stdout}${red.stderr}`,
     );
     assert.match(`${red.stdout}${red.stderr}`, /NEW correction record/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/*
+ * ---------------------------------------------------------------------------
+ * Baseline writers merge the verdicts they find.
+ *
+ * All three writers built their row map from the detector alone, stamping a
+ * placeholder into every row -- so the documented way to add ONE row was the
+ * way to destroy every judgment in the file. Measured before the fix: 90 of 90
+ * verdicts replaced and 74 notes blanked, from the spellings the scripts
+ * advertise (barwise-1026, docs/specs/baseline-write-preserves-verdicts.spec.md).
+ *
+ * The loss was silent: the only reason it was ever noticed is that a later
+ * `--check` happened to fail on an untouched row. So these tests assert the
+ * write path directly rather than trusting `--check` to catch a clobber.
+ * ---------------------------------------------------------------------------
+ */
+
+/** The three writers, their baseline file, and the fields a human owns in it. */
+const BASELINE_WRITERS = [
+  {
+    script: "audit-corrections.mjs",
+    args: ["--write"],
+    file: "barwise/correction-baseline.json",
+    key: "records",
+    human: ["caught_by", "note"],
+    placeholder: "TODO: classify",
+  },
+  {
+    script: "audit-rubric.mjs",
+    args: ["--write-baseline"],
+    file: "barwise/rubric-baseline.json",
+    key: "checks",
+    human: ["verdict"],
+    placeholder: "TODO",
+    // Reads packages/promptlab/dist, which `npm test` builds before it gets
+    // here. Skipped rather than failed when absent: a test that cannot see its
+    // input must not report either verdict.
+    needsDist: "packages/promptlab/dist/index.js",
+  },
+  {
+    script: "audit-spec-status.mjs",
+    args: ["--write"],
+    file: "barwise/spec-status-baseline.json",
+    key: "specs",
+    human: ["note"],
+    placeholder: "TODO: classify",
+  },
+];
+
+for (const w of BASELINE_WRITERS) {
+  test(`${w.script} rewrites without changing a committed verdict`, (t) => {
+    if (w.needsDist !== undefined && !existsSync(join(REPO, "barwise", w.needsDist))) {
+      t.skip(`${w.needsDist} not built; run npm run build first`);
+      return;
+    }
+
+    const path = join(REPO, w.file);
+    const before = readFileSync(path, "utf8");
+    try {
+      const r = gate(w.script, REPO, ...w.args);
+      assert.equal(r.status, 0, `writer failed:\n${r.stdout}${r.stderr}`);
+      const after = readFileSync(path, "utf8");
+
+      // The property, stated over the human-owned fields rather than over the
+      // bytes. An earlier version of this test asserted the file came back
+      // byte-identical to the committed one, which is NOT a property of
+      // audit-spec-status: its `commits` field is derived from `git log`, so it
+      // legitimately changes the moment any commit touches a spec's named
+      // sources. That test passed locally and failed in CI on this PR's own
+      // first commit, because locally it ran before the commit existed -- green
+      // for a reason unrelated to what it verified (barwise-906's shape).
+      const oldRows = JSON.parse(before)[w.key];
+      const newRows = JSON.parse(after)[w.key];
+      for (const [id, row] of Object.entries(oldRows)) {
+        assert.ok(id in newRows, `${w.file}: row ${id} was dropped by a rewrite`);
+        for (const field of w.human) {
+          assert.deepEqual(
+            newRows[id][field],
+            row[field],
+            `${w.file}: ${id}.${field} changed when rewritten over itself. Before the`
+              + ` fix this was every verdict in the file replaced by a placeholder.`,
+          );
+        }
+      }
+
+      // And the writer is a function of its inputs: whatever the first write
+      // absorbed from a moved history, a second must be a no-op. This is the
+      // byte-level half, stated where it is actually true.
+      const again = gate(w.script, REPO, ...w.args);
+      assert.equal(again.status, 0, `second write failed:\n${again.stdout}${again.stderr}`);
+      assert.equal(
+        readFileSync(path, "utf8"),
+        after,
+        `${w.file}: writing twice gave two different files, so the output depends`
+          + ` on something other than the findings (row order, most likely).`,
+      );
+    } finally {
+      // Restored unconditionally: a failing assertion must not leave the
+      // repository's own baseline rewritten.
+      writeFileSync(path, before);
+    }
+  });
+
+  test(`${w.file} has no unclassified row, so the round trip is not vacuous`, () => {
+    // The round-trip test above is strong because every row in the committed
+    // tree carries a real verdict: a placeholder row would survive a clobber
+    // unchanged and the assertion would pass over exactly the data it exists
+    // to protect. This is the guard on that precondition.
+    const rows = JSON.parse(readFileSync(join(REPO, w.file), "utf8"))[w.key];
+    const unclassified = Object.entries(rows).filter(([, row]) =>
+      w.human.every((f) => row[f] === w.placeholder || row[f] === "")
+    );
+    assert.deepEqual(
+      unclassified.map(([id]) => id),
+      [],
+      `${w.file} carries unclassified rows, which weakens the round-trip test above`,
+    );
+  });
+}
+
+test("audit-corrections --write keeps a classified verdict and its note", () => {
+  const dir = correctionRepo({ "probe.spec.md": A_CORRECTION }, {});
+  try {
+    const id = idOf(dir, "the draft said the loader was pure");
+    stage(
+      dir,
+      "barwise/correction-baseline.json",
+      JSON.stringify(
+        {
+          $comment: "test",
+          records: {
+            [id]: {
+              spec: "probe.spec.md",
+              excerpt: "stale excerpt, refreshed by the writer",
+              caught_by: "execution",
+              note: "Implementing it is what showed the loader reads the environment.",
+            },
+          },
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+
+    const w = gate("audit-corrections.mjs", dir, "--write");
+    assert.equal(w.status, 0, `--write failed:\n${w.stdout}${w.stderr}`);
+
+    const rows = JSON.parse(
+      readFileSync(join(dir, "barwise/correction-baseline.json"), "utf8"),
+    ).records;
+    assert.equal(rows[id].caught_by, "execution", "the verdict must survive a rewrite");
+    assert.match(rows[id].note, /reads the environment/, "the note must survive too");
+    // The derived half still refreshes: the detector owns the excerpt, so a
+    // stale one is replaced rather than preserved alongside the verdict.
+    assert.match(rows[id].excerpt, /the draft said the loader was pure/);
+    assert.match(w.stdout, /1 verdict\(s\) kept/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("audit-corrections --write stamps the placeholder on a new record only", () => {
+  const second = "# Probe two\n\nThe second estimate turned out to be mistaken once the\n"
+    + "packages were counted, so the figure is restated with the real set here.\n";
+  const dir = correctionRepo({ "probe.spec.md": A_CORRECTION }, {});
+  try {
+    const id = idOf(dir, "the draft said the loader was pure");
+    stage(
+      dir,
+      "barwise/correction-baseline.json",
+      JSON.stringify(
+        {
+          $comment: "test",
+          records: {
+            [id]: { spec: "probe.spec.md", excerpt: "x", caught_by: "reasoning", note: "kept" },
+          },
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+    stage(dir, "barwise/docs/specs/two.spec.md", second);
+
+    const w = gate("audit-corrections.mjs", dir, "--write");
+    assert.equal(w.status, 0, `--write failed:\n${w.stdout}${w.stderr}`);
+
+    const rows = JSON.parse(
+      readFileSync(join(dir, "barwise/correction-baseline.json"), "utf8"),
+    ).records;
+    assert.equal(rows[id].caught_by, "reasoning");
+    assert.equal(rows[id].note, "kept");
+    const fresh = Object.entries(rows).find(([rid]) => rid !== id);
+    assert.ok(fresh, "the new record must be written");
+    assert.equal(fresh[1].caught_by, "TODO: classify", "a NEW row gets the placeholder");
+    assert.match(w.stdout, /1 verdict\(s\) kept, 1 new/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/*
+ * The "empty note survives" case is NOT here: corrections' own placeholder for
+ * `note` is `""`, so at this level the merge rule and a naive `||` fallthrough
+ * are indistinguishable -- a mutation swapping them passed all 118 tests. It is
+ * asserted against the helper instead, in baseline-merge.test.mjs, which is the
+ * level where the distinction is observable.
+ */
+
+test("audit-corrections --write reports a row it dropped rather than dropping it silently", () => {
+  const dir = correctionRepo({ "probe.spec.md": A_CORRECTION }, {});
+  try {
+    const id = idOf(dir, "the draft said the loader was pure");
+    stage(
+      dir,
+      "barwise/correction-baseline.json",
+      JSON.stringify(
+        {
+          $comment: "test",
+          records: {
+            [id]: { spec: "probe.spec.md", excerpt: "x", caught_by: "execution", note: "n" },
+            "gone::deadbeef0000": {
+              spec: "gone.spec.md",
+              excerpt: "text that is no longer anywhere",
+              caught_by: "reasoning",
+              note: "n",
+            },
+          },
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+
+    const w = gate("audit-corrections.mjs", dir, "--write");
+    assert.equal(w.status, 0, `--write failed:\n${w.stdout}${w.stderr}`);
+    assert.match(w.stdout, /1 no longer detected/);
+    assert.match(w.stdout, /gone::deadbeef0000/);
+    const rows = JSON.parse(
+      readFileSync(join(dir, "barwise/correction-baseline.json"), "utf8"),
+    ).records;
+    assert.ok(!("gone::deadbeef0000" in rows), "an undetected row is not written back");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("audit-spec-status writes nothing without --write", () => {
+  // The write path used to be the `else` of `--check`, so bare
+  // `npm run audit:specs` -- the spelling a reader tries first to see what the
+  // gate says -- rewrote the baseline and blanked every note. The operator
+  // never asked to write anything.
+  const path = join(REPO, "barwise/spec-status-baseline.json");
+  const before = readFileSync(path, "utf8");
+  try {
+    const r = gate("audit-spec-status.mjs", REPO);
+    assert.equal(r.status, 0, `survey failed:\n${r.stdout}${r.stderr}`);
+    assert.equal(readFileSync(path, "utf8"), before, "a bare invocation must not write");
+    assert.match(r.stdout, /Nothing written/);
+  } finally {
+    writeFileSync(path, before);
+  }
+});
+
+test("audit-duplication.mjs still has no baseline writer", () => {
+  // CLAUDE.md and baseline-write-preserves-verdicts.spec.md both say this gate
+  // never had the clobber defect BECAUSE it has no writer -- its 48 candidates
+  // are hand-maintained. That is a claim about code, so it is checked here
+  // rather than asserted in prose: adding a writer to this script would make
+  // both documents quietly false, and would reintroduce exactly the hazard the
+  // other three just had removed.
+  const src = readFileSync(join(SCRIPTS, "audit-duplication.mjs"), "utf8");
+  assert.ok(
+    !src.includes("writeFileSync"),
+    "audit-duplication.mjs gained a writer. If that is deliberate, route it "
+      + "through scripts/lib/baseline-merge.mjs and update both documents.",
+  );
+});
+
+/*
+ * ---------------------------------------------------------------------------
+ * run-script-tests: a run that did not finish must not read as one that did.
+ *
+ * `node --test` reports the tests that REGISTERED, and `test()` registers as
+ * the module executes -- so a module-scope failure partway down a file drops
+ * every test below it and still prints a complete-looking summary. Measured on
+ * this repository's own suite: plain `node --test` said
+ * `tests 117 / pass 116 / fail 1` with one test silently not existing, where
+ * the manifest says 118 (barwise-1027,
+ * docs/specs/test-run-completeness.spec.md).
+ * ---------------------------------------------------------------------------
+ */
+
+/** A throwaway repo holding gate-test files and (optionally) a count manifest. */
+function testRunRepo(files, counts) {
+  const dir = tempRepo();
+  for (const [name, body] of Object.entries(files)) {
+    stage(dir, `barwise/scripts/tests/${name}`, body);
+  }
+  if (counts !== undefined) {
+    stage(
+      dir,
+      "barwise/scripts/tests/expected-counts.json",
+      JSON.stringify({ $comment: "test", counts }, null, 2) + "\n",
+    );
+  }
+  return dir;
+}
+
+const TWO_PASSING = 'import { test } from "node:test";\n'
+  + 'test("one", () => {});\ntest("two", () => {});\n';
+
+// Three registered, a module-scope throw, then two that never register. The
+// measured shape: the runner reports 4 (three plus the file's own failure).
+const TRUNCATES = 'import { test } from "node:test";\n'
+  + 'test("t1", () => {});\ntest("t2", () => {});\ntest("t3", () => {});\n'
+  + 'await import("node:nonexistent-module-xyz");\n'
+  + 'test("t4", () => {});\ntest("t5", () => {});\n';
+
+const ONE_FAILING = 'import { test } from "node:test";\n'
+  + 'import assert from "node:assert/strict";\n'
+  + 'test("passes", () => {});\ntest("fails", () => { assert.equal(1, 2); });\n';
+
+test("run-script-tests passes when every count matches", () => {
+  const dir = testRunRepo({ "a.test.mjs": TWO_PASSING }, { "a.test.mjs": 2 });
+  try {
+    const r = gate("run-script-tests.mjs", dir);
+    assert.equal(r.status, 0, `expected a pass:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stdout, /every count matching the manifest/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests REFUSES when registration stopped early", () => {
+  // The whole point. node --test exits 1 here with a plausible summary; the
+  // difference is that this says the run was incomplete and by how much.
+  const dir = testRunRepo({ "a.test.mjs": TRUNCATES }, { "a.test.mjs": 6 });
+  try {
+    const r = gate("run-script-tests.mjs", dir);
+    assert.equal(r.status, 2, `expected a refusal (2):\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /a\.test\.mjs/);
+    assert.match(r.stderr, /manifest says 6/);
+    assert.match(r.stderr, /describe a different suite/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests FAILS, not refuses, when the counts match and a test fails", () => {
+  // The distinction the third exit code exists for: this run answered the
+  // question and the answer was no. Reporting 2 here would be as wrong as
+  // reporting 1 for the truncation above.
+  const dir = testRunRepo({ "a.test.mjs": ONE_FAILING }, { "a.test.mjs": 2 });
+  try {
+    const r = gate("run-script-tests.mjs", dir);
+    assert.equal(r.status, 1, `expected a failure (1):\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /1 failing of 2, all counts verified/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests refuses when the manifest is absent", () => {
+  const dir = testRunRepo({ "a.test.mjs": TWO_PASSING }, undefined);
+  try {
+    const r = gate("run-script-tests.mjs", dir);
+    assert.equal(r.status, 2, `expected a refusal:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /no manifest/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests refuses a file the manifest does not name", () => {
+  // Otherwise a new file's tests run unchecked, which is the blind spot this
+  // gate exists to close rather than relocate.
+  const dir = testRunRepo(
+    { "a.test.mjs": TWO_PASSING, "b.test.mjs": TWO_PASSING },
+    { "a.test.mjs": 2 },
+  );
+  try {
+    const r = gate("run-script-tests.mjs", dir);
+    assert.equal(r.status, 2, `expected a refusal:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /b\.test\.mjs: not in the manifest/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests refuses a manifest row whose file is gone", () => {
+  // The stale-entry half, matching audit:duplication and audit:corrections: a
+  // deleted suite must not leave a row that quietly describes nothing.
+  const dir = testRunRepo(
+    { "a.test.mjs": TWO_PASSING },
+    { "a.test.mjs": 2, "deleted.test.mjs": 9 },
+  );
+  try {
+    const r = gate("run-script-tests.mjs", dir);
+    assert.equal(r.status, 2, `expected a refusal:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /deleted\.test\.mjs: in the manifest but no longer on disk/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests --write refuses to record a truncated run", () => {
+  // The barwise-1026 shape, one file over: a writer that records whatever ran
+  // would bake the short count in and the manifest would then certify the very
+  // truncation it exists to detect.
+  const dir = testRunRepo({ "a.test.mjs": TRUNCATES }, undefined);
+  try {
+    const r = gate("run-script-tests.mjs", dir, "--write");
+    assert.equal(r.status, 2, `expected a refusal:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /refusing to record counts/);
+    assert.ok(
+      !existsSync(join(dir, "barwise/scripts/tests/expected-counts.json")),
+      "no manifest may be written from a run that did not come back clean",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests refuses an empty suite rather than reporting a pass", () => {
+  // Zero files means zero failures means green, over a suite nobody ran --
+  // the same empty-corpus reading audit-corrections refuses.
+  const dir = testRunRepo({}, {});
+  try {
+    const r = gate("run-script-tests.mjs", dir);
+    assert.equal(r.status, 2, `expected a refusal:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /no \*\.test\.mjs found/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests counts correctly despite a reporter forced through NODE_OPTIONS", () => {
+  // The defect CI caught, generalised. This script reads TAP's `# tests N`,
+  // and the child's reporter is not something the environment gets to choose:
+  // CI printed the spec reporter's `i tests N` instead, because CI runs the
+  // Node `.nvmrc` pins (26) and the default reporter differs from the Node this
+  // was developed on (22). Every healthy suite then read as "printed no
+  // summary".
+  //
+  // So the wrapper forces `--test-reporter=tap` and strips any inherited one.
+  // Stripping rather than overriding matters: the flag ACCUMULATES between
+  // NODE_OPTIONS and argv, and node refuses the whole run with "must match the
+  // number of specified --test-reporter-destination".
+  const dir = testRunRepo({ "a.test.mjs": TWO_PASSING }, { "a.test.mjs": 2 });
+  try {
+    const r = spawnSync(process.execPath, [join(SCRIPTS, "run-script-tests.mjs")], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, NODE_OPTIONS: "--test-reporter=junit" },
+    });
+    assert.equal(
+      r.status,
+      0,
+      `a hostile NODE_OPTIONS reporter must not change the count:\n${r.stdout}${r.stderr}`,
+    );
+    assert.match(r.stdout, /every count matching the manifest/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests refuses an absent tests directory rather than failing", () => {
+  // Found reviewing this PR's own diff. `readdirSync` on a missing path raises
+  // ENOENT, which left the script exiting 1 with a stack trace -- and exit 1 is
+  // this gate's word for "tests failed", a wrong answer rather than an
+  // admission that it could not look. The distinction is the whole point of
+  // docs/specs/gate-refusal-contract.spec.md, which this script's own header
+  // cites.
+  const dir = tempRepo();
+  try {
+    mkdirSync(join(dir, "barwise"), { recursive: true });
+    const r = gate("run-script-tests.mjs", dir);
+    assert.equal(r.status, 2, `expected a refusal (2):\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /no directory at/);
+    assert.doesNotMatch(r.stderr, /ENOENT/, "a stack trace is not a refusal");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

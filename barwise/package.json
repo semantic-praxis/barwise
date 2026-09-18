@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "build": "turbo run build",
-    "test": "turbo run test && node --test scripts/tests/*.test.mjs",
+    "test": "turbo run test && node scripts/run-script-tests.mjs",
     "test:coverage": "turbo run test:coverage",
     "test:watch": "turbo run test:watch",
     "lint": "turbo run lint",
@@ -23,7 +23,7 @@
     "check:python-uv": "node scripts/check-python-uv.mjs",
     "check:root-scripts": "node scripts/regen-root-package.mjs --check",
     "check:book-citations": "node scripts/check-book-citations.mjs",
-    "test:scripts": "node --test scripts/tests/*.test.mjs",
+    "test:scripts": "node scripts/run-script-tests.mjs",
     "test:optimizer": "uv run --frozen --extra dev pytest -q",
     "audit:duplication": "node scripts/audit-duplication.mjs",
     "mutate": "node scripts/mutate.mjs",
