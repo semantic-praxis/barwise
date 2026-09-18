@@ -157,6 +157,15 @@ jobs:
       # here instead of drifting silently (barwise-868).
       - run: npm run check:parity
 
+      # review-tiers.json is a declared copy of the trigger headings in
+      # .claude/skills/pr-review/checklist.md. This fails BOTH ways: a new
+      # heading with no row is a trigger the classifier would silently
+      # never fire on, and a row naming a deleted heading is a tier
+      # decision applying to nothing. Exit 2 when either input cannot be
+      # read, because "every row is stale" is what an unreadable checklist
+      # would otherwise look like.
+      - run: npm run check:review-tiers
+
       # A NUL byte makes git classify a source file as binary: no diff, no
       # blame, no review, and a patch taken from it loses changes silently.
       # Four files had reached main writing NUL as a composite-key

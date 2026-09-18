@@ -2824,3 +2824,145 @@ test("run-script-tests refuses an absent tests directory rather than failing", (
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// check-review-tiers: the bidirectional agreement between
+// .claude/skills/pr-review/checklist.md and barwise/review-tiers.json.
+//
+// Written red-first with the real files perturbed by hand, then pinned
+// here against fixtures so the suite never touches the live checklist.
+// The `--checklist`/`--table` overrides exist for exactly this: the
+// acceptance criterion is watching each EXIT CODE on a planted defect,
+// and a test that can only assert the green path would be the thing
+// barwise-906 is about.
+
+/** A minimal pair of inputs the gate accepts, written into a temp dir. */
+function tierFixture(dir, headings, rows) {
+  const md = ["# Checklist", "", ...headings.flatMap((h) => [`## ${h}`, "", "- item", ""])];
+  writeFileSync(join(dir, "checklist.md"), md.join("\n"));
+  writeFileSync(
+    join(dir, "review-tiers.json"),
+    JSON.stringify({
+      rows: rows.map((r) =>
+        r.tier === "not-path-derivable"
+          ? { heading: r.heading, tier: r.tier, why: "fixture" }
+          : { heading: r.heading, tier: r.tier ?? "routine", globs: ["x/"], why: "fixture" }
+      ),
+    }),
+  );
+  return [
+    "--checklist",
+    join(dir, "checklist.md"),
+    "--table",
+    join(dir, "review-tiers.json"),
+  ];
+}
+
+test("check-review-tiers passes when every heading has exactly one row", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A", "B"], [{ heading: "A" }, { heading: "B" }]);
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 0, `agreement must pass: ${run.stdout}${run.stderr}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers fails on a heading with no row", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A", "B"], [{ heading: "A" }]);
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, "a new trigger the classifier would never fire on must fail");
+    assert.match(`${run.stdout}${run.stderr}`, /no row for checklist heading: B/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers fails on a row naming a heading that no longer exists", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }, { heading: "renamed away" }]);
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, "a tier decision applying to nothing must fail");
+    assert.match(`${run.stdout}${run.stderr}`, /no longer has: renamed away/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers fails on two rows for one heading", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }, { heading: "A" }]);
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, "the classifier would pick whichever duplicate it saw first");
+    assert.match(`${run.stdout}${run.stderr}`, /more than one row: A/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers REFUSES an unreadable checklist rather than calling every row stale", () => {
+  // The reading that would look like an answer. Treating an absent
+  // checklist as zero headings makes every row "stale" and prints a
+  // confident, detailed, wholly wrong failure about a file never opened.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }]);
+    rmSync(join(dir, "checklist.md"));
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2, "could not answer is not the same as failed");
+    assert.match(`${run.stdout}${run.stderr}`, /cannot answer/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers REFUSES a checklist with no headings at all", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }]);
+    writeFileSync(join(dir, "checklist.md"), "# Checklist\n\nno trigger sections\n");
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(
+      run.status,
+      2,
+      "a parse that finds nothing is not a checklist that declares nothing",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers REFUSES a row whose tier is unknown or whose globs are missing", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    tierFixture(dir, ["A"], [{ heading: "A" }]);
+    const args = [
+      "--checklist",
+      join(dir, "checklist.md"),
+      "--table",
+      join(dir, "review-tiers.json"),
+    ];
+
+    writeFileSync(
+      join(dir, "review-tiers.json"),
+      JSON.stringify({ rows: [{ heading: "A", tier: "sort-of-risky", globs: ["x/"], why: "f" }] }),
+    );
+    assert.equal(gate("check-review-tiers.mjs", dir, ...args).status, 2, "unknown tier");
+
+    writeFileSync(
+      join(dir, "review-tiers.json"),
+      JSON.stringify({ rows: [{ heading: "A", tier: "high-risk", why: "f" }] }),
+    );
+    assert.equal(
+      gate("check-review-tiers.mjs", dir, ...args).status,
+      2,
+      "a path tier with no globs is a row that can never match, not a routine one",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
