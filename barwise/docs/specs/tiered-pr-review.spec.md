@@ -1,9 +1,13 @@
 # Tiered PR review: Copilot on every PR, a blocking tier for the changes that carry liability
 
-Status: Draft -- no workstream implemented
+Status: Draft -- no workstream implemented. WS1's precondition is now
+SETTLED (Copilot code review works here; see "What the live test
+measured"), Open decision 2 is RESOLVED against this spec's own
+recommendation, and Open decision 5 raises a cost question that may
+invert WS1's premise. No code, workflow, script or gate has been built.
 
 Created: 2026-09-17
-Last-updated: 2026-09-17
+Last-updated: 2026-09-18
 Tracking: barwise-1036 (WS1, the Copilot review workflow); barwise-1037 (WS2,
 the tier table and its completeness gate); barwise-1038 (WS3, the
 classifier); barwise-1041 (WS4, the blocking gate); barwise-1040 (WS5,
@@ -64,13 +68,14 @@ caught.
 
 So the gate has three results, the same three every other gate here has:
 
-| Situation                                                | Exit | Merge   |
-| -------------------------------------------------------- | ---: | ------- |
-| Routine tier                                             |    0 | allowed |
-| High-risk tier, Copilot reviewed, no blocking finding    |    0 | allowed |
-| High-risk tier, blocking finding open                    |    1 | blocked |
-| Recorded barwise verdict is "cannot tell"                |    1 | blocked |
-| No Copilot review recorded, or the API could not be read |    2 | blocked |
+| Situation                                                    | Exit | Merge   |
+| ------------------------------------------------------------ | ---: | ------- |
+| Routine tier                                                 |    0 | allowed |
+| High-risk tier, Copilot reviewed, no blocking finding        |    0 | allowed |
+| High-risk tier, blocking finding open                        |    1 | blocked |
+| Recorded barwise verdict is "cannot tell"                    |    1 | blocked |
+| No Copilot review recorded, or the API could not be read     |    2 | blocked |
+| Copilot responded that it could not review (quota exhausted) |    2 | blocked |
 
 Exit 2 is not a failure of the pull request. It is the gate saying it
 could not see its input, which is the signal that routes to a person --
@@ -101,6 +106,81 @@ generator reads it to emit path-scoped instructions. Two parsers over one
 table would be the copy the rule forbids, so the table is parsed once in
 `scripts/lib/review-tiers.mjs` -- the shape `lib/ci-gates.mjs` already
 uses for `ci.yml`.
+
+## What the live test measured (2026-09-18)
+
+The precondition WS1 was blocked on is **settled positive**, and the same
+run answered Open decision 2, falsified this spec's recommendation on it,
+and surfaced a cost the design had not priced.
+
+Copilot code review was requested on PRs #516 and #509 across two windows,
+before and after the org's Copilot entitlement was enabled. Five responses
+from `copilot-pull-request-reviewer[bot]`:
+
+| Time (UTC) | PR   | Response                           |
+| ---------- | ---- | ---------------------------------- |
+| 01:33:08   | #516 | "unable to review ... quota limit" |
+| 01:33:54   | #509 | "unable to review ... quota limit" |
+| 01:34:00   | #516 | "unable to review ... quota limit" |
+| 01:36:08   | #516 | "unable to review ... quota limit" |
+| 01:39:34   | #516 | a real review                      |
+
+**The false green this spec was written around occurred in the wild, four
+times, within hours of it merging.** Those first four are `state:
+COMMENTED` reviews authored by the reviewer bot. A gate asking "did
+Copilot post a review on this head?" passes on every one of them. The
+review says, in its own body, that it did not review. That is not a
+hypothetical the refusal contract was guarding against -- it is the
+observed default behaviour of this reviewer under a condition
+(exhausted quota) that recurs monthly by construction.
+
+**Open decision 2 is resolved, against this spec's own recommendation.**
+The spec recommended treating `CHANGES_REQUESTED` as the blocking signal
+and leaving comments advisory. That cannot work: **all five responses
+carry `state: COMMENTED`**, including the real review, whose body opens
+with an approval recommendation. Copilot does not vary its review state.
+The signal is in the body, not the state, and a gate reading `state`
+would have been reading a constant. The recommendation was made without a
+corpus, and one run of the corpus disproved it.
+
+What the body does carry, in the real review, is structure:
+
+- A verdict line -- an approval recommendation, prefixed with a coloured
+  status marker.
+- A details block with `Files reviewed: 1/2 changed files`,
+  `Comments generated: 0 new`, `Review effort level: Balanced`, and a
+  `Files not reviewed` list naming each skipped file with a reason
+  (`barwise/package-lock.json: Generated file`).
+
+Copilot self-reports its own coverage. That is a stronger signal than
+this spec designed for: the gate can detect a review that covered almost
+nothing, not merely one that did not happen.
+
+**It does not run your gates.** The real review recommended approval on
+#516, whose CI has been red since 2026-09-12. A Copilot approval is
+evidence a reviewer looked, never evidence the change is sound, which is
+why the review job reads tier, CI and review state together.
+
+**The cost the design had not priced. (UNVERIFIED -- confirm before
+acting on it.)** Secondary sources report that Copilot code review
+carries a premium-request multiplier of 13 from 2026-06-01, and that on
+private repositories it additionally consumes Actions minutes from the
+same pool as CI. **This spec has not verified either figure**:
+`docs.github.com` is unreachable from the session that wrote this
+section (blocked by the network egress proxy), so the numbers come from
+search-result summaries rather than from GitHub's billing documentation,
+and no command in this repository reproduces them. Whether this
+repository is private in GitHub's sense is also unestablished -- the
+`"private": true` in `barwise/package.json` is the npm publish flag
+and says nothing about repository visibility.
+
+If the multiplier of 13 holds, then at this repository's measured rate
+of 216 merged pull requests a month (`git log --merges --since="30 days
+ago" --format="%s" | grep -c '^Merge pull request'`), "Copilot reviews
+every pull request" is on the order of 2,800 premium requests a month
+before a single Chat or agent call. That conditional is the whole of the
+cost argument, and it rests on a number nobody here has checked against
+its source. Verify it first; it may invert WS1's central choice.
 
 ## Scope
 
@@ -343,15 +423,16 @@ which is what keeps that bound meaningful.
    The cost is a gate that needs network and a token, so it refuses with
    exit 2 offline -- which is the contract working, not a defect.
 
-2. **What counts as a blocking finding from Copilot.** Claude Code Review
-   marks severity; Copilot's review comments are not known to carry a
-   comparable marker. Options: (a) treat every unresolved Copilot comment
-   as blocking, which will block on nits; (b) treat only `CHANGES_REQUESTED`
-   review state as blocking and leave comments advisory; (c) require the
-   author to resolve each thread, making resolution the signal.
-   **Recommended: (b) for WS4, revisited once WS1's corpus shows what
-   Copilot actually emits here.** Deciding this before the corpus exists
-   is guessing.
+2. **What counts as a blocking finding from Copilot. (RESOLVED
+   2026-09-18, against this spec's own recommendation.)** The
+   recommendation was (b): treat `CHANGES_REQUESTED` as blocking, leave
+   comments advisory. Measurement disproved it -- Copilot returns
+   `state: COMMENTED` invariantly, including on the review whose body
+   recommends approval and on the four that say it could not review. A
+   gate reading `state` reads a constant. The signal is the body's
+   verdict line, and the `Files reviewed: N/M` and `Files not reviewed`
+   fields beside it. WS4 parses the body; it must not branch on review
+   state. See "What the live test measured".
 
 3. **Where a barwise deep-review verdict is recorded so a gate can read
    it.** The "cannot tell" row needs a machine-readable home. Options:
@@ -370,3 +451,38 @@ which is what keeps that bound meaningful.
    reaches for it. It is a third-party capability and this spec has not
    verified it. WS5 grounds it first and falls back to a single generated
    `copilot-instructions.md` if path scoping is unavailable.
+
+5. **Which model tier reviews, and whether the tier gates requesting as
+   well as blocking.** Published figures for the GPT-5.6 family: Sol
+   $5/$30 per 1M tokens, Terminal-Bench 2.1 88.8%, Nerova 79.2%; Terra
+   $2.50/$15, 87.1%, 71.4%; Luna $1/$6, 83.2%, 41.3%. Context is 1.05M on
+   all three, so the instruction-absorption risk this spec worried about
+   -- 341 checklist lines plus generated instructions -- does not
+   discriminate between them. (Figures as supplied by the repository
+   owner from the model picker, 2026-09-18; not independently verified
+   against a vendor publication.) **Recommended: Terra.** Luna is
+   disqualified by the SPREAD rather than by either score: it trails
+   Terra by 3.9 points on Terminal-Bench and by 30.1 on Nerova, and two
+   benchmarks disagreeing by 26 points about the same model means one of
+   them is insensitive to something Luna lacks. Which one is relevant to
+   reviewing a diff against a written checklist is not established here
+   -- what this spec has is the shape, not a reading of Nerova -- and a
+   reviewer that gates merges is the wrong place to bet on the
+   optimistic benchmark. Terra is within 1.7 points of Sol on
+   Terminal-Bench at half the token price.
+
+   Two things this recommendation does NOT settle. First, Copilot bills
+   by premium request with a per-model multiplier, not by token, so the
+   prices above may not drive Copilot cost at all -- confirm whether the
+   13x code-review multiplier varies by tier before treating Terra as
+   the cheap option. Second, at 13x and roughly 216 merged pull requests
+   a month, reviewing every pull request is on the order of 2,800
+   premium requests monthly; if that is not affordable, the tier must
+   gate **requesting** and not only blocking, which inverts WS1's
+   "every pull request" premise. That is the decision, and it is a
+   budget question this spec cannot answer.
+
+   WS5 settles the capability half empirically: run the planted
+   checklist violations at Terra and at Luna and compare. The benchmarks
+   say Luna is risky; only WS5 says whether that matters for these
+   invariants.
