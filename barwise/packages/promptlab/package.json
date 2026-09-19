@@ -28,7 +28,7 @@
     "@barwise/core": "1.7.0",
     "@barwise/learn": "1.7.0",
     "@barwise/llm": "1.7.0",
-    "yaml": "^2.8.2"
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
