@@ -84,11 +84,40 @@ jobs:
           gh release upload "${{ github.event.release.tag_name }}" \
             release-assets/* --clobber --repo "${{ github.repository }}"
 
-      # Refresh the edge assets in place. The `edge` tag is created once
-      # and never moved on later pushes: a moving tag makes every
-      # contributor's `git pull` fail with "would clobber existing tag".
-      # The downloadable bundles stay current; the release body records
-      # the real build commit even though the tag itself does not move.
+      # Move `edge` to the commit just built, then refresh the release.
+      #
+      # The tag USED to be frozen (cf748238, "stop moving the edge tag
+      # (it breaks git pull)"). Frozen, it sat on a 2026-06-14 commit
+      # while the assets were rebuilt on every merge, so the releases
+      # page filed edge fourth -- below three versioned releases, under a
+      # published date six weeks older than its own bundles -- and the
+      # owner read that as the build having stopped. That is the failure
+      # this reverses; docs/specs/edge-release-currency.spec.md carries
+      # the measurements.
+      #
+      # The original reason does not hold on git 2.43.0, measured: a
+      # PLAIN `git pull` exits 0 and updates main, because auto-tag-
+      # following adds tags that are absent locally and skips one that
+      # exists rather than clobbering it. Only an explicit `git fetch
+      # --tags` is rejected, and one per-clone config line fixes that for
+      # good:
+      #
+      #   git config --add remote.origin.fetch '+refs/tags/*:refs/tags/*'
+      #
+      # Do NOT reach for `fetch.pruneTags` instead: it was measured to
+      # make even a plain pull fail, which is worse than the problem.
+      #
+      # The push comes BEFORE the release calls so a release created on a
+      # first run targets a tag already pointing where it should. The
+      # force is scoped to the literal ref `edge` by this command; it
+      # cannot reach a version tag without this line being edited.
+      - name: Move the edge tag to this commit
+        if: github.event_name == 'push'
+        run: |
+          git tag -f edge "$GITHUB_SHA"
+          git push --force origin refs/tags/edge
+
+      # Refresh the edge assets in place.
       # --draft=false: a release left in draft (e.g. by a manual edit in
       # the UI) is invisible and undownloadable, so every refresh
       # republishes it.
@@ -98,12 +127,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           notes="Automatically built from commit ${{ github.sha }}. Unstable preview of the latest main -- not a tagged release. For a stable build, use the latest versioned release."
-          # The tag deliberately never moves, so GitHub keeps showing the
-          # release's original published_at and target_commitish -- a date
-          # weeks older than the assets, sitting above bundles rebuilt
-          # minutes ago. The body records the real build commit, but the
-          # title is what the releases list shows, so put the currency
-          # there and stop the page claiming a stale build.
+          # The title carries the build date as well as the tag, because
+          # the tag alone reads as a name rather than a timestamp.
           title="Edge build ${GITHUB_SHA::7} ($(date -u +%Y-%m-%d))"
           if gh release view edge --repo "${{ github.repository }}" >/dev/null 2>&1; then
             gh release edit edge --draft=false --prerelease --notes "$notes" \

@@ -69,6 +69,29 @@ bundle (`barwise-cli-<ver>.cjs`), the MCP server bundle
 refreshes a rolling `edge` pre-release on every push to `main`, so a
 current download always exists between tagged releases.
 
+**The `edge` tag moves on every build, so run this once per clone:**
+
+```
+git config --add remote.origin.fetch '+refs/tags/*:refs/tags/*'
+```
+
+Without it, a plain `git pull` is fine -- measured: it exits 0 and
+updates `main`, because auto-tag-following adds tags that are absent
+locally and skips one that already exists. But an explicit `git fetch
+--tags` is rejected with "would clobber existing tag" and exits 1. The
+config line makes tag updates forced, which is what a moving tag needs.
+
+Do NOT reach for `fetch.pruneTags` instead. It was measured to make even
+a plain `git pull` fail, which is worse than the problem it is being
+asked to solve.
+
+The tag was frozen between 2026-06-14 and 2026-09-22 for the opposite
+reason, and the cost of freezing it was a releases page that filed
+`edge` below three versioned releases under a date six weeks older than
+its own assets -- read, correctly, as the build having stopped.
+`barwise/docs/specs/edge-release-currency.spec.md` carries the
+measurements both ways.
+
 ## Minor releases: run the Phase A architecture review
 
 A minor release is the cadence point for the deep assessment in
