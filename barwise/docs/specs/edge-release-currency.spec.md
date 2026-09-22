@@ -1,9 +1,10 @@
 # The edge release must look as current as it is
 
-Status: Not implemented. The decision is taken (move the tag on every
-build); the workstream below is unbuilt. Acceptance criterion 2 cannot
-be predicted from here and has to be observed on the live releases page
-after the first merge.
+Status: WS1 IMPLEMENTED (`release.yml` moves the tag; the release skill
+and `README.md` carry the contributor config). **Acceptance criterion 2
+is PENDING and cannot be predicted from here** -- whether the releases
+page actually reorders has to be observed live after the first merge,
+and this change is reverted if it does not. Criteria 1 and 3 are met.
 Created: 2026-09-22
 Last-updated: 2026-09-22
 Tracking: barwise-1047. Revises the edge-build half of

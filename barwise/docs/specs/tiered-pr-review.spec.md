@@ -507,8 +507,9 @@ and WS4 must not read a routine classification as "the checklist is
 satisfied".
 
 **WS3 -- The classifier. (IMPLEMENTED 2026-09-22.)**
-`scripts/pr-risk.mjs` over `review-tiers.mjs`, `npm run pr:risk`, ten
-tests in `scripts/tests/gates.test.mjs`. It prints the tier and every
+`scripts/pr-risk.mjs` over `review-tiers.mjs`, `npm run pr:risk`, and
+fifteen tests in `scripts/tests/gates.test.mjs` (`expected-counts.json`
+138 -> 153). It prints the tier and every
 triggering heading with the files that triggered it, so the verdict can
 be checked against the diff rather than trusted. Exit 0 classified, exit
 2 could not; **there is deliberately no exit 1**, because a high-risk

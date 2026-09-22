@@ -185,6 +185,16 @@ export function patternFault(pattern) {
     if (seg.length === 0) {
       return `pattern ${JSON.stringify(pattern)} has an empty path segment`;
     }
+    if (seg === "." || seg === "..") {
+      // Accepted, these are rows that can never fire: git prints no path
+      // with a `.` or `..` segment, so `./barwise/packages/core/src/`
+      // passes the completeness gate and matches nothing forever. That is
+      // the same silently-dead rule `*.ts` would be, by a different route
+      // -- and `pr-risk` already refuses these shapes on its INPUT side,
+      // so accepting them on the pattern side was the one-way hole.
+      return `pattern ${JSON.stringify(pattern)} has a ${JSON.stringify(seg)} segment; `
+        + "git prints no such path, so this row could never match";
+    }
     if (seg.includes("*") && seg !== "*") {
       return (
         `pattern ${JSON.stringify(pattern)} uses ${JSON.stringify(seg)}: a '*' is one whole `

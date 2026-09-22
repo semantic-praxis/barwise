@@ -111,13 +111,21 @@ jobs:
       # first run targets a tag already pointing where it should. The
       # force is scoped to the literal ref `edge` by this command; it
       # cannot reach a version tag without this line being edited.
-      - name: Move the edge tag to this commit
-        if: github.event_name == 'push'
-        run: |
-          git tag -f edge "$GITHUB_SHA"
-          git push --force origin refs/tags/edge
-
-      # Refresh the edge assets in place.
+      # ASSETS FIRST, THEN THE TAG. Neither ordering is atomic, so the
+      # question is which half-done state a failed run leaves behind:
+      #
+      #   tag moved, upload failed  -> `edge` names a commit whose
+      #                                artifacts are the PREVIOUS build,
+      #                                and the download URLs are
+      #                                tag-relative, so a consumer gets
+      #                                artifacts that do not match the tag
+      #                                they asked for.
+      #   uploaded, tag move failed -> the state this repository sat in
+      #                                for three months: current bundles
+      #                                under a lagging tag. Cosmetic, and
+      #                                the next successful run fixes it.
+      #
+      # The second is strictly the safer failure, so the tag moves last.
       # --draft=false: a release left in draft (e.g. by a manual edit in
       # the UI) is invisible and undownloadable, so every refresh
       # republishes it.
@@ -131,12 +139,18 @@ jobs:
           # the tag alone reads as a name rather than a timestamp.
           title="Edge build ${GITHUB_SHA::7} ($(date -u +%Y-%m-%d))"
           if gh release view edge --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload edge release-assets/* --clobber \
+              --repo "${{ github.repository }}"
+            git tag -f edge "$GITHUB_SHA"
+            git push --force origin refs/tags/edge
             gh release edit edge --draft=false --prerelease --notes "$notes" \
               --title "$title" --repo "${{ github.repository }}"
           else
+            # First run only: `gh release create --target` mints the tag
+            # itself, so there is no separate push and no window at all.
             gh release create edge --prerelease --target "${{ github.sha }}" \
               --title "$title" --notes "$notes" \
               --repo "${{ github.repository }}"
+            gh release upload edge release-assets/* --clobber \
+              --repo "${{ github.repository }}"
           fi
-          gh release upload edge release-assets/* --clobber \
-            --repo "${{ github.repository }}"

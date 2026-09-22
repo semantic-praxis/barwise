@@ -46,10 +46,31 @@ import { classify, TABLE, tierRows } from "./lib/review-tiers.mjs";
 // Imported at the top, it refused before ever reading the list it was
 // given. So the git path imports it, and only the git path pays for it.
 
-/** `--flag value`, or the default. No dependency, and no partial matching. */
+/**
+ * `--flag value`, or the default. No dependency, and no partial matching.
+ *
+ * A flag PRESENT WITH NO VALUE is refused, not silently defaulted. The
+ * first version returned the fallback for both, so `--base` with a typo
+ * after it classified against `origin/main` and printed a confident tier
+ * for a base the caller never named -- the exact "answered a different
+ * question" shape this script's exit-2 contract exists to prevent.
+ *
+ * A value starting with `--` is treated as a missing value, because every
+ * option here takes a path or a git ref and neither begins that way; the
+ * realistic case is `--base --json`, where the ref was simply forgotten.
+ */
 function opt(flag, fallback) {
   const i = process.argv.indexOf(flag);
-  return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
+  if (i === -1) return fallback;
+  const value = process.argv[i + 1];
+  if (value === undefined || value.startsWith("--")) {
+    refuse(
+      `${flag} was given with no value`,
+      `Found ${value === undefined ? "nothing" : JSON.stringify(value)} after it.`
+        + `\n  Defaulting here would classify an input you did not name.`,
+    );
+  }
+  return value;
 }
 
 /** Could not answer. Never prints a tier -- that is the whole contract. */

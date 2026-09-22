@@ -48,12 +48,22 @@ code --install-extension barwise-vscode-edge.vsix
 node barwise-cli-edge.cjs --help
 ```
 
-**Check that the build is the one you want.** The `edge` git tag
-deliberately never moves -- a moving tag makes every contributor's `git
-pull` fail with "would clobber existing tag" -- so GitHub keeps showing
-the release's original publish date above assets rebuilt minutes ago.
-The release _title_ carries the real build commit and date
-(`Edge build <sha> (<date>)`); read that, not the date beside the tag.
+**Check that the build is the one you want.** The `edge` tag moves to
+each build's commit, and the release title carries the same thing in
+readable form (`Edge build <sha> (<date>)`).
+
+**If you have a clone of this repository, run this once:**
+
+```bash
+git config --add remote.origin.fetch '+refs/tags/*:refs/tags/*'
+```
+
+A plain `git pull` is unaffected without it -- it exits 0 and updates
+your branch, because git adds tags you are missing and skips ones you
+already have rather than overwriting them. But an explicit `git fetch
+--tags` will fail with "would clobber existing tag" until you add that
+line, which makes tag updates forced. Do not use `fetch.pruneTags`
+instead: it makes even a plain `git pull` fail.
 
 ## Installation (from source)
 

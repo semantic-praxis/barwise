@@ -3139,10 +3139,6 @@ test("pr-risk REFUSES when the inputs cannot be read, and prints no tier", () =>
     assert.equal(absent.status, 2, "an unreadable file list");
     assert.doesNotMatch(absent.stdout, /routine|high-risk/);
 
-    const badBase = gate("pr-risk.mjs", dir, "--base", "origin/no-such-ref-here");
-    assert.equal(badBase.status, 2, "a base ref git cannot resolve, as in a shallow clone");
-    assert.doesNotMatch(badBase.stdout, /routine|high-risk/);
-
     writeFileSync(join(dir, "table.json"), "{ not json");
     const badTable = gate(
       "pr-risk.mjs",
@@ -3156,6 +3152,75 @@ test("pr-risk REFUSES when the inputs cannot be read, and prints no tier", () =>
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("pr-risk REFUSES a base ref git cannot resolve, from inside a repository", () => {
+  // Run from REPO deliberately. This case lived in the temp-dir test
+  // above and passed there for the WRONG reason: outside a repository
+  // `pr-risk` refuses while lazily importing tracked.mjs, so it never
+  // reached the `git diff` it claims to exercise, and a regression in
+  // that catch block would have stayed green. Caught by review, not by
+  // the six mutations -- none of which touched the git-diff path.
+  const run = gate("pr-risk.mjs", REPO, "--base", "origin/no-such-ref-here");
+  assert.equal(run.status, 2, "a base ref git cannot resolve, as in a shallow clone");
+  assert.doesNotMatch(run.stdout, /routine|high-risk/, "a refusal prints no tier");
+  assert.match(run.stderr, /git diff --name-only origin\/no-such-ref-here/);
+  assert.doesNotMatch(
+    run.stderr,
+    /rev-parse --show-toplevel/,
+    "this must be the git-diff refusal, not the repo-root one standing in for it",
+  );
+});
+
+test("pr-risk REFUSES a flag given with no value, rather than defaulting", () => {
+  // `--base` with nothing after it used to fall back to origin/main and
+  // print a confident tier for a base the caller never named.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    for (const argv of [["--base"], ["--files"], ["--base", "--json"]]) {
+      const run = gate("pr-risk.mjs", REPO, ...argv);
+      assert.equal(run.status, 2, `${argv.join(" ")} must refuse`);
+      assert.doesNotMatch(run.stdout, /routine|high-risk/, `${argv.join(" ")} printed a tier`);
+      assert.match(run.stderr, /given with no value/);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers REFUSES a table whose pattern the language does not define", () => {
+  // The validation added in WS3 is wired into `tierRows`, but every test
+  // for it called `patternFault` directly -- so deleting the two lines
+  // that call it would have left the suite green while the gate accepted
+  // a row that can never fire. This exercises it through the gate.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    tierFixture(dir, ["A"], [{ heading: "A" }]);
+    const args = [
+      "--checklist",
+      join(dir, "checklist.md"),
+      "--table",
+      join(dir, "review-tiers.json"),
+    ];
+    for (const glob of ["*.ts", "./barwise/scripts/", "a/../b/"]) {
+      writeFileSync(
+        join(dir, "review-tiers.json"),
+        JSON.stringify({ rows: [{ heading: "A", tier: "routine", globs: [glob], why: "f" }] }),
+      );
+      const run = gate("check-review-tiers.mjs", dir, ...args);
+      assert.equal(run.status, 2, `${glob} is valid JSON and an invalid pattern`);
+      assert.match(`${run.stdout}${run.stderr}`, /cannot answer/);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("patternFault refuses a dot segment, which git never prints", () => {
+  assert.match(patternFault("./barwise/scripts/"), /"\." segment/);
+  assert.match(patternFault("../etc/"), /"\.\." segment/);
+  assert.match(patternFault("barwise/./scripts/"), /"\." segment/);
+  assert.match(patternFault("barwise/../etc/"), /"\.\." segment/);
 });
 
 test("pr-risk REFUSES a path list that is not repo-root-relative", () => {
