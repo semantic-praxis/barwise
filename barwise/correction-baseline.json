@@ -193,6 +193,12 @@
       "caught_by": "not-a-correction",
       "note": "The spec's Status line, which says two things the draft had wrong are recorded below and points at them. It records no correction of its own -- both are detected separately, as this spec's other two rows -- so giving it a verdict would count one finding twice. The detector over-matched on the pointer, which is what an over-inclusive detector is built to do."
     },
+    "edge-release-currency::e8bf22909434": {
+      "spec": "edge-release-currency.spec.md",
+      "excerpt": "stated carefully, because the earlier reading was wrong in this spec's first draft: createdat desc alone does not explain the whole historical ordering (before ",
+      "caught_by": "execution",
+      "note": "Re-reading the live API after the merge. The first draft asserted GitHub's releases-list sort key was 'measurably neither created_at nor published_at', on the pre-merge reading alone. Running it again after the tag moved showed created_at DID follow the tag (2026-06-14T21:45:35Z -> 2026-09-22T18:40:50Z) while published_at stayed frozen, and the position changed with it -- so the causal chain does run through created_at and the original phrasing overstated the negative. The correction narrows the claim to the chain rather than the full sort rule, because the historical ordering still is not explained by created_at desc alone. Caught by executing the same query twice, not by rethinking it."
+    },
     "eval-metric-readiness::7a846f091cfc": {
       "spec": "eval-metric-readiness.spec.md",
       "excerpt": "nothing in the harness would have caught it, because every case is a training case. a search that runs hundreds of candidates against the same seven, with no he",

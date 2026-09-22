@@ -1,10 +1,9 @@
 # The edge release must look as current as it is
 
-Status: WS1 IMPLEMENTED (`release.yml` moves the tag; the release skill
-and `README.md` carry the contributor config). **Acceptance criterion 2
-is PENDING and cannot be predicted from here** -- whether the releases
-page actually reorders has to be observed live after the first merge,
-and this change is reverted if it does not. Criteria 1 and 3 are met.
+Status: IMPLEMENTED and VERIFIED. All three acceptance criteria met on
+the live repository after PR #531 merged at `3a1aed8f` (2026-09-22). The
+experiment this shipped as has resolved in favour of keeping it; nothing
+is reverted. See "What the first real run measured".
 Created: 2026-09-22
 Last-updated: 2026-09-22
 Tracking: barwise-1047. Revises the edge-build half of
@@ -90,6 +89,63 @@ session may have been on another version, or have reached it through a
 And `fetch.pruneTags` being _worse_ is the reason this table exists
 rather than a recommendation: it was the mitigation this spec was going
 to propose until it was run.
+
+## What the first real run measured (2026-09-22)
+
+Release run 381, on the `#531` merge commit `3a1aed8f`. Every criterion
+checked against the live repository with the value read directly, not
+inferred from the workflow succeeding.
+
+**1. The tag moves.** `git ls-remote origin refs/tags/edge` returned
+`3a1aed8f` within ten seconds of the run starting, against `04265738`
+before. Met.
+
+**2. The releases page reorders. MET, and this was the one that could
+not be predicted.** Edge now lists **first**, above `v1.7.0`, from
+fourth before.
+
+The mechanism, now that there is evidence for it: `published_at` did
+**not** move -- it is still `2026-08-07T11:46:23Z`, frozen where it has
+always been -- while `created_at` went from `2026-06-14T21:45:35Z` to
+`2026-09-22T18:40:50Z`, which is the new tag's commit. So the listing
+follows the tag, through `created_at`, and the publish date is
+irrelevant to it. That also explains why the title-carries-the-date
+mitigation could never work: it addressed the text, and position is what
+a reader scans.
+
+Stated carefully, because the earlier reading was wrong in this spec's
+first draft: `created_at desc` alone does not explain the whole
+historical ordering (before the move, edge's `created_at` of 21:45:35
+was LATER than `v1.6.0`'s 21:10:58, yet the page listed `v1.6.0` above
+it). What is established is the causal chain -- move the tag, and
+`created_at` follows it, and the position changes -- not the complete
+sort rule. Do not build anything on a sharper claim than that.
+
+**3. A plain `git pull` is unaffected.** Run on a real clone still
+holding the old tag, exit status read directly:
+
+```
+local edge before   04265738        remote edge   3a1aed8f
+git fetch origin main     EXIT=0    local edge after: 04265738
+git fetch --tags origin   EXIT=1    ! [rejected] edge -> edge (would clobber existing tag)
+```
+
+Exactly the scratch-repo measurements, reproduced in production: the
+plain fetch succeeds and leaves the stale tag alone, and only the
+explicit `--tags` form is rejected -- which is what `README.md` and the
+release skill now tell contributors, so that guidance is verified rather
+than argued.
+
+**The reordered step worked.** Asset `created_at` is 18:41:47-48, the
+tag moved next, and the release's `updated_at` is 18:41:51 -- upload,
+then tag, then metadata, in that order. The failure-safety argued for in
+review is therefore the real behaviour, though no failure occurred to
+exercise the safe half-done state.
+
+**One thing did not update and does not matter:** `target_commitish`
+still reads `04265738`. GitHub does not refresh it for an existing
+release, and nothing consumes it -- the tag ref, the assets and the
+listing are all correct.
 
 ## Scope
 
