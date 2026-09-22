@@ -2966,3 +2966,289 @@ test("check-review-tiers REFUSES a row whose tier is unknown or whose globs are 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// --- WS3: the pattern language, the matcher, and pr-risk.mjs ---------------
+//
+// The language is small on purpose, so these pin it shape by shape rather
+// than sampling. The dot-segment cases are the ones that matter most:
+// `path.matchesGlob` declines to match them, which would have silently
+// emptied the "Every PR" row of everything under `.claude/` and
+// `.github/` -- a classifier reading fewer files than it claims while
+// printing a confident tier.
+
+const { classify, matchesPattern, patternFault } = await import(
+  pathToFileURL(join(SCRIPTS, "lib", "review-tiers.mjs")).href
+);
+
+test("matchesPattern implements the four shapes and nothing else", () => {
+  // `**` is every path, dot-segments included.
+  assert.equal(matchesPattern("CLAUDE.md", "**"), true);
+  assert.equal(matchesPattern(".github/workflows/ci.yml", "**"), true);
+  assert.equal(matchesPattern(".beads/issues.jsonl", "**"), true);
+
+  // A directory prefix covers what is under it, at any depth.
+  assert.equal(matchesPattern("barwise/packages/cli/src/index.ts", "barwise/packages/cli/"), true);
+  assert.equal(matchesPattern("barwise/packages/cli/a/b/c.ts", "barwise/packages/cli/"), true);
+  // ...and nothing that merely shares its prefix as a string.
+  assert.equal(matchesPattern("barwise/packages/climate.ts", "barwise/packages/cli/"), false);
+  // ...nor the directory itself: git lists files, so this would be an
+  // answer about something that was not changed.
+  assert.equal(matchesPattern("barwise/packages/cli", "barwise/packages/cli/"), false);
+
+  // A `*` is exactly one segment.
+  assert.equal(
+    matchesPattern("barwise/packages/core/tests/a.ts", "barwise/packages/*/tests/"),
+    true,
+  );
+  assert.equal(
+    matchesPattern("barwise/packages/core/tests/x/a.ts", "barwise/packages/*/tests/"),
+    true,
+  );
+  assert.equal(
+    matchesPattern("barwise/packages/core/src/a.ts", "barwise/packages/*/tests/"),
+    false,
+  );
+
+  // An exact path is exact.
+  assert.equal(matchesPattern("barwise/package.json", "barwise/package.json"), true);
+  assert.equal(matchesPattern("barwise/package-lock.json", "barwise/package.json"), false);
+  assert.equal(matchesPattern("barwise/CLAUDE.md", "CLAUDE.md"), false);
+});
+
+test("matchesPattern matches dot-segments, where node's glob would not", () => {
+  // The divergence that decided against `path.matchesGlob`, pinned so a
+  // later "simplify this to matchesGlob" fails instead of silently
+  // dropping every rule-bearing path in the repository.
+  assert.equal(matchesPattern(".claude/skills/pr-review/checklist.md", ".claude/skills/"), true);
+  assert.equal(matchesPattern(".github/workflows/ci.yml", ".github/workflows/"), true);
+  assert.equal(
+    matchesPattern("barwise/packages/vscode/.vscodeignore", "barwise/packages/vscode/"),
+    true,
+  );
+});
+
+test("patternFault refuses a shape that would match nothing and look like a rule", () => {
+  assert.equal(patternFault("**"), null);
+  assert.equal(patternFault("a/b/"), null);
+  assert.equal(patternFault("a/*/c/"), null);
+  assert.equal(patternFault("a/b.json"), null);
+
+  // `*.ts` is the trap: valid-looking, parses, matches nothing.
+  assert.match(patternFault("*.ts"), /one whole path segment/);
+  assert.match(patternFault("src/**/*.test.ts"), /one whole path segment/);
+  assert.match(patternFault("/etc/passwd"), /absolute/);
+  assert.match(patternFault("a//b"), /empty path segment/);
+});
+
+test("classify: a high-risk row decides the tier, and an always row does not", () => {
+  const rows = [
+    { heading: "Every PR", tier: "always", globs: ["**"], why: "w" },
+    { heading: "core", tier: "high-risk", globs: ["pkg/core/src/"], why: "w" },
+    { heading: "specs", tier: "routine", globs: ["docs/specs/"], why: "w" },
+    { heading: "semantic", tier: "not-path-derivable", why: "w" },
+  ];
+
+  const routine = classify(["docs/specs/a.md"], rows);
+  assert.equal(routine.tier, "routine", "an always row matching everything must not promote");
+  assert.deepEqual(routine.matched.map((r) => r.heading).sort(), ["Every PR", "specs"]);
+
+  const risky = classify(["docs/specs/a.md", "pkg/core/src/b.ts"], rows);
+  assert.equal(risky.tier, "high-risk");
+  assert.deepEqual(
+    risky.matched.find((r) => r.heading === "core").files,
+    ["pkg/core/src/b.ts"],
+    "the triggering files are reported so the verdict can be checked against the diff",
+  );
+});
+
+test("classify always reports the groups no path can reach", () => {
+  // The spec's own warning: WS4 must not read `routine` as "the checklist
+  // is satisfied". Three groups never match anything, so the verdict
+  // carries them rather than expecting each caller to remember.
+  const rows = [
+    { heading: "specs", tier: "routine", globs: ["docs/specs/"], why: "w" },
+    { heading: "a type was introduced", tier: "not-path-derivable", why: "w" },
+    { heading: "a copy was edited", tier: "not-path-derivable", why: "w" },
+  ];
+  const out = classify(["docs/specs/a.md"], rows);
+  assert.equal(out.tier, "routine");
+  assert.deepEqual(out.beyondReach.map((r) => r.heading), [
+    "a type was introduced",
+    "a copy was edited",
+  ]);
+});
+
+/** Write a changed-file list, and the args that make pr-risk read it. */
+function fileList(dir, files) {
+  const path = join(dir, "files.txt");
+  writeFileSync(path, `${files.join("\n")}\n`);
+  return ["--files", path];
+}
+
+test("pr-risk classifies a real file list and exits 0 for either tier", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    const routine = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/docs/specs/a.spec.md"]));
+    assert.equal(routine.status, 0, `${routine.stdout}${routine.stderr}`);
+    assert.match(routine.stdout, /^pr-risk: routine/);
+
+    const risky = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/packages/core/src/a.ts"]));
+    assert.equal(
+      risky.status,
+      0,
+      "high-risk is an ANSWER, not a failure -- the gate contract lets such a PR merge on a clean review",
+    );
+    assert.match(risky.stdout, /^pr-risk: high-risk/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("pr-risk names the triggering heading and the file that triggered it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    const run = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/packages/core/src/model.ts"]));
+    assert.match(run.stdout, /@barwise\/core` changed/);
+    assert.match(run.stdout, /barwise\/packages\/core\/src\/model\.ts/);
+    // And the caveat WS4 depends on.
+    assert.match(run.stdout, /routine tier does NOT mean the checklist is satisfied/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("pr-risk REFUSES an empty changed-file list rather than calling it routine", () => {
+  // The reading that looks like an answer: nothing changed and nothing
+  // matched are indistinguishable downstream, and "routine" is what a
+  // git call about the wrong tree would also produce.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    const run = gate("pr-risk.mjs", dir, ...fileList(dir, []));
+    assert.equal(run.status, 2, "could not answer is not routine");
+    assert.doesNotMatch(run.stdout, /routine|high-risk/, "a refusal must print no tier");
+    assert.match(run.stderr, /changed-file list is empty/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("pr-risk REFUSES when the inputs cannot be read, and prints no tier", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    const absent = gate("pr-risk.mjs", dir, "--files", join(dir, "nope.txt"));
+    assert.equal(absent.status, 2, "an unreadable file list");
+    assert.doesNotMatch(absent.stdout, /routine|high-risk/);
+
+    writeFileSync(join(dir, "table.json"), "{ not json");
+    const badTable = gate(
+      "pr-risk.mjs",
+      dir,
+      ...fileList(dir, ["barwise/docs/specs/a.spec.md"]),
+      "--table",
+      join(dir, "table.json"),
+    );
+    assert.equal(badTable.status, 2, "an unparseable tier table");
+    assert.doesNotMatch(badTable.stdout, /routine|high-risk/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("pr-risk REFUSES a base ref git cannot resolve, from inside a repository", () => {
+  // Run from REPO deliberately. This case lived in the temp-dir test
+  // above and passed there for the WRONG reason: outside a repository
+  // `pr-risk` refuses while lazily importing tracked.mjs, so it never
+  // reached the `git diff` it claims to exercise, and a regression in
+  // that catch block would have stayed green. Caught by review, not by
+  // the six mutations -- none of which touched the git-diff path.
+  const run = gate("pr-risk.mjs", REPO, "--base", "origin/no-such-ref-here");
+  assert.equal(run.status, 2, "a base ref git cannot resolve, as in a shallow clone");
+  assert.doesNotMatch(run.stdout, /routine|high-risk/, "a refusal prints no tier");
+  assert.match(run.stderr, /git diff --name-only origin\/no-such-ref-here/);
+  assert.doesNotMatch(
+    run.stderr,
+    /rev-parse --show-toplevel/,
+    "this must be the git-diff refusal, not the repo-root one standing in for it",
+  );
+});
+
+test("pr-risk REFUSES a flag given with no value, rather than defaulting", () => {
+  // `--base` with nothing after it used to fall back to origin/main and
+  // print a confident tier for a base the caller never named.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    for (const argv of [["--base"], ["--files"], ["--base", "--json"]]) {
+      const run = gate("pr-risk.mjs", REPO, ...argv);
+      assert.equal(run.status, 2, `${argv.join(" ")} must refuse`);
+      assert.doesNotMatch(run.stdout, /routine|high-risk/, `${argv.join(" ")} printed a tier`);
+      assert.match(run.stderr, /given with no value/);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers REFUSES a table whose pattern the language does not define", () => {
+  // The validation added in WS3 is wired into `tierRows`, but every test
+  // for it called `patternFault` directly -- so deleting the two lines
+  // that call it would have left the suite green while the gate accepted
+  // a row that can never fire. This exercises it through the gate.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    tierFixture(dir, ["A"], [{ heading: "A" }]);
+    const args = [
+      "--checklist",
+      join(dir, "checklist.md"),
+      "--table",
+      join(dir, "review-tiers.json"),
+    ];
+    for (const glob of ["*.ts", "./barwise/scripts/", "a/../b/"]) {
+      writeFileSync(
+        join(dir, "review-tiers.json"),
+        JSON.stringify({ rows: [{ heading: "A", tier: "routine", globs: [glob], why: "f" }] }),
+      );
+      const run = gate("check-review-tiers.mjs", dir, ...args);
+      assert.equal(run.status, 2, `${glob} is valid JSON and an invalid pattern`);
+      assert.match(`${run.stdout}${run.stderr}`, /cannot answer/);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("patternFault refuses a dot segment, which git never prints", () => {
+  assert.match(patternFault("./barwise/scripts/"), /"\." segment/);
+  assert.match(patternFault("../etc/"), /"\.\." segment/);
+  assert.match(patternFault("barwise/./scripts/"), /"\." segment/);
+  assert.match(patternFault("barwise/../etc/"), /"\.\." segment/);
+});
+
+test("pr-risk REFUSES a path list that is not repo-root-relative", () => {
+  // Found on a second read of the diff, not by any gate: a `./`-prefixed
+  // path matches nothing but the `**` row, so the run classifies as
+  // routine over a list it could not read. The two real producers never
+  // emit these shapes, so one means the list came from somewhere else.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    for (const bad of ["./barwise/docs/specs/b.spec.md", "/abs/path.ts", "barwise/../etc/x"]) {
+      const run = gate("pr-risk.mjs", dir, ...fileList(dir, [bad]));
+      assert.equal(run.status, 2, `${bad} must refuse, not classify`);
+      assert.doesNotMatch(run.stdout, /routine|high-risk/, `${bad} printed a tier`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("pr-risk gives the same answer from every cwd", () => {
+  // barwise-918: the file list is repo-root-relative, so a classifier
+  // that resolved paths against cwd would quietly match fewer rows.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    const args = fileList(dir, ["barwise/packages/core/src/a.ts", "barwise/docs/specs/b.spec.md"]);
+    const outputs = new Set(CWDS.map((cwd) => gate("pr-risk.mjs", cwd, ...args).stdout));
+    assert.equal(outputs.size, 1, `pr-risk depends on cwd:\n${[...outputs].join("\n---\n")}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

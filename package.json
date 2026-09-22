@@ -19,6 +19,7 @@
     "check:depcruise-gate": "npm --prefix barwise run check:depcruise-gate --",
     "check:parity": "npm --prefix barwise run check:parity --",
     "check:review-tiers": "npm --prefix barwise run check:review-tiers --",
+    "pr:risk": "npm --prefix barwise run pr:risk --",
     "check:no-nul": "npm --prefix barwise run check:no-nul --",
     "check:secrets": "npm --prefix barwise run check:secrets --",
     "check:shell": "npm --prefix barwise run check:shell --",

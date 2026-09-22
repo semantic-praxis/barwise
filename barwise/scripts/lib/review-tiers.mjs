@@ -62,13 +62,20 @@ export function checklistHeadings(file = CHECKLIST) {
 }
 
 /**
- * The rows of review-tiers.json, validated for shape only.
+ * The rows of review-tiers.json, validated for shape AND for pattern
+ * language.
  *
- * Glob SEMANTICS are WS3's problem; this validates that a row carries
- * what a consumer needs and nothing malformed, so the classifier does
- * not have to guard each field. A `not-path-derivable` row carries no
- * globs by design, and a row of any other tier without globs is an
- * error rather than a silently unmatchable row.
+ * A row is validated here so the classifier does not have to guard each
+ * field. A `not-path-derivable` row carries no globs by design, and a
+ * row of any other tier without globs is an error rather than a silently
+ * unmatchable row.
+ *
+ * The patterns are checked against `patternFault` because a pattern this
+ * language does not define is worse than a malformed one: `*.ts` parses
+ * fine and matches nothing, so the row would sit in the table looking
+ * like a rule while the classifier silently never fired on it. That is
+ * the same defect as a heading with no row, one level down, and it is
+ * why the gate refuses rather than the classifier shrugging.
  */
 export function tierRows(file = TABLE) {
   let parsed;
@@ -105,6 +112,8 @@ export function tierRows(file = TABLE) {
       if (typeof g !== "string" || g.length === 0) {
         throw new Error(`${at}: every glob must be a non-empty string`);
       }
+      const fault = patternFault(g);
+      if (fault) throw new Error(`${at}: ${fault}`);
     }
   }
   return rows;
@@ -127,5 +136,132 @@ export function compareTable(headings, rows) {
     missing: headings.filter((h) => !declared.includes(h)),
     stale: declared.filter((h) => !headings.includes(h)),
     duplicated: declared.filter((h, i) => declared.indexOf(h) !== i),
+  };
+}
+
+/**
+ * The pattern language of `review-tiers.json`, stated once.
+ *
+ * These are NOT globs, despite the field name they are stored under.
+ * The language is four shapes and no more:
+ *
+ *   `**`          every path (the "Every PR" row, which has no trigger)
+ *   `a/b/`        every path under the directory a/b
+ *   `a/<*>/c/`    every path under a/<one segment>/c
+ *   `a/b.json`    that exact path
+ *
+ * A `*` is one whole path segment. There is no partial-segment match and
+ * no recursive wildcard except the bare `**`, which is why `patternFault`
+ * refuses a shape like `*.ts`: it parses, matches nothing, and sits in
+ * the table looking like a rule.
+ *
+ * Node's `path.matchesGlob` is NOT used, and not for style. Measured over
+ * this repository -- the table's 25 distinct patterns against all 1637
+ * tracked files, 40,925 comparisons -- it disagrees on 73, and every one
+ * is a path with a dot-segment that its `*` and `**` decline to match.
+ * That silently empties the rows this table most needs: "Every PR" would
+ * miss 71 files, all of `.beads/`, `.claude/`, `.github/` and `.husky/`
+ * among them, and the high-risk surface row would miss
+ * `barwise/packages/vscode/.vscode-test.mjs` and `.vscodeignore`. A
+ * classifier reading fewer files than it claims, while printing a
+ * confident tier, is barwise-905's shape exactly. `matchesGlob` is also
+ * experimental in the Node `.nvmrc` pins, so its semantics can move under
+ * a runtime upgrade. Four shapes we define beat a matcher we cannot pin
+ * and whose default excludes the paths that carry the rules.
+ *
+ * Paths are compared as git prints them: relative to the repo root, with
+ * forward slashes, no leading `./`.
+ */
+
+/** Why `pattern` is not in the language, or `null` if it is. */
+export function patternFault(pattern) {
+  if (pattern === "**") return null;
+  if (pattern.startsWith("/")) {
+    return `pattern ${JSON.stringify(pattern)} is absolute; paths are relative to the repo root`;
+  }
+  const body = pattern.endsWith("/") ? pattern.slice(0, -1) : pattern;
+  if (body.length === 0) return `pattern ${JSON.stringify(pattern)} names no path`;
+  for (const seg of body.split("/")) {
+    if (seg.length === 0) {
+      return `pattern ${JSON.stringify(pattern)} has an empty path segment`;
+    }
+    if (seg === "." || seg === "..") {
+      // Accepted, these are rows that can never fire: git prints no path
+      // with a `.` or `..` segment, so `./barwise/packages/core/src/`
+      // passes the completeness gate and matches nothing forever. That is
+      // the same silently-dead rule `*.ts` would be, by a different route
+      // -- and `pr-risk` already refuses these shapes on its INPUT side,
+      // so accepting them on the pattern side was the one-way hole.
+      return `pattern ${JSON.stringify(pattern)} has a ${JSON.stringify(seg)} segment; `
+        + "git prints no such path, so this row could never match";
+    }
+    if (seg.includes("*") && seg !== "*") {
+      return (
+        `pattern ${JSON.stringify(pattern)} uses ${JSON.stringify(seg)}: a '*' is one whole `
+        + "path segment here, so a partial-segment wildcard would match nothing and look like a rule"
+      );
+    }
+  }
+  return null;
+}
+
+/**
+ * Does `file` fall under `pattern`? See the language above.
+ *
+ * PRECONDITION: `pattern` is in the language -- `patternFault(pattern)`
+ * is null. This does NOT re-check, and on a pattern outside the language
+ * it returns a confident wrong answer rather than an error: `*.ts` reads
+ * as a literal segment and matches only a file named `*.ts`. Validation
+ * is `tierRows`' job, once at load, which is the only way rows reach
+ * `classify`; putting it here would run it once per file per pattern
+ * (40,925 times over this repository) to re-establish something already
+ * known. Any NEW caller reaching this directly owes that check.
+ *
+ * `file` is one path from a changed-file list. A directory pattern does
+ * not match the directory itself, only what is under it -- git lists
+ * files, so `barwise/packages/cli` as a path does not arise, and
+ * matching it would be answering about something that was not changed.
+ */
+export function matchesPattern(file, pattern) {
+  if (pattern === "**") return true;
+  const isDir = pattern.endsWith("/");
+  const pat = (isDir ? pattern.slice(0, -1) : pattern).split("/");
+  const segs = file.split("/");
+  if (isDir ? segs.length <= pat.length : segs.length !== pat.length) return false;
+  return pat.every((seg, i) => seg === "*" || seg === segs[i]);
+}
+
+/**
+ * The risk tier of a changed-file list, and why.
+ *
+ * `matched` carries the files that triggered each row so the answer can
+ * be read rather than trusted -- a classifier that prints only "high-risk"
+ * is a verdict nobody can check against the diff.
+ *
+ * `beyondReach` is the part WS4 must not forget: the `not-path-derivable`
+ * rows never match anything, so a `routine` tier means "no path-shaped
+ * trigger fired", NOT "the checklist is satisfied". Returning them beside
+ * the verdict is cheaper than expecting every caller to remember they
+ * exist, and the spec says a routine classification that reads as
+ * checklist-satisfied is the way this design goes wrong.
+ *
+ * An `always` row matches every diff and is reported, but does not make a
+ * diff high-risk: its tier is a statement about scope, not liability.
+ */
+export function classify(files, rows) {
+  const matched = [];
+  for (const row of rows) {
+    if (row.tier === "not-path-derivable") continue;
+    const hit = files.filter((f) => row.globs.some((g) => matchesPattern(f, g)));
+    if (hit.length > 0) {
+      matched.push({ heading: row.heading, tier: row.tier, why: row.why, files: hit });
+    }
+  }
+  return {
+    tier: matched.some((r) => r.tier === "high-risk") ? "high-risk" : "routine",
+    matched,
+    beyondReach: rows
+      .filter((r) => r.tier === "not-path-derivable")
+      .map((r) => ({ heading: r.heading, why: r.why })),
   };
 }

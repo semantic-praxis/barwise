@@ -18,6 +18,7 @@
     "check:depcruise-gate": "node scripts/check-depcruise-gate.mjs",
     "check:parity": "node scripts/check-parity.mjs",
     "check:review-tiers": "node scripts/check-review-tiers.mjs",
+    "pr:risk": "node scripts/pr-risk.mjs",
     "check:no-nul": "node scripts/check-no-nul.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:shell": "node scripts/check-shell.mjs",
