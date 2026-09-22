@@ -22,8 +22,8 @@
     {
       "heading": "When `@barwise/core` changed",
       "tier": "high-risk",
-      "globs": ["barwise/packages/core/"],
-      "why": "rework: eleven downstream packages absorb a bad decision here (root CLAUDE.md)"
+      "globs": ["barwise/packages/core/src/", "barwise/packages/core/package.json"],
+      "why": "rework: eleven downstream packages absorb a bad decision here (root CLAUDE.md). src/ and the exports map, not the whole package -- a change to core's own tests is the tests row, and measured over the last 40 merged PRs the wider glob made 4 of 13 core triggers reach nothing under src/ (tests, core's CLAUDE.md, mutation configs). The package.json half has fired 0 times in that window and is reasoning rather than measurement"
     },
     {
       "heading": "When a type was introduced, or a field's type chosen",
@@ -73,14 +73,22 @@
     {
       "heading": "When a skill, agent brief, CLAUDE.md, AGENTS.md, or prompt artifact changed",
       "tier": "high-risk",
-      "globs": ["barwise/.claude/", ".claude/skills/", "CLAUDE.md", "AGENTS.md", ".github/copilot-instructions.md"],
-      "why": "instructions are logic: a rule change is a behaviour change with no test, and nothing else reviews it"
+      "globs": [
+        "barwise/.claude/",
+        ".claude/skills/",
+        "CLAUDE.md",
+        "AGENTS.md",
+        "barwise/packages/*/CLAUDE.md",
+        "barwise/optimizer/CLAUDE.md",
+        ".github/copilot-instructions.md"
+      ],
+      "why": "instructions are logic: a rule change is a behaviour change with no test, and nothing else reviews it. The per-package CLAUDE.md files are named explicitly because `CLAUDE.md` is an exact path that matches only the root one -- 8 of the 13 package instruction files reached this row through no glob at all, and the other 5 only incidentally, via the surface or Python rows (WS3)"
     },
     {
       "heading": "When a dependency was added",
       "tier": "high-risk",
-      "globs": ["barwise/package.json", "barwise/package-lock.json", "barwise/pyproject.toml", "barwise/uv.lock"],
-      "why": "external harm, supply-chain shaped. Provisional: this makes every dependabot PR blocking, roughly five a week. WS3's distribution check is where that gets revisited against measurement rather than taste."
+      "globs": ["barwise/package-lock.json", "barwise/uv.lock"],
+      "why": "external harm, supply-chain shaped. The LOCKFILES, not the manifests: a dependency change is always written into the lock by npm install or uv lock, and CI rejects a lock that disagrees with its manifest -- while a manifest edit on its own is almost always an npm script. Measured (WS3): over the last 20 merged PRs the manifest globs fired 5 times and 4 were npm script additions with no lockfile change; over 40, 7 of 8. Still makes every dependabot PR blocking, roughly five a week."
     }
   ]
 }

@@ -1,15 +1,23 @@
 # Tiered PR review: Copilot on every PR, a blocking tier for the changes that carry liability
 
-Status: WS2 IMPLEMENTED (the tier table, its shared parser, and
-`check:review-tiers`, wired into ci.yml). WS1's precondition is SETTLED
-(Copilot code review works here; see "What the live test measured") but
-WS1 is NOT built -- its cost question is open. Open decision 2 is
-RESOLVED against this spec's own recommendation; Open decision 5's model
-half is decided (the org Copilot policy now enables only GPT-5.6 Terra)
-and its cost half is open. WS3, WS4 and WS5 are unbuilt.
+Status: WS2 and WS3 IMPLEMENTED. **WS4 IS BLOCKED, by WS3's own
+acceptance criterion.** The classifier works and the tiers are wrong:
+this spec set a budget of roughly a third of merged pull requests in the
+high-risk tier, and the measurement is 55% over the last 20 and 70% over
+the last 40 (see "What WS3 measured"). The criterion says the globs are
+wrong and WS4 does not proceed; two of them were wrong and are fixed, and
+the residual is not a glob defect but a premise defect, which is a
+decision this spec cannot take on its own.
+
+WS1's precondition is SETTLED (Copilot code review works here; see "What
+the live test measured") but WS1 is NOT built -- its cost question is
+open. Open decision 2 is RESOLVED against this spec's own recommendation;
+Open decision 5's model half is decided (the org Copilot policy now
+enables only GPT-5.6 Terra) and its cost half is open. WS5 is unbuilt.
+Open decision 6 is new and is what WS4 waits on.
 
 Created: 2026-09-17
-Last-updated: 2026-09-18
+Last-updated: 2026-09-22
 Tracking: barwise-1036 (WS1, the Copilot review workflow); barwise-1037 (WS2,
 the tier table and its completeness gate); barwise-1038 (WS3, the
 classifier); barwise-1041 (WS4, the blocking gate); barwise-1040 (WS5,
@@ -183,6 +191,130 @@ every pull request" is on the order of 2,800 premium requests a month
 before a single Chat or agent call. That conditional is the whole of the
 cost argument, and it rests on a number nobody here has checked against
 its source. Verify it first; it may invert WS1's central choice.
+
+## What WS3 measured (2026-09-22)
+
+WS3's acceptance criterion: classify the last 20 merged pull requests,
+and **if high-risk exceeds roughly a third, the globs are wrong and WS4
+does not proceed.** It fired. The number is recorded here rather than
+adjusted, because a budget moved to fit its measurement is not a budget.
+
+Method, reproducible from any checkout:
+
+```
+git log --merges --format='%H %s' origin/main       # filter to 'Merge pull request #'
+git diff --name-only <merge>^1...<merge>^2 > files.txt
+npm run pr:risk -- --files files.txt --json
+```
+
+Two things in that recipe were wrong on the first pass, and both inflate
+the number:
+
+- **Merges whose subject is not `Merge pull request #N` are base-syncs,
+  not pull requests.** One was in the first sample.
+- **Three dots, not two.** `git diff A B` compares two trees, so where
+  the base moved while a pull request was open, the base's own commits
+  appear as that pull request's changes. It affected 5 of 40 -- and two
+  of those five were the pull requests first cited as evidence for
+  narrowing the core row, which is how the error was found. `pr-risk`
+  itself uses `base...HEAD` for exactly this reason, with a comment
+  saying why; the measurement harness did not, so the comment sat in the
+  one place that did not need it.
+
+**The distribution, before and after fixing two rows:**
+
+| Window      | high-risk before | high-risk after | budget |
+| ----------- | ---------------- | --------------- | ------ |
+| last 20 PRs | 12/20 (60%)      | 11/20 (55%)     | ~33%   |
+| last 40 PRs | 29/40 (72%)      | 28/40 (70%)     | ~33%   |
+
+Two windows because one window can be an artifact of what happened to be
+worked on. It is not: the wider window is worse.
+
+**Two rows were wrong, and the measurement is what showed it.** Both
+were rows whose path stood in for something the path does not mean:
+
+- **"When a dependency was added" fired on every `package.json` edit.**
+  Of its 5 triggers in the last 20 pull requests, **4 added an npm
+  script and nothing else** -- `check:review-tiers` (this spec's own WS2
+  pull request), `check:secrets`, `audit:corrections`, and a `test`
+  target. Over 40 pull requests it is 7 of 8. The globs are now the
+  LOCKFILES (`package-lock.json`,
+  `uv.lock`) and not the manifests: a dependency change is always written
+  into the lock by `npm install` or `uv lock`, and CI rejects a lock that
+  disagrees with its manifest, while a manifest edit on its own is almost
+  always a script. The lock is a shadow of "a dependency changed" with a
+  stated mechanism, and it diverges exactly where the mechanism is
+  bypassed -- a hand-edited manifest with no install, which CI already
+  refuses. Over the last 20 pull requests, 5 triggers became 1.
+
+- **"When `@barwise/core` changed" fired on core's own tests.** Over 40
+  pull requests, 4 of its 13 triggers touched nothing under `src/`:
+  tests, core's own `CLAUDE.md`, and two mutation-testing configs. In
+  the last 20 it is 1 of 2, which is why the wider window is quoted --
+  one instance would not carry this. The glob is now
+  `barwise/packages/core/src/` plus the package's `package.json`, since
+  the exports map is a real API surface; a change to core's own tests is
+  the tests row, which is routine.
+
+  Against myself: **the `package.json` half of that glob has never
+  fired.** It is in 0 of the 13 core triggers over 40 pull requests --
+  reasoning, not measurement. If it is still unfired when WS4 is
+  revisited, it should probably come out.
+
+- **"When a skill, agent brief, CLAUDE.md, AGENTS.md, or prompt artifact
+  changed" reached only the ROOT instruction files.** `CLAUDE.md` and
+  `AGENTS.md` are exact paths, so 8 of the repository's 13 package-level
+  `CLAUDE.md` files matched no glob on that row, and the other 5 reached
+  a high-risk tier only incidentally -- `cli`, `mcp` and `vscode`
+  through the surface row, `core` through the core row, `optimizer`
+  through Python (routine). Narrowing the core glob above would have
+  dropped `core/CLAUDE.md` to routine, which is how this surfaced: the
+  audit of what the change DELETED, not the measurement. The row now
+  names `barwise/packages/*/CLAUDE.md` and `barwise/optimizer/CLAUDE.md`
+  explicitly. This is the only one of the three that made the tier
+  WIDER; it moves the 40-PR figure from 68% to 70% and the 20-PR figure
+  not at all.
+
+  It is also the clearest case for the completeness gate WS2 shipped
+  being insufficient on its own: `check:review-tiers` verifies that every
+  heading HAS a row, and cannot see that a row's globs reach a fraction
+  of what its heading claims. Filed as barwise-1046, with the three
+  candidate mechanisms and the note that the cheap one -- refuse a glob
+  matching zero tracked files -- would NOT have caught this, since
+  `CLAUDE.md` does match the root file.
+
+**The residual is not a glob defect.** After both fixes, high-risk is
+still 55%, and two rows account for nearly all of it:
+
+| Heading                                                    | PRs (of 20) | PRs (of 40) |
+| ---------------------------------------------------------- | ----------- | ----------- |
+| When a check, gate, hook, or script was added or changed   | 8           | 15          |
+| When a skill, agent brief, CLAUDE.md, AGENTS.md, or prompt | 6           | 13          |
+| When `@barwise/core` changed                               | 1           | 9           |
+| When a surface changed (CLI, MCP, VS Code)                 | 1           | 4           |
+| When a dependency was added                                | 1           | 1           |
+
+Both leading rows are, on inspection, correctly tiered. A gate that stops
+answering is this repository's most-repeated defect (barwise-906, six
+occurrences), and an instruction file is logic with no test. Narrowing
+either one would be narrowing it to hit a number.
+
+So the finding is about the design's premise, not its globs. **The tier
+design assumes changes that carry liability are a minority of changes.
+In this repository they are the majority, because much of what this
+repository produces IS its verification and instruction apparatus.** A
+tier that fires on more than half of all pull requests does not triage;
+it renames "every PR".
+
+That is a question about how much review this repository wants, which is
+Open decision 6, and not one the classifier can answer.
+
+**What WS3 did not measure.** Whether the classification is CORRECT on
+any given pull request -- only how often it says high-risk. A row can be
+well-tiered and still be reached by the wrong paths, and nothing here
+would show it. The three `not-path-derivable` groups are outside the
+classifier entirely and stay with the deep review.
 
 ## Scope
 
@@ -374,17 +506,58 @@ gap -- but it does mean the tier can never be the whole of the checklist,
 and WS4 must not read a routine classification as "the checklist is
 satisfied".
 
-**WS3 -- The classifier.** Add `scripts/pr-risk.mjs` over
-`review-tiers.mjs`, plus `test:scripts` coverage. Prints the tier and
-every triggering heading; exits 2 when it cannot obtain the changed-file
-list. Acceptance: classifies the last 20 merged pull requests, and the
-distribution is reported in this spec's revision -- if high-risk exceeds
-roughly a third, the globs are wrong and WS4 does not proceed.
+**WS3 -- The classifier. (IMPLEMENTED 2026-09-22.)**
+`scripts/pr-risk.mjs` over `review-tiers.mjs`, `npm run pr:risk`, ten
+tests in `scripts/tests/gates.test.mjs`. It prints the tier and every
+triggering heading with the files that triggered it, so the verdict can
+be checked against the diff rather than trusted. Exit 0 classified, exit
+2 could not; **there is deliberately no exit 1**, because a high-risk
+tier is an answer and the gate contract above lets such a pull request
+merge on a clean review -- mapping the tier onto the exit status would
+put the classifier at odds with the gate that reads it.
 
-**WS4 -- The blocking gate.** Add the `review` job to `ci.yml` reading
-the pull request's reviews through the API, with the five-row table
-above as its contract. Acceptance: watched producing each of 0, 1 and 2
-on a real pull request before it is made required.
+Not wired into `ci.yml`. It has nothing to gate until WS4 exists, and a
+required step that only ever prints would be a gate in name.
+
+The acceptance criterion FIRED: see "What WS3 measured". 55% high-risk
+against a budget of roughly a third, so **WS4 does not proceed.** Two
+rows were genuinely wrong and are fixed; the residual is Open decision 6.
+
+**What WS3 found that this spec assumed away, twice over:**
+
+_The patterns are not globs._ The table's `globs` field holds four
+shapes -- `**`, a directory prefix, a one-segment `*`, an exact path --
+and `lib/review-tiers.mjs` now says so and refuses anything else, because
+a shape like `*.ts` parses, matches nothing, and sits in the table
+looking like a rule. Node's `path.matchesGlob` was the obvious
+implementation and is NOT used: measured over this repository, 25
+distinct patterns against 1637 tracked files, it disagrees on 73 of
+40,925 comparisons, and every disagreement is a path with a dot-segment
+that its wildcards decline to match. It would have silently emptied the
+"Every PR" row of 71 files -- all of `.beads/`, `.claude/`, `.github/`
+and `.husky/` -- and taken `.vscodeignore` out of the high-risk surface
+row. A classifier reading fewer files than it claims while printing a
+confident tier is barwise-905's shape exactly. It is also experimental in
+the Node `.nvmrc` pins, so its semantics can move under a runtime
+upgrade.
+
+_An empty changed-file list is a refusal._ It classifies as `routine`
+under any rule, and `routine` is also what a git call about the wrong
+tree produces. A pull request changing no files does not occur here, so
+an empty list means the question was never asked.
+
+**WS4 -- The blocking gate. BLOCKED on Open decision 6.** Add the
+`review` job to `ci.yml` reading the pull request's reviews through the
+API, with the five-row table above as its contract. Acceptance: watched
+producing each of 0, 1 and 2 on a real pull request before it is made
+required. Do not start it while the tier fires on 55% of merges: a gate
+that blocks more than half of all pull requests is the shape that gets
+gates disabled, which the Risks section already names.
+
+When it is unblocked, one thing carries over from WS2 and must not be
+lost: **a routine classification does NOT mean the checklist is
+satisfied.** Three groups are outside the classifier's reach; `pr-risk`
+prints them with every verdict for that reason.
 
 **WS5 -- Generated Copilot instructions, and the measurement that decides
 whether they work (provisional: not yet grounded).** Add
@@ -409,6 +582,15 @@ two per day held until a review is recorded. That is the requester's
 decision and the point of the design, but it is also the shape that gets
 gates disabled. WS3's distribution check exists to catch a tier that is
 too wide before WS4 makes it binding.
+
+**It caught one (2026-09-22).** Not a third: 55% of the last 20 merges
+and 70% of the last 40, which at this merge rate is about four pull
+requests a day, not two. The risk this paragraph describes is therefore
+the live state of the design rather than a thing to watch for, and WS4
+is blocked on Open decision 6 until it is resolved. Worth noting which
+way the check was useful: it did not find the globs sloppy, it found the
+premise wrong, and a check that can only report "too wide, narrow it"
+would have been answered by narrowing rows that are correctly tiered.
 
 **Copilot finding nothing is a shadow, not a property.** It correlates
 with the diff being clean through a mechanism -- Copilot read the diff
@@ -517,3 +699,53 @@ which is what keeps that bound meaningful.
    checklist violations at Terra and at Luna and compare. The benchmarks
    say Luna is risky; only WS5 says whether that matters for these
    invariants.
+
+6. **The tier fires on 55% of merges, not a third. Narrow it, accept it,
+   or change what "blocking" costs?** (open; WS4 waits on this)
+
+   WS3 measured it and the two glob defects it found are fixed; the
+   residual is the design's premise, not its patterns. Two rows produce
+   almost all of it -- "a check, gate, hook, or script" (8 of the last
+   20 merges, 15 of the last 40) and "a skill, agent brief, CLAUDE.md,
+   AGENTS.md, or prompt artifact" (6 and 13) -- and both are, on
+   inspection, tiered correctly. A gate that stops answering is this
+   repository's most-repeated defect; an instruction file is logic with
+   no test. The measurement is not telling us the globs are sloppy. It
+   is telling us that in a repository whose output is substantially its
+   own apparatus, the changes that carry liability ARE the bulk of the
+   changes.
+
+   Three ways out, and they are genuinely different bets:
+
+   **(a) Accept 55% and let it block.** Honest to the risk, and the
+   design does what it says. Costs roughly one pull request in two
+   waiting on a recorded review -- at 216 merges a month, about four a
+   day. The Risks section already names this as the shape that gets
+   gates turned off, and at 55% the tier has stopped triaging and is
+   close to "every PR" under another name.
+
+   **(b) Narrow the two rows until the budget is met.** Cheapest to do
+   and the worst reason to do it: it would mean deciding that gate code
+   and instruction files are low-risk because there is too much of them,
+   which is fitting the measure to the target. If it is done at all it
+   needs a reason that survives being written down -- for instance that
+   `barwise/scripts/tests/` is test work rather than apparatus work,
+   which is arguable and worth one measured pass, but it moves 1 of 20.
+
+   **(c) Change what the high-risk tier COSTS, instead of its size.**
+   Keep the tiers honest and make blocking cheap enough to apply to
+   55% -- which is the WS1 cost question from Open decision 5 arriving
+   from the other direction. If a Copilot review is affordable on every
+   pull request and usually clean, a 55% blocking tier is a few minutes
+   of latency, not a queue. If it is not affordable, then neither (a)
+   nor this is available and the answer is (b) or no WS4 at all.
+
+   These are not independent: **(c) cannot be evaluated until the
+   premium-request multiplier in Open decision 5 is confirmed.** That is
+   the one external fact both open decisions now turn on, and it is a
+   lookup rather than a judgment.
+
+   Recommendation: do not start WS4. Confirm the multiplier, then choose
+   between (a)/(c) and (b) with the cost in hand. WS1 and WS5 are
+   unaffected and can proceed meanwhile -- WS5's planted-violation
+   measurement is worth more before a gate exists than after.
