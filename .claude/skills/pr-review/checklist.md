@@ -20,6 +20,11 @@ output specification for the PR body (spec:
 - Every number in the body has the command that produced it, and
   re-running the command gives that number. Authority:
   `pr-creation`, section 4.3.
+- Each fact the PR states -- a count, a status, a list, a behaviour --
+  is written in one place and pointed to from the others. A copy that
+  has to stay is either current, or a snapshot that says when it was
+  taken; an undated copy of an old value is the defect. Authority:
+  `pr-creation`, section 1.
 - The reading guide accounts for every changed file, as spine or as a
   fallout pattern; a file it cannot place is a scope question.
   Authority: `pr-creation`, section 4.2.

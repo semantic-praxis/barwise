@@ -6,7 +6,8 @@ non-trivial pull request, nothing blocks on the review, and when Copilot
 cannot review -- an exhausted quota -- work carries on without it. See
 "The decision of 2026-09-23". WS5 is unbuilt. **WS6 is new** (barwise-1050):
 classify what the reviews find by failure mode and prevent the most
-common one upstream; its seed pass is done, its first mechanism is not.
+common one upstream; its seed pass is done and its first mechanism is
+landed (write each fact once), and the next pass measures it.
 
 WS1 (`.github/workflows/copilot-review.yml`) merged in #533. Its first
 live run, on #534, settled the open question -- `GITHUB_TOKEN` CAN request
@@ -93,7 +94,7 @@ design away. The review becomes a thing that happens to a pull request
 rather than a thing someone starts.
 
 **Explicit over implicit** decides where the rules live. Copilot cannot
-know barwise's invariants, and the 341 lines that state them already have
+know barwise's invariants, and the lines that state them already have
 exactly one home in `pr-review/checklist.md`. Restating them for Copilot
 creates the must-agree copy CLAUDE.md forbids, so the instructions
 Copilot reads are generated from that file and a drift gate fails when
@@ -415,6 +416,8 @@ Out of scope:
 
 ## Inventory
 
+Each file as it stood when this spec was written, 2026-09-17.
+
 | File                                    | Current state                                                        | Verdict                                                                                                                         |
 | --------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `.claude/skills/pr-review/checklist.md` | 341 lines, 13 trigger headings, prose                                | authority; gains no globs, gains a completeness gate                                                                            |
@@ -438,7 +441,7 @@ The blocking gate this diagram used to end in (WS4) is withdrawn.
 ```mermaid
 flowchart TD
     subgraph Derivation["One authority, derived once"]
-        CL["checklist.md\nAUTHORITY: 341 lines, 13 trigger headings\nprose, human-read"]
+        CL["checklist.md\nAUTHORITY: the trigger headings\nprose, human-read"]
         RT["review-tiers.json\nREGISTERED PAIR\nheading, tier, globs; trivial allow-list"]
         PARSER["scripts/lib/review-tiers.mjs\nONE PARSER, TWO CONSUMERS"]
     end
@@ -823,7 +826,7 @@ misses is a heading the deep review still owns, recorded in this spec
 rather than assumed away.
 
 **WS6 -- Learn from what the reviews find. (NEW 2026-09-23; seed pass
-done, first mechanism not yet chosen.)** The owner: "We should be
+done; first mechanism LANDED 2026-09-23, not yet measured.)** The owner: "We should be
 reviewing the failure modes in those reviews so we get less rework over
 time." A Copilot finding fixed on its pull request is rework -- the defect
 was written, found, and written again -- and fixing each one where it
@@ -849,15 +852,20 @@ next mechanism; they are not a target.
 **The seed pass: 25 findings on #531, #532 and #533**, this spec's own
 pull requests of 2026-09-22 and -23. One finding per thread as Copilot
 posted them, so #533's trimming defect, posted once per file, counts
-twice. Read through the GitHub MCP tools; the `gh` spelling below returns
-the same comments but was not itself run here:
+twice. The count, run 2026-09-23 against the public API (no token
+needed; the repository is public); replace `length` with `.body` for
+the findings themselves. The classification into modes below is a
+reading of each one, which no command reproduces:
 
 ```sh
 for n in 531 532 533; do
-  gh api --paginate repos/semantic-praxis/barwise/pulls/$n/comments \
-    --jq '.[] | select(.in_reply_to_id == null)
-              | select(.user.login | ascii_downcase | contains("copilot")) | .body'
+  curl -s "https://api.github.com/repos/semantic-praxis/barwise/pulls/$n/comments?per_page=100" \
+    | jq '[.[] | select(.in_reply_to_id == null)
+               | select(.user.login | ascii_downcase | contains("copilot"))] | length'
 done
+# 9
+# 5
+# 11
 ```
 
 | Failure mode                              | #531 | #532 | #533 | Total |
@@ -907,25 +915,32 @@ must-agree rule covers copies in code; these are copies in prose (tracker
 notes, a spec's Status line and counts, the README, a comment restating
 config), and nothing checks them.
 
-**Proposed first mechanism, for that mode -- not landed; the owner's
-call.** Write each fact once and point to it everywhere else. A tracker
+**First mechanism, for that mode -- LANDED 2026-09-23 on the owner's
+approval.** Write each fact once and point to it everywhere else. The
+rule lives in the `pr-creation` skill's readiness gate (section 1), and
+`checklist.md`'s "Every PR" group checks it; this paragraph is the
+reasoning, those two are the rule. A tracker
 note records the verdict and a pointer ("see the spec, WS3") rather than
 the spec's counts; a PR body links the spec section rather than copying
 its figures; a workflow comment names its config file rather than
 listing the entries. That removes the copies instead of checking them,
-and most of the nine would never have been written. It would go in the
-`pr-creation` skill as an authoring rule, with one line in
-`checklist.md`'s "Every PR" group so a reviewer can hold an author to it.
-A check would be stronger than a line of prose, and none is proposed
+and most of the nine would never have been written. A check would be
+stronger than a line of prose, and none is proposed
 because none is known that works on prose: a checker cannot tell a
 restated fact from two numbers that happen to be equal. If the next pass
 shows the mode holding its share, that is the signal to look for one.
 
 Pass log:
 
-| Pass | Date       | Window           | Findings | Top mode                | Mechanism            |
-| ---- | ---------- | ---------------- | -------: | ----------------------- | -------------------- |
-| seed | 2026-09-23 | #531, #532, #533 |       25 | stale restated fact (9) | proposed, not landed |
+| Pass | Date       | Window           | Findings | Top mode                | Mechanism                        |
+| ---- | ---------- | ---------------- | -------: | ----------------------- | -------------------------------- |
+| seed | 2026-09-23 | #531, #532, #533 |       25 | stale restated fact (9) | write it once: landed 2026-09-23 |
+
+Between the seed and the mechanism, Copilot's review of #534 found three
+more, two of them this mode -- a workflow header still describing the
+withdrawn WS4, and one claim about quota resets repeated in three files.
+They are outside every pass window and counted in none. The next pass's
+window starts at the first pull request merged after the mechanism.
 
 Acceptance: a pass is recorded here with its window, per-mode counts and
 the command that collected them; the mechanism chosen for its top mode is
@@ -1043,7 +1058,7 @@ that bound meaningful.
    $5/$30 per 1M tokens, Terminal-Bench 2.1 88.8%, Nerova 79.2%; Terra
    $2.50/$15, 87.1%, 71.4%; Luna $1/$6, 83.2%, 41.3%. Context is 1.05M on
    all three, so the instruction-absorption risk this spec worried about
-   -- 341 checklist lines plus generated instructions -- does not
+   -- 341 checklist lines on 2026-09-18, plus generated instructions -- does not
    discriminate between them. (Figures as supplied by the repository
    owner from the model picker, 2026-09-18; not independently verified
    against a vendor publication.) **The model half is DECIDED as of
