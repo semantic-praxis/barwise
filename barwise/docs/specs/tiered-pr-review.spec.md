@@ -8,11 +8,11 @@ cannot review -- an exhausted quota -- work carries on without it. See
 classify what the reviews find by failure mode and prevent the most
 common one upstream; its seed pass is done, its first mechanism is not.
 
-WS1 (`.github/workflows/copilot-review.yml`) merged in #533; its request
-path is UNVERIFIED until it runs on a real pull request, since whether a
-workflow's `GITHUB_TOKEN` can request this reviewer could not be checked
-from the session that built it. It no longer counts Copilot's quota
-refusal as a review (2026-09-23). WS3's measurement -- 55% of the last 20
+WS1 (`.github/workflows/copilot-review.yml`) merged in #533. Its first
+live run, on #534, settled the open question -- `GITHUB_TOKEN` CAN request
+Copilot -- and went red anyway, on a readback that could never pass; see
+WS1, "What the first live run found". Fixed in #534, along with a
+refusal being counted as a review. WS3's measurement -- 55% of the last 20
 merges high-risk, 70% of the last 40 -- stands as a description; with no
 gate reading the tier, it is no longer a budget anything fails against.
 
@@ -223,7 +223,10 @@ search-result summaries rather than from GitHub's billing documentation,
 and no command in this repository reproduces them. Whether this
 repository is private in GitHub's sense is also unestablished -- the
 `"private": true` in `barwise/package.json` is the npm publish flag
-and says nothing about repository visibility.
+and says nothing about repository visibility. (Established 2026-09-23:
+it is public -- `curl -s https://api.github.com/repos/semantic-praxis/barwise
+| jq '{private, visibility}'` prints `false` and `"public"` -- so the
+Actions-minutes half of this concern does not apply.)
 
 If the multiplier of 13 holds, then at this repository's measured rate
 of 216 merged pull requests a month (`git log --merges --since="30 days
@@ -609,7 +612,8 @@ fresh, a failed reviews read; a tracker edit (the one skip), the tracker
 deleted, code renamed into its path, a hook beside it, two look-alike
 names, tracker-plus-spec; a failed files read, a classifier refusal, an
 empty list, 3,000 files, and a request that did not land (exit 1,
-`::error::`, the response printed). This began as a one-off harness in
+`::error::`, the evidence printed). The cases added after the first live
+run are listed under "What the first live run found". This began as a one-off harness in
 the session that wrote the workflow; a Copilot review then found four
 defects in exactly the shell it had exercised, which is the argument
 for the harness being a test rather than a transcript.
@@ -641,7 +645,8 @@ mechanism -- automatic enumeration, occurrence-indexed anchoring, a
 survivor ratchet -- is barwise-1049, because a pilot run once is the
 remembering this was meant to replace.
 
-**Not verifiable before shipping:** whether `GITHUB_TOKEN` can request
+**Not verifiable before shipping** (both since measured -- see "What the
+first live run found"): whether `GITHUB_TOKEN` can request
 `copilot-pull-request-reviewer[bot]`, and what login Copilot appears
 under in the POST response. (The reviews endpoint's login WAS measured,
 on #533's own review: `copilot-pull-request-reviewer[bot]`.) `docs.github.com` returned 403 through the
@@ -653,6 +658,49 @@ the printed response says which assumption was wrong. The fallback, if
 `GITHUB_TOKEN` cannot request this reviewer at all, is a token the owner
 creates and stores as a secret; that is not something a pull request
 can do.
+
+**What the first live run found (#534, 2026-09-23).** The first pull
+request after #533 merged was non-trivial, and the workflow classified
+it so, requested Copilot, and went RED: "The request returned without
+error, but Copilot is not among the requested reviewers", with
+`requested_reviewers: []` printed. The request had landed. The PR's event
+history records it, and Copilot's review started 14 seconds later:
+
+```sh
+curl -s https://api.github.com/repos/semantic-praxis/barwise/issues/534/events \
+  | jq -c '.[] | select(.event == "review_requested")
+               | {created_at, actor: .actor.login, reviewer: .requested_reviewer.login}'
+# {"created_at":"2026-09-23T20:04:40Z","actor":"github-actions[bot]","reviewer":"Copilot"}
+```
+
+So both unverifiable questions are answered: `GITHUB_TOKEN` can request
+Copilot, and no owner-created token is needed; and Copilot appears in
+the event history as `Copilot`, type `Bot`. What was wrong was the
+readback's source. **`requested_reviewers` never lists Copilot**: it was
+empty in the POST response, and `GET .../pulls/534/requested_reviewers`
+was still empty while Copilot's review was visibly running. The same
+field fed the "already requested" check, which therefore could never
+fire; a push during the roughly eight minutes a review takes would have
+requested a second one.
+
+Both now read the event history. The readback counts Copilot's
+`review_requested` events before and after the POST and passes only on
+a NEW one, retrying briefly. "Already requested" means the latest Copilot
+request is newer than every removal and every Copilot answer (real or
+refusal) and under an hour old, so a request Copilot never answers does
+not stop the next push from asking. Tested: requested and unanswered,
+requested then removed, requested two hours ago, a team request with a
+null reviewer, requested and answered by a refusal, a failed events read,
+and a lost request whose only matching event is an old one. Seven
+mutations, one per rule, each caught by the test written for it. The
+harness's fake `gh` no longer answers the reviewer-list endpoint, so a
+future read of it fails the tests instead of passing on a field that is
+always empty.
+
+Found the only way it could have been, by running it: the readback's
+wrong assumption was named in this section before shipping, and the
+design's answer -- fail loudly, print the evidence -- is what turned a
+silent never-fires into a red job with the empty list on screen.
 
 **A refusal is not a review (fixed 2026-09-23).** The first version
 counted any review by the Copilot bot as "already reviewed". Copilot

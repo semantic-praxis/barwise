@@ -511,11 +511,17 @@
       "caught_by": "reasoning",
       "note": "Nine defects in WS1's first implementation, found by a Copilot review of #533 that read the code and ran nothing. Four of them sat in the workflow shell that a stubbed-gh harness had already exercised branch by branch: the harness tested the branches as designed and could not test the design, which is what a reader did. Each fix then got a test that a mutation of the fix fails, which is execution, but the catch was the review."
     },
-    "tiered-pr-review::a0b7e1e6a742": {
+    "tiered-pr-review::7e370fc47f3b": {
       "spec": "tiered-pr-review.spec.md",
-      "excerpt": "not verifiable before shipping: whether githubtoken can request copilot-pull-request-reviewer[bot], and what login copilot appears under in the post response. (",
+      "excerpt": "not verifiable before shipping (both since measured -- see \"what the first live run found\"): whether githubtoken can request copilot-pull-request-reviewer[bot],",
       "caught_by": "not-a-correction",
-      "note": "States a limit of verification, not a correction of an earlier claim: whether a workflow's GITHUB_TOKEN can request copilot-pull-request-reviewer[bot] could not be checked before the workflow first runs (docs.github.com returned 403 through the proxy; no gh in the container). Its added parenthesis records a measurement (the reviews endpoint's login, read from #533's own review), not a reversal. Carried over from row 1937dd238ba9, whose paragraph this is, reworded. That row's note also recorded that the paragraph just above -- WS1 saying its precondition was 'NOT established' for five days after it was settled -- IS a correction the detector does not surface; still true."
+      "note": "States a limit of verification, not a correction: whether GITHUB_TOKEN can request copilot-pull-request-reviewer[bot], and the login in the POST response, could not be checked before the workflow first ran. Its parenthesis now points to the section that answers both, which is where the correction lives (row c967ef3990a2). Re-keyed from a0b7e1e6a742 and before it 1937dd238ba9, the same paragraph reworded each time; the earlier notes' point stands that the WS1 precondition paragraph above it IS a correction the detector does not surface."
+    },
+    "tiered-pr-review::c967ef3990a2": {
+      "spec": "tiered-pr-review.spec.md",
+      "excerpt": "so both unverifiable questions are answered: githubtoken can request copilot, and no owner-created token is needed; and copilot appears in the event history as ",
+      "caught_by": "execution",
+      "note": "The WS1 readback read requested_reviewers, which never lists Copilot: empty in the POST response and while Copilot's review ran, measured on #534. The first live run (#534) turned a request that had landed into a red job, and the printed empty list plus the PR's event history (review_requested by github-actions[bot]) showed the request was fine and the readback's source was wrong. The same field fed the 'already requested' check, which could therefore never fire. Caught by running the workflow for real, which the section had named as the only way to settle it; the loud-failure design is what made it visible."
     },
     "tracker-quick-wins::ae1c4c3cc7ab": {
       "spec": "tracker-quick-wins.spec.md",
