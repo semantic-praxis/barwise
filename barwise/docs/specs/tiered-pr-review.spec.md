@@ -416,6 +416,8 @@ Out of scope:
 
 ## Inventory
 
+Each file as it stood when this spec was written, 2026-09-17.
+
 | File                                    | Current state                                                        | Verdict                                                                                                                         |
 | --------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `.claude/skills/pr-review/checklist.md` | 341 lines, 13 trigger headings, prose                                | authority; gains no globs, gains a completeness gate                                                                            |
@@ -850,15 +852,20 @@ next mechanism; they are not a target.
 **The seed pass: 25 findings on #531, #532 and #533**, this spec's own
 pull requests of 2026-09-22 and -23. One finding per thread as Copilot
 posted them, so #533's trimming defect, posted once per file, counts
-twice. Read through the GitHub MCP tools; the `gh` spelling below returns
-the same comments but was not itself run here:
+twice. The count, run 2026-09-23 against the public API (no token
+needed; the repository is public); replace `length` with `.body` for
+the findings themselves. The classification into modes below is a
+reading of each one, which no command reproduces:
 
 ```sh
 for n in 531 532 533; do
-  gh api --paginate repos/semantic-praxis/barwise/pulls/$n/comments \
-    --jq '.[] | select(.in_reply_to_id == null)
-              | select(.user.login | ascii_downcase | contains("copilot")) | .body'
+  curl -s "https://api.github.com/repos/semantic-praxis/barwise/pulls/$n/comments?per_page=100" \
+    | jq '[.[] | select(.in_reply_to_id == null)
+               | select(.user.login | ascii_downcase | contains("copilot"))] | length'
 done
+# 9
+# 5
+# 11
 ```
 
 | Failure mode                              | #531 | #532 | #533 | Total |
@@ -1051,7 +1058,7 @@ that bound meaningful.
    $5/$30 per 1M tokens, Terminal-Bench 2.1 88.8%, Nerova 79.2%; Terra
    $2.50/$15, 87.1%, 71.4%; Luna $1/$6, 83.2%, 41.3%. Context is 1.05M on
    all three, so the instruction-absorption risk this spec worried about
-   -- 341 checklist lines plus generated instructions -- does not
+   -- 341 checklist lines on 2026-09-18, plus generated instructions -- does not
    discriminate between them. (Figures as supplied by the repository
    owner from the model picker, 2026-09-18; not independently verified
    against a vendor publication.) **The model half is DECIDED as of

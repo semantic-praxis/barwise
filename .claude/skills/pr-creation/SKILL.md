@@ -64,8 +64,11 @@ least once:
   most common Copilot finding in `tiered-pr-review.spec.md`'s WS6
   review, always in one shape -- a change that updated some copies and
   not the others. A copy that has to stay, such as a PR body quoting a
-  measurement with its command, is a snapshot: before pushing a change
-  to that fact, grep the repository for its old value.
+  measurement with its command, is a snapshot, and says when it was
+  taken -- a date or a commit -- so a later reader does not mistake it
+  for the current value. Before pushing a change to a fact, grep the
+  repository for its old value: each hit is either updated, or a
+  snapshot that already says it is one.
 - **The commits are the record.** Subjects prefixed as the log does
   (`feat:`, `fix:`, `docs:`, `chore:`), one concern per commit, no
   merge markers, and no model identifier in commit or PR prose; the
