@@ -35,6 +35,12 @@ name: Copilot review
 # Copilot has already reviewed or been requested -- pushes do not buy
 # repeat reviews, and a repeat run costs seconds.
 #
+# A REFUSAL IS NOT A REVIEW. With its quota exhausted, Copilot posts "was
+# unable to review this pull request" AS a review, so the next push asks
+# again. Nothing waits on it: the owner's policy is to carry on without
+# the review until the quota resets. While it stays exhausted, each push
+# draws one more refusal, which is visible and costs nothing.
+#
 # EVERY UNCERTAINTY RESOLVES TOWARD REQUESTING. A files API call that
 # fails, a file list that may be truncated, pr-risk refusing (exit 2), and
 # an empty list all request the review. A wrong skip is a defect nobody
@@ -93,6 +99,13 @@ jobs:
       # endpoint's spelling is not evidence of another's. `// ""` because a
       # deleted account's review has a null user.
       COPILOT: '((.login // "") | ascii_downcase | contains("copilot"))'
+      # Whether a review object is a real one. The refusal carries the same
+      # bot and the same state (COMMENTED) as a real review, so the body is
+      # the only signal. Measured on #516: "Copilot was unable to review
+      # this pull request because the user who requested the review has
+      # reached their quota limit." Counting that as "already reviewed"
+      # meant a PR whose request met an empty quota was never asked again.
+      REVIEWED: '((.body // "") | ascii_downcase | contains("was unable to review this pull request") | not)'
 
     steps:
       # Cheap checks first, before any checkout, so the common repeat run
@@ -109,7 +122,7 @@ jobs:
             # Reading the reviews is not optional: if it fails, set -e stops
             # the job red rather than guessing that no review exists.
             reviewed=$(gh api --paginate "repos/$REPO/pulls/$PR/reviews" \
-              --jq ".[] | select(.user | $COPILOT) | .id" | wc -l)
+              --jq ".[] | select((.user | $COPILOT) and $REVIEWED) | .id" | wc -l)
             pending=$(gh api "repos/$REPO/pulls/$PR/requested_reviewers" \
               --jq "[.users[] | select($COPILOT)] | length")
             if [ "$reviewed" -gt 0 ]; then

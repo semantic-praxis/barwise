@@ -3648,6 +3648,7 @@ function runWorkflowStep(name, api, fail = []) {
         PR: "7",
         BOT: workflowEnv("BOT"),
         COPILOT: workflowEnv("COPILOT"),
+        REVIEWED: workflowEnv("REVIEWED"),
         RUNNER_TEMP: dir,
         GITHUB_OUTPUT: join(dir, "output"),
       },
@@ -3668,6 +3669,9 @@ function runWorkflowStep(name, api, fail = []) {
 const DECIDE = "Decide whether a request is needed";
 const CLASSIFY = "Classify, and request Copilot if non-trivial";
 const COPILOT_LOGIN = "copilot-pull-request-reviewer[bot]"; // as the reviews API reported it on #533
+const QUOTA_REFUSAL =
+  "Copilot was unable to review this pull request because the user who requested "
+  + "the review has reached their quota limit."; // verbatim, #516, 2026-09-18
 
 test("workflow, decide: requests only when Copilot has neither reviewed nor been requested", () => {
   const cases = [
@@ -3691,6 +3695,26 @@ test("workflow, decide: requests only when Copilot has neither reviewed nor been
       /already requested/,
     ],
     ["a fresh PR", {}, "true", null],
+    // A refusal is posted AS a review, by the same bot, with the same
+    // state; counting it meant a PR that met an empty quota was never
+    // requested again. The text is the one measured on #516.
+    [
+      "Copilot's only review is a quota refusal",
+      { reviews: [{ id: 1, user: { login: COPILOT_LOGIN, type: "Bot" }, body: QUOTA_REFUSAL }] },
+      "true",
+      null,
+    ],
+    [
+      "a quota refusal, then a real review",
+      {
+        reviews: [
+          { id: 1, user: { login: COPILOT_LOGIN, type: "Bot" }, body: QUOTA_REFUSAL },
+          { id: 2, user: { login: COPILOT_LOGIN, type: "Bot" }, body: "Approval recommended" },
+        ],
+      },
+      "false",
+      /already reviewed PR #7 \(1 review/,
+    ],
   ];
   for (const [label, api, need, message] of cases) {
     const r = runWorkflowStep(DECIDE, api);
@@ -3769,7 +3793,14 @@ test("the workflow asks who Copilot is in ONE place", () => {
   // disagreeing means a request on every push (a Copilot finding on #533).
   const wf = readFileSync(WORKFLOW, "utf8");
   assert.equal(wf.match(/contains\("copilot"\)/g)?.length, 1, "one definition");
-  assert.equal(wf.match(/select\(\.user \| \$COPILOT\)|select\(\$COPILOT\)/g)?.length, 3);
+  assert.equal(wf.match(/\$COPILOT\b/g)?.length, 3, "used by exactly the three checks");
+  // And what counts as a review is decided once, too.
+  assert.equal(
+    wf.match(/was unable to review this pull request/g)?.length,
+    1,
+    "defined once",
+  );
+  assert.match(wf, /select\(\(\.user \| \$COPILOT\) and \$REVIEWED\)/, "the reviews check uses it");
 });
 
 test("check-review-tiers names the defect it refuses, for every row and allow-list guard", () => {
