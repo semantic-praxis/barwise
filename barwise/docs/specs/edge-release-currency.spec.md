@@ -96,6 +96,24 @@ Release run 381, on the `#531` merge commit `3a1aed8f`. Every criterion
 checked against the live repository with the value read directly, not
 inferred from the workflow succeeding.
 
+Every number below comes from one of these three, re-runnable against
+the live repository (`pr-review/checklist.md`, "Every number in the body
+has the command that produced it"):
+
+```
+git ls-remote origin refs/tags/edge                       # criterion 1
+gh api repos/semantic-praxis/barwise/releases \
+  --jq '.[] | {tag_name, name, created_at, published_at}' # criterion 2, in list order
+gh api repos/semantic-praxis/barwise/releases/tags/edge \
+  --jq '{created_at, published_at, updated_at, target_commitish,
+         assets: [.assets[] | {name, created_at}]}'       # the step ordering
+```
+
+The criterion-3 commands are inline with its evidence below. This
+session read the release endpoints through the GitHub MCP tools rather
+than `gh`; the `gh` spellings above are the equivalent a reader can run,
+and were not themselves executed here.
+
 **1. The tag moves.** `git ls-remote origin refs/tags/edge` returned
 `3a1aed8f` within ten seconds of the run starting, against `04265738`
 before. Met.
@@ -121,19 +139,39 @@ it). What is established is the causal chain -- move the tag, and
 `created_at` follows it, and the position changes -- not the complete
 sort rule. Do not build anything on a sharper claim than that.
 
-**3. A plain `git pull` is unaffected.** Run on a real clone still
-holding the old tag, exit status read directly:
+**3. A plain `git pull` is unaffected.** The first attempt at this
+evidence ran `git fetch origin main`, which proves the transfer and NOT
+the criterion -- the criterion says a plain pull exits 0 AND updates
+`main`, and a fetch updates no branch. Re-run properly, reproducing a
+contributor's clone made before the tag moved (stale tag, branch
+behind):
 
 ```
-local edge before   04265738        remote edge   3a1aed8f
-git fetch origin main     EXIT=0    local edge after: 04265738
-git fetch --tags origin   EXIT=1    ! [rejected] edge -> edge (would clobber existing tag)
+git clone https://github.com/semantic-praxis/barwise.git c && cd c
+git tag -f edge 04265738      # a clone taken before the move
+git reset --hard HEAD~2       # and a branch behind the remote
+git pull
+
+  BEFORE   main=a886f1ae  edge=04265738
+  remote   main=3a1aed8f  edge=3a1aed8f
+
+  Updating a886f1ae..3a1aed8f
+  Fast-forward
+   13 files changed, 1171 insertions(+), 53 deletions(-)
+  EXIT=0
+
+  AFTER    main=3a1aed8f  edge=04265738
 ```
 
-Exactly the scratch-repo measurements, reproduced in production: the
-plain fetch succeeds and leaves the stale tag alone, and only the
-explicit `--tags` form is rejected -- which is what `README.md` and the
-release skill now tell contributors, so that guidance is verified rather
+`main` fast-forwarded, the stale local tag was left alone, exit 0. And
+separately, the explicit form is rejected as documented:
+
+```
+git fetch --tags origin   EXIT=1   ! [rejected] edge -> edge (would clobber existing tag)
+```
+
+So the scratch-repo measurements hold in production, and what
+`README.md` and the release skill tell contributors is verified rather
 than argued.
 
 **The reordered step worked.** Asset `created_at` is 18:41:47-48, the
@@ -166,16 +204,30 @@ The one changed step, in the `push` branch of `release.yml`:
 ```mermaid
 flowchart TD
   P[push to main] --> B[build VSIX, CLI, MCP, SHA256SUMS]
-  B --> T["git tag -f edge $GITHUB_SHA<br/>git push --force origin edge"]
-  T --> E{"gh release view edge"}
-  E -->|exists| ED["gh release edit edge<br/>--draft=false --prerelease<br/>--title --notes"]
+  B --> E{"gh release view edge"}
+  E -->|exists| U["gh release upload --clobber"]
+  U --> T["git tag -f edge $GITHUB_SHA<br/>git push --force origin refs/tags/edge"]
+  T --> ED["gh release edit edge<br/>--draft=false --prerelease<br/>--title --notes"]
   E -->|absent| CR["gh release create edge<br/>--prerelease --target $GITHUB_SHA"]
-  ED --> U[gh release upload --clobber]
-  CR --> U
+  CR --> U2["gh release upload --clobber"]
 ```
 
-The tag push goes **before** the release call, so a release created on a
-first run targets a tag that already points where it should.
+**Assets first, then the tag.** This diagram originally showed the tag
+moving first; a review of the implementing pull request pointed out that
+a failed upload then leaves `edge` naming a commit whose tag-relative
+artifacts are the PREVIOUS build, and a consumer downloads artifacts
+that do not match the tag they asked for. Uploading first inverts the
+failure into current bundles under a lagging tag -- exactly the state
+this repository sat in for three months, cosmetic, and fixed by the next
+successful run.
+
+**That failure path has never been exercised.** Release run 381
+succeeded, which establishes the ORDER (see the timestamps below) and
+says nothing about what a failure does. The safety is argued from the
+ordering, not measured.
+
+The first-run branch has no window at all: `gh release create --target`
+mints the tag itself.
 
 Asset download URLs are tag-relative
 (`releases/download/edge/barwise-cli-edge.cjs`) and survive a tag move,
@@ -207,23 +259,29 @@ not inferred:
 
 1. After the next merge, `git ls-remote origin refs/tags/edge` returns
    that merge commit, not `04265738`.
-2. **The releases page shows edge above the versioned releases.** This
-   is the part that cannot be predicted from here: GitHub's
-   releases-list sort key was measured to be neither `created_at` nor
-   `published_at` (edge's `created_at` is 2026-06-14T21:45:35Z, v1.6.0's
-   is 21:10:58Z, and the page nonetheless lists v1.6.0 above edge). So
-   it is observed on the live page, and if the position does not move,
-   this change is reverted and the alternative above is reconsidered.
+2. **The releases page shows edge above the versioned releases.** The
+   part that could not be predicted before merging: the pre-merge
+   reading was that the sort key was neither `created_at` nor
+   `published_at` (edge's `created_at` was 2026-06-14T21:45:35Z,
+   v1.6.0's is 21:10:58Z, and the page nonetheless listed v1.6.0 above
+   edge). So it was to be observed on the live page, with the change
+   reverted if the position did not move.
 3. A plain `git pull` in an existing clone still exits 0 and still
    updates `main`.
 
-Criterion 2 is why this spec ships as an experiment rather than a fix.
+**ALL THREE MET on 2026-09-22 -- see "What the first real run
+measured", which supersedes the contingency here.** The criteria are
+left in their original wording as the record of what was promised
+before the evidence existed; criterion 2's pre-merge reading of the sort
+key is corrected in that section, not here.
 
 ## Risks
 
 **The position may not move, and then this bought a moved tag for
-nothing.** Mitigated by being one step, trivially revertible, and by
-criterion 2 being a real gate on keeping it.
+nothing.** RESOLVED 2026-09-22: it moved, from fourth to first. The
+mitigation (one step, trivially revertible, gated on criterion 2) was
+never needed, and the risk is retained as the record of what was
+uncertain.
 
 **A contributor who runs `git fetch --tags` gets a rejection until they
 add the config line.** Measured, bounded, and one line to fix. This
@@ -237,5 +295,10 @@ sees.
 
 ## Open decisions
 
-None. The owner chose the approach; criterion 2 decides whether it
-stays.
+None open. The owner chose the approach, and criterion 2 -- which
+decided whether it stays -- was met on the live page on 2026-09-22.
+
+One thing is deliberately NOT claimed: the failure-safety of the
+upload-then-tag ordering. Run 381 succeeded, so the half-done state that
+ordering exists for has never occurred. That is an argued property, not
+a measured one, and the Target architecture section says so.
