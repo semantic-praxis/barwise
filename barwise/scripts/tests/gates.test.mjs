@@ -2835,6 +2835,14 @@ test("run-script-tests refuses an absent tests directory rather than failing", (
 // and a test that can only assert the green path would be the thing
 // barwise-906 is about.
 
+/**
+ * A valid `trivial` block for fixtures. Every hand-written table carries
+ * one, so a refusal test fails on the defect it plants and not on a
+ * missing block -- a test passing for a reason other than the one it
+ * names is the defect a review found in this very suite.
+ */
+const VALID_TRIVIAL = { globs: [".beads/"], why: "fixture" };
+
 /** A minimal pair of inputs the gate accepts, written into a temp dir. */
 function tierFixture(dir, headings, rows) {
   const md = ["# Checklist", "", ...headings.flatMap((h) => [`## ${h}`, "", "- item", ""])];
@@ -2842,6 +2850,7 @@ function tierFixture(dir, headings, rows) {
   writeFileSync(
     join(dir, "review-tiers.json"),
     JSON.stringify({
+      trivial: VALID_TRIVIAL,
       rows: rows.map((r) =>
         r.tier === "not-path-derivable"
           ? { heading: r.heading, tier: r.tier, why: "fixture" }
@@ -2914,7 +2923,10 @@ test("check-review-tiers REFUSES an unreadable checklist rather than calling eve
     rmSync(join(dir, "checklist.md"));
     const run = gate("check-review-tiers.mjs", dir, ...args);
     assert.equal(run.status, 2, "could not answer is not the same as failed");
-    assert.match(`${run.stdout}${run.stderr}`, /cannot answer/);
+    // The REASON, not only the code: the gate maps any exception to exit 2,
+    // so with this guard removed the function crashes on `undefined.split`
+    // and still exits 2. A mutation pass found this test passing that way.
+    assert.match(`${run.stdout}${run.stderr}`, /cannot read the checklist/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -2949,19 +2961,32 @@ test("check-review-tiers REFUSES a row whose tier is unknown or whose globs are 
 
     writeFileSync(
       join(dir, "review-tiers.json"),
-      JSON.stringify({ rows: [{ heading: "A", tier: "sort-of-risky", globs: ["x/"], why: "f" }] }),
+      JSON.stringify({
+        trivial: VALID_TRIVIAL,
+        rows: [{ heading: "A", tier: "sort-of-risky", globs: ["x/"], why: "f" }],
+      }),
     );
-    assert.equal(gate("check-review-tiers.mjs", dir, ...args).status, 2, "unknown tier");
+    const unknown = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(unknown.status, 2, "unknown tier");
+    assert.match(`${unknown.stdout}${unknown.stderr}`, /tier must be one of/);
 
     writeFileSync(
       join(dir, "review-tiers.json"),
-      JSON.stringify({ rows: [{ heading: "A", tier: "high-risk", why: "f" }] }),
+      JSON.stringify({
+        trivial: VALID_TRIVIAL,
+        rows: [{ heading: "A", tier: "high-risk", why: "f" }],
+      }),
     );
+    const noGlobs = gate("check-review-tiers.mjs", dir, ...args);
     assert.equal(
-      gate("check-review-tiers.mjs", dir, ...args).status,
+      noGlobs.status,
       2,
       "a path tier with no globs is a row that can never match, not a routine one",
     );
+    // With the guard removed this reaches `for (const g of undefined)` and
+    // throws a TypeError the gate also maps to 2 -- found surviving by a
+    // mutation pass. The message is what proves the guard fired.
+    assert.match(`${noGlobs.stdout}${noGlobs.stderr}`, /needs at least one glob/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -3205,7 +3230,10 @@ test("check-review-tiers REFUSES a table whose pattern the language does not def
     for (const glob of ["*.ts", "./barwise/scripts/", "a/../b/"]) {
       writeFileSync(
         join(dir, "review-tiers.json"),
-        JSON.stringify({ rows: [{ heading: "A", tier: "routine", globs: [glob], why: "f" }] }),
+        JSON.stringify({
+          trivial: VALID_TRIVIAL,
+          rows: [{ heading: "A", tier: "routine", globs: [glob], why: "f" }],
+        }),
       );
       const run = gate("check-review-tiers.mjs", dir, ...args);
       assert.equal(run.status, 2, `${glob} is valid JSON and an invalid pattern`);
@@ -3248,6 +3276,182 @@ test("pr-risk gives the same answer from every cwd", () => {
     const args = fileList(dir, ["barwise/packages/core/src/a.ts", "barwise/docs/specs/b.spec.md"]);
     const outputs = new Set(CWDS.map((cwd) => gate("pr-risk.mjs", cwd, ...args).stdout));
     assert.equal(outputs.size, 1, `pr-risk depends on cwd:\n${[...outputs].join("\n---\n")}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- WS1: the trivial allow-list that decides whether Copilot is requested -
+
+const { isTrivial, trivialGlobs } = await import(
+  pathToFileURL(join(SCRIPTS, "lib", "review-tiers.mjs")).href
+);
+
+test("isTrivial: every file must be on the allow-list, and an empty list is never trivial", () => {
+  const globs = [".beads/"];
+  assert.equal(isTrivial([".beads/issues.jsonl"], globs), true, "a tracker-only PR");
+  assert.equal(
+    isTrivial([".beads/issues.jsonl", "barwise/docs/specs/a.spec.md"], globs),
+    false,
+    "one file off the list makes the whole PR non-trivial",
+  );
+  assert.equal(isTrivial(["barwise/packages/diagram/src/a.ts"], globs), false);
+  // The trap the function exists for: [].every(...) is true.
+  assert.equal(isTrivial([], globs), false, "no files must never read as nothing to review");
+});
+
+test("trivialGlobs REFUSES a table that would exempt the wrong things, or say nothing", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-trivial-"));
+  try {
+    const table = join(dir, "t.json");
+    const rows = [{ heading: "A", tier: "routine", globs: ["x/"], why: "f" }];
+    const cases = [
+      [{ rows }, /no trivial\.globs/, "a missing block"],
+      [{ rows, trivial: { globs: [], why: "w" } }, /no trivial\.globs/, "an empty list"],
+      [
+        { rows, trivial: { globs: ["**"], why: "w" } },
+        /exempt everything/,
+        "** would switch review off",
+      ],
+      [
+        { rows, trivial: { globs: ["*.md"], why: "w" } },
+        /one whole path segment/,
+        "a pattern outside the language",
+      ],
+      [{ rows, trivial: { globs: [".beads/"] } }, /trivial\.why/, "no stated reason"],
+    ];
+    for (const [json, pattern, label] of cases) {
+      writeFileSync(table, JSON.stringify(json));
+      assert.throws(() => trivialGlobs(table), pattern, label);
+    }
+    writeFileSync(table, JSON.stringify({ rows, trivial: VALID_TRIVIAL }));
+    assert.deepEqual(trivialGlobs(table), [".beads/"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers REFUSES a trivial allow-list of **, through the gate", () => {
+  // Through the gate, not only the function: a one-character edit to the
+  // table must fail CI on the PR that makes it, not surface later as a
+  // reviewer that silently stopped being requested.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-trivial-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }]);
+    assert.equal(
+      gate("check-review-tiers.mjs", dir, ...args).status,
+      0,
+      "the valid fixture passes",
+    );
+    writeFileSync(
+      join(dir, "review-tiers.json"),
+      JSON.stringify({
+        trivial: { globs: ["**"], why: "w" },
+        rows: [{ heading: "A", tier: "routine", globs: ["x/"], why: "f" }],
+      }),
+    );
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2);
+    assert.match(`${run.stdout}${run.stderr}`, /exempt everything/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("pr-risk reports trivial, and the real table exempts a tracker-only PR and nothing wider", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    const read = (files) =>
+      JSON.parse(gate("pr-risk.mjs", dir, ...fileList(dir, files), "--json").stdout).trivial;
+    assert.equal(read([".beads/issues.jsonl"]), true, "tracker-only is trivial");
+    assert.equal(read([".beads/issues.jsonl", "README.md"]), false, "docs are reviewed");
+    assert.equal(read(["barwise/docs/specs/a.spec.md"]), false, "specs are reviewed");
+    assert.equal(
+      read(["barwise/packages/diagram/src/a.ts"]),
+      false,
+      "code no row covers is reviewed",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the Copilot workflow reads its allow-list from main, never from the pull request", () => {
+  // pull_request would check out the PR's tree, and a PR could widen the
+  // allow-list and exempt itself. This pins the trigger and the checkout.
+  const wf = readFileSync(join(REPO, ".github/workflows/copilot-review.yml"), "utf8");
+  assert.match(wf, /^\s*pull_request_target:/m, "must run in the base branch's context");
+  assert.doesNotMatch(wf, /^\s*pull_request:/m, "plain pull_request would read the PR's own table");
+  assert.doesNotMatch(
+    wf,
+    /ref:\s*\$\{\{\s*github\.event\.pull_request\.head/,
+    "checking out the PR head under pull_request_target runs its code with a write token",
+  );
+  assert.doesNotMatch(
+    wf,
+    /\$\{\{\s*github\.event\.pull_request\.(title|body|head\.ref)/,
+    "PR-controlled strings must reach the shell through env, never interpolation",
+  );
+});
+
+test("check-review-tiers names the defect it refuses, for every row and allow-list guard", () => {
+  // One case per guard in tierRows and trivialGlobs, each asserting the
+  // SPECIFIC message. An automated pass that neutralized every refusal in
+  // lib/review-tiers.mjs found eight of them surviving: five no test
+  // reached, and three reached only by tests that checked the exit code,
+  // which a crash satisfies as well as a refusal does.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }]);
+    const ok = { heading: "A", tier: "routine", globs: ["x/"], why: "f" };
+    const cases = [
+      [{ trivial: VALID_TRIVIAL, rows: [] }, /declares no rows/, "an empty rows list"],
+      [{ trivial: VALID_TRIVIAL }, /declares no rows/, "no rows key at all"],
+      [
+        { trivial: VALID_TRIVIAL, rows: [{ ...ok, heading: "" }] },
+        /heading must be a non-empty string/,
+        "an empty heading",
+      ],
+      [
+        { trivial: VALID_TRIVIAL, rows: [{ ...ok, why: undefined }] },
+        /why must be a non-empty string/,
+        "no why",
+      ],
+      [
+        {
+          trivial: VALID_TRIVIAL,
+          rows: [{ heading: "A", tier: "not-path-derivable", globs: ["x/"], why: "f" }],
+        },
+        /carry no globs/,
+        "globs on a row the classifier cannot reach",
+      ],
+      [
+        { trivial: VALID_TRIVIAL, rows: [{ ...ok, globs: [""] }] },
+        /every glob must be a non-empty string/,
+        "an empty glob",
+      ],
+      [
+        { trivial: VALID_TRIVIAL, rows: [{ ...ok, globs: [42] }] },
+        /every glob must be a non-empty string/,
+        "a non-string glob",
+      ],
+      [
+        { trivial: { globs: [""], why: "w" }, rows: [ok] },
+        /every trivial glob must be a non-empty string/,
+        "an empty trivial glob",
+      ],
+      [
+        { trivial: { globs: [7], why: "w" }, rows: [ok] },
+        /every trivial glob must be a non-empty string/,
+        "a non-string trivial glob",
+      ],
+    ];
+    for (const [json, pattern, label] of cases) {
+      writeFileSync(join(dir, "review-tiers.json"), JSON.stringify(json));
+      const run = gate("check-review-tiers.mjs", dir, ...args);
+      assert.equal(run.status, 2, `${label}: must refuse`);
+      assert.match(`${run.stdout}${run.stderr}`, pattern, `${label}: must refuse for THIS reason`);
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

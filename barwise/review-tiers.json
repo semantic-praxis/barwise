@@ -6,6 +6,10 @@
     "routine": "CI and the ratchets carry it. No blocking review.",
     "not-path-derivable": "The checklist trigger is semantic, not path-shaped. The classifier CANNOT detect it, and saying so is the point: these stay with the deep review, and a row exists so the completeness gate still accounts for the heading."
   },
+  "trivial": {
+    "globs": [".beads/"],
+    "why": "A pull request is trivial only if EVERY changed file is under one of these, and a trivial PR gets no Copilot review (.github/workflows/copilot-review.yml). Measured over the last 60 merged PRs: 11 (18%) touched only .beads/issues.jsonl -- every one a one-file tracker closure -- and nothing else was plausibly trivial. Documentation is deliberately NOT here: PR #532 was docs-and-tracker only and a Copilot review found five real defects in it, the worst a spec diagram describing an implementation that no longer existed. Widen this list only with the same kind of evidence, because a wrong entry is a defect nobody looks at."
+  },
   "rows": [
     {
       "heading": "Every PR",

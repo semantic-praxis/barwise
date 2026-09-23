@@ -505,6 +505,12 @@
       "caught_by": "not-a-correction",
       "note": "The Status header announcing that corrections are recorded below. It points at the records; it is not one. Re-keyed from ::3eff3ca4612e when the header was corrected during this change's own review -- the id is a hash of the normalised text, so editing the sentence drops the old row and adds this one."
     },
+    "tiered-pr-review::1937dd238ba9": {
+      "spec": "tiered-pr-review.spec.md",
+      "excerpt": "not verifiable before shipping: whether githubtoken can request copilot-pull-request-reviewer[bot], and what login copilot appears under in the post response. d",
+      "caught_by": "not-a-correction",
+      "note": "States a limit of verification, not a correction of an earlier claim: whether a workflow's GITHUB_TOKEN can request copilot-pull-request-reviewer[bot] could not be checked before the workflow first runs (docs.github.com returned 403 through the proxy; no gh in the container). Nothing earlier said otherwise. The detector surfaced it on its wording. Its converse is worth recording: the paragraph just above it IS a correction -- WS1 said its precondition was 'NOT established' for five days after it was settled -- and the detector did not surface that one."
+    },
     "tracker-quick-wins::ae1c4c3cc7ab": {
       "spec": "tracker-quick-wins.spec.md",
       "excerpt": "- ws2, splitmodel: the fallback was dead, not stale. the draft said to redirect doc.ormversion ?? \"1.0\" to currentormversion. writing the test showed the path c",

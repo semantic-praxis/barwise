@@ -37,7 +37,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-import { classify, TABLE, tierRows } from "./lib/review-tiers.mjs";
+import { classify, isTrivial, TABLE, tierRows, trivialGlobs } from "./lib/review-tiers.mjs";
 
 // `lib/tracked.mjs` resolves the repository root AT IMPORT, and exits 2
 // when git cannot answer. That is right for a gate that always needs the
@@ -147,9 +147,10 @@ async function changedFiles() {
   }
 }
 
-let rows;
+let rows, trivial;
 try {
   rows = tierRows(opt("--table", TABLE));
+  trivial = trivialGlobs(opt("--table", TABLE));
 } catch (err) {
   refuse(err.message, err.cause?.message);
 }
@@ -163,7 +164,11 @@ if (files.length === 0) {
   );
 }
 
-const result = classify(files, rows);
+// `trivial` is a separate question from the tier: it decides whether a
+// Copilot review is requested at all (WS1), where the tier decides
+// whether one blocks (WS4). Reported side by side because the workflow
+// reads one and a person reading the output may want both.
+const result = { ...classify(files, rows), trivial: isTrivial(files, trivial) };
 
 if (process.argv.includes("--json")) {
   console.log(JSON.stringify({ ...result, fileCount: files.length }, null, 2));
@@ -172,7 +177,8 @@ if (process.argv.includes("--json")) {
 
 const width = Math.max(...result.matched.map((r) => r.tier.length), 0);
 console.log(
-  `pr-risk: ${result.tier}  (${files.length} changed file${files.length === 1 ? "" : "s"})`,
+  `pr-risk: ${result.tier}${result.trivial ? ", trivial" : ""}`
+    + `  (${files.length} changed file${files.length === 1 ? "" : "s"})`,
 );
 console.log();
 for (const row of result.matched.sort((a, b) => a.tier.localeCompare(b.tier))) {

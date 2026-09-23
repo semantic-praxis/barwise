@@ -9,15 +9,17 @@ wrong and WS4 does not proceed; two of them were wrong and are fixed, and
 the residual is not a glob defect but a premise defect, which is a
 decision this spec cannot take on its own.
 
-WS1's precondition is SETTLED (Copilot code review works here; see "What
-the live test measured") but WS1 is NOT built -- its cost question is
-open. Open decision 2 is RESOLVED against this spec's own recommendation;
-Open decision 5's model half is decided (the org Copilot policy now
-enables only GPT-5.6 Terra) and its cost half is open. WS5 is unbuilt.
-Open decision 6 is new and is what WS4 waits on.
+WS1 IMPLEMENTED, and its request path UNVERIFIED until it first runs:
+`.github/workflows/copilot-review.yml` requests one Copilot review on
+every NON-TRIVIAL pull request, by the owner's direction on 2026-09-23.
+That direction also settles Open decision 5's cost half. Whether a
+workflow's `GITHUB_TOKEN` can request this reviewer could not be checked
+from the session that built it; the workflow is written to fail loudly
+if it cannot. Open decision 2 is RESOLVED against this spec's own
+recommendation. WS5 is unbuilt. Open decision 6 is what WS4 waits on.
 
 Created: 2026-09-17
-Last-updated: 2026-09-22
+Last-updated: 2026-09-23
 Tracking: barwise-1036 (WS1, the Copilot review workflow); barwise-1037 (WS2,
 the tier table and its completeness gate); barwise-1038 (WS3, the
 classifier); barwise-1041 (WS4, the blocking gate); barwise-1040 (WS5,
@@ -461,20 +463,96 @@ observable, which is what the third exit code exists to separate.
 
 ## Workstreams (each independently shippable)
 
-**WS1 -- Copilot reviews every pull request. Its precondition is NOT
-established.** Requesting a Copilot review on PR #525 on 2026-09-17
-produced no review in over eight hours, and nothing available
-distinguishes "Copilot code review is disabled for this repository" from
-"the request silently failed" (barwise-1036). Establish that Copilot code
-review is enabled here and posts, BEFORE building the workflow: if it is
-not, WS1 cannot ship, the first tier of this design is empty, and WS3 and
-WS4 are moot. Then add
-`.github/workflows/copilot-review.yml` requesting
-`copilot-pull-request-reviewer[bot]` as a reviewer on `opened`,
-`reopened`, `ready_for_review`. No gate, no tier, nothing blocks. This
-ships value on its own and produces the review corpus WS5 measures.
-Acceptance: a pull request opened after this lands carries a Copilot
-review, observed, with the request visible in the workflow log.
+**WS1 -- Copilot reviews every NON-TRIVIAL pull request.
+(IMPLEMENTED 2026-09-23; request path unverified until first run.)**
+
+_This paragraph used to say the precondition was not established._ It
+was settled on 2026-09-18 (see "What the live test measured") and the
+paragraph was never updated -- the status header said SETTLED while this
+said NOT, in the same document, for five days. Recorded because it is
+the same drift this spec's own reviews kept finding in other copies.
+
+**The decision.** The owner, on 2026-09-23: "Copilot should fire for any
+non trivial pr." Not every pull request, and not only the high-risk
+tier -- which is the "gate requesting, not only blocking" inversion Open
+decision 5 named as the budget fallback, taken on a narrower line.
+
+**What trivial means, measured rather than chosen.** Of the last 60
+merged pull requests, 11 (18%) touched only `.beads/issues.jsonl` -- each
+a one-file tracker closure -- and nothing else was plausibly trivial.
+Documentation is deliberately NOT trivial: PR #532 was docs-and-tracker
+only, and a Copilot review found five real defects in it, the worst a
+spec diagram describing an implementation that no longer existed. So
+trivial is an explicit allow-list, `trivial.globs` in
+`barwise/review-tiers.json`, currently `.beads/` alone, read through
+`pr-risk.mjs`. A PR is trivial only if EVERY changed file is on it.
+
+It is an allow-list and not derived from the tier rows because deriving
+it is wrong in the direction that matters: the rows cover checklist
+triggers, not the repository, so "no row but Every PR matched" would
+read a change to `barwise/packages/diagram/src/` as trivial. An
+unrecognised path must mean review it. A wrong skip is a defect nobody
+looks at; a wrong request is one review's cost.
+
+**The workflow's design, each choice stated where it lives:**
+
+- `pull_request_target`, checking out the BASE branch. The allow-list is
+  read from main, so a PR cannot widen it to exempt itself -- under
+  plain `pull_request` the checkout is the PR's own tree. It also gives
+  Dependabot PRs a token that can request a reviewer. No PR code is run;
+  the only PR-controlled input is the list of file names, read as data.
+  A test pins the trigger and forbids checking out the PR head.
+- One review per PR. It runs on every push, but exits before checkout
+  when Copilot has already reviewed or been requested, so a PR that
+  starts tracker-only and later gains code is still reviewed once, and
+  pushes do not buy repeat reviews.
+- Every uncertainty resolves toward requesting: `pr-risk` refusing, an
+  empty file list, and a list of 3,000 files (where the API stops, so it
+  may be truncated) all request the review. `isTrivial([])` is false for
+  the same reason, because `[].every(...)` is true.
+- A request that did not land fails the job, with the API response
+  printed. A green job that requested nothing would be the
+  absence-read-as-an-answer failure this repository keeps recording.
+- `workflow_dispatch` runs it on an existing PR by number, to verify the
+  request path or to backfill a PR opened before this existed.
+
+**Verified before shipping:** the workflow's two shell steps, extracted
+verbatim from the YAML, run against a stubbed `gh` across every branch
+-- draft, already reviewed, reviewed by a human only, already requested,
+fresh; trivial, tracker-plus-spec, code, classifier refusal, empty list,
+3,000 files, and a request that did not land (exit 1, `::error::`, the
+response printed). Both steps pass shellcheck.
+
+**And a mutation pass found the suite weaker than it looked.** Asked
+whether testing the gate-level wiring should rest on remembering to, a
+pilot enumerated every refusal site in `lib/review-tiers.mjs` and
+`pr-risk.mjs` automatically and neutralized each: 8 caught, 8 survived,
+8 unmeasurable. Seven survivors were in WS2 code already merged in #527,
+one in this workstream's new code. Some guards no test reached; others
+were reached by tests that asserted only exit 2, which a crash satisfies
+as well as a designed refusal does, since the gate maps any exception to
+2. Fixed here by asserting each refusal's own message; the same pass
+afterwards reads 14 of 14 measurable sites caught in that file. The
+mechanism -- automatic enumeration, occurrence-indexed anchoring, a
+survivor ratchet -- is barwise-1049, because a pilot run once is the
+remembering this was meant to replace.
+
+**Not verifiable before shipping:** whether `GITHUB_TOKEN` can request
+`copilot-pull-request-reviewer[bot]`, and what login Copilot appears
+under in the POST response. `docs.github.com` returned 403 through the
+session's proxy and the container has no `gh`. The workflow reads the
+response back and matches any requested reviewer containing "copilot",
+case-insensitively -- deliberately loose about the spelling, which could
+not be checked, and strict about the effect. If the first run goes red,
+the printed response says which assumption was wrong. The fallback, if
+`GITHUB_TOKEN` cannot request this reviewer at all, is a token the owner
+creates and stores as a secret; that is not something a pull request
+can do.
+
+Acceptance, unchanged in substance: a non-trivial pull request opened
+after this lands carries a Copilot review, observed, with the request
+visible in the workflow log -- and a tracker-only one carries none, with
+the skip visible in its log.
 
 **WS2 -- The tier table and its completeness gate. (IMPLEMENTED
 2026-09-18.)** `barwise/review-tiers.json`, `scripts/lib/review-tiers.mjs`,
@@ -659,7 +737,11 @@ which is what keeps that bound meaningful.
    verified it. WS5 grounds it first and falls back to a single generated
    `copilot-instructions.md` if path scoping is unavailable.
 
-5. **Which model tier reviews, and whether the tier gates requesting as
+5. **(Cost half DECIDED 2026-09-23: request on every non-trivial pull
+   request -- see WS1. At the measured 82% non-trivial and ~216 merges a
+   month that is roughly 177 reviews; the premium-request multiplier
+   that would turn that into a bill is STILL UNVERIFIED, so the monthly
+   cost is not known, only its driver.)** Which model tier reviews, and whether the tier gates requesting as
    well as blocking.** Published figures for the GPT-5.6 family: Sol
    $5/$30 per 1M tokens, Terminal-Bench 2.1 88.8%, Nerova 79.2%; Terra
    $2.50/$15, 87.1%, 71.4%; Luna $1/$6, 83.2%, 41.3%. Context is 1.05M on
