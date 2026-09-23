@@ -3,8 +3,9 @@ name: Copilot review
 # Requests one Copilot code review on every NON-TRIVIAL pull request.
 #
 # WS1 of barwise/docs/specs/tiered-pr-review.spec.md (barwise-1036). This
-# REQUESTS a review; nothing here blocks a merge. Blocking is WS4, which is
-# held on that spec's Open decision 6.
+# REQUESTS a review, and nothing blocks a merge on it: the owner decided on
+# 2026-09-23 against any Copilot merge gate, and that spec's WS4 (the gate)
+# is withdrawn.
 #
 # "Trivial" is decided by scripts/pr-risk.mjs against the `trivial` block
 # of barwise/review-tiers.json. That block is the authority for what is on
@@ -38,8 +39,10 @@ name: Copilot review
 # A REFUSAL IS NOT A REVIEW. With its quota exhausted, Copilot posts "was
 # unable to review this pull request" AS a review, so the next push asks
 # again. Nothing waits on it: the owner's policy is to carry on without
-# the review until the quota resets. While it stays exhausted, each push
-# draws one more refusal, which is visible and costs nothing.
+# the review. While the quota stays exhausted, each push draws one more
+# refusal, which is visible and costs nothing. A reset triggers nothing by
+# itself -- there is no schedule here -- so the first push after it gets
+# the review, and a PR with no later push goes unreviewed.
 #
 # EVERY UNCERTAINTY RESOLVES TOWARD REQUESTING. A files API call that
 # fails, a file list that may be truncated, pr-risk refusing (exit 2), and

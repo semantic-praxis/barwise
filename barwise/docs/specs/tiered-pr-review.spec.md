@@ -29,7 +29,8 @@ state). Extends `docs/specs/pr-skills.spec.md`, which wrote the review
 down, and applies `docs/specs/gate-refusal-contract.spec.md`, which is
 the reason the gate here has three results instead of two.
 
-In one sentence: every non-trivial pull request gets a Copilot review,
+In one sentence: every non-trivial pull request has a Copilot review
+requested -- a refusal, when the quota is out, is carried on past --
 nothing blocks on it, and what the reviews keep finding is classified so
 the most common failure can be prevented before review instead of fixed
 after it.
@@ -975,9 +976,10 @@ acceptance.
 refusal is visible on the pull request and costs nothing, and the
 owner's policy is to carry on without the review. The cost is the
 review that did not happen: pull requests merged in that window got no
-second reader. WS1 asks again on the next push, so a pull request still
-open when the quota resets is reviewed then; one merged before it is
-not, and nothing goes back for it.
+second reader. WS1 asks again only on a push -- it has no schedule, so a
+reset triggers nothing -- which means a pull request pushed to after the
+reset is reviewed then, and one with no later push, or merged before it,
+is not. Nothing goes back for it.
 
 **Prompt injection reaches the reviewer.** Copilot reads diff content,
 and a pull request can contain text addressed to it. This is an
