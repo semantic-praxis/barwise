@@ -33,6 +33,7 @@ import {
   compareTable,
   TABLE,
   tierRows,
+  trivialGlobs,
 } from "./lib/review-tiers.mjs";
 
 /** `--flag value`, or the default. No dependency, and no partial matching. */
@@ -41,10 +42,15 @@ function opt(flag, fallback) {
   return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 }
 
-let headings, rows;
+let headings, rows, trivial;
 try {
   headings = checklistHeadings(opt("--checklist", CHECKLIST));
   rows = tierRows(opt("--table", TABLE));
+  // Validated here, not only where the workflow reads it, so a broken
+  // allow-list fails CI on the PR that breaks it -- rather than turning
+  // every later workflow run into a refusal, which requests a review
+  // (safe) but hides the cause in a job log nobody opens.
+  trivial = trivialGlobs(opt("--table", TABLE));
 } catch (err) {
   console.error(`check:review-tiers: cannot answer -- ${err.message}`);
   if (err.cause) console.error(`  cause: ${err.cause.message}`);
@@ -68,4 +74,7 @@ if (missing.length > 0 || stale.length > 0 || duplicated.length > 0) {
 
 const byTier = rows.reduce((acc, r) => ({ ...acc, [r.tier]: (acc[r.tier] ?? 0) + 1 }), {});
 const summary = Object.entries(byTier).sort().map(([t, n]) => `${n} ${t}`).join(", ");
-console.log(`check:review-tiers: ${rows.length} headings, all with a row (${summary}). OK`);
+console.log(
+  `check:review-tiers: ${rows.length} headings, all with a row (${summary}); `
+    + `${trivial.length} trivial pattern${trivial.length === 1 ? "" : "s"}. OK`,
+);

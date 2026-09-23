@@ -265,3 +265,80 @@ export function classify(files, rows) {
       .map((r) => ({ heading: r.heading, why: r.why })),
   };
 }
+
+/**
+ * The patterns under which a pull request is TRIVIAL: every changed file
+ * must match one, or it is not.
+ *
+ * This decides whether a Copilot review is requested at all
+ * (`.github/workflows/copilot-review.yml`, WS1), which is why it is an
+ * explicit ALLOW-list and not derived from the tier rows. Deriving it --
+ * "trivial if no row but 'Every PR' matched" -- was the obvious move and
+ * is wrong: the rows cover checklist triggers, not the repository, so a
+ * change to `barwise/packages/diagram/src/` matches no row and would have
+ * read as trivial. An unrecognised path must mean "review it", never
+ * "skip it", because the two errors are not symmetric: a wrong skip is a
+ * defect nobody looked at, a wrong review is one request's cost.
+ *
+ * Throws, like `tierRows`, rather than returning an empty list. An empty
+ * allow-list is SAFE (nothing is trivial, everything is reviewed) but a
+ * missing one is a file that is not the one we think it is, and that
+ * should be loud. The workflow maps any refusal to "request the review".
+ */
+export function trivialGlobs(file = TABLE) {
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(file, "utf8"));
+  } catch (cause) {
+    throw new Error(`cannot read or parse the tier table at ${file}`, { cause });
+  }
+  const globs = parsed?.trivial?.globs;
+  if (!Array.isArray(globs) || globs.length === 0) {
+    throw new Error(`${file} declares no trivial.globs -- the allow-list is missing`);
+  }
+  if (typeof parsed.trivial.why !== "string" || parsed.trivial.why.length === 0) {
+    throw new Error(`${file}: trivial.why must say why these paths need no review`);
+  }
+  for (const g of globs) {
+    if (typeof g !== "string" || g.length === 0) {
+      throw new Error(`${file}: every trivial glob must be a non-empty string`);
+    }
+    if (g === "**") {
+      // Every path would be trivial and no pull request would ever be
+      // reviewed. A one-character edit to this file must not be able to
+      // switch the reviewer off for the whole repository.
+      throw new Error(`${file}: trivial.globs may not contain "**" -- it would exempt everything`);
+    }
+    const fault = patternFault(g);
+    if (fault) throw new Error(`${file}: trivial.${fault}`);
+  }
+  return globs;
+}
+
+/**
+ * Is this change list trivial -- every change an EDIT to a path under an
+ * allow-listed pattern?
+ *
+ * `changes` are `{ path, status }`, with the pull request files API's
+ * status words (`modified`, `added`, `removed`, `renamed`, ...). Only
+ * `modified` can be trivial, because an edit to the tracker is what the
+ * allow-list's evidence measured. The other statuses are not that: a
+ * rename's SOURCE is somewhere else, so moving code in under an
+ * allow-listed name read as a tracker edit by name alone, and deleting
+ * the tracker is not a closure. A status of `null` -- a bare path list,
+ * which cannot say -- is therefore never trivial either.
+ *
+ * An EMPTY list is not trivial, and that is the whole reason this is a
+ * function rather than an inline `changes.every(...)`: `[].every(f)` is
+ * true, so the obvious one-liner reads "no files" as "nothing needs
+ * review" and skips the reviewer on exactly the input a broken git call
+ * or an empty API page produces. `pr-risk` already refuses an empty list
+ * before it gets here; this refuses it again for any other caller, in
+ * the direction that costs a review rather than one that loses it.
+ */
+export function isTrivial(changes, globs) {
+  if (changes.length === 0) return false;
+  return changes.every(
+    (c) => c.status === "modified" && globs.some((g) => matchesPattern(c.path, g)),
+  );
+}

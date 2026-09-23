@@ -1,0 +1,178 @@
+name: Copilot review
+
+# Requests one Copilot code review on every NON-TRIVIAL pull request.
+#
+# WS1 of barwise/docs/specs/tiered-pr-review.spec.md (barwise-1036). This
+# REQUESTS a review; nothing here blocks a merge. Blocking is WS4, which is
+# held on that spec's Open decision 6.
+#
+# "Trivial" is decided by scripts/pr-risk.mjs against the `trivial` block
+# of barwise/review-tiers.json. That block is the authority for what is on
+# the allow-list and for the evidence behind each entry; this file restates
+# neither. What this file relies on is the rule pr-risk applies: a PR is
+# trivial only if EVERY change is an edit to an allow-listed path. An
+# unlisted path, an add, a delete or a rename is reviewed.
+#
+# WHY pull_request_target, and why that is safe here:
+#   - The allow-list must come from main, not from the pull request. Under
+#     plain pull_request the checkout is the PR's own tree, so a PR could
+#     widen the list and exempt itself from review. The checkout below is
+#     pinned to the default branch, so a workflow_dispatch started from
+#     another branch reads main's table too.
+#   - Dependabot PRs get a read-only token under pull_request, so the
+#     request would fail on exactly the supply-chain PRs worth reviewing.
+#   - The usual danger -- running the PR's code with a write token -- does
+#     not arise: no PR code is checked out, and the only PR-controlled
+#     input is the changed-file records, fetched from the API and read as
+#     data. No PR-controlled string is interpolated into a shell command;
+#     everything goes through env. The records travel as one JSON object
+#     per line, so a file name arrives exactly as GitHub reports it: a
+#     leading space or an embedded newline cannot turn it into an
+#     allow-listed path on the way.
+#
+# ONE REVIEW PER PR. Runs on every push so a PR that starts tracker-only
+# and later gains code still gets reviewed, but exits before checkout when
+# Copilot has already reviewed or been requested -- pushes do not buy
+# repeat reviews, and a repeat run costs seconds.
+#
+# EVERY UNCERTAINTY RESOLVES TOWARD REQUESTING. A files API call that
+# fails, a file list that may be truncated, pr-risk refusing (exit 2), and
+# an empty list all request the review. A wrong skip is a defect nobody
+# looks at; a wrong request is one review's cost.
+#
+# A REQUEST THAT DID NOT LAND FAILS THE JOB. Whether GITHUB_TOKEN can
+# request this reviewer could not be checked before this file first ran --
+# the docs were unreachable from the session that wrote it -- so the
+# response is read back and the job goes red with it printed if Copilot is
+# not among the requested reviewers. A green job with no request would be
+# the absence-read-as-an-answer failure this repository keeps finding.
+#
+# workflow_dispatch runs the same logic on an existing PR by number: to
+# verify the request path, or to backfill a PR opened before this existed.
+#
+# The shell in both `run:` steps is executed by
+# barwise/scripts/tests/gates.test.mjs against a stubbed `gh`, one case per
+# branch, so an edit here is tested as written.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, synchronize]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Pull request number"
+        required: true
+        type: number
+
+# One run at a time per PR, queued rather than cancelled: two overlapping
+# runs could both see "not yet requested" and request twice.
+concurrency:
+  group: copilot-review-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  request:
+    runs-on: ubuntu-latest
+    # Drafts are skipped without a runner; ready_for_review brings them back.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number || inputs.pr }}
+      BOT: copilot-pull-request-reviewer[bot]
+      # Who counts as Copilot, as ONE jq test on a user object, used by all
+      # three checks below (past reviews, pending requests, the readback).
+      # Three spellings could disagree, and the one that decides "already
+      # reviewed" disagreeing means a request on every push. Loose about the
+      # login on purpose: the reviews endpoint reports
+      # copilot-pull-request-reviewer[bot] (measured on #533), and one
+      # endpoint's spelling is not evidence of another's. `// ""` because a
+      # deleted account's review has a null user.
+      COPILOT: '((.login // "") | ascii_downcase | contains("copilot"))'
+
+    steps:
+      # Cheap checks first, before any checkout, so the common repeat run
+      # (every push after the first review) exits in seconds.
+      - name: Decide whether a request is needed
+        id: decide
+        run: |
+          set -euo pipefail
+          need=true
+          if [ "$(gh api "repos/$REPO/pulls/$PR" --jq .draft)" = "true" ]; then
+            echo "PR #$PR is a draft; Copilot is requested when it is marked ready."
+            need=false
+          else
+            # Reading the reviews is not optional: if it fails, set -e stops
+            # the job red rather than guessing that no review exists.
+            reviewed=$(gh api --paginate "repos/$REPO/pulls/$PR/reviews" \
+              --jq ".[] | select(.user | $COPILOT) | .id" | wc -l)
+            pending=$(gh api "repos/$REPO/pulls/$PR/requested_reviewers" \
+              --jq "[.users[] | select($COPILOT)] | length")
+            if [ "$reviewed" -gt 0 ]; then
+              echo "Copilot has already reviewed PR #$PR ($reviewed review(s)); not requesting again."
+              need=false
+            elif [ "$pending" -gt 0 ]; then
+              echo "Copilot is already requested on PR #$PR; not requesting again."
+              need=false
+            fi
+          fi
+          echo "need=$need" >> "$GITHUB_OUTPUT"
+
+      # The DEFAULT branch, named rather than left to the event: the
+      # classifier and the allow-list come from main whichever branch a
+      # workflow_dispatch was started from.
+      - uses: actions/checkout@v7
+        if: steps.decide.outputs.need == 'true'
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - uses: actions/setup-node@v7
+        if: steps.decide.outputs.need == 'true'
+        with:
+          node-version-file: .nvmrc
+
+      - name: Classify, and request Copilot if non-trivial
+        if: steps.decide.outputs.need == 'true'
+        run: |
+          set -euo pipefail
+          changes="$RUNNER_TEMP/changes.ndjson"
+          trivial=false
+          # One JSON record per line, not bare names: the name arrives
+          # exactly, and its status travels with it, because only an edit
+          # can be trivial.
+          if ! gh api --paginate "repos/$REPO/pulls/$PR/files" \
+            --jq '.[] | {filename, status, previous_filename} | @json' > "$changes"; then
+            echo "::warning::Could not read the changed files of PR #$PR; treating it as non-trivial."
+          else
+            count=$(wc -l < "$changes")
+            echo "PR #$PR changes $count file(s)."
+            if [ "$count" -ge 3000 ]; then
+              echo "The files API stops at 3000; a list that may be truncated is never trivial."
+            elif out=$(node barwise/scripts/pr-risk.mjs --changes "$changes" --json); then
+              trivial=$(printf '%s' "$out" | jq -r .trivial)
+              echo "pr-risk: tier=$(printf '%s' "$out" | jq -r .tier) trivial=$trivial"
+            else
+              echo "pr-risk could not classify PR #$PR (exit $?); treating it as non-trivial."
+            fi
+          fi
+
+          if [ "$trivial" = "true" ]; then
+            echo "Trivial: every change is an edit to a path on the allow-list in barwise/review-tiers.json. No review requested."
+            exit 0
+          fi
+
+          echo "Requesting $BOT on PR #$PR."
+          resp=$(jq -n --arg bot "$BOT" '{reviewers: [$bot]}' \
+            | gh api --method POST "repos/$REPO/pulls/$PR/requested_reviewers" --input -)
+          if printf '%s' "$resp" \
+            | jq -e "[.requested_reviewers[]? | select($COPILOT)] | length > 0" >/dev/null; then
+            echo "Requested."
+          else
+            echo "::error::The request returned without error, but Copilot is not among the requested reviewers."
+            printf '%s' "$resp" | jq '{requested_reviewers, requested_teams}'
+            exit 1
+          fi

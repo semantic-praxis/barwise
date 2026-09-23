@@ -2835,6 +2835,14 @@ test("run-script-tests refuses an absent tests directory rather than failing", (
 // and a test that can only assert the green path would be the thing
 // barwise-906 is about.
 
+/**
+ * A valid `trivial` block for fixtures. Every hand-written table carries
+ * one, so a refusal test fails on the defect it plants and not on a
+ * missing block -- a test passing for a reason other than the one it
+ * names is the defect a review found in this very suite.
+ */
+const VALID_TRIVIAL = { globs: [".beads/issues.jsonl"], why: "fixture" };
+
 /** A minimal pair of inputs the gate accepts, written into a temp dir. */
 function tierFixture(dir, headings, rows) {
   const md = ["# Checklist", "", ...headings.flatMap((h) => [`## ${h}`, "", "- item", ""])];
@@ -2842,6 +2850,7 @@ function tierFixture(dir, headings, rows) {
   writeFileSync(
     join(dir, "review-tiers.json"),
     JSON.stringify({
+      trivial: VALID_TRIVIAL,
       rows: rows.map((r) =>
         r.tier === "not-path-derivable"
           ? { heading: r.heading, tier: r.tier, why: "fixture" }
@@ -2914,7 +2923,10 @@ test("check-review-tiers REFUSES an unreadable checklist rather than calling eve
     rmSync(join(dir, "checklist.md"));
     const run = gate("check-review-tiers.mjs", dir, ...args);
     assert.equal(run.status, 2, "could not answer is not the same as failed");
-    assert.match(`${run.stdout}${run.stderr}`, /cannot answer/);
+    // The REASON, not only the code: the gate maps any exception to exit 2,
+    // so with this guard removed the function crashes on `undefined.split`
+    // and still exits 2. A mutation pass found this test passing that way.
+    assert.match(`${run.stdout}${run.stderr}`, /cannot read the checklist/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -2949,19 +2961,32 @@ test("check-review-tiers REFUSES a row whose tier is unknown or whose globs are 
 
     writeFileSync(
       join(dir, "review-tiers.json"),
-      JSON.stringify({ rows: [{ heading: "A", tier: "sort-of-risky", globs: ["x/"], why: "f" }] }),
+      JSON.stringify({
+        trivial: VALID_TRIVIAL,
+        rows: [{ heading: "A", tier: "sort-of-risky", globs: ["x/"], why: "f" }],
+      }),
     );
-    assert.equal(gate("check-review-tiers.mjs", dir, ...args).status, 2, "unknown tier");
+    const unknown = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(unknown.status, 2, "unknown tier");
+    assert.match(`${unknown.stdout}${unknown.stderr}`, /tier must be one of/);
 
     writeFileSync(
       join(dir, "review-tiers.json"),
-      JSON.stringify({ rows: [{ heading: "A", tier: "high-risk", why: "f" }] }),
+      JSON.stringify({
+        trivial: VALID_TRIVIAL,
+        rows: [{ heading: "A", tier: "high-risk", why: "f" }],
+      }),
     );
+    const noGlobs = gate("check-review-tiers.mjs", dir, ...args);
     assert.equal(
-      gate("check-review-tiers.mjs", dir, ...args).status,
+      noGlobs.status,
       2,
       "a path tier with no globs is a row that can never match, not a routine one",
     );
+    // With the guard removed this reaches `for (const g of undefined)` and
+    // throws a TypeError the gate also maps to 2 -- found surviving by a
+    // mutation pass. The message is what proves the guard fired.
+    assert.match(`${noGlobs.stdout}${noGlobs.stderr}`, /needs at least one glob/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -3164,7 +3189,7 @@ test("pr-risk REFUSES a base ref git cannot resolve, from inside a repository", 
   const run = gate("pr-risk.mjs", REPO, "--base", "origin/no-such-ref-here");
   assert.equal(run.status, 2, "a base ref git cannot resolve, as in a shallow clone");
   assert.doesNotMatch(run.stdout, /routine|high-risk/, "a refusal prints no tier");
-  assert.match(run.stderr, /git diff --name-only origin\/no-such-ref-here/);
+  assert.match(run.stderr, /git diff --name-status origin\/no-such-ref-here/);
   assert.doesNotMatch(
     run.stderr,
     /rev-parse --show-toplevel/,
@@ -3177,7 +3202,7 @@ test("pr-risk REFUSES a flag given with no value, rather than defaulting", () =>
   // print a confident tier for a base the caller never named.
   const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
   try {
-    for (const argv of [["--base"], ["--files"], ["--base", "--json"]]) {
+    for (const argv of [["--base"], ["--files"], ["--changes"], ["--base", "--json"]]) {
       const run = gate("pr-risk.mjs", REPO, ...argv);
       assert.equal(run.status, 2, `${argv.join(" ")} must refuse`);
       assert.doesNotMatch(run.stdout, /routine|high-risk/, `${argv.join(" ")} printed a tier`);
@@ -3205,7 +3230,10 @@ test("check-review-tiers REFUSES a table whose pattern the language does not def
     for (const glob of ["*.ts", "./barwise/scripts/", "a/../b/"]) {
       writeFileSync(
         join(dir, "review-tiers.json"),
-        JSON.stringify({ rows: [{ heading: "A", tier: "routine", globs: [glob], why: "f" }] }),
+        JSON.stringify({
+          trivial: VALID_TRIVIAL,
+          rows: [{ heading: "A", tier: "routine", globs: [glob], why: "f" }],
+        }),
       );
       const run = gate("check-review-tiers.mjs", dir, ...args);
       assert.equal(run.status, 2, `${glob} is valid JSON and an invalid pattern`);
@@ -3230,10 +3258,19 @@ test("pr-risk REFUSES a path list that is not repo-root-relative", () => {
   // emit these shapes, so one means the list came from somewhere else.
   const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
   try {
-    for (const bad of ["./barwise/docs/specs/b.spec.md", "/abs/path.ts", "barwise/../etc/x"]) {
+    for (
+      const bad of ["./barwise/docs/specs/b.spec.md", "/abs/path.ts", "barwise/../etc/x", "a/.."]
+    ) {
       const run = gate("pr-risk.mjs", dir, ...fileList(dir, [bad]));
       assert.equal(run.status, 2, `${bad} must refuse, not classify`);
       assert.doesNotMatch(run.stdout, /routine|high-risk/, `${bad} printed a tier`);
+      assert.match(run.stderr, /not repo-root-relative/, bad);
+    }
+    // A dot SEGMENT is refused; dots inside a name are a legal name. The
+    // first version tested the substring and refused these (#533 review).
+    for (const legal of ["barwise/packages/core/src/a..b.ts", "..hidden/x", "x/.env", "y/..."]) {
+      const run = gate("pr-risk.mjs", dir, ...fileList(dir, [legal]));
+      assert.equal(run.status, 0, `${legal} is a legal path:\n${run.stderr}`);
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -3248,6 +3285,551 @@ test("pr-risk gives the same answer from every cwd", () => {
     const args = fileList(dir, ["barwise/packages/core/src/a.ts", "barwise/docs/specs/b.spec.md"]);
     const outputs = new Set(CWDS.map((cwd) => gate("pr-risk.mjs", cwd, ...args).stdout));
     assert.equal(outputs.size, 1, `pr-risk depends on cwd:\n${[...outputs].join("\n---\n")}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- WS1: the trivial allow-list that decides whether Copilot is requested -
+
+const { isTrivial, trivialGlobs } = await import(
+  pathToFileURL(join(SCRIPTS, "lib", "review-tiers.mjs")).href
+);
+
+test("isTrivial: every change must be an EDIT to an allow-listed path, and none is not trivial", () => {
+  const globs = [".beads/issues.jsonl"];
+  const edit = (path) => ({ path, status: "modified" });
+  assert.equal(isTrivial([edit(".beads/issues.jsonl")], globs), true, "a tracker closure");
+  assert.equal(
+    isTrivial([edit(".beads/issues.jsonl"), edit("barwise/docs/specs/a.spec.md")], globs),
+    false,
+    "one file off the list makes the whole PR non-trivial",
+  );
+  assert.equal(isTrivial([edit("barwise/packages/diagram/src/a.ts")], globs), false);
+  // The evidence is edits. A rename's source is elsewhere, a delete is not
+  // a closure, and a bare path list cannot say which it was.
+  for (const status of ["removed", "added", "renamed", "changed", null]) {
+    assert.equal(
+      isTrivial([{ path: ".beads/issues.jsonl", status }], globs),
+      false,
+      `status ${status} on an allow-listed path`,
+    );
+  }
+  // The trap the function exists for: [].every(...) is true.
+  assert.equal(isTrivial([], globs), false, "no files must never read as nothing to review");
+});
+
+test("trivialGlobs REFUSES a table that would exempt the wrong things, or say nothing", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-trivial-"));
+  try {
+    const table = join(dir, "t.json");
+    const rows = [{ heading: "A", tier: "routine", globs: ["x/"], why: "f" }];
+    const cases = [
+      [{ rows }, /no trivial\.globs/, "a missing block"],
+      [{ rows, trivial: { globs: [], why: "w" } }, /no trivial\.globs/, "an empty list"],
+      [
+        { rows, trivial: { globs: ["**"], why: "w" } },
+        /exempt everything/,
+        "** would switch review off",
+      ],
+      [
+        { rows, trivial: { globs: ["*.md"], why: "w" } },
+        /one whole path segment/,
+        "a pattern outside the language",
+      ],
+      [{ rows, trivial: { globs: [".beads/"] } }, /trivial\.why/, "no stated reason"],
+    ];
+    for (const [json, pattern, label] of cases) {
+      writeFileSync(table, JSON.stringify(json));
+      assert.throws(() => trivialGlobs(table), pattern, label);
+    }
+    writeFileSync(table, JSON.stringify({ rows, trivial: VALID_TRIVIAL }));
+    assert.deepEqual(trivialGlobs(table), [".beads/issues.jsonl"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers REFUSES a trivial allow-list of **, through the gate", () => {
+  // Through the gate, not only the function: a one-character edit to the
+  // table must fail CI on the PR that makes it, not surface later as a
+  // reviewer that silently stopped being requested.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-trivial-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }]);
+    assert.equal(
+      gate("check-review-tiers.mjs", dir, ...args).status,
+      0,
+      "the valid fixture passes",
+    );
+    writeFileSync(
+      join(dir, "review-tiers.json"),
+      JSON.stringify({
+        trivial: { globs: ["**"], why: "w" },
+        rows: [{ heading: "A", tier: "routine", globs: ["x/"], why: "f" }],
+      }),
+    );
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2);
+    assert.match(`${run.stdout}${run.stderr}`, /exempt everything/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * Write pull request files API records, one JSON object per line as the
+ * Copilot workflow's `--jq ... | @json` prints them, and the args that
+ * make pr-risk read them. Each change is `[status, filename, previous]`.
+ */
+function changeList(dir, changes) {
+  const path = join(dir, "changes.ndjson");
+  const recs = changes.map(([status, filename, previous_filename = null]) =>
+    JSON.stringify({ filename, status, previous_filename })
+  );
+  writeFileSync(path, recs.map((r) => `${r}\n`).join(""));
+  return ["--changes", path];
+}
+
+test("pr-risk reports trivial for a tracker edit through --changes, and for nothing wider", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    const read = (changes) => {
+      const run = gate("pr-risk.mjs", dir, ...changeList(dir, changes), "--json");
+      assert.equal(run.status, 0, `${run.stdout}${run.stderr}`);
+      return JSON.parse(run.stdout);
+    };
+    assert.equal(read([["modified", ".beads/issues.jsonl"]]).trivial, true, "a tracker edit");
+    const reviewed = [
+      [[["modified", ".beads/issues.jsonl"], ["modified", "README.md"]], "docs"],
+      [[["modified", "barwise/docs/specs/a.spec.md"]], "a spec"],
+      [[["modified", "barwise/packages/diagram/src/a.ts"]], "code no row covers"],
+      // The rest of .beads/ is tracked executable git hooks, among others.
+      [[["modified", ".beads/hooks/pre-commit"]], "a hook beside the tracker"],
+      [[["removed", ".beads/issues.jsonl"]], "the tracker deleted"],
+      // Names are exact. The first version trimmed, so this WAS the tracker.
+      [[["modified", " .beads/issues.jsonl"]], "a name with a leading space"],
+      [[["modified", "x\n.beads/issues.jsonl"]], "a name with an embedded newline"],
+    ];
+    for (const [changes, label] of reviewed) {
+      assert.equal(read(changes).trivial, false, `${label} must be reviewed`);
+    }
+    // A rename is classified from BOTH ends: code moved out of core, in
+    // under the tracker's name, is a core change and not a closure.
+    const moved = read([["renamed", ".beads/issues.jsonl", "barwise/packages/core/src/a.ts"]]);
+    assert.equal(moved.trivial, false, "a rename into the allow-list");
+    assert.equal(moved.tier, "high-risk", "the rename's source is classified too");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("pr-risk --files never reports trivial, and REFUSES a padded path rather than trimming it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    const run = gate("pr-risk.mjs", dir, ...fileList(dir, [".beads/issues.jsonl"]), "--json");
+    assert.equal(run.status, 0, `${run.stdout}${run.stderr}`);
+    assert.equal(JSON.parse(run.stdout).trivial, false, "a bare list has no status to be an edit");
+    for (const bad of [" .beads/issues.jsonl", ".beads/issues.jsonl\r"]) {
+      const padded = gate("pr-risk.mjs", dir, ...fileList(dir, [bad]));
+      assert.equal(padded.status, 2, `${JSON.stringify(bad)} must refuse`);
+      assert.doesNotMatch(padded.stdout, /routine|high-risk/);
+      assert.match(padded.stderr, /begin or end with whitespace/);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("pr-risk REFUSES a --changes record it cannot read, naming the line", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    const path = join(dir, "changes.ndjson");
+    const cases = [
+      ["not json", /line 1 is not JSON/],
+      [JSON.stringify({ filename: "a/b.ts" }), /line 1 is not a files API record/],
+      [JSON.stringify({ status: "modified" }), /line 1 is not a files API record/],
+      [JSON.stringify(".beads/issues.jsonl"), /line 1 is not a files API record/],
+      [
+        JSON.stringify({ filename: "a/b.ts", status: "renamed", previous_filename: 7 }),
+        /previous_filename that is not a path/,
+      ],
+      [
+        JSON.stringify({ filename: "a/b.ts", status: "renamed", previous_filename: "../x" }),
+        /not repo-root-relative/,
+      ],
+    ];
+    for (const [line, message] of cases) {
+      writeFileSync(path, `${line}\n`);
+      const run = gate("pr-risk.mjs", dir, "--changes", path);
+      assert.equal(run.status, 2, `${line} must refuse`);
+      assert.doesNotMatch(run.stdout, /routine|high-risk/, `${line} printed a tier`);
+      assert.match(run.stderr, message, line);
+    }
+    const both = gate("pr-risk.mjs", dir, "--changes", path, ...fileList(dir, ["a/b.ts"]));
+    assert.equal(both.status, 2);
+    assert.match(both.stderr, /both given/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("pr-risk's git path keeps a rename's source and reads names exactly", () => {
+  // `--name-only` names only a rename's destination, so moving a core
+  // file to the tracker's path printed `.beads/issues.jsonl` alone: core
+  // row missed, and a tracker "edit" by name. `--no-renames -z` fixes both.
+  const dir = tempRepo();
+  try {
+    stage(dir, "barwise/packages/core/src/a.ts", "export const a = 1;\n");
+    execFileSync("git", ["commit", "-qm", "base"], { cwd: dir });
+    execFileSync("git", ["branch", "-M", "main"], { cwd: dir });
+    const branch = (name, change) => {
+      execFileSync("git", ["checkout", "-q", "-B", name, "main"], { cwd: dir });
+      change();
+      execFileSync("git", ["commit", "-qam", name], { cwd: dir });
+      const run = gate("pr-risk.mjs", dir, "--base", "main", "--json");
+      assert.equal(run.status, 0, `${run.stdout}${run.stderr}`);
+      return JSON.parse(run.stdout);
+    };
+    const moved = branch("move", () => {
+      mkdirSync(join(dir, ".beads"));
+      execFileSync("git", ["mv", "barwise/packages/core/src/a.ts", ".beads/issues.jsonl"], {
+        cwd: dir,
+      });
+    });
+    assert.equal(moved.tier, "high-risk", "the rename's source is a core change");
+    assert.equal(moved.trivial, false);
+    assert.equal(moved.fileCount, 2, "a delete and an add");
+
+    // Main gains the tracker AND a look-alike, so a branch can EDIT either:
+    // same status, and only the exact name makes the edit trivial.
+    execFileSync("git", ["checkout", "-q", "main"], { cwd: dir });
+    stage(dir, ".beads/issues.jsonl", "{}\n");
+    stage(dir, " .beads/issues.jsonl", "{}\n");
+    execFileSync("git", ["commit", "-qm", "tracker"], { cwd: dir });
+    const edit = (name) => () => writeFileSync(join(dir, name), "{}\n{}\n");
+    assert.equal(branch("edit", edit(".beads/issues.jsonl")).trivial, true, "a tracker edit");
+    assert.equal(
+      branch("pad", edit(" .beads/issues.jsonl")).trivial,
+      false,
+      "an edit to a name with a leading space is not a tracker edit",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the Copilot workflow reads its allow-list from main, never from the pull request", () => {
+  // pull_request would check out the PR's tree, and a PR could widen the
+  // allow-list and exempt itself. This pins the trigger and the checkout.
+  const wf = readFileSync(join(REPO, ".github/workflows/copilot-review.yml"), "utf8");
+  assert.match(wf, /^\s*pull_request_target:/m, "must run in the base branch's context");
+  assert.doesNotMatch(wf, /^\s*pull_request:/m, "plain pull_request would read the PR's own table");
+  assert.doesNotMatch(
+    wf,
+    /ref:\s*\$\{\{\s*github\.event\.pull_request\.head/,
+    "checking out the PR head under pull_request_target runs its code with a write token",
+  );
+  assert.doesNotMatch(
+    wf,
+    /\$\{\{\s*github\.event\.pull_request\.(title|body|head\.ref)/,
+    "PR-controlled strings must reach the shell through env, never interpolation",
+  );
+  // Named, not left to the event: a workflow_dispatch checks out the ref it
+  // was started from, so a run from a branch read that branch's table.
+  assert.match(
+    wf,
+    /- uses: actions\/checkout@\S+\n(?:\s+if: .*\n)?\s+with:\n\s+ref: \$\{\{ github\.event\.repository\.default_branch \}\}\n/,
+    "the checkout must name the default branch",
+  );
+});
+
+// --- The workflow's shell, run as written against a stubbed `gh` -----------
+//
+// Both `run:` blocks are cut out of the YAML and executed, so a test here
+// exercises the text Actions will run rather than a copy of it. The stub
+// answers each API path from a file and can be told to fail one.
+
+const WORKFLOW = join(REPO, ".github/workflows/copilot-review.yml");
+
+/** The `run: |` body of the step called `name`, dedented as Actions does. */
+function workflowRun(name) {
+  const lines = readFileSync(WORKFLOW, "utf8").split("\n");
+  const at = lines.findIndex((l) => l.trim() === `- name: ${name}`);
+  assert.notEqual(at, -1, `no step named ${JSON.stringify(name)}`);
+  const runAt = lines.findIndex((l, i) => i > at && /^\s*run: \|\s*$/.test(l));
+  const nextStep = lines.findIndex((l, i) => i > at && /^\s*- (name|uses):/.test(l));
+  assert.ok(runAt !== -1 && (nextStep === -1 || runAt < nextStep), `${name} has no run block`);
+  const indent = lines[runAt].search(/\S/);
+  const body = [];
+  for (const l of lines.slice(runAt + 1)) {
+    if (l.trim() !== "" && l.search(/\S/) <= indent) break;
+    body.push(l);
+  }
+  const pad = Math.min(...body.filter((l) => l.trim()).map((l) => l.search(/\S/)));
+  return `${body.map((l) => l.slice(pad)).join("\n").trimEnd()}\n`;
+}
+
+/** A literal from the job's `env:` block, unquoted as YAML would. */
+function workflowEnv(key) {
+  const m = new RegExp(`^\\s+${key}: (.+)$`, "m").exec(readFileSync(WORKFLOW, "utf8"));
+  assert.ok(m, `no ${key} in the workflow env`);
+  const v = m[1].trim();
+  return v.startsWith("'") ? v.slice(1, -1).replaceAll("''", "'") : v;
+}
+
+const GH_STUB = `#!/bin/bash
+# gh api [--paginate] [--method M] PATH [--jq EXPR] [--input -]
+shift
+method=GET; path=""; jqx=""; input=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --paginate) ;;
+    --method) shift; method="$1" ;;
+    --jq) shift; jqx="$1" ;;
+    --input) shift; input="$(cat)" ;;
+    *) path="$1" ;;
+  esac
+  shift
+done
+echo "$method $path" >> "$STUB/log"
+case "$method $path" in
+  "GET repos/o/r/pulls/7") name=pr ;;
+  "GET repos/o/r/pulls/7/reviews") name=reviews ;;
+  "GET repos/o/r/pulls/7/requested_reviewers") name=requested ;;
+  "GET repos/o/r/pulls/7/files") name=files ;;
+  "POST repos/o/r/pulls/7/requested_reviewers") name=post; printf '%s' "$input" > "$STUB/posted" ;;
+  *) echo "stub gh: unexpected $method $path" >&2; exit 99 ;;
+esac
+if [ -e "$STUB/$name.fail" ]; then echo "stub gh: HTTP 502 on $path" >&2; exit 1; fi
+# gh prints a string result raw and anything else as JSON, as jq -r does.
+if [ -n "$jqx" ]; then jq -r "$jqx" < "$STUB/$name.json"; else cat "$STUB/$name.json"; fi
+`;
+
+/**
+ * Run one step's shell with the stub answering. `api` maps a stub name
+ * (pr, reviews, requested, files, post) to its JSON body; `fail` names
+ * the calls that fail. Returns what a reader of the job log would see.
+ */
+function runWorkflowStep(name, api, fail = []) {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-wf-"));
+  try {
+    mkdirSync(join(dir, "bin"));
+    writeFileSync(join(dir, "bin", "gh"), GH_STUB, { mode: 0o755 });
+    const answers = {
+      pr: { draft: false },
+      reviews: [],
+      requested: { users: [], teams: [] },
+      files: [],
+      post: { requested_reviewers: [{ login: "Copilot", type: "Bot" }], requested_teams: [] },
+      ...api,
+    };
+    for (const [k, v] of Object.entries(answers)) {
+      writeFileSync(join(dir, `${k}.json`), JSON.stringify(v));
+    }
+    for (const f of fail) writeFileSync(join(dir, `${f}.fail`), "");
+    writeFileSync(join(dir, "output"), "");
+    writeFileSync(join(dir, "step.sh"), workflowRun(name));
+    // Actions runs `run:` with exactly these bash flags.
+    const run = spawnSync("bash", [
+      "--noprofile",
+      "--norc",
+      "-eo",
+      "pipefail",
+      join(dir, "step.sh"),
+    ], {
+      cwd: REPO,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${join(dir, "bin")}:${dirname(process.execPath)}:${process.env.PATH}`,
+        STUB: dir,
+        REPO: "o/r",
+        PR: "7",
+        BOT: workflowEnv("BOT"),
+        COPILOT: workflowEnv("COPILOT"),
+        RUNNER_TEMP: dir,
+        GITHUB_OUTPUT: join(dir, "output"),
+      },
+    });
+    const read = (f) => (existsSync(join(dir, f)) ? readFileSync(join(dir, f), "utf8") : null);
+    return {
+      status: run.status,
+      log: `${run.stdout}${run.stderr}`,
+      output: read("output"),
+      calls: read("log") ?? "",
+      posted: read("posted"),
+    };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const DECIDE = "Decide whether a request is needed";
+const CLASSIFY = "Classify, and request Copilot if non-trivial";
+const COPILOT_LOGIN = "copilot-pull-request-reviewer[bot]"; // as the reviews API reported it on #533
+
+test("workflow, decide: requests only when Copilot has neither reviewed nor been requested", () => {
+  const cases = [
+    ["a draft", { pr: { draft: true } }, "false", /is a draft/],
+    [
+      "Copilot already reviewed",
+      { reviews: [{ id: 1, user: { login: COPILOT_LOGIN, type: "Bot" } }] },
+      "false",
+      /already reviewed/,
+    ],
+    [
+      "a human review, and a deleted account's review with a null user",
+      { reviews: [{ id: 1, user: { login: "alice", type: "User" } }, { id: 2, user: null }] },
+      "true",
+      null,
+    ],
+    [
+      "Copilot already requested",
+      { requested: { users: [{ login: "Copilot", type: "Bot" }], teams: [] } },
+      "false",
+      /already requested/,
+    ],
+    ["a fresh PR", {}, "true", null],
+  ];
+  for (const [label, api, need, message] of cases) {
+    const r = runWorkflowStep(DECIDE, api);
+    assert.equal(r.status, 0, `${label}:\n${r.log}`);
+    assert.equal(r.output, `need=${need}\n`, label);
+    if (message) assert.match(r.log, message, label);
+  }
+  // Reading the reviews is not optional: a failure is red, never "none".
+  const r = runWorkflowStep(DECIDE, {}, ["reviews"]);
+  assert.notEqual(r.status, 0, "a failed reviews read must fail the step");
+  assert.equal(r.output, "", "and must not decide anything");
+});
+
+test("workflow, classify: skips only an edit to the tracker; every other shape requests", () => {
+  const rec = (status, filename, previous_filename) =>
+    previous_filename ? { filename, status, previous_filename } : { filename, status };
+  const skip = runWorkflowStep(CLASSIFY, { files: [rec("modified", ".beads/issues.jsonl")] });
+  assert.equal(skip.status, 0, skip.log);
+  assert.match(skip.log, /Trivial:/);
+  assert.equal(skip.posted, null, "a tracker edit requests nothing");
+  assert.doesNotMatch(skip.calls, /POST/);
+
+  const requested = [
+    ["the tracker deleted", [rec("removed", ".beads/issues.jsonl")]],
+    [
+      "code renamed into the tracker's path",
+      [rec("renamed", ".beads/issues.jsonl", "barwise/packages/core/src/a.ts")],
+    ],
+    ["a git hook beside the tracker", [rec("modified", ".beads/hooks/pre-commit")]],
+    ["a leading-space look-alike", [rec("modified", " .beads/issues.jsonl")]],
+    ["a newline look-alike", [rec("modified", "x\n.beads/issues.jsonl")]],
+    [
+      "the tracker and a spec",
+      [rec("modified", ".beads/issues.jsonl"), rec("modified", "barwise/docs/specs/a.spec.md")],
+    ],
+  ];
+  for (const [label, files] of requested) {
+    const r = runWorkflowStep(CLASSIFY, { files });
+    assert.equal(r.status, 0, `${label}:\n${r.log}`);
+    assert.deepEqual(JSON.parse(r.posted ?? "null"), { reviewers: [workflowEnv("BOT")] }, label);
+    assert.match(r.log, /Requested\./, label);
+  }
+});
+
+test("workflow, classify: every uncertainty requests, and a request that did not land is red", () => {
+  const tracker = { filename: ".beads/issues.jsonl", status: "modified" };
+  const uncertain = [
+    ["the files API failing", {}, ["files"], /::warning::Could not read the changed files/],
+    ["pr-risk refusing", { files: [{ filename: "./x", status: "modified" }] }, [], /exit 2/],
+    ["an empty file list", { files: [] }, [], /exit 2/],
+    [
+      "a list the API may have truncated",
+      { files: Array.from({ length: 3000 }, () => tracker) },
+      [],
+      /stops at 3000/,
+    ],
+  ];
+  for (const [label, api, fail, message] of uncertain) {
+    const r = runWorkflowStep(CLASSIFY, api, fail);
+    assert.equal(r.status, 0, `${label}:\n${r.log}`);
+    assert.match(r.log, message, label);
+    assert.deepEqual(JSON.parse(r.posted ?? "null"), { reviewers: [workflowEnv("BOT")] }, label);
+  }
+  const lost = runWorkflowStep(CLASSIFY, {
+    files: [{ filename: "barwise/packages/core/src/a.ts", status: "modified" }],
+    post: { requested_reviewers: [{ login: "alice", type: "User" }], requested_teams: [] },
+  });
+  assert.equal(lost.status, 1, "a request that did not land fails the job");
+  assert.match(lost.log, /::error::/);
+  assert.match(lost.log, /"alice"/, "and prints the response that says why");
+});
+
+test("the workflow asks who Copilot is in ONE place", () => {
+  // Three checks -- past reviews, pending requests, the readback -- with
+  // three spellings of Copilot could disagree, and the review check
+  // disagreeing means a request on every push (a Copilot finding on #533).
+  const wf = readFileSync(WORKFLOW, "utf8");
+  assert.equal(wf.match(/contains\("copilot"\)/g)?.length, 1, "one definition");
+  assert.equal(wf.match(/select\(\.user \| \$COPILOT\)|select\(\$COPILOT\)/g)?.length, 3);
+});
+
+test("check-review-tiers names the defect it refuses, for every row and allow-list guard", () => {
+  // One case per guard in tierRows and trivialGlobs, each asserting the
+  // SPECIFIC message. An automated pass that neutralized every refusal in
+  // lib/review-tiers.mjs found eight of them surviving: five no test
+  // reached, and three reached only by tests that checked the exit code,
+  // which a crash satisfies as well as a refusal does.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }]);
+    const ok = { heading: "A", tier: "routine", globs: ["x/"], why: "f" };
+    const cases = [
+      [{ trivial: VALID_TRIVIAL, rows: [] }, /declares no rows/, "an empty rows list"],
+      [{ trivial: VALID_TRIVIAL }, /declares no rows/, "no rows key at all"],
+      [
+        { trivial: VALID_TRIVIAL, rows: [{ ...ok, heading: "" }] },
+        /heading must be a non-empty string/,
+        "an empty heading",
+      ],
+      [
+        { trivial: VALID_TRIVIAL, rows: [{ ...ok, why: undefined }] },
+        /why must be a non-empty string/,
+        "no why",
+      ],
+      [
+        {
+          trivial: VALID_TRIVIAL,
+          rows: [{ heading: "A", tier: "not-path-derivable", globs: ["x/"], why: "f" }],
+        },
+        /carry no globs/,
+        "globs on a row the classifier cannot reach",
+      ],
+      [
+        { trivial: VALID_TRIVIAL, rows: [{ ...ok, globs: [""] }] },
+        /every glob must be a non-empty string/,
+        "an empty glob",
+      ],
+      [
+        { trivial: VALID_TRIVIAL, rows: [{ ...ok, globs: [42] }] },
+        /every glob must be a non-empty string/,
+        "a non-string glob",
+      ],
+      [
+        { trivial: { globs: [""], why: "w" }, rows: [ok] },
+        /every trivial glob must be a non-empty string/,
+        "an empty trivial glob",
+      ],
+      [
+        { trivial: { globs: [7], why: "w" }, rows: [ok] },
+        /every trivial glob must be a non-empty string/,
+        "a non-string trivial glob",
+      ],
+    ];
+    for (const [json, pattern, label] of cases) {
+      writeFileSync(join(dir, "review-tiers.json"), JSON.stringify(json));
+      const run = gate("check-review-tiers.mjs", dir, ...args);
+      assert.equal(run.status, 2, `${label}: must refuse`);
+      assert.match(`${run.stdout}${run.stderr}`, pattern, `${label}: must refuse for THIS reason`);
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
