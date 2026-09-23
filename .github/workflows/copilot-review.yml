@@ -3,8 +3,9 @@ name: Copilot review
 # Requests one Copilot code review on every NON-TRIVIAL pull request.
 #
 # WS1 of barwise/docs/specs/tiered-pr-review.spec.md (barwise-1036). This
-# REQUESTS a review; nothing here blocks a merge. Blocking is WS4, which is
-# held on that spec's Open decision 6.
+# REQUESTS a review, and nothing blocks a merge on it: the owner decided on
+# 2026-09-23 against any Copilot merge gate, and that spec's WS4 (the gate)
+# is withdrawn.
 #
 # "Trivial" is decided by scripts/pr-risk.mjs against the `trivial` block
 # of barwise/review-tiers.json. That block is the authority for what is on
@@ -35,17 +36,27 @@ name: Copilot review
 # Copilot has already reviewed or been requested -- pushes do not buy
 # repeat reviews, and a repeat run costs seconds.
 #
+# A REFUSAL IS NOT A REVIEW. With its quota exhausted, Copilot posts "was
+# unable to review this pull request" AS a review, so the next push asks
+# again. Nothing waits on it: the owner's policy is to carry on without
+# the review. While the quota stays exhausted, each push draws one more
+# refusal, which is visible and costs nothing. A reset triggers nothing by
+# itself -- there is no schedule here -- so the first push after it gets
+# the review, and a PR with no later push goes unreviewed.
+#
 # EVERY UNCERTAINTY RESOLVES TOWARD REQUESTING. A files API call that
 # fails, a file list that may be truncated, pr-risk refusing (exit 2), and
 # an empty list all request the review. A wrong skip is a defect nobody
 # looks at; a wrong request is one review's cost.
 #
-# A REQUEST THAT DID NOT LAND FAILS THE JOB. Whether GITHUB_TOKEN can
-# request this reviewer could not be checked before this file first ran --
-# the docs were unreachable from the session that wrote it -- so the
-# response is read back and the job goes red with it printed if Copilot is
-# not among the requested reviewers. A green job with no request would be
-# the absence-read-as-an-answer failure this repository keeps finding.
+# A REQUEST THAT DID NOT LAND FAILS THE JOB. GITHUB_TOKEN can request
+# this reviewer -- measured on #534, whose event history records the
+# request as made by github-actions[bot] -- and the request is read back
+# from that same event history, not from the response. The response's
+# requested_reviewers NEVER lists Copilot: on #534 it was empty in the
+# POST response and stayed empty while Copilot's review ran, so the first
+# version of this readback turned a request that had landed into a red
+# job. The same is why "already requested" is read from the events too.
 #
 # workflow_dispatch runs the same logic on an existing PR by number: to
 # verify the request path, or to backfill a PR opened before this existed.
@@ -93,6 +104,26 @@ jobs:
       # endpoint's spelling is not evidence of another's. `// ""` because a
       # deleted account's review has a null user.
       COPILOT: '((.login // "") | ascii_downcase | contains("copilot"))'
+      # Whether a review object is a real one. The refusal carries the same
+      # bot and the same state (COMMENTED) as a real review, so the body is
+      # the only signal. Measured on #516: "Copilot was unable to review
+      # this pull request because the user who requested the review has
+      # reached their quota limit." Counting that as "already reviewed"
+      # meant a PR whose request met an empty quota was never asked again.
+      REAL_REVIEW: '((.body // "") | ascii_downcase | contains("was unable to review this pull request") | not)'
+      # Whether a Copilot request is still outstanding, over one JSON line
+      # per Copilot request, removal (from the PR's event history) and
+      # answer (a review, real or a refusal). Outstanding means the latest
+      # request is newer than every removal and answer, and under an hour
+      # old: a request Copilot never answers must not stop the next push
+      # from asking again.
+      OUTSTANDING: >-
+        ([.[] | select(.event == "review_requested") | .at] | max) as $asked
+        | ([.[] | select(.event != "review_requested") | .at] | max) as $settled
+        | if $asked == null then false
+          elif $settled != null and $settled >= $asked then false
+          else ($asked | fromdateiso8601) > now - 3600
+          end
 
     steps:
       # Cheap checks first, before any checkout, so the common repeat run
@@ -106,17 +137,20 @@ jobs:
             echo "PR #$PR is a draft; Copilot is requested when it is marked ready."
             need=false
           else
-            # Reading the reviews is not optional: if it fails, set -e stops
-            # the job red rather than guessing that no review exists.
-            reviewed=$(gh api --paginate "repos/$REPO/pulls/$PR/reviews" \
-              --jq ".[] | select(.user | $COPILOT) | .id" | wc -l)
-            pending=$(gh api "repos/$REPO/pulls/$PR/requested_reviewers" \
-              --jq "[.users[] | select($COPILOT)] | length")
+            # Reading these is not optional: if either fails, set -e stops
+            # the job red rather than guessing that nothing happened yet.
+            answers=$(gh api --paginate "repos/$REPO/pulls/$PR/reviews" \
+              --jq ".[] | select(.user | $COPILOT) | {at: .submitted_at, real: $REAL_REVIEW} | @json")
+            asks=$(gh api --paginate "repos/$REPO/issues/$PR/events" \
+              --jq ".[] | select(.event == \"review_requested\" or .event == \"review_request_removed\")
+                    | select(.requested_reviewer | $COPILOT) | {event, at: .created_at} | @json")
+            reviewed=$(printf '%s\n' "$answers" | jq -s '[.[] | select(.real)] | length')
+            pending=$(printf '%s\n%s\n' "$answers" "$asks" | jq -s "$OUTSTANDING")
             if [ "$reviewed" -gt 0 ]; then
               echo "Copilot has already reviewed PR #$PR ($reviewed review(s)); not requesting again."
               need=false
-            elif [ "$pending" -gt 0 ]; then
-              echo "Copilot is already requested on PR #$PR; not requesting again."
+            elif [ "$pending" = "true" ]; then
+              echo "Copilot was requested on PR #$PR and has not answered yet; not requesting again."
               need=false
             fi
           fi
@@ -165,14 +199,26 @@ jobs:
             exit 0
           fi
 
+          # How many times Copilot has been requested here, from the event
+          # history -- the only place a Copilot request is recorded.
+          asked() {
+            gh api --paginate "repos/$REPO/issues/$PR/events" \
+              --jq ".[] | select(.event == \"review_requested\") | select(.requested_reviewer | $COPILOT) | .id" | wc -l
+          }
+          before=$(asked)
           echo "Requesting $BOT on PR #$PR."
-          resp=$(jq -n --arg bot "$BOT" '{reviewers: [$bot]}' \
-            | gh api --method POST "repos/$REPO/pulls/$PR/requested_reviewers" --input -)
-          if printf '%s' "$resp" \
-            | jq -e "[.requested_reviewers[]? | select($COPILOT)] | length > 0" >/dev/null; then
-            echo "Requested."
-          else
-            echo "::error::The request returned without error, but Copilot is not among the requested reviewers."
-            printf '%s' "$resp" | jq '{requested_reviewers, requested_teams}'
-            exit 1
-          fi
+          jq -n --arg bot "$BOT" '{reviewers: [$bot]}' \
+            | gh api --method POST "repos/$REPO/pulls/$PR/requested_reviewers" --input - > /dev/null
+          # A few tries: on #534 the event carried the POST's own second,
+          # but an event log is not promised to be read-your-write.
+          for _ in 1 2 3; do
+            if [ "$(asked)" -gt "$before" ]; then
+              echo "Requested."
+              exit 0
+            fi
+            sleep "${READBACK_WAIT:-5}"
+          done
+          echo "::error::The request returned without error, but no review_requested event for Copilot appeared on PR #$PR."
+          gh api "repos/$REPO/issues/$PR/events" \
+            --jq '[.[] | select(.event | test("review")) | {event, created_at, reviewer: .requested_reviewer.login}]'
+          exit 1

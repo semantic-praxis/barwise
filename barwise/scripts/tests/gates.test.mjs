@@ -3572,9 +3572,20 @@ function workflowRun(name) {
 
 /** A literal from the job's `env:` block, unquoted as YAML would. */
 function workflowEnv(key) {
-  const m = new RegExp(`^\\s+${key}: (.+)$`, "m").exec(readFileSync(WORKFLOW, "utf8"));
-  assert.ok(m, `no ${key} in the workflow env`);
-  const v = m[1].trim();
+  const lines = readFileSync(WORKFLOW, "utf8").split("\n");
+  const at = lines.findIndex((l) => new RegExp(`^\\s+${key}: `).test(l));
+  assert.notEqual(at, -1, `no ${key} in the workflow env`);
+  const v = lines[at].slice(lines[at].indexOf(": ") + 2).trim();
+  if (v === ">-") {
+    // A folded block: the more-indented lines below, joined by spaces.
+    const indent = lines[at].search(/\S/);
+    const body = [];
+    for (const l of lines.slice(at + 1)) {
+      if (l.trim() !== "" && l.search(/\S/) <= indent) break;
+      body.push(l.trim());
+    }
+    return body.filter(Boolean).join(" ");
+  }
   return v.startsWith("'") ? v.slice(1, -1).replaceAll("''", "'") : v;
 }
 
@@ -3596,14 +3607,20 @@ echo "$method $path" >> "$STUB/log"
 case "$method $path" in
   "GET repos/o/r/pulls/7") name=pr ;;
   "GET repos/o/r/pulls/7/reviews") name=reviews ;;
-  "GET repos/o/r/pulls/7/requested_reviewers") name=requested ;;
   "GET repos/o/r/pulls/7/files") name=files ;;
+  "GET repos/o/r/issues/7/events") name=events ;;
   "POST repos/o/r/pulls/7/requested_reviewers") name=post; printf '%s' "$input" > "$STUB/posted" ;;
   *) echo "stub gh: unexpected $method $path" >&2; exit 99 ;;
 esac
 if [ -e "$STUB/$name.fail" ]; then echo "stub gh: HTTP 502 on $path" >&2; exit 1; fi
+# The event history as it reads once the request has been POSTed, if the
+# case gave one; otherwise it does not change.
+file=$name
+if [ "$name" = events ] && [ -e "$STUB/posted" ] && [ -e "$STUB/events.after.json" ]; then
+  file=events.after
+fi
 # gh prints a string result raw and anything else as JSON, as jq -r does.
-if [ -n "$jqx" ]; then jq -r "$jqx" < "$STUB/$name.json"; else cat "$STUB/$name.json"; fi
+if [ -n "$jqx" ]; then jq -r "$jqx" < "$STUB/$file.json"; else cat "$STUB/$file.json"; fi
 `;
 
 /**
@@ -3619,9 +3636,13 @@ function runWorkflowStep(name, api, fail = []) {
     const answers = {
       pr: { draft: false },
       reviews: [],
-      requested: { users: [], teams: [] },
+      events: [],
+      // A request that lands leaves a review_requested event, and that is
+      // the readback. The POST response is deliberately useless, as it is
+      // live: requested_reviewers never lists Copilot (measured on #534).
+      "events.after": [copilotRequest(ago(0))],
       files: [],
-      post: { requested_reviewers: [{ login: "Copilot", type: "Bot" }], requested_teams: [] },
+      post: { requested_reviewers: [], requested_teams: [] },
       ...api,
     };
     for (const [k, v] of Object.entries(answers)) {
@@ -3648,6 +3669,9 @@ function runWorkflowStep(name, api, fail = []) {
         PR: "7",
         BOT: workflowEnv("BOT"),
         COPILOT: workflowEnv("COPILOT"),
+        REAL_REVIEW: workflowEnv("REAL_REVIEW"),
+        OUTSTANDING: workflowEnv("OUTSTANDING"),
+        READBACK_WAIT: "0",
         RUNNER_TEMP: dir,
         GITHUB_OUTPUT: join(dir, "output"),
       },
@@ -3668,29 +3692,102 @@ function runWorkflowStep(name, api, fail = []) {
 const DECIDE = "Decide whether a request is needed";
 const CLASSIFY = "Classify, and request Copilot if non-trivial";
 const COPILOT_LOGIN = "copilot-pull-request-reviewer[bot]"; // as the reviews API reported it on #533
+const QUOTA_REFUSAL =
+  "Copilot was unable to review this pull request because the user who requested "
+  + "the review has reached their quota limit."; // verbatim, #516, 2026-09-18
+
+/** A GitHub timestamp `seconds` ago -- whole seconds, as the API prints them. */
+function ago(seconds) {
+  return new Date(Date.now() - seconds * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+/** A Copilot request in the event history, shaped as #534's was. */
+function copilotRequest(at, event = "review_requested") {
+  return {
+    id: Date.parse(at),
+    event,
+    created_at: at,
+    actor: { login: "github-actions[bot]" },
+    requested_reviewer: { login: "Copilot", type: "Bot" },
+  };
+}
+
+/** A review by `login` at `at`, with an optional body. */
+function review(login, at, body = "") {
+  return { id: Date.parse(at), user: login && { login }, submitted_at: at, body };
+}
 
 test("workflow, decide: requests only when Copilot has neither reviewed nor been requested", () => {
   const cases = [
     ["a draft", { pr: { draft: true } }, "false", /is a draft/],
+    ["a fresh PR", {}, "true", null],
     [
       "Copilot already reviewed",
-      { reviews: [{ id: 1, user: { login: COPILOT_LOGIN, type: "Bot" } }] },
+      { reviews: [review(COPILOT_LOGIN, ago(600))] },
       "false",
       /already reviewed/,
     ],
     [
       "a human review, and a deleted account's review with a null user",
-      { reviews: [{ id: 1, user: { login: "alice", type: "User" } }, { id: 2, user: null }] },
+      { reviews: [review("alice", ago(600)), review(null, ago(500))] },
+      "true",
+      null,
+    ],
+    // Requested and not yet answered: the ~8 minutes a review takes. The
+    // reviewer list never shows Copilot, so this reads the event history.
+    [
+      "requested a minute ago, not answered",
+      { events: [copilotRequest(ago(60))] },
+      "false",
+      /has not answered yet/,
+    ],
+    [
+      "a team request, whose requested_reviewer is null",
+      { events: [{ ...copilotRequest(ago(60)), requested_reviewer: null }] },
       "true",
       null,
     ],
     [
-      "Copilot already requested",
-      { requested: { users: [{ login: "Copilot", type: "Bot" }], teams: [] } },
-      "false",
-      /already requested/,
+      "requested, then the request removed",
+      { events: [copilotRequest(ago(120)), copilotRequest(ago(60), "review_request_removed")] },
+      "true",
+      null,
     ],
-    ["a fresh PR", {}, "true", null],
+    [
+      "requested two hours ago and never answered",
+      { events: [copilotRequest(ago(7200))] },
+      "true",
+      null,
+    ],
+    // A refusal is posted AS a review, by the same bot, with the same
+    // state; counting it meant a PR that met an empty quota was never
+    // requested again. The text is the one measured on #516.
+    [
+      "Copilot's only review is a quota refusal",
+      { reviews: [review(COPILOT_LOGIN, ago(60), QUOTA_REFUSAL)] },
+      "true",
+      null,
+    ],
+    [
+      "requested, and answered with a quota refusal",
+      {
+        events: [copilotRequest(ago(120))],
+        reviews: [review(COPILOT_LOGIN, ago(60), QUOTA_REFUSAL)],
+      },
+      "true",
+      null,
+    ],
+    [
+      "a quota refusal, then a real review",
+      {
+        reviews: [
+          review(COPILOT_LOGIN, ago(600), QUOTA_REFUSAL),
+          review(COPILOT_LOGIN, ago(60), "Approval recommended"),
+        ],
+      },
+      "false",
+      /already reviewed PR #7 \(1 review/,
+    ],
   ];
   for (const [label, api, need, message] of cases) {
     const r = runWorkflowStep(DECIDE, api);
@@ -3698,10 +3795,12 @@ test("workflow, decide: requests only when Copilot has neither reviewed nor been
     assert.equal(r.output, `need=${need}\n`, label);
     if (message) assert.match(r.log, message, label);
   }
-  // Reading the reviews is not optional: a failure is red, never "none".
-  const r = runWorkflowStep(DECIDE, {}, ["reviews"]);
-  assert.notEqual(r.status, 0, "a failed reviews read must fail the step");
-  assert.equal(r.output, "", "and must not decide anything");
+  // Reading either history is not optional: a failure is red, never "none".
+  for (const read of ["reviews", "events"]) {
+    const r = runWorkflowStep(DECIDE, {}, [read]);
+    assert.notEqual(r.status, 0, `a failed ${read} read must fail the step`);
+    assert.equal(r.output, "", "and must not decide anything");
+  }
 });
 
 test("workflow, classify: skips only an edit to the tracker; every other shape requests", () => {
@@ -3754,13 +3853,21 @@ test("workflow, classify: every uncertainty requests, and a request that did not
     assert.match(r.log, message, label);
     assert.deepEqual(JSON.parse(r.posted ?? "null"), { reviewers: [workflowEnv("BOT")] }, label);
   }
+  // The POST succeeds and no review_requested event follows.
   const lost = runWorkflowStep(CLASSIFY, {
     files: [{ filename: "barwise/packages/core/src/a.ts", status: "modified" }],
-    post: { requested_reviewers: [{ login: "alice", type: "User" }], requested_teams: [] },
+    events: [copilotRequest(ago(3600))],
+    "events.after": [copilotRequest(ago(3600))],
   });
   assert.equal(lost.status, 1, "a request that did not land fails the job");
-  assert.match(lost.log, /::error::/);
-  assert.match(lost.log, /"alice"/, "and prints the response that says why");
+  assert.match(lost.log, /::error::.*no review_requested event/);
+  assert.match(lost.log, /"review_requested"/, "and prints the event history that says why");
+  // An OLD request does not satisfy the readback; only a new one does.
+  assert.equal(
+    lost.calls.match(/GET repos\/o\/r\/issues\/7\/events/g)?.length,
+    5,
+    "1 before, 3 tries, 1 print",
+  );
 });
 
 test("the workflow asks who Copilot is in ONE place", () => {
@@ -3769,7 +3876,17 @@ test("the workflow asks who Copilot is in ONE place", () => {
   // disagreeing means a request on every push (a Copilot finding on #533).
   const wf = readFileSync(WORKFLOW, "utf8");
   assert.equal(wf.match(/contains\("copilot"\)/g)?.length, 1, "one definition");
-  assert.equal(wf.match(/select\(\.user \| \$COPILOT\)|select\(\$COPILOT\)/g)?.length, 3);
+  assert.equal(wf.match(/\$COPILOT\b/g)?.length, 3, "used by exactly the three checks");
+  // And what counts as a review is decided once, too.
+  assert.equal(
+    wf.match(/was unable to review this pull request/g)?.length,
+    1,
+    "defined once",
+  );
+  assert.match(wf, /real: \$REAL_REVIEW/, "the reviews check uses it");
+  // The reviewer list never shows Copilot -- empty in the POST response
+  // and while its review ran, measured on #534 -- so nothing may read it.
+  assert.doesNotMatch(wf, /\.requested_reviewers\b|\.users\[\]/, "no read of the reviewer list");
 });
 
 test("check-review-tiers names the defect it refuses, for every row and allow-list guard", () => {

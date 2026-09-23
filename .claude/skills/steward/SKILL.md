@@ -153,3 +153,24 @@ So prune when a PR merges, before reading any of those three as
 evidence about the remote. Nothing checks this; barwise-1033 carries
 the question of whether a check is worth it and where one could
 usefully run.
+
+## 7. A Copilot refusal is not a review, and nothing waits on it
+
+A Copilot review is requested on every non-trivial pull request, and nothing blocks on
+that review (`docs/specs/tiered-pr-review.spec.md`, "The decision of
+2026-09-23"). When its quota is exhausted it posts a refusal AS a review
+-- "Copilot was unable to review this pull request because the user who
+requested the review has reached their quota limit." That is not a
+finding and not a blocker: there is nothing to reply to, fix or wait
+for, so carry on and drive the pull request on CI and any human review.
+Do not request Copilot again by hand; the Copilot review workflow asks
+again on the next push. A quota reset triggers nothing by itself: the
+workflow has no schedule, so a pull request with no push after the reset
+is not reviewed. That is the accepted cost -- never an empty commit to
+force a run; if one pull request's review matters, say so to the owner.
+
+The findings Copilot does post are fixed on the pull request, and they
+are also the corpus for WS6 of that spec, which classifies them by
+failure mode to prevent the most common one upstream. Replying to each
+finding with what was wrong and why is what makes that later
+classification possible.

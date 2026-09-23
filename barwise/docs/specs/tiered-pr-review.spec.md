@@ -1,40 +1,74 @@
-# Tiered PR review: Copilot on every PR, a blocking tier for the changes that carry liability
+# Tiered PR review: Copilot on every non-trivial PR, and learning from what it finds
 
-Status: WS2 and WS3 IMPLEMENTED. **WS4 IS BLOCKED, by WS3's own
-acceptance criterion.** The classifier works and the tiers are wrong:
-this spec set a budget of roughly a third of merged pull requests in the
-high-risk tier, and the measurement is 55% over the last 20 and 70% over
-the last 40 (see "What WS3 measured"). The criterion says the globs are
-wrong and WS4 does not proceed; two of them were wrong and are fixed, and
-the residual is not a glob defect but a premise defect, which is a
-decision this spec cannot take on its own.
+Status: WS1, WS2 and WS3 IMPLEMENTED. **WS4 WITHDRAWN** by the owner's
+decision of 2026-09-23 (Open decision 6, resolved): Copilot reviews every
+non-trivial pull request, nothing blocks on the review, and when Copilot
+cannot review -- an exhausted quota -- work carries on without it. See
+"The decision of 2026-09-23". WS5 is unbuilt. **WS6 is new** (barwise-1050):
+classify what the reviews find by failure mode and prevent the most
+common one upstream; its seed pass is done, its first mechanism is not.
 
-WS1 IMPLEMENTED, and its request path UNVERIFIED until it first runs:
-`.github/workflows/copilot-review.yml` requests one Copilot review on
-every NON-TRIVIAL pull request, by the owner's direction on 2026-09-23.
-That direction also settles Open decision 5's cost half. Whether a
-workflow's `GITHUB_TOKEN` can request this reviewer could not be checked
-from the session that built it; the workflow is written to fail loudly
-if it cannot. Open decision 2 is RESOLVED against this spec's own
-recommendation. WS5 is unbuilt. Open decision 6 is what WS4 waits on.
+WS1 (`.github/workflows/copilot-review.yml`) merged in #533. Its first
+live run, on #534, settled the open question -- `GITHUB_TOKEN` CAN request
+Copilot -- and went red anyway, on a readback that could never pass; see
+WS1, "What the first live run found". Fixed in #534, along with a
+refusal being counted as a review. WS3's measurement -- 55% of the last 20
+merges high-risk, 70% of the last 40 -- stands as a description; with no
+gate reading the tier, it is no longer a budget anything fails against.
 
 Created: 2026-09-17
 Last-updated: 2026-09-23
 Tracking: barwise-1036 (WS1, the Copilot review workflow); barwise-1037 (WS2,
 the tier table and its completeness gate); barwise-1038 (WS3, the
-classifier); barwise-1041 (WS4, the blocking gate); barwise-1040 (WS5,
-generated instructions and the measurement). Closes nothing on its own.
+classifier); barwise-1041 (WS4, the blocking gate -- withdrawn); barwise-1040
+(WS5, generated instructions and the measurement); barwise-1050 (WS6, the
+failure-mode review). Closes nothing on its own.
 The finding is barwise-953 (the instance: PR skills exist, are discoverable,
 and are not invoked -- two recorded occurrences, and now the steady
 state). Extends `docs/specs/pr-skills.spec.md`, which wrote the review
 down, and applies `docs/specs/gate-refusal-contract.spec.md`, which is
 the reason the gate here has three results instead of two.
 
-In one sentence: every pull request gets a Copilot review driven by
-repository instructions generated from the files that already own the
-rules, a path-derived tier decides whether that review blocks the merge,
-and a reviewer that could not answer blocks too -- because "found
-nothing" and "did not run" must not look the same.
+In one sentence: every non-trivial pull request has a Copilot review
+requested -- a refusal, when the quota is out, is carried on past --
+nothing blocks on it, and what the reviews keep finding is classified so
+the most common failure can be prevented before review instead of fixed
+after it.
+
+_Until 2026-09-23 the sentence read differently:_ a path-derived tier was
+to decide whether the review BLOCKS the merge, and a reviewer that could
+not answer was to block too. The sections that argue that design are kept
+as the record of it, each marked where the decision made it moot.
+
+## The decision of 2026-09-23: review everything non-trivial, block nothing
+
+The owner, after WS3 measured the high-risk tier at 55% of merges and
+Open decision 6 laid out accepting it, narrowing it, or making blocking
+cheap: "I don't think we need to manage the copilot reviews this
+closely. Stick with the approach of reviewing all non trivial changes.
+Keeps it simple. If we get a message saying that the [quota] has been
+exceeded (or whatever that message is) then we can do our best without
+it. We should be reviewing the
+failure modes in those reviews so we get less rework over time."
+
+What that settles:
+
+- **No blocking gate.** WS4 is withdrawn. So are the gate's three-result
+  contract, Open decision 1 (where a required check is enforced) and
+  Open decision 3 (where a deep-review verdict is recorded for a gate to
+  read): with nothing reading a verdict, none of them has a consumer.
+- **A quota refusal is carried on past, not waited on.** Copilot posts
+  its refusal as a review; nobody treats it as a finding or a blocker,
+  and WS1 asks again on the next push. The steward skill carries this
+  for whoever drives a pull request.
+- **The tier stays, as information.** `pr-risk` still prints the tier and
+  the checklist headings a diff triggers, for a person reading it and
+  for WS5's path-scoped instructions. The trivial allow-list is the one
+  part a workflow acts on.
+- **Rework is the thing to reduce.** Every Copilot finding fixed on its
+  pull request was written, found and rewritten. WS6 looks across the
+  findings for the failure that recurs and puts a mechanism in front of
+  it, so the next pull request does not carry it to review at all.
 
 ## Principle
 
@@ -65,7 +99,12 @@ creates the must-agree copy CLAUDE.md forbids, so the instructions
 Copilot reads are generated from that file and a drift gate fails when
 they diverge.
 
-## Should the review gate trust a silent Copilot? (resolved: no -- it refuses)
+## Should the review gate trust a silent Copilot? (resolved: no -- it refuses; MOOT since 2026-09-23)
+
+_Moot: there is no review gate (WS4 withdrawn). Kept as the record of
+the design. One finding outlived it: a refusal is not a review. WS1's
+"already reviewed" check counted Copilot's quota refusal as one until
+2026-09-23, which is this section's false green one layer earlier._
 
 A review check that passes when Copilot posted nothing is the defect
 `gate-refusal-contract.spec.md` spent a month removing, one layer out.
@@ -113,8 +152,9 @@ naming a heading that no longer exists. That bidirectional shape is
 `check:root-scripts`, which already fails both ways for the same reason.
 
 One derivation then feeds two consumers: the tier classifier reads it to
-decide whether a pull request blocks, and the Copilot instruction
-generator reads it to emit path-scoped instructions. Two parsers over one
+report a tier (it was to decide whether a pull request blocks, until WS4
+was withdrawn), and the Copilot instruction generator reads it to emit
+path-scoped instructions. Two parsers over one
 table would be the copy the rule forbids, so the table is parsed once in
 `scripts/lib/review-tiers.mjs` -- the shape `lib/ci-gates.mjs` already
 uses for `ci.yml`.
@@ -171,7 +211,7 @@ nothing, not merely one that did not happen.
 **It does not run your gates.** The real review recommended approval on
 #516, whose CI has been red since 2026-09-12. A Copilot approval is
 evidence a reviewer looked, never evidence the change is sound, which is
-why the review job reads tier, CI and review state together.
+why the review job was to read tier, CI and review state together.
 
 **The cost the design had not priced. (UNVERIFIED -- confirm before
 acting on it.)** Secondary sources report that Copilot code review
@@ -184,7 +224,10 @@ search-result summaries rather than from GitHub's billing documentation,
 and no command in this repository reproduces them. Whether this
 repository is private in GitHub's sense is also unestablished -- the
 `"private": true` in `barwise/package.json` is the npm publish flag
-and says nothing about repository visibility.
+and says nothing about repository visibility. (Established 2026-09-23:
+it is public -- `curl -s https://api.github.com/repos/semantic-praxis/barwise
+| jq '{private, visibility}'` prints `false` and `"public"` -- so the
+Actions-minutes half of this concern does not apply.)
 
 If the multiplier of 13 holds, then at this repository's measured rate
 of 216 merged pull requests a month (`git log --merges --since="30 days
@@ -193,6 +236,11 @@ every pull request" is on the order of 2,800 premium requests a month
 before a single Chat or agent call. That conditional is the whole of the
 cost argument, and it rests on a number nobody here has checked against
 its source. Verify it first; it may invert WS1's central choice.
+
+_Superseded by the owner's decisions of 2026-09-23 (Open decision 5 and
+"The decision of 2026-09-23"): the review cost is accepted, and the
+multiplier now matters only for how early in a month the quota runs
+out -- after which work carries on without the review._
 
 ## What WS3 measured (2026-09-22)
 
@@ -328,8 +376,11 @@ classifier entirely and stay with the deep review.
 
 In scope:
 
-- When a pull request is opened, reopened, or marked ready for review,
-  the system shall request a Copilot code review on it.
+- When a NON-TRIVIAL pull request is opened, reopened, marked ready for
+  review, or pushed to, and Copilot has neither reviewed it nor been
+  requested, the system shall request a Copilot code review on it. A
+  review whose body says Copilot was unable to review does not count as
+  one.
 - When `.github/copilot-instructions.md` or any file under
   `.github/instructions/` differs from its regenerator's output,
   `npm run check:copilot-instructions` shall exit 1 and name the stale
@@ -343,10 +394,11 @@ In scope:
 - When a heading in `checklist.md` has no row in `review-tiers.json`, or
   a row names a heading absent from `checklist.md`,
   `npm run check:review-tiers` shall exit 1.
-- When a high-risk pull request has no Copilot review recorded on its head
-  commit, the review gate shall exit 2.
-- When a high-risk pull request carries an unresolved blocking finding, or
-  a recorded barwise verdict of "cannot tell", the review gate shall exit 1.
+- ~~When a high-risk pull request has no Copilot review recorded on its
+  head commit, the review gate shall exit 2.~~ Withdrawn with WS4.
+- ~~When a high-risk pull request carries an unresolved blocking finding,
+  or a recorded barwise verdict of "cannot tell", the review gate shall
+  exit 1.~~ Withdrawn with WS4.
 
 Out of scope:
 
@@ -358,8 +410,8 @@ Out of scope:
   invariants.
 - **Retiring any `ci.yml` gate.** Nothing here replaces a deterministic
   check. `checklist.md` is scoped by construction to what CI cannot reach.
-- **Enforcing the required check.** Branch protection is a repository
-  setting, not a file. See Open decisions.
+- **Blocking a merge on the review.** Decided 2026-09-23: nothing blocks
+  on Copilot, including when it cannot review.
 
 ## Inventory
 
@@ -368,7 +420,7 @@ Out of scope:
 | `.claude/skills/pr-review/checklist.md` | 341 lines, 13 trigger headings, prose                                | authority; gains no globs, gains a completeness gate                                                                            |
 | `.github/copilot-instructions.md`       | 31 hand-written lines, all about ORM tool usage, no review guidance  | becomes generated; current content is preserved as a hand-authored preamble section                                             |
 | `.github/instructions/`                 | absent                                                               | new: one generated `*.instructions.md` per tier heading                                                                         |
-| `.github/workflows/ci.yml`              | one `ci` job; inline path classification for docs-only and optimizer | gains a `review` job; the two existing classifiers stay as they are                                                             |
+| `.github/workflows/ci.yml`              | one `ci` job; inline path classification for docs-only and optimizer | untouched -- the `review` job it was to gain was WS4, withdrawn                                                                 |
 | `barwise/scripts/lib/ci-gates.mjs`      | parses `ci.yml` into the gate list                                   | untouched; the model this spec copies                                                                                           |
 | `barwise/parity.manifest.json`          | 8 declared sets, byte-checked                                        | untouched -- the generated pair is guarded by a regenerator and a drift gate, which the rule accepts in place of a manifest row |
 | `barwise/audit-baseline.json`           | duplication ratchet                                                  | untouched, but WS3 must classify any candidate the new scripts raise                                                            |
@@ -378,21 +430,22 @@ which is why no workstream below runs the monorepo build for its own sake.
 
 ## Target architecture
 
-The shape to check is the fan-out in the middle and the fan-out at the
-end: one authority derived once into one parser that two consumers read,
-and one gate with three results rather than two.
+The shape to check is the fan-out in the middle and the loop at the end:
+one authority derived once into one parser that two consumers read, and
+the reviews' findings feeding back into what authors check before review.
+The blocking gate this diagram used to end in (WS4) is withdrawn.
 
 ```mermaid
 flowchart TD
     subgraph Derivation["One authority, derived once"]
         CL["checklist.md\nAUTHORITY: 341 lines, 13 trigger headings\nprose, human-read"]
-        RT["review-tiers.json\nREGISTERED PAIR\nheading, tier, globs"]
+        RT["review-tiers.json\nREGISTERED PAIR\nheading, tier, globs; trivial allow-list"]
         PARSER["scripts/lib/review-tiers.mjs\nONE PARSER, TWO CONSUMERS"]
     end
 
     CRT{{"check:review-tiers\nfails on a heading with no row\nAND on a row naming no heading"}}
 
-    subgraph Consumer1["Consumer 1: what Copilot reads"]
+    subgraph Consumer1["Consumer 1: what Copilot reads (WS5, unbuilt)"]
         REGEN["regen-copilot-instructions.mjs"]
         OUT1[".github/copilot-instructions.md"]
         OUT2[".github/instructions/SLUG.instructions.md\napplyTo: the same globs"]
@@ -400,19 +453,17 @@ flowchart TD
 
     CCI{{"check:copilot-instructions\nfails when either output is stale"}}
 
-    subgraph Consumer2["Consumer 2: does this PR block"]
-        RISK["scripts/pr-risk.mjs\nroutine, high-risk, or cannot see the diff"]
+    subgraph Consumer2["Consumer 2: pr-risk"]
+        RISK["scripts/pr-risk.mjs\ntier (informational), and trivial or not"]
     end
 
-    subgraph OnPR["On every pull request"]
-        WF["copilot-review.yml\non: opened, reopened, ready_for_review"]
+    subgraph OnPR["On every non-trivial pull request (WS1)"]
+        WF["copilot-review.yml\nopened, reopened, ready_for_review, synchronize"]
         BOT["copilot-pull-request-reviewer bot"]
-        GATE{"ci.yml job: review"}
+        OUTCOME["a review: findings fixed on the PR\nor a refusal (quota): carried on past,\nrequested again on the next push"]
     end
 
-    R0["exit 0 -- merge allowed\nroutine tier, or high-risk reviewed\nwith no blocking finding"]
-    R1["exit 1 -- merge blocked\nblocking finding open, or the\nrecorded verdict is cannot tell"]
-    R2["exit 2 -- merge blocked\nno Copilot review recorded, or the API\ncould not be read. The only path that\npages a human."]
+    LEARN["WS6: findings classified by failure mode;\nthe top mode gets one mechanism\n(a check, a test rule, a checklist line)"]
 
     CL -->|headings| RT
     RT --> PARSER
@@ -426,20 +477,20 @@ flowchart TD
     OUT2 -.-> CCI
     OUT1 --> BOT
     OUT2 --> BOT
+    RISK -->|trivial? then no request| WF
     WF -->|POST requested_reviewers| BOT
-    RISK --> GATE
-    BOT -->|its review, or its silence| GATE
-    GATE --> R0
-    GATE --> R1
-    GATE --> R2
+    BOT --> OUTCOME
+    OUTCOME -->|findings, periodically| LEARN
+    LEARN -->|prevention, before the next review| CL
 ```
 
 The dotted edges are checks, not data flow: `check:review-tiers` reads
 both `checklist.md` and `review-tiers.json` because it fails in both
 directions, and `check:copilot-instructions` reads the generated outputs
-to fail when they are stale. The edge from the bot to the gate is
-labelled "its review, or its silence" because those two are the same
-observable, which is what the third exit code exists to separate.
+to fail when they are stale. The loop from `LEARN` back to the checklist
+is drawn to the checklist because that is the commonest landing place,
+not the only one: a mechanism belongs wherever it stops the failure
+earliest, and a check beats a line of prose that someone must remember.
 
 ## Alternatives considered
 
@@ -466,6 +517,13 @@ observable, which is what the third exit code exists to separate.
   no code. Invisible to the tree: nothing in a diff shows it exists, and
   no gate can assert it is still on. Rejected on the same ground the
   requester chose a workflow file.
+
+- **Block nothing; review every non-trivial pull request. (CHOSEN
+  2026-09-23.)** The simplest of the options, and the owner chose it for
+  that. What it gives up is a guarantee that a finding is addressed
+  before merge. On this spec's own pull requests every finding was
+  addressed before merge without a gate, which is evidence the practice
+  holds, not proof that it always will. See "The decision of 2026-09-23".
 
 ## Workstreams (each independently shippable)
 
@@ -555,7 +613,8 @@ fresh, a failed reviews read; a tracker edit (the one skip), the tracker
 deleted, code renamed into its path, a hook beside it, two look-alike
 names, tracker-plus-spec; a failed files read, a classifier refusal, an
 empty list, 3,000 files, and a request that did not land (exit 1,
-`::error::`, the response printed). This began as a one-off harness in
+`::error::`, the evidence printed). The cases added after the first live
+run are listed under "What the first live run found". This began as a one-off harness in
 the session that wrote the workflow; a Copilot review then found four
 defects in exactly the shell it had exercised, which is the argument
 for the harness being a test rather than a transcript.
@@ -587,7 +646,8 @@ mechanism -- automatic enumeration, occurrence-indexed anchoring, a
 survivor ratchet -- is barwise-1049, because a pilot run once is the
 remembering this was meant to replace.
 
-**Not verifiable before shipping:** whether `GITHUB_TOKEN` can request
+**Not verifiable before shipping** (both since measured -- see "What the
+first live run found"): whether `GITHUB_TOKEN` can request
 `copilot-pull-request-reviewer[bot]`, and what login Copilot appears
 under in the POST response. (The reviews endpoint's login WAS measured,
 on #533's own review: `copilot-pull-request-reviewer[bot]`.) `docs.github.com` returned 403 through the
@@ -599,6 +659,62 @@ the printed response says which assumption was wrong. The fallback, if
 `GITHUB_TOKEN` cannot request this reviewer at all, is a token the owner
 creates and stores as a secret; that is not something a pull request
 can do.
+
+**What the first live run found (#534, 2026-09-23).** The first pull
+request after #533 merged was non-trivial, and the workflow classified
+it so, requested Copilot, and went RED: "The request returned without
+error, but Copilot is not among the requested reviewers", with
+`requested_reviewers: []` printed. The request had landed. The PR's event
+history records it, and Copilot's review started 14 seconds later:
+
+```sh
+curl -s https://api.github.com/repos/semantic-praxis/barwise/issues/534/events \
+  | jq -c '.[] | select(.event == "review_requested")
+               | {created_at, actor: .actor.login, reviewer: .requested_reviewer.login}'
+# {"created_at":"2026-09-23T20:04:40Z","actor":"github-actions[bot]","reviewer":"Copilot"}
+```
+
+So both unverifiable questions are answered: `GITHUB_TOKEN` can request
+Copilot, and no owner-created token is needed; and Copilot appears in
+the event history as `Copilot`, type `Bot`. What was wrong was the
+readback's source. **`requested_reviewers` never lists Copilot**: it was
+empty in the POST response, and `GET .../pulls/534/requested_reviewers`
+was still empty while Copilot's review was visibly running. The same
+field fed the "already requested" check, which therefore could never
+fire; a push during the roughly eight minutes a review takes would have
+requested a second one.
+
+Both now read the event history. The readback counts Copilot's
+`review_requested` events before and after the POST and passes only on
+a NEW one, retrying briefly. "Already requested" means the latest Copilot
+request is newer than every removal and every Copilot answer (real or
+refusal) and under an hour old, so a request Copilot never answers does
+not stop the next push from asking. Tested: requested and unanswered,
+requested then removed, requested two hours ago, a team request with a
+null reviewer, requested and answered by a refusal, a failed events read,
+and a lost request whose only matching event is an old one. Seven
+mutations, one per rule, each caught by the test written for it. The
+harness's fake `gh` no longer answers the reviewer-list endpoint, so a
+future read of it fails the tests instead of passing on a field that is
+always empty.
+
+Found the only way it could have been, by running it: the readback's
+wrong assumption was named in this section before shipping, and the
+design's answer -- fail loudly, print the evidence -- is what turned a
+silent never-fires into a red job with the empty list on screen.
+
+**A refusal is not a review (fixed 2026-09-23).** The first version
+counted any review by the Copilot bot as "already reviewed". Copilot
+posts its quota refusal AS a review -- same bot, same `COMMENTED` state --
+so a pull request whose request met an empty quota was never asked
+again. The check now ignores a review whose body says Copilot "was
+unable to review this pull request", the text measured on #516. The next
+push requests again; while the quota stays empty each push draws one
+more refusal, which is visible and costs nothing. Found while answering a
+question about Open decision 6, not by a test: every review in the
+harness was a real one. It now has a refusal case and a
+refusal-then-review case, and a mutation that counts refusals again fails
+the first.
 
 Acceptance, unchanged in substance: a non-trivial pull request opened
 after this lands carries a Copilot review, observed, with the request
@@ -646,12 +762,16 @@ tier is an answer and the gate contract above lets such a pull request
 merge on a clean review -- mapping the tier onto the exit status would
 put the classifier at odds with the gate that reads it.
 
-Not wired into `ci.yml`. It has nothing to gate until WS4 exists, and a
-required step that only ever prints would be a gate in name.
+Not wired into `ci.yml`, and now it will not be: its tier fed WS4, which
+is withdrawn. Its one consumer that acts is WS1, which reads the
+`trivial` field; the tier is information for a person reading the
+output.
 
 The acceptance criterion FIRED: see "What WS3 measured". 55% high-risk
 against a budget of roughly a third, so **WS4 does not proceed.** Two
-rows were genuinely wrong and are fixed; the residual is Open decision 6.
+rows were genuinely wrong and are fixed; the residual is Open decision 6,
+resolved on 2026-09-23 by withdrawing WS4, which leaves the budget nothing
+to guard.
 
 **What WS3 found that this spec assumed away, twice over:**
 
@@ -676,18 +796,20 @@ under any rule, and `routine` is also what a git call about the wrong
 tree produces. A pull request changing no files does not occur here, so
 an empty list means the question was never asked.
 
-**WS4 -- The blocking gate. BLOCKED on Open decision 6.** Add the
-`review` job to `ci.yml` reading the pull request's reviews through the
-API, with the five-row table above as its contract. Acceptance: watched
-producing each of 0, 1 and 2 on a real pull request before it is made
-required. Do not start it while the tier fires on 55% of merges: a gate
-that blocks more than half of all pull requests is the shape that gets
-gates disabled, which the Risks section already names.
+**WS4 -- The blocking gate. WITHDRAWN 2026-09-23 (Open decision 6).** It
+was to add a `review` job to `ci.yml` that read each pull request's
+reviews and held a high-risk one until Copilot had reviewed it with no
+blocking finding. The owner decided against blocking at all: every
+non-trivial pull request is reviewed, nothing waits on the review, and a
+quota refusal is carried on past. barwise-1041 is closed as withdrawn.
 
-When it is unblocked, one thing carries over from WS2 and must not be
-lost: **a routine classification does NOT mean the checklist is
-satisfied.** Three groups are outside the classifier's reach; `pr-risk`
-prints them with every verdict for that reason.
+If blocking is ever reconsidered, two things here carry over. The
+three-result contract ("Should the review gate trust a silent Copilot?"),
+because a quota refusal is the reviewer's normal failure mode, not an
+edge case. And WS2's point that **a routine classification does NOT
+mean the checklist is satisfied**: three groups are outside the
+classifier's reach, and `pr-risk` prints them with every verdict for
+that reason.
 
 **WS5 -- Generated Copilot instructions, and the measurement that decides
 whether they work (provisional: not yet grounded).** Add
@@ -700,13 +822,124 @@ tier heading, and record whether Copilot flags it. A heading Copilot
 misses is a heading the deep review still owns, recorded in this spec
 rather than assumed away.
 
-Coupling: WS4 depends on WS3, which depends on WS2. WS1 and WS5 are
-independent of all three; WS1 should land first because WS5 needs its
-corpus.
+**WS6 -- Learn from what the reviews find. (NEW 2026-09-23; seed pass
+done, first mechanism not yet chosen.)** The owner: "We should be
+reviewing the failure modes in those reviews so we get less rework over
+time." A Copilot finding fixed on its pull request is rework -- the defect
+was written, found, and written again -- and fixing each one where it
+lands does nothing about the next. WS6 reads the findings as a corpus.
+
+The method, kept small on purpose:
+
+1. Collect every Copilot inline finding on the pull requests merged since
+   the last pass.
+2. Put each in one failure mode. Use the five below; add a mode only when
+   a finding fits none of them.
+3. For the mode with the most findings, land ONE mechanism that would
+   have stopped most of them before review -- a check, a test rule, a
+   skill or checklist line -- and record which.
+4. The next pass reads whether that mode's share fell.
+
+Roughly monthly, or sooner once about twenty reviewed pull requests have
+merged. **Do not gate on the counts.** How many findings Copilot posts is
+a shadow of how much rework there is: it moves with the review's effort
+level, the diff's size and Copilot's own variance. The counts choose the
+next mechanism; they are not a target.
+
+**The seed pass: 25 findings on #531, #532 and #533**, this spec's own
+pull requests of 2026-09-22 and -23. One finding per thread as Copilot
+posted them, so #533's trimming defect, posted once per file, counts
+twice. Read through the GitHub MCP tools; the `gh` spelling below returns
+the same comments but was not itself run here:
+
+```sh
+for n in 531 532 533; do
+  gh api --paginate repos/semantic-praxis/barwise/pulls/$n/comments \
+    --jq '.[] | select(.in_reply_to_id == null)
+              | select(.user.login | ascii_downcase | contains("copilot")) | .body'
+done
+```
+
+| Failure mode                              | #531 | #532 | #533 | Total |
+| ----------------------------------------- | ---: | ---: | ---: | ----: |
+| A fact restated elsewhere went stale      |    4 |    2 |    3 |     9 |
+| An input at a boundary was not handled    |    2 |    0 |    4 |     6 |
+| A claim went wider than its evidence      |    0 |    3 |    2 |     5 |
+| A failure or secondary path was not built |    1 |    0 |    2 |     3 |
+| A test missed what it claimed to test     |    2 |    0 |    0 |     2 |
+| Total                                     |    9 |    5 |   11 |    25 |
+
+Each finding, so the classification can be argued with:
+
+- _Stale restated fact (9):_ #531's tracker note kept superseded counts;
+  #531's README still said the edge tag never moves; #531's spec Status
+  said "unbuilt" for a shipped change; #531's spec said ten tests where
+  there were eleven; #532's Status was updated but three passages below
+  it were not; #532's diagram still showed the step order the previous
+  review had changed; #533's workflow spelled Copilot's identity three
+  ways; #533's workflow header restated the allow-list it does not own;
+  #533's tracker note kept the superseded allow-list unmarked.
+- _Boundary input (6):_ #531's pattern language accepted `.` and `..`
+  segments; #531's flag with no value fell back to a default; #533
+  trimmed file names, so a leading space made another file the tracker
+  (two threads); #533 dropped each file's change status, so a rename or
+  delete read as an edit; #533's `..` substring test refused legal names
+  once names arrived exactly.
+- _Claim wider than evidence (5):_ #532 evidenced "a plain `git pull`
+  works" with `git fetch`, in the spec and the tracker (two threads);
+  #532 gave release positions and timestamps with no command; #533's
+  allow-list was wider than the file its evidence measured; #533 gave 11
+  of 60 without the command that counted it.
+- _Failure or secondary path (3):_ #531 moved the tag before uploading,
+  so a failed upload left it naming the wrong artifacts; #533's failed
+  files API call ended the job with no request, against its own rule;
+  #533's manual run checked out whatever branch it was started from.
+- _Test missed its target (2):_ #531 tested new validation only by
+  calling the helper, not through the gate; #531 had a refusal test that
+  passed for a different reason than the one it named.
+
+What it shows, with the caveat that three pull requests from one author
+on one spec is a hypothesis, not a finding: **the stale restated fact is
+the largest mode, 9 of 25, and the only one in all three pull requests.**
+Every instance has one shape -- a fact written in more than one place,
+and a change that updated only some of the copies. CLAUDE.md's
+must-agree rule covers copies in code; these are copies in prose (tracker
+notes, a spec's Status line and counts, the README, a comment restating
+config), and nothing checks them.
+
+**Proposed first mechanism, for that mode -- not landed; the owner's
+call.** Write each fact once and point to it everywhere else. A tracker
+note records the verdict and a pointer ("see the spec, WS3") rather than
+the spec's counts; a PR body links the spec section rather than copying
+its figures; a workflow comment names its config file rather than
+listing the entries. That removes the copies instead of checking them,
+and most of the nine would never have been written. It would go in the
+`pr-creation` skill as an authoring rule, with one line in
+`checklist.md`'s "Every PR" group so a reviewer can hold an author to it.
+A check would be stronger than a line of prose, and none is proposed
+because none is known that works on prose: a checker cannot tell a
+restated fact from two numbers that happen to be equal. If the next pass
+shows the mode holding its share, that is the signal to look for one.
+
+Pass log:
+
+| Pass | Date       | Window           | Findings | Top mode                | Mechanism            |
+| ---- | ---------- | ---------------- | -------: | ----------------------- | -------------------- |
+| seed | 2026-09-23 | #531, #532, #533 |       25 | stale restated fact (9) | proposed, not landed |
+
+Acceptance: a pass is recorded here with its window, per-mode counts and
+the command that collected them; the mechanism chosen for its top mode is
+landed; and the next pass records whether that mode's share fell.
+
+Coupling: WS3 depends on WS2, and WS1 reads WS3's trivial allow-list.
+WS5 and WS6 both draw on WS1's reviews and are independent of each
+other: WS5 changes what Copilot is told to look for, WS6 changes what
+authors do before a review happens.
 
 ## Risks
 
-**Blocking the tier makes roughly one or two pull requests a day wait.**
+**Blocking the tier makes roughly one or two pull requests a day wait.
+(RESOLVED 2026-09-23 by blocking nothing; kept as the record.)**
 At 216 merges in thirty days, a tier catching a third of them is about
 two per day held until a review is recorded. That is the requester's
 decision and the point of the design, but it is also the shape that gets
@@ -717,7 +950,7 @@ too wide before WS4 makes it binding.
 and 70% of the last 40, which at this merge rate is about four pull
 requests a day, not two. The risk this paragraph describes is therefore
 the live state of the design rather than a thing to watch for, and WS4
-is blocked on Open decision 6 until it is resolved. Worth noting which
+was blocked on Open decision 6 until the owner withdrew it. Worth noting which
 way the check was useful: it did not find the globs sloppy, it found the
 premise wrong, and a check that can only report "too wide, narrow it"
 would have been answered by narrowing rows that are correctly tiered.
@@ -726,29 +959,39 @@ would have been answered by narrowing rows that are correctly tiered.
 with the diff being clean through a mechanism -- Copilot read the diff
 and had an opinion -- and diverges exactly where the mechanism is bypassed:
 instructions too long to absorb, a pointer to `checklist.md` it did not
-follow, a diff too large for its context. The gate can verify Copilot
-_answered_; nothing in this design verifies it answered _well_. WS5 is
-the instrument, and its findings belong in this spec, not in a comment.
+follow, a diff too large for its context. With no gate, nothing even
+checks that Copilot _answered_, and nothing verifies it answered _well_.
+A clean review is a reviewer's opinion, not evidence the change is
+sound. WS5 is the instrument for the second question, and its findings
+belong in this spec, not in a comment.
 
 **The whole design rests on a third-party capability this spec has not
-seen work.** Every tier, gate and generated instruction below assumes
-Copilot code review runs on this repository. One measurement exists and
-it is negative: no review in eight hours from an explicit request. That
-is not evidence Copilot is unavailable -- it is evidence the question is
-unanswered, which is the weaker position of the two. WS1 exists to settle
-it first, and no later workstream should be built on the assumption until
-it is.
+seen work. (RESOLVED: it has.)** Copilot reviewed #516 on 2026-09-18
+after four quota refusals ("What the live test measured"), and reviewed
+#531, #532 and #533 (twice) with findings nearly all real. What is still
+unseen is WS1's workflow requesting a review on its own; that is WS1's
+acceptance.
+
+**The quota runs out, and reviews stop for the rest of the month.** A
+refusal is visible on the pull request and costs nothing, and the
+owner's policy is to carry on without the review. The cost is the
+review that did not happen: pull requests merged in that window got no
+second reader. WS1 asks again only on a push -- it has no schedule, so a
+reset triggers nothing -- which means a pull request pushed to after the
+reset is reviewed then, and one with no later push, or merged before it,
+is not. Nothing goes back for it.
 
 **Prompt injection reaches the reviewer.** Copilot reads diff content,
 and a pull request can contain text addressed to it. This is an
 unsolved class, acknowledged as such in the literature. It bounds what
-the gate may conclude: a Copilot review is evidence that a review
-happened, never authority to merge. The high-risk tier ends at a human,
-which is what keeps that bound meaningful.
+a review may be taken to mean: evidence that a review happened, never
+authority to merge. Every merge ends at a human, which is what keeps
+that bound meaningful.
 
 ## Open decisions
 
-1. **Where required-check enforcement is recorded.** Branch protection is
+1. **(MOOT 2026-09-23: there is no review check to require, since WS4 is
+   withdrawn.)** **Where required-check enforcement is recorded.** Branch protection is
    a repository setting; nothing in the tree shows it exists or is still
    on -- the objection that decided WS1's mechanism. Options: (a) accept
    it and document it in CLAUDE.md; (b) add a gate that reads the
@@ -768,9 +1011,12 @@ which is what keeps that bound meaningful.
    gate reading `state` reads a constant. The signal is the body's
    verdict line, and the `Files reviewed: N/M` and `Files not reviewed`
    fields beside it. WS4 parses the body; it must not branch on review
-   state. See "What the live test measured".
+   state. See "What the live test measured". (WS4 is withdrawn; the
+   finding still governs WS1, which reads the body to tell a quota
+   refusal from a review.)
 
-3. **Where a barwise deep-review verdict is recorded so a gate can read
+3. **(MOOT 2026-09-23: no gate reads a verdict, since WS4 is
+   withdrawn.)** **Where a barwise deep-review verdict is recorded so a gate can read
    it.** The "cannot tell" row needs a machine-readable home. Options:
    (a) a review posted through the API whose first line carries the
    verdict, parsed by the gate; (b) a `review-verdict.json` committed to
@@ -827,7 +1073,9 @@ which is what keeps that bound meaningful.
    premium requests monthly; if that is not affordable, the tier must
    gate **requesting** and not only blocking, which inverts WS1's
    "every pull request" premise. That is the decision, and it is a
-   budget question this spec cannot answer.
+   budget question this spec cannot answer. (Answered 2026-09-23: every
+   non-trivial pull request, and the multiplier now decides only how
+   early in a month the quota runs out -- see Risks.)
 
    WS5 settles the capability half empirically: run the planted
    checklist violations at Terra and at Luna and compare. The benchmarks
@@ -835,7 +1083,23 @@ which is what keeps that bound meaningful.
    invariants.
 
 6. **The tier fires on 55% of merges, not a third. Narrow it, accept it,
-   or change what "blocking" costs?** (open; WS4 waits on this)
+   or change what "blocking" costs?** (RESOLVED 2026-09-23: none of the
+   three -- nothing blocks.)
+
+   **The resolution.** The owner went simpler than any of the options
+   below: review every non-trivial pull request, block nothing, carry on
+   without the review when the quota is exhausted, and study what the
+   reviews find to reduce rework (WS6). WS4 is withdrawn, so the tier no
+   longer has a budget to exceed; the 55% stands as a description of
+   this repository. The options are kept as the record of what was
+   weighed.
+
+   One thing had changed by the time the decision was taken, and the
+   text below predates it: WS1 was already requesting a review on every
+   non-trivial pull request, so blocking would have bought no extra
+   reviews -- only waiting, fix rounds, and a merge freeze whenever the
+   quota ran out. That is what made "block nothing" the cheap choice
+   rather than the careless one.
 
    WS3 measured it and the two glob defects it found are fixed; the
    residual is the design's premise, not its patterns. Two rows produce
@@ -879,7 +1143,7 @@ which is what keeps that bound meaningful.
    the one external fact both open decisions now turn on, and it is a
    lookup rather than a judgment.
 
-   Recommendation: do not start WS4. Confirm the multiplier, then choose
+   Recommendation at the time: do not start WS4. Confirm the multiplier, then choose
    between (a)/(c) and (b) with the cost in hand. WS1 and WS5 are
    unaffected and can proceed meanwhile -- WS5's planted-violation
    measurement is worth more before a gate exists than after.
