@@ -216,20 +216,26 @@ async function readChanges() {
 
 /**
  * The table's patterns are written against paths exactly as git prints
- * them. A path that is absolute, `./`-prefixed, or carries a `..` matches
+ * them. A path that is absolute, or has a `.` or `..` SEGMENT, matches
  * nothing but the `**` row and still classifies -- a confident `routine`
  * over a list this could not read properly. Neither real producer (git
  * and the pull request files API) emits any of those shapes, so one here
  * means the list came from somewhere unexamined.
+ *
+ * Segments, not substrings: `a..b.ts` is a legal file name, and once
+ * `--changes` carried names exactly, a substring test refused a real
+ * pull request that had one (a Copilot finding on #533).
  */
 function checkPaths(paths) {
-  const bad = paths.filter((f) => f.startsWith("/") || f.startsWith("./") || f.includes(".."));
+  const bad = paths.filter(
+    (f) => f.startsWith("/") || f.split("/").some((seg) => seg === "." || seg === ".."),
+  );
   if (bad.length > 0) {
     refuse(
       `${bad.length} path(s) are not repo-root-relative as git prints them`,
       `first: ${
         bad[0]
-      }\n  Expected e.g. barwise/packages/core/src/x.ts -- no leading '/' or './', no '..'.`,
+      }\n  Expected e.g. barwise/packages/core/src/x.ts -- no leading '/', no '.' or '..' segment.`,
     );
   }
 }

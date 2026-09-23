@@ -3258,10 +3258,19 @@ test("pr-risk REFUSES a path list that is not repo-root-relative", () => {
   // emit these shapes, so one means the list came from somewhere else.
   const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
   try {
-    for (const bad of ["./barwise/docs/specs/b.spec.md", "/abs/path.ts", "barwise/../etc/x"]) {
+    for (
+      const bad of ["./barwise/docs/specs/b.spec.md", "/abs/path.ts", "barwise/../etc/x", "a/.."]
+    ) {
       const run = gate("pr-risk.mjs", dir, ...fileList(dir, [bad]));
       assert.equal(run.status, 2, `${bad} must refuse, not classify`);
       assert.doesNotMatch(run.stdout, /routine|high-risk/, `${bad} printed a tier`);
+      assert.match(run.stderr, /not repo-root-relative/, bad);
+    }
+    // A dot SEGMENT is refused; dots inside a name are a legal name. The
+    // first version tested the substring and refused these (#533 review).
+    for (const legal of ["barwise/packages/core/src/a..b.ts", "..hidden/x", "x/.env", "y/..."]) {
+      const run = gate("pr-risk.mjs", dir, ...fileList(dir, [legal]));
+      assert.equal(run.status, 0, `${legal} is a legal path:\n${run.stderr}`);
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
