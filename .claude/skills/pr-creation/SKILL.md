@@ -51,6 +51,21 @@ least once:
 - **`pr-review/checklist.md` has been run against your own diff**, as
   a reviewer would run it, and what it found is fixed rather than
   promised.
+- **Each fact is written once; everything else points to it.** A
+  count, a status, a list of entries, or a claim about what the code
+  does has one home: wherever it is produced or decided -- the spec's
+  workstream section for a measurement, a config file for its own
+  entries, the code for its behaviour. Every other document names that
+  home instead of repeating the value. A tracker note records the
+  verdict and "see the spec, WS3", not the spec's figures; a comment
+  names `review-tiers.json`, not its current allow-list; a spec's
+  `Status` line summarizes and its sections hold the numbers. The
+  copies are how it goes wrong: a restated fact that went stale is the
+  most common Copilot finding in `tiered-pr-review.spec.md`'s WS6
+  review, always in one shape -- a change that updated some copies and
+  not the others. A copy that has to stay, such as a PR body quoting a
+  measurement with its command, is a snapshot: before pushing a change
+  to that fact, grep the repository for its old value.
 - **The commits are the record.** Subjects prefixed as the log does
   (`feat:`, `fix:`, `docs:`, `chore:`), one concern per commit, no
   merge markers, and no model identifier in commit or PR prose; the
