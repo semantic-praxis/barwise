@@ -505,11 +505,17 @@
       "caught_by": "not-a-correction",
       "note": "The Status header announcing that corrections are recorded below. It points at the records; it is not one. Re-keyed from ::3eff3ca4612e when the header was corrected during this change's own review -- the id is a hash of the normalised text, so editing the sentence drops the old row and adds this one."
     },
-    "tiered-pr-review::1937dd238ba9": {
+    "tiered-pr-review::1d650ddba3ec": {
       "spec": "tiered-pr-review.spec.md",
-      "excerpt": "not verifiable before shipping: whether githubtoken can request copilot-pull-request-reviewer[bot], and what login copilot appears under in the post response. d",
+      "excerpt": "what the copilot review of #533 found. nine findings. eight were real as stated; the ninth, three spellings of copilot's identity, was a real inconsistency whos",
+      "caught_by": "reasoning",
+      "note": "Nine defects in WS1's first implementation, found by a Copilot review of #533 that read the code and ran nothing. Four of them sat in the workflow shell that a stubbed-gh harness had already exercised branch by branch: the harness tested the branches as designed and could not test the design, which is what a reader did. Each fix then got a test that a mutation of the fix fails, which is execution, but the catch was the review."
+    },
+    "tiered-pr-review::a0b7e1e6a742": {
+      "spec": "tiered-pr-review.spec.md",
+      "excerpt": "not verifiable before shipping: whether githubtoken can request copilot-pull-request-reviewer[bot], and what login copilot appears under in the post response. (",
       "caught_by": "not-a-correction",
-      "note": "States a limit of verification, not a correction of an earlier claim: whether a workflow's GITHUB_TOKEN can request copilot-pull-request-reviewer[bot] could not be checked before the workflow first runs (docs.github.com returned 403 through the proxy; no gh in the container). Nothing earlier said otherwise. The detector surfaced it on its wording. Its converse is worth recording: the paragraph just above it IS a correction -- WS1 said its precondition was 'NOT established' for five days after it was settled -- and the detector did not surface that one."
+      "note": "States a limit of verification, not a correction of an earlier claim: whether a workflow's GITHUB_TOKEN can request copilot-pull-request-reviewer[bot] could not be checked before the workflow first runs (docs.github.com returned 403 through the proxy; no gh in the container). Its added parenthesis records a measurement (the reviews endpoint's login, read from #533's own review), not a reversal. Carried over from row 1937dd238ba9, whose paragraph this is, reworded. That row's note also recorded that the paragraph just above -- WS1 saying its precondition was 'NOT established' for five days after it was settled -- IS a correction the detector does not surface; still true."
     },
     "tracker-quick-wins::ae1c4c3cc7ab": {
       "spec": "tracker-quick-wins.spec.md",

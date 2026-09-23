@@ -7,8 +7,8 @@
     "not-path-derivable": "The checklist trigger is semantic, not path-shaped. The classifier CANNOT detect it, and saying so is the point: these stay with the deep review, and a row exists so the completeness gate still accounts for the heading."
   },
   "trivial": {
-    "globs": [".beads/"],
-    "why": "A pull request is trivial only if EVERY changed file is under one of these, and a trivial PR gets no Copilot review (.github/workflows/copilot-review.yml). Measured over the last 60 merged PRs: 11 (18%) touched only .beads/issues.jsonl -- every one a one-file tracker closure -- and nothing else was plausibly trivial. Documentation is deliberately NOT here: PR #532 was docs-and-tracker only and a Copilot review found five real defects in it, the worst a spec diagram describing an implementation that no longer existed. Widen this list only with the same kind of evidence, because a wrong entry is a defect nobody looks at."
+    "globs": [".beads/issues.jsonl"],
+    "why": "A pull request is trivial only if EVERY change is an EDIT (files API status modified) to one of these paths, and a trivial PR gets no Copilot review (.github/workflows/copilot-review.yml). Measured over the 60 merged PRs #466..#532 (first-parent merges ending at 2f231119): 11 (18%) changed only .beads/issues.jsonl, every one of them as an edit, and nothing else was plausibly trivial. The exact file, not .beads/: that directory also holds tracked, executable git hooks, which no measurement covered. Documentation is deliberately NOT here: PR #532 was docs-and-tracker only and a Copilot review found five real defects in it, the worst a spec diagram describing an implementation that no longer existed. The command that reproduces the count is in docs/specs/tiered-pr-review.spec.md, WS1. Widen this list only with the same kind of evidence, because a wrong entry is a defect nobody looks at."
   },
   "rows": [
     {

@@ -209,6 +209,12 @@ git diff --name-only <merge>^1...<merge>^2 > files.txt
 npm run pr:risk -- --files files.txt --json
 ```
 
+`--name-only` names only a rename's destination, which WS1's review
+later showed can hide a change's real source. None of these 40 pull
+requests contains a rename (`git diff --name-status` shows no `R` line
+in any of them), so the numbers below stand; a re-run should use
+`--name-status --no-renames`, as `pr-risk` itself now does.
+
 Two things in that recipe were wrong on the first pass, and both inflate
 the number:
 
@@ -477,15 +483,28 @@ non trivial pr." Not every pull request, and not only the high-risk
 tier -- which is the "gate requesting, not only blocking" inversion Open
 decision 5 named as the budget fallback, taken on a narrower line.
 
-**What trivial means, measured rather than chosen.** Of the last 60
-merged pull requests, 11 (18%) touched only `.beads/issues.jsonl` -- each
-a one-file tracker closure -- and nothing else was plausibly trivial.
+**What trivial means, measured rather than chosen.** Of the 60 merged
+pull requests #466 to #532, 11 (18%) changed only `.beads/issues.jsonl`,
+every one of them as an edit, and nothing else was plausibly trivial.
+The count, over the first-parent merges ending at `2f231119`:
+
+```sh
+for m in $(git log --first-parent --merges --format=%H -60 2f231119); do
+  git diff --name-status --no-renames "$m^1...$m^2" | paste -sd' '
+done | grep -cxF "$(printf 'M\t.beads/issues.jsonl')"    # prints 11
+```
+
 Documentation is deliberately NOT trivial: PR #532 was docs-and-tracker
 only, and a Copilot review found five real defects in it, the worst a
 spec diagram describing an implementation that no longer existed. So
-trivial is an explicit allow-list, `trivial.globs` in
-`barwise/review-tiers.json`, currently `.beads/` alone, read through
-`pr-risk.mjs`. A PR is trivial only if EVERY changed file is on it.
+trivial is an explicit allow-list, `trivial` in
+`barwise/review-tiers.json` -- the authority for its entries and their
+evidence -- read through `pr-risk.mjs`. A PR is trivial only if EVERY
+change is an EDIT to a path on it. The entry is the file the evidence
+measured, not `.beads/`: that directory also holds tracked, executable
+git hooks. And only edits, because a rename's source path lies
+elsewhere (code moved in under the tracker's name read as a closure by
+name alone) and deleting the tracker is not a closure.
 
 It is an allow-list and not derived from the tier rows because deriving
 it is wrong in the direction that matters: the rows cover checklist
@@ -496,19 +515,31 @@ looks at; a wrong request is one review's cost.
 
 **The workflow's design, each choice stated where it lives:**
 
-- `pull_request_target`, checking out the BASE branch. The allow-list is
-  read from main, so a PR cannot widen it to exempt itself -- under
-  plain `pull_request` the checkout is the PR's own tree. It also gives
+- `pull_request_target`, checking out the DEFAULT branch by name. The
+  allow-list is read from main, so a PR cannot widen it to exempt
+  itself -- under plain `pull_request` the checkout is the PR's own
+  tree -- and a `workflow_dispatch` started from another branch reads
+  main's table too, which the event's own ref would not. It also gives
   Dependabot PRs a token that can request a reviewer. No PR code is run;
-  the only PR-controlled input is the list of file names, read as data.
-  A test pins the trigger and forbids checking out the PR head.
+  the only PR-controlled input is the changed-file records, read as
+  data. A test pins the trigger, the checkout ref, and forbids checking
+  out the PR head.
+- The records travel as JSON, one per line (`pr-risk --changes`), not
+  as bare names. JSON is the one line format in which every legal file
+  name survives exactly, and it carries each file's status, which the
+  edits-only rule needs. Nothing in `pr-risk` trims or normalises a
+  path; a bare `--files` list with edge whitespace is refused, and one
+  without status never reports trivial.
+- One test decides who Copilot is, used by all three checks (past
+  reviews, pending requests, the readback), so they cannot disagree.
 - One review per PR. It runs on every push, but exits before checkout
   when Copilot has already reviewed or been requested, so a PR that
   starts tracker-only and later gains code is still reviewed once, and
   pushes do not buy repeat reviews.
-- Every uncertainty resolves toward requesting: `pr-risk` refusing, an
-  empty file list, and a list of 3,000 files (where the API stops, so it
-  may be truncated) all request the review. `isTrivial([])` is false for
+- Every uncertainty resolves toward requesting: a files API call that
+  fails, `pr-risk` refusing, an empty file list, and a list of 3,000
+  files (where the API stops, so it may be truncated) all request the
+  review. `isTrivial([])` is false for
   the same reason, because `[].every(...)` is true.
 - A request that did not land fails the job, with the API response
   printed. A green job that requested nothing would be the
@@ -516,12 +547,31 @@ looks at; a wrong request is one review's cost.
 - `workflow_dispatch` runs it on an existing PR by number, to verify the
   request path or to backfill a PR opened before this existed.
 
-**Verified before shipping:** the workflow's two shell steps, extracted
-verbatim from the YAML, run against a stubbed `gh` across every branch
--- draft, already reviewed, reviewed by a human only, already requested,
-fresh; trivial, tracker-plus-spec, code, classifier refusal, empty list,
-3,000 files, and a request that did not land (exit 1, `::error::`, the
-response printed). Both steps pass shellcheck.
+**Verified before shipping, and kept verified:** the workflow's two
+shell steps are cut out of the YAML by `gates.test.mjs` and run as
+written against a stubbed `gh`, one case per branch -- draft, already
+reviewed, a human and a deleted account's review, already requested,
+fresh, a failed reviews read; a tracker edit (the one skip), the tracker
+deleted, code renamed into its path, a hook beside it, two look-alike
+names, tracker-plus-spec; a failed files read, a classifier refusal, an
+empty list, 3,000 files, and a request that did not land (exit 1,
+`::error::`, the response printed). This began as a one-off harness in
+the session that wrote the workflow; a Copilot review then found four
+defects in exactly the shell it had exercised, which is the argument
+for the harness being a test rather than a transcript.
+
+**What the Copilot review of #533 found.** Nine findings. Eight were
+real as stated; the ninth, three spellings of Copilot's identity, was a
+real inconsistency whose predicted failure did not occur, because the
+reviews endpoint turned out to use the exact spelling checked. In full:
+the allow-list wider than its evidence (`.beads/` rather than the
+file); names trimmed, so ` .beads/issues.jsonl` became the tracker;
+status discarded, so a rename or delete read as an edit; a failed files
+read going red with no request, against the stated rule; the dispatch
+checkout following the run's ref; three spellings of Copilot's identity;
+the workflow header restating the allow-list it does not own; and this
+section's count given without its command. Each fix has a test that a
+mutation of it fails.
 
 **And a mutation pass found the suite weaker than it looked.** Asked
 whether testing the gate-level wiring should rest on remembering to, a
@@ -539,7 +589,8 @@ remembering this was meant to replace.
 
 **Not verifiable before shipping:** whether `GITHUB_TOKEN` can request
 `copilot-pull-request-reviewer[bot]`, and what login Copilot appears
-under in the POST response. `docs.github.com` returned 403 through the
+under in the POST response. (The reviews endpoint's login WAS measured,
+on #533's own review: `copilot-pull-request-reviewer[bot]`.) `docs.github.com` returned 403 through the
 session's proxy and the container has no `gh`. The workflow reads the
 response back and matches any requested reviewer containing "copilot",
 case-insensitively -- deliberately loose about the spelling, which could

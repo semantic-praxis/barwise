@@ -26,13 +26,25 @@
  * so an empty list means the question was not asked
  * (docs/specs/gate-refusal-contract.spec.md, and barwise-905's shape).
  *
- * `--files` is how CI will feed the list it already has from the API, and
- * how the tests plant one without a repository. `--base` is for a local
- * run on a branch. Both print the same answer over the same list.
+ * Three inputs, one answer over the same changes:
+ *
+ *   --changes  one pull-request-files API record per line, as JSON
+ *              (`{filename, status, previous_filename}`). This is what the
+ *              Copilot workflow sends, because it is the only one of the
+ *              three that is both exact and carries each file's status.
+ *   --files    bare paths, one per line: for a person, and for tests that
+ *              plant a list without a repository. It has no status, so it
+ *              never reports trivial (`isTrivial` says why).
+ *   --base     a local run on a branch, read from git.
+ *
+ * No input is normalised. A path is read exactly as its producer wrote
+ * it, or refused: the first version trimmed each line, so a real file
+ * named ` .beads/issues.jsonl` became the tracker, and the Copilot
+ * workflow would have skipped its review (a Copilot finding on #533).
  *
  *   node barwise/scripts/pr-risk.mjs                    # vs origin/main
  *   node barwise/scripts/pr-risk.mjs --base main --json
- *   git diff --name-only A B | node .../pr-risk.mjs --files -
+ *   git diff --name-only A...B | node .../pr-risk.mjs --files -
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -41,8 +53,8 @@ import { classify, isTrivial, TABLE, tierRows, trivialGlobs } from "./lib/review
 
 // `lib/tracked.mjs` resolves the repository root AT IMPORT, and exits 2
 // when git cannot answer. That is right for a gate that always needs the
-// root, and wrong here: with `--files` this script needs no repository at
-// all, which is how CI will call it -- from a list the API already has.
+// root, and wrong here: with `--changes` or `--files` this script needs no
+// repository at all, which is how CI calls it -- from records the API has.
 // Imported at the top, it refused before ever reading the list it was
 // given. So the git path imports it, and only the git path pays for it.
 
@@ -82,67 +94,142 @@ function refuse(what, detail) {
   process.exit(2);
 }
 
+/** The whole of `--changes` or `--files`: a path, or `-` for stdin. */
+function readInput(flag, from) {
+  try {
+    return from === "-" ? readFileSync(0, "utf8") : readFileSync(from, "utf8");
+  } catch (err) {
+    refuse(
+      from === "-" ? "stdin could not be read" : `cannot read the ${flag} input at ${from}`,
+      err.message,
+    );
+  }
+}
+
+/** Lines of a text input, with only the empty ones dropped. Never trimmed. */
+function lines(raw) {
+  return raw.split("\n").filter((l) => l !== "");
+}
+
 /**
- * The changed-file list, from a file, from stdin, or from git.
- *
- * Paths come back exactly as git prints them -- repo-root-relative, with
- * forward slashes -- because that is what the table's patterns are
- * written against. Anything that would need normalising here is a path
- * the table cannot express anyway.
+ * One `--changes` record: `{filename, status, previous_filename}` from the
+ * pull request files API. JSON, not a bare name, because JSON is the only
+ * line format in which every legal file name -- a leading space, an
+ * embedded newline -- survives the trip exactly.
  */
-async function changedFiles() {
-  const from = opt("--files", null);
-  if (from !== null) {
-    let raw;
-    try {
-      raw = from === "-" ? readFileSync(0, "utf8") : readFileSync(from, "utf8");
-    } catch (err) {
+function changeRecord(line, n) {
+  let rec;
+  try {
+    rec = JSON.parse(line);
+  } catch (err) {
+    refuse(`--changes line ${n} is not JSON`, err.message);
+  }
+  const str = (v) => typeof v === "string" && v.length > 0;
+  if (rec === null || typeof rec !== "object" || !str(rec.filename) || !str(rec.status)) {
+    refuse(
+      `--changes line ${n} is not a files API record`,
+      `Expected {"filename": "...", "status": "...", "previous_filename": ...}; got ${line}`,
+    );
+  }
+  if (rec.previous_filename != null && !str(rec.previous_filename)) {
+    refuse(`--changes line ${n} has a previous_filename that is not a path`, line);
+  }
+  return { path: rec.filename, status: rec.status, previous: rec.previous_filename ?? null };
+}
+
+/** `git diff --name-status` letters, in the files API's words. */
+const GIT_STATUS = { M: "modified", A: "added", D: "removed", T: "changed" };
+
+/**
+ * The changes, as `{ path, status, previous }`, from whichever input was
+ * given. `previous` is a rename's source path and is classified too: a
+ * file moved OUT of `core/src/` is a change to core.
+ */
+async function readChanges() {
+  const fromChanges = opt("--changes", null);
+  const fromFiles = opt("--files", null);
+  if (fromChanges !== null && fromFiles !== null) {
+    refuse("--changes and --files were both given", "They are two spellings of one input.");
+  }
+  if (fromChanges !== null) {
+    return lines(readInput("--changes", fromChanges)).map((l, i) => changeRecord(l, i + 1));
+  }
+  if (fromFiles !== null) {
+    const files = lines(readInput("--files", fromFiles));
+    // Refused, not trimmed. Trimming made a name that begins with a space
+    // into a different, allow-listed file; refusing costs only the rare
+    // real name with edge whitespace, and a CRLF list, both loudly.
+    const padded = files.filter((f) => f !== f.trim());
+    if (padded.length > 0) {
       refuse(
-        from === "-" ? "stdin could not be read" : `cannot read the file list at ${from}`,
-        err.message,
+        `${padded.length} path(s) in --files begin or end with whitespace`,
+        `first: ${JSON.stringify(padded[0])}\n  A bare list cannot say whether that is`
+          + " part of the name; --changes can, because it is JSON.",
       );
     }
-    const files = raw.split("\n").map((l) => l.trim()).filter(Boolean);
-    // The table's patterns are written against paths exactly as git
-    // prints them. A path that is absolute, `./`-prefixed, or carries a
-    // `..` matches nothing but the `**` row and still classifies -- a
-    // confident `routine` over a list this could not read properly.
-    // Neither of the two real producers (`git diff --name-only` and the
-    // pull request files API) emits any of those shapes, so one here
-    // means the list came from somewhere unexamined.
-    const bad = files.filter((f) => f.startsWith("/") || f.startsWith("./") || f.includes(".."));
-    if (bad.length > 0) {
-      refuse(
-        `${bad.length} path(s) are not repo-root-relative as git prints them`,
-        `first: ${
-          bad[0]
-        }\n  Expected e.g. barwise/packages/core/src/x.ts -- no leading '/' or './', no '..'.`,
-      );
-    }
-    return files;
+    return files.map((path) => ({ path, status: null, previous: null }));
   }
 
   const base = opt("--base", "origin/main");
   const { REPO_ROOT } = await import("./lib/tracked.mjs");
+  let out;
   try {
     // Three dots: what this branch changed since it diverged, not every
     // difference from the base tip. A two-dot diff would attribute the
     // base's own movement to this PR and misclassify on someone else's
-    // commits.
-    return execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      maxBuffer: 64 * 1024 * 1024,
-    })
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean);
+    // commits. `-z` prints names exactly, unquoted; `--no-renames` turns
+    // a rename into its delete and its add, because `--name-only` names
+    // only a rename's destination and so lost the path it came from.
+    out = execFileSync(
+      "git",
+      ["diff", "--name-status", "-z", "--no-renames", `${base}...HEAD`],
+      {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        maxBuffer: 64 * 1024 * 1024,
+      },
+    );
   } catch (err) {
     refuse(
-      `\`git diff --name-only ${base}...HEAD\` failed`,
+      `\`git diff --name-status ${base}...HEAD\` failed`,
       `${err.stderr?.toString().trim().split("\n")[0] ?? err.message}`
         + `\n  A shallow clone or a missing '${base}' both land here.`,
+    );
+  }
+  const fields = out.split("\u0000");
+  if (fields.at(-1) === "") fields.pop();
+  if (fields.length % 2 !== 0) {
+    refuse("git printed a status without a path", `${fields.length} NUL-separated fields`);
+  }
+  const changes = [];
+  for (let i = 0; i < fields.length; i += 2) {
+    const letter = fields[i];
+    changes.push({
+      path: fields[i + 1],
+      status: GIT_STATUS[letter] ?? `git:${letter}`,
+      previous: null,
+    });
+  }
+  return changes;
+}
+
+/**
+ * The table's patterns are written against paths exactly as git prints
+ * them. A path that is absolute, `./`-prefixed, or carries a `..` matches
+ * nothing but the `**` row and still classifies -- a confident `routine`
+ * over a list this could not read properly. Neither real producer (git
+ * and the pull request files API) emits any of those shapes, so one here
+ * means the list came from somewhere unexamined.
+ */
+function checkPaths(paths) {
+  const bad = paths.filter((f) => f.startsWith("/") || f.startsWith("./") || f.includes(".."));
+  if (bad.length > 0) {
+    refuse(
+      `${bad.length} path(s) are not repo-root-relative as git prints them`,
+      `first: ${
+        bad[0]
+      }\n  Expected e.g. barwise/packages/core/src/x.ts -- no leading '/' or './', no '..'.`,
     );
   }
 }
@@ -155,30 +242,32 @@ try {
   refuse(err.message, err.cause?.message);
 }
 
-const files = await changedFiles();
-if (files.length === 0) {
+const changes = await readChanges();
+if (changes.length === 0) {
   refuse(
     "the changed-file list is empty",
     "A pull request that changes nothing does not occur here, so this is a\n"
       + "  list that was never populated rather than a diff that is genuinely clean.",
   );
 }
+const paths = [...new Set(changes.flatMap((c) => (c.previous ? [c.path, c.previous] : [c.path])))];
+checkPaths(paths);
 
 // `trivial` is a separate question from the tier: it decides whether a
 // Copilot review is requested at all (WS1), where the tier decides
 // whether one blocks (WS4). Reported side by side because the workflow
 // reads one and a person reading the output may want both.
-const result = { ...classify(files, rows), trivial: isTrivial(files, trivial) };
+const result = { ...classify(paths, rows), trivial: isTrivial(changes, trivial) };
 
 if (process.argv.includes("--json")) {
-  console.log(JSON.stringify({ ...result, fileCount: files.length }, null, 2));
+  console.log(JSON.stringify({ ...result, fileCount: changes.length }, null, 2));
   process.exit(0);
 }
 
 const width = Math.max(...result.matched.map((r) => r.tier.length), 0);
 console.log(
   `pr-risk: ${result.tier}${result.trivial ? ", trivial" : ""}`
-    + `  (${files.length} changed file${files.length === 1 ? "" : "s"})`,
+    + `  (${changes.length} changed file${changes.length === 1 ? "" : "s"})`,
 );
 console.log();
 for (const row of result.matched.sort((a, b) => a.tier.localeCompare(b.tier))) {

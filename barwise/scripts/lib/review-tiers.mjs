@@ -316,18 +316,29 @@ export function trivialGlobs(file = TABLE) {
 }
 
 /**
- * Is this changed-file list trivial -- every file under an allow-listed
- * pattern?
+ * Is this change list trivial -- every change an EDIT to a path under an
+ * allow-listed pattern?
+ *
+ * `changes` are `{ path, status }`, with the pull request files API's
+ * status words (`modified`, `added`, `removed`, `renamed`, ...). Only
+ * `modified` can be trivial, because an edit to the tracker is what the
+ * allow-list's evidence measured. The other statuses are not that: a
+ * rename's SOURCE is somewhere else, so moving code in under an
+ * allow-listed name read as a tracker edit by name alone, and deleting
+ * the tracker is not a closure. A status of `null` -- a bare path list,
+ * which cannot say -- is therefore never trivial either.
  *
  * An EMPTY list is not trivial, and that is the whole reason this is a
- * function rather than an inline `files.every(...)`: `[].every(f)` is
+ * function rather than an inline `changes.every(...)`: `[].every(f)` is
  * true, so the obvious one-liner reads "no files" as "nothing needs
  * review" and skips the reviewer on exactly the input a broken git call
  * or an empty API page produces. `pr-risk` already refuses an empty list
  * before it gets here; this refuses it again for any other caller, in
  * the direction that costs a review rather than one that loses it.
  */
-export function isTrivial(files, globs) {
-  if (files.length === 0) return false;
-  return files.every((f) => globs.some((g) => matchesPattern(f, g)));
+export function isTrivial(changes, globs) {
+  if (changes.length === 0) return false;
+  return changes.every(
+    (c) => c.status === "modified" && globs.some((g) => matchesPattern(c.path, g)),
+  );
 }
