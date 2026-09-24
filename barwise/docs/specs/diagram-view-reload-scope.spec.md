@@ -3,7 +3,7 @@
 Status: Implemented 2026-09-24 (single workstream)
 Created: 2026-09-24
 Last-updated: 2026-09-24
-Tracking: barwise-1061 (bug report: Asset view in `edpl-domain.orm.yaml`
+Tracking: barwise-1064 (bug report: Asset view in `edpl-domain.orm.yaml`
 shows financing, customer and listing clusters)
 
 ## Principle
@@ -47,7 +47,7 @@ In scope:
 
 Out of scope:
 
-- The NORMA `.orm` exporter ignoring `elements` (barwise-1062). Found
+- The NORMA `.orm` exporter ignoring `elements` (barwise-1065). Found
   while investigating; a different surface with a different fix.
 - Diagram definitions keyed by name rather than id (barwise-1063). A
   schema question that needs its own spec and a decision.

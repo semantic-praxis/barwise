@@ -368,7 +368,7 @@ function cmdUpdate(positional, flags) {
   if (!changed) fail("update requires at least one field flag or --depends-on");
 
   // Reopening through `update --status` must drop the closure stamps, or
-  // the row reads as open and closed at once (barwise-1061 was reopened
+  // the row reads as open and closed at once (barwise-1064 was reopened
   // this way to satisfy "close after merge" and kept its closed_at).
   if (flags.status !== undefined && flags.status !== "closed") {
     delete r.obj.closed_at;
