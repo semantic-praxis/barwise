@@ -3,7 +3,7 @@
 Status: Implemented 2026-09-24 (single workstream)
 Created: 2026-09-24
 Last-updated: 2026-09-24
-Tracking: barwise-1057 (bug report: Asset view in `edpl-domain.orm.yaml`
+Tracking: barwise-1061 (bug report: Asset view in `edpl-domain.orm.yaml`
 shows financing, customer and listing clusters)
 
 ## Principle
@@ -47,9 +47,9 @@ In scope:
 
 Out of scope:
 
-- The NORMA `.orm` exporter ignoring `elements` (barwise-1058). Found
+- The NORMA `.orm` exporter ignoring `elements` (barwise-1062). Found
   while investigating; a different surface with a different fix.
-- Diagram definitions keyed by name rather than id (barwise-1059). A
+- Diagram definitions keyed by name rather than id (barwise-1063). A
   schema question that needs its own spec and a decision.
 - Re-reading an edited `elements:` list for the active view on reload.
   Today a hand edit to the active view's definition takes effect on the
@@ -79,7 +79,7 @@ so a re-parse of unchanged text yields the same ids.
   the list. Lost because it drops a newly added fact's other player on
   the following reload (it is not in `elements`), so the fact would
   appear and then vanish, and it discards ghosts the user promoted but
-  the write has not yet landed. A candidate for barwise-1059's redesign.
+  the write has not yet landed. A candidate for barwise-1063's redesign.
 - **Remove the reload expansion entirely.** Simplest, and never grows.
   Lost because it silently drops the feature 617cf025 added: a fact the
   user types next to a visible entity would not appear until Load View.
