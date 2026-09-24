@@ -76,9 +76,9 @@ function buildModel(): OrmModel {
   model.addDiagramLayout({
     name: "Main",
     positions: {
-      Customer: { x: 192, y: 96 },
-      Order: { x: 480, y: 96 },
-      "Customer places Order": { x: 336, y: 96 },
+      "ot-customer": { x: 192, y: 96 },
+      "ot-order": { x: 480, y: 96 },
+      "ft-places": { x: 336, y: 96 },
     },
     orientations: {},
   });
@@ -668,9 +668,16 @@ describe("NORMA diagram geometry round-trip (WS2)", () => {
   it("round-trips saved layout positions through inch coordinates", () => {
     const layout = back.getDiagramLayout("Main");
     expect(layout).toBeDefined();
-    expect(layout!.positions["Customer"]).toEqual({ x: 192, y: 96 });
-    expect(layout!.positions["Order"]).toEqual({ x: 480, y: 96 });
-    expect(layout!.positions["Customer places Order"]).toEqual({ x: 336, y: 96 });
+    // Keyed by id on both sides. The imported model's ids are its own
+    // (NORMA-prefixed object types, fresh fact types), so resolve each one
+    // there: a position must land on the element it was saved for.
+    const id = (name: string) =>
+      (back.getObjectTypeByName(name) ?? back.getFactTypeByName(name))!.id;
+    expect(layout!.positions).toEqual({
+      [id("Customer")]: { x: 192, y: 96 },
+      [id("Order")]: { x: 480, y: 96 },
+      [id("Customer places Order")]: { x: 336, y: 96 },
+    });
   });
 
   it("emits no diagram section for a model with no saved layout", () => {

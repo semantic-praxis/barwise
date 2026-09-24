@@ -2,8 +2,8 @@
  * Phase 5 of the NORMA mapping: diagram geometry (norma-export spec,
  * workstream 2). Each ORMDiagram section becomes a saved DiagramLayout:
  * shape centers convert from NORMA's inch coordinates to barwise's pixel
- * space (96 px/inch), keyed by element name as the `diagrams:` section
- * requires. Connector shapes are not persisted on either side.
+ * space (96 px/inch), keyed by element id as the `diagrams:` section
+ * requires (orm_version 2.0). Connector shapes are not persisted on either side.
  */
 import type { NormaMappingContext } from "./context.js";
 
@@ -25,7 +25,7 @@ export function mapDiagrams(ctx: NormaMappingContext): void {
         ? model.getObjectType(mappedId)
         : model.getFactType(mappedId);
       if (!element) continue;
-      positions[element.name] = {
+      positions[element.id] = {
         x: Math.round((shape.x + shape.width / 2) * PX_PER_INCH),
         y: Math.round((shape.y + shape.height / 2) * PX_PER_INCH),
       };

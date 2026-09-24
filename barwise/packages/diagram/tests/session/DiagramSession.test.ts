@@ -29,6 +29,13 @@ function chainModel(): OrmModel {
 const otId = (m: OrmModel, name: string) => m.getObjectTypeByName(name)!.id;
 const ftId = (m: OrmModel, name: string) => m.getFactTypeByName(name)!.id;
 
+/**
+ * Saved views reference object types by id (orm_version 2.0). A name with
+ * no object type passes through unchanged, standing in for a stale id.
+ */
+const ids = (m: OrmModel, ...names: string[]) =>
+  names.map((n) => m.getObjectTypeByName(n)?.id ?? n);
+
 /** What the panel's document watcher does on every edit: re-parse the text. */
 const serializer = new OrmYamlSerializer();
 const reparse = (m: OrmModel): OrmModel => serializer.deserialize(serializer.serialize(m));
@@ -161,7 +168,12 @@ describe("DiagramSession", () => {
     const model = chainModel();
     const session = new DiagramSession(model);
     // Load a one-entity view so ghosts have a filter to extend.
-    model.addDiagramLayout({ name: "JustA", positions: {}, orientations: {}, elements: ["A"] });
+    model.addDiagramLayout({
+      name: "JustA",
+      positions: {},
+      orientations: {},
+      elements: ids(model, "A"),
+    });
 
     session.apply({ type: "loadView", viewName: "JustA" });
     const focused = await session.present();
@@ -183,8 +195,18 @@ describe("DiagramSession", () => {
 
   it("lists available views from the model", async () => {
     const model = chainModel();
-    model.addDiagramLayout({ name: "V1", positions: {}, orientations: {}, elements: ["A"] });
-    model.addDiagramLayout({ name: "V2", positions: {}, orientations: {}, elements: ["B"] });
+    model.addDiagramLayout({
+      name: "V1",
+      positions: {},
+      orientations: {},
+      elements: ids(model, "A"),
+    });
+    model.addDiagramLayout({
+      name: "V2",
+      positions: {},
+      orientations: {},
+      elements: ids(model, "B"),
+    });
 
     const p = await new DiagramSession(model).present();
     expect([...p.availableViews].sort()).toEqual(["V1", "V2"]);
@@ -213,7 +235,12 @@ describe("DiagramSession", () => {
   // until it showed the full connected graph.
   it("keeps a named view's scope across live reloads that add nothing", async () => {
     const model = chainModel();
-    model.addDiagramLayout({ name: "JustA", positions: {}, orientations: {}, elements: ["A"] });
+    model.addDiagramLayout({
+      name: "JustA",
+      positions: {},
+      orientations: {},
+      elements: ids(model, "A"),
+    });
     const session = new DiagramSession(model);
     session.apply({ type: "loadView", viewName: "JustA" });
     expect(await objectTypeNames(session, model)).toEqual(["A"]);
@@ -226,7 +253,12 @@ describe("DiagramSession", () => {
 
   it("pulls in a fact type added since the last model, and only that one", async () => {
     const model = chainModel();
-    model.addDiagramLayout({ name: "JustA", positions: {}, orientations: {}, elements: ["A"] });
+    model.addDiagramLayout({
+      name: "JustA",
+      positions: {},
+      orientations: {},
+      elements: ids(model, "A"),
+    });
     const session = new DiagramSession(model);
     session.apply({ type: "loadView", viewName: "JustA" });
     await session.present();
@@ -256,7 +288,12 @@ describe("DiagramSession", () => {
 
   it("recognizes a new fact type when the caller mutates the current model", async () => {
     const model = chainModel();
-    model.addDiagramLayout({ name: "JustA", positions: {}, orientations: {}, elements: ["A"] });
+    model.addDiagramLayout({
+      name: "JustA",
+      positions: {},
+      orientations: {},
+      elements: ids(model, "A"),
+    });
     const session = new DiagramSession(model);
     session.apply({ type: "loadView", viewName: "JustA" });
     await session.present();
@@ -289,23 +326,28 @@ describe("DiagramSession", () => {
     const layout = session.buildLayout("Default");
     expect(layout.name).toBe("Default");
     // Every object type has a saved position; keys are sorted.
-    expect(Object.keys(layout.positions)).toEqual(["A", "B", "C"]);
+    expect(Object.keys(layout.positions)).toEqual(ids(model, "A", "B", "C").sort());
     for (const pos of Object.values(layout.positions)) {
       expect(Number.isInteger(pos.x)).toBe(true);
       expect(Number.isInteger(pos.y)).toBe(true);
     }
   });
 
-  it("assembles a save-view with element names", async () => {
+  it("assembles a save-view with element ids", async () => {
     const model = chainModel();
-    model.addDiagramLayout({ name: "AB", positions: {}, orientations: {}, elements: ["A", "B"] });
+    model.addDiagramLayout({
+      name: "AB",
+      positions: {},
+      orientations: {},
+      elements: ids(model, "A", "B"),
+    });
     const session = new DiagramSession(model);
     session.apply({ type: "loadView", viewName: "AB" });
     await session.present();
 
     const view = session.buildViewLayout("My View");
     expect(view.name).toBe("My View");
-    expect([...(view.elements ?? [])].sort()).toEqual(["A", "B"]);
+    expect([...(view.elements ?? [])].sort()).toEqual(ids(model, "A", "B").sort());
   });
 
   it("focuses a subtype fact via applyHighlight", async () => {
@@ -360,7 +402,12 @@ describe("DiagramSession", () => {
 
   it("promotes a ghost into the active view and reports the name", async () => {
     const model = chainModel();
-    model.addDiagramLayout({ name: "JustA", positions: {}, orientations: {}, elements: ["A"] });
+    model.addDiagramLayout({
+      name: "JustA",
+      positions: {},
+      orientations: {},
+      elements: ids(model, "A"),
+    });
     const session = new DiagramSession(model);
     session.apply({ type: "loadView", viewName: "JustA" });
     await session.present();
@@ -368,7 +415,7 @@ describe("DiagramSession", () => {
     await session.present();
 
     const promoted = session.addGhostToView(otId(model, "B"));
-    expect(promoted).toBe("B");
+    expect(promoted).toBe(otId(model, "B"));
 
     // B is now a permanent member: present without ghosts still shows it.
     session.apply({ type: "clearGhosts" });
@@ -512,7 +559,12 @@ describe("DiagramSession", () => {
 
   it("returns null promoting a ghost that no longer resolves to an object type", async () => {
     const model = chainModel();
-    model.addDiagramLayout({ name: "JustA", positions: {}, orientations: {}, elements: ["A"] });
+    model.addDiagramLayout({
+      name: "JustA",
+      positions: {},
+      orientations: {},
+      elements: ids(model, "A"),
+    });
     const session = new DiagramSession(model);
     session.apply({ type: "loadView", viewName: "JustA" });
     await session.present();
@@ -531,7 +583,12 @@ describe("DiagramSession", () => {
 
   it("drops stale object-type nodes when building a save-view after a model swap", async () => {
     const model = chainModel();
-    model.addDiagramLayout({ name: "AB", positions: {}, orientations: {}, elements: ["A", "B"] });
+    model.addDiagramLayout({
+      name: "AB",
+      positions: {},
+      orientations: {},
+      elements: ids(model, "A", "B"),
+    });
     const session = new DiagramSession(model);
     session.apply({ type: "loadView", viewName: "AB" });
     await session.present();
@@ -583,7 +640,7 @@ describe("DiagramSession", () => {
       name: "Mixed",
       positions: {},
       orientations: {},
-      elements: ["A", "not-a-real-entity-name"],
+      elements: ids(model, "A", "not-a-real-entity-name"),
     });
     const session = new DiagramSession(model);
 
@@ -602,7 +659,7 @@ describe("DiagramSession", () => {
       name: "PersonParty",
       positions: {},
       orientations: {},
-      elements: ["Person", "Party"],
+      elements: ids(model, "Person", "Party"),
     });
     const session = new DiagramSession(model);
 
@@ -639,12 +696,17 @@ describe("DiagramSession", () => {
     session.apply({ type: "moveNode", nodeId: otId(model, "B"), x: 2, y: 2 });
     const layout = session.buildLayout("Default");
 
-    expect(Object.keys(layout.positions)).toEqual(["A", "B", "C"]);
+    expect(Object.keys(layout.positions)).toEqual(ids(model, "A", "B", "C").sort());
   });
 
   it("reloads the same model unchanged without widening the view", async () => {
     const model = chainModel();
-    model.addDiagramLayout({ name: "AB", positions: {}, orientations: {}, elements: ["A", "B"] });
+    model.addDiagramLayout({
+      name: "AB",
+      positions: {},
+      orientations: {},
+      elements: ids(model, "A", "B"),
+    });
     const session = new DiagramSession(model);
     session.apply({ type: "loadView", viewName: "AB" });
     await session.present();
@@ -662,7 +724,7 @@ describe("DiagramSession", () => {
       name: "ABOrphan",
       positions: {},
       orientations: {},
-      elements: ["A", "B"],
+      elements: ids(model, "A", "B"),
     });
     const orphanId = model.addObjectType({ name: "Orphan", kind: "value" }).id;
     model.getDiagramLayout("ABOrphan");
@@ -686,7 +748,7 @@ describe("DiagramSession", () => {
       name: "PersonParty",
       positions: {},
       orientations: {},
-      elements: ["Person", "Party"],
+      elements: ids(model, "Person", "Party"),
     });
     const session = new DiagramSession(model);
     session.apply({ type: "loadView", viewName: "PersonParty" });
@@ -701,19 +763,20 @@ describe("DiagramSession", () => {
     expect(p.focus).toBeNull();
   });
 
-  it("seeds position and orientation overrides from a saved layout, skipping unresolved names", async () => {
+  it("seeds position and orientation overrides from a saved layout, skipping unresolved ids", async () => {
     const model = chainModel();
+    const aId = otId(model, "A");
     const abFtId = ftId(model, "A relates to B");
     model.addDiagramLayout({
       name: "Seeded",
       positions: {
-        A: { x: 10, y: 20 },
-        "A relates to B": { x: 30, y: 40 },
-        "not-a-real-name": { x: 0, y: 0 },
+        [aId]: { x: 10, y: 20 },
+        [abFtId]: { x: 30, y: 40 },
+        "not-a-real-id": { x: 0, y: 0 },
       },
       orientations: {
-        "A relates to B": "vertical",
-        "not-a-real-name": "vertical",
+        [abFtId]: "vertical",
+        "not-a-real-id": "vertical",
       },
     });
     const session = new DiagramSession(model, model.getDiagramLayout("Seeded"));
@@ -722,8 +785,10 @@ describe("DiagramSession", () => {
     session.apply({ type: "moveNode", nodeId: abFtId, x: 999, y: 999 });
     const layout = session.buildLayout("Resaved");
 
-    expect(layout.positions["A"]).toEqual({ x: 10, y: 20 });
-    expect(layout.orientations["A relates to B"]).toBe("vertical");
+    expect(layout.positions[aId]).toEqual({ x: 10, y: 20 });
+    expect(layout.orientations[abFtId]).toBe("vertical");
+    expect(layout.positions["not-a-real-id"]).toBeUndefined();
+    expect(layout.orientations["not-a-real-id"]).toBeUndefined();
   });
 
   it("builds a save-layout before any layout has been computed", () => {
@@ -737,7 +802,12 @@ describe("DiagramSession", () => {
 
   it("keeps a still-valid ghost across an unrelated reload, then drops it once its model is gone", async () => {
     const model = chainModel();
-    model.addDiagramLayout({ name: "JustA", positions: {}, orientations: {}, elements: ["A"] });
+    model.addDiagramLayout({
+      name: "JustA",
+      positions: {},
+      orientations: {},
+      elements: ids(model, "A"),
+    });
     const session = new DiagramSession(model);
     session.apply({ type: "loadView", viewName: "JustA" });
     await session.present();
@@ -761,7 +831,7 @@ describe("DiagramSession", () => {
       name: "JustPerson",
       positions: {},
       orientations: {},
-      elements: ["Person"],
+      elements: ids(model, "Person"),
     });
     const session = new DiagramSession(model);
     session.apply({ type: "loadView", viewName: "JustPerson" });
@@ -820,7 +890,7 @@ describe("DiagramSession", () => {
       name: "AllThree",
       positions: {},
       orientations: {},
-      elements: ["Party", "Person", "Employee"],
+      elements: ids(model, "Party", "Person", "Employee"),
     });
     const session = new DiagramSession(model);
     session.apply({ type: "loadView", viewName: "AllThree" });
@@ -847,7 +917,7 @@ describe("DiagramSession", () => {
       name: "JustPerson",
       positions: {},
       orientations: {},
-      elements: ["Person"],
+      elements: ids(model, "Person"),
     });
     const session = new DiagramSession(model);
     session.apply({ type: "loadView", viewName: "JustPerson" });

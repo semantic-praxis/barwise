@@ -44,8 +44,8 @@ export function structuralRules(model: OrmModel, graph: ModelGraph): Diagnostic[
 }
 
 /**
- * The structural checks that read no reference, so they run whether or
- * not the model's ids resolve.
+ * The structural checks that need no resolved graph, so they run whether
+ * or not the model's conceptual references resolve.
  */
 export function structuralWellFormedness(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -54,7 +54,46 @@ export function structuralWellFormedness(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkDuplicateFactTypeNames(model));
   diagnostics.push(...checkBinaryFactTypeReadings(model));
   diagnostics.push(...checkSubtypeCycles(model));
+  diagnostics.push(...checkDiagramReferences(model));
 
+  return diagnostics;
+}
+
+/**
+ * Every id a saved diagram names should belong to an element. A stale
+ * entry breaks nothing conceptual, so this is a warning: the entry is
+ * ignored when the view renders. `OrmModel` removal and merge prune ids
+ * as they go; what reaches here is a hand edit or a 1.x name the 2.0
+ * migration could not resolve. The diagram's name stands in as the
+ * element id, since a layout has no id of its own.
+ */
+function checkDiagramReferences(model: OrmModel): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const known = (id: string) =>
+    model.getObjectType(id) !== undefined || model.getFactType(id) !== undefined;
+  for (const layout of model.diagramLayouts) {
+    const refs: Array<[string, readonly string[]]> = [
+      ["elements", layout.elements ?? []],
+      ["positions", Object.keys(layout.positions)],
+      ["orientations", Object.keys(layout.orientations)],
+    ];
+    for (const [field, ids] of refs) {
+      for (const id of ids) {
+        if (!known(id)) {
+          diagnostics.push(
+            report(
+              RULE_ID.diagramDanglingReference,
+              "default",
+              layout.name,
+              layout.name,
+              field,
+              id,
+            ),
+          );
+        }
+      }
+    }
+  }
   return diagnostics;
 }
 

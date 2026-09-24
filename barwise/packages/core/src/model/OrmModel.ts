@@ -148,6 +148,7 @@ export class OrmModel {
     }
 
     this._objectTypes.delete(id);
+    this.pruneDiagramReferences(id);
   }
 
   // ---- Fact Types ----
@@ -239,6 +240,7 @@ export class OrmModel {
     }
 
     this._factTypes.delete(id);
+    this.pruneDiagramReferences(id);
   }
 
   // ---- Subtype Facts ----
@@ -557,6 +559,29 @@ export class OrmModel {
       throw new Error(`Diagram layout "${layout.name}" not found.`);
     }
     this._diagramLayouts[idx] = layout;
+  }
+
+  /**
+   * Drop a removed element's id from every layout. Conceptual references
+   * make a removal throw; a diagram entry is presentation, so it follows
+   * the element out rather than blocking it or dangling.
+   */
+  private pruneDiagramReferences(id: string): void {
+    for (let i = 0; i < this._diagramLayouts.length; i++) {
+      const layout = this._diagramLayouts[i]!;
+      const mentions = layout.elements?.includes(id)
+        || id in layout.positions
+        || id in layout.orientations;
+      if (!mentions) continue;
+      const { [id]: _p, ...positions } = layout.positions;
+      const { [id]: _o, ...orientations } = layout.orientations;
+      this._diagramLayouts[i] = {
+        ...layout,
+        ...(layout.elements ? { elements: layout.elements.filter((e) => e !== id) } : {}),
+        positions,
+        orientations,
+      };
+    }
   }
 
   /** Remove a diagram layout by name. */

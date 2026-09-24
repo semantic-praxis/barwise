@@ -8,12 +8,14 @@
  * forward before they are validated against the current schema.
  */
 
+import { migrateDiagramReferencesToIds } from "./migrations/diagramReferencesToIds.js";
+
 /**
  * The schema version this build reads and writes. The serializer stamps
  * this onto every document it produces, and the JSON Schema pins its
  * `orm_version` `const` to the same value.
  */
-export const CURRENT_ORM_VERSION = "1.1";
+export const CURRENT_ORM_VERSION = "2.0";
 
 /**
  * Upgrades a parsed `.orm.yaml` document from one version to the next.
@@ -29,8 +31,8 @@ export interface OrmVersionMigration {
 }
 
 /**
- * Registered migrations, applied in chain order on load. Empty today --
- * `1.0` is the only version. When a new version lands, bump
+ * Registered migrations, applied in chain order on load. When a new
+ * version lands, bump
  * {@link CURRENT_ORM_VERSION} and the schema `const`, and add the
  * version-to-version migration here.
  */
@@ -43,6 +45,15 @@ export const ORM_VERSION_MIGRATIONS: readonly OrmVersionMigration[] = [
     from: "1.0",
     to: "1.1",
     migrate: (doc) => ({ ...doc, orm_version: "1.1" }),
+  },
+  // 1.1 -> 2.0 is structural, so it is a major bump (ADR-0001): diagram
+  // references change from element names to element ids. A 1.x reader
+  // would look each id up as a name and silently render the whole model;
+  // the version is what makes it refuse instead.
+  {
+    from: "1.1",
+    to: "2.0",
+    migrate: migrateDiagramReferencesToIds,
   },
 ];
 

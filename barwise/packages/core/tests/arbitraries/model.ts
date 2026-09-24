@@ -848,15 +848,15 @@ function toDiagramLayouts(
   return raws.map((raw, i) => {
     const positions: Record<string, { x: number; y: number; }> = {};
     for (const [k, [x, y]] of raw.positionPicks.entries()) {
-      positions[pick(objectTypes, k).name] = { x, y };
+      positions[pick(objectTypes, k).id!] = { x, y };
     }
     const orientations: Record<string, "horizontal" | "vertical"> = {};
     for (const [k, horizontal] of raw.orientationPicks.entries()) {
-      orientations[pick(skeletons, k).name] = horizontal ? "horizontal" : "vertical";
+      orientations[pick(skeletons, k).id] = horizontal ? "horizontal" : "vertical";
     }
     return {
       name: `View${i}`,
-      ...(raw.withElements ? { elements: objectTypes.map((ot) => ot.name) } : {}),
+      ...(raw.withElements ? { elements: objectTypes.map((ot) => ot.id!) } : {}),
       positions,
       orientations,
     };

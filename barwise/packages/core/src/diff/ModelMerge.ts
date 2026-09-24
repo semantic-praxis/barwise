@@ -441,11 +441,21 @@ function addableSubtypeFact(merged: OrmModel, subtypeId: string, supertypeId: st
  * `addableSubtypeFact` and `addableObjectification`.
  */
 function carryUnmodelledElements(merged: OrmModel, existing: OrmModel): void {
-  // A layout references object and fact types by name rather than by
-  // id, and already tolerates naming an element that is not present, so
-  // it carries through whole.
+  // A layout references elements by id, and every element the merge keeps
+  // from `existing` keeps its id -- a rename included -- so the layout
+  // carries through. The one loss is an element an accepted removal took
+  // out: its id is dropped here, as `OrmModel.removeObjectType` would.
+  const present = (id: string) =>
+    merged.getObjectType(id) !== undefined || merged.getFactType(id) !== undefined;
   for (const layout of existing.diagramLayouts) {
-    merged.addDiagramLayout(layout);
+    const keep = <T>(record: Readonly<Record<string, T>>) =>
+      Object.fromEntries(Object.entries(record).filter(([id]) => present(id)));
+    merged.addDiagramLayout({
+      ...layout,
+      ...(layout.elements ? { elements: layout.elements.filter(present) } : {}),
+      positions: keep(layout.positions),
+      orientations: keep(layout.orientations),
+    });
   }
 }
 

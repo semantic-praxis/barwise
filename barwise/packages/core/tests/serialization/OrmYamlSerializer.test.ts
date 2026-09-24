@@ -26,7 +26,7 @@ describe("OrmYamlSerializer", () => {
       const model = new OrmModel({ name: "Empty Model" });
       const yaml = serializer.serialize(model);
 
-      expect(yaml).toContain('orm_version: "1.1"');
+      expect(yaml).toContain('orm_version: "2.0"');
       expect(yaml).toContain("name: Empty Model");
     });
 
@@ -819,7 +819,7 @@ model:
   describe("error handling", () => {
     it("throws DeserializationError for invalid YAML schema", () => {
       const yaml = `
-orm_version: "2.0"
+orm_version: "3.0"
 model:
   name: "Test"
 `;
@@ -1037,7 +1037,7 @@ model:
       const yaml = serializer.serialize(model);
 
       // The YAML should be readable and match the documented format.
-      expect(yaml).toContain('orm_version: "1.1"');
+      expect(yaml).toContain('orm_version: "2.0"');
       expect(yaml).toContain("name: Order Management");
       expect(yaml).toContain("domain_context: ecommerce");
       expect(yaml).toContain("id: ot-001");

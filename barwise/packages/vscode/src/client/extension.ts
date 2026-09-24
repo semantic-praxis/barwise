@@ -143,13 +143,16 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(
       "barwise.addToView",
       async (first: unknown, _second?: unknown) => {
-        // Resolve element name from click or context menu args.
-        let elementName: string | undefined;
+        // A saved view lists object type ids (orm_version 2.0). A click
+        // passes (elementId, kind); the context menu passes the tree item,
+        // which carries the id and the display label.
+        let elementId: string | undefined;
+        let elementLabel: string | undefined;
         if (typeof first === "string") {
-          // From item.command args: (elementId, kind)
-          // We need the name, not the ID. Look it up from the active editor model.
+          elementId = first;
         } else if (first && typeof first === "object") {
-          elementName = (first as { label?: string; }).label;
+          elementId = (first as { id?: string; }).id;
+          elementLabel = (first as { label?: string; }).label;
         }
 
         // Read model from active editor.
@@ -169,12 +172,10 @@ export function activate(context: vscode.ExtensionContext): void {
           return;
         }
 
-        // If we got an ID instead of a name, resolve it.
-        if (!elementName && typeof first === "string") {
-          const ot = model.getObjectType(first);
-          elementName = ot?.name;
-        }
-        if (!elementName) return;
+        const ot = (elementId ? model.getObjectType(elementId) : undefined)
+          ?? (elementLabel ? model.getObjectTypeByName(elementLabel) : undefined);
+        if (!ot) return;
+        const elementName = ot.name;
 
         // Get existing views that have element subsets.
         const views = model.diagramLayouts.filter(
@@ -193,7 +194,7 @@ export function activate(context: vscode.ExtensionContext): void {
           views.map((v) => ({
             label: v.name,
             description: `${v.elements!.length} elements`,
-            detail: v.elements!.includes(elementName!)
+            detail: v.elements!.includes(ot.id)
               ? "(already included)"
               : undefined,
           })),
@@ -206,13 +207,13 @@ export function activate(context: vscode.ExtensionContext): void {
         if (!view) return;
 
         const currentElements = view.elements ? [...view.elements] : [];
-        if (currentElements.includes(elementName)) {
+        if (currentElements.includes(ot.id)) {
           vscode.window.showInformationMessage(
             `"${elementName}" is already in "${view.name}".`,
           );
           return;
         }
-        currentElements.push(elementName);
+        currentElements.push(ot.id);
 
         model.updateDiagramLayout({
           ...view,
@@ -275,6 +276,7 @@ export function activate(context: vscode.ExtensionContext): void {
           label: ot.name,
           description: ot.kind,
           picked: false,
+          id: ot.id,
         }));
 
         const picked = await vscode.window.showQuickPick(items, {
@@ -283,7 +285,8 @@ export function activate(context: vscode.ExtensionContext): void {
         });
         if (!picked || picked.length === 0) return;
 
-        const elements = picked.map((p) => p.label);
+        // The picker shows names; the view stores ids (orm_version 2.0).
+        const elements = picked.map((p) => p.id);
         model.addDiagramLayout({ name, elements, positions: {}, orientations: {} });
 
         const yaml = serializer.serialize(model);

@@ -416,6 +416,55 @@ describe("OrmModel", () => {
       expect(() => model.removeDiagramLayout("Missing")).toThrow(/not found/);
     });
 
+    it("drops a removed object type's id from every layout", () => {
+      const model = new OrmModel({ name: "Test" });
+      const a = model.addObjectType({ name: "A", kind: "value" });
+      const b = model.addObjectType({ name: "B", kind: "value" });
+      model.addDiagramLayout({
+        name: "V",
+        elements: [a.id, b.id],
+        positions: { [a.id]: { x: 1, y: 2 }, [b.id]: { x: 3, y: 4 } },
+        orientations: {},
+      });
+      model.addDiagramLayout({
+        name: "Unrelated",
+        positions: { [b.id]: { x: 5, y: 6 } },
+        orientations: {},
+      });
+
+      model.removeObjectType(a.id);
+
+      expect(model.getDiagramLayout("V")).toEqual({
+        name: "V",
+        elements: [b.id],
+        positions: { [b.id]: { x: 3, y: 4 } },
+        orientations: {},
+      });
+      expect(model.getDiagramLayout("Unrelated")!.positions).toEqual({ [b.id]: { x: 5, y: 6 } });
+    });
+
+    it("drops a removed fact type's id from positions and orientations", () => {
+      const model = new OrmModel({ name: "Test" });
+      const a = model.addObjectType({ name: "A", kind: "value" });
+      const ft = model.addFactType({
+        name: "A exists",
+        roles: [{ name: "exists", playerId: a.id }],
+        readings: ["{0} exists"],
+      });
+      model.addDiagramLayout({
+        name: "V",
+        positions: { [a.id]: { x: 1, y: 2 }, [ft.id]: { x: 3, y: 4 } },
+        orientations: { [ft.id]: "vertical" },
+      });
+
+      model.removeFactType(ft.id);
+
+      const layout = model.getDiagramLayout("V")!;
+      expect(layout.positions).toEqual({ [a.id]: { x: 1, y: 2 } });
+      expect(layout.orientations).toEqual({});
+      expect(layout.elements).toBeUndefined();
+    });
+
     it("counts diagram layouts in elementCount", () => {
       const model = new OrmModel({ name: "Test" });
       model.addDiagramLayout({ name: "Default", positions: {}, orientations: {} });

@@ -101,6 +101,7 @@ export const RULE_ID = {
   productMappingDependencyUnresolved: "project/product-mapping-dependency-unresolved",
   binaryMissingInverseReading: "structural/binary-missing-inverse-reading",
   danglingRoleReference: "structural/dangling-role-reference",
+  diagramDanglingReference: "structural/diagram-dangling-reference",
   duplicateFactTypeName: "structural/duplicate-fact-type-name",
   duplicateObjectTypeName: "structural/duplicate-object-type-name",
   duplicateObjectification: "structural/duplicate-objectification",
@@ -797,6 +798,15 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (roleName: string, ftName: string, rolePlayerId: string): string =>
         `Role "${roleName}" in fact type "${ftName}" references object type id "${rolePlayerId}" which does not exist in the model.`,
+    },
+  },
+  [RULE_ID.diagramDanglingReference]: {
+    severity: "warning",
+    description:
+      "A saved diagram references an element id that no object type or fact type carries, so that entry has no effect.",
+    messages: {
+      default: (diagramName: string, field: string, reference: string): string =>
+        `Diagram "${diagramName}" lists "${reference}" in ${field}, but no object type or fact type has that id.`,
     },
   },
   [RULE_ID.duplicateFactTypeName]: {
