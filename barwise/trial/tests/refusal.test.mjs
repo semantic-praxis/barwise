@@ -8,7 +8,16 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  renameSync,
+  rmdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
@@ -52,19 +61,13 @@ test("a tier that was never generated is refused, and names the command that mak
 });
 
 test("gating a tier with no results is refused, not reported as a pass", () => {
-  const results = fileURLToPath(new URL("../results/small.json", import.meta.url));
-  const parked = existsSync(results)
-    ? join(mkdtempSync(join(tmpdir(), "trial-")), "small.json")
-    : null;
-  if (parked) renameSync(results, parked);
-  try {
-    const r = run("gate.mjs", "--tier", "small");
-    assert.equal(r.status, 2);
-    assert.match(r.stderr, /no results/);
-    assert.doesNotMatch(r.stdout, /PASS/);
-  } finally {
-    if (parked) renameSync(parked, results);
-  }
+  // A tier name nothing has written, rather than moving the real
+  // results/small.json aside: a lane running at the same time writes that
+  // file, and restoring the parked copy would silently discard its run.
+  const r = run("gate.mjs", "--tier", `never-run-${process.pid}`);
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /no results/);
+  assert.doesNotMatch(r.stdout, /PASS/);
 });
 
 // Two more ways the lane could not answer but said nothing, both from a
@@ -87,26 +90,25 @@ test("a sprint outside the known set is refused even when it is a number", () =>
 });
 
 /**
- * Run the gate over a results fixture, leaving the tree as it was found.
- * results/ is gitignored, so on a clean checkout it does not exist; the
- * first version of the authoring test wrote into it unguarded and failed
- * with ENOENT before the refusal was reached.
+ * Run the gate over a results fixture under a tier name of its own, so the
+ * real results/small.json is never read, moved or restored. The first
+ * version wrote into results/ unguarded and failed with ENOENT on a clean
+ * checkout, where the gitignored directory does not exist; the second
+ * parked small.json aside, which discards the output of a lane writing it
+ * at the same time.
  */
 function gateOver(rows) {
-  const results = fileURLToPath(new URL("../results/small.json", import.meta.url));
+  const tier = `gate-test-${process.pid}`;
+  const results = fileURLToPath(new URL(`../results/${tier}.json`, import.meta.url));
   const madeDir = !existsSync(dirname(results));
-  const parked = existsSync(results)
-    ? join(mkdtempSync(join(tmpdir(), "trial-gate-")), "small.json")
-    : null;
-  if (parked) renameSync(results, parked);
   mkdirSync(dirname(results), { recursive: true });
   try {
     writeFileSync(results, JSON.stringify({ results: rows }));
-    return run("gate.mjs", "--tier", "small");
+    return run("gate.mjs", "--tier", tier);
   } finally {
     rmSync(results, { force: true });
-    if (parked) renameSync(parked, results);
-    if (madeDir) rmSync(dirname(results), { recursive: true, force: true });
+    // Only if still empty: a lane may have written into it meanwhile.
+    if (madeDir && readdirSync(dirname(results)).length === 0) rmdirSync(dirname(results));
   }
 }
 
