@@ -26,12 +26,24 @@ const files = execFileSync("git", ["ls-files", "*.orm.yaml"], { cwd: repoRoot })
   .toString().trim().split("\n").filter(Boolean);
 
 const hasComment = (text) => /^\s*#/m.test(text);
+// Lines removed plus lines added, from the longest common subsequence
+// of the two line sequences -- a real line diff, so one inserted or
+// wrapped line counts once instead of shifting every line after it.
+// Two DP rows keep memory at O(m); the files are small enough that
+// O(n*m) time is fine.
 const changedLines = (a, b) => {
   const x = a.split("\n");
   const y = b.split("\n");
-  let n = 0;
-  for (let i = 0; i < Math.max(x.length, y.length); i++) if (x[i] !== y[i]) n++;
-  return n;
+  let prev = new Uint32Array(y.length + 1);
+  let row = new Uint32Array(y.length + 1);
+  for (let i = 1; i <= x.length; i++) {
+    for (let j = 1; j <= y.length; j++) {
+      row[j] = x[i - 1] === y[j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], row[j - 1]);
+    }
+    [prev, row] = [row, prev];
+  }
+  const common = prev[y.length];
+  return (x.length - common) + (y.length - common);
 };
 
 const serializer = new OrmYamlSerializer();
@@ -40,6 +52,7 @@ const fidelity = {
   files: files.length,
   serializerLoaded: 0,
   serializerIdentical: 0,
+  serializerChangedLines: 0,
   withComments: 0,
   serializerKeptComments: 0,
   documentIdentical: 0,
@@ -58,6 +71,7 @@ for (const file of files) {
     const out = serializer.serialize(serializer.deserialize(text));
     fidelity.serializerLoaded++;
     if (out === text) fidelity.serializerIdentical++;
+    else fidelity.serializerChangedLines += changedLines(text, out);
     if (hasComment(text) && hasComment(out)) fidelity.serializerKeptComments++;
   } catch {
     // Strict load failed; counted by its absence from serializerLoaded.
