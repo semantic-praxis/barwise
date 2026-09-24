@@ -14,6 +14,14 @@ updates:
       development:
         dependency-type: "development"
         update-types: ["minor", "patch"]
+    ignore:
+      # @types/vscode is the floor of the VS Code API the extension may
+      # call, so it moves with engines.vscode, never ahead of it: vsce
+      # refuses to package when the types are newer than the engine
+      # ("@types/vscode 1.138.0 greater than engines.vscode ^1.101.0"),
+      # and CI does not run vsce -- only release.yml does. Raising both
+      # drops users on older editors, so it is a deliberate change.
+      - dependency-name: "@types/vscode"
 
   # Keep the GitHub Actions used by the workflows current.
   - package-ecosystem: "github-actions"
