@@ -1,0 +1,11 @@
+# The operator's TMF-style Open API facade (TMF620 catalog, TMF622
+# ordering, TMF639 resource inventory, TMF632 party). Subtypes are
+# expressed as allOf over the base schema with an @type discriminator,
+# references are circular (a ProductOffering points at its bundled
+# offerings, a Service at the services it depends on), and payloads nest
+# four deep.
+polymorphism: allOf
+discriminator: "@type"
+circular_refs: true
+version: "3.1.0"
+nesting_depth: 4

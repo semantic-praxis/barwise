@@ -1,0 +1,1749 @@
+orm_version: "1.1"
+
+# Trial customer C04, Global Marketplace Core.
+# Hand-authored seed kernel for the enterprise trial (trial/AUTHORING.md).
+# Ids are stable readable strings so the artifact generators can name
+# tables, models and classes from them.
+#
+# Modeling difficulties carried on purpose:
+#   - Buyer and Seller are subtypes of Party, and both are aliased and read
+#     as "customer" (support means the buyer, finance means the seller).
+#   - Product > PhysicalProduct > HazmatProduct is a three-level chain.
+#   - ProductVariant is identified in the business by seller + SKU (external
+#     uniqueness) while carrying a surrogate variant_id.
+#   - OrderLine objectifies the ternary Order includes ProductVariant in Quantity.
+#   - Fulfillment objectifies Shipment carries OrderLine.
+#   - Product bundles Product is an acyclic ring.
+#   - The refund-window mandatory is deontic: policy, not fact.
+#   - CurrencyCode carries 35 ISO 4217 values.
+#   - Populations carry Japanese, German with umlauts and sharp s, one emoji,
+#     and one leading U+FEFF, plus multi-currency amounts.
+
+model:
+  name: Global Marketplace Core
+  domain_context: retail-marketplace
+
+  object_types:
+    - id: ot-party
+      name: Party
+      kind: entity
+      reference_mode: party_id
+      definition: "A person or business registered on the marketplace, whether it buys, sells, or both."
+      source_context: parties
+    - id: ot-party-id
+      name: PartyId
+      kind: value
+      definition: The party id that identifies a Party.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-buyer
+      name: Buyer
+      kind: entity
+      reference_mode: party_id
+      definition: "A party that places orders on the marketplace; support calls this party the customer."
+      source_context: parties
+      aliases: [Customer]
+    - id: ot-seller
+      name: Seller
+      kind: entity
+      reference_mode: party_id
+      definition: "A party that lists product variants for sale and receives payouts; finance calls this party the customer."
+      source_context: parties
+      aliases: [Customer]
+    - id: ot-party-name
+      name: PartyName
+      kind: value
+      definition: "The display name a party shows on listings, orders and statements."
+      data_type:
+        name: text
+        length: 200
+    - id: ot-email-address
+      name: EmailAddress
+      kind: value
+      definition: The email address a party signs in with and receives notices at.
+      data_type:
+        name: text
+        length: 254
+    - id: ot-marketplace
+      name: Marketplace
+      kind: entity
+      reference_mode: marketplace_code
+      definition: "A country storefront with its own locale, settlement currency and tax rules."
+      source_context: catalog
+    - id: ot-marketplace-code
+      name: MarketplaceCode
+      kind: value
+      definition: The marketplace code that identifies a Marketplace.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-category
+      name: Category
+      kind: entity
+      reference_mode: category_code
+      definition: A node of the browse taxonomy under which products are listed.
+      source_context: catalog
+    - id: ot-category-code
+      name: CategoryCode
+      kind: value
+      definition: The category code that identifies a Category.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-product
+      name: Product
+      kind: entity
+      reference_mode: product_id
+      definition: "A catalog item as the seller describes it, before size, color or pack variation."
+      source_context: catalog
+    - id: ot-product-id
+      name: ProductId
+      kind: value
+      definition: The product id that identifies a Product.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-physical-product
+      name: PhysicalProduct
+      kind: entity
+      reference_mode: product_id
+      definition: "A product that must be picked, packed and shipped, so it has weight and dimensions."
+      source_context: catalog
+    - id: ot-hazmat-product
+      name: HazmatProduct
+      kind: entity
+      reference_mode: product_id
+      definition: A physical product regulated as dangerous goods and restricted to approved carriers.
+      source_context: catalog
+    - id: ot-product-variant
+      name: ProductVariant
+      kind: entity
+      reference_mode: variant_id
+      definition: "A sellable form of a product, identified within its seller by the seller's SKU."
+      source_context: catalog
+    - id: ot-variant-id
+      name: VariantId
+      kind: value
+      definition: The variant id that identifies a ProductVariant.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-listing
+      name: Listing
+      kind: entity
+      reference_mode: listing_id
+      definition: The offer of one product variant on one marketplace at a price and refund window.
+      source_context: catalog
+    - id: ot-listing-id
+      name: ListingId
+      kind: value
+      definition: The listing id that identifies a Listing.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-product-name
+      name: ProductName
+      kind: value
+      definition: "The product title as the seller entered it, in the seller's own language and script."
+      data_type:
+        name: text
+        length: 500
+    - id: ot-sku
+      name: Sku
+      kind: value
+      definition: "The seller's stock keeping unit for a variant; unique within the seller, not across sellers."
+      data_type:
+        name: text
+        length: 64
+    - id: ot-listing-title
+      name: ListingTitle
+      kind: value
+      definition: The localized title shown to buyers on the marketplace storefront.
+      data_type:
+        name: text
+        length: 500
+    - id: ot-locale
+      name: Locale
+      kind: value
+      definition: The BCP 47 language and region tag a listing is written for.
+      data_type:
+        name: text
+        length: 10
+      value_constraint:
+        values:
+          - en-US
+          - en-GB
+          - en-CA
+          - en-AU
+          - en-IN
+          - de-DE
+          - de-AT
+          - de-CH
+          - fr-FR
+          - fr-CA
+          - es-ES
+          - es-MX
+          - it-IT
+          - nl-NL
+          - pt-BR
+          - pl-PL
+          - sv-SE
+          - ja-JP
+          - ko-KR
+          - zh-CN
+          - zh-TW
+    - id: ot-refund-window-days
+      name: RefundWindowDays
+      kind: value
+      definition: The number of days after delivery within which a buyer may open a return on the listing.
+      data_type:
+        name: integer
+      value_constraint:
+        ranges:
+          - { min: "0", max: "365" }
+    - id: ot-legacy-import-flag
+      name: LegacyImportFlag
+      kind: value
+      definition: Marks a listing migrated from the pre-2019 catalog and not yet re-reviewed.
+      data_type:
+        name: boolean
+    - id: ot-weight-grams
+      name: WeightGrams
+      kind: value
+      definition: The shipping weight of a physical product in grams.
+      data_type:
+        name: integer
+      value_constraint:
+        ranges:
+          - { min: "1" }
+    - id: ot-hazmat-class
+      name: HazmatClass
+      kind: value
+      definition: The dangerous-goods class the carrier network uses to accept or refuse a hazmat product.
+      data_type:
+        name: text
+        length: 30
+      value_constraint:
+        values:
+          - flammable_liquid
+          - flammable_solid
+          - lithium_battery
+          - aerosol
+          - corrosive
+          - oxidizer
+          - toxic
+          - magnetized
+          - miscellaneous
+    - id: ot-order
+      name: Order
+      kind: entity
+      reference_mode: order_number
+      definition: A buyer's purchase of one or more product variants on one marketplace in one checkout.
+      source_context: orders
+    - id: ot-order-number
+      name: OrderNumber
+      kind: value
+      definition: The order number that identifies a Order.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-order-line
+      name: OrderLine
+      kind: entity
+      reference_mode: line_id
+      definition: "One product variant in a given quantity on one order; the unit that ships, returns and refunds."
+      source_context: orders
+    - id: ot-line-id
+      name: LineId
+      kind: value
+      definition: The line id that identifies a OrderLine.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-order-date
+      name: OrderDate
+      kind: value
+      definition: "The moment the buyer completed checkout, in UTC."
+      data_type:
+        name: datetime
+    - id: ot-order-status
+      name: OrderStatus
+      kind: value
+      definition: The lifecycle state of an order as the order service records it.
+      data_type:
+        name: text
+        length: 20
+      value_constraint:
+        values:
+          - pending
+          - paid
+          - shipped
+          - delivered
+          - cancelled
+          - returned
+    - id: ot-quantity
+      name: Quantity
+      kind: value
+      definition: A count of units of one product variant.
+      data_type:
+        name: integer
+      value_constraint:
+        ranges:
+          - { min: "1" }
+    - id: ot-amount
+      name: Amount
+      kind: value
+      definition: A monetary value in the minor-unit precision of its currency.
+      data_type:
+        name: money
+        length: 18
+        scale: 2
+    - id: ot-warehouse
+      name: Warehouse
+      kind: entity
+      reference_mode: warehouse_code
+      definition: A fulfillment site operated by the marketplace or a seller from which shipments depart and to which returns arrive.
+      source_context: fulfillment
+    - id: ot-warehouse-code
+      name: WarehouseCode
+      kind: value
+      definition: The warehouse code that identifies a Warehouse.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-carrier
+      name: Carrier
+      kind: entity
+      reference_mode: carrier_code
+      definition: A parcel or freight company that transports shipments.
+      source_context: fulfillment
+    - id: ot-carrier-code
+      name: CarrierCode
+      kind: value
+      definition: The carrier code that identifies a Carrier.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-shipment
+      name: Shipment
+      kind: entity
+      reference_mode: tracking_number
+      definition: A parcel handed to a carrier that carries one or more order lines.
+      source_context: fulfillment
+    - id: ot-tracking-number
+      name: TrackingNumber
+      kind: value
+      definition: The tracking number that identifies a Shipment.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-fulfillment
+      name: Fulfillment
+      kind: entity
+      reference_mode: fulfillment_id
+      definition: "The carrying of an order line by a shipment, in whole or in part."
+      source_context: fulfillment
+    - id: ot-fulfillment-id
+      name: FulfillmentId
+      kind: value
+      definition: The fulfillment id that identifies a Fulfillment.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-return
+      name: Return
+      kind: entity
+      reference_mode: rma_number
+      definition: "A buyer's request to send an order line back, authorized under a return merchandise number."
+      source_context: fulfillment
+    - id: ot-rma-number
+      name: RmaNumber
+      kind: value
+      definition: The rma number that identifies a Return.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-shipment-status
+      name: ShipmentStatus
+      kind: value
+      definition: The carrier-reported state of a shipment.
+      data_type:
+        name: text
+        length: 25
+      value_constraint:
+        values:
+          - label_created
+          - in_transit
+          - out_for_delivery
+          - delivered
+          - lost
+          - returned_to_sender
+    - id: ot-shipped-date
+      name: ShippedDate
+      kind: value
+      definition: The date the carrier scanned the shipment as accepted.
+      data_type:
+        name: date
+    - id: ot-return-reason
+      name: ReturnReason
+      kind: value
+      definition: The reason a buyer selects when opening a return.
+      data_type:
+        name: text
+        length: 30
+      value_constraint:
+        values:
+          - damaged
+          - defective
+          - not_as_described
+          - wrong_item
+          - arrived_late
+          - changed_mind
+          - counterfeit_suspected
+    - id: ot-currency
+      name: Currency
+      kind: entity
+      reference_mode: iso_code
+      definition: "A settlement currency the marketplace prices, collects and pays out in."
+      source_context: payments
+    - id: ot-currency-code
+      name: CurrencyCode
+      kind: value
+      definition: The ISO 4217 alphabetic code of a currency.
+      data_type:
+        name: text
+        length: 3
+      value_constraint:
+        values:
+          - USD
+          - EUR
+          - GBP
+          - JPY
+          - CAD
+          - AUD
+          - NZD
+          - CHF
+          - SEK
+          - NOK
+          - DKK
+          - PLN
+          - CZK
+          - HUF
+          - RON
+          - BGN
+          - TRY
+          - INR
+          - SGD
+          - HKD
+          - KRW
+          - TWD
+          - CNY
+          - THB
+          - MYR
+          - IDR
+          - PHP
+          - MXN
+          - BRL
+          - CLP
+          - COP
+          - ZAR
+          - AED
+          - SAR
+          - ILS
+    - id: ot-payment
+      name: Payment
+      kind: entity
+      reference_mode: payment_id
+      definition: A buyer's settlement of an order through one payment method.
+      source_context: payments
+    - id: ot-payment-id
+      name: PaymentId
+      kind: value
+      definition: The payment id that identifies a Payment.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-refund
+      name: Refund
+      kind: entity
+      reference_mode: refund_id
+      definition: The reversal of all or part of a payment after a return is accepted.
+      source_context: payments
+    - id: ot-refund-id
+      name: RefundId
+      kind: value
+      definition: The refund id that identifies a Refund.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-payout
+      name: Payout
+      kind: entity
+      reference_mode: payout_id
+      definition: A transfer of accumulated net proceeds to a seller in the seller's settlement currency.
+      source_context: payments
+    - id: ot-payout-id
+      name: PayoutId
+      kind: value
+      definition: The payout id that identifies a Payout.
+      data_type:
+        name: text
+        length: 40
+    - id: ot-payment-method
+      name: PaymentMethod
+      kind: value
+      definition: The instrument a buyer pays with.
+      data_type:
+        name: text
+        length: 20
+      value_constraint:
+        values:
+          - card
+          - wallet
+          - bank_transfer
+          - sepa_debit
+          - konbini
+          - cash_on_delivery
+          - installments
+    - id: ot-payout-date
+      name: PayoutDate
+      kind: value
+      definition: The date a payout was released to the seller's bank.
+      data_type:
+        name: date
+
+  fact_types:
+    - id: ft-party-has-partyid
+      name: Party has PartyId
+      roles:
+        - id: r-party-has-partyid-party
+          player: ot-party
+          role_name: has
+        - id: r-party-has-partyid-party-id
+          player: ot-party-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-party-has-partyid-party]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-party-has-partyid-party-id]
+        - type: mandatory
+          role: r-party-has-partyid-party
+    - id: ft-marketplace-has-marketplacecode
+      name: Marketplace has MarketplaceCode
+      roles:
+        - id: r-marketplace-has-marketplacecode-marketplace
+          player: ot-marketplace
+          role_name: has
+        - id: r-marketplace-has-marketplacecode-marketplace-code
+          player: ot-marketplace-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-marketplace-has-marketplacecode-marketplace]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-marketplace-has-marketplacecode-marketplace-code]
+        - type: mandatory
+          role: r-marketplace-has-marketplacecode-marketplace
+    - id: ft-category-has-categorycode
+      name: Category has CategoryCode
+      roles:
+        - id: r-category-has-categorycode-category
+          player: ot-category
+          role_name: has
+        - id: r-category-has-categorycode-category-code
+          player: ot-category-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-category-has-categorycode-category]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-category-has-categorycode-category-code]
+        - type: mandatory
+          role: r-category-has-categorycode-category
+    - id: ft-product-has-productid
+      name: Product has ProductId
+      roles:
+        - id: r-product-has-productid-product
+          player: ot-product
+          role_name: has
+        - id: r-product-has-productid-product-id
+          player: ot-product-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-product-has-productid-product]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-product-has-productid-product-id]
+        - type: mandatory
+          role: r-product-has-productid-product
+    - id: ft-productvariant-has-variantid
+      name: ProductVariant has VariantId
+      roles:
+        - id: r-productvariant-has-variantid-product-variant
+          player: ot-product-variant
+          role_name: has
+        - id: r-productvariant-has-variantid-variant-id
+          player: ot-variant-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-productvariant-has-variantid-product-variant]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-productvariant-has-variantid-variant-id]
+        - type: mandatory
+          role: r-productvariant-has-variantid-product-variant
+    - id: ft-listing-has-listingid
+      name: Listing has ListingId
+      roles:
+        - id: r-listing-has-listingid-listing
+          player: ot-listing
+          role_name: has
+        - id: r-listing-has-listingid-listing-id
+          player: ot-listing-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-listing-has-listingid-listing]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-listing-has-listingid-listing-id]
+        - type: mandatory
+          role: r-listing-has-listingid-listing
+    - id: ft-order-has-ordernumber
+      name: Order has OrderNumber
+      roles:
+        - id: r-order-has-ordernumber-order
+          player: ot-order
+          role_name: has
+        - id: r-order-has-ordernumber-order-number
+          player: ot-order-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-order-has-ordernumber-order]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-order-has-ordernumber-order-number]
+        - type: mandatory
+          role: r-order-has-ordernumber-order
+    - id: ft-orderline-has-lineid
+      name: OrderLine has LineId
+      roles:
+        - id: r-orderline-has-lineid-order-line
+          player: ot-order-line
+          role_name: has
+        - id: r-orderline-has-lineid-line-id
+          player: ot-line-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-orderline-has-lineid-order-line]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-orderline-has-lineid-line-id]
+        - type: mandatory
+          role: r-orderline-has-lineid-order-line
+    - id: ft-warehouse-has-warehousecode
+      name: Warehouse has WarehouseCode
+      roles:
+        - id: r-warehouse-has-warehousecode-warehouse
+          player: ot-warehouse
+          role_name: has
+        - id: r-warehouse-has-warehousecode-warehouse-code
+          player: ot-warehouse-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-warehouse-has-warehousecode-warehouse]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-warehouse-has-warehousecode-warehouse-code]
+        - type: mandatory
+          role: r-warehouse-has-warehousecode-warehouse
+    - id: ft-carrier-has-carriercode
+      name: Carrier has CarrierCode
+      roles:
+        - id: r-carrier-has-carriercode-carrier
+          player: ot-carrier
+          role_name: has
+        - id: r-carrier-has-carriercode-carrier-code
+          player: ot-carrier-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-carrier-has-carriercode-carrier]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-carrier-has-carriercode-carrier-code]
+        - type: mandatory
+          role: r-carrier-has-carriercode-carrier
+    - id: ft-shipment-has-trackingnumber
+      name: Shipment has TrackingNumber
+      roles:
+        - id: r-shipment-has-trackingnumber-shipment
+          player: ot-shipment
+          role_name: has
+        - id: r-shipment-has-trackingnumber-tracking-number
+          player: ot-tracking-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-shipment-has-trackingnumber-shipment]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-shipment-has-trackingnumber-tracking-number]
+        - type: mandatory
+          role: r-shipment-has-trackingnumber-shipment
+    - id: ft-fulfillment-has-fulfillmentid
+      name: Fulfillment has FulfillmentId
+      roles:
+        - id: r-fulfillment-has-fulfillmentid-fulfillment
+          player: ot-fulfillment
+          role_name: has
+        - id: r-fulfillment-has-fulfillmentid-fulfillment-id
+          player: ot-fulfillment-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-fulfillment-has-fulfillmentid-fulfillment]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-fulfillment-has-fulfillmentid-fulfillment-id]
+        - type: mandatory
+          role: r-fulfillment-has-fulfillmentid-fulfillment
+    - id: ft-return-has-rmanumber
+      name: Return has RmaNumber
+      roles:
+        - id: r-return-has-rmanumber-return
+          player: ot-return
+          role_name: has
+        - id: r-return-has-rmanumber-rma-number
+          player: ot-rma-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-return-has-rmanumber-return]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-return-has-rmanumber-rma-number]
+        - type: mandatory
+          role: r-return-has-rmanumber-return
+    - id: ft-currency-has-currencycode
+      name: Currency has CurrencyCode
+      roles:
+        - id: r-currency-has-currencycode-currency
+          player: ot-currency
+          role_name: has
+        - id: r-currency-has-currencycode-currency-code
+          player: ot-currency-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-currency-has-currencycode-currency]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-currency-has-currencycode-currency-code]
+        - type: mandatory
+          role: r-currency-has-currencycode-currency
+    - id: ft-payment-has-paymentid
+      name: Payment has PaymentId
+      roles:
+        - id: r-payment-has-paymentid-payment
+          player: ot-payment
+          role_name: has
+        - id: r-payment-has-paymentid-payment-id
+          player: ot-payment-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-payment-has-paymentid-payment]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-payment-has-paymentid-payment-id]
+        - type: mandatory
+          role: r-payment-has-paymentid-payment
+    - id: ft-refund-has-refundid
+      name: Refund has RefundId
+      roles:
+        - id: r-refund-has-refundid-refund
+          player: ot-refund
+          role_name: has
+        - id: r-refund-has-refundid-refund-id
+          player: ot-refund-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-refund-has-refundid-refund]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-refund-has-refundid-refund-id]
+        - type: mandatory
+          role: r-refund-has-refundid-refund
+    - id: ft-payout-has-payoutid
+      name: Payout has PayoutId
+      roles:
+        - id: r-payout-has-payoutid-payout
+          player: ot-payout
+          role_name: has
+        - id: r-payout-has-payoutid-payout-id
+          player: ot-payout-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-payout-has-payoutid-payout]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [r-payout-has-payoutid-payout-id]
+        - type: mandatory
+          role: r-payout-has-payoutid-payout
+    - id: ft-party-has-partyname
+      name: Party has PartyName
+      roles:
+        - id: r-party-has-partyname-party
+          player: ot-party
+          role_name: has
+        - id: r-party-has-partyname-party-name
+          player: ot-party-name
+          role_name: is name of
+      readings:
+        - "{0} has {1}"
+        - "{1} is name of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-party-has-partyname-party]
+        - type: mandatory
+          role: r-party-has-partyname-party
+    - id: ft-party-has-emailaddress
+      name: Party has EmailAddress
+      roles:
+        - id: r-party-has-emailaddress-party
+          player: ot-party
+          role_name: has
+        - id: r-party-has-emailaddress-email-address
+          player: ot-email-address
+          role_name: belongs to
+      readings:
+        - "{0} has {1}"
+        - "{1} belongs to {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-party-has-emailaddress-party]
+        - type: internal_uniqueness
+          roles: [r-party-has-emailaddress-email-address]
+        - type: mandatory
+          role: r-party-has-emailaddress-party
+    - id: ft-seller-ships-from-warehouse
+      name: Seller ships from Warehouse
+      definition: A seller may fulfil from more than one warehouse and a warehouse may serve many sellers.
+      roles:
+        - id: r-seller-ships-from-warehouse-seller
+          player: ot-seller
+          role_name: ships from
+        - id: r-seller-ships-from-warehouse-warehouse
+          player: ot-warehouse
+          role_name: ships for
+      readings:
+        - "{0} ships from {1}"
+        - "{1} ships for {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-seller-ships-from-warehouse-seller, r-seller-ships-from-warehouse-warehouse]
+    - id: ft-buyer-places-order
+      name: Buyer places Order
+      definition: Support reads the buyer on an order as the customer.
+      roles:
+        - id: r-buyer-places-order-buyer
+          player: ot-buyer
+          role_name: places
+        - id: r-buyer-places-order-order
+          player: ot-order
+          role_name: is placed by
+      readings:
+        - "{0} places {1}"
+        - "{1} is placed by customer {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-buyer-places-order-order]
+        - type: mandatory
+          role: r-buyer-places-order-order
+    - id: ft-seller-receives-payout
+      name: Seller receives Payout
+      definition: Finance reads the seller on a payout as the customer.
+      roles:
+        - id: r-seller-receives-payout-seller
+          player: ot-seller
+          role_name: receives
+        - id: r-seller-receives-payout-payout
+          player: ot-payout
+          role_name: is paid to
+      readings:
+        - "{0} receives {1}"
+        - "{1} is paid to customer {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-seller-receives-payout-payout]
+        - type: mandatory
+          role: r-seller-receives-payout-payout
+    - id: ft-product-has-productname
+      name: Product has ProductName
+      roles:
+        - id: r-product-has-productname-product
+          player: ot-product
+          role_name: has
+        - id: r-product-has-productname-product-name
+          player: ot-product-name
+          role_name: names
+      readings:
+        - "{0} has {1}"
+        - "{1} names {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-product-has-productname-product]
+        - type: mandatory
+          role: r-product-has-productname-product
+    - id: ft-product-is-in-category
+      name: Product is in Category
+      roles:
+        - id: r-product-is-in-category-product
+          player: ot-product
+          role_name: is in
+        - id: r-product-is-in-category-category
+          player: ot-category
+          role_name: contains
+      readings:
+        - "{0} is in {1}"
+        - "{1} contains {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-product-is-in-category-product]
+        - type: mandatory
+          role: r-product-is-in-category-product
+    - id: ft-product-bundles-product
+      name: Product bundles Product
+      definition: "A bundle product is composed of other products; a product cannot, through any chain of bundles, contain itself."
+      roles:
+        - id: r-product-bundles-product-product
+          player: ot-product
+          role_name: bundles
+        - id: r-product-bundles-product-product-1
+          player: ot-product
+          role_name: is bundled in
+      readings:
+        - "{0} bundles {1}"
+        - "{1} is bundled in {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-product-bundles-product-product, r-product-bundles-product-product-1]
+        - type: ring
+          role_1: r-product-bundles-product-product
+          role_2: r-product-bundles-product-product-1
+          ring_type: acyclic
+    - id: ft-physicalproduct-weighs-weightgrams
+      name: PhysicalProduct weighs WeightGrams
+      roles:
+        - id: r-physicalproduct-weighs-weightgrams-physical-product
+          player: ot-physical-product
+          role_name: weighs
+        - id: r-physicalproduct-weighs-weightgrams-weight-grams
+          player: ot-weight-grams
+          role_name: is weight of
+      readings:
+        - "{0} weighs {1}"
+        - "{1} is weight of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-physicalproduct-weighs-weightgrams-physical-product]
+        - type: mandatory
+          role: r-physicalproduct-weighs-weightgrams-physical-product
+    - id: ft-hazmatproduct-has-hazmatclass
+      name: HazmatProduct has HazmatClass
+      roles:
+        - id: r-hazmatproduct-has-hazmatclass-hazmat-product
+          player: ot-hazmat-product
+          role_name: has
+        - id: r-hazmatproduct-has-hazmatclass-hazmat-class
+          player: ot-hazmat-class
+          role_name: classifies
+      readings:
+        - "{0} has {1}"
+        - "{1} classifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-hazmatproduct-has-hazmatclass-hazmat-product]
+        - type: mandatory
+          role: r-hazmatproduct-has-hazmatclass-hazmat-product
+    - id: ft-productvariant-is-of-product
+      name: ProductVariant is of Product
+      roles:
+        - id: r-productvariant-is-of-product-product-variant
+          player: ot-product-variant
+          role_name: is of
+        - id: r-productvariant-is-of-product-product
+          player: ot-product
+          role_name: has variant
+      readings:
+        - "{0} is of {1}"
+        - "{1} has variant {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-productvariant-is-of-product-product-variant]
+        - type: mandatory
+          role: r-productvariant-is-of-product-product-variant
+    - id: ft-productvariant-is-offered-by-seller
+      name: ProductVariant is offered by Seller
+      roles:
+        - id: r-productvariant-is-offered-by-seller-product-variant
+          player: ot-product-variant
+          role_name: is offered by
+        - id: r-productvariant-is-offered-by-seller-seller
+          player: ot-seller
+          role_name: offers
+      readings:
+        - "{0} is offered by {1}"
+        - "{1} offers {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-productvariant-is-offered-by-seller-product-variant]
+        - type: mandatory
+          role: r-productvariant-is-offered-by-seller-product-variant
+    - id: ft-productvariant-has-sku
+      name: ProductVariant has Sku
+      definition: "A SKU identifies a variant only together with the seller that assigned it; two sellers may reuse the same SKU string."
+      roles:
+        - id: r-productvariant-has-sku-product-variant
+          player: ot-product-variant
+          role_name: has
+        - id: r-productvariant-has-sku-sku
+          player: ot-sku
+          role_name: is sku of
+      readings:
+        - "{0} has {1}"
+        - "{1} is sku of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-productvariant-has-sku-product-variant]
+        - type: mandatory
+          role: r-productvariant-has-sku-product-variant
+        - type: external_uniqueness
+          roles: [r-productvariant-has-sku-sku, r-productvariant-is-offered-by-seller-seller]
+    - id: ft-listing-offers-productvariant
+      name: Listing offers ProductVariant
+      roles:
+        - id: r-listing-offers-productvariant-listing
+          player: ot-listing
+          role_name: offers
+        - id: r-listing-offers-productvariant-product-variant
+          player: ot-product-variant
+          role_name: is offered on
+      readings:
+        - "{0} offers {1}"
+        - "{1} is offered on {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-listing-offers-productvariant-listing]
+        - type: mandatory
+          role: r-listing-offers-productvariant-listing
+    - id: ft-listing-is-on-marketplace
+      name: Listing is on Marketplace
+      roles:
+        - id: r-listing-is-on-marketplace-listing
+          player: ot-listing
+          role_name: is on
+        - id: r-listing-is-on-marketplace-marketplace
+          player: ot-marketplace
+          role_name: carries
+      readings:
+        - "{0} is on {1}"
+        - "{1} carries {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-listing-is-on-marketplace-listing]
+        - type: mandatory
+          role: r-listing-is-on-marketplace-listing
+    - id: ft-listing-has-listingtitle
+      name: Listing has ListingTitle
+      roles:
+        - id: r-listing-has-listingtitle-listing
+          player: ot-listing
+          role_name: has
+        - id: r-listing-has-listingtitle-listing-title
+          player: ot-listing-title
+          role_name: titles
+      readings:
+        - "{0} has {1}"
+        - "{1} titles {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-listing-has-listingtitle-listing]
+        - type: mandatory
+          role: r-listing-has-listingtitle-listing
+    - id: ft-listing-is-written-in-locale
+      name: Listing is written in Locale
+      roles:
+        - id: r-listing-is-written-in-locale-listing
+          player: ot-listing
+          role_name: is written in
+        - id: r-listing-is-written-in-locale-locale
+          player: ot-locale
+          role_name: is locale of
+      readings:
+        - "{0} is written in {1}"
+        - "{1} is locale of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-listing-is-written-in-locale-listing]
+        - type: mandatory
+          role: r-listing-is-written-in-locale-listing
+    - id: ft-listing-has-refundwindowdays
+      name: Listing has RefundWindowDays
+      definition: "Policy obliges every listing to state a refund window; listings migrated before the policy still lack one, so the rule is deontic rather than alethic."
+      roles:
+        - id: r-listing-has-refundwindowdays-listing
+          player: ot-listing
+          role_name: has
+        - id: r-listing-has-refundwindowdays-refund-window-days
+          player: ot-refund-window-days
+          role_name: is refund window of
+      readings:
+        - "{0} has {1}"
+        - "{1} is refund window of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-listing-has-refundwindowdays-listing]
+        - type: mandatory
+          role: r-listing-has-refundwindowdays-listing
+          modality: deontic
+    - id: ft-listing-has-legacyimportflag
+      name: Listing has LegacyImportFlag
+      roles:
+        - id: r-listing-has-legacyimportflag-listing
+          player: ot-listing
+          role_name: has
+        - id: r-listing-has-legacyimportflag-legacy-import-flag
+          player: ot-legacy-import-flag
+          role_name: flags
+      readings:
+        - "{0} has {1}"
+        - "{1} flags {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-listing-has-legacyimportflag-listing]
+    - id: ft-marketplace-settles-in-currency
+      name: Marketplace settles in Currency
+      roles:
+        - id: r-marketplace-settles-in-currency-marketplace
+          player: ot-marketplace
+          role_name: settles in
+        - id: r-marketplace-settles-in-currency-currency
+          player: ot-currency
+          role_name: is settlement currency of
+      readings:
+        - "{0} settles in {1}"
+        - "{1} is settlement currency of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-marketplace-settles-in-currency-marketplace]
+        - type: mandatory
+          role: r-marketplace-settles-in-currency-marketplace
+    - id: ft-order-has-orderdate
+      name: Order has OrderDate
+      roles:
+        - id: r-order-has-orderdate-order
+          player: ot-order
+          role_name: has
+        - id: r-order-has-orderdate-order-date
+          player: ot-order-date
+          role_name: is date of
+      readings:
+        - "{0} has {1}"
+        - "{1} is date of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-order-has-orderdate-order]
+        - type: mandatory
+          role: r-order-has-orderdate-order
+    - id: ft-order-has-orderstatus
+      name: Order has OrderStatus
+      roles:
+        - id: r-order-has-orderstatus-order
+          player: ot-order
+          role_name: has
+        - id: r-order-has-orderstatus-order-status
+          player: ot-order-status
+          role_name: is status of
+      readings:
+        - "{0} has {1}"
+        - "{1} is status of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-order-has-orderstatus-order]
+        - type: mandatory
+          role: r-order-has-orderstatus-order
+    - id: ft-order-is-placed-on-marketplace
+      name: Order is placed on Marketplace
+      roles:
+        - id: r-order-is-placed-on-marketplace-order
+          player: ot-order
+          role_name: is placed on
+        - id: r-order-is-placed-on-marketplace-marketplace
+          player: ot-marketplace
+          role_name: receives
+      readings:
+        - "{0} is placed on {1}"
+        - "{1} receives {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-order-is-placed-on-marketplace-order]
+        - type: mandatory
+          role: r-order-is-placed-on-marketplace-order
+    - id: ft-order-includes-productvariant-in-quantity
+      name: Order includes ProductVariant in Quantity
+      definition: "One order line: a variant appears on an order at most once, with its ordered quantity."
+      roles:
+        - id: r-order-includes-productvariant-in-quantity-order
+          player: ot-order
+          role_name: includes
+        - id: r-order-includes-productvariant-in-quantity-product-variant
+          player: ot-product-variant
+          role_name: is included in
+        - id: r-order-includes-productvariant-in-quantity-quantity
+          player: ot-quantity
+          role_name: is quantity of
+      readings:
+        - "{0} includes {1} in {2}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-order-includes-productvariant-in-quantity-order, r-order-includes-productvariant-in-quantity-product-variant]
+    - id: ft-order-is-priced-in-currency
+      name: Order is priced in Currency
+      roles:
+        - id: r-order-is-priced-in-currency-order
+          player: ot-order
+          role_name: is priced in
+        - id: r-order-is-priced-in-currency-currency
+          player: ot-currency
+          role_name: prices
+      readings:
+        - "{0} is priced in {1}"
+        - "{1} prices {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-order-is-priced-in-currency-order]
+        - type: mandatory
+          role: r-order-is-priced-in-currency-order
+    - id: ft-order-totals-amount
+      name: Order totals Amount
+      definition: "The order total in the order's own currency, never converted."
+      roles:
+        - id: r-order-totals-amount-order
+          player: ot-order
+          role_name: totals
+        - id: r-order-totals-amount-amount
+          player: ot-amount
+          role_name: is total of
+      readings:
+        - "{0} totals {1}"
+        - "{1} is total of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-order-totals-amount-order]
+        - type: mandatory
+          role: r-order-totals-amount-order
+    - id: ft-shipment-carries-orderline
+      name: Shipment carries OrderLine
+      definition: A shipment may carry several lines and a line may be split across shipments.
+      roles:
+        - id: r-shipment-carries-orderline-shipment
+          player: ot-shipment
+          role_name: carries
+        - id: r-shipment-carries-orderline-order-line
+          player: ot-order-line
+          role_name: is carried by
+      readings:
+        - "{0} carries {1}"
+        - "{1} is carried by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-shipment-carries-orderline-shipment, r-shipment-carries-orderline-order-line]
+    - id: ft-fulfillment-ships-quantity
+      name: Fulfillment ships Quantity
+      definition: "The units of the line carried by that shipment; the sum over a line's fulfillments never exceeds the line quantity."
+      roles:
+        - id: r-fulfillment-ships-quantity-fulfillment
+          player: ot-fulfillment
+          role_name: ships
+        - id: r-fulfillment-ships-quantity-quantity
+          player: ot-quantity
+          role_name: is shipped in
+      readings:
+        - "{0} ships {1}"
+        - "{1} is shipped in {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-fulfillment-ships-quantity-fulfillment]
+        - type: mandatory
+          role: r-fulfillment-ships-quantity-fulfillment
+    - id: ft-shipment-is-handled-by-carrier
+      name: Shipment is handled by Carrier
+      roles:
+        - id: r-shipment-is-handled-by-carrier-shipment
+          player: ot-shipment
+          role_name: is handled by
+        - id: r-shipment-is-handled-by-carrier-carrier
+          player: ot-carrier
+          role_name: handles
+      readings:
+        - "{0} is handled by {1}"
+        - "{1} handles {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-shipment-is-handled-by-carrier-shipment]
+    - id: ft-shipment-departs-from-warehouse
+      name: Shipment departs from Warehouse
+      roles:
+        - id: r-shipment-departs-from-warehouse-shipment
+          player: ot-shipment
+          role_name: departs from
+        - id: r-shipment-departs-from-warehouse-warehouse
+          player: ot-warehouse
+          role_name: dispatches
+      readings:
+        - "{0} departs from {1}"
+        - "{1} dispatches {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-shipment-departs-from-warehouse-shipment]
+        - type: mandatory
+          role: r-shipment-departs-from-warehouse-shipment
+    - id: ft-shipment-has-shipmentstatus
+      name: Shipment has ShipmentStatus
+      roles:
+        - id: r-shipment-has-shipmentstatus-shipment
+          player: ot-shipment
+          role_name: has
+        - id: r-shipment-has-shipmentstatus-shipment-status
+          player: ot-shipment-status
+          role_name: is status of
+      readings:
+        - "{0} has {1}"
+        - "{1} is status of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-shipment-has-shipmentstatus-shipment]
+        - type: mandatory
+          role: r-shipment-has-shipmentstatus-shipment
+    - id: ft-shipment-was-shipped-on-shippeddate
+      name: Shipment was shipped on ShippedDate
+      roles:
+        - id: r-shipment-was-shipped-on-shippeddate-shipment
+          player: ot-shipment
+          role_name: was shipped on
+        - id: r-shipment-was-shipped-on-shippeddate-shipped-date
+          player: ot-shipped-date
+          role_name: is ship date of
+      readings:
+        - "{0} was shipped on {1}"
+        - "{1} is ship date of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-shipment-was-shipped-on-shippeddate-shipment]
+    - id: ft-return-is-for-orderline
+      name: Return is for OrderLine
+      roles:
+        - id: r-return-is-for-orderline-return
+          player: ot-return
+          role_name: is for
+        - id: r-return-is-for-orderline-order-line
+          player: ot-order-line
+          role_name: is returned under
+      readings:
+        - "{0} is for {1}"
+        - "{1} is returned under {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-return-is-for-orderline-return]
+        - type: mandatory
+          role: r-return-is-for-orderline-return
+    - id: ft-return-has-returnreason
+      name: Return has ReturnReason
+      roles:
+        - id: r-return-has-returnreason-return
+          player: ot-return
+          role_name: has
+        - id: r-return-has-returnreason-return-reason
+          player: ot-return-reason
+          role_name: is reason for
+      readings:
+        - "{0} has {1}"
+        - "{1} is reason for {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-return-has-returnreason-return]
+        - type: mandatory
+          role: r-return-has-returnreason-return
+    - id: ft-return-is-received-at-warehouse
+      name: Return is received at Warehouse
+      roles:
+        - id: r-return-is-received-at-warehouse-return
+          player: ot-return
+          role_name: is received at
+        - id: r-return-is-received-at-warehouse-warehouse
+          player: ot-warehouse
+          role_name: receives
+      readings:
+        - "{0} is received at {1}"
+        - "{1} receives {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-return-is-received-at-warehouse-return]
+    - id: ft-payment-settles-order
+      name: Payment settles Order
+      roles:
+        - id: r-payment-settles-order-payment
+          player: ot-payment
+          role_name: settles
+        - id: r-payment-settles-order-order
+          player: ot-order
+          role_name: is settled by
+      readings:
+        - "{0} settles {1}"
+        - "{1} is settled by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-payment-settles-order-payment]
+        - type: mandatory
+          role: r-payment-settles-order-payment
+    - id: ft-payment-is-made-by-paymentmethod
+      name: Payment is made by PaymentMethod
+      roles:
+        - id: r-payment-is-made-by-paymentmethod-payment
+          player: ot-payment
+          role_name: is made by
+        - id: r-payment-is-made-by-paymentmethod-payment-method
+          player: ot-payment-method
+          role_name: is method of
+      readings:
+        - "{0} is made by {1}"
+        - "{1} is method of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-payment-is-made-by-paymentmethod-payment]
+        - type: mandatory
+          role: r-payment-is-made-by-paymentmethod-payment
+    - id: ft-payment-is-of-amount
+      name: Payment is of Amount
+      roles:
+        - id: r-payment-is-of-amount-payment
+          player: ot-payment
+          role_name: is of
+        - id: r-payment-is-of-amount-amount
+          player: ot-amount
+          role_name: is amount of
+      readings:
+        - "{0} is of {1}"
+        - "{1} is amount of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-payment-is-of-amount-payment]
+        - type: mandatory
+          role: r-payment-is-of-amount-payment
+    - id: ft-refund-reverses-payment
+      name: Refund reverses Payment
+      roles:
+        - id: r-refund-reverses-payment-refund
+          player: ot-refund
+          role_name: reverses
+        - id: r-refund-reverses-payment-payment
+          player: ot-payment
+          role_name: is reversed by
+      readings:
+        - "{0} reverses {1}"
+        - "{1} is reversed by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-refund-reverses-payment-refund]
+        - type: mandatory
+          role: r-refund-reverses-payment-refund
+    - id: ft-refund-is-for-return
+      name: Refund is for Return
+      definition: "A return is refunded at most once; a second refund against the same RMA is the fraud pattern finance reconciles for."
+      roles:
+        - id: r-refund-is-for-return-refund
+          player: ot-refund
+          role_name: is for
+        - id: r-refund-is-for-return-return
+          player: ot-return
+          role_name: is refunded by
+      readings:
+        - "{0} is for {1}"
+        - "{1} is refunded by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-refund-is-for-return-refund]
+        - type: internal_uniqueness
+          roles: [r-refund-is-for-return-return]
+        - type: mandatory
+          role: r-refund-is-for-return-refund
+    - id: ft-refund-is-of-amount
+      name: Refund is of Amount
+      roles:
+        - id: r-refund-is-of-amount-refund
+          player: ot-refund
+          role_name: is of
+        - id: r-refund-is-of-amount-amount
+          player: ot-amount
+          role_name: is amount of
+      readings:
+        - "{0} is of {1}"
+        - "{1} is amount of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-refund-is-of-amount-refund]
+        - type: mandatory
+          role: r-refund-is-of-amount-refund
+    - id: ft-payout-has-payoutdate
+      name: Payout has PayoutDate
+      roles:
+        - id: r-payout-has-payoutdate-payout
+          player: ot-payout
+          role_name: has
+        - id: r-payout-has-payoutdate-payout-date
+          player: ot-payout-date
+          role_name: is date of
+      readings:
+        - "{0} has {1}"
+        - "{1} is date of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-payout-has-payoutdate-payout]
+    - id: ft-payout-is-of-amount
+      name: Payout is of Amount
+      roles:
+        - id: r-payout-is-of-amount-payout
+          player: ot-payout
+          role_name: is of
+        - id: r-payout-is-of-amount-amount
+          player: ot-amount
+          role_name: is amount of
+      readings:
+        - "{0} is of {1}"
+        - "{1} is amount of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-payout-is-of-amount-payout]
+        - type: mandatory
+          role: r-payout-is-of-amount-payout
+    - id: ft-payout-is-denominated-in-currency
+      name: Payout is denominated in Currency
+      roles:
+        - id: r-payout-is-denominated-in-currency-payout
+          player: ot-payout
+          role_name: is denominated in
+        - id: r-payout-is-denominated-in-currency-currency
+          player: ot-currency
+          role_name: denominates
+      readings:
+        - "{0} is denominated in {1}"
+        - "{1} denominates {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [r-payout-is-denominated-in-currency-payout]
+        - type: mandatory
+          role: r-payout-is-denominated-in-currency-payout
+
+  subtype_facts:
+    - id: sf-buyer-is-party
+      subtype: ot-buyer
+      supertype: ot-party
+    - id: sf-seller-is-party
+      subtype: ot-seller
+      supertype: ot-party
+    - id: sf-physical-product-is-product
+      subtype: ot-physical-product
+      supertype: ot-product
+    - id: sf-hazmat-product-is-physical-product
+      subtype: ot-hazmat-product
+      supertype: ot-physical-product
+
+  objectified_fact_types:
+    - id: oft-order-line
+      fact_type: ft-order-includes-productvariant-in-quantity
+      object_type: ot-order-line
+    - id: oft-fulfillment
+      fact_type: ft-shipment-carries-orderline
+      object_type: ot-fulfillment
+
+  populations:
+    - id: pop-product-has-productname
+      fact_type: ft-product-has-productname
+      description: "Seller-entered product titles across marketplaces; the last row carries a leading zero-width no-break space from a spreadsheet export."
+      sample: true
+      instances:
+        - id: inst-product-has-productname-1
+          role_values:
+            r-product-has-productname-product: "P-1001"
+            r-product-has-productname-product-name: "ワイヤレスイヤホン 黒 ノイズキャンセリング"
+        - id: inst-product-has-productname-2
+          role_values:
+            r-product-has-productname-product: "P-1002"
+            r-product-has-productname-product-name: "Küchenmaschine Größe L, Edelstahl"
+        - id: inst-product-has-productname-3
+          role_values:
+            r-product-has-productname-product: "P-1003"
+            r-product-has-productname-product-name: "Straßenkarte Österreich 1:200000"
+        - id: inst-product-has-productname-4
+          role_values:
+            r-product-has-productname-product: "P-1004"
+            r-product-has-productname-product-name: "Sunset Beach Towel 🌴 oversized"
+        - id: inst-product-has-productname-5
+          role_values:
+            r-product-has-productname-product: "P-1005"
+            r-product-has-productname-product-name: "﻿Stainless Water Bottle 750ml"
+    - id: pop-product-bundles-product
+      fact_type: ft-product-bundles-product
+      description: A starter kit bundles two catalog products.
+      sample: true
+      instances:
+        - id: inst-product-bundles-product-1
+          role_values:
+            r-product-bundles-product-product: "P-1006"
+            r-product-bundles-product-product-1: "P-1001"
+        - id: inst-product-bundles-product-2
+          role_values:
+            r-product-bundles-product-product: "P-1006"
+            r-product-bundles-product-product-1: "P-1005"
+    - id: pop-order-totals-amount
+      fact_type: ft-order-totals-amount
+      description: Order totals in each order's own currency.
+      sample: true
+      instances:
+        - id: inst-order-totals-amount-1
+          role_values:
+            r-order-totals-amount-order: "ORD-240911-0001"
+            r-order-totals-amount-amount: "12980.00"
+        - id: inst-order-totals-amount-2
+          role_values:
+            r-order-totals-amount-order: "ORD-240911-0002"
+            r-order-totals-amount-amount: "89.90"
+        - id: inst-order-totals-amount-3
+          role_values:
+            r-order-totals-amount-order: "ORD-240911-0003"
+            r-order-totals-amount-amount: "1249.00"
+    - id: pop-order-is-priced-in-currency
+      fact_type: ft-order-is-priced-in-currency
+      description: The currency each order was priced in.
+      sample: true
+      instances:
+        - id: inst-order-is-priced-in-currency-1
+          role_values:
+            r-order-is-priced-in-currency-order: "ORD-240911-0001"
+            r-order-is-priced-in-currency-currency: "JPY"
+        - id: inst-order-is-priced-in-currency-2
+          role_values:
+            r-order-is-priced-in-currency-order: "ORD-240911-0002"
+            r-order-is-priced-in-currency-currency: "EUR"
+        - id: inst-order-is-priced-in-currency-3
+          role_values:
+            r-order-is-priced-in-currency-order: "ORD-240911-0003"
+            r-order-is-priced-in-currency-currency: "USD"
+    - id: pop-payout-is-of-amount
+      fact_type: ft-payout-is-of-amount
+      description: "Seller payouts, minor-unit precision of the payout currency."
+      sample: true
+      instances:
+        - id: inst-payout-is-of-amount-1
+          role_values:
+            r-payout-is-of-amount-payout: "PO-88041"
+            r-payout-is-of-amount-amount: "458200.00"
+        - id: inst-payout-is-of-amount-2
+          role_values:
+            r-payout-is-of-amount-payout: "PO-88042"
+            r-payout-is-of-amount-amount: "3120.45"
+    - id: pop-payout-is-denominated-in-currency
+      fact_type: ft-payout-is-denominated-in-currency
+      description: The settlement currency of each payout.
+      sample: true
+      instances:
+        - id: inst-payout-is-denominated-in-currency-1
+          role_values:
+            r-payout-is-denominated-in-currency-payout: "PO-88041"
+            r-payout-is-denominated-in-currency-currency: "JPY"
+        - id: inst-payout-is-denominated-in-currency-2
+          role_values:
+            r-payout-is-denominated-in-currency-payout: "PO-88042"
+            r-payout-is-denominated-in-currency-currency: "EUR"
+
+  definitions:
+    - term: Customer
+      definition: "The buyer on an order: the party support answers to."
+      context: orders
+    - term: Customer
+      definition: "The seller on a payout: the party finance reconciles with."
+      context: payments
+    - term: SKU
+      definition: "The seller's own stock keeping unit; unique per seller, reused freely across sellers."
+      context: catalog
+    - term: Fulfillment
+      definition: "A shipment carrying an order line, in whole or in part."
+      context: fulfillment
+    - term: Refund window
+      definition: "The days after delivery in which a return may be opened; obligatory on every listing by policy, absent on migrated ones in fact."
+      context: fulfillment

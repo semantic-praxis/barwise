@@ -1,0 +1,71 @@
+id: C05
+slug: manufacturer
+name: Discrete manufacturer
+industry: manufacturing
+summary: >-
+  A make-to-order manufacturer whose ERP tables are replicated nightly
+  into a lakehouse under their original four-letter names and German
+  abbreviations, whose execution system is a Spring code base, and whose
+  bill of materials is twelve levels deep.
+stressors: [K1, K2, K7, K11, K12, K14]
+seed: 41
+personas:
+  - id: master-data-lead
+    name: Ingrid Hallström
+    role: Master-data lead
+    wants: Material, plant and storage location keep their composite keys, and the BOM cannot contain itself.
+    acceptance: personas/master-data-lead.gym.yaml
+    judges: [erp-ddl]
+  - id: mes-engineer
+    name: Rafael Ortega
+    role: Manufacturing execution engineer
+    wants: The work order, routing and operation entities in the Java code come back with their inheritance intact.
+    acceptance: personas/mes-engineer.gym.yaml
+    judges: [mes-java]
+artifacts:
+  - id: erp-ddl
+    generator: ddl
+    skin: skins/databricks-erp.yaml
+    importer: sql
+    dialect: databricks
+    expect: import
+    tiers: { small: 1, medium: 8, enterprise: 30 }
+  - id: mes-java
+    generator: code
+    skin: skins/java-spring.yaml
+    importer: java
+    expect: import
+    tiers: { small: 1, medium: 8, enterprise: 30 }
+  - id: scheduling-kotlin
+    generator: code
+    skin: skins/kotlin-spring.yaml
+    importer: kotlin
+    expect: import
+    tiers: { small: 1, medium: 6, enterprise: 20 }
+contexts:
+  materials: [Material, RawMaterial, Assembly, FinishedGood, ConfigurableProduct, UnitOfMeasure, Characteristic, BillOfMaterial]
+  production: [Plant, StorageLocation, MaterialPlantData, Routing, Operation, WorkCenter, Batch, WorkOrder]
+  procurement: [Supplier, PurchaseOrder, PurchaseOrderItem]
+  quality: [InspectionLot]
+history:
+  - { kind: rename_object_type, from: WorkCenter, to: Resource }
+  - { kind: add_value_constraint_value, object_type: UomCode, value: PAL }
+  - { kind: add_fact_type, name: Plant belongs to Plant, between: [Plant, Plant] }
+  - { kind: add_subtype, subtype: PurchaseOrderItem, supertype: Operation }
+  - { kind: rename_object_type, from: Resource, to: WorkCenter }
+  - { kind: tighten_uniqueness, fact_type: Material uses Material in Quantity }
+  - { kind: remove_object_type, name: InspectionLot }
+  - { kind: rename_fact_type, from: Material is component of Material, to: Material is part of Material }
+transcripts:
+  - file: transcripts/session-01-bom.md
+    key: transcripts/session-01-bom.key.yaml
+lateRequirement:
+  # Packaging introduces a unit of measure nobody mentioned in the workshops.
+  note: "Packaging introduces a unit of measure nobody mentioned in the workshops."
+  change: {"kind":"add_value_constraint_value","object_type":"UomCode","value":"KIT"}
+  element: UomCode
+  expectInExport: "KIT"
+budgets:
+  small: 30000
+  medium: 180000
+  enterprise: 900000

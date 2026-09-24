@@ -1,0 +1,248 @@
+{
+  "$comment": "The finding classes the trial has surfaced, one per beads issue. gate.mjs --write classifies a new failing step by the first class whose matchers fit and writes the class's note into trial-baseline.json; a failure no class fits stays unclassified and keeps the gate red. A class is removed here, with its baseline rows, in the PR that fixes the issue.",
+  "classes": [
+    {
+      "id": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "severity": "S1",
+      "step": "^read-back-diff-ddl:",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509."
+    },
+    {
+      "id": "lineage-impact-by-name",
+      "issue": "barwise-5m9",
+      "severity": "S1",
+      "step": "^late:impact-name$",
+      "detail": "no affected artifacts",
+      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer."
+    },
+    {
+      "id": "lineage-impact-no-sources",
+      "issue": "barwise-ofb",
+      "severity": "S1",
+      "step": "^late:impact-id$",
+      "detail": "no affected artifacts",
+      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509."
+    },
+    {
+      "id": "sql-importer-fk-targets",
+      "issue": "barwise-jjd",
+      "severity": "S1",
+      "step": "^import:",
+      "importer": "sql",
+      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them."
+    },
+    {
+      "id": "sql-importer-fk-targets-roundtrip",
+      "issue": "barwise-jjd",
+      "severity": "S1",
+      "step": "^roundtrip-(diff|reimport|export):",
+      "importer": "sql",
+      "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent."
+    },
+    {
+      "id": "ddl-regex-importer",
+      "issue": "barwise-zuk",
+      "severity": "S3",
+      "step": "^import:",
+      "importer": "ddl",
+      "note": "import model --format ddl is a single regex; schema-qualified, bracket-quoted, backtick-quoted and unterminated statements do not match and the only warning claims the file has no CREATE TABLE at all (barwise-zuk)."
+    },
+    {
+      "id": "ddl-regex-roundtrip",
+      "issue": "barwise-dnm",
+      "severity": "S1",
+      "step": "^roundtrip-(diff|reimport|export):",
+      "importer": "ddl",
+      "note": "Consequence of barwise-dnm and barwise-zuk: the DDL export of the imported model is not readable back by the regex importer. Closes with the parents."
+    },
+    {
+      "id": "openapi-importer-duplicate-role-ids",
+      "issue": "barwise-lh9",
+      "severity": "S1",
+      "step": "^validate-imported:",
+      "importer": "openapi",
+      "note": "The OpenAPI importer derives role ids from the property name, so two schemas with a 'related' or 'has' property collide and every imported model fails structural/duplicate-role-id (barwise-lh9)."
+    },
+    {
+      "id": "openapi-importer-duplicate-role-ids-acceptance",
+      "issue": "barwise-lh9",
+      "severity": "S1",
+      "step": "^acceptance:",
+      "importer": "openapi",
+      "detail": "validation error",
+      "note": "Consequence of barwise-lh9: the persona's must_validate check fails on the importer's duplicate role ids. Closes with the parent."
+    },
+    {
+      "id": "read-back-duplicate-role-ids",
+      "issue": "barwise-lh9",
+      "severity": "S1",
+      "step": "^read-back:",
+      "detail": "duplicate-role-id",
+      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-lh9 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model."
+    },
+    {
+      "id": "roundtrip-duplicate-role-ids",
+      "issue": "barwise-lh9",
+      "severity": "S1",
+      "step": "^(model-)?roundtrip-validate:",
+      "detail": "duplicate-role-id",
+      "note": "barwise-lh9 reached from the sprint-1 round trip: the model that comes back from barwise's own export carries duplicate role ids and fails validation. The round trip used to grade only the diff, whose deltas sat inside the declared loss set, so the invalid model went unrecorded."
+    },
+    {
+      "id": "roundtrip-norma-mandatory-violation",
+      "issue": "barwise-oph",
+      "severity": "S1",
+      "step": "^(model-)?roundtrip-validate:norma$",
+      "detail": "mandatory-violation",
+      "note": "barwise-oph reached from the sprint-1 round trip: NORMA has no place for the population sample flag, so the re-imported populations count as real, their instances enter the object universe, and every mandatory role they do not play reports a violation. The model that was exported validates clean."
+    },
+    {
+      "id": "ddl-importer-duplicate-role-ids",
+      "issue": "barwise-lh9",
+      "severity": "S1",
+      "step": "^validate-imported:",
+      "importer": "ddl",
+      "note": "The DDL importer has the same role-id collision as the OpenAPI importer: role ids derived from column names collide across tables and the imported model fails structural/duplicate-role-id (barwise-lh9, second importer)."
+    },
+    {
+      "id": "ddl-importer-duplicate-role-ids-acceptance",
+      "issue": "barwise-lh9",
+      "severity": "S1",
+      "step": "^acceptance:",
+      "importer": "ddl",
+      "detail": "validation error",
+      "note": "Consequence of barwise-lh9 in the DDL importer: the persona's must_validate check fails on duplicate role ids. Closes with the parent."
+    },
+    {
+      "id": "openapi-export-comment-header",
+      "issue": "barwise-sxh",
+      "severity": "S1",
+      "step": "^roundtrip-(diff|reimport):",
+      "importer": "openapi",
+      "note": "The default OpenAPI export writes a /* comment */ header when the model has diagnostics (which it always has after barwise-lh9), so the .json is not JSON and the importer returns an empty model with exit 0 (barwise-sxh)."
+    },
+    {
+      "id": "openapi-roundtrip-loss",
+      "issue": "barwise-a0h",
+      "severity": "S1",
+      "step": "^model-roundtrip:openapi$",
+      "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-a0h)."
+    },
+    {
+      "id": "ddl-roundtrip",
+      "issue": "barwise-dnm",
+      "severity": "S1",
+      "step": "^model-roundtrip:ddl$",
+      "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-dnm)."
+    },
+    {
+      "id": "dbt-importer-duplicate-fact-type",
+      "issue": "barwise-bvl",
+      "severity": "S3",
+      "detail": "already exists in model \"dbt Import\"",
+      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-bvl)."
+    },
+    {
+      "id": "read-back-dbt-duplicate-fact-type",
+      "issue": "barwise-bvl",
+      "severity": "S3",
+      "step": "^read-back:dbt$",
+      "note": "Reading barwise's own dbt export back throws 'Fact type X already exists' (barwise-bvl)."
+    },
+    {
+      "id": "dbt-roundtrip",
+      "issue": "barwise-vsp",
+      "severity": "S1",
+      "step": "^(model-roundtrip:dbt|roundtrip-diff:.*dbt)",
+      "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-vsp)."
+    },
+    {
+      "id": "norma-roundtrip",
+      "issue": "barwise-ro8",
+      "severity": "S1",
+      "step": "^model-roundtrip:norma$",
+      "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-ro8)."
+    },
+    {
+      "id": "norma-read-back-sample-flag",
+      "issue": "barwise-oph",
+      "severity": "S1",
+      "step": "^read-back:norma$",
+      "detail": "population/mandatory-violation",
+      "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation. The cause is the lost `sample: true` flag: NORMA has no seat for a sample instance, so the populations come back significant, their instances enter the object universe, and every mandatory role they must play reports a violation (barwise-oph). Restoring only that flag takes the round-tripped model from 49 errors to 0."
+    },
+    {
+      "id": "diff-rename-no-synonym",
+      "issue": "barwise-rkm",
+      "severity": "S5",
+      "step": "^diff:\\d+:rename_object_type$",
+      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm)."
+    },
+    {
+      "id": "code-import-utility-name-skip",
+      "issue": "barwise-tn4",
+      "severity": "S1",
+      "step": "^import:",
+      "importer": "typescript",
+      "detail": "expected names are absent",
+      "note": "The code importers skip any class whose name is on a fixed utility list (Event, Request, Result, Error, Context, ...) with exit 0 and no warning naming it (barwise-tn4). C06 has a domain class Event; the import returns ScanEvent and ShipmentEvent but no Event. Hidden until the import oracle stopped accepting a name as present because another name ended with it."
+    },
+    {
+      "id": "kotlin-importer-empty",
+      "issue": "barwise-dyq",
+      "severity": "S1",
+      "step": "^import:",
+      "importer": "kotlin",
+      "note": "The Kotlin importer returns an empty model for data classes and sealed classes with constructor properties, exit 0, no warning naming a class (barwise-dyq)."
+    },
+    {
+      "id": "merge-rename-structural-error",
+      "issue": "barwise-nqd",
+      "severity": "S3",
+      "step": "^merge:\\d+:rename_fact_type$",
+      "note": "merge exits 1 with 'Merge produced 1 structural error(s)' on a fact-type rename and does not say which error (barwise-nqd)."
+    },
+    {
+      "id": "bundle-gym-catalog",
+      "issue": "barwise-fbi",
+      "severity": "S3",
+      "step": "^release-bundle:gym-list$",
+      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi)."
+    },
+    {
+      "id": "acceptance-edit-distance-sql",
+      "issue": "barwise-jjd",
+      "severity": "S5",
+      "step": "^acceptance:.*:(?!kernel).*-ddl$",
+      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue."
+    },
+    {
+      "id": "acceptance-edit-distance-dbt",
+      "issue": "barwise-bvl",
+      "severity": "S5",
+      "step": "^acceptance:.*:(?!kernel).*-dbt$",
+      "note": "Edit distance to acceptance on a dbt project: the persona's checks fail because the model barwise produced is missing what the dbt importer dropped (barwise-bvl). A consequence row; closes with that importer issue."
+    },
+    {
+      "id": "acceptance-edit-distance-kotlin",
+      "issue": "barwise-dyq",
+      "severity": "S5",
+      "step": "^acceptance:.*:(?!kernel).*-kotlin$",
+      "note": "Edit distance to acceptance on a Kotlin repo: the persona's checks fail because the Kotlin importer returned an empty model (barwise-dyq). A consequence row; closes with that importer issue."
+    },
+    {
+      "id": "acceptance-edit-distance-norma",
+      "issue": "barwise-nm4",
+      "severity": "S5",
+      "step": "^acceptance:.*:(?!kernel).*-norma$",
+      "note": "barwise-nm4: the NORMA importer drops every internal uniqueness constraint that no fact references, while keeping the mandatory ones, so the imported model allows what the source forbids. Exit 0, confidence high, no warning. A consequence row; closes with that importer issue."
+    },
+    {
+      "id": "avro-no-read-back",
+      "issue": "barwise-s4x",
+      "step": "^read-back:avro$",
+      "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail."
+    }
+  ]
+}

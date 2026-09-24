@@ -1,0 +1,1002 @@
+orm_version: "1.1"
+model:
+  name: Pharmaceutical Sponsor Clinical Data
+  domain_context: pharmaceutical
+  note: >-
+    The hand-authored seed model for trial customer C09. A mid-size
+    pharmaceutical sponsor that runs phase 2 and 3 studies through a
+    clinical database and submits CDISC SDTM datasets; the vocabulary is
+    SDTM's (Subject, not Patient; Site, not Center; Visit, not
+    Encounter). Subjects are numbered per site within a study, which is
+    the three-part composite key that the safety and data-management
+    teams argue about whenever a subject transfers between sites.
+
+  object_types:
+    # ---- study set-up --------------------------------------------------
+    - id: ot-study
+      name: Study
+      kind: entity
+      reference_mode: study_id
+      definition: A clinical investigation run under one protocol, identified by the sponsor's study identifier (STUDYID).
+      aliases: [Trial]
+    - id: ot-protocol
+      name: Protocol
+      kind: entity
+      reference_mode: protocol_number
+      definition: The document that states the objectives, design, methodology and conduct of a study, identified by its protocol number.
+    - id: ot-protocol-amendment
+      name: ProtocolAmendment
+      kind: entity
+      reference_mode: amendment_id
+      definition: A numbered change to a protocol that has been approved and issued to sites; the objectification of a protocol being amended by an amendment number.
+    - id: ot-site
+      name: Site
+      kind: entity
+      reference_mode: site_id
+      definition: An investigational location, such as a hospital or clinic, that screens and treats subjects under a principal investigator (SITEID).
+      aliases: [Center, Centre]
+    - id: ot-investigator
+      name: Investigator
+      kind: entity
+      reference_mode: investigator_id
+      definition: A qualified clinician responsible for the conduct of the study at a site, identified by the sponsor's investigator number.
+    - id: ot-arm
+      name: Arm
+      kind: entity
+      reference_mode: arm_code
+      definition: A planned path through the study, such as active or placebo, to which a randomized subject is assigned (ARMCD).
+    - id: ot-treatment
+      name: Treatment
+      kind: entity
+      reference_mode: treatment_code
+      definition: A study treatment that can be administered to a subject, whether the investigational product, a comparator or placebo (EXTRT).
+      aliases: [Product, StudyDrug]
+
+    # ---- subjects -------------------------------------------------------
+    - id: ot-subject
+      name: Subject
+      kind: entity
+      reference_mode: usubjid
+      definition: A person who signed informed consent for a study, identified across all studies by a unique subject identifier (USUBJID).
+      aliases: [Participant, Patient]
+    - id: ot-screen-failed-subject
+      name: ScreenFailedSubject
+      kind: entity
+      reference_mode: usubjid
+      definition: A subject who was screened and did not meet the eligibility criteria, so was never enrolled.
+    - id: ot-enrolled-subject
+      name: EnrolledSubject
+      kind: entity
+      reference_mode: usubjid
+      definition: A subject who met the eligibility criteria and was enrolled into the study on a recorded date.
+    - id: ot-randomized-subject
+      name: RandomizedSubject
+      kind: entity
+      reference_mode: usubjid
+      definition: An enrolled subject who has been allocated to an arm by the randomization system.
+    - id: ot-visit
+      name: Visit
+      kind: entity
+      reference_mode: visit_id
+      definition: A scheduled or unscheduled contact between a subject and the site at which assessments are collected (VISITNUM).
+
+    # ---- safety ---------------------------------------------------------
+    - id: ot-adverse-event
+      name: AdverseEvent
+      kind: entity
+      reference_mode: ae_seq
+      definition: Any untoward medical occurrence in a subject, whether or not related to the study treatment, numbered in sequence within the subject (AESEQ).
+      aliases: [AE]
+    - id: ot-serious-adverse-event
+      name: SeriousAdverseEvent
+      kind: entity
+      reference_mode: ae_seq
+      definition: An adverse event that results in death, is life-threatening, requires hospitalisation, or otherwise meets the regulatory seriousness criteria.
+      aliases: [SAE]
+    - id: ot-concomitant-medication
+      name: ConcomitantMedication
+      kind: entity
+      reference_mode: cm_seq
+      definition: A medication other than the study treatment that a subject takes during the study, numbered in sequence within the subject (CMSEQ).
+      aliases: [ConMed]
+
+    # ---- exposure -------------------------------------------------------
+    - id: ot-dose
+      name: Dose
+      kind: entity
+      reference_mode: dose_code
+      definition: A quantity of treatment expressed as an amount and a unit, such as 10 mg, identified by the sponsor's dose code.
+    - id: ot-exposure
+      name: Exposure
+      kind: entity
+      reference_mode: exposure_id
+      definition: The administration of a dose of a treatment to a subject; the objectification of a subject receiving a dose of a treatment.
+
+    # ---- laboratory -----------------------------------------------------
+    - id: ot-lab-test
+      name: LabTest
+      kind: entity
+      reference_mode: lbtestcd
+      definition: A laboratory measurement that can be performed on a specimen, such as haemoglobin, identified by its controlled test code (LBTESTCD).
+    - id: ot-lab-result
+      name: LabResult
+      kind: entity
+      reference_mode: lb_seq
+      definition: One measured value of one lab test on one subject at one visit, numbered in sequence within the subject (LBSEQ).
+
+    # ---- identifier value types ----------------------------------------
+    - id: ot-study-id
+      name: StudyId
+      kind: value
+      definition: The sponsor's identifier for a study.
+      data_type: { name: text, length: 20 }
+    - id: ot-protocol-number
+      name: ProtocolNumber
+      kind: value
+      definition: The number under which a protocol is filed with regulators.
+      data_type: { name: text, length: 30 }
+    - id: ot-amendment-number
+      name: AmendmentNumber
+      kind: value
+      definition: The sequential number of an amendment within its protocol.
+      data_type: { name: integer }
+    - id: ot-site-id
+      name: SiteId
+      kind: value
+      definition: The identifier the sponsor assigns to a site.
+      data_type: { name: text, length: 10 }
+    - id: ot-investigator-id
+      name: InvestigatorId
+      kind: value
+      definition: The sponsor's number for an investigator.
+      data_type: { name: text, length: 20 }
+    - id: ot-arm-code
+      name: ArmCode
+      kind: value
+      definition: The short code of a planned arm.
+      data_type: { name: text, length: 20 }
+    - id: ot-treatment-code
+      name: TreatmentCode
+      kind: value
+      definition: The code of a study treatment as it appears in the exposure dataset.
+      data_type: { name: text, length: 40 }
+    - id: ot-usubjid
+      name: UniqueSubjectId
+      kind: value
+      definition: The identifier that is unique for a subject across all of the sponsor's studies.
+      data_type: { name: text, length: 40 }
+    - id: ot-visit-id
+      name: VisitId
+      kind: value
+      definition: The identifier of one visit record in the clinical database.
+      data_type: { name: text, length: 40 }
+    - id: ot-ae-seq
+      name: AeSequenceNumber
+      kind: value
+      definition: The sequence number of an adverse event within its subject.
+      data_type: { name: integer }
+    - id: ot-cm-seq
+      name: CmSequenceNumber
+      kind: value
+      definition: The sequence number of a concomitant medication within its subject.
+      data_type: { name: integer }
+    - id: ot-dose-code
+      name: DoseCode
+      kind: value
+      definition: The sponsor's code for a dose level.
+      data_type: { name: text, length: 20 }
+    - id: ot-lbtestcd
+      name: LabTestCode
+      kind: value
+      definition: The controlled short code of a laboratory test.
+      data_type: { name: text, length: 8 }
+    - id: ot-lb-seq
+      name: LbSequenceNumber
+      kind: value
+      definition: The sequence number of a lab result within its subject.
+      data_type: { name: integer }
+
+    # ---- study attributes ----------------------------------------------
+    - id: ot-study-title
+      name: StudyTitle
+      kind: value
+      definition: The full title of the study as it appears on the protocol cover page.
+      data_type: { name: text, length: 500 }
+    - id: ot-study-phase
+      name: StudyPhase
+      kind: value
+      definition: The clinical development phase of the study.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [Phase 1, Phase 2, Phase 3, Phase 4]
+    - id: ot-protocol-title
+      name: ProtocolTitle
+      kind: value
+      definition: The title of a protocol document.
+      data_type: { name: text, length: 500 }
+    - id: ot-amendment-approval-date
+      name: AmendmentApprovalDate
+      kind: value
+      definition: The date on which an amendment was approved by the sponsor.
+      data_type: { name: date }
+    - id: ot-country-code
+      name: CountryCode
+      kind: value
+      definition: The ISO 3166-1 alpha-3 country in which a site is located.
+      data_type: { name: text, length: 3 }
+      value_constraint:
+        values: [USA, CAN, GBR, DEU, FRA, ESP, ITA, POL, JPN, AUS, BRA, ZAF]
+    - id: ot-investigator-name
+      name: InvestigatorName
+      kind: value
+      definition: The full name of an investigator.
+      data_type: { name: text, length: 200 }
+
+    # ---- subject attributes --------------------------------------------
+    - id: ot-subject-number
+      name: SubjectNumber
+      kind: value
+      definition: The number a site assigns to a subject at screening; unique only within the site and study that issued it (SUBJID).
+      data_type: { name: text, length: 20 }
+    - id: ot-sex
+      name: Sex
+      kind: value
+      definition: The sex of a subject as collected at screening (SEX).
+      data_type: { name: text, length: 1 }
+      value_constraint:
+        values: [M, F, U]
+    - id: ot-screen-failure-reason
+      name: ScreenFailureReason
+      kind: value
+      definition: The eligibility criterion a screen-failed subject did not meet, as recorded by the site.
+      data_type: { name: text, length: 200 }
+    - id: ot-enrollment-date
+      name: EnrollmentDate
+      kind: value
+      definition: The date on which a subject was enrolled.
+      data_type: { name: date }
+    - id: ot-randomization-date
+      name: RandomizationDate
+      kind: value
+      definition: The date on which a subject was randomized.
+      data_type: { name: date }
+    - id: ot-visit-number
+      name: VisitNumber
+      kind: value
+      definition: The protocol-defined number of a visit; unscheduled visits carry a decimal suffix such as 3.1.
+      data_type: { name: decimal, scale: 2 }
+    - id: ot-visit-date
+      name: VisitDate
+      kind: value
+      definition: The date on which a visit took place.
+      data_type: { name: date }
+
+    # ---- safety attributes ---------------------------------------------
+    - id: ot-ae-verbatim-term
+      name: AeVerbatimTerm
+      kind: value
+      definition: The adverse event exactly as the investigator wrote it on the case report form (AETERM).
+      data_type: { name: text, length: 200 }
+    - id: ot-meddra-pt-code
+      name: MeddraPreferredTermCode
+      kind: value
+      definition: The sponsor's controlled dictionary code and preferred term to which a verbatim adverse event term is coded (AEDECOD); this list is invented for the trial and is not a real dictionary.
+      data_type: { name: text, length: 80 }
+      value_constraint:
+        values:
+          - "90000101 Headache"
+          - "90000102 Nausea"
+          - "90000103 Vomiting"
+          - "90000104 Diarrhoea"
+          - "90000105 Constipation"
+          - "90000106 Abdominal pain"
+          - "90000107 Dyspepsia"
+          - "90000108 Fatigue"
+          - "90000109 Pyrexia"
+          - "90000110 Dizziness"
+          - "90000111 Insomnia"
+          - "90000112 Somnolence"
+          - "90000113 Rash"
+          - "90000114 Pruritus"
+          - "90000115 Urticaria"
+          - "90000116 Injection site erythema"
+          - "90000117 Injection site pain"
+          - "90000118 Infusion related reaction"
+          - "90000119 Hypersensitivity"
+          - "90000120 Anaphylactic reaction"
+          - "90000121 Upper respiratory tract infection"
+          - "90000122 Nasopharyngitis"
+          - "90000123 Urinary tract infection"
+          - "90000124 Pneumonia"
+          - "90000125 Cough"
+          - "90000126 Dyspnoea"
+          - "90000127 Hypertension"
+          - "90000128 Hypotension"
+          - "90000129 Tachycardia"
+          - "90000130 Palpitations"
+          - "90000131 Atrial fibrillation"
+          - "90000132 Myocardial infarction"
+          - "90000133 Syncope"
+          - "90000134 Anaemia"
+          - "90000135 Neutropenia"
+          - "90000136 Thrombocytopenia"
+          - "90000137 Alanine aminotransferase increased"
+          - "90000138 Aspartate aminotransferase increased"
+          - "90000139 Blood creatinine increased"
+          - "90000140 Hyperglycaemia"
+          - "90000141 Hypokalaemia"
+          - "90000142 Arthralgia"
+          - "90000143 Back pain"
+          - "90000144 Myalgia"
+    - id: ot-ae-severity
+      name: AeSeverity
+      kind: value
+      definition: The investigator's assessment of the intensity of an adverse event (AESEV).
+      data_type: { name: text, length: 10 }
+      value_constraint:
+        values: [MILD, MODERATE, SEVERE]
+    - id: ot-ae-outcome
+      name: AeOutcome
+      kind: value
+      definition: The outcome of an adverse event at the last assessment (AEOUT).
+      data_type: { name: text, length: 40 }
+      value_constraint:
+        values:
+          - RECOVERED/RESOLVED
+          - RECOVERING/RESOLVING
+          - NOT RECOVERED/NOT RESOLVED
+          - RECOVERED/RESOLVED WITH SEQUELAE
+          - FATAL
+          - UNKNOWN
+    - id: ot-ae-start-date
+      name: AeStartDate
+      kind: value
+      definition: The date on which an adverse event started (AESTDTC).
+      data_type: { name: date }
+    - id: ot-sae-report-datetime
+      name: SaeReportDateTime
+      kind: value
+      definition: The date and time at which the site reported a serious adverse event to the sponsor's pharmacovigilance desk.
+      data_type: { name: datetime }
+    - id: ot-cm-name
+      name: CmName
+      kind: value
+      definition: The name of a concomitant medication as written on the case report form (CMTRT).
+      data_type: { name: text, length: 200 }
+
+    # ---- exposure attributes -------------------------------------------
+    - id: ot-dose-amount
+      name: DoseAmount
+      kind: value
+      definition: The numeric quantity of a dose (EXDOSE).
+      data_type: { name: decimal, scale: 3 }
+    - id: ot-dose-unit
+      name: DoseUnit
+      kind: value
+      definition: The unit of measure of a dose (EXDOSU).
+      data_type: { name: text, length: 10 }
+      value_constraint:
+        values: [mg, mg/kg, ug, g, mL, IU, TABLET, CAPSULE]
+    - id: ot-exposure-start-date
+      name: ExposureStartDate
+      kind: value
+      definition: The date on which an exposure to a treatment started (EXSTDTC).
+      data_type: { name: date }
+
+    # ---- laboratory attributes -----------------------------------------
+    - id: ot-lab-value
+      name: LabValue
+      kind: value
+      definition: The numeric result of a lab test in the reported unit (LBORRES).
+      data_type: { name: decimal, scale: 4 }
+    - id: ot-lab-unit
+      name: LabUnit
+      kind: value
+      definition: The unit in which a lab result was reported by the laboratory (LBORRESU).
+      data_type: { name: text, length: 20 }
+    - id: ot-lab-range-indicator
+      name: LabReferenceRangeIndicator
+      kind: value
+      definition: Where a lab result falls relative to the laboratory's reference range (LBNRIND).
+      data_type: { name: text, length: 10 }
+      value_constraint:
+        values: [LOW, NORMAL, HIGH, ABNORMAL]
+
+  fact_types:
+    # ---- identification ------------------------------------------------
+    - id: ft-study-has-study-id
+      name: Study has StudyId
+      roles:
+        - { id: r-study-has-study-id-study, player: ot-study, role_name: has }
+        - { id: r-study-has-study-id-id, player: ot-study-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-study-has-study-id-study], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-study-has-study-id-id] }
+        - { type: mandatory, role: r-study-has-study-id-study }
+    - id: ft-protocol-has-protocol-number
+      name: Protocol has ProtocolNumber
+      roles:
+        - { id: r-protocol-has-number-protocol, player: ot-protocol, role_name: has }
+        - { id: r-protocol-has-number-number, player: ot-protocol-number, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-protocol-has-number-protocol], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-protocol-has-number-number] }
+        - { type: mandatory, role: r-protocol-has-number-protocol }
+    - id: ft-site-has-site-id
+      name: Site has SiteId
+      roles:
+        - { id: r-site-has-site-id-site, player: ot-site, role_name: has }
+        - { id: r-site-has-site-id-id, player: ot-site-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-site-has-site-id-site], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-site-has-site-id-id] }
+        - { type: mandatory, role: r-site-has-site-id-site }
+    - id: ft-investigator-has-investigator-id
+      name: Investigator has InvestigatorId
+      roles:
+        - { id: r-investigator-has-id-investigator, player: ot-investigator, role_name: has }
+        - { id: r-investigator-has-id-id, player: ot-investigator-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-investigator-has-id-investigator], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-investigator-has-id-id] }
+        - { type: mandatory, role: r-investigator-has-id-investigator }
+    - id: ft-arm-has-arm-code
+      name: Arm has ArmCode
+      roles:
+        - { id: r-arm-has-code-arm, player: ot-arm, role_name: has }
+        - { id: r-arm-has-code-code, player: ot-arm-code, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-arm-has-code-arm], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-arm-has-code-code] }
+        - { type: mandatory, role: r-arm-has-code-arm }
+    - id: ft-treatment-has-treatment-code
+      name: Treatment has TreatmentCode
+      roles:
+        - { id: r-treatment-has-code-treatment, player: ot-treatment, role_name: has }
+        - { id: r-treatment-has-code-code, player: ot-treatment-code, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-treatment-has-code-treatment], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-treatment-has-code-code] }
+        - { type: mandatory, role: r-treatment-has-code-treatment }
+    - id: ft-subject-has-usubjid
+      name: Subject has UniqueSubjectId
+      roles:
+        - { id: r-subject-has-usubjid-subject, player: ot-subject, role_name: has }
+        - { id: r-subject-has-usubjid-id, player: ot-usubjid, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subject-has-usubjid-subject], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-subject-has-usubjid-id] }
+        - { type: mandatory, role: r-subject-has-usubjid-subject }
+    - id: ft-visit-has-visit-id
+      name: Visit has VisitId
+      roles:
+        - { id: r-visit-has-visit-id-visit, player: ot-visit, role_name: has }
+        - { id: r-visit-has-visit-id-id, player: ot-visit-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-visit-has-visit-id-visit], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-visit-has-visit-id-id] }
+        - { type: mandatory, role: r-visit-has-visit-id-visit }
+    - id: ft-adverse-event-has-ae-seq
+      name: AdverseEvent has AeSequenceNumber
+      roles:
+        - { id: r-ae-has-seq-ae, player: ot-adverse-event, role_name: has }
+        - { id: r-ae-has-seq-seq, player: ot-ae-seq, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-ae-has-seq-ae], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-ae-has-seq-seq] }
+        - { type: mandatory, role: r-ae-has-seq-ae }
+    - id: ft-concomitant-medication-has-cm-seq
+      name: ConcomitantMedication has CmSequenceNumber
+      roles:
+        - { id: r-cm-has-seq-cm, player: ot-concomitant-medication, role_name: has }
+        - { id: r-cm-has-seq-seq, player: ot-cm-seq, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-cm-has-seq-cm], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-cm-has-seq-seq] }
+        - { type: mandatory, role: r-cm-has-seq-cm }
+    - id: ft-dose-has-dose-code
+      name: Dose has DoseCode
+      roles:
+        - { id: r-dose-has-code-dose, player: ot-dose, role_name: has }
+        - { id: r-dose-has-code-code, player: ot-dose-code, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-dose-has-code-dose], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-dose-has-code-code] }
+        - { type: mandatory, role: r-dose-has-code-dose }
+    - id: ft-lab-test-has-lab-test-code
+      name: LabTest has LabTestCode
+      roles:
+        - { id: r-lab-test-has-code-test, player: ot-lab-test, role_name: has }
+        - { id: r-lab-test-has-code-code, player: ot-lbtestcd, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-lab-test-has-code-test], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-lab-test-has-code-code] }
+        - { type: mandatory, role: r-lab-test-has-code-test }
+    - id: ft-lab-result-has-lb-seq
+      name: LabResult has LbSequenceNumber
+      roles:
+        - { id: r-lab-result-has-seq-result, player: ot-lab-result, role_name: has }
+        - { id: r-lab-result-has-seq-seq, player: ot-lb-seq, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-lab-result-has-seq-result], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-lab-result-has-seq-seq] }
+        - { type: mandatory, role: r-lab-result-has-seq-result }
+
+    # ---- study and protocol --------------------------------------------
+    - id: ft-study-has-study-title
+      name: Study has StudyTitle
+      roles:
+        - { id: r-study-has-title-study, player: ot-study, role_name: has }
+        - { id: r-study-has-title-title, player: ot-study-title, role_name: is of }
+      readings: ["{0} has {1}", "{1} is of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-study-has-title-study] }
+        - { type: mandatory, role: r-study-has-title-study }
+    - id: ft-study-is-in-study-phase
+      name: Study is in StudyPhase
+      roles:
+        - { id: r-study-in-phase-study, player: ot-study, role_name: is in }
+        - { id: r-study-in-phase-phase, player: ot-study-phase, role_name: applies to }
+      readings: ["{0} is in {1}", "{1} applies to {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-study-in-phase-study] }
+        - { type: mandatory, role: r-study-in-phase-study }
+    - id: ft-study-follows-protocol
+      name: Study follows Protocol
+      definition: Each study is conducted under exactly one protocol and a protocol governs one study; amendments change the protocol, not the study.
+      roles:
+        - { id: r-study-follows-study, player: ot-study, role_name: follows }
+        - { id: r-study-follows-protocol, player: ot-protocol, role_name: governs }
+      readings: ["{0} follows {1}", "{1} governs {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-study-follows-study] }
+        - { type: internal_uniqueness, roles: [r-study-follows-protocol] }
+        - { type: mandatory, role: r-study-follows-study }
+    - id: ft-protocol-has-protocol-title
+      name: Protocol has ProtocolTitle
+      roles:
+        - { id: r-protocol-has-title-protocol, player: ot-protocol, role_name: has }
+        - { id: r-protocol-has-title-title, player: ot-protocol-title, role_name: is of }
+      readings: ["{0} has {1}", "{1} is of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-protocol-has-title-protocol] }
+        - { type: mandatory, role: r-protocol-has-title-protocol }
+
+    # ---- amendments (objectified) --------------------------------------
+    - id: ft-protocol-is-amended-by-amendment-number
+      name: Protocol is amended by AmendmentNumber
+      definition: The amendment event; amendments are numbered within their protocol, so protocol and number together identify one amendment.
+      roles:
+        - { id: r-protocol-amended-protocol, player: ot-protocol, role_name: is amended by }
+        - { id: r-protocol-amended-number, player: ot-amendment-number, role_name: amends }
+      readings: ["{0} is amended by {1}", "{1} amends {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-protocol-amended-protocol, r-protocol-amended-number] }
+    - id: ft-protocol-amendment-was-approved-on-amendment-approval-date
+      name: ProtocolAmendment was approved on AmendmentApprovalDate
+      roles:
+        - { id: r-amendment-approved-amendment, player: ot-protocol-amendment, role_name: was approved on }
+        - { id: r-amendment-approved-date, player: ot-amendment-approval-date, role_name: is the approval date of }
+      readings: ["{0} was approved on {1}", "{1} is the approval date of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-amendment-approved-amendment] }
+        - { type: mandatory, role: r-amendment-approved-amendment }
+    - id: ft-protocol-amendment-was-issued-to-site
+      name: ProtocolAmendment was issued to Site
+      definition: Which sites have received which amendments; a site that has not received an amendment is still running under the previous version.
+      roles:
+        - { id: r-amendment-issued-amendment, player: ot-protocol-amendment, role_name: was issued to }
+        - { id: r-amendment-issued-site, player: ot-site, role_name: received }
+      readings: ["{0} was issued to {1}", "{1} received {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-amendment-issued-amendment, r-amendment-issued-site] }
+
+    # ---- sites and investigators ---------------------------------------
+    - id: ft-site-participates-in-study
+      name: Site participates in Study
+      definition: A site may run several of the sponsor's studies and a study runs at many sites.
+      roles:
+        - { id: r-site-participates-site, player: ot-site, role_name: participates in }
+        - { id: r-site-participates-study, player: ot-study, role_name: is run at }
+      readings: ["{0} participates in {1}", "{1} is run at {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-site-participates-site, r-site-participates-study] }
+    - id: ft-site-is-located-in-country-code
+      name: Site is located in CountryCode
+      roles:
+        - { id: r-site-located-site, player: ot-site, role_name: is located in }
+        - { id: r-site-located-country, player: ot-country-code, role_name: is the country of }
+      readings: ["{0} is located in {1}", "{1} is the country of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-site-located-site] }
+        - { type: mandatory, role: r-site-located-site }
+    - id: ft-site-has-principal-investigator
+      name: Site has principal Investigator
+      definition: Every active site has exactly one principal investigator at a time; an investigator may be principal at more than one site.
+      roles:
+        - { id: r-site-has-pi-site, player: ot-site, role_name: has principal }
+        - { id: r-site-has-pi-investigator, player: ot-investigator, role_name: is principal investigator of }
+      readings: ["{0} has principal {1}", "{1} is principal investigator of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-site-has-pi-site] }
+        - { type: mandatory, role: r-site-has-pi-site }
+    - id: ft-investigator-has-investigator-name
+      name: Investigator has InvestigatorName
+      roles:
+        - { id: r-investigator-has-name-investigator, player: ot-investigator, role_name: has }
+        - { id: r-investigator-has-name-name, player: ot-investigator-name, role_name: is of }
+      readings: ["{0} has {1}", "{1} is of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-investigator-has-name-investigator] }
+        - { type: mandatory, role: r-investigator-has-name-investigator }
+
+    # ---- subjects ---------------------------------------------------------
+    - id: ft-subject-is-in-study
+      name: Subject is in Study
+      roles:
+        - { id: r-subject-in-study-subject, player: ot-subject, role_name: is in }
+        - { id: r-subject-in-study-study, player: ot-study, role_name: has }
+      readings: ["{0} is in {1}", "{1} has {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subject-in-study-subject] }
+        - { type: mandatory, role: r-subject-in-study-subject }
+    - id: ft-subject-is-screened-at-site
+      name: Subject is screened at Site
+      roles:
+        - { id: r-subject-screened-subject, player: ot-subject, role_name: is screened at }
+        - { id: r-subject-screened-site, player: ot-site, role_name: screens }
+      readings: ["{0} is screened at {1}", "{1} screens {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subject-screened-subject] }
+        - { type: mandatory, role: r-subject-screened-subject }
+    - id: ft-subject-has-subject-number
+      name: Subject has SubjectNumber
+      definition: The site-assigned subject number; it is reused across sites and across studies, so only the triple (study, site, number) picks out one subject.
+      roles:
+        - { id: r-subject-has-number-subject, player: ot-subject, role_name: has }
+        - { id: r-subject-has-number-number, player: ot-subject-number, role_name: is assigned to }
+      readings: ["{0} has {1}", "{1} is assigned to {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subject-has-number-subject] }
+        - { type: mandatory, role: r-subject-has-number-subject }
+        # The three-part composite key: STUDYID + SITEID + SUBJID. A
+        # subject number is unique only within the site that issued it,
+        # and site numbers repeat across studies.
+        - { type: external_uniqueness, roles: [r-subject-in-study-study, r-subject-screened-site, r-subject-has-number-number] }
+    - id: ft-subject-has-sex
+      name: Subject has Sex
+      roles:
+        - { id: r-subject-has-sex-subject, player: ot-subject, role_name: has }
+        - { id: r-subject-has-sex-sex, player: ot-sex, role_name: is of }
+      readings: ["{0} has {1}", "{1} is of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subject-has-sex-subject] }
+        - { type: mandatory, role: r-subject-has-sex-subject }
+    - id: ft-screen-failed-subject-failed-for-screen-failure-reason
+      name: ScreenFailedSubject failed for ScreenFailureReason
+      roles:
+        - { id: r-screen-failed-subject, player: ot-screen-failed-subject, role_name: failed for }
+        - { id: r-screen-failed-reason, player: ot-screen-failure-reason, role_name: is the reason for }
+      readings: ["{0} failed for {1}", "{1} is the reason for {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-screen-failed-subject] }
+        - { type: mandatory, role: r-screen-failed-subject }
+    - id: ft-enrolled-subject-was-enrolled-on-enrollment-date
+      name: EnrolledSubject was enrolled on EnrollmentDate
+      roles:
+        - { id: r-enrolled-on-subject, player: ot-enrolled-subject, role_name: was enrolled on }
+        - { id: r-enrolled-on-date, player: ot-enrollment-date, role_name: is the enrollment date of }
+      readings: ["{0} was enrolled on {1}", "{1} is the enrollment date of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-enrolled-on-subject] }
+        - { type: mandatory, role: r-enrolled-on-subject }
+    - id: ft-randomized-subject-is-assigned-to-arm
+      name: RandomizedSubject is assigned to Arm
+      definition: The randomization allocation; a randomized subject is on exactly one planned arm, and the actual arm may differ and is derived, not stored here.
+      roles:
+        - { id: r-randomized-assigned-subject, player: ot-randomized-subject, role_name: is assigned to }
+        - { id: r-randomized-assigned-arm, player: ot-arm, role_name: is assigned }
+      readings: ["{0} is assigned to {1}", "{1} is assigned {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-randomized-assigned-subject] }
+        - { type: mandatory, role: r-randomized-assigned-subject }
+    - id: ft-randomized-subject-was-randomized-on-randomization-date
+      name: RandomizedSubject was randomized on RandomizationDate
+      roles:
+        - { id: r-randomized-on-subject, player: ot-randomized-subject, role_name: was randomized on }
+        - { id: r-randomized-on-date, player: ot-randomization-date, role_name: is the randomization date of }
+      readings: ["{0} was randomized on {1}", "{1} is the randomization date of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-randomized-on-subject] }
+        - { type: mandatory, role: r-randomized-on-subject }
+    - id: ft-arm-belongs-to-study
+      name: Arm belongs to Study
+      roles:
+        - { id: r-arm-belongs-arm, player: ot-arm, role_name: belongs to }
+        - { id: r-arm-belongs-study, player: ot-study, role_name: has }
+      readings: ["{0} belongs to {1}", "{1} has {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-arm-belongs-arm] }
+        - { type: mandatory, role: r-arm-belongs-arm }
+    - id: ft-arm-administers-treatment
+      name: Arm administers Treatment
+      definition: The planned treatments on an arm; a combination arm administers more than one and placebo counts as a treatment.
+      roles:
+        - { id: r-arm-administers-arm, player: ot-arm, role_name: administers }
+        - { id: r-arm-administers-treatment, player: ot-treatment, role_name: is administered on }
+      readings: ["{0} administers {1}", "{1} is administered on {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-arm-administers-arm, r-arm-administers-treatment] }
+
+    # ---- visits -----------------------------------------------------------
+    - id: ft-visit-is-of-subject
+      name: Visit is of Subject
+      roles:
+        - { id: r-visit-of-visit, player: ot-visit, role_name: is of }
+        - { id: r-visit-of-subject, player: ot-subject, role_name: attends }
+      readings: ["{0} is of {1}", "{1} attends {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-visit-of-visit] }
+        - { type: mandatory, role: r-visit-of-visit }
+    - id: ft-visit-has-visit-number
+      name: Visit has VisitNumber
+      definition: The protocol visit number; a subject has at most one visit per number, which is the key the SDTM datasets join on (USUBJID, VISITNUM).
+      roles:
+        - { id: r-visit-has-number-visit, player: ot-visit, role_name: has }
+        - { id: r-visit-has-number-number, player: ot-visit-number, role_name: is of }
+      readings: ["{0} has {1}", "{1} is of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-visit-has-number-visit] }
+        - { type: mandatory, role: r-visit-has-number-visit }
+        - { type: external_uniqueness, roles: [r-visit-of-subject, r-visit-has-number-number] }
+    - id: ft-visit-occurred-on-visit-date
+      name: Visit occurred on VisitDate
+      roles:
+        - { id: r-visit-occurred-visit, player: ot-visit, role_name: occurred on }
+        - { id: r-visit-occurred-date, player: ot-visit-date, role_name: is the date of }
+      readings: ["{0} occurred on {1}", "{1} is the date of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-visit-occurred-visit] }
+
+    # ---- adverse events ---------------------------------------------------
+    - id: ft-adverse-event-is-experienced-by-subject
+      name: AdverseEvent is experienced by Subject
+      roles:
+        - { id: r-ae-experienced-ae, player: ot-adverse-event, role_name: is experienced by }
+        - { id: r-ae-experienced-subject, player: ot-subject, role_name: experiences }
+      readings: ["{0} is experienced by {1}", "{1} experiences {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-ae-experienced-ae] }
+        - { type: mandatory, role: r-ae-experienced-ae }
+    - id: ft-adverse-event-has-ae-verbatim-term
+      name: AdverseEvent has AeVerbatimTerm
+      roles:
+        - { id: r-ae-has-verbatim-ae, player: ot-adverse-event, role_name: has }
+        - { id: r-ae-has-verbatim-term, player: ot-ae-verbatim-term, role_name: describes }
+      readings: ["{0} has {1}", "{1} describes {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-ae-has-verbatim-ae] }
+        - { type: mandatory, role: r-ae-has-verbatim-ae }
+    - id: ft-adverse-event-is-coded-to-meddra-preferred-term-code
+      name: AdverseEvent is coded to MeddraPreferredTermCode
+      definition: Medical coding of the verbatim term; every event ought to be coded before database lock, but a newly entered event is not yet.
+      roles:
+        - { id: r-ae-coded-ae, player: ot-adverse-event, role_name: is coded to }
+        - { id: r-ae-coded-code, player: ot-meddra-pt-code, role_name: codes }
+      readings: ["{0} is coded to {1}", "{1} codes {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-ae-coded-ae] }
+        - { type: mandatory, role: r-ae-coded-ae, modality: deontic }
+    - id: ft-adverse-event-has-ae-severity
+      name: AdverseEvent has AeSeverity
+      roles:
+        - { id: r-ae-has-severity-ae, player: ot-adverse-event, role_name: has }
+        - { id: r-ae-has-severity-severity, player: ot-ae-severity, role_name: is the severity of }
+      readings: ["{0} has {1}", "{1} is the severity of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-ae-has-severity-ae] }
+        - { type: mandatory, role: r-ae-has-severity-ae }
+    - id: ft-adverse-event-has-ae-outcome
+      name: AdverseEvent has AeOutcome
+      roles:
+        - { id: r-ae-has-outcome-ae, player: ot-adverse-event, role_name: has }
+        - { id: r-ae-has-outcome-outcome, player: ot-ae-outcome, role_name: is the outcome of }
+      readings: ["{0} has {1}", "{1} is the outcome of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-ae-has-outcome-ae] }
+    - id: ft-adverse-event-started-on-ae-start-date
+      name: AdverseEvent started on AeStartDate
+      roles:
+        - { id: r-ae-started-ae, player: ot-adverse-event, role_name: started on }
+        - { id: r-ae-started-date, player: ot-ae-start-date, role_name: is the start date of }
+      readings: ["{0} started on {1}", "{1} is the start date of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-ae-started-ae] }
+        - { type: mandatory, role: r-ae-started-ae }
+    - id: ft-adverse-event-was-reported-at-visit
+      name: AdverseEvent was reported at Visit
+      roles:
+        - { id: r-ae-reported-at-ae, player: ot-adverse-event, role_name: was reported at }
+        - { id: r-ae-reported-at-visit, player: ot-visit, role_name: records }
+      readings: ["{0} was reported at {1}", "{1} records {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-ae-reported-at-ae] }
+    - id: ft-adverse-event-is-follow-up-of-adverse-event
+      name: AdverseEvent is follow-up of AdverseEvent
+      definition: A worsening or recurrence is recorded as a new event that follows up an earlier one; the chain runs forward in time and can never loop back.
+      roles:
+        - { id: r-ae-follow-up-later, player: ot-adverse-event, role_name: is follow-up of }
+        - { id: r-ae-follow-up-earlier, player: ot-adverse-event, role_name: is followed up by }
+      readings: ["{0} is follow-up of {1}", "{1} is followed up by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-ae-follow-up-later] }
+        - { type: ring, role_1: r-ae-follow-up-later, role_2: r-ae-follow-up-earlier, ring_type: acyclic }
+    - id: ft-serious-adverse-event-was-reported-at-sae-report-datetime
+      name: SeriousAdverseEvent was reported at SaeReportDateTime
+      definition: The site must report every serious adverse event to the sponsor within 24 hours of becoming aware of it; an SAE without a report time is a compliance finding, not a modelling option.
+      roles:
+        - { id: r-sae-reported-sae, player: ot-serious-adverse-event, role_name: was reported at }
+        - { id: r-sae-reported-datetime, player: ot-sae-report-datetime, role_name: is the report time of }
+      readings: ["{0} was reported at {1}", "{1} is the report time of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-sae-reported-sae] }
+        - { type: mandatory, role: r-sae-reported-sae, modality: deontic }
+
+    # ---- concomitant medications -----------------------------------------
+    - id: ft-concomitant-medication-is-taken-by-subject
+      name: ConcomitantMedication is taken by Subject
+      roles:
+        - { id: r-cm-taken-cm, player: ot-concomitant-medication, role_name: is taken by }
+        - { id: r-cm-taken-subject, player: ot-subject, role_name: takes }
+      readings: ["{0} is taken by {1}", "{1} takes {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-cm-taken-cm] }
+        - { type: mandatory, role: r-cm-taken-cm }
+    - id: ft-concomitant-medication-has-cm-name
+      name: ConcomitantMedication has CmName
+      roles:
+        - { id: r-cm-has-name-cm, player: ot-concomitant-medication, role_name: has }
+        - { id: r-cm-has-name-name, player: ot-cm-name, role_name: names }
+      readings: ["{0} has {1}", "{1} names {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-cm-has-name-cm] }
+        - { type: mandatory, role: r-cm-has-name-cm }
+    - id: ft-concomitant-medication-treats-adverse-event
+      name: ConcomitantMedication treats AdverseEvent
+      definition: A medication given because of an adverse event; one medication may treat several events and an event may be treated by several medications.
+      roles:
+        - { id: r-cm-treats-cm, player: ot-concomitant-medication, role_name: treats }
+        - { id: r-cm-treats-ae, player: ot-adverse-event, role_name: is treated with }
+      readings: ["{0} treats {1}", "{1} is treated with {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-cm-treats-cm, r-cm-treats-ae] }
+
+    # ---- exposure (objectified ternary) ----------------------------------
+    - id: ft-subject-receives-dose-of-treatment
+      name: Subject receives Dose of Treatment
+      definition: The exposure record; a subject is on one dose level of each treatment, so subject and treatment determine the dose.
+      roles:
+        - { id: r-subject-receives-subject, player: ot-subject, role_name: receives }
+        - { id: r-subject-receives-dose, player: ot-dose, role_name: is received by }
+        - { id: r-subject-receives-treatment, player: ot-treatment, role_name: is given as }
+      readings: ["{0} receives {1} of {2}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subject-receives-subject, r-subject-receives-treatment] }
+    - id: ft-exposure-started-on-exposure-start-date
+      name: Exposure started on ExposureStartDate
+      roles:
+        - { id: r-exposure-started-exposure, player: ot-exposure, role_name: started on }
+        - { id: r-exposure-started-date, player: ot-exposure-start-date, role_name: is the start date of }
+      readings: ["{0} started on {1}", "{1} is the start date of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-exposure-started-exposure] }
+        - { type: mandatory, role: r-exposure-started-exposure }
+    - id: ft-dose-has-dose-amount
+      name: Dose has DoseAmount
+      roles:
+        - { id: r-dose-has-amount-dose, player: ot-dose, role_name: has }
+        - { id: r-dose-has-amount-amount, player: ot-dose-amount, role_name: is the amount of }
+      readings: ["{0} has {1}", "{1} is the amount of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-dose-has-amount-dose] }
+        - { type: mandatory, role: r-dose-has-amount-dose }
+    - id: ft-dose-has-dose-unit
+      name: Dose has DoseUnit
+      roles:
+        - { id: r-dose-has-unit-dose, player: ot-dose, role_name: has }
+        - { id: r-dose-has-unit-unit, player: ot-dose-unit, role_name: is the unit of }
+      readings: ["{0} has {1}", "{1} is the unit of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-dose-has-unit-dose] }
+        - { type: mandatory, role: r-dose-has-unit-dose }
+
+    # ---- laboratory --------------------------------------------------------
+    - id: ft-lab-result-is-for-subject
+      name: LabResult is for Subject
+      roles:
+        - { id: r-lab-result-for-result, player: ot-lab-result, role_name: is for }
+        - { id: r-lab-result-for-subject, player: ot-subject, role_name: has }
+      readings: ["{0} is for {1}", "{1} has {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-lab-result-for-result] }
+        - { type: mandatory, role: r-lab-result-for-result }
+    - id: ft-lab-result-is-of-lab-test
+      name: LabResult is of LabTest
+      roles:
+        - { id: r-lab-result-of-result, player: ot-lab-result, role_name: is of }
+        - { id: r-lab-result-of-test, player: ot-lab-test, role_name: yields }
+      readings: ["{0} is of {1}", "{1} yields {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-lab-result-of-result] }
+        - { type: mandatory, role: r-lab-result-of-result }
+    - id: ft-lab-result-was-collected-at-visit
+      name: LabResult was collected at Visit
+      roles:
+        - { id: r-lab-result-collected-result, player: ot-lab-result, role_name: was collected at }
+        - { id: r-lab-result-collected-visit, player: ot-visit, role_name: collects }
+      readings: ["{0} was collected at {1}", "{1} collects {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-lab-result-collected-result] }
+        - { type: mandatory, role: r-lab-result-collected-result }
+    - id: ft-lab-result-has-lab-value
+      name: LabResult has LabValue
+      roles:
+        - { id: r-lab-result-has-value-result, player: ot-lab-result, role_name: has }
+        - { id: r-lab-result-has-value-value, player: ot-lab-value, role_name: is the value of }
+      readings: ["{0} has {1}", "{1} is the value of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-lab-result-has-value-result] }
+    - id: ft-lab-result-has-lab-unit
+      name: LabResult has LabUnit
+      roles:
+        - { id: r-lab-result-has-unit-result, player: ot-lab-result, role_name: has }
+        - { id: r-lab-result-has-unit-unit, player: ot-lab-unit, role_name: is the unit of }
+      readings: ["{0} has {1}", "{1} is the unit of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-lab-result-has-unit-result] }
+    - id: ft-lab-result-has-lab-reference-range-indicator
+      name: LabResult has LabReferenceRangeIndicator
+      roles:
+        - { id: r-lab-result-has-indicator-result, player: ot-lab-result, role_name: has }
+        - { id: r-lab-result-has-indicator-indicator, player: ot-lab-range-indicator, role_name: flags }
+      readings: ["{0} has {1}", "{1} flags {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-lab-result-has-indicator-result] }
+
+  subtype_facts:
+    - { id: st-screen-failed-subject, subtype: ot-screen-failed-subject, supertype: ot-subject, is_exclusive: true }
+    - { id: st-enrolled-subject, subtype: ot-enrolled-subject, supertype: ot-subject, is_exclusive: true }
+    - { id: st-randomized-subject, subtype: ot-randomized-subject, supertype: ot-enrolled-subject }
+    - { id: st-serious-adverse-event, subtype: ot-serious-adverse-event, supertype: ot-adverse-event }
+
+  objectified_fact_types:
+    - id: oft-protocol-amendment
+      fact_type: ft-protocol-is-amended-by-amendment-number
+      object_type: ot-protocol-amendment
+    - id: oft-exposure
+      fact_type: ft-subject-receives-dose-of-treatment
+      object_type: ot-exposure
+
+  definitions:
+    - term: Subject
+      definition: In data management, anyone with a USUBJID, screen failures included; to the biostatistician, the analysis population starts at randomization. The two readings disagree on the denominator of every table.
+      context: data-management
+    - term: Visit
+      definition: The protocol-defined assessment window; sites use the word for any contact, which is why unscheduled visits carry decimal numbers.
+      context: subjects
+    - term: Site
+      definition: The investigational location that screens a subject; a subject who transfers keeps the USUBJID and gains a second site, which the composite key does not allow.
+      context: protocol

@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: data-platform-lead
+title: "Funnels stay ordered and the adapter is named"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Confirm that funnels, steps and cohorts are entities and that the
+  step ordering ring is acyclic.
+brief: |
+  You own the warehouse. A funnel step that precedes itself is an
+  infinite query; a dbt import that silently assumed ANSI on duckdb
+  is a model that will not match the tests.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 7 (ring constraints).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: requires_element
+    element:
+      entity: Funnel
+    diagnosis: >-
+      Funnels are the analysis the customers pay for.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.2."
+  - kind: requires_element
+    element:
+      entity: FunnelStep
+    diagnosis: >-
+      Steps carry the ordering; without them a funnel is a name.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4."
+  - kind: requires_element
+    element:
+      entity: Cohort
+    diagnosis: >-
+      Cohorts are how users are grouped for every comparison.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.2."
+  - kind: must_validate
+    diagnosis: >-
+      A structurally invalid model cannot be exported back to dbt.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 5, section 5.3."
+  - kind: forbids_population
+    factType: "FunnelStep precedes FunnelStep"
+    constraint: ring
+    hint: "Precedes is acyclic."
+    diagnosis: >-
+      Without the acyclic constraint a step can precede itself and the
+      funnel query never terminates.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 7, section 7.3."

@@ -1,0 +1,92 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: clinical-data-manager
+title: "The SDTM datasets still merge"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Read a conceptual model produced from the sponsor's clinical database
+  DDL and confirm that every key the SDTM mapping merges on -- USUBJID,
+  the STUDYID/SITEID/SUBJID triple, and VISITNUM within a subject -- is
+  still there with the same parts, and that nothing safety-critical was
+  folded away.
+brief: |
+  You manage clinical data for a sponsor running phase 2 and 3 studies.
+  The clinical database exports one table per SDTM domain: DM, AE, VS,
+  LB, EX and the rest, every row keyed by STUDYID and USUBJID, findings
+  rows also by VISITNUM. Subject numbers are assigned by sites, repeat
+  across sites and across studies, and only the triple picks out a
+  person. A model that treats SUBJID as unique on its own, or loses the
+  visit number, produces datasets that fail the merge at database lock.
+  Check that the model barwise produced from your DDL keeps the keys you
+  merge on.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 5 (reference schemes,
+  external uniqueness), ch. 6 (subtyping).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: must_validate
+    diagnosis: >-
+      If the model does not validate I cannot generate a define.xml from
+      it, and the mapping stays hand-maintained in spreadsheets.
+  - kind: requires_element
+    element:
+      entity: Subject
+    diagnosis: >-
+      DM is the table every domain merges back to; a model without
+      Subject has read something other than my database.
+  - kind: requires_element
+    element:
+      entity: Visit
+    diagnosis: >-
+      VISITNUM is on every findings row. If Visit was folded into
+      Subject, LB and VS collapse to one row per subject and the
+      by-visit listings are gone.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Subject, Site]
+    diagnosis: >-
+      SITEID is one third of the composite key. Without the site on the
+      subject, SUBJID 001 at site 101 and SUBJID 001 at site 102 are the
+      same person.
+  - kind: forbids_population
+    factType: Subject has UniqueSubjectId
+    constraint: internal_uniqueness
+    hint: "USUBJID is unique across every study the sponsor runs; one row per subject in DM."
+    diagnosis: >-
+      A model that lets one USUBJID appear on two subjects has lost the
+      key every SDTM domain merges on.
+  - kind: forbids_population
+    factType: Visit is of Subject
+    constraint: mandatory
+    hint: "USUBJID on every visit row is NOT NULL; a visit belongs to a subject."
+    diagnosis: >-
+      A visit with no subject is an orphan row that never reaches a
+      dataset, and the database has never allowed one.
+  - kind: requires_verbalization
+    sentence: "The combination of Study, Site and SubjectNumber is unique across fact types."
+    hint: "The three-part composite key: SUBJID is unique only within the site and study that issued it."
+    diagnosis: >-
+      If the model says SubjectNumber alone is unique it has believed one
+      site's export rather than the whole database, and the first
+      multi-site merge will double count.
+  - kind: requires_verbalization
+    sentence: "The combination of Subject and VisitNumber is unique across fact types."
+    hint: "One visit per VISITNUM per subject is what LB and VS merge on."
+    diagnosis: >-
+      Two visits with the same number for one subject means the findings
+      merge fans out and every lab value appears twice.
+  - kind: requires_element
+    element:
+      entity: EnrolledSubject
+    diagnosis: >-
+      Screen failures sit in DM with no enrollment date. If the model has
+      no EnrolledSubject, the enrollment date becomes optional on
+      everyone and the query rules for missing dates cannot be written.
+  - kind: requires_verbalization
+    sentence: "It is obligatory that each AdverseEvent is coded to at least one MeddraPreferredTermCode."
+    hint: "Coding is a lock-readiness rule, not a structural one; uncoded events exist until the coder gets to them."
+    diagnosis: >-
+      If coding is modelled as a hard mandatory, no event can be entered
+      before it is coded and the sites cannot enter data; if it is not
+      modelled at all, the lock checklist has nothing to check.

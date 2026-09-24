@@ -1,0 +1,112 @@
+# What the DDL generator needs to make the kernel look like the carrier's
+# Redshift copy of the policy administration schema: lower-case pc_
+# tables, pctl_ typelist tables, and a handful of hand-written tables in
+# the suite's public idiom (bigint id, PublicID, Retired, BeanVersion,
+# CreateTime/UpdateTime). The DISTKEY/SORTKEY clauses appear only on the
+# extra tables: the generator's table_suffix would put them on every
+# table, and the real load only distributes the big ones.
+dialect: redshift
+naming:
+  table_case: lower
+  column_case: lower
+  table_prefix: "pc_"
+  abbreviate: false
+  max_identifier: 127
+idioms:
+  schema_qualified: "public."
+  if_not_exists: false
+  quoting: none
+  lookup_tables: "pctl_"
+  inline_pk: false
+  check_constraints: false
+  engine_suffix: false
+  comments: true
+  missing_semicolon_every: 0
+  extension_tables: false
+types:
+  text: VARCHAR(256)
+  integer: BIGINT
+  decimal: DECIMAL(18,2)
+  money: DECIMAL(18,2)
+  date: DATE
+  datetime: TIMESTAMP
+  id: BIGINT
+extra_tables:
+  - |
+    CREATE TABLE public.pc_job (
+      id BIGINT NOT NULL,
+      publicid VARCHAR(64) NOT NULL,
+      retired BIGINT NOT NULL DEFAULT 0,
+      beanversion INTEGER NOT NULL,
+      createtime TIMESTAMP NOT NULL,
+      updatetime TIMESTAMP,
+      jobnumber VARCHAR(40),
+      subtype BIGINT NOT NULL,
+      policyid BIGINT,
+      closedate TIMESTAMP,
+      PRIMARY KEY (id)
+    )
+    DISTSTYLE KEY
+    DISTKEY (policyid)
+    SORTKEY (id)
+  - |
+    CREATE TABLE public.pc_effdatedfields (
+      id BIGINT NOT NULL,
+      publicid VARCHAR(64) NOT NULL,
+      retired BIGINT NOT NULL DEFAULT 0,
+      fixedid BIGINT NOT NULL,
+      branchid BIGINT NOT NULL,
+      effectivedate TIMESTAMP,
+      expirationdate TIMESTAMP,
+      primarynamedinsuredid BIGINT,
+      PRIMARY KEY (id)
+    )
+    DISTSTYLE KEY
+    DISTKEY (branchid)
+    SORTKEY (branchid, fixedid)
+  - |
+    CREATE TABLE public.pctl_job (
+      id BIGINT NOT NULL,
+      typecode VARCHAR(50) NOT NULL,
+      name VARCHAR(256) NOT NULL,
+      description VARCHAR(1024),
+      retired BIGINT NOT NULL DEFAULT 0,
+      priority INTEGER,
+      PRIMARY KEY (id)
+    )
+    DISTSTYLE ALL
+    SORTKEY (typecode)
+  - |
+    CREATE TABLE public.pc_note (
+      id BIGINT NOT NULL,
+      publicid VARCHAR(64) NOT NULL,
+      retired BIGINT NOT NULL DEFAULT 0,
+      beanversion INTEGER NOT NULL,
+      createtime TIMESTAMP NOT NULL,
+      authorid BIGINT,
+      policyid BIGINT,
+      jobid BIGINT,
+      subject VARCHAR(256),
+      body VARCHAR(65535),
+      confidential BOOLEAN,
+      PRIMARY KEY (id)
+    )
+    DISTSTYLE KEY
+    DISTKEY (policyid)
+    SORTKEY (createtime)
+  - |
+    CREATE TABLE public.pc_policyperiod_snapshot (
+      snapshotdate DATE NOT NULL,
+      policyperiodid BIGINT NOT NULL,
+      policynumber VARCHAR(40),
+      termnumber INTEGER,
+      periodstart TIMESTAMP,
+      periodend TIMESTAMP,
+      status BIGINT,
+      totalpremiumrpt DECIMAL(18,2),
+      loadbatchid BIGINT,
+      PRIMARY KEY (snapshotdate, policyperiodid)
+    )
+    DISTSTYLE KEY
+    DISTKEY (policyperiodid)
+    SORTKEY (snapshotdate, policyperiodid)

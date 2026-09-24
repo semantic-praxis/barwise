@@ -1,7 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@latest/schema.json",
   "ignoreExportsUsedInFile": true,
-  "ignore": ["test-plan/**"],
+  "ignore": ["test-plan/**", "trial/**"],
   "ignoreBinaries": ["gitleaks", "pkill", "shellcheck", "uv"],
   "ignoreDependencies": ["@dprint/json", "@dprint/markdown", "@dprint/typescript"],
   "workspaces": {

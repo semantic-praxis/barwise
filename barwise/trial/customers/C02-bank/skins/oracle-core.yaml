@@ -1,0 +1,77 @@
+# A core-banking schema in the public Oracle idiom: NUMBER(38) keys,
+# NUMBER(1) booleans, VARCHAR2, thirty-character upper-case names, a
+# schema prefix, a synonym and a partitioned table among the hand-written
+# extras. barwise has no Oracle dialect; this artifact grades the refusal.
+dialect: oracle
+naming:
+  table_case: upper
+  column_case: upper
+  abbreviate: true
+  max_identifier: 30
+  abbreviations:
+    Account: ACCT
+    Transaction: TXN
+    Customer: CUST
+    Deposit: DEP
+    GeneralLedger: GL
+    Interest: INT
+    Number: NBR
+    Balance: BAL
+    Currency: CCY
+    Branch: BRCH
+    Product: PROD
+idioms:
+  schema_qualified: "CBS."
+  quoting: none
+  check_constraints: true
+  comments: true
+  named_constraints: true
+types:
+  text: VARCHAR2(255)
+  integer: NUMBER(38)
+  decimal: NUMBER(18,2)
+  date: DATE
+  datetime: TIMESTAMP(6)
+  boolean: NUMBER(1)
+  id: NUMBER(38)
+extra_tables:
+  - |
+    CREATE TABLE CBS.ACCT_BAL_HIST (
+      ACCT_NBR NUMBER(38) NOT NULL,
+      BAL_DT DATE NOT NULL,
+      LEDGER_BAL NUMBER(18,2) DEFAULT 0 NOT NULL,
+      AVAIL_BAL NUMBER(18,2),
+      DORMANT_FLG NUMBER(1) DEFAULT 0 CHECK (DORMANT_FLG IN (0,1)),
+      CONSTRAINT PK_ACCT_BAL_HIST PRIMARY KEY (ACCT_NBR, BAL_DT)
+    ) PARTITION BY RANGE (BAL_DT) (PARTITION P2024 VALUES LESS THAN (TO_DATE('2025-01-01','YYYY-MM-DD')), PARTITION PMAX VALUES LESS THAN (MAXVALUE))
+  - |
+    CREATE TABLE CBS.TXN_LEG (
+      TXN_ID NUMBER(38) NOT NULL,
+      LEG_SEQ NUMBER(3) NOT NULL,
+      GL_ACCT_CD VARCHAR2(12) NOT NULL,
+      DR_CR_IND CHAR(1) NOT NULL CHECK (DR_CR_IND IN ('D','C')),
+      AMT NUMBER(18,2) NOT NULL,
+      CCY_CD CHAR(3) NOT NULL,
+      VALUE_DT DATE,
+      CONSTRAINT PK_TXN_LEG PRIMARY KEY (TXN_ID, LEG_SEQ),
+      CONSTRAINT FK_TXN_LEG_TXN FOREIGN KEY (TXN_ID) REFERENCES CBS.TXN (TXN_ID)
+    )
+  - |
+    CREATE OR REPLACE SYNONYM CBS.ACCOUNTS FOR CBS.DEPACCT
+  - |
+    CREATE TABLE CBS.CUST_KYC (
+      CUST_NBR NUMBER(38) NOT NULL,
+      KYC_STS VARCHAR2(10) DEFAULT 'PENDING' NOT NULL,
+      LAST_REVIEW_DT DATE,
+      PEP_FLG NUMBER(1) DEFAULT 0,
+      RISK_TIER VARCHAR2(6),
+      CONSTRAINT PK_CUST_KYC PRIMARY KEY (CUST_NBR) USING INDEX TABLESPACE CBS_IDX
+    ) TABLESPACE CBS_DATA
+  - |
+    CREATE TABLE CBS.INT_RATE_VERS (
+      PROD_CD VARCHAR2(8) NOT NULL,
+      EFF_DT DATE NOT NULL,
+      REC_DT TIMESTAMP(6) DEFAULT SYSTIMESTAMP NOT NULL,
+      RATE_PCT NUMBER(7,4) NOT NULL,
+      CONSTRAINT PK_INT_RATE_VERS PRIMARY KEY (PROD_CD, EFF_DT, REC_DT)
+    )

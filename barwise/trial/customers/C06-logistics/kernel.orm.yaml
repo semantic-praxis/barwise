@@ -1,0 +1,1593 @@
+orm_version: "1.1"
+model:
+  name: Third-Party Logistics Transport Management
+  object_types:
+    - id: ot-shipper
+      name: Shipper
+      kind: entity
+      reference_mode: shipper_id
+      definition: The party that tenders goods for carriage and is named as consignor on the transport document.
+    - id: ot-shipper-id
+      name: ShipperId
+      kind: value
+      definition: The identifier the platform assigns to a shipper account.
+      data_type:
+        name: text
+        length: 12
+    - id: ot-consignee
+      name: Consignee
+      kind: entity
+      reference_mode: consignee_id
+      definition: The party entitled to take delivery of the goods at destination.
+    - id: ot-consignee-id
+      name: ConsigneeId
+      kind: value
+      definition: The identifier the platform assigns to a consignee account.
+      data_type:
+        name: text
+        length: 12
+    - id: ot-carrier
+      name: Carrier
+      kind: entity
+      reference_mode: scac_code
+      definition: A transport operator that contracts to move shipments, identified by its Standard Carrier Alpha Code.
+    - id: ot-scac-code
+      name: ScacCode
+      kind: value
+      definition: The two-to-four letter Standard Carrier Alpha Code of a carrier.
+      data_type:
+        name: text
+        length: 4
+    - id: ot-shipment
+      name: Shipment
+      kind: entity
+      reference_mode: shipment_number
+      definition: A consignment of goods moved for one shipper from origin to destination under one set of transport instructions.
+    - id: ot-shipment-number
+      name: ShipmentNumber
+      kind: value
+      definition: The number that identifies a shipment on the platform.
+      data_type:
+        name: text
+        length: 16
+    - id: ot-booking
+      name: Booking
+      kind: entity
+      reference_mode: booking_number
+      definition: The contract event in which a shipper books a shipment with a carrier; it objectifies that fact so terms can attach to it.
+    - id: ot-booking-number
+      name: BookingNumber
+      kind: value
+      definition: The carrier-issued number that identifies a booking.
+      data_type:
+        name: text
+        length: 16
+    - id: ot-booking-status
+      name: BookingStatus
+      kind: value
+      definition: Where a booking stands in its life from request to release.
+      value_constraint:
+        values:
+          - requested
+          - confirmed
+          - amended
+          - cancelled
+          - released
+      data_type:
+        name: text
+        length: 12
+    - id: ot-incoterm
+      name: Incoterm
+      kind: value
+      definition: The trade term that fixes where risk and cost pass between seller and buyer.
+      value_constraint:
+        values:
+          - EXW
+          - FCA
+          - CPT
+          - CIP
+          - DAP
+          - DPU
+          - DDP
+          - FAS
+          - FOB
+          - CFR
+          - CIF
+      data_type:
+        name: text
+        length: 3
+    - id: ot-port
+      name: Port
+      kind: entity
+      reference_mode: unlocode
+      definition: A seaport, airport, rail ramp or inland terminal location identified by its UN/LOCODE.
+    - id: ot-un-locode
+      name: UnLocode
+      kind: value
+      definition: The five-character United Nations code for a trade and transport location.
+      data_type:
+        name: text
+        length: 5
+    - id: ot-latitude
+      name: Latitude
+      kind: value
+      definition: The north-south coordinate of a location in decimal degrees, WGS 84.
+      value_constraint:
+        ranges:
+          - min: "-90"
+            max: "90"
+      data_type:
+        name: decimal
+        length: 9
+        scale: 6
+    - id: ot-longitude
+      name: Longitude
+      kind: value
+      definition: The east-west coordinate of a location in decimal degrees, WGS 84.
+      value_constraint:
+        ranges:
+          - min: "-180"
+            max: "180"
+      data_type:
+        name: decimal
+        length: 10
+        scale: 6
+    - id: ot-terminal
+      name: Terminal
+      kind: entity
+      reference_mode: terminal_code
+      definition: A container handling facility within a port where gate moves are recorded.
+    - id: ot-terminal-code
+      name: TerminalCode
+      kind: value
+      definition: The code that identifies a terminal within its port.
+      data_type:
+        name: text
+        length: 8
+    - id: ot-vehicle
+      name: Vehicle
+      kind: entity
+      reference_mode: vehicle_id
+      definition: A vessel, truck, aircraft or railcar that carries containers on a leg, identified by its IMO number or registration.
+    - id: ot-vehicle-id
+      name: VehicleId
+      kind: value
+      definition: The IMO number, registration plate or tail number that identifies a vehicle.
+      data_type:
+        name: text
+        length: 16
+    - id: ot-leg
+      name: Leg
+      kind: entity
+      reference_mode: leg_id
+      definition: One segment of a route from an origin port to a destination port by one mode of transport.
+    - id: ot-leg-id
+      name: LegId
+      kind: value
+      definition: The identifier the platform assigns to a route leg.
+      data_type:
+        name: text
+        length: 16
+    - id: ot-transport-mode
+      name: TransportMode
+      kind: value
+      definition: The mode of transport a leg is moved by.
+      value_constraint:
+        values:
+          - sea
+          - rail
+          - road
+          - air
+          - barge
+      data_type:
+        name: text
+        length: 6
+    - id: ot-voyage
+      name: Voyage
+      kind: entity
+      reference_mode: voyage_number
+      definition: One scheduled sailing of a vessel along a rotation of ports, identified by the carrier's voyage number.
+    - id: ot-voyage-number
+      name: VoyageNumber
+      kind: value
+      definition: The carrier-issued number that identifies a voyage.
+      data_type:
+        name: text
+        length: 10
+    - id: ot-container
+      name: Container
+      kind: entity
+      reference_mode: container_number
+      definition: A reusable intermodal box identified by an ISO 6346 container number made of an owner code, a serial number and a check digit.
+    - id: ot-container-number
+      name: ContainerNumber
+      kind: value
+      definition: The eleven-character ISO 6346 number printed on a container.
+      data_type:
+        name: text
+        length: 11
+    - id: ot-owner-code
+      name: OwnerCode
+      kind: value
+      definition: The four-letter prefix of a container number that names the owner or operator and ends in U, J or Z.
+      data_type:
+        name: text
+        length: 4
+    - id: ot-serial-number
+      name: SerialNumber
+      kind: value
+      definition: The six-digit serial that the owner assigns within its owner code.
+      data_type:
+        name: text
+        length: 6
+    - id: ot-check-digit
+      name: CheckDigit
+      kind: value
+      definition: The single digit computed from the owner code and serial that validates a container number.
+      value_constraint:
+        ranges:
+          - min: "0"
+            max: "9"
+      data_type:
+        name: integer
+    - id: ot-container-size-type
+      name: ContainerSizeType
+      kind: value
+      definition: The ISO 6346 size and type code of a container.
+      value_constraint:
+        values:
+          - 22G1
+          - 42G1
+          - 45G1
+          - 22R1
+          - 42R1
+          - 45R1
+          - 22U1
+          - 42U1
+          - 22P1
+          - 42P1
+          - 22T1
+          - 42T1
+          - L5G1
+          - 22V1
+      data_type:
+        name: text
+        length: 4
+    - id: ot-gross-weight
+      name: GrossWeight
+      kind: value
+      definition: The verified gross mass of a packed container in kilograms.
+      data_type:
+        name: decimal
+        length: 10
+        scale: 2
+    - id: ot-seal
+      name: Seal
+      kind: entity
+      reference_mode: seal_number
+      definition: A tamper-evident device fixed to a container door and recorded at stuffing.
+    - id: ot-seal-number
+      name: SealNumber
+      kind: value
+      definition: The number stamped on a seal.
+      data_type:
+        name: text
+        length: 20
+    - id: ot-container-movement
+      name: ContainerMovement
+      kind: entity
+      reference_mode: movement_id
+      definition: One placement of a container on one leg of one voyage in sequence, the unit that terminal and vessel planners reconcile.
+    - id: ot-movement-id
+      name: MovementId
+      kind: value
+      definition: The surrogate the platform assigns to a container movement.
+      data_type:
+        name: auto_counter
+    - id: ot-sequence-number
+      name: SequenceNumber
+      kind: value
+      definition: The order of a container's movements within a voyage leg, starting at 1.
+      value_constraint:
+        ranges:
+          - min: "1"
+      data_type:
+        name: integer
+    - id: ot-commodity
+      name: Commodity
+      kind: entity
+      reference_mode: hs_code
+      definition: A category of goods identified by its Harmonized System code.
+    - id: ot-hs-code
+      name: HsCode
+      kind: value
+      definition: The six-digit Harmonized System code of a commodity.
+      data_type:
+        name: text
+        length: 6
+    - id: ot-hazard-class
+      name: HazardClass
+      kind: entity
+      reference_mode: un_number
+      definition: A dangerous-goods classification for a commodity, identified by its UN number.
+    - id: ot-un-number
+      name: UnNumber
+      kind: value
+      definition: The four-digit United Nations number that identifies a hazardous substance or article.
+      value_constraint:
+        values:
+          - UN0004
+          - UN0012
+          - UN0027
+          - UN0081
+          - UN0131
+          - UN0209
+          - UN0335
+          - UN0336
+          - UN1001
+          - UN1005
+          - UN1006
+          - UN1011
+          - UN1017
+          - UN1044
+          - UN1049
+          - UN1066
+          - UN1072
+          - UN1075
+          - UN1090
+          - UN1170
+          - UN1202
+          - UN1203
+          - UN1219
+          - UN1263
+          - UN1267
+          - UN1268
+          - UN1294
+          - UN1301
+          - UN1325
+          - UN1350
+          - UN1381
+          - UN1402
+          - UN1428
+          - UN1479
+          - UN1495
+          - UN1547
+          - UN1593
+          - UN1648
+          - UN1660
+          - UN1710
+          - UN1760
+          - UN1789
+          - UN1791
+          - UN1805
+          - UN1814
+          - UN1823
+          - UN1830
+          - UN1863
+          - UN1866
+          - UN1888
+          - UN1942
+          - UN1950
+          - UN1965
+          - UN1977
+          - UN1993
+          - UN2014
+          - UN2031
+          - UN2067
+          - UN2211
+          - UN2215
+          - UN2448
+          - UN2735
+          - UN2794
+          - UN2796
+          - UN2814
+          - UN2900
+          - UN2910
+          - UN3077
+          - UN3082
+          - UN3090
+          - UN3091
+          - UN3166
+          - UN3171
+          - UN3245
+          - UN3257
+          - UN3268
+          - UN3480
+          - UN3481
+      data_type:
+        name: text
+        length: 6
+    - id: ot-imdg-class
+      name: ImdgClass
+      kind: value
+      definition: The IMDG Code class or division a hazard class falls in.
+      value_constraint:
+        values:
+          - "1.1"
+          - "1.2"
+          - "1.3"
+          - "1.4"
+          - "1.5"
+          - "1.6"
+          - "2.1"
+          - "2.2"
+          - "2.3"
+          - "3"
+          - "4.1"
+          - "4.2"
+          - "4.3"
+          - "5.1"
+          - "5.2"
+          - "6.1"
+          - "6.2"
+          - "7"
+          - "8"
+          - "9"
+      data_type:
+        name: text
+        length: 3
+    - id: ot-customs-declaration
+      name: CustomsDeclaration
+      kind: entity
+      reference_mode: declaration_number
+      definition: A filing with a customs authority that declares the goods, value and origin of a shipment for clearance.
+    - id: ot-declaration-number
+      name: DeclarationNumber
+      kind: value
+      definition: The reference the customs authority assigns to a declaration.
+      data_type:
+        name: text
+        length: 18
+    - id: ot-declaration-type
+      name: DeclarationType
+      kind: value
+      definition: Whether a declaration clears goods into, out of, or through a customs territory.
+      value_constraint:
+        values:
+          - import
+          - export
+          - transit
+      data_type:
+        name: text
+        length: 7
+    - id: ot-filing-deadline
+      name: FilingDeadline
+      kind: value
+      definition: The instant by which a declaration must be lodged with the customs authority.
+      data_type:
+        name: datetime
+    - id: ot-filed-at
+      name: FiledAt
+      kind: value
+      definition: The instant a declaration was lodged with the customs authority.
+      data_type:
+        name: datetime
+    - id: ot-event
+      name: Event
+      kind: entity
+      reference_mode: event_id
+      definition: A timestamped occurrence recorded against a shipment, container or vehicle.
+    - id: ot-event-id
+      name: EventId
+      kind: value
+      definition: The identifier the platform assigns to an event.
+      data_type:
+        name: uuid
+    - id: ot-event-timestamp
+      name: EventTimestamp
+      kind: value
+      definition: The instant at which an event occurred, in UTC.
+      data_type:
+        name: timestamp
+    - id: ot-shipment-event
+      name: ShipmentEvent
+      kind: entity
+      reference_mode: event_id
+      definition: An event that changes the status of a shipment, such as a departure or an arrival.
+    - id: ot-scan-event
+      name: ScanEvent
+      kind: entity
+      reference_mode: event_id
+      definition: A shipment event captured by scanning a container or package identifier rather than keyed by hand.
+    - id: ot-gate-scan
+      name: GateScan
+      kind: entity
+      reference_mode: event_id
+      definition: A scan event recorded when a container passes a terminal gate in or out.
+    - id: ot-gate-direction
+      name: GateDirection
+      kind: value
+      definition: Whether a gate scan records the container entering or leaving the terminal.
+      value_constraint:
+        values:
+          - gate in
+          - gate out
+      data_type:
+        name: text
+        length: 8
+  fact_types:
+    - id: ft-shipper-has-shipper-id
+      name: Shipper has ShipperId
+      roles:
+        - id: r-shipper-has-shipper-id-shipper
+          player: ot-shipper
+          role_name: has
+        - id: r-shipper-has-shipper-id-shipper-id
+          player: ot-shipper-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-shipper-has-shipper-id-shipper
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-shipper-has-shipper-id-shipper-id
+        - type: mandatory
+          role: r-shipper-has-shipper-id-shipper
+    - id: ft-consignee-has-consignee-id
+      name: Consignee has ConsigneeId
+      roles:
+        - id: r-consignee-has-consignee-id-consignee
+          player: ot-consignee
+          role_name: has
+        - id: r-consignee-has-consignee-id-consignee-id
+          player: ot-consignee-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-consignee-has-consignee-id-consignee
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-consignee-has-consignee-id-consignee-id
+        - type: mandatory
+          role: r-consignee-has-consignee-id-consignee
+    - id: ft-carrier-has-scac-code
+      name: Carrier has ScacCode
+      roles:
+        - id: r-carrier-has-scac-code-carrier
+          player: ot-carrier
+          role_name: has
+        - id: r-carrier-has-scac-code-scac-code
+          player: ot-scac-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-carrier-has-scac-code-carrier
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-carrier-has-scac-code-scac-code
+        - type: mandatory
+          role: r-carrier-has-scac-code-carrier
+    - id: ft-shipment-has-shipment-number
+      name: Shipment has ShipmentNumber
+      roles:
+        - id: r-shipment-has-shipment-number-shipment
+          player: ot-shipment
+          role_name: has
+        - id: r-shipment-has-shipment-number-shipment-number
+          player: ot-shipment-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-shipment-has-shipment-number-shipment
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-shipment-has-shipment-number-shipment-number
+        - type: mandatory
+          role: r-shipment-has-shipment-number-shipment
+    - id: ft-booking-has-booking-number
+      name: Booking has BookingNumber
+      roles:
+        - id: r-booking-has-booking-number-booking
+          player: ot-booking
+          role_name: has
+        - id: r-booking-has-booking-number-booking-number
+          player: ot-booking-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-booking-has-booking-number-booking
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-booking-has-booking-number-booking-number
+        - type: mandatory
+          role: r-booking-has-booking-number-booking
+    - id: ft-shipper-books-shipment-with-carrier
+      name: Shipper books Shipment with Carrier
+      definition: The act of contracting a carrier to move a shipment; each shipment is booked once, by one shipper, with one carrier.
+      roles:
+        - id: r-shipper-books-shipment-with-carrier-shipper
+          player: ot-shipper
+          role_name: books
+        - id: r-shipper-books-shipment-with-carrier-shipment
+          player: ot-shipment
+          role_name: is booked by
+        - id: r-shipper-books-shipment-with-carrier-carrier
+          player: ot-carrier
+          role_name: carries under
+      readings:
+        - "{0} books {1} with {2}"
+        - "{1} is booked by {0} with {2}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-shipper-books-shipment-with-carrier-shipment
+    - id: ft-booking-has-booking-status
+      name: Booking has BookingStatus
+      roles:
+        - id: r-booking-has-booking-status-booking
+          player: ot-booking
+          role_name: has
+        - id: r-booking-has-booking-status-booking-status
+          player: ot-booking-status
+          role_name: is status of
+      readings:
+        - "{0} has {1}"
+        - "{1} is status of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-booking-has-booking-status-booking
+        - type: mandatory
+          role: r-booking-has-booking-status-booking
+    - id: ft-booking-has-incoterm
+      name: Booking has Incoterm
+      roles:
+        - id: r-booking-has-incoterm-booking
+          player: ot-booking
+          role_name: has
+        - id: r-booking-has-incoterm-incoterm
+          player: ot-incoterm
+          role_name: governs
+      readings:
+        - "{0} has {1}"
+        - "{1} governs {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-booking-has-incoterm-booking
+    - id: ft-shipment-is-consigned-to-consignee
+      name: Shipment is consigned to Consignee
+      roles:
+        - id: r-shipment-is-consigned-to-consignee-shipment
+          player: ot-shipment
+          role_name: is consigned to
+        - id: r-shipment-is-consigned-to-consignee-consignee
+          player: ot-consignee
+          role_name: receives
+      readings:
+        - "{0} is consigned to {1}"
+        - "{1} receives {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-shipment-is-consigned-to-consignee-shipment
+        - type: mandatory
+          role: r-shipment-is-consigned-to-consignee-shipment
+    - id: ft-port-has-un-locode
+      name: Port has UnLocode
+      roles:
+        - id: r-port-has-un-locode-port
+          player: ot-port
+          role_name: has
+        - id: r-port-has-un-locode-un-locode
+          player: ot-un-locode
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-port-has-un-locode-port
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-port-has-un-locode-un-locode
+        - type: mandatory
+          role: r-port-has-un-locode-port
+    - id: ft-port-has-latitude
+      name: Port has Latitude
+      roles:
+        - id: r-port-has-latitude-port
+          player: ot-port
+          role_name: has
+        - id: r-port-has-latitude-latitude
+          player: ot-latitude
+          role_name: locates
+      readings:
+        - "{0} has {1}"
+        - "{1} locates {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-port-has-latitude-port
+        - type: mandatory
+          role: r-port-has-latitude-port
+    - id: ft-port-has-longitude
+      name: Port has Longitude
+      roles:
+        - id: r-port-has-longitude-port
+          player: ot-port
+          role_name: has
+        - id: r-port-has-longitude-longitude
+          player: ot-longitude
+          role_name: locates
+      readings:
+        - "{0} has {1}"
+        - "{1} locates {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-port-has-longitude-port
+        - type: mandatory
+          role: r-port-has-longitude-port
+    - id: ft-port-transships-to-port
+      name: Port transships to Port
+      definition: "A transshipment link: cargo discharged at the first port is routinely reloaded for the second; a port never transships to itself."
+      roles:
+        - id: r-port-transships-to-port-port
+          player: ot-port
+          role_name: transships to
+        - id: r-port-transships-to-port-port-2
+          player: ot-port
+          role_name: receives transshipment from
+      readings:
+        - "{0} transships to {1}"
+        - "{1} receives transshipment from {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-port-transships-to-port-port
+            - r-port-transships-to-port-port-2
+        - type: ring
+          role_1: r-port-transships-to-port-port
+          role_2: r-port-transships-to-port-port-2
+          ring_type: irreflexive
+    - id: ft-terminal-has-terminal-code
+      name: Terminal has TerminalCode
+      roles:
+        - id: r-terminal-has-terminal-code-terminal
+          player: ot-terminal
+          role_name: has
+        - id: r-terminal-has-terminal-code-terminal-code
+          player: ot-terminal-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-terminal-has-terminal-code-terminal
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-terminal-has-terminal-code-terminal-code
+        - type: mandatory
+          role: r-terminal-has-terminal-code-terminal
+    - id: ft-terminal-is-in-port
+      name: Terminal is in Port
+      roles:
+        - id: r-terminal-is-in-port-terminal
+          player: ot-terminal
+          role_name: is in
+        - id: r-terminal-is-in-port-port
+          player: ot-port
+          role_name: has
+      readings:
+        - "{0} is in {1}"
+        - "{1} has {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-terminal-is-in-port-terminal
+        - type: mandatory
+          role: r-terminal-is-in-port-terminal
+    - id: ft-vehicle-has-vehicle-id
+      name: Vehicle has VehicleId
+      roles:
+        - id: r-vehicle-has-vehicle-id-vehicle
+          player: ot-vehicle
+          role_name: has
+        - id: r-vehicle-has-vehicle-id-vehicle-id
+          player: ot-vehicle-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-vehicle-has-vehicle-id-vehicle
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-vehicle-has-vehicle-id-vehicle-id
+        - type: mandatory
+          role: r-vehicle-has-vehicle-id-vehicle
+    - id: ft-leg-has-leg-id
+      name: Leg has LegId
+      roles:
+        - id: r-leg-has-leg-id-leg
+          player: ot-leg
+          role_name: has
+        - id: r-leg-has-leg-id-leg-id
+          player: ot-leg-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-leg-has-leg-id-leg
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-leg-has-leg-id-leg-id
+        - type: mandatory
+          role: r-leg-has-leg-id-leg
+    - id: ft-leg-departs-from-port
+      name: Leg departs from Port
+      roles:
+        - id: r-leg-departs-from-port-leg
+          player: ot-leg
+          role_name: departs from
+        - id: r-leg-departs-from-port-port
+          player: ot-port
+          role_name: is origin of
+      readings:
+        - "{0} departs from {1}"
+        - "{1} is origin of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-leg-departs-from-port-leg
+        - type: mandatory
+          role: r-leg-departs-from-port-leg
+    - id: ft-leg-arrives-at-port
+      name: Leg arrives at Port
+      roles:
+        - id: r-leg-arrives-at-port-leg
+          player: ot-leg
+          role_name: arrives at
+        - id: r-leg-arrives-at-port-port
+          player: ot-port
+          role_name: is destination of
+      readings:
+        - "{0} arrives at {1}"
+        - "{1} is destination of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-leg-arrives-at-port-leg
+        - type: mandatory
+          role: r-leg-arrives-at-port-leg
+    - id: ft-leg-has-transport-mode
+      name: Leg has TransportMode
+      roles:
+        - id: r-leg-has-transport-mode-leg
+          player: ot-leg
+          role_name: has
+        - id: r-leg-has-transport-mode-transport-mode
+          player: ot-transport-mode
+          role_name: moves
+      readings:
+        - "{0} has {1}"
+        - "{1} moves {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-leg-has-transport-mode-leg
+        - type: mandatory
+          role: r-leg-has-transport-mode-leg
+    - id: ft-shipment-travels-leg-on-vehicle
+      name: Shipment travels Leg on Vehicle
+      definition: "The routing of a shipment: for each leg it travels, the one vehicle that carries it on that leg."
+      roles:
+        - id: r-shipment-travels-leg-on-vehicle-shipment
+          player: ot-shipment
+          role_name: travels
+        - id: r-shipment-travels-leg-on-vehicle-leg
+          player: ot-leg
+          role_name: is travelled by
+        - id: r-shipment-travels-leg-on-vehicle-vehicle
+          player: ot-vehicle
+          role_name: carries
+      readings:
+        - "{0} travels {1} on {2}"
+        - "{2} carries {0} on {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-shipment-travels-leg-on-vehicle-shipment
+            - r-shipment-travels-leg-on-vehicle-leg
+    - id: ft-voyage-has-voyage-number
+      name: Voyage has VoyageNumber
+      roles:
+        - id: r-voyage-has-voyage-number-voyage
+          player: ot-voyage
+          role_name: has
+        - id: r-voyage-has-voyage-number-voyage-number
+          player: ot-voyage-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-voyage-has-voyage-number-voyage
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-voyage-has-voyage-number-voyage-number
+        - type: mandatory
+          role: r-voyage-has-voyage-number-voyage
+    - id: ft-voyage-is-operated-by-carrier
+      name: Voyage is operated by Carrier
+      roles:
+        - id: r-voyage-is-operated-by-carrier-voyage
+          player: ot-voyage
+          role_name: is operated by
+        - id: r-voyage-is-operated-by-carrier-carrier
+          player: ot-carrier
+          role_name: operates
+      readings:
+        - "{0} is operated by {1}"
+        - "{1} operates {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-voyage-is-operated-by-carrier-voyage
+        - type: mandatory
+          role: r-voyage-is-operated-by-carrier-voyage
+    - id: ft-voyage-is-sailed-by-vehicle
+      name: Voyage is sailed by Vehicle
+      roles:
+        - id: r-voyage-is-sailed-by-vehicle-voyage
+          player: ot-voyage
+          role_name: is sailed by
+        - id: r-voyage-is-sailed-by-vehicle-vehicle
+          player: ot-vehicle
+          role_name: sails
+      readings:
+        - "{0} is sailed by {1}"
+        - "{1} sails {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-voyage-is-sailed-by-vehicle-voyage
+        - type: mandatory
+          role: r-voyage-is-sailed-by-vehicle-voyage
+    - id: ft-voyage-calls-at-port
+      name: Voyage calls at Port
+      definition: The port rotation of a voyage; a voyage calls at at least two ports.
+      roles:
+        - id: r-voyage-calls-at-port-voyage
+          player: ot-voyage
+          role_name: calls at
+        - id: r-voyage-calls-at-port-port
+          player: ot-port
+          role_name: is called at by
+      readings:
+        - "{0} calls at {1}"
+        - "{1} is called at by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-voyage-calls-at-port-voyage
+            - r-voyage-calls-at-port-port
+        - type: mandatory
+          role: r-voyage-calls-at-port-voyage
+        - type: frequency
+          roles:
+            - r-voyage-calls-at-port-voyage
+          min: 2
+          max: unbounded
+    - id: ft-container-has-container-number
+      name: Container has ContainerNumber
+      roles:
+        - id: r-container-has-container-number-container
+          player: ot-container
+          role_name: has
+        - id: r-container-has-container-number-container-number
+          player: ot-container-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-container-has-container-number-container
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-container-has-container-number-container-number
+        - type: mandatory
+          role: r-container-has-container-number-container
+    - id: ft-seal-has-seal-number
+      name: Seal has SealNumber
+      roles:
+        - id: r-seal-has-seal-number-seal
+          player: ot-seal
+          role_name: has
+        - id: r-seal-has-seal-number-seal-number
+          player: ot-seal-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-seal-has-seal-number-seal
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-seal-has-seal-number-seal-number
+        - type: mandatory
+          role: r-seal-has-seal-number-seal
+    - id: ft-container-has-owner-code
+      name: Container has OwnerCode
+      roles:
+        - id: r-container-has-owner-code-container
+          player: ot-container
+          role_name: has
+        - id: r-container-has-owner-code-owner-code
+          player: ot-owner-code
+          role_name: prefixes
+      readings:
+        - "{0} has {1}"
+        - "{1} prefixes {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-container-has-owner-code-container
+        - type: mandatory
+          role: r-container-has-owner-code-container
+    - id: ft-container-has-serial-number
+      name: Container has SerialNumber
+      roles:
+        - id: r-container-has-serial-number-container
+          player: ot-container
+          role_name: has
+        - id: r-container-has-serial-number-serial-number
+          player: ot-serial-number
+          role_name: is serial of
+      readings:
+        - "{0} has {1}"
+        - "{1} is serial of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-container-has-serial-number-container
+        - type: mandatory
+          role: r-container-has-serial-number-container
+    - id: ft-container-has-check-digit
+      name: Container has CheckDigit
+      roles:
+        - id: r-container-has-check-digit-container
+          player: ot-container
+          role_name: has
+        - id: r-container-has-check-digit-check-digit
+          player: ot-check-digit
+          role_name: validates
+      readings:
+        - "{0} has {1}"
+        - "{1} validates {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-container-has-check-digit-container
+        - type: mandatory
+          role: r-container-has-check-digit-container
+        - type: external_uniqueness
+          id: euc-container-iso6346
+          roles:
+            - r-container-has-owner-code-owner-code
+            - r-container-has-serial-number-serial-number
+            - r-container-has-check-digit-check-digit
+    - id: ft-container-has-container-size-type
+      name: Container has ContainerSizeType
+      roles:
+        - id: r-container-has-container-size-type-container
+          player: ot-container
+          role_name: has
+        - id: r-container-has-container-size-type-container-size-type
+          player: ot-container-size-type
+          role_name: sizes
+      readings:
+        - "{0} has {1}"
+        - "{1} sizes {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-container-has-container-size-type-container
+        - type: mandatory
+          role: r-container-has-container-size-type-container
+    - id: ft-container-has-gross-weight
+      name: Container has GrossWeight
+      roles:
+        - id: r-container-has-gross-weight-container
+          player: ot-container
+          role_name: has
+        - id: r-container-has-gross-weight-gross-weight
+          player: ot-gross-weight
+          role_name: is mass of
+      readings:
+        - "{0} has {1}"
+        - "{1} is mass of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-container-has-gross-weight-container
+    - id: ft-container-is-sealed-with-seal
+      name: Container is sealed with Seal
+      roles:
+        - id: r-container-is-sealed-with-seal-container
+          player: ot-container
+          role_name: is sealed with
+        - id: r-container-is-sealed-with-seal-seal
+          player: ot-seal
+          role_name: seals
+      readings:
+        - "{0} is sealed with {1}"
+        - "{1} seals {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-container-is-sealed-with-seal-seal
+    - id: ft-shipment-is-loaded-in-container
+      name: Shipment is loaded in Container
+      definition: Which containers carry a shipment; a consolidated container carries several shipments and a large shipment fills several containers.
+      roles:
+        - id: r-shipment-is-loaded-in-container-shipment
+          player: ot-shipment
+          role_name: is loaded in
+        - id: r-shipment-is-loaded-in-container-container
+          player: ot-container
+          role_name: carries
+      readings:
+        - "{0} is loaded in {1}"
+        - "{1} carries {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-shipment-is-loaded-in-container-shipment
+            - r-shipment-is-loaded-in-container-container
+    - id: ft-container-movement-has-movement-id
+      name: ContainerMovement has MovementId
+      roles:
+        - id: r-container-movement-has-movement-id-container-movement
+          player: ot-container-movement
+          role_name: has
+        - id: r-container-movement-has-movement-id-movement-id
+          player: ot-movement-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-container-movement-has-movement-id-container-movement
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-container-movement-has-movement-id-movement-id
+        - type: mandatory
+          role: r-container-movement-has-movement-id-container-movement
+    - id: ft-container-movement-moves-container
+      name: ContainerMovement moves Container
+      roles:
+        - id: r-container-movement-moves-container-container-movement
+          player: ot-container-movement
+          role_name: moves
+        - id: r-container-movement-moves-container-container
+          player: ot-container
+          role_name: is moved by
+      readings:
+        - "{0} moves {1}"
+        - "{1} is moved by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-container-movement-moves-container-container-movement
+        - type: mandatory
+          role: r-container-movement-moves-container-container-movement
+    - id: ft-container-movement-is-on-voyage
+      name: ContainerMovement is on Voyage
+      roles:
+        - id: r-container-movement-is-on-voyage-container-movement
+          player: ot-container-movement
+          role_name: is on
+        - id: r-container-movement-is-on-voyage-voyage
+          player: ot-voyage
+          role_name: carries
+      readings:
+        - "{0} is on {1}"
+        - "{1} carries {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-container-movement-is-on-voyage-container-movement
+        - type: mandatory
+          role: r-container-movement-is-on-voyage-container-movement
+    - id: ft-container-movement-is-on-leg
+      name: ContainerMovement is on Leg
+      roles:
+        - id: r-container-movement-is-on-leg-container-movement
+          player: ot-container-movement
+          role_name: is on
+        - id: r-container-movement-is-on-leg-leg
+          player: ot-leg
+          role_name: carries
+      readings:
+        - "{0} is on {1}"
+        - "{1} carries {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-container-movement-is-on-leg-container-movement
+        - type: mandatory
+          role: r-container-movement-is-on-leg-container-movement
+    - id: ft-container-movement-has-sequence-number
+      name: ContainerMovement has SequenceNumber
+      roles:
+        - id: r-container-movement-has-sequence-number-container-movement
+          player: ot-container-movement
+          role_name: has
+        - id: r-container-movement-has-sequence-number-sequence-number
+          player: ot-sequence-number
+          role_name: orders
+      readings:
+        - "{0} has {1}"
+        - "{1} orders {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-container-movement-has-sequence-number-container-movement
+        - type: mandatory
+          role: r-container-movement-has-sequence-number-container-movement
+        - type: external_uniqueness
+          id: euc-container-movement
+          roles:
+            - r-container-movement-moves-container-container
+            - r-container-movement-is-on-voyage-voyage
+            - r-container-movement-is-on-leg-leg
+            - r-container-movement-has-sequence-number-sequence-number
+    - id: ft-commodity-has-hs-code
+      name: Commodity has HsCode
+      roles:
+        - id: r-commodity-has-hs-code-commodity
+          player: ot-commodity
+          role_name: has
+        - id: r-commodity-has-hs-code-hs-code
+          player: ot-hs-code
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-commodity-has-hs-code-commodity
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-commodity-has-hs-code-hs-code
+        - type: mandatory
+          role: r-commodity-has-hs-code-commodity
+    - id: ft-hazard-class-has-un-number
+      name: HazardClass has UnNumber
+      roles:
+        - id: r-hazard-class-has-un-number-hazard-class
+          player: ot-hazard-class
+          role_name: has
+        - id: r-hazard-class-has-un-number-un-number
+          player: ot-un-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-hazard-class-has-un-number-hazard-class
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-hazard-class-has-un-number-un-number
+        - type: mandatory
+          role: r-hazard-class-has-un-number-hazard-class
+    - id: ft-shipment-contains-commodity
+      name: Shipment contains Commodity
+      roles:
+        - id: r-shipment-contains-commodity-shipment
+          player: ot-shipment
+          role_name: contains
+        - id: r-shipment-contains-commodity-commodity
+          player: ot-commodity
+          role_name: is carried in
+      readings:
+        - "{0} contains {1}"
+        - "{1} is carried in {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-shipment-contains-commodity-shipment
+            - r-shipment-contains-commodity-commodity
+        - type: mandatory
+          role: r-shipment-contains-commodity-shipment
+    - id: ft-commodity-is-classed-as-hazard-class
+      name: Commodity is classed as HazardClass
+      roles:
+        - id: r-commodity-is-classed-as-hazard-class-commodity
+          player: ot-commodity
+          role_name: is classed as
+        - id: r-commodity-is-classed-as-hazard-class-hazard-class
+          player: ot-hazard-class
+          role_name: classes
+      readings:
+        - "{0} is classed as {1}"
+        - "{1} classes {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-commodity-is-classed-as-hazard-class-commodity
+    - id: ft-hazard-class-has-imdg-class
+      name: HazardClass has ImdgClass
+      roles:
+        - id: r-hazard-class-has-imdg-class-hazard-class
+          player: ot-hazard-class
+          role_name: has
+        - id: r-hazard-class-has-imdg-class-imdg-class
+          player: ot-imdg-class
+          role_name: groups
+      readings:
+        - "{0} has {1}"
+        - "{1} groups {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-hazard-class-has-imdg-class-hazard-class
+        - type: mandatory
+          role: r-hazard-class-has-imdg-class-hazard-class
+    - id: ft-customs-declaration-has-declaration-number
+      name: CustomsDeclaration has DeclarationNumber
+      roles:
+        - id: r-customs-declaration-has-declaration-number-customs-declaration
+          player: ot-customs-declaration
+          role_name: has
+        - id: r-customs-declaration-has-declaration-number-declaration-number
+          player: ot-declaration-number
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-customs-declaration-has-declaration-number-customs-declaration
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-customs-declaration-has-declaration-number-declaration-number
+        - type: mandatory
+          role: r-customs-declaration-has-declaration-number-customs-declaration
+    - id: ft-customs-declaration-covers-shipment
+      name: CustomsDeclaration covers Shipment
+      roles:
+        - id: r-customs-declaration-covers-shipment-customs-declaration
+          player: ot-customs-declaration
+          role_name: covers
+        - id: r-customs-declaration-covers-shipment-shipment
+          player: ot-shipment
+          role_name: is declared by
+      readings:
+        - "{0} covers {1}"
+        - "{1} is declared by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-customs-declaration-covers-shipment-customs-declaration
+        - type: mandatory
+          role: r-customs-declaration-covers-shipment-customs-declaration
+    - id: ft-customs-declaration-has-declaration-type
+      name: CustomsDeclaration has DeclarationType
+      roles:
+        - id: r-customs-declaration-has-declaration-type-customs-declaration
+          player: ot-customs-declaration
+          role_name: has
+        - id: r-customs-declaration-has-declaration-type-declaration-type
+          player: ot-declaration-type
+          role_name: types
+      readings:
+        - "{0} has {1}"
+        - "{1} types {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-customs-declaration-has-declaration-type-customs-declaration
+        - type: mandatory
+          role: r-customs-declaration-has-declaration-type-customs-declaration
+    - id: ft-customs-declaration-is-due-by-filing-deadline-and-filed-at-filed-at
+      name: CustomsDeclaration is due by FilingDeadline and filed at FiledAt
+      definition: A declaration should be lodged no later than its deadline; the rule is deontic because late filings happen and are penalised, not rejected.
+      roles:
+        - id: r-customs-declaration-is-due-by-filing-deadline-and-filed-at-filed-at-customs-declaration
+          player: ot-customs-declaration
+          role_name: is due by
+        - id: r-customs-declaration-is-due-by-filing-deadline-and-filed-at-filed-at-filing-deadline
+          player: ot-filing-deadline
+          role_name: bounds
+        - id: r-customs-declaration-is-due-by-filing-deadline-and-filed-at-filed-at-filed-at
+          player: ot-filed-at
+          role_name: records
+      readings:
+        - "{0} is due by {1} and filed at {2}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-customs-declaration-is-due-by-filing-deadline-and-filed-at-filed-at-customs-declaration
+        - type: mandatory
+          role: r-customs-declaration-is-due-by-filing-deadline-and-filed-at-filed-at-customs-declaration
+        - type: value_comparison
+          id: vc-filed-by-deadline
+          modality: deontic
+          role_1: r-customs-declaration-is-due-by-filing-deadline-and-filed-at-filed-at-filed-at
+          role_2: r-customs-declaration-is-due-by-filing-deadline-and-filed-at-filed-at-filing-deadline
+          operator: <=
+    - id: ft-event-has-event-id
+      name: Event has EventId
+      roles:
+        - id: r-event-has-event-id-event
+          player: ot-event
+          role_name: has
+        - id: r-event-has-event-id-event-id
+          player: ot-event-id
+          role_name: identifies
+      readings:
+        - "{0} has {1}"
+        - "{1} identifies {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-event-has-event-id-event
+          is_preferred: true
+        - type: internal_uniqueness
+          roles:
+            - r-event-has-event-id-event-id
+        - type: mandatory
+          role: r-event-has-event-id-event
+    - id: ft-event-occurs-at-event-timestamp
+      name: Event occurs at EventTimestamp
+      roles:
+        - id: r-event-occurs-at-event-timestamp-event
+          player: ot-event
+          role_name: occurs at
+        - id: r-event-occurs-at-event-timestamp-event-timestamp
+          player: ot-event-timestamp
+          role_name: times
+      readings:
+        - "{0} occurs at {1}"
+        - "{1} times {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-event-occurs-at-event-timestamp-event
+        - type: mandatory
+          role: r-event-occurs-at-event-timestamp-event
+    - id: ft-shipment-event-concerns-shipment
+      name: ShipmentEvent concerns Shipment
+      roles:
+        - id: r-shipment-event-concerns-shipment-shipment-event
+          player: ot-shipment-event
+          role_name: concerns
+        - id: r-shipment-event-concerns-shipment-shipment
+          player: ot-shipment
+          role_name: has
+      readings:
+        - "{0} concerns {1}"
+        - "{1} has {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-shipment-event-concerns-shipment-shipment-event
+        - type: mandatory
+          role: r-shipment-event-concerns-shipment-shipment-event
+    - id: ft-scan-event-scans-container
+      name: ScanEvent scans Container
+      roles:
+        - id: r-scan-event-scans-container-scan-event
+          player: ot-scan-event
+          role_name: scans
+        - id: r-scan-event-scans-container-container
+          player: ot-container
+          role_name: is scanned by
+      readings:
+        - "{0} scans {1}"
+        - "{1} is scanned by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-scan-event-scans-container-scan-event
+        - type: mandatory
+          role: r-scan-event-scans-container-scan-event
+    - id: ft-gate-scan-occurs-at-terminal
+      name: GateScan occurs at Terminal
+      roles:
+        - id: r-gate-scan-occurs-at-terminal-gate-scan
+          player: ot-gate-scan
+          role_name: occurs at
+        - id: r-gate-scan-occurs-at-terminal-terminal
+          player: ot-terminal
+          role_name: records
+      readings:
+        - "{0} occurs at {1}"
+        - "{1} records {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-gate-scan-occurs-at-terminal-gate-scan
+        - type: mandatory
+          role: r-gate-scan-occurs-at-terminal-gate-scan
+    - id: ft-gate-scan-has-gate-direction
+      name: GateScan has GateDirection
+      roles:
+        - id: r-gate-scan-has-gate-direction-gate-scan
+          player: ot-gate-scan
+          role_name: has
+        - id: r-gate-scan-has-gate-direction-gate-direction
+          player: ot-gate-direction
+          role_name: is direction of
+      readings:
+        - "{0} has {1}"
+        - "{1} is direction of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - r-gate-scan-has-gate-direction-gate-scan
+        - type: mandatory
+          role: r-gate-scan-has-gate-direction-gate-scan
+  subtype_facts:
+    - id: sf-shipment-event-is-event
+      subtype: ot-shipment-event
+      supertype: ot-event
+    - id: sf-scan-event-is-shipment-event
+      subtype: ot-scan-event
+      supertype: ot-shipment-event
+    - id: sf-gate-scan-is-scan-event
+      subtype: ot-gate-scan
+      supertype: ot-scan-event
+  objectified_fact_types:
+    - id: oft-booking
+      fact_type: ft-shipper-books-shipment-with-carrier
+      object_type: ot-booking

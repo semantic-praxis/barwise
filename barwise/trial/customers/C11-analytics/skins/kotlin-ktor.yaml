@@ -1,0 +1,5 @@
+language: kotlin
+framework: ktor
+files_per_class: 1
+sealed: true
+data_classes: true

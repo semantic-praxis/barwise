@@ -1,0 +1,16 @@
+version: 2
+models:
+  - name: stg_port
+    columns:
+      - name: port_code
+        tests: [unique, not_null]
+  - name: stg_leg
+    columns:
+      - name: leg_id
+        tests: [unique, not_null]
+      - name: origin_port_code
+        tests:
+          - relationships: { to: ref('stg_port'), field: port_code }
+      - name: destination_port_code
+        tests:
+          - relationships: { to: ref('stg_port'), field: port_code }

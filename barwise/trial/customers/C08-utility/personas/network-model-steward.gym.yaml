@@ -1,0 +1,72 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: "c08-network-model-steward"
+title: "The connectivity model does not loop"
+transition:
+  from: "apprentice"
+  to: "journeyman"
+exitPerformance: >-
+  Model substation, feeder and transformer connectivity with a
+  mandatory origin for every feeder and an acyclic feeds relationship
+  between feeders.
+brief: |
+  You are the steward of the utility's network model, the one the CIM
+  export was produced from. Every feeder leaves exactly one substation.
+  Every transformer sits on exactly one feeder. During switching a feeder
+  can feed another through a closed tie, and the chain of feeds must
+  never come back to where it started, because that is a loop the
+  protection scheme cannot clear. Model the connectivity so those three
+  rules are stated, not implied.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 7 (ring constraints), ch. 4 (mandatory roles).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: "requires_element"
+    element:
+      entity: "Substation"
+    diagnosis: >-
+      Without Substation, feeders have no origin and the model cannot say
+      which breaker clears a fault; the CIM export names it and so must we.
+  - kind: "requires_element"
+    element:
+      entity: "Feeder"
+    diagnosis: >-
+      A feeder is the unit the outage system, the planning group and the
+      protection engineers all reason about; a model that folds it into
+      transformer attributes has lost the level they work at.
+  - kind: "requires_element"
+    element:
+      entity: "Transformer"
+    diagnosis: >-
+      Transformers are where feeder connectivity meets service points; leave
+      them out and a service point hangs off a feeder with no path between.
+  - kind: "requires_element"
+    element:
+      factTypeBetween: ["Transformer", "Feeder"]
+    diagnosis: >-
+      The fact Transformer is on Feeder is the connectivity itself; without
+      it the model has the equipment and none of the topology.
+  - kind: "must_validate"
+    diagnosis: >-
+      An invalid model here is usually a ring constraint placed on roles from
+      two different object types, which is not a ring at all.
+  - kind: "forbids_population"
+    factType: "Feeder feeds Feeder"
+    constraint: "ring"
+    hint: "An acyclic ring constraint on the two Feeder roles."
+    diagnosis: >-
+      If feeder A feeds B and B feeds A, the model has stored the loop the
+      switching order exists to prevent; the acyclic ring is the rule the
+      protection engineers asked for.
+  - kind: "forbids_population"
+    factType: "Feeder originates at Substation"
+    constraint: "mandatory"
+    hint: "Every feeder originates at some substation."
+    diagnosis: >-
+      A feeder with no substation is an orphan circuit; the outage system
+      cannot place it on a breaker and the planning model cannot load it.
+  - kind: "requires_verbalization"
+    sentence: "Each Transformer is on at most one Feeder."
+    diagnosis: >-
+      A transformer on two feeders is a parallel supply the connectivity
+      model has no way to represent; the uniqueness on the Transformer role
+      is what keeps the tree a tree.

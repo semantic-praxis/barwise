@@ -400,6 +400,19 @@ jobs:
       - run: npm run test:mcp-checks
         if: steps.changes.outputs.docs_only != 'true'
 
+      # The enterprise trial's own unit tests: the graders, the gate, the
+      # generators (docs/specs/enterprise-trial.spec.md). NOT the lane --
+      # `trial:offline` takes about twelve minutes and is WS6's to wire.
+      # These take about 2.5s and need the CLI bundle built above, because
+      # one test runs the real `barwise diff` so a grader's fixture cannot
+      # drift from the shape the CLI emits. That drift happened twice on
+      # #509 with the unit tests green -- once found in review, once only
+      # because the lane was re-run by hand. A check that protects anything
+      # only when someone remembers to run it is the gap this closes. Ten
+      # runs before wiring: 10 of 10 exit 0, 2.2-2.5s.
+      - run: npm run test:trial
+        if: steps.changes.outputs.docs_only != 'true'
+
       - run: npm run publint
         if: steps.changes.outputs.docs_only != 'true'
 

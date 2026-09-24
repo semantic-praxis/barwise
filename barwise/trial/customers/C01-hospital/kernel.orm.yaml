@@ -1,0 +1,962 @@
+orm_version: "1.1"
+model:
+  name: Regional Hospital Network
+  domain_context: healthcare
+  note: >-
+    The hand-authored seed model for trial customer C01. A hospital network
+    that runs an Epic-style Clarity warehouse and exposes a FHIR facade; the
+    vocabulary is the network's own (Encounter, not Visit; Payer, not
+    Insurer). Patients are registered per facility, which is the composite
+    key the registration transcript argues about.
+
+  object_types:
+    # ---- parties ------------------------------------------------------
+    - id: ot-patient
+      name: Patient
+      kind: entity
+      reference_mode: patient_id
+      definition: A person who receives care at a facility in the network, identified by a network-wide patient identifier.
+      aliases: [Person]
+    - id: ot-provider
+      name: Provider
+      kind: entity
+      reference_mode: npi
+      definition: A licensed clinician who attends, orders, or administers care, identified by a National Provider Identifier.
+      aliases: [Clinician]
+    - id: ot-payer
+      name: Payer
+      kind: entity
+      reference_mode: payer_id
+      definition: An insurer or government program that is billed for care, identified by a payer identifier assigned by revenue cycle.
+      aliases: [Insurer]
+    - id: ot-facility
+      name: Facility
+      kind: entity
+      reference_mode: facility_code
+      definition: A hospital, clinic, or emergency department in the network that registers patients under its own medical record numbers.
+    - id: ot-department
+      name: Department
+      kind: entity
+      reference_mode: department_id
+      definition: A clinical unit within a facility, such as cardiology or the emergency department, that owns encounters and appointments.
+
+    # ---- clinical -----------------------------------------------------
+    - id: ot-encounter
+      name: Encounter
+      kind: entity
+      reference_mode: csn
+      definition: A single interaction between a patient and the network for care, identified by a contact serial number.
+    - id: ot-inpatient-encounter
+      name: InpatientEncounter
+      kind: entity
+      reference_mode: csn
+      definition: An encounter in which the patient is admitted to a bed under an admission order.
+    - id: ot-outpatient-encounter
+      name: OutpatientEncounter
+      kind: entity
+      reference_mode: csn
+      definition: An encounter in which the patient receives care without being admitted, such as a clinic visit.
+    - id: ot-emergency-encounter
+      name: EmergencyEncounter
+      kind: entity
+      reference_mode: csn
+      definition: An encounter that begins in an emergency department and carries a triage acuity.
+    - id: ot-trauma-encounter
+      name: TraumaEncounter
+      kind: entity
+      reference_mode: csn
+      definition: An emergency encounter in which the trauma team was activated at a declared level.
+    - id: ot-admission
+      name: Admission
+      kind: entity
+      reference_mode: admission_id
+      definition: The admission of a patient to a facility at a point in time, which an inpatient encounter is recorded against.
+    - id: ot-diagnosis
+      name: Diagnosis
+      kind: entity
+      reference_mode: icd10_code
+      definition: A condition from the ICD-10-CM code set that can be recorded on an encounter.
+    - id: ot-order
+      name: Order
+      kind: entity
+      reference_mode: order_id
+      definition: A provider's instruction placed during an encounter, such as a medication or a laboratory test.
+    - id: ot-medication-order
+      name: MedicationOrder
+      kind: entity
+      reference_mode: order_id
+      definition: An order for a medication to be administered to the patient in a stated dose.
+    - id: ot-lab-order
+      name: LabOrder
+      kind: entity
+      reference_mode: order_id
+      definition: An order for a laboratory test on a specimen taken from the patient.
+    - id: ot-medication
+      name: Medication
+      kind: entity
+      reference_mode: medication_id
+      definition: A drug product in the formulary, identified by the pharmacy's medication identifier.
+    - id: ot-specimen-type
+      name: SpecimenType
+      kind: value
+      definition: The kind of specimen a laboratory order is collected on, such as blood or urine.
+      data_type: { name: text, length: 40 }
+      value_constraint:
+        values: [blood, urine, sputum, cerebrospinal fluid, tissue, swab, stool]
+
+    # ---- scheduling ---------------------------------------------------
+    - id: ot-appointment
+      name: Appointment
+      kind: entity
+      reference_mode: appointment_id
+      definition: A booked slot for a patient to see a provider in a department at a scheduled time.
+
+    # ---- billing ------------------------------------------------------
+    - id: ot-claim
+      name: Claim
+      kind: entity
+      reference_mode: claim_number
+      definition: A request for payment submitted to a payer for the care delivered in one encounter.
+
+    # ---- identifier value types --------------------------------------
+    - id: ot-patient-id
+      name: PatientId
+      kind: value
+      definition: The network-wide identifier assigned to a patient record.
+      data_type: { name: text, length: 20 }
+    - id: ot-mrn
+      name: MedicalRecordNumber
+      kind: value
+      definition: The medical record number a facility assigns to a patient at registration; unique only within that facility.
+      data_type: { name: text, length: 20 }
+    - id: ot-npi
+      name: NationalProviderIdentifier
+      kind: value
+      definition: The ten-digit identifier issued to a provider by the national plan and provider enumeration system.
+      data_type: { name: text, length: 10 }
+    - id: ot-payer-id
+      name: PayerId
+      kind: value
+      definition: The identifier revenue cycle assigns to a payer.
+      data_type: { name: text, length: 20 }
+    - id: ot-facility-code
+      name: FacilityCode
+      kind: value
+      definition: The short code for a facility, such as MAIN or NORTH.
+      data_type: { name: text, length: 10 }
+    - id: ot-department-id
+      name: DepartmentId
+      kind: value
+      definition: The numeric identifier of a department in the scheduling system.
+      data_type: { name: integer }
+    - id: ot-csn
+      name: ContactSerialNumber
+      kind: value
+      definition: The serial number the registration system assigns to each encounter.
+      data_type: { name: integer }
+    - id: ot-icd10-code
+      name: Icd10Code
+      kind: value
+      definition: A code from ICD-10-CM, such as E11.9.
+      data_type: { name: text, length: 8 }
+    - id: ot-order-id
+      name: OrderId
+      kind: value
+      definition: The identifier the order entry system assigns to an order.
+      data_type: { name: integer }
+    - id: ot-medication-id
+      name: MedicationId
+      kind: value
+      definition: The pharmacy formulary identifier of a medication.
+      data_type: { name: integer }
+    - id: ot-appointment-id
+      name: AppointmentId
+      kind: value
+      definition: The identifier the scheduling system assigns to an appointment.
+      data_type: { name: integer }
+    - id: ot-claim-number
+      name: ClaimNumber
+      kind: value
+      definition: The number revenue cycle assigns to a claim when it is created.
+      data_type: { name: text, length: 20 }
+
+    # ---- descriptive value types --------------------------------------
+    - id: ot-patient-name
+      name: PatientName
+      kind: value
+      definition: The patient's legal name as registered.
+      data_type: { name: text, length: 200 }
+    - id: ot-date-of-birth
+      name: DateOfBirth
+      kind: value
+      definition: The patient's date of birth.
+      data_type: { name: date }
+    - id: ot-preferred-language
+      name: PreferredLanguage
+      kind: value
+      definition: The language the patient prefers for clinical communication.
+      data_type: { name: text, length: 40 }
+      value_constraint:
+        values:
+          - English
+          - Español
+          - Tiếng Việt
+          - 中文
+          - العربية
+          - Русский
+          - Português
+          - Français
+          - 한국어
+          - American Sign Language
+    - id: ot-legacy-flag
+      name: LegacyFlag
+      kind: value
+      definition: A flag carried over from the pre-merger registration system whose meaning nobody can state.
+      data_type: { name: boolean }
+    - id: ot-encounter-type
+      name: EncounterType
+      kind: value
+      definition: The registration classification of an encounter.
+      data_type: { name: text, length: 40 }
+      value_constraint:
+        values:
+          - inpatient
+          - outpatient
+          - emergency
+          - observation
+          - surgery
+          - office visit
+          - telephone
+          - anesthesia
+          - hospital outpatient
+          - lab visit
+    - id: ot-arrival-datetime
+      name: ArrivalDateTime
+      kind: value
+      definition: The date and time the patient arrived for the encounter.
+      data_type: { name: datetime }
+    - id: ot-triage-acuity
+      name: TriageAcuity
+      kind: value
+      definition: The Emergency Severity Index level assigned at triage, from 1 (resuscitation) to 5 (non-urgent).
+      data_type: { name: integer }
+      value_constraint:
+        values: ["1", "2", "3", "4", "5"]
+    - id: ot-trauma-activation-level
+      name: TraumaActivationLevel
+      kind: value
+      definition: The level at which the trauma team was activated.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [level 1, level 2, level 3, consult]
+    - id: ot-admission-datetime
+      name: AdmissionDateTime
+      kind: value
+      definition: The date and time at which the patient was admitted.
+      data_type: { name: datetime }
+    - id: ot-discharge-disposition
+      name: DischargeDisposition
+      kind: value
+      definition: The UB-04 patient discharge status describing where the patient went when the admission ended.
+      data_type: { name: text, length: 120 }
+      value_constraint:
+        values:
+          - "01 Discharged to home or self-care"
+          - "02 Transferred to a short-term general hospital"
+          - "03 Transferred to a skilled nursing facility with Medicare certification"
+          - "04 Transferred to a facility that provides custodial or supportive care"
+          - "05 Transferred to a designated cancer center or children's hospital"
+          - "06 Discharged to home under care of an organized home health service"
+          - "07 Left against medical advice"
+          - "09 Admitted as an inpatient to this hospital"
+          - "20 Expired"
+          - "21 Discharged to court or law enforcement"
+          - "30 Still a patient"
+          - "40 Expired at home"
+          - "41 Expired in a medical facility"
+          - "42 Expired, place unknown"
+          - "43 Transferred to a federal health care facility"
+          - "50 Discharged to hospice, home"
+          - "51 Discharged to hospice, medical facility"
+          - "61 Transferred to a hospital-based Medicare-approved swing bed"
+          - "62 Transferred to an inpatient rehabilitation facility"
+          - "63 Transferred to a Medicare-certified long-term care hospital"
+          - "64 Transferred to a nursing facility certified under Medicaid only"
+          - "65 Transferred to a psychiatric hospital or psychiatric unit"
+          - "66 Transferred to a critical access hospital"
+          - "69 Transferred to a designated disaster alternative care site"
+          - "70 Transferred to another type of health care institution not defined elsewhere"
+          - "81 Discharged to home with a planned readmission"
+          - "82 Transferred to a short-term general hospital with a planned readmission"
+          - "83 Transferred to a skilled nursing facility with a planned readmission"
+          - "84 Transferred to a custodial care facility with a planned readmission"
+          - "85 Transferred to a designated cancer center with a planned readmission"
+          - "86 Discharged to home health service with a planned readmission"
+          - "87 Transferred to court or law enforcement with a planned readmission"
+          - "88 Transferred to a federal health care facility with a planned readmission"
+          - "89 Transferred to a swing bed with a planned readmission"
+          - "90 Transferred to an inpatient rehabilitation facility with a planned readmission"
+          - "91 Transferred to a long-term care hospital with a planned readmission"
+          - "92 Transferred to a Medicaid-only nursing facility with a planned readmission"
+          - "93 Transferred to a psychiatric hospital with a planned readmission"
+          - "94 Transferred to a critical access hospital with a planned readmission"
+          - "95 Transferred to another health care institution with a planned readmission"
+    - id: ot-diagnosis-description
+      name: DiagnosisDescription
+      kind: value
+      definition: The long description of an ICD-10-CM code.
+      data_type: { name: text, length: 300 }
+    - id: ot-diagnosis-rank
+      name: DiagnosisRank
+      kind: value
+      definition: The position of a diagnosis on an encounter, where 1 is the principal diagnosis.
+      data_type: { name: integer }
+    - id: ot-order-status
+      name: OrderStatus
+      kind: value
+      definition: The lifecycle state of an order.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [pending, signed, in process, completed, canceled, discontinued]
+    - id: ot-administration-datetime
+      name: AdministrationDateTime
+      kind: value
+      definition: The date and time a dose was administered.
+      data_type: { name: datetime }
+    - id: ot-dose-amount
+      name: DoseAmount
+      kind: value
+      definition: The numeric quantity of a dose.
+      data_type: { name: decimal, scale: 3 }
+    - id: ot-dose-unit
+      name: DoseUnit
+      kind: value
+      definition: The unit of measure of a dose.
+      data_type: { name: text, length: 10 }
+      value_constraint:
+        values: [mg, mcg, g, mL, units, mEq, tablet, capsule, puff, drop]
+    - id: ot-provider-specialty
+      name: ProviderSpecialty
+      kind: value
+      definition: The board specialty a provider practices under.
+      data_type: { name: text, length: 60 }
+      value_constraint:
+        values:
+          - internal medicine
+          - family medicine
+          - emergency medicine
+          - cardiology
+          - orthopedic surgery
+          - general surgery
+          - pediatrics
+          - obstetrics and gynecology
+          - psychiatry
+          - radiology
+          - anesthesiology
+          - hospital medicine
+    - id: ot-department-name
+      name: DepartmentName
+      kind: value
+      definition: The name a department is scheduled under.
+      data_type: { name: text, length: 100 }
+    - id: ot-payer-name
+      name: PayerName
+      kind: value
+      definition: The name of a payer as it appears on the claim.
+      data_type: { name: text, length: 100 }
+    - id: ot-claim-amount
+      name: ClaimAmount
+      kind: value
+      definition: The total billed amount on a claim.
+      data_type: { name: money }
+    - id: ot-claim-status
+      name: ClaimStatus
+      kind: value
+      definition: The adjudication state of a claim.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [draft, submitted, accepted, denied, paid, appealed, voided]
+    - id: ot-appointment-datetime
+      name: AppointmentDateTime
+      kind: value
+      definition: The date and time an appointment is scheduled to start.
+      data_type: { name: datetime }
+    - id: ot-appointment-status
+      name: AppointmentStatus
+      kind: value
+      definition: The scheduling state of an appointment.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [scheduled, arrived, completed, canceled, no show, left without seen]
+
+  fact_types:
+    # ---- identification ----------------------------------------------
+    - id: ft-patient-has-patient-id
+      name: Patient has PatientId
+      roles:
+        - { id: r-patient-has-patient-id-patient, player: ot-patient, role_name: has }
+        - { id: r-patient-has-patient-id-id, player: ot-patient-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-patient-has-patient-id-patient], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-patient-has-patient-id-id] }
+        - { type: mandatory, role: r-patient-has-patient-id-patient }
+    - id: ft-provider-has-npi
+      name: Provider has NationalProviderIdentifier
+      roles:
+        - { id: r-provider-has-npi-provider, player: ot-provider, role_name: has }
+        - { id: r-provider-has-npi-npi, player: ot-npi, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-provider-has-npi-provider], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-provider-has-npi-npi] }
+        - { type: mandatory, role: r-provider-has-npi-provider }
+    - id: ft-payer-has-payer-id
+      name: Payer has PayerId
+      roles:
+        - { id: r-payer-has-payer-id-payer, player: ot-payer, role_name: has }
+        - { id: r-payer-has-payer-id-id, player: ot-payer-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-payer-has-payer-id-payer], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-payer-has-payer-id-id] }
+        - { type: mandatory, role: r-payer-has-payer-id-payer }
+    - id: ft-facility-has-facility-code
+      name: Facility has FacilityCode
+      roles:
+        - { id: r-facility-has-code-facility, player: ot-facility, role_name: has }
+        - { id: r-facility-has-code-code, player: ot-facility-code, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-facility-has-code-facility], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-facility-has-code-code] }
+        - { type: mandatory, role: r-facility-has-code-facility }
+    - id: ft-department-has-department-id
+      name: Department has DepartmentId
+      roles:
+        - { id: r-department-has-id-department, player: ot-department, role_name: has }
+        - { id: r-department-has-id-id, player: ot-department-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-department-has-id-department], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-department-has-id-id] }
+        - { type: mandatory, role: r-department-has-id-department }
+    - id: ft-encounter-has-csn
+      name: Encounter has ContactSerialNumber
+      roles:
+        - { id: r-encounter-has-csn-encounter, player: ot-encounter, role_name: has }
+        - { id: r-encounter-has-csn-csn, player: ot-csn, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-encounter-has-csn-encounter], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-encounter-has-csn-csn] }
+        - { type: mandatory, role: r-encounter-has-csn-encounter }
+    - id: ft-diagnosis-has-icd10-code
+      name: Diagnosis has Icd10Code
+      roles:
+        - { id: r-diagnosis-has-code-diagnosis, player: ot-diagnosis, role_name: has }
+        - { id: r-diagnosis-has-code-code, player: ot-icd10-code, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-diagnosis-has-code-diagnosis], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-diagnosis-has-code-code] }
+        - { type: mandatory, role: r-diagnosis-has-code-diagnosis }
+    - id: ft-order-has-order-id
+      name: Order has OrderId
+      roles:
+        - { id: r-order-has-id-order, player: ot-order, role_name: has }
+        - { id: r-order-has-id-id, player: ot-order-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-order-has-id-order], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-order-has-id-id] }
+        - { type: mandatory, role: r-order-has-id-order }
+    - id: ft-medication-has-medication-id
+      name: Medication has MedicationId
+      roles:
+        - { id: r-medication-has-id-medication, player: ot-medication, role_name: has }
+        - { id: r-medication-has-id-id, player: ot-medication-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-medication-has-id-medication], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-medication-has-id-id] }
+        - { type: mandatory, role: r-medication-has-id-medication }
+    - id: ft-appointment-has-appointment-id
+      name: Appointment has AppointmentId
+      roles:
+        - { id: r-appointment-has-id-appointment, player: ot-appointment, role_name: has }
+        - { id: r-appointment-has-id-id, player: ot-appointment-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-appointment-has-id-appointment], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-appointment-has-id-id] }
+        - { type: mandatory, role: r-appointment-has-id-appointment }
+    - id: ft-claim-has-claim-number
+      name: Claim has ClaimNumber
+      roles:
+        - { id: r-claim-has-number-claim, player: ot-claim, role_name: has }
+        - { id: r-claim-has-number-number, player: ot-claim-number, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-claim-has-number-claim], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-claim-has-number-number] }
+        - { type: mandatory, role: r-claim-has-number-claim }
+
+    # ---- patient registration ----------------------------------------
+    - id: ft-patient-has-mrn
+      name: Patient has MedicalRecordNumber
+      definition: The medical record number under which the patient is registered at the registering facility; the number is reused across facilities.
+      roles:
+        - { id: r-patient-has-mrn-patient, player: ot-patient, role_name: has }
+        - { id: r-patient-has-mrn-mrn, player: ot-mrn, role_name: is assigned to }
+      readings: ["{0} has {1}", "{1} is assigned to {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-patient-has-mrn-patient] }
+        - { type: mandatory, role: r-patient-has-mrn-patient }
+        # The composite key: an MRN is unique only within the facility
+        # that issued it, so the pair (MRN, Facility) identifies a
+        # patient record and the MRN alone does not.
+        - { type: external_uniqueness, roles: [r-patient-has-mrn-mrn, r-patient-registered-at-facility] }
+    - id: ft-patient-is-registered-at-facility
+      name: Patient is registered at Facility
+      roles:
+        - { id: r-patient-registered-at-patient, player: ot-patient, role_name: is registered at }
+        - { id: r-patient-registered-at-facility, player: ot-facility, role_name: registers }
+      readings: ["{0} is registered at {1}", "{1} registers {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-patient-registered-at-patient] }
+        - { type: mandatory, role: r-patient-registered-at-patient }
+    - id: ft-patient-has-patient-name
+      name: Patient has PatientName
+      roles:
+        - { id: r-patient-has-name-patient, player: ot-patient, role_name: has }
+        - { id: r-patient-has-name-name, player: ot-patient-name, role_name: is of }
+      readings: ["{0} has {1}", "{1} is of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-patient-has-name-patient] }
+        - { type: mandatory, role: r-patient-has-name-patient }
+    - id: ft-patient-was-born-on-date-of-birth
+      name: Patient was born on DateOfBirth
+      roles:
+        - { id: r-patient-born-on-patient, player: ot-patient, role_name: was born on }
+        - { id: r-patient-born-on-date, player: ot-date-of-birth, role_name: is birth date of }
+      readings: ["{0} was born on {1}", "{1} is birth date of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-patient-born-on-patient] }
+        - { type: mandatory, role: r-patient-born-on-patient }
+    - id: ft-patient-has-preferred-language
+      name: Patient has PreferredLanguage
+      roles:
+        - { id: r-patient-has-language-patient, player: ot-patient, role_name: has }
+        - { id: r-patient-has-language-language, player: ot-preferred-language, role_name: is preferred by }
+      readings: ["{0} has {1}", "{1} is preferred by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-patient-has-language-patient] }
+    - id: ft-patient-has-legacy-flag
+      name: Patient has LegacyFlag
+      roles:
+        - { id: r-patient-has-legacy-flag-patient, player: ot-patient, role_name: has }
+        - { id: r-patient-has-legacy-flag-flag, player: ot-legacy-flag, role_name: is set on }
+      readings: ["{0} has {1}", "{1} is set on {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-patient-has-legacy-flag-patient] }
+    - id: ft-patient-is-covered-by-payer
+      name: Patient is covered by Payer
+      definition: The payer on file as the patient's primary coverage.
+      roles:
+        - { id: r-patient-covered-by-patient, player: ot-patient, role_name: is covered by }
+        - { id: r-patient-covered-by-payer, player: ot-payer, role_name: covers }
+      readings: ["{0} is covered by {1}", "{1} covers {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-patient-covered-by-patient] }
+
+    # ---- encounters --------------------------------------------------
+    - id: ft-encounter-is-for-patient
+      name: Encounter is for Patient
+      roles:
+        - { id: r-encounter-is-for-encounter, player: ot-encounter, role_name: is for }
+        - { id: r-encounter-is-for-patient, player: ot-patient, role_name: has }
+      readings: ["{0} is for {1}", "{1} has {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-encounter-is-for-encounter] }
+        - { type: mandatory, role: r-encounter-is-for-encounter }
+    - id: ft-encounter-occurs-at-facility
+      name: Encounter occurs at Facility
+      roles:
+        - { id: r-encounter-occurs-at-encounter, player: ot-encounter, role_name: occurs at }
+        - { id: r-encounter-occurs-at-facility, player: ot-facility, role_name: hosts }
+      readings: ["{0} occurs at {1}", "{1} hosts {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-encounter-occurs-at-encounter] }
+        - { type: mandatory, role: r-encounter-occurs-at-encounter }
+    - id: ft-encounter-is-in-department
+      name: Encounter is in Department
+      roles:
+        - { id: r-encounter-in-department-encounter, player: ot-encounter, role_name: is in }
+        - { id: r-encounter-in-department-department, player: ot-department, role_name: owns }
+      readings: ["{0} is in {1}", "{1} owns {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-encounter-in-department-encounter] }
+    - id: ft-encounter-has-encounter-type
+      name: Encounter has EncounterType
+      roles:
+        - { id: r-encounter-has-type-encounter, player: ot-encounter, role_name: has }
+        - { id: r-encounter-has-type-type, player: ot-encounter-type, role_name: classifies }
+      readings: ["{0} has {1}", "{1} classifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-encounter-has-type-encounter] }
+        - { type: mandatory, role: r-encounter-has-type-encounter }
+    - id: ft-encounter-arrived-at-arrival-datetime
+      name: Encounter arrived at ArrivalDateTime
+      roles:
+        - { id: r-encounter-arrived-at-encounter, player: ot-encounter, role_name: arrived at }
+        - { id: r-encounter-arrived-at-datetime, player: ot-arrival-datetime, role_name: is arrival of }
+      readings: ["{0} arrived at {1}", "{1} is arrival of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-encounter-arrived-at-encounter] }
+        - { type: mandatory, role: r-encounter-arrived-at-encounter }
+    - id: ft-encounter-is-attended-by-provider
+      name: Encounter is attended by Provider
+      definition: The attending provider of record for the encounter.
+      roles:
+        - { id: r-encounter-attended-by-encounter, player: ot-encounter, role_name: is attended by }
+        - { id: r-encounter-attended-by-provider, player: ot-provider, role_name: attends }
+      readings: ["{0} is attended by {1}", "{1} attends {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-encounter-attended-by-encounter] }
+    - id: ft-encounter-fulfills-appointment
+      name: Encounter fulfills Appointment
+      roles:
+        - { id: r-encounter-fulfills-encounter, player: ot-encounter, role_name: fulfills }
+        - { id: r-encounter-fulfills-appointment, player: ot-appointment, role_name: is fulfilled by }
+      readings: ["{0} fulfills {1}", "{1} is fulfilled by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-encounter-fulfills-encounter] }
+        - { type: internal_uniqueness, roles: [r-encounter-fulfills-appointment] }
+    - id: ft-encounter-has-diagnosis-at-diagnosis-rank
+      name: Encounter has Diagnosis at DiagnosisRank
+      definition: The diagnoses coded on an encounter, ranked so that rank 1 is the principal diagnosis.
+      roles:
+        - { id: r-encounter-has-diagnosis-encounter, player: ot-encounter, role_name: has }
+        - { id: r-encounter-has-diagnosis-diagnosis, player: ot-diagnosis, role_name: is coded on }
+        - { id: r-encounter-has-diagnosis-rank, player: ot-diagnosis-rank, role_name: at }
+      readings: ["{0} has {1} at {2}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-encounter-has-diagnosis-encounter, r-encounter-has-diagnosis-diagnosis] }
+        - { type: internal_uniqueness, roles: [r-encounter-has-diagnosis-encounter, r-encounter-has-diagnosis-rank] }
+    - id: ft-diagnosis-has-diagnosis-description
+      name: Diagnosis has DiagnosisDescription
+      roles:
+        - { id: r-diagnosis-has-description-diagnosis, player: ot-diagnosis, role_name: has }
+        - { id: r-diagnosis-has-description-description, player: ot-diagnosis-description, role_name: describes }
+      readings: ["{0} has {1}", "{1} describes {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-diagnosis-has-description-diagnosis] }
+        - { type: mandatory, role: r-diagnosis-has-description-diagnosis }
+    - id: ft-outpatient-encounter-follows-up-encounter
+      name: OutpatientEncounter follows up Encounter
+      definition: The earlier encounter, of any kind, that a clinic visit was booked to follow up.
+      roles:
+        - { id: r-outpatient-follows-up-outpatient, player: ot-outpatient-encounter, role_name: follows up }
+        - { id: r-outpatient-follows-up-encounter, player: ot-encounter, role_name: is followed up by }
+      readings: ["{0} follows up {1}", "{1} is followed up by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-outpatient-follows-up-outpatient] }
+    - id: ft-emergency-encounter-has-triage-acuity
+      name: EmergencyEncounter has TriageAcuity
+      roles:
+        - { id: r-emergency-has-acuity-encounter, player: ot-emergency-encounter, role_name: has }
+        - { id: r-emergency-has-acuity-acuity, player: ot-triage-acuity, role_name: is assigned to }
+      readings: ["{0} has {1}", "{1} is assigned to {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-emergency-has-acuity-encounter] }
+        - { type: mandatory, role: r-emergency-has-acuity-encounter }
+    - id: ft-trauma-encounter-has-trauma-activation-level
+      name: TraumaEncounter has TraumaActivationLevel
+      roles:
+        - { id: r-trauma-has-level-encounter, player: ot-trauma-encounter, role_name: has }
+        - { id: r-trauma-has-level-level, player: ot-trauma-activation-level, role_name: is declared for }
+      readings: ["{0} has {1}", "{1} is declared for {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-trauma-has-level-encounter] }
+        - { type: mandatory, role: r-trauma-has-level-encounter }
+
+    # ---- admissions (objectified) ------------------------------------
+    - id: ft-patient-is-admitted-to-facility-at-admission-datetime
+      name: Patient is admitted to Facility at AdmissionDateTime
+      definition: The admission event; a patient is at one facility at any moment, so patient and time determine the facility.
+      roles:
+        - { id: r-patient-admitted-patient, player: ot-patient, role_name: is admitted to }
+        - { id: r-patient-admitted-facility, player: ot-facility, role_name: admits }
+        - { id: r-patient-admitted-datetime, player: ot-admission-datetime, role_name: at }
+      readings: ["{0} is admitted to {1} at {2}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-patient-admitted-patient, r-patient-admitted-datetime] }
+    - id: ft-admission-is-for-inpatient-encounter
+      name: Admission is for InpatientEncounter
+      roles:
+        - { id: r-admission-is-for-admission, player: ot-admission, role_name: is for }
+        - { id: r-admission-is-for-encounter, player: ot-inpatient-encounter, role_name: is recorded under }
+      readings: ["{0} is for {1}", "{1} is recorded under {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-admission-is-for-admission] }
+        - { type: internal_uniqueness, roles: [r-admission-is-for-encounter] }
+        - { type: mandatory, role: r-admission-is-for-admission }
+        - { type: mandatory, role: r-admission-is-for-encounter }
+    - id: ft-admission-is-admitted-by-provider
+      name: Admission is admitted by Provider
+      roles:
+        - { id: r-admission-admitted-by-admission, player: ot-admission, role_name: is admitted by }
+        - { id: r-admission-admitted-by-provider, player: ot-provider, role_name: admits }
+      readings: ["{0} is admitted by {1}", "{1} admits {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-admission-admitted-by-admission] }
+        - { type: mandatory, role: r-admission-admitted-by-admission }
+    - id: ft-admission-has-discharge-disposition
+      name: Admission has DischargeDisposition
+      definition: Where the patient went when the admission ended; every admission ought to have one once discharged, but an open admission does not yet.
+      roles:
+        - { id: r-admission-has-disposition-admission, player: ot-admission, role_name: has }
+        - { id: r-admission-has-disposition-disposition, player: ot-discharge-disposition, role_name: is recorded for }
+      readings: ["{0} has {1}", "{1} is recorded for {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-admission-has-disposition-admission] }
+        - { type: mandatory, role: r-admission-has-disposition-admission, modality: deontic }
+
+    # ---- orders ------------------------------------------------------
+    - id: ft-order-is-placed-during-encounter
+      name: Order is placed during Encounter
+      roles:
+        - { id: r-order-placed-during-order, player: ot-order, role_name: is placed during }
+        - { id: r-order-placed-during-encounter, player: ot-encounter, role_name: carries }
+      readings: ["{0} is placed during {1}", "{1} carries {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-order-placed-during-order] }
+        - { type: mandatory, role: r-order-placed-during-order }
+    - id: ft-order-is-placed-by-provider
+      name: Order is placed by Provider
+      roles:
+        - { id: r-order-placed-by-order, player: ot-order, role_name: is placed by }
+        - { id: r-order-placed-by-provider, player: ot-provider, role_name: places }
+      readings: ["{0} is placed by {1}", "{1} places {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-order-placed-by-order] }
+        - { type: mandatory, role: r-order-placed-by-order }
+    - id: ft-order-has-order-status
+      name: Order has OrderStatus
+      roles:
+        - { id: r-order-has-status-order, player: ot-order, role_name: has }
+        - { id: r-order-has-status-status, player: ot-order-status, role_name: is state of }
+      readings: ["{0} has {1}", "{1} is state of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-order-has-status-order] }
+        - { type: mandatory, role: r-order-has-status-order }
+    - id: ft-medication-order-is-for-medication
+      name: MedicationOrder is for Medication
+      roles:
+        - { id: r-medication-order-is-for-order, player: ot-medication-order, role_name: is for }
+        - { id: r-medication-order-is-for-medication, player: ot-medication, role_name: is ordered by }
+      readings: ["{0} is for {1}", "{1} is ordered by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-medication-order-is-for-order] }
+        - { type: mandatory, role: r-medication-order-is-for-order }
+    - id: ft-medication-order-has-dose-amount
+      name: MedicationOrder has DoseAmount
+      roles:
+        - { id: r-medication-order-has-dose-order, player: ot-medication-order, role_name: has }
+        - { id: r-medication-order-has-dose-amount, player: ot-dose-amount, role_name: is dose of }
+      readings: ["{0} has {1}", "{1} is dose of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-medication-order-has-dose-order] }
+        - { type: mandatory, role: r-medication-order-has-dose-order }
+    - id: ft-medication-order-has-dose-unit
+      name: MedicationOrder has DoseUnit
+      roles:
+        - { id: r-medication-order-has-unit-order, player: ot-medication-order, role_name: has }
+        - { id: r-medication-order-has-unit-unit, player: ot-dose-unit, role_name: is unit of }
+      readings: ["{0} has {1}", "{1} is unit of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-medication-order-has-unit-order] }
+        - { type: mandatory, role: r-medication-order-has-unit-order }
+    - id: ft-medication-order-is-administered-at-administration-datetime-by-provider
+      name: MedicationOrder is administered at AdministrationDateTime by Provider
+      definition: One row of the medication administration record; a given order is given at most once at a given time, by the nurse or provider who signed it.
+      roles:
+        - { id: r-mar-order, player: ot-medication-order, role_name: is administered }
+        - { id: r-mar-datetime, player: ot-administration-datetime, role_name: at }
+        - { id: r-mar-provider, player: ot-provider, role_name: by }
+      readings: ["{0} is administered at {1} by {2}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-mar-order, r-mar-datetime] }
+    - id: ft-lab-order-is-collected-on-specimen-type
+      name: LabOrder is collected on SpecimenType
+      roles:
+        - { id: r-lab-order-collected-order, player: ot-lab-order, role_name: is collected on }
+        - { id: r-lab-order-collected-specimen, player: ot-specimen-type, role_name: is specimen for }
+      readings: ["{0} is collected on {1}", "{1} is specimen for {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-lab-order-collected-order] }
+        - { type: mandatory, role: r-lab-order-collected-order }
+
+    # ---- providers and departments -----------------------------------
+    - id: ft-provider-has-provider-specialty
+      name: Provider has ProviderSpecialty
+      roles:
+        - { id: r-provider-has-specialty-provider, player: ot-provider, role_name: has }
+        - { id: r-provider-has-specialty-specialty, player: ot-provider-specialty, role_name: is practiced by }
+      readings: ["{0} has {1}", "{1} is practiced by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-provider-has-specialty-provider] }
+    - id: ft-provider-refers-to-provider
+      name: Provider refers to Provider
+      definition: The referral network; a provider sends patients to another provider and may in turn receive referrals back, but never refers to themselves.
+      roles:
+        - { id: r-provider-refers-referrer, player: ot-provider, role_name: refers to }
+        - { id: r-provider-refers-referee, player: ot-provider, role_name: receives referrals from }
+      readings: ["{0} refers to {1}", "{1} receives referrals from {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-provider-refers-referrer, r-provider-refers-referee] }
+        - { type: ring, role_1: r-provider-refers-referrer, role_2: r-provider-refers-referee, ring_type: irreflexive }
+    - id: ft-provider-is-a-member-of-department
+      name: Provider is a member of Department
+      roles:
+        - { id: r-provider-member-provider, player: ot-provider, role_name: is a member of }
+        - { id: r-provider-member-department, player: ot-department, role_name: includes }
+      readings: ["{0} is a member of {1}", "{1} includes {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-provider-member-provider, r-provider-member-department] }
+    - id: ft-department-has-department-name
+      name: Department has DepartmentName
+      roles:
+        - { id: r-department-has-name-department, player: ot-department, role_name: has }
+        - { id: r-department-has-name-name, player: ot-department-name, role_name: is of }
+      readings: ["{0} has {1}", "{1} is of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-department-has-name-department] }
+        - { type: mandatory, role: r-department-has-name-department }
+    - id: ft-department-is-located-at-facility
+      name: Department is located at Facility
+      roles:
+        - { id: r-department-located-department, player: ot-department, role_name: is located at }
+        - { id: r-department-located-facility, player: ot-facility, role_name: houses }
+      readings: ["{0} is located at {1}", "{1} houses {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-department-located-department] }
+        - { type: mandatory, role: r-department-located-department }
+
+    # ---- scheduling --------------------------------------------------
+    - id: ft-appointment-is-for-patient
+      name: Appointment is for Patient
+      roles:
+        - { id: r-appointment-for-appointment, player: ot-appointment, role_name: is for }
+        - { id: r-appointment-for-patient, player: ot-patient, role_name: books }
+      readings: ["{0} is for {1}", "{1} books {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-appointment-for-appointment] }
+        - { type: mandatory, role: r-appointment-for-appointment }
+    - id: ft-appointment-is-with-provider
+      name: Appointment is with Provider
+      roles:
+        - { id: r-appointment-with-appointment, player: ot-appointment, role_name: is with }
+        - { id: r-appointment-with-provider, player: ot-provider, role_name: sees }
+      readings: ["{0} is with {1}", "{1} sees {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-appointment-with-appointment] }
+        - { type: mandatory, role: r-appointment-with-appointment }
+        # A provider cannot be booked twice at the same time.
+        - { type: external_uniqueness, roles: [r-appointment-with-provider, r-appointment-scheduled-datetime] }
+    - id: ft-appointment-is-in-department
+      name: Appointment is in Department
+      roles:
+        - { id: r-appointment-in-appointment, player: ot-appointment, role_name: is in }
+        - { id: r-appointment-in-department, player: ot-department, role_name: schedules }
+      readings: ["{0} is in {1}", "{1} schedules {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-appointment-in-appointment] }
+        - { type: mandatory, role: r-appointment-in-appointment }
+    - id: ft-appointment-is-scheduled-at-appointment-datetime
+      name: Appointment is scheduled at AppointmentDateTime
+      roles:
+        - { id: r-appointment-scheduled-appointment, player: ot-appointment, role_name: is scheduled at }
+        - { id: r-appointment-scheduled-datetime, player: ot-appointment-datetime, role_name: is start of }
+      readings: ["{0} is scheduled at {1}", "{1} is start of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-appointment-scheduled-appointment] }
+        - { type: mandatory, role: r-appointment-scheduled-appointment }
+    - id: ft-appointment-has-appointment-status
+      name: Appointment has AppointmentStatus
+      roles:
+        - { id: r-appointment-has-status-appointment, player: ot-appointment, role_name: has }
+        - { id: r-appointment-has-status-status, player: ot-appointment-status, role_name: is state of }
+      readings: ["{0} has {1}", "{1} is state of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-appointment-has-status-appointment] }
+        - { type: mandatory, role: r-appointment-has-status-appointment }
+
+    # ---- billing -----------------------------------------------------
+    - id: ft-claim-bills-encounter
+      name: Claim bills Encounter
+      roles:
+        - { id: r-claim-bills-claim, player: ot-claim, role_name: bills }
+        - { id: r-claim-bills-encounter, player: ot-encounter, role_name: is billed by }
+      readings: ["{0} bills {1}", "{1} is billed by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-claim-bills-claim] }
+        - { type: mandatory, role: r-claim-bills-claim }
+    - id: ft-claim-is-submitted-to-payer
+      name: Claim is submitted to Payer
+      roles:
+        - { id: r-claim-submitted-claim, player: ot-claim, role_name: is submitted to }
+        - { id: r-claim-submitted-payer, player: ot-payer, role_name: receives }
+      readings: ["{0} is submitted to {1}", "{1} receives {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-claim-submitted-claim] }
+        - { type: mandatory, role: r-claim-submitted-claim }
+    - id: ft-claim-has-claim-amount
+      name: Claim has ClaimAmount
+      roles:
+        - { id: r-claim-has-amount-claim, player: ot-claim, role_name: has }
+        - { id: r-claim-has-amount-amount, player: ot-claim-amount, role_name: is billed on }
+      readings: ["{0} has {1}", "{1} is billed on {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-claim-has-amount-claim] }
+        - { type: mandatory, role: r-claim-has-amount-claim }
+    - id: ft-claim-has-claim-status
+      name: Claim has ClaimStatus
+      roles:
+        - { id: r-claim-has-status-claim, player: ot-claim, role_name: has }
+        - { id: r-claim-has-status-status, player: ot-claim-status, role_name: is state of }
+      readings: ["{0} has {1}", "{1} is state of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-claim-has-status-claim] }
+        - { type: mandatory, role: r-claim-has-status-claim }
+    - id: ft-payer-has-payer-name
+      name: Payer has PayerName
+      roles:
+        - { id: r-payer-has-name-payer, player: ot-payer, role_name: has }
+        - { id: r-payer-has-name-name, player: ot-payer-name, role_name: is of }
+      readings: ["{0} has {1}", "{1} is of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-payer-has-name-payer] }
+        - { type: mandatory, role: r-payer-has-name-payer }
+
+  subtype_facts:
+    - { id: st-inpatient-encounter, subtype: ot-inpatient-encounter, supertype: ot-encounter, is_exclusive: true, is_exhaustive: true }
+    - { id: st-outpatient-encounter, subtype: ot-outpatient-encounter, supertype: ot-encounter, is_exclusive: true, is_exhaustive: true }
+    - { id: st-emergency-encounter, subtype: ot-emergency-encounter, supertype: ot-encounter, is_exclusive: true, is_exhaustive: true }
+    - { id: st-trauma-encounter, subtype: ot-trauma-encounter, supertype: ot-emergency-encounter }
+    - { id: st-medication-order, subtype: ot-medication-order, supertype: ot-order, is_exclusive: true }
+    - { id: st-lab-order, subtype: ot-lab-order, supertype: ot-order, is_exclusive: true }
+
+  objectified_fact_types:
+    - id: oft-admission
+      fact_type: ft-patient-is-admitted-to-facility-at-admission-datetime
+      object_type: ot-admission
+
+  definitions:
+    - term: Encounter
+      definition: In the clinical context, any patient contact that produces a chart entry; in billing, the unit a claim is raised against. The two readings disagree on telephone and portal contacts.
+      context: clinical
+    - term: Visit
+      definition: The scheduling and billing teams' word for an outpatient encounter; not a separate concept.
+      context: billing

@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: tms-dba
+title: "Multi-part keys survive the TMS schema"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Confirm that container, voyage and leg are entities with their keys
+  and that a shipment's legs keep the ternary rule.
+brief: |
+  You run the transport database. If the model loses the leg sequence
+  or the container check digit, the migration built on it will load
+  the wrong box on the wrong ship.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 5 (reference schemes).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: requires_element
+    element:
+      entity: Container
+    diagnosis: >-
+      The container is the thing that moves; a model without it moves
+      nothing.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.2."
+  - kind: requires_element
+    element:
+      entity: Voyage
+    diagnosis: >-
+      Legs belong to voyages; without Voyage a leg has no schedule.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4."
+  - kind: requires_element
+    element:
+      entity: Leg
+    diagnosis: >-
+      A shipment is a sequence of legs; the sequence is the plan.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4."
+  - kind: requires_element
+    element:
+      factTypeBetween: [Shipment, Container]
+    diagnosis: >-
+      The load fact is the join the yard runs on.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4."
+  - kind: must_validate
+    diagnosis: >-
+      A structurally invalid model cannot be exported to the new TMS.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 5, section 5.3."
+  - kind: forbids_population
+    factType: "Shipment travels Leg on Vehicle"
+    constraint: internal_uniqueness
+    hint: "A shipment travels a given leg on one vehicle."
+    diagnosis: >-
+      Two vehicles for one shipment leg is a double booking the ternary's
+      uniqueness exists to prevent.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 4, section 4.4."

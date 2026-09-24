@@ -1,0 +1,5 @@
+language: java
+framework: spring
+files_per_class: 1
+inheritance: joined
+jpa: true

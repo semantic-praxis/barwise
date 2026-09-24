@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: catalog-steward
+title: "Bundles cannot loop and names keep their scripts"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Confirm the catalog hierarchy is intact and the bundling ring is
+  acyclic.
+brief: |
+  You steward the catalog. A bundle that contains itself takes the
+  storefront down; a product name that lost its script is a support
+  ticket in a language nobody on shift reads.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 7 (ring constraints).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: requires_element
+    element:
+      entity: Product
+    diagnosis: >-
+      No catalog without products.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.2."
+  - kind: requires_element
+    element:
+      entity: HazmatProduct
+    diagnosis: >-
+      Hazmat is a subtype with its own shipping rules; flattening it
+      loses the rule.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 6, section 6.3."
+  - kind: requires_element
+    element:
+      entity: Listing
+    diagnosis: >-
+      A listing is a seller's offer of a variant; without it price has
+      no home.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4."
+  - kind: must_validate
+    diagnosis: >-
+      A model with structural errors cannot be diagrammed for the catalog
+      team.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 5, section 5.3."
+  - kind: forbids_population
+    factType: "Product bundles Product"
+    constraint: ring
+    hint: "Bundling is acyclic: a product cannot, through any chain, bundle itself."
+    diagnosis: >-
+      Without the acyclic ring constraint the model accepts a bundle that
+      contains itself.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 7, section 7.3."

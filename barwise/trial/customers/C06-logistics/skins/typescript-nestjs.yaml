@@ -1,0 +1,6 @@
+language: typescript
+framework: nestjs
+files_per_class: 1
+discriminated_unions: true
+zod: true
+generics: true
