@@ -7,3 +7,8 @@ coverage/
 .DS_Store
 .vscode-test/
 .barwise/
+
+# Trial lane: generated tiers and run results are derived from committed
+# kernels, skins and seeds (trial:generate) and never committed.
+trial/customers/*/generated/
+trial/results/

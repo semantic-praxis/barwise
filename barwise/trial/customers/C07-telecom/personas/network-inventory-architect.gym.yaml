@@ -1,0 +1,92 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: network-inventory-architect
+title: "The inventory still knows what a router is"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Read a conceptual model produced from the inventory warehouse DDL and
+  confirm that the resource hierarchy is still five levels deep with one
+  key at the top, that every network device still sits at a site, and
+  that the service dependency graph is still acyclic.
+brief: |
+  You own the network inventory model for a mobile operator, the one the
+  BigQuery warehouse under telco_dwh was built from. The SID resource
+  hierarchy runs Resource, PhysicalResource, NetworkDevice, Router,
+  EdgeRouter, and every level inherits one resource identifier from the
+  top. Services depend on other services, and the dependency chain must
+  never loop, because activation is ordered by walking it. Check that the
+  model barwise produced from the DDL keeps the chain, the key, and the
+  order.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 6 (subtyping), ch. 7
+  (ring constraints); TM Forum GB922 Resource and Service domains.
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: must_validate
+    diagnosis: >-
+      If the model does not validate it cannot be exported back to the
+      warehouse, and the inventory team keeps hand-editing DDL.
+  - kind: requires_element
+    element:
+      entity: Resource
+    diagnosis: >-
+      Resource is the root of the hierarchy and the owner of the only
+      identifier; without it every subtype needs its own key and the
+      warehouse joins break.
+  - kind: requires_element
+    element:
+      entity: NetworkDevice
+    diagnosis: >-
+      NetworkDevice is where physical inventory meets the site register
+      and the management network; folding it into PhysicalResource puts a
+      management address on every antenna.
+  - kind: requires_element
+    element:
+      entity: EdgeRouter
+    diagnosis: >-
+      EdgeRouter is the bottom of the chain and the only level that peers
+      with other operators; if it is gone the interconnect has no home and
+      the chain is four deep, not five.
+  - kind: requires_element
+    element:
+      factTypeBetween: [NetworkDevice, Site]
+    diagnosis: >-
+      A device with no site is a device field engineering cannot find;
+      the dispatch system keys on the site identifier.
+  - kind: forbids_population
+    factType: Resource has ResourceId
+    constraint: internal_uniqueness
+    hint: "One resource identifier per resource; the subtypes inherit it."
+    diagnosis: >-
+      If a resource can carry two identifiers the warehouse fact tables
+      fan out on the join, and every capacity report double counts.
+  - kind: forbids_population
+    factType: NetworkDevice is installed at Site
+    constraint: mandatory
+    hint: "Every network device is installed at exactly one site; there is no device in inventory without one."
+    diagnosis: >-
+      A device that need not have a site will be created without one by
+      the first bulk load, and the site-level power and space reports go
+      quietly wrong.
+  - kind: forbids_population
+    factType: Service depends on Service
+    constraint: ring
+    hint: "Service dependency is acyclic: no service depends on itself through any chain."
+    diagnosis: >-
+      If the dependency graph can loop, activation walks it forever; the
+      orchestrator has a loop guard, but it stops with the service half
+      built rather than refusing the design.
+  - kind: requires_element
+    element:
+      entity: ResourceFacingService
+    diagnosis: >-
+      The resource-facing service is the layer that maps services to
+      resources; without it the model claims customer-facing services run
+      directly on routers, which nobody in operations would recognize.
+  - kind: requires_verbalization
+    sentence: "No Service depends on that same Service, directly or through a chain of such relationships."
+    hint: "The ring constraint must be acyclic, not merely irreflexive."
+    diagnosis: >-
+      A model that forbids only the direct self-dependency has left the
+      two-step loop in, and that is the one that actually occurs.

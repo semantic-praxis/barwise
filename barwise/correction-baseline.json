@@ -199,6 +199,42 @@
       "caught_by": "execution",
       "note": "Re-reading the live API after the merge. The first draft asserted GitHub's releases-list sort key was 'measurably neither created_at nor published_at', on the pre-merge reading alone. Running it again after the tag moved showed created_at DID follow the tag (2026-06-14T21:45:35Z -> 2026-09-22T18:40:50Z) while published_at stayed frozen, and the position changed with it -- so the causal chain does run through created_at and the original phrasing overstated the negative. The correction narrows the claim to the chain rather than the full sort rule, because the historical ordering still is not explained by created_at desc alone. Caught by executing the same query twice, not by rethinking it."
     },
+    "enterprise-trial::0bc207e81633": {
+      "spec": "enterprise-trial.spec.md",
+      "excerpt": "- the generator produces regular mess. a generator that emits 1,500 tables from a 60-type kernel emits 25 variations of each type; a real erp has 1,500 differen",
+      "caught_by": "not-a-correction",
+      "note": "A Risks-and-testing entry with its tripwire: an amplifier produces regular mess where a real schema's mess is irregular, so the skins carry hand-written irregularity. It states a risk the design carries and the signal that would reopen it; it records nothing the draft got wrong."
+    },
+    "enterprise-trial::0d9cbb1d4114": {
+      "spec": "enterprise-trial.spec.md",
+      "excerpt": "- the journey moved out of the package, and the acceptance oracles became gym exercises. see target architecture. - a finding class, not a free-text note, is wh",
+      "caught_by": "execution",
+      "note": "The Status header announcing that corrections are recorded below. It points at the records; it is not one. Re-keyed from ::714e7e934891 (and before that ::2e97ec924e21, ::b20d229deee7) when this branch's issue ids changed again -- the key hashes a window of normalised text that reaches the ids, so every renumbering drops the old row and adds this one. Fourth re-key of the same record; the content has never changed."
+    },
+    "enterprise-trial::3551935b55a1": {
+      "spec": "enterprise-trial.spec.md",
+      "excerpt": "deviations from the draft, recorded so the next workstream starts from reality (the spec-writer convention).",
+      "caught_by": "not-a-correction",
+      "note": "The heading sentence of the Implementation notes section, naming the spec-writer convention it follows. The corrections themselves are the bullets under it, recorded separately."
+    },
+    "enterprise-trial::4d8a47e338ba": {
+      "spec": "enterprise-trial.spec.md",
+      "excerpt": "the journey is not per-customer. the draft gave each package a journey.yaml listing its steps. twelve copies of one list is the must-agree duplication claude.md",
+      "caught_by": "execution",
+      "note": "Real correction. The draft gave every customer package a journey.yaml listing its steps; writing the runner for the first customer showed every sprint is the same six commands over whatever the package declares, so twelve copies would have been the must-agree duplication CLAUDE.md forbids. Caught by building it, not by reading the draft."
+    },
+    "enterprise-trial::6aa83b9e74b2": {
+      "spec": "enterprise-trial.spec.md",
+      "excerpt": "- twelve customers or six (resolved: twelve, built). all nineteen stressor rows are covered, across nine sql dialects, 686 object types and 710 fact types of ha",
+      "caught_by": "execution",
+      "note": "An Open decision the implementation resolved: the draft recommended twelve customers with six as a floor if authoring ran late. Twelve were built and the authoring cost was lower than the draft assumed, because the packages are independent. The counts in the row (nineteen stressors, nine dialects, 686 object types) were measured from the built packages, not estimated."
+    },
+    "enterprise-trial::f0d76fc11d13": {
+      "spec": "enterprise-trial.spec.md",
+      "excerpt": "| sprint | name | lane | steps | oracles | | ------ | ------------ | ------- | ---------------------------------------------------------------------------------",
+      "caught_by": "not-a-correction",
+      "note": "The six-sprint table. It matches on \"edit distance from the draft to a model the persona accepts\", where \"draft\" is the draft MODEL an extraction produces, not the draft of this spec. No correction is recorded here."
+    },
     "eval-metric-readiness::7a846f091cfc": {
       "spec": "eval-metric-readiness.spec.md",
       "excerpt": "nothing in the harness would have caught it, because every case is a training case. a search that runs hundreds of candidates against the same seven, with no he",

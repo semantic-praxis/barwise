@@ -1,0 +1,66 @@
+id: C04
+slug: marketplace
+name: Global e-commerce marketplace
+industry: retail
+summary: >-
+  A two-sided marketplace whose analytics stack is a large dbt project on
+  Snowflake with semi-structured columns, whose product names arrive in
+  every script the world writes, and whose finance and support teams both
+  say "customer" and mean the opposite sides of the trade.
+stressors: [K1, K4, K6, K9, K10, K11, K13]
+seed: 31
+personas:
+  - id: analytics-engineer
+    name: Yusuf Adeyemi
+    role: Analytics engineer, dbt owner
+    wants: Every staging model with a key comes back as an entity, relationships tests become fact types, and the models without keys are named as skipped rather than vanishing.
+    acceptance: personas/analytics-engineer.gym.yaml
+    judges: [warehouse-dbt]
+  - id: catalog-steward
+    name: Mei-Ling Chao
+    role: Catalog data steward
+    wants: Product, variant and listing are distinct, bundles cannot loop, and product names in Japanese and German survive every export byte for byte.
+    acceptance: personas/catalog-steward.gym.yaml
+    judges: [snowflake-ddl]
+artifacts:
+  - id: warehouse-dbt
+    generator: dbt
+    skin: skins/snowflake-dbt.yaml
+    importer: dbt
+    expect: import
+    tiers: { small: 1, medium: 6, enterprise: 15 }
+  - id: snowflake-ddl
+    generator: ddl
+    skin: skins/snowflake-core.yaml
+    importer: sql
+    dialect: snowflake
+    expect: import
+    tiers: { small: 1, medium: 8, enterprise: 30 }
+contexts:
+  parties: [Party, Buyer, Seller, Marketplace]
+  catalog: [Category, Product, PhysicalProduct, HazmatProduct, ProductVariant, Listing]
+  orders: [Order, OrderLine, Return]
+  fulfillment: [Warehouse, Carrier, Shipment, Fulfillment]
+  payments: [Currency, Payment, Refund, Payout]
+history:
+  - { kind: rename_object_type, from: Listing, to: Offer }
+  - { kind: add_value_constraint_value, object_type: CurrencyCode, value: XAU }
+  - { kind: add_fact_type, name: Seller prefers Carrier, between: [Seller, Carrier] }
+  - { kind: add_subtype, subtype: Marketplace, supertype: Party }
+  - { kind: rename_object_type, from: Offer, to: Listing }
+  - { kind: tighten_uniqueness, fact_type: Seller ships from Warehouse }
+  - { kind: remove_object_type, name: Refund }
+  - { kind: add_mandatory, fact_type: Order includes ProductVariant in Quantity, role_index: 0 }
+transcripts:
+  - file: transcripts/session-01-customer.md
+    key: transcripts/session-01-customer.key.yaml
+lateRequirement:
+  # A market launches and finance needs the currency the week before.
+  note: "A market launches and finance needs the currency the week before."
+  change: {"kind":"add_value_constraint_value","object_type":"CurrencyCode","value":"TRY"}
+  element: CurrencyCode
+  expectInExport: "TRY"
+budgets:
+  small: 30000
+  medium: 180000
+  enterprise: 900000

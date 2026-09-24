@@ -1,0 +1,1001 @@
+orm_version: "1.1"
+model:
+  name: Mobile Network Operator
+  domain_context: telecommunications
+  note: >-
+    The hand-authored seed model for trial customer C07. A mobile network
+    operator whose vocabulary is the TM Forum Information Framework (SID):
+    Party and the roles it plays (Customer, Subscriber), the product
+    catalog (ProductSpecification, ProductOffering, Product), the service
+    layer split into customer-facing and resource-facing services, and a
+    resource inventory whose subtype chain runs five deep. Number
+    portability is regulated, which is where the deontic rule lives; a
+    mobile number is unique only together with its country code, which is
+    the composite key the catalog session argues about.
+
+  object_types:
+    # ---- parties ------------------------------------------------------
+    - id: ot-party
+      name: Party
+      kind: entity
+      reference_mode: party_id
+      definition: An individual or organization that the operator has a relationship with, identified by a party identifier.
+    - id: ot-individual
+      name: Individual
+      kind: entity
+      reference_mode: party_id
+      definition: A party that is a single natural person.
+      aliases: [Person]
+    - id: ot-organization
+      name: Organization
+      kind: entity
+      reference_mode: party_id
+      definition: A party that is a company, agency, or other legal entity.
+    - id: ot-customer
+      name: Customer
+      kind: entity
+      reference_mode: customer_id
+      definition: The role a party plays when it buys products from the operator and is billed for them, identified by a customer identifier.
+      aliases: [Account holder]
+    - id: ot-subscriber
+      name: Subscriber
+      kind: entity
+      reference_mode: subscriber_id
+      definition: The role a party plays when it uses a mobile line served under a customer, identified by a subscriber identifier; the customer pays, the subscriber uses.
+      aliases: [Line user, End user]
+    - id: ot-country
+      name: Country
+      kind: entity
+      reference_mode: country_code
+      definition: A country with its own numbering plan, identified by its ITU E.164 country calling code.
+    - id: ot-operator
+      name: Operator
+      kind: entity
+      reference_mode: operator_code
+      definition: A mobile network operator, this one or a competitor, identified by the code the national regulator assigns for number portability.
+      aliases: [Carrier, Network]
+
+    # ---- product catalog ----------------------------------------------
+    - id: ot-product-specification
+      name: ProductSpecification
+      kind: entity
+      reference_mode: product_specification_id
+      definition: The detailed description of a sellable thing, independent of how it is priced or marketed; several offerings can sell one specification.
+    - id: ot-product-offering
+      name: ProductOffering
+      kind: entity
+      reference_mode: product_offering_id
+      definition: A product specification made available to customers at a price under a rate plan; what appears on the tariff sheet.
+      aliases: [Plan, Tariff]
+    - id: ot-product
+      name: Product
+      kind: entity
+      reference_mode: product_id
+      definition: An instance of a product offering that a customer has bought and holds, such as this customer's 5G Unlimited line.
+
+    # ---- ordering -----------------------------------------------------
+    - id: ot-product-order
+      name: ProductOrder
+      kind: entity
+      reference_mode: product_order_id
+      definition: A customer's request to buy, change, or cease products, identified by an order identifier.
+    - id: ot-order-item
+      name: OrderItem
+      kind: entity
+      reference_mode: order_item_id
+      definition: One line of a product order; a product offering included in the order in a stated quantity.
+    - id: ot-subscription
+      name: Subscription
+      kind: entity
+      reference_mode: subscription_id
+      definition: The standing arrangement under which a subscriber takes a product offering, identified by a subscription identifier.
+    - id: ot-port-in-request
+      name: PortInRequest
+      kind: entity
+      reference_mode: port_request_id
+      definition: A request to move a mobile number from a donor operator onto this network, identified by a port request identifier.
+
+    # ---- services -----------------------------------------------------
+    - id: ot-service-specification
+      name: ServiceSpecification
+      kind: entity
+      reference_mode: service_specification_id
+      definition: The template a service is instantiated from, such as the LTE data bearer specification.
+    - id: ot-service
+      name: Service
+      kind: entity
+      reference_mode: service_id
+      definition: A running capability delivered on the network, identified by a service identifier.
+    - id: ot-customer-facing-service
+      name: CustomerFacingService
+      kind: entity
+      reference_mode: service_id
+      definition: A service the subscriber can perceive and that a product is realized by, such as mobile data.
+      aliases: [CFS]
+    - id: ot-resource-facing-service
+      name: ResourceFacingService
+      kind: entity
+      reference_mode: service_id
+      definition: A service that runs on resources and supports customer-facing services without being sold on its own, such as an APN or a VLAN.
+      aliases: [RFS]
+
+    # ---- resource inventory -------------------------------------------
+    - id: ot-resource
+      name: Resource
+      kind: entity
+      reference_mode: resource_id
+      definition: A physical or logical component of the network that services run on, identified by an inventory resource identifier.
+    - id: ot-physical-resource
+      name: PhysicalResource
+      kind: entity
+      reference_mode: resource_id
+      definition: A resource that occupies space and has a serial number, such as a chassis, a card, or an antenna.
+    - id: ot-logical-resource
+      name: LogicalResource
+      kind: entity
+      reference_mode: resource_id
+      definition: A resource that has no physical form, such as an IP address block or a VLAN identifier.
+    - id: ot-network-device
+      name: NetworkDevice
+      kind: entity
+      reference_mode: resource_id
+      definition: A physical resource that is managed as a network element at a site and reached at a management address.
+    - id: ot-router
+      name: Router
+      kind: entity
+      reference_mode: resource_id
+      definition: A network device that forwards IP packets between networks under one or more routing protocols.
+    - id: ot-edge-router
+      name: EdgeRouter
+      kind: entity
+      reference_mode: resource_id
+      definition: A router at the boundary of the operator's network that peers with other operators.
+      aliases: [PE router]
+    - id: ot-site
+      name: Site
+      kind: entity
+      reference_mode: site_id
+      definition: A physical location in the operator's inventory, such as a central office, a data center, or a cell site, where network devices are installed.
+
+    # ---- identifier value types --------------------------------------
+    - id: ot-party-id
+      name: PartyId
+      kind: value
+      definition: The identifier the party management system assigns to a party.
+      data_type: { name: text, length: 20 }
+    - id: ot-customer-id
+      name: CustomerId
+      kind: value
+      definition: The identifier the customer management system assigns when a party becomes a customer.
+      data_type: { name: text, length: 20 }
+    - id: ot-subscriber-id
+      name: SubscriberId
+      kind: value
+      definition: The identifier assigned to a subscriber; not the mobile number, which can be ported away and reissued.
+      data_type: { name: text, length: 20 }
+    - id: ot-country-code
+      name: CountryCode
+      kind: value
+      definition: The E.164 country calling code, such as 44 or 353.
+      data_type: { name: text, length: 4 }
+    - id: ot-operator-code
+      name: OperatorCode
+      kind: value
+      definition: The regulator-assigned code of a mobile network operator, such as 23430.
+      data_type: { name: text, length: 10 }
+    - id: ot-product-specification-id
+      name: ProductSpecificationId
+      kind: value
+      definition: The catalog identifier of a product specification.
+      data_type: { name: text, length: 20 }
+    - id: ot-product-offering-id
+      name: ProductOfferingId
+      kind: value
+      definition: The catalog identifier of a product offering.
+      data_type: { name: text, length: 20 }
+    - id: ot-product-id
+      name: ProductId
+      kind: value
+      definition: The inventory identifier of a product a customer holds.
+      data_type: { name: text, length: 20 }
+    - id: ot-product-order-id
+      name: ProductOrderId
+      kind: value
+      definition: The identifier the order management system assigns to a product order.
+      data_type: { name: text, length: 20 }
+    - id: ot-order-item-id
+      name: OrderItemId
+      kind: value
+      definition: The identifier of one line within a product order.
+      data_type: { name: text, length: 20 }
+    - id: ot-subscription-id
+      name: SubscriptionId
+      kind: value
+      definition: The identifier assigned to a subscription when it is created.
+      data_type: { name: text, length: 20 }
+    - id: ot-port-request-id
+      name: PortRequestId
+      kind: value
+      definition: The identifier the porting gateway assigns to a port-in request.
+      data_type: { name: text, length: 20 }
+    - id: ot-service-specification-id
+      name: ServiceSpecificationId
+      kind: value
+      definition: The catalog identifier of a service specification.
+      data_type: { name: text, length: 20 }
+    - id: ot-service-id
+      name: ServiceId
+      kind: value
+      definition: The identifier the service inventory assigns to a service.
+      data_type: { name: text, length: 20 }
+    - id: ot-resource-id
+      name: ResourceId
+      kind: value
+      definition: The identifier the resource inventory assigns to a resource.
+      data_type: { name: text, length: 20 }
+    - id: ot-site-id
+      name: SiteId
+      kind: value
+      definition: The identifier the site register assigns to a site.
+      data_type: { name: text, length: 20 }
+
+    # ---- descriptive value types --------------------------------------
+    - id: ot-party-name
+      name: PartyName
+      kind: value
+      definition: The name a party is known by; a legal name for an organization, a full name for an individual.
+      data_type: { name: text, length: 200 }
+    - id: ot-msisdn
+      name: Msisdn
+      kind: value
+      definition: The national significant number of a mobile line, without the country code; the same digits can exist in two countries.
+      data_type: { name: text, length: 15 }
+    - id: ot-rate-plan-code
+      name: RatePlanCode
+      kind: value
+      definition: The code under which billing rates a product offering; one code per offering on the tariff sheet.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values:
+          - PAYG-BASIC
+          - PAYG-DATA
+          - PAYG-INTL
+          - PRE-1G-30D
+          - PRE-5G-30D
+          - PRE-20G-30D
+          - PRE-UNL-30D
+          - PRE-5G-90D
+          - PRE-UNL-90D
+          - POST-2G-SIM
+          - POST-10G-SIM
+          - POST-30G-SIM
+          - POST-UNL-SIM
+          - POST-5G-UNL-24
+          - POST-5G-UNL-36
+          - POST-5G-100G-24
+          - POST-5G-100G-36
+          - POST-FAMILY-2
+          - POST-FAMILY-3
+          - POST-FAMILY-4
+          - POST-FAMILY-5
+          - POST-SENIOR
+          - POST-STUDENT
+          - BIZ-SHARED-50G
+          - BIZ-SHARED-200G
+          - BIZ-SHARED-1T
+          - BIZ-UNL-PER-LINE
+          - BIZ-FLEET-IOT
+          - IOT-NBIOT-100M
+          - IOT-LTEM-1G
+          - IOT-LTEM-5G
+          - MBB-20G
+          - MBB-100G
+          - MBB-UNL
+          - FWA-5G-HOME
+          - FWA-5G-HOME-PRO
+          - ROAM-EU-DAY
+          - ROAM-WORLD-DAY
+    - id: ot-offering-name
+      name: OfferingName
+      kind: value
+      definition: The marketing name of a product offering as it appears to customers.
+      data_type: { name: text, length: 120 }
+    - id: ot-offering-lifecycle-status
+      name: OfferingLifecycleStatus
+      kind: value
+      definition: Where a product offering is in its catalog lifecycle.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [In study, In design, In test, Active, Launched, Retired, Obsolete, Rejected]
+    - id: ot-monthly-recurring-charge
+      name: MonthlyRecurringCharge
+      kind: value
+      definition: The recurring charge a product offering is billed at per month.
+      data_type: { name: money }
+    - id: ot-order-date
+      name: OrderDate
+      kind: value
+      definition: The date a product order was placed.
+      data_type: { name: date }
+    - id: ot-product-order-state
+      name: ProductOrderState
+      kind: value
+      definition: The lifecycle state of a product order.
+      data_type: { name: text, length: 30 }
+      value_constraint:
+        values: [acknowledged, rejected, pending, held, inProgress, cancelled, completed, failed, partial, pendingCancellation]
+    - id: ot-quantity
+      name: Quantity
+      kind: value
+      definition: How many units of a product offering an order item asks for.
+      data_type: { name: integer }
+    - id: ot-subscription-start-date
+      name: SubscriptionStartDate
+      kind: value
+      definition: The date a subscription came into force.
+      data_type: { name: date }
+    - id: ot-port-status
+      name: PortStatus
+      kind: value
+      definition: The state of a port-in request in the inter-operator porting process.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [received, validated, sent to donor, accepted by donor, rejected by donor, scheduled, ported, cancelled]
+    - id: ot-letter-of-authorization-reference
+      name: LetterOfAuthorizationReference
+      kind: value
+      definition: The reference of the signed authorization in which the subscriber consents to the port.
+      data_type: { name: text, length: 40 }
+    - id: ot-service-state
+      name: ServiceState
+      kind: value
+      definition: The operational state of a service.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [feasibilityChecked, designed, reserved, inactive, active, terminated]
+    - id: ot-resource-state
+      name: ResourceState
+      kind: value
+      definition: The inventory state of a resource.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [planned, installed, available, reserved, in use, faulty, retired]
+    - id: ot-serial-number
+      name: SerialNumber
+      kind: value
+      definition: The manufacturer's serial number stamped on a physical resource.
+      data_type: { name: text, length: 40 }
+    - id: ot-management-ip-address
+      name: ManagementIpAddress
+      kind: value
+      definition: The IP address at which a network device is managed.
+      data_type: { name: text, length: 45 }
+    - id: ot-site-name
+      name: SiteName
+      kind: value
+      definition: The name a site is known by in the field.
+      data_type: { name: text, length: 100 }
+    - id: ot-routing-protocol
+      name: RoutingProtocol
+      kind: value
+      definition: A routing protocol a router runs.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [BGP, OSPF, IS-IS, MPLS-LDP, static]
+
+  fact_types:
+    # ---- identification ----------------------------------------------
+    - id: ft-party-has-party-id
+      name: Party has PartyId
+      roles:
+        - { id: r-party-has-party-id-party, player: ot-party, role_name: has }
+        - { id: r-party-has-party-id-id, player: ot-party-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-party-has-party-id-party], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-party-has-party-id-id] }
+        - { type: mandatory, role: r-party-has-party-id-party }
+    - id: ft-customer-has-customer-id
+      name: Customer has CustomerId
+      roles:
+        - { id: r-customer-has-customer-id-customer, player: ot-customer, role_name: has }
+        - { id: r-customer-has-customer-id-id, player: ot-customer-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-customer-has-customer-id-customer], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-customer-has-customer-id-id] }
+        - { type: mandatory, role: r-customer-has-customer-id-customer }
+    - id: ft-subscriber-has-subscriber-id
+      name: Subscriber has SubscriberId
+      roles:
+        - { id: r-subscriber-has-subscriber-id-subscriber, player: ot-subscriber, role_name: has }
+        - { id: r-subscriber-has-subscriber-id-id, player: ot-subscriber-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subscriber-has-subscriber-id-subscriber], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-subscriber-has-subscriber-id-id] }
+        - { type: mandatory, role: r-subscriber-has-subscriber-id-subscriber }
+    - id: ft-country-has-country-code
+      name: Country has CountryCode
+      roles:
+        - { id: r-country-has-code-country, player: ot-country, role_name: has }
+        - { id: r-country-has-code-code, player: ot-country-code, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-country-has-code-country], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-country-has-code-code] }
+        - { type: mandatory, role: r-country-has-code-country }
+    - id: ft-operator-has-operator-code
+      name: Operator has OperatorCode
+      roles:
+        - { id: r-operator-has-code-operator, player: ot-operator, role_name: has }
+        - { id: r-operator-has-code-code, player: ot-operator-code, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-operator-has-code-operator], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-operator-has-code-code] }
+        - { type: mandatory, role: r-operator-has-code-operator }
+    - id: ft-product-specification-has-product-specification-id
+      name: ProductSpecification has ProductSpecificationId
+      roles:
+        - { id: r-product-spec-has-id-spec, player: ot-product-specification, role_name: has }
+        - { id: r-product-spec-has-id-id, player: ot-product-specification-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-product-spec-has-id-spec], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-product-spec-has-id-id] }
+        - { type: mandatory, role: r-product-spec-has-id-spec }
+    - id: ft-product-offering-has-product-offering-id
+      name: ProductOffering has ProductOfferingId
+      roles:
+        - { id: r-product-offering-has-id-offering, player: ot-product-offering, role_name: has }
+        - { id: r-product-offering-has-id-id, player: ot-product-offering-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-product-offering-has-id-offering], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-product-offering-has-id-id] }
+        - { type: mandatory, role: r-product-offering-has-id-offering }
+    - id: ft-product-has-product-id
+      name: Product has ProductId
+      roles:
+        - { id: r-product-has-id-product, player: ot-product, role_name: has }
+        - { id: r-product-has-id-id, player: ot-product-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-product-has-id-product], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-product-has-id-id] }
+        - { type: mandatory, role: r-product-has-id-product }
+    - id: ft-product-order-has-product-order-id
+      name: ProductOrder has ProductOrderId
+      roles:
+        - { id: r-product-order-has-id-order, player: ot-product-order, role_name: has }
+        - { id: r-product-order-has-id-id, player: ot-product-order-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-product-order-has-id-order], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-product-order-has-id-id] }
+        - { type: mandatory, role: r-product-order-has-id-order }
+    - id: ft-order-item-has-order-item-id
+      name: OrderItem has OrderItemId
+      roles:
+        - { id: r-order-item-has-id-item, player: ot-order-item, role_name: has }
+        - { id: r-order-item-has-id-id, player: ot-order-item-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-order-item-has-id-item], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-order-item-has-id-id] }
+        - { type: mandatory, role: r-order-item-has-id-item }
+    - id: ft-subscription-has-subscription-id
+      name: Subscription has SubscriptionId
+      roles:
+        - { id: r-subscription-has-id-subscription, player: ot-subscription, role_name: has }
+        - { id: r-subscription-has-id-id, player: ot-subscription-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subscription-has-id-subscription], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-subscription-has-id-id] }
+        - { type: mandatory, role: r-subscription-has-id-subscription }
+    - id: ft-port-in-request-has-port-request-id
+      name: PortInRequest has PortRequestId
+      roles:
+        - { id: r-port-request-has-id-request, player: ot-port-in-request, role_name: has }
+        - { id: r-port-request-has-id-id, player: ot-port-request-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-port-request-has-id-request], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-port-request-has-id-id] }
+        - { type: mandatory, role: r-port-request-has-id-request }
+    - id: ft-service-specification-has-service-specification-id
+      name: ServiceSpecification has ServiceSpecificationId
+      roles:
+        - { id: r-service-spec-has-id-spec, player: ot-service-specification, role_name: has }
+        - { id: r-service-spec-has-id-id, player: ot-service-specification-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-service-spec-has-id-spec], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-service-spec-has-id-id] }
+        - { type: mandatory, role: r-service-spec-has-id-spec }
+    - id: ft-service-has-service-id
+      name: Service has ServiceId
+      roles:
+        - { id: r-service-has-id-service, player: ot-service, role_name: has }
+        - { id: r-service-has-id-id, player: ot-service-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-service-has-id-service], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-service-has-id-id] }
+        - { type: mandatory, role: r-service-has-id-service }
+    - id: ft-resource-has-resource-id
+      name: Resource has ResourceId
+      roles:
+        - { id: r-resource-has-id-resource, player: ot-resource, role_name: has }
+        - { id: r-resource-has-id-id, player: ot-resource-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-resource-has-id-resource], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-resource-has-id-id] }
+        - { type: mandatory, role: r-resource-has-id-resource }
+    - id: ft-site-has-site-id
+      name: Site has SiteId
+      roles:
+        - { id: r-site-has-id-site, player: ot-site, role_name: has }
+        - { id: r-site-has-id-id, player: ot-site-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-site-has-id-site], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-site-has-id-id] }
+        - { type: mandatory, role: r-site-has-id-site }
+
+    # ---- parties and roles -------------------------------------------
+    - id: ft-party-has-party-name
+      name: Party has PartyName
+      roles:
+        - { id: r-party-has-name-party, player: ot-party, role_name: has }
+        - { id: r-party-has-name-name, player: ot-party-name, role_name: is of }
+      readings: ["{0} has {1}", "{1} is of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-party-has-name-party] }
+        - { type: mandatory, role: r-party-has-name-party }
+    - id: ft-customer-is-played-by-party
+      name: Customer is played by Party
+      definition: Customer is a role, not a kind of party; one party can be a customer more than once (a sole trader with a personal and a business account).
+      roles:
+        - { id: r-customer-played-by-customer, player: ot-customer, role_name: is played by }
+        - { id: r-customer-played-by-party, player: ot-party, role_name: plays }
+      readings: ["{0} is played by {1}", "{1} plays {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-customer-played-by-customer] }
+        - { type: mandatory, role: r-customer-played-by-customer }
+    - id: ft-subscriber-is-played-by-party
+      name: Subscriber is played by Party
+      roles:
+        - { id: r-subscriber-played-by-subscriber, player: ot-subscriber, role_name: is played by }
+        - { id: r-subscriber-played-by-party, player: ot-party, role_name: plays }
+      readings: ["{0} is played by {1}", "{1} plays {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subscriber-played-by-subscriber] }
+        - { type: mandatory, role: r-subscriber-played-by-subscriber }
+    - id: ft-subscriber-is-served-under-customer
+      name: Subscriber is served under Customer
+      definition: The customer whose account the subscriber's line is billed to; a family plan has one customer and several subscribers.
+      roles:
+        - { id: r-subscriber-served-under-subscriber, player: ot-subscriber, role_name: is served under }
+        - { id: r-subscriber-served-under-customer, player: ot-customer, role_name: pays for }
+      readings: ["{0} is served under {1}", "{1} pays for {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subscriber-served-under-subscriber] }
+        - { type: mandatory, role: r-subscriber-served-under-subscriber }
+    - id: ft-subscriber-has-msisdn
+      name: Subscriber has Msisdn
+      definition: The mobile number on the subscriber's line, as national significant digits; the number is unique only together with the country whose plan issued it.
+      roles:
+        - { id: r-subscriber-has-msisdn-subscriber, player: ot-subscriber, role_name: has }
+        - { id: r-subscriber-has-msisdn-msisdn, player: ot-msisdn, role_name: is assigned to }
+      readings: ["{0} has {1}", "{1} is assigned to {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subscriber-has-msisdn-subscriber] }
+        - { type: mandatory, role: r-subscriber-has-msisdn-subscriber }
+        # The composite key: 7700900123 exists under 44 and again under
+        # 353, so (Msisdn, Country) identifies the line and Msisdn alone
+        # does not. The catalog session argues about exactly this.
+        - { type: external_uniqueness, roles: [r-subscriber-has-msisdn-msisdn, r-subscriber-numbered-in-country] }
+    - id: ft-subscriber-is-numbered-in-country
+      name: Subscriber is numbered in Country
+      roles:
+        - { id: r-subscriber-numbered-in-subscriber, player: ot-subscriber, role_name: is numbered in }
+        - { id: r-subscriber-numbered-in-country, player: ot-country, role_name: issues numbers to }
+      readings: ["{0} is numbered in {1}", "{1} issues numbers to {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subscriber-numbered-in-subscriber] }
+        - { type: mandatory, role: r-subscriber-numbered-in-subscriber }
+    - id: ft-operator-is-licensed-in-country
+      name: Operator is licensed in Country
+      roles:
+        - { id: r-operator-licensed-operator, player: ot-operator, role_name: is licensed in }
+        - { id: r-operator-licensed-country, player: ot-country, role_name: licenses }
+      readings: ["{0} is licensed in {1}", "{1} licenses {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-operator-licensed-operator] }
+        - { type: mandatory, role: r-operator-licensed-operator }
+
+    # ---- product catalog ----------------------------------------------
+    - id: ft-product-offering-has-offering-name
+      name: ProductOffering has OfferingName
+      roles:
+        - { id: r-offering-has-name-offering, player: ot-product-offering, role_name: has }
+        - { id: r-offering-has-name-name, player: ot-offering-name, role_name: is of }
+      readings: ["{0} has {1}", "{1} is of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-offering-has-name-offering] }
+        - { type: mandatory, role: r-offering-has-name-offering }
+    - id: ft-product-offering-is-defined-by-product-specification
+      name: ProductOffering is defined by ProductSpecification
+      roles:
+        - { id: r-offering-defined-by-offering, player: ot-product-offering, role_name: is defined by }
+        - { id: r-offering-defined-by-spec, player: ot-product-specification, role_name: defines }
+      readings: ["{0} is defined by {1}", "{1} defines {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-offering-defined-by-offering] }
+        - { type: mandatory, role: r-offering-defined-by-offering }
+    - id: ft-product-offering-has-rate-plan-code
+      name: ProductOffering has RatePlanCode
+      definition: The billing rate plan the offering is charged under; billing keys on the code, so no two offerings share one.
+      roles:
+        - { id: r-offering-has-rate-plan-offering, player: ot-product-offering, role_name: has }
+        - { id: r-offering-has-rate-plan-code, player: ot-rate-plan-code, role_name: rates }
+      readings: ["{0} has {1}", "{1} rates {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-offering-has-rate-plan-offering] }
+        - { type: internal_uniqueness, roles: [r-offering-has-rate-plan-code] }
+        - { type: mandatory, role: r-offering-has-rate-plan-offering }
+    - id: ft-product-offering-has-offering-lifecycle-status
+      name: ProductOffering has OfferingLifecycleStatus
+      roles:
+        - { id: r-offering-has-status-offering, player: ot-product-offering, role_name: has }
+        - { id: r-offering-has-status-status, player: ot-offering-lifecycle-status, role_name: is state of }
+      readings: ["{0} has {1}", "{1} is state of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-offering-has-status-offering] }
+        - { type: mandatory, role: r-offering-has-status-offering }
+    - id: ft-product-offering-has-monthly-recurring-charge
+      name: ProductOffering has MonthlyRecurringCharge
+      roles:
+        - { id: r-offering-has-mrc-offering, player: ot-product-offering, role_name: has }
+        - { id: r-offering-has-mrc-charge, player: ot-monthly-recurring-charge, role_name: is charged for }
+      readings: ["{0} has {1}", "{1} is charged for {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-offering-has-mrc-offering] }
+    - id: ft-product-offering-bundles-product-offering
+      name: ProductOffering bundles ProductOffering
+      definition: A bundle offering is composed of component offerings; a bundle cannot, through any chain of components, contain itself.
+      roles:
+        - { id: r-offering-bundles-bundle, player: ot-product-offering, role_name: bundles }
+        - { id: r-offering-bundles-component, player: ot-product-offering, role_name: is a component of }
+      readings: ["{0} bundles {1}", "{1} is a component of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-offering-bundles-bundle, r-offering-bundles-component] }
+        - { type: ring, role_1: r-offering-bundles-bundle, role_2: r-offering-bundles-component, ring_type: acyclic }
+    - id: ft-product-specification-is-realized-by-service-specification
+      name: ProductSpecification is realized by ServiceSpecification
+      roles:
+        - { id: r-product-spec-realized-by-spec, player: ot-product-specification, role_name: is realized by }
+        - { id: r-product-spec-realized-by-service-spec, player: ot-service-specification, role_name: realizes }
+      readings: ["{0} is realized by {1}", "{1} realizes {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-product-spec-realized-by-spec, r-product-spec-realized-by-service-spec] }
+    - id: ft-product-is-an-instance-of-product-offering
+      name: Product is an instance of ProductOffering
+      roles:
+        - { id: r-product-instance-of-product, player: ot-product, role_name: is an instance of }
+        - { id: r-product-instance-of-offering, player: ot-product-offering, role_name: is instantiated as }
+      readings: ["{0} is an instance of {1}", "{1} is instantiated as {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-product-instance-of-product] }
+        - { type: mandatory, role: r-product-instance-of-product }
+    - id: ft-product-is-held-by-customer
+      name: Product is held by Customer
+      roles:
+        - { id: r-product-held-by-product, player: ot-product, role_name: is held by }
+        - { id: r-product-held-by-customer, player: ot-customer, role_name: holds }
+      readings: ["{0} is held by {1}", "{1} holds {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-product-held-by-product] }
+        - { type: mandatory, role: r-product-held-by-product }
+
+    # ---- ordering (OrderItem is the objectified ternary) -------------
+    - id: ft-product-order-is-placed-by-customer
+      name: ProductOrder is placed by Customer
+      roles:
+        - { id: r-order-placed-by-order, player: ot-product-order, role_name: is placed by }
+        - { id: r-order-placed-by-customer, player: ot-customer, role_name: places }
+      readings: ["{0} is placed by {1}", "{1} places {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-order-placed-by-order] }
+        - { type: mandatory, role: r-order-placed-by-order }
+    - id: ft-product-order-was-placed-on-order-date
+      name: ProductOrder was placed on OrderDate
+      roles:
+        - { id: r-order-placed-on-order, player: ot-product-order, role_name: was placed on }
+        - { id: r-order-placed-on-date, player: ot-order-date, role_name: is date of }
+      readings: ["{0} was placed on {1}", "{1} is date of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-order-placed-on-order] }
+        - { type: mandatory, role: r-order-placed-on-order }
+    - id: ft-product-order-has-product-order-state
+      name: ProductOrder has ProductOrderState
+      roles:
+        - { id: r-order-has-state-order, player: ot-product-order, role_name: has }
+        - { id: r-order-has-state-state, player: ot-product-order-state, role_name: is state of }
+      readings: ["{0} has {1}", "{1} is state of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-order-has-state-order] }
+        - { type: mandatory, role: r-order-has-state-order }
+    - id: ft-product-order-includes-product-offering-in-quantity
+      name: ProductOrder includes ProductOffering in Quantity
+      definition: One order line; an order names a given offering at most once, with the quantity on the line.
+      roles:
+        - { id: r-order-includes-order, player: ot-product-order, role_name: includes }
+        - { id: r-order-includes-offering, player: ot-product-offering, role_name: is included in }
+        - { id: r-order-includes-quantity, player: ot-quantity, role_name: in }
+      readings: ["{0} includes {1} in {2}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-order-includes-order, r-order-includes-offering] }
+    - id: ft-order-item-results-in-product
+      name: OrderItem results in Product
+      definition: The product created or changed when the order line completes; a line that has not completed has no product yet.
+      roles:
+        - { id: r-order-item-results-item, player: ot-order-item, role_name: results in }
+        - { id: r-order-item-results-product, player: ot-product, role_name: results from }
+      readings: ["{0} results in {1}", "{1} results from {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-order-item-results-item] }
+        - { type: internal_uniqueness, roles: [r-order-item-results-product] }
+
+    # ---- subscriptions (Subscription is the objectified binary) ------
+    - id: ft-subscriber-subscribes-to-product-offering
+      name: Subscriber subscribes to ProductOffering
+      definition: The standing arrangement between a line and an offering; a subscriber holds a given offering under at most one subscription at a time.
+      roles:
+        - { id: r-subscriber-subscribes-subscriber, player: ot-subscriber, role_name: subscribes to }
+        - { id: r-subscriber-subscribes-offering, player: ot-product-offering, role_name: is subscribed to by }
+      readings: ["{0} subscribes to {1}", "{1} is subscribed to by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subscriber-subscribes-subscriber, r-subscriber-subscribes-offering] }
+    - id: ft-subscription-started-on-subscription-start-date
+      name: Subscription started on SubscriptionStartDate
+      roles:
+        - { id: r-subscription-started-subscription, player: ot-subscription, role_name: started on }
+        - { id: r-subscription-started-date, player: ot-subscription-start-date, role_name: is start of }
+      readings: ["{0} started on {1}", "{1} is start of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subscription-started-subscription] }
+        - { type: mandatory, role: r-subscription-started-subscription }
+    - id: ft-subscription-is-delivered-as-product
+      name: Subscription is delivered as Product
+      roles:
+        - { id: r-subscription-delivered-subscription, player: ot-subscription, role_name: is delivered as }
+        - { id: r-subscription-delivered-product, player: ot-product, role_name: delivers }
+      readings: ["{0} is delivered as {1}", "{1} delivers {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-subscription-delivered-subscription] }
+        - { type: internal_uniqueness, roles: [r-subscription-delivered-product] }
+
+    # ---- number portability ------------------------------------------
+    - id: ft-port-in-request-ports-msisdn
+      name: PortInRequest ports Msisdn
+      roles:
+        - { id: r-port-ports-request, player: ot-port-in-request, role_name: ports }
+        - { id: r-port-ports-msisdn, player: ot-msisdn, role_name: is ported by }
+      readings: ["{0} ports {1}", "{1} is ported by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-port-ports-request] }
+        - { type: mandatory, role: r-port-ports-request }
+    - id: ft-port-in-request-is-from-operator
+      name: PortInRequest is from Operator
+      definition: The donor operator that currently serves the number being ported in.
+      roles:
+        - { id: r-port-from-request, player: ot-port-in-request, role_name: is from }
+        - { id: r-port-from-operator, player: ot-operator, role_name: is donor for }
+      readings: ["{0} is from {1}", "{1} is donor for {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-port-from-request] }
+        - { type: mandatory, role: r-port-from-request }
+    - id: ft-port-in-request-is-for-subscriber
+      name: PortInRequest is for Subscriber
+      roles:
+        - { id: r-port-for-request, player: ot-port-in-request, role_name: is for }
+        - { id: r-port-for-subscriber, player: ot-subscriber, role_name: requests }
+      readings: ["{0} is for {1}", "{1} requests {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-port-for-request] }
+        - { type: mandatory, role: r-port-for-request }
+    - id: ft-port-in-request-has-port-status
+      name: PortInRequest has PortStatus
+      roles:
+        - { id: r-port-has-status-request, player: ot-port-in-request, role_name: has }
+        - { id: r-port-has-status-status, player: ot-port-status, role_name: is state of }
+      readings: ["{0} has {1}", "{1} is state of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-port-has-status-request] }
+        - { type: mandatory, role: r-port-has-status-request }
+    - id: ft-port-in-request-carries-letter-of-authorization-reference
+      name: PortInRequest carries LetterOfAuthorizationReference
+      definition: The regulator requires the subscriber's signed authorization before a port is sent to the donor; a request may be received before the letter is filed, which is why the obligation is deontic rather than a hard mandatory.
+      roles:
+        - { id: r-port-carries-loa-request, player: ot-port-in-request, role_name: carries }
+        - { id: r-port-carries-loa-reference, player: ot-letter-of-authorization-reference, role_name: authorizes }
+      readings: ["{0} carries {1}", "{1} authorizes {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-port-carries-loa-request] }
+        - { type: mandatory, role: r-port-carries-loa-request, modality: deontic }
+    - id: ft-port-in-request-is-authorized-by-individual
+      name: PortInRequest is authorized by Individual
+      roles:
+        - { id: r-port-authorized-request, player: ot-port-in-request, role_name: is authorized by }
+        - { id: r-port-authorized-individual, player: ot-individual, role_name: authorizes }
+      readings: ["{0} is authorized by {1}", "{1} authorizes {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-port-authorized-request] }
+
+    # ---- services -----------------------------------------------------
+    - id: ft-service-is-specified-by-service-specification
+      name: Service is specified by ServiceSpecification
+      roles:
+        - { id: r-service-specified-by-service, player: ot-service, role_name: is specified by }
+        - { id: r-service-specified-by-spec, player: ot-service-specification, role_name: specifies }
+      readings: ["{0} is specified by {1}", "{1} specifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-service-specified-by-service] }
+        - { type: mandatory, role: r-service-specified-by-service }
+    - id: ft-service-has-service-state
+      name: Service has ServiceState
+      roles:
+        - { id: r-service-has-state-service, player: ot-service, role_name: has }
+        - { id: r-service-has-state-state, player: ot-service-state, role_name: is state of }
+      readings: ["{0} has {1}", "{1} is state of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-service-has-state-service] }
+        - { type: mandatory, role: r-service-has-state-service }
+    - id: ft-service-depends-on-service
+      name: Service depends on Service
+      definition: A service cannot be active unless the services it depends on are; the dependency chain must never come back to where it started, or activation cannot be ordered.
+      roles:
+        - { id: r-service-depends-dependent, player: ot-service, role_name: depends on }
+        - { id: r-service-depends-dependency, player: ot-service, role_name: supports }
+      readings: ["{0} depends on {1}", "{1} supports {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-service-depends-dependent, r-service-depends-dependency] }
+        - { type: ring, role_1: r-service-depends-dependent, role_2: r-service-depends-dependency, ring_type: acyclic }
+    - id: ft-customer-facing-service-realizes-product
+      name: CustomerFacingService realizes Product
+      roles:
+        - { id: r-cfs-realizes-service, player: ot-customer-facing-service, role_name: realizes }
+        - { id: r-cfs-realizes-product, player: ot-product, role_name: is realized by }
+      readings: ["{0} realizes {1}", "{1} is realized by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-cfs-realizes-service] }
+        - { type: mandatory, role: r-cfs-realizes-service }
+    - id: ft-resource-facing-service-runs-on-resource
+      name: ResourceFacingService runs on Resource
+      roles:
+        - { id: r-rfs-runs-on-service, player: ot-resource-facing-service, role_name: runs on }
+        - { id: r-rfs-runs-on-resource, player: ot-resource, role_name: hosts }
+      readings: ["{0} runs on {1}", "{1} hosts {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-rfs-runs-on-service, r-rfs-runs-on-resource] }
+
+    # ---- resource inventory ------------------------------------------
+    - id: ft-resource-has-resource-state
+      name: Resource has ResourceState
+      roles:
+        - { id: r-resource-has-state-resource, player: ot-resource, role_name: has }
+        - { id: r-resource-has-state-state, player: ot-resource-state, role_name: is state of }
+      readings: ["{0} has {1}", "{1} is state of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-resource-has-state-resource] }
+        - { type: mandatory, role: r-resource-has-state-resource }
+    - id: ft-physical-resource-has-serial-number
+      name: PhysicalResource has SerialNumber
+      roles:
+        - { id: r-physical-has-serial-resource, player: ot-physical-resource, role_name: has }
+        - { id: r-physical-has-serial-serial, player: ot-serial-number, role_name: is stamped on }
+      readings: ["{0} has {1}", "{1} is stamped on {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-physical-has-serial-resource] }
+        - { type: internal_uniqueness, roles: [r-physical-has-serial-serial] }
+        - { type: mandatory, role: r-physical-has-serial-resource }
+    - id: ft-logical-resource-is-hosted-on-physical-resource
+      name: LogicalResource is hosted on PhysicalResource
+      roles:
+        - { id: r-logical-hosted-logical, player: ot-logical-resource, role_name: is hosted on }
+        - { id: r-logical-hosted-physical, player: ot-physical-resource, role_name: hosts }
+      readings: ["{0} is hosted on {1}", "{1} hosts {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-logical-hosted-logical] }
+    - id: ft-network-device-is-installed-at-site
+      name: NetworkDevice is installed at Site
+      roles:
+        - { id: r-device-installed-device, player: ot-network-device, role_name: is installed at }
+        - { id: r-device-installed-site, player: ot-site, role_name: houses }
+      readings: ["{0} is installed at {1}", "{1} houses {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-device-installed-device] }
+        - { type: mandatory, role: r-device-installed-device }
+    - id: ft-network-device-has-management-ip-address
+      name: NetworkDevice has ManagementIpAddress
+      roles:
+        - { id: r-device-has-mgmt-ip-device, player: ot-network-device, role_name: has }
+        - { id: r-device-has-mgmt-ip-address, player: ot-management-ip-address, role_name: manages }
+      readings: ["{0} has {1}", "{1} manages {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-device-has-mgmt-ip-device] }
+        - { type: internal_uniqueness, roles: [r-device-has-mgmt-ip-address] }
+    - id: ft-router-runs-routing-protocol
+      name: Router runs RoutingProtocol
+      roles:
+        - { id: r-router-runs-router, player: ot-router, role_name: runs }
+        - { id: r-router-runs-protocol, player: ot-routing-protocol, role_name: is run by }
+      readings: ["{0} runs {1}", "{1} is run by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-router-runs-router, r-router-runs-protocol] }
+    - id: ft-edge-router-peers-with-operator
+      name: EdgeRouter peers with Operator
+      definition: The interconnect, where an edge router exchanges traffic with another operator's network.
+      roles:
+        - { id: r-edge-peers-router, player: ot-edge-router, role_name: peers with }
+        - { id: r-edge-peers-operator, player: ot-operator, role_name: is peered by }
+      readings: ["{0} peers with {1}", "{1} is peered by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-edge-peers-router, r-edge-peers-operator] }
+    - id: ft-site-has-site-name
+      name: Site has SiteName
+      roles:
+        - { id: r-site-has-name-site, player: ot-site, role_name: has }
+        - { id: r-site-has-name-name, player: ot-site-name, role_name: is of }
+      readings: ["{0} has {1}", "{1} is of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-site-has-name-site] }
+        - { type: mandatory, role: r-site-has-name-site }
+    - id: ft-site-is-in-country
+      name: Site is in Country
+      roles:
+        - { id: r-site-in-site, player: ot-site, role_name: is in }
+        - { id: r-site-in-country, player: ot-country, role_name: contains }
+      readings: ["{0} is in {1}", "{1} contains {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-site-in-site] }
+        - { type: mandatory, role: r-site-in-site }
+
+  subtype_facts:
+    - { id: st-individual, subtype: ot-individual, supertype: ot-party, is_exclusive: true, is_exhaustive: true }
+    - { id: st-organization, subtype: ot-organization, supertype: ot-party, is_exclusive: true, is_exhaustive: true }
+    - { id: st-customer-facing-service, subtype: ot-customer-facing-service, supertype: ot-service, is_exclusive: true, is_exhaustive: true }
+    - { id: st-resource-facing-service, subtype: ot-resource-facing-service, supertype: ot-service, is_exclusive: true, is_exhaustive: true }
+    # The five-deep chain: Resource > PhysicalResource > NetworkDevice > Router > EdgeRouter.
+    - { id: st-physical-resource, subtype: ot-physical-resource, supertype: ot-resource, is_exclusive: true, is_exhaustive: true }
+    - { id: st-logical-resource, subtype: ot-logical-resource, supertype: ot-resource, is_exclusive: true, is_exhaustive: true }
+    - { id: st-network-device, subtype: ot-network-device, supertype: ot-physical-resource }
+    - { id: st-router, subtype: ot-router, supertype: ot-network-device }
+    - { id: st-edge-router, subtype: ot-edge-router, supertype: ot-router }
+
+  objectified_fact_types:
+    - id: oft-order-item
+      fact_type: ft-product-order-includes-product-offering-in-quantity
+      object_type: ot-order-item
+    - id: oft-subscription
+      fact_type: ft-subscriber-subscribes-to-product-offering
+      object_type: ot-subscription
+
+  definitions:
+    - term: Product
+      definition: In the catalog context, the thing sold (what SID calls ProductSpecification and ProductOffering); in the ordering and inventory contexts, one customer's instance of it. The two readings are what "how many products do we have" turns on.
+      context: catalog
+    - term: Plan
+      definition: The commercial team's word for a ProductOffering; billing uses it for the RatePlanCode. Not a separate concept in either case.
+      context: catalog
+    - term: Service
+      definition: In the inventory context, a running capability with a state; in the parties context, what customer care means by "the customer's service", which is the Product. The inventory reading is the modeled one.
+      context: inventory
+    - term: Account
+      definition: Customer care says "account" for the Customer; billing says it for the billing account under the customer, which this model does not carry; network operations say it for a login on a NetworkDevice. Three concepts, one word.
+      context: parties

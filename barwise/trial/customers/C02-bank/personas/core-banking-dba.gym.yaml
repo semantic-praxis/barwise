@@ -1,0 +1,49 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: core-banking-dba
+title: "Every core table accounted for"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Confirm that the entities the core schema carries are present with
+  their keys, and that the transaction and branch tables were not
+  invented or dropped.
+brief: |
+  You run the core-banking database. If the model says a table exists
+  that does not, or omits one that does, the migration plan built on it
+  is wrong on day one.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 5 (reference schemes).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: requires_element
+    element:
+      entity: Transaction
+    diagnosis: >-
+      The transaction table is the largest in the system; a model without
+      it was not read from the core schema.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4."
+  - kind: requires_element
+    element:
+      entity: Branch
+    diagnosis: >-
+      Every account belongs to a branch; without Branch the account key is
+      incomplete.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 5, section 5.3."
+  - kind: requires_element
+    element:
+      entity: Currency
+    diagnosis: >-
+      Amounts without a currency are not amounts.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.2."
+  - kind: requires_element
+    element:
+      factTypeBetween: [DepositAccount, Branch]
+    diagnosis: >-
+      The account-to-branch foreign key is the join every report starts
+      from; if it did not survive, the DDL was not read.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4."
+  - kind: must_validate
+    diagnosis: >-
+      A model with structural errors cannot be exported back to DDL.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 5, section 5.3."

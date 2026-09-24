@@ -1,0 +1,86 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: clinical-informaticist
+title: "The chart still reads like a chart"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Read a conceptual model of the clinical record and confirm that
+  encounter classes, diagnosis ranking, and the medication
+  administration record are stated as clinicians state them, not as
+  the billing office does.
+brief: |
+  You are the clinical informaticist for a regional hospital network.
+  You sit between the clinicians who chart and the analysts who read
+  the chart back, and your job is to make sure the data means what the
+  bedside meant. An encounter is a patient contact, of which inpatient,
+  outpatient and emergency are kinds; a trauma activation is a kind of
+  emergency encounter; the principal diagnosis is the one at rank 1; and
+  a medication administration is an order given at a time by a person.
+  Check that the model barwise built says these things.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 6 (subtyping),
+  ch. 9 (n-ary fact types and objectification).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: must_validate
+    diagnosis: >-
+      A model that does not validate cannot be verbalized, and a model I
+      cannot read back to a clinician is one I cannot sign off.
+  - kind: requires_element
+    element:
+      entity: EmergencyEncounter
+    diagnosis: >-
+      If the emergency department is not its own kind of encounter, triage
+      acuity has nowhere to live and ends up as a nullable column on every
+      clinic visit.
+  - kind: requires_element
+    element:
+      entity: TraumaEncounter
+    diagnosis: >-
+      Trauma activations are a kind of emergency encounter, three levels
+      down; a model that stops at two has flattened the trauma registry
+      into a flag.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Encounter, Diagnosis]
+    diagnosis: >-
+      Without diagnoses on the encounter there is no principal diagnosis,
+      and the whole quality reporting pipeline reads from the principal
+      diagnosis.
+  - kind: forbids_population
+    factType: Encounter has Diagnosis at DiagnosisRank
+    constraint: internal_uniqueness
+    hint: "One diagnosis per rank on an encounter: two diagnoses cannot both be principal."
+    diagnosis: >-
+      If two diagnoses can both sit at rank 1, "principal diagnosis" is
+      no longer a question the model can answer, and the registries pick
+      whichever row loads first.
+  - kind: forbids_population
+    factType: EmergencyEncounter has TriageAcuity
+    constraint: mandatory
+    hint: "Every ED encounter is triaged; acuity is mandatory on the subtype, not on Encounter."
+    diagnosis: >-
+      An ED encounter with no acuity means the patient was never triaged,
+      which the department does not allow and the regulators audit for.
+  - kind: requires_element
+    element:
+      factTypeBetween: [MedicationOrder, AdministrationDateTime]
+    diagnosis: >-
+      The medication administration record is the fact that a dose was
+      given at a time; if the model records only that a medication was
+      ordered, it has lost the difference between ordered and given.
+  - kind: forbids_population
+    factType: MedicationOrder is administered at AdministrationDateTime by Provider
+    constraint: internal_uniqueness
+    hint: "An order is administered at a given time once; the person who signed it is determined by order and time."
+    diagnosis: >-
+      If the same order can be administered at the same time by two
+      people, the MAR double-charts a dose and the pharmacy reconciliation
+      shows a duplicate that never happened.
+  - kind: requires_verbalization
+    sentence: "No Provider refers to that same Provider."
+    hint: "The referral ring: a provider never refers a patient to themselves."
+    diagnosis: >-
+      A self-referral is either a charting error or a compliance problem;
+      either way the model must not permit it.

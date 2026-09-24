@@ -1,0 +1,92 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: integration-engineer
+title: "The porting gateway still gets a whole request"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Read a conceptual model produced from the operator's TMF-style APIs and
+  confirm that a mobile number is keyed together with its country, that
+  an order line is a real thing with an identifier, and that the number
+  portability obligation is stated as an obligation rather than dropped
+  or hardened into a constraint the gateway cannot honor.
+brief: |
+  You build the integrations between the order management system, the
+  subscriber database and the number portability gateway. The gateway
+  speaks in MSISDNs that are only unique with their country code; the
+  order system speaks in order lines that have their own identifiers and
+  become products; the regulator requires a signed letter of
+  authorization before a port goes to the donor, but the request exists
+  before the letter is filed. Check that the model barwise produced from
+  the APIs keeps those three facts straight, because each of them has
+  broken an integration before.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 5 (external
+  uniqueness), ch. 10 (objectification), sec. 11.7 (deontic constraints).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: must_validate
+    diagnosis: >-
+      An invalid model cannot be exported to the OpenAPI the gateway team
+      consumes, and they go back to reading the wiki.
+  - kind: requires_element
+    element:
+      entity: Subscriber
+    diagnosis: >-
+      Subscriber is the party the line belongs to; if it has been merged
+      into Customer the family plan has one line and four people fighting
+      over it.
+  - kind: requires_element
+    element:
+      entity: PortInRequest
+    diagnosis: >-
+      Without PortInRequest there is no record of a port in flight, and
+      the gateway callback has nothing to update.
+  - kind: requires_element
+    element:
+      entity: OrderItem
+    diagnosis: >-
+      The order line is what the fulfilment callback names; if it has been
+      flattened into the order there is no identifier to correlate on.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Subscriber, Country]
+    diagnosis: >-
+      The country is half of the key on the number; without it the
+      gateway cannot tell 7700900123 in one numbering plan from the same
+      digits in another.
+  - kind: forbids_population
+    factType: Subscriber has Msisdn
+    constraint: mandatory
+    hint: "Every subscriber has a mobile number; a line without a number is not a line."
+    diagnosis: >-
+      A subscriber with no number cannot be ported, billed or called; the
+      integration treats a null MSISDN as a bug, and it would be right.
+  - kind: forbids_population
+    factType: PortInRequest is from Operator
+    constraint: mandatory
+    hint: "Every port-in request names its donor operator; the gateway routes on it."
+    diagnosis: >-
+      A port request with no donor cannot be sent anywhere; the gateway
+      rejects it, and the retry queue fills up.
+  - kind: requires_element
+    element:
+      entity: Subscription
+    diagnosis: >-
+      Subscription is the objectified fact the billing feed keys on; if
+      the model only has the relationship, there is no identifier to put
+      on the invoice line.
+  - kind: requires_verbalization
+    sentence: "The combination of Msisdn and Country is unique across fact types."
+    hint: "The composite key: MSISDN is unique only together with the country code."
+    diagnosis: >-
+      If the model says the number alone is unique, the first roaming
+      partner load collides two subscribers with the same national digits
+      and the gateway ports the wrong one.
+  - kind: requires_verbalization
+    sentence: "It is obligatory that each PortInRequest carries at least one LetterOfAuthorizationReference."
+    hint: "The letter of authorization is a deontic obligation, not an alethic mandatory: the request exists before the letter is filed."
+    diagnosis: >-
+      Dropped, the regulator's rule is gone from the model; hardened into
+      a plain mandatory, the gateway cannot create the request the
+      subscriber's first call produces. Only the obligation is right.

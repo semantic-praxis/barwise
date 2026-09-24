@@ -4,6 +4,13 @@
     "ci-local-condition-parity.spec.md": {
       "status": "Draft -- no workstream implemented",
       "commits": [
+        "e07f6ec6",
+        "2e958d4a",
+        "3617d2f2",
+        "3f372373",
+        "e49773e7",
+        "962b75bc",
+        "bc93f06b",
         "b17cc52a",
         "9b763902",
         "33ea339c",
@@ -72,7 +79,13 @@
     "mutation-ratchet.spec.md": {
       "status": "Draft -- no workstream implemented. All five open decisions\nresolved 2026-09-10; the workstreams below reflect them.",
       "commits": [
+        "98b069d6",
+        "e07f6ec6",
+        "e49773e7",
+        "bc93f06b",
+        "4000df85",
         "33ea339c",
+        "b983db1b",
         "b6324fd1",
         "ec9ae742"
       ],

@@ -1,0 +1,9 @@
+{
+  "$comment": "What a round trip through the dbt exporter and importer may drop: models without an identifiable key are skipped by the importer (dbtMapping/entityTypes.ts), populations are not carried, subtypes and objectification have no dbt seat. A delta outside this list is a finding.",
+  "allowed": [
+    { "elementType": "population", "kind": "*" },
+    { "elementType": "subtype_fact", "kind": "removed" },
+    { "elementType": "objectified_fact_type", "kind": "removed" },
+    { "elementType": "definition", "kind": "*" }
+  ]
+}

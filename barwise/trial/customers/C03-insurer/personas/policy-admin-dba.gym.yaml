@@ -1,0 +1,88 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: policy-admin-dba
+title: "The period key is policy number plus term"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Read a conceptual model produced from the policy administration DDL
+  and confirm that the period is still keyed the way the declarations
+  page is, that the supersession chain cannot loop, and that nothing the
+  nightly Redshift load joins on has been silently dropped.
+brief: |
+  You administer the Redshift copy of the policy administration
+  database at a regional property and casualty carrier: pc_ tables with
+  a bigint id, a public id, a Retired column, and pctl_ typelist tables
+  for every code column, loaded nightly from the core system. The load
+  joins pc_policyperiod to everything by id, but the business finds a
+  period by policy number and term number, and a period supersedes the
+  one before it when a change is bound. A model that gives the period a
+  different key, lets the supersession chain loop, or loses the account
+  and producer tables breaks the load. Check that the model barwise
+  produced from your DDL keeps the keys you join on.
+reading: >-
+  Skim (optional): Halpin & Morgan 3rd ed. -- ch. 5 (external
+  uniqueness), ch. 7 (ring constraints), ch. 11 (relational mapping).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: must_validate
+    diagnosis: >-
+      If the model does not validate I cannot map it to pc_ tables and
+      the nightly load stays on the hand-maintained DDL.
+  - kind: requires_element
+    element:
+      entity: Policy
+    diagnosis: >-
+      pc_policy is the container every period hangs off. Without it a
+      rewrite loses its history.
+  - kind: requires_element
+    element:
+      entity: PolicyPeriod
+    diagnosis: >-
+      pc_policyperiod is the spine of the whole database. If it has been
+      folded into Policy, every dated column is gone.
+  - kind: requires_element
+    element:
+      entity: Term
+    diagnosis: >-
+      The term number is half of the business key. If Term is missing the
+      model believes the policy number alone finds a period, and it does
+      not after the first renewal.
+  - kind: forbids_population
+    factType: PolicyPeriod has PolicyPeriodId
+    constraint: internal_uniqueness
+    hint: "The period id is the surrogate the load joins on; one row per period."
+    diagnosis: >-
+      A model that lets one period id appear on two periods has lost the
+      primary key that every foreign key in the database points at.
+  - kind: requires_verbalization
+    sentence: "The combination of PolicyNumber and Term is unique across fact types."
+    hint: "The declarations-page key: the same policy number recurs on every term, so the pair identifies the period."
+    diagnosis: >-
+      If the model says the policy number alone is unique the second
+      term collides with the first on the first renewal load.
+  - kind: forbids_population
+    factType: PolicyPeriod supersedes PolicyPeriod
+    constraint: ring
+    hint: "A period supersedes the one before it; the chain is acyclic."
+    diagnosis: >-
+      A supersession loop is the thing the change history walker will
+      spin on forever, and it has happened once with a bad reinstatement.
+  - kind: requires_verbalization
+    sentence: "No PolicyPeriod supersedes that same PolicyPeriod, directly or through a chain of such relationships."
+    hint: "The acyclic ring constraint on supersedes."
+    diagnosis: >-
+      Without the acyclic rule the model permits the loop the walker
+      cannot handle.
+  - kind: requires_element
+    element:
+      factTypeBetween: [Account, Producer]
+    diagnosis: >-
+      Producer of record on the account is what commission runs on. If
+      the link is gone the agency statement pays nobody.
+  - kind: requires_element
+    element:
+      entity: Invoice
+    diagnosis: >-
+      Billing joins the invoice to the account and the period. Without
+      Invoice the receivables load has no target table.

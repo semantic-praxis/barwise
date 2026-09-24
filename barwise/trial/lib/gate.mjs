@@ -1,0 +1,165 @@
+/**
+ * The ratchet. Every failing step in the latest results must be
+ * classified by a row in trial-baseline.json, and every baseline row
+ * that was re-run must still fail, so the baseline enumerates exactly
+ * what is open. Same shape as audit-duplication, audit-rubric and
+ * audit-spec-status; same three-way exit.
+ *
+ *   node trial/lib/gate.mjs [--tier small] [--write]
+ *
+ * `--write` appends the unclassified findings as rows marked
+ * "(unclassified)" so an operator can fill in the note and the issue;
+ * the gate keeps failing until every row carries a real note, which is
+ * what makes a written row a classification rather than a snooze.
+ */
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { classify, loadCatalog } from "./classify.mjs";
+import { BASELINE_PATH, FINDINGS_DIR, resultsPath } from "./paths.mjs";
+
+export const keyOf = (r) => `${r.customer}/${r.tier}/${r.sprint}/${r.step}`;
+
+/**
+ * A could_not_answer step is an open item exactly as a failing one is.
+ * The first version of this gate counted only `fail` rows, so every step
+ * the lane could not grade was dropped on the floor and the run still
+ * printed PASS -- including the oracles taught to refuse unreadable
+ * input, whose refusals then certified nothing. Each blind spot now
+ * needs a baseline row saying why it cannot be answered, and a new one
+ * is loud.
+ *
+ * `hasReproduction` is injected so the pure evaluation can be tested
+ * without a findings directory on disk.
+ */
+export function evaluateGate(results, baseline, {
+  hasReproduction = (issue) => existsSync(join(FINDINGS_DIR, issue)),
+} = {}) {
+  const failing = results.filter((r) => r.status === "fail" && r.severity !== "authoring");
+  const blind = results.filter((r) => r.status === "could_not_answer");
+  const open = new Set([...failing, ...blind].map(keyOf));
+  const ranKeys = new Set(results.map(keyOf));
+  const rows = baseline.findings ?? {};
+  const fresh = failing.filter((r) => !rows[keyOf(r)]);
+  const freshBlind = blind.filter((r) => !rows[keyOf(r)]);
+  const stale = Object.keys(rows).filter((k) => ranKeys.has(k) && !open.has(k));
+  // The README's contract for a classified row is a note, an issue, and a
+  // reproduction under findings/<issue>/. Only the note used to be
+  // checked, so a row with `issue: null`, or an issue with nothing to
+  // reproduce it, passed. A blind-spot row needs the note and the issue;
+  // there is no defect to reproduce, so it needs no directory.
+  const unclassified = Object.entries(rows).filter(([, v]) =>
+    !v.note || /^\(unclassified\)/.test(v.note) || !v.issue
+  ).map(([k]) => k);
+  const unreproduced = Object.entries(rows).filter(([k, v]) =>
+    v.issue && v.status !== "could_not_answer" && !unclassified.includes(k)
+    && !hasReproduction(v.issue)
+  ).map(([k, v]) => ({ key: k, issue: v.issue }));
+  const authoring = results.filter((r) => r.severity === "authoring");
+  return { failing, blind, fresh, freshBlind, stale, unclassified, unreproduced, authoring };
+}
+
+export function runGate({ tier = "small", write = false } = {}) {
+  const path = resultsPath(tier);
+  if (!existsSync(path)) {
+    console.error(`trial gate: no results for tier ${tier} at ${path}; run trial:offline first`);
+    return 2;
+  }
+  const { results } = JSON.parse(readFileSync(path, "utf8"));
+  if (!results?.length) {
+    console.error(`trial gate: results file for tier ${tier} is empty; the run recorded nothing`);
+    return 2;
+  }
+  const baseline = existsSync(BASELINE_PATH)
+    ? JSON.parse(readFileSync(BASELINE_PATH, "utf8"))
+    : { findings: {} };
+  const v = evaluateGate(results, baseline);
+  const toWrite = [...v.fresh, ...v.freshBlind];
+  if (write && toWrite.length) {
+    baseline.findings = baseline.findings ?? {};
+    const classes = loadCatalog();
+    let classified = 0;
+    for (const r of toWrite) {
+      const c = classify(r, classes);
+      if (c) classified++;
+      // A blind-spot row carries its status, which is how the gate knows
+      // it needs no reproduction under findings/<issue>/.
+      const kind = r.status === "could_not_answer"
+        ? { status: "could_not_answer" }
+        : { severity: r.severity };
+      baseline.findings[keyOf(r)] = c
+        ? {
+          ...kind,
+          class: c.id,
+          issue: c.issue,
+          note: c.note,
+          detail: String(r.detail).slice(0, 300),
+        }
+        : {
+          ...kind,
+          detail: String(r.detail).slice(0, 300),
+          note:
+            "(unclassified) add a class to trial/findings/catalog.json or fix it and remove the row",
+          issue: null,
+        };
+    }
+    console.log(
+      `trial gate: ${classified} of ${toWrite.length} new row(s) matched a catalog class`,
+    );
+    writeFileSync(BASELINE_PATH, JSON.stringify(sortKeys(baseline), null, 2) + "\n");
+    console.log(`trial gate: wrote ${toWrite.length} row(s) to ${BASELINE_PATH}`);
+  }
+  // A found regression is a definite answer and the most actionable one,
+  // so it outranks "could not answer": exit 1 wins over exit 2. The first
+  // version let an authoring row override it, which reported a run that
+  // HAD found a regression as merely unable to answer.
+  let definite = false;
+  let blindSpot = false;
+  const justWritten = (k) => write && [...v.fresh, ...v.freshBlind].some((r) => keyOf(r) === k);
+  for (const r of v.fresh) {
+    console.log(`NEW FINDING  ${keyOf(r)}  ${r.severity}: ${r.detail}`);
+    definite = true;
+  }
+  for (const k of v.stale) {
+    console.log(`STALE ROW    ${k}  no longer open; remove it from trial-baseline.json`);
+    definite = true;
+  }
+  for (const k of v.unclassified) {
+    if (justWritten(k)) continue;
+    console.log(`UNCLASSIFIED ${k}  baseline row needs a note and an issue`);
+    definite = true;
+  }
+  for (const { key, issue } of v.unreproduced) {
+    console.log(`NO REPRO     ${key}  nothing under findings/${issue}/ reproduces it`);
+    definite = true;
+  }
+  for (const r of v.freshBlind) {
+    console.log(`NEW BLIND    ${keyOf(r)}  could not answer: ${r.detail}`);
+    blindSpot = true;
+  }
+  for (const r of v.authoring) {
+    console.log(`AUTHORING    ${keyOf(r)}  ${r.detail}`);
+    blindSpot = true;
+  }
+  const code = definite ? 1 : blindSpot ? 2 : 0;
+  const open = Object.keys(baseline.findings ?? {}).length;
+  console.log(
+    `trial gate (${tier}): ${results.length} steps, ${v.failing.length} failing, ${v.blind.length} could not answer, ${
+      v.fresh.length + v.freshBlind.length
+    } new, ${v.stale.length} stale, ${open} open in baseline${
+      v.authoring.length ? `, ${v.authoring.length} authoring` : ""
+    } -> ${code === 0 ? "PASS" : code === 2 ? "COULD NOT ANSWER" : "FAIL"}`,
+  );
+  return code;
+}
+
+function sortKeys(baseline) {
+  const sorted = {};
+  for (const k of Object.keys(baseline.findings ?? {}).sort()) sorted[k] = baseline.findings[k];
+  return { ...baseline, findings: sorted };
+}
+
+if (process.argv[1] && process.argv[1].endsWith("gate.mjs")) {
+  const tierIdx = process.argv.indexOf("--tier");
+  const tier = tierIdx === -1 ? "small" : process.argv[tierIdx + 1];
+  process.exit(runGate({ tier, write: process.argv.includes("--write") }));
+}

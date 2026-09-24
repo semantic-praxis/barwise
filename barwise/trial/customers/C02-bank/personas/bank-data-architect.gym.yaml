@@ -1,0 +1,66 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: bank-data-architect
+title: "Three accounts, three keys, and the ownership ring survives"
+transition:
+  from: apprentice
+  to: journeyman
+exitPerformance: >-
+  Read a conceptual model produced from the bank's schemas and confirm
+  that deposit, loan and ledger accounts are distinct entities, that the
+  party hierarchy is intact, and that beneficial ownership cannot loop.
+brief: |
+  You own the regulatory data architecture. Auditors ask you every
+  quarter which "account" a report means. A model that collapses the
+  three into one is worse than no model.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 6 (subtyping), ch. 7 (ring constraints).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: requires_element
+    element:
+      entity: DepositAccount
+    diagnosis: >-
+      The deposit account is the one retail sees; if it is missing the
+      model came from the ledger side only.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, sections 3.2-3.4."
+  - kind: requires_element
+    element:
+      entity: LoanAccount
+    diagnosis: >-
+      Lending's account is not a deposit account with a negative balance;
+      collapsing them is the mistake every warehouse makes once.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 6, section 6.1."
+  - kind: requires_element
+    element:
+      entity: GeneralLedgerAccount
+    diagnosis: >-
+      The ledger account is the one finance means; a model without it
+      cannot explain a single posting.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4."
+  - kind: requires_element
+    element:
+      entity: LegalEntity
+    diagnosis: >-
+      Beneficial ownership is stated about legal entities; without the
+      subtype the ring constraint has nothing to attach to.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 6, section 6.3."
+  - kind: requires_element
+    element:
+      factTypeBetween: [Transaction, GeneralLedgerAccount]
+    diagnosis: >-
+      A transaction that posts to no ledger account is a transaction the
+      auditors cannot trace.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 3, section 3.4."
+  - kind: must_validate
+    diagnosis: >-
+      A model with structural errors cannot be handed to the regulator's
+      lineage tool.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 5, section 5.3."
+  - kind: forbids_population
+    factType: "Party holds DepositAccount"
+    constraint: internal_uniqueness
+    hint: "The holding is unique per party and account; a party cannot hold the same account twice."
+    diagnosis: >-
+      Without the uniqueness constraint the model records a party holding
+      one account twice, which is how duplicate KYC reviews start.
+    reading: "Halpin & Morgan 3rd ed. -- ch. 4, sections 4.1-4.3."

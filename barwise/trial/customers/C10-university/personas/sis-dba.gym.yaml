@@ -1,0 +1,82 @@
+# yaml-language-server: $schema=../../../../packages/learn/schemas/gym-exercise.schema.json
+id: "sis-dba"
+title: "SIS DBA: the keys the schema already enforces"
+transition:
+  from: "apprentice"
+  to: "journeyman"
+exitPerformance: >-
+  Confirm that a model reverse-engineered from the SIS schema carries
+  the primary keys, the alternate keys and the mandatory columns the
+  database enforces today, so that a forward-generated DDL would not
+  drop a constraint the production schema has.
+brief: |
+  You are Ken Alvarado, the SIS database administrator. You have kept
+  the production schema since the campus merger and you know which
+  constraints are declared and which are enforced by trigger. A model is
+  acceptable to you when nothing the database enforces is missing from
+  it: PIDM is the key of the person record, employee number is unique,
+  and the composite keys survive.
+reading: >-
+  Halpin & Morgan 3rd ed. -- ch. 11 (relational mapping), ch. 5
+  (reference schemes and external uniqueness).
+reference: "../kernel.orm.yaml"
+checks:
+  - kind: "requires_element"
+    element:
+      entity: "Person"
+    diagnosis: >-
+      Student and Employee both key off the person record; without
+      Person the model has two copies of a name and a birth date and I
+      have a synchronization problem.
+  - kind: "requires_element"
+    element:
+      factTypeBetween: ["Person", "Pidm"]
+    diagnosis: >-
+      If PIDM is not stated as the identifier of Person, the generated
+      DDL will invent one and every foreign key in the schema will point
+      at the wrong column.
+  - kind: "must_validate"
+    diagnosis: >-
+      A structurally invalid model cannot be mapped to tables; I cannot
+      forward-engineer a schema from a model that has no keys.
+  - kind: "forbids_population"
+    factType: "Person has Pidm"
+    constraint: "internal_uniqueness"
+    hint: "One PIDM, one person; the sequence never reuses a value."
+    diagnosis: >-
+      Two people with one PIDM is a merge I will be asked to undo by
+      hand, row by row, across forty tables.
+  - kind: "forbids_population"
+    factType: "Employee has EmployeeNumber"
+    constraint: "internal_uniqueness"
+    hint: "Employee number is an alternate key on the employee table."
+    diagnosis: >-
+      Payroll joins on employee number; a duplicate pays two people
+      from one line.
+  - kind: "forbids_population"
+    factType: "Room has RoomNumber"
+    constraint: "mandatory"
+    hint: "A room row without a number cannot be scheduled."
+    diagnosis: >-
+      The scheduling feed rejects a section whose room has no number;
+      the model must say the number is required, not optional.
+  - kind: "requires_verbalization"
+    sentence: "The combination of Building and RoomNumber is unique across fact types."
+    diagnosis: >-
+      Room 101 exists in every building; the unique index is on building
+      plus number and a model that drops the building half will fail the
+      first load.
+  - kind: "requires_element"
+    element:
+      entity: "Position"
+    diagnosis: >-
+      The HR tables key an assignment by position number; a model that
+      attaches the department straight to the employee cannot represent
+      a vacant position or a transfer.
+  - kind: "forbids_population"
+    factType: "Enrollment has RegistrationStatusCode"
+    constraint: "mandatory"
+    hint: "Every registration row has a status; the column is NOT NULL."
+    diagnosis: >-
+      A registration with no status is neither registered nor dropped,
+      and the tuition calculation will count it as both.

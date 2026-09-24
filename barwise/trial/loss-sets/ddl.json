@@ -1,0 +1,9 @@
+{
+  "$comment": "What a round trip through the DDL exporter and importer may drop, from docs/IMPORT_EXPORT.md: CHECK constraints are not parsed (value constraints come back as plain value types), definitions are not extracted (column comments are not read), populations are not carried, subtypes and objectification flatten into tables. A delta outside this list is a finding. Shrink this list in the same PR that teaches the importer a construct.",
+  "allowed": [
+    { "elementType": "definition", "kind": "*" },
+    { "elementType": "population", "kind": "*" },
+    { "elementType": "subtype_fact", "kind": "removed" },
+    { "elementType": "objectified_fact_type", "kind": "removed" }
+  ]
+}

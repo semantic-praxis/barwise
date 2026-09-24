@@ -1,0 +1,5 @@
+# The account-event stream: nested records, nullable unions, logical
+# types. barwise has no Avro importer; this artifact grades the refusal.
+nested_records: true
+unions: true
+logical_types: true

@@ -1,0 +1,65 @@
+id: C06
+slug: logistics
+name: Third-party logistics provider
+industry: logistics
+summary: >-
+  A container logistics provider whose transport management system is a
+  Postgres schema that uses every feature Postgres has, and whose
+  booking platform is a TypeScript monorepo with more classes than the
+  importer will read.
+stressors: [K1, K5, K7, K12, K14]
+seed: 53
+personas:
+  - id: tms-dba
+    name: Aisha Rahman
+    role: TMS database administrator
+    wants: Container, voyage and leg keep their multi-part keys, and every partitioned or inherited table is imported or named as skipped.
+    acceptance: personas/tms-dba.gym.yaml
+    judges: [tms-ddl]
+  - id: integration-architect
+    name: Lukas Meier
+    role: Integration architect
+    wants: The booking platform's classes come back as entities with their discriminated unions as subtypes, all of them, not the first five hundred files.
+    acceptance: personas/integration-architect.gym.yaml
+    judges: [platform-typescript]
+artifacts:
+  - id: tms-ddl
+    generator: ddl
+    skin: skins/postgres-tms.yaml
+    importer: sql
+    dialect: postgres
+    expect: import
+    tiers: { small: 1, medium: 8, enterprise: 25 }
+  - id: platform-typescript
+    generator: code
+    skin: skins/typescript-nestjs.yaml
+    importer: typescript
+    expect: import
+    tiers: { small: 1, medium: 10, enterprise: 30 }
+contexts:
+  parties: [Shipper, Consignee, Carrier]
+  booking: [Shipment, Booking, Commodity, HazardClass]
+  execution: [Port, Terminal, Vehicle, Leg, Voyage, Container, Seal, ContainerMovement, Event, ShipmentEvent, ScanEvent, GateScan]
+  customs: [CustomsDeclaration]
+history:
+  - { kind: rename_object_type, from: Vehicle, to: Conveyance }
+  - { kind: add_value_constraint_value, object_type: ImdgClass, value: "9A" }
+  - { kind: add_fact_type, name: Carrier operates Vehicle, between: [Carrier, Conveyance] }
+  - { kind: add_subtype, subtype: Terminal, supertype: Port }
+  - { kind: rename_object_type, from: Conveyance, to: Vehicle }
+  - { kind: tighten_uniqueness, fact_type: Shipment travels Leg on Vehicle }
+  - { kind: remove_object_type, name: Seal }
+  - { kind: add_mandatory, fact_type: Shipment is loaded in Container, role_index: 0 }
+transcripts:
+  - file: transcripts/session-01-container.md
+    key: transcripts/session-01-container.key.yaml
+lateRequirement:
+  # A new hazard class enters scope after the customs review.
+  note: "A new hazard class enters scope after the customs review."
+  change: {"kind":"add_value_constraint_value","object_type":"ImdgClass","value":"6.2"}
+  element: ImdgClass
+  expectInExport: "6.2"
+budgets:
+  small: 30000
+  medium: 180000
+  enterprise: 900000

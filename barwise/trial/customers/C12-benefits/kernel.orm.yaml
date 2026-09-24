@@ -1,0 +1,1024 @@
+orm_version: "1.1"
+model:
+  name: State Benefits Agency
+  domain_context: government
+  note: >-
+    The hand-authored seed model for trial customer C12. A state benefits
+    agency whose case management system was written against DB2 on the
+    mainframe from COBOL copybooks, and whose rules are statute. The
+    vocabulary is the agency's own (Client, Case, Determination,
+    Issuance; never Customer or Order). A case number is assigned by the
+    office that opened the case and is reused across offices, which is
+    the composite key the intake transcript argues about.
+
+  object_types:
+    # ---- people and households ----------------------------------------
+    - id: ot-client
+      name: Client
+      kind: entity
+      reference_mode: client_number
+      definition: A person known to the agency, whether or not they have ever applied, identified by the client number the mainframe assigns on first contact.
+      aliases: [Individual]
+    - id: ot-applicant
+      name: Applicant
+      kind: entity
+      reference_mode: client_number
+      definition: A client who has signed and submitted an application for one or more programs.
+    - id: ot-recipient
+      name: Recipient
+      kind: entity
+      reference_mode: client_number
+      definition: An applicant who has been found eligible and is included in an active case for at least one program.
+      aliases: [Participant]
+    - id: ot-household
+      name: Household
+      kind: entity
+      reference_mode: household_number
+      definition: The group of people who purchase and prepare food together or otherwise share a residence for program purposes, as the statute defines the assistance unit.
+      aliases: [Assistance Unit]
+    - id: ot-income-source
+      name: IncomeSource
+      kind: entity
+      reference_mode: income_source_id
+      definition: One stream of earned or unearned income attributed to a client and counted in the gross income test.
+
+    # ---- cases and programs -------------------------------------------
+    - id: ot-case
+      name: Case
+      kind: entity
+      reference_mode: case_id
+      definition: The agency's record of a household's participation, opened by one office and carrying every determination, issuance, sanction and appeal for that household.
+    - id: ot-program
+      name: Program
+      kind: entity
+      reference_mode: program_code
+      definition: A benefit program the agency administers under a specific statutory authority, such as the Nutrition Assistance Program or Family Cash Assistance.
+    - id: ot-certification-period
+      name: CertificationPeriod
+      kind: entity
+      reference_mode: period_number
+      definition: The span of months over which a determination of eligibility remains in force before the household must be recertified.
+    - id: ot-determination
+      name: Determination
+      kind: entity
+      reference_mode: determination
+      definition: The agency's decision that a case is or is not eligible for a program over a certification period; the act that the client may appeal.
+    - id: ot-benefit
+      name: Benefit
+      kind: entity
+      reference_mode: benefit_type_code
+      definition: A kind of assistance a program provides, such as a food allotment or a cash grant, identified by the benefit type code the issuance system uses.
+    - id: ot-benefit-issuance
+      name: BenefitIssuance
+      kind: entity
+      reference_mode: issuance
+      definition: The issuance of one benefit to one case for one benefit month; the row the issuance batch writes to the EBT processor or the warrant file.
+    - id: ot-statute-reference
+      name: StatuteReference
+      kind: entity
+      reference_mode: citation
+      definition: A section of the state code or administrative rules that a determination relies on, identified by its citation.
+
+    # ---- workforce ----------------------------------------------------
+    - id: ot-worker
+      name: Worker
+      kind: entity
+      reference_mode: worker_id
+      definition: An agency employee with a mainframe sign-on who acts on cases, identified by the worker identifier in the security table.
+    - id: ot-eligibility-worker
+      name: EligibilityWorker
+      kind: entity
+      reference_mode: worker_id
+      definition: A worker who interviews applicants, gathers verification and makes determinations.
+      aliases: [Caseworker]
+    - id: ot-hearing-officer
+      name: HearingOfficer
+      kind: entity
+      reference_mode: worker_id
+      definition: A worker in the appeals unit who hears appeals and issues decisions, and who must not have made the determination under appeal.
+    - id: ot-supervisor
+      name: Supervisor
+      kind: entity
+      reference_mode: worker_id
+      definition: A worker who signs off determinations above the delegated authority of an eligibility worker; carried in the mainframe as a separate table with its own copy of the worker identifier.
+    - id: ot-office
+      name: Office
+      kind: entity
+      reference_mode: office_code
+      definition: A local office of the agency that opens and serves cases, identified by the office code that prefixes its case numbers.
+
+    # ---- verification, sanctions, appeals ------------------------------
+    - id: ot-verification-document
+      name: VerificationDocument
+      kind: entity
+      reference_mode: document_number
+      definition: A document a client furnishes, or the agency obtains from a data exchange, that verifies an eligibility factor such as identity, income or residency.
+    - id: ot-sanction
+      name: Sanction
+      kind: entity
+      reference_mode: sanction_id
+      definition: A penalty imposed on a recipient for a program, such as a reduction or disqualification for failure to comply with work requirements.
+    - id: ot-appeal
+      name: Appeal
+      kind: entity
+      reference_mode: appeal_number
+      definition: A client's request for a fair hearing to contest a determination, tracked by the appeals unit under its own docket number.
+
+    # ---- identifier value types ----------------------------------------
+    - id: ot-client-number
+      name: ClientNumber
+      kind: value
+      definition: The nine-digit number the mainframe assigns to a client on first contact; the CLNTNBR of every copybook.
+      data_type: { name: text, length: 9 }
+    - id: ot-household-number
+      name: HouseholdNumber
+      kind: value
+      definition: The number assigned to a household when it is first registered.
+      data_type: { name: text, length: 10 }
+    - id: ot-income-source-id
+      name: IncomeSourceId
+      kind: value
+      definition: The identifier of an income source record.
+      data_type: { name: integer }
+    - id: ot-case-id
+      name: CaseId
+      kind: value
+      definition: The system-wide surrogate the mainframe assigns to a case; distinct from the office-assigned case number.
+      data_type: { name: integer }
+    - id: ot-case-number
+      name: CaseNumber
+      kind: value
+      definition: The seven-digit number an office assigns to a case when it is opened; unique only within the office that assigned it.
+      data_type: { name: text, length: 7 }
+    - id: ot-program-code
+      name: ProgramCode
+      kind: value
+      definition: The three-letter code of a program.
+      data_type: { name: text, length: 3 }
+      value_constraint:
+        values: [NAP, FCA, SMC, CCS, HEA, GAP]
+    - id: ot-period-number
+      name: PeriodNumber
+      kind: value
+      definition: The sequence number of a certification period.
+      data_type: { name: integer }
+    - id: ot-benefit-type-code
+      name: BenefitTypeCode
+      kind: value
+      definition: The code the issuance system uses for a kind of benefit.
+      data_type: { name: text, length: 4 }
+    - id: ot-citation
+      name: Citation
+      kind: value
+      definition: The citation of a section of state code or rule, such as "Admin. Code 12-4-118(b)".
+      data_type: { name: text, length: 60 }
+    - id: ot-worker-id
+      name: WorkerId
+      kind: value
+      definition: The worker identifier in the mainframe security table.
+      data_type: { name: text, length: 8 }
+    - id: ot-office-code
+      name: OfficeCode
+      kind: value
+      definition: The three-character code of a local office.
+      data_type: { name: text, length: 3 }
+    - id: ot-document-number
+      name: DocumentNumber
+      kind: value
+      definition: The number the imaging system stamps on a verification document.
+      data_type: { name: text, length: 14 }
+    - id: ot-sanction-id
+      name: SanctionId
+      kind: value
+      definition: The identifier of a sanction record.
+      data_type: { name: integer }
+    - id: ot-appeal-number
+      name: AppealNumber
+      kind: value
+      definition: The docket number the appeals unit assigns when an appeal is filed.
+      data_type: { name: text, length: 12 }
+
+    # ---- descriptive value types --------------------------------------
+    - id: ot-client-name
+      name: ClientName
+      kind: value
+      definition: The client's legal name as it appears on the identity verification.
+      data_type: { name: text, length: 100 }
+    - id: ot-date-of-birth
+      name: DateOfBirth
+      kind: value
+      definition: The client's date of birth.
+      data_type: { name: date }
+    - id: ot-citizenship-status
+      name: CitizenshipStatus
+      kind: value
+      definition: The client's citizenship or immigration status as verified for program purposes.
+      data_type: { name: text, length: 40 }
+      value_constraint:
+        values: [citizen, lawful permanent resident, refugee, asylee, qualified non-citizen, non-qualified non-citizen, unverified]
+    - id: ot-application-date
+      name: ApplicationDate
+      kind: value
+      definition: The date the agency received a signed application; the date from which the processing standard runs.
+      data_type: { name: date }
+    - id: ot-household-size
+      name: HouseholdSize
+      kind: value
+      definition: The number of people in the assistance unit.
+      data_type: { name: integer }
+    - id: ot-income-type
+      name: IncomeType
+      kind: value
+      definition: The kind of income an income source pays.
+      data_type: { name: text, length: 40 }
+      value_constraint:
+        values: [wages, self-employment, unemployment insurance, social security retirement, disability insurance, child support, pension, rental income, veterans benefits, workers compensation, other unearned]
+    - id: ot-monthly-income-amount
+      name: MonthlyIncomeAmount
+      kind: value
+      definition: The gross monthly amount an income source pays, before any disregard.
+      data_type: { name: money }
+    - id: ot-program-name
+      name: ProgramName
+      kind: value
+      definition: The name of a program as it appears on notices.
+      data_type: { name: text, length: 80 }
+    - id: ot-case-status
+      name: CaseStatus
+      kind: value
+      definition: The lifecycle state of a case.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [pending, active, suspended, closed, denied, reopened]
+    - id: ot-closure-reason-code
+      name: ClosureReasonCode
+      kind: value
+      definition: The reason a case was closed or denied, as coded on the closing notice; the code table the notice generator reads.
+      data_type: { name: text, length: 80 }
+      value_constraint:
+        values:
+          - "001 Voluntary withdrawal of application"
+          - "002 Voluntary request to close"
+          - "003 Failure to complete interview"
+          - "004 Failure to provide requested verification"
+          - "005 Failure to sign application"
+          - "006 Failure to complete recertification"
+          - "007 Failure to submit periodic report"
+          - "010 Gross income exceeds program limit"
+          - "011 Net income exceeds program limit"
+          - "012 Countable resources exceed limit"
+          - "013 Ineligible due to lump sum receipt"
+          - "020 Household moved out of state"
+          - "021 Household moved to another office area"
+          - "022 Whereabouts unknown"
+          - "023 Returned mail with no forwarding address"
+          - "030 Citizenship or immigration status not verified"
+          - "031 Social security number not furnished"
+          - "032 Identity not verified"
+          - "033 Residency not verified"
+          - "040 Failure to comply with work requirements"
+          - "041 Voluntary quit without good cause"
+          - "042 Refused suitable employment"
+          - "043 Failure to cooperate with child support enforcement"
+          - "044 Failure to participate in employment and training"
+          - "050 Intentional program violation disqualification"
+          - "051 Fleeing felon"
+          - "052 Probation or parole violation"
+          - "053 Drug felony conviction after effective date"
+          - "060 Death of sole household member"
+          - "061 Institutionalized"
+          - "062 Incarcerated"
+          - "070 Time limit reached"
+          - "071 Lifetime limit reached"
+          - "072 Aged out of program"
+          - "080 Duplicate participation in another case"
+          - "081 Duplicate participation in another state"
+          - "082 Member of another household's case"
+          - "090 Program terminated by statute"
+          - "091 Funding exhausted"
+          - "092 Administrative closure by state office"
+          - "093 Closed by data exchange match"
+          - "094 Closed by mass change"
+          - "099 Other reason stated on notice"
+    - id: ot-determination-outcome
+      name: DeterminationOutcome
+      kind: value
+      definition: The result of a determination.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [approved, denied, approved with reduction, pending verification]
+    - id: ot-determination-date
+      name: DeterminationDate
+      kind: value
+      definition: The date the determination was authorized on the mainframe.
+      data_type: { name: date }
+    - id: ot-period-start-date
+      name: PeriodStartDate
+      kind: value
+      definition: The first day of a certification period.
+      data_type: { name: date }
+    - id: ot-period-end-date
+      name: PeriodEndDate
+      kind: value
+      definition: The last day of a certification period.
+      data_type: { name: date }
+    - id: ot-benefit-month
+      name: BenefitMonth
+      kind: value
+      definition: The calendar month a benefit is issued for, written as YYYYMM in the issuance file.
+      data_type: { name: text, length: 6 }
+    - id: ot-issuance-amount
+      name: IssuanceAmount
+      kind: value
+      definition: The dollar amount of an issuance.
+      data_type: { name: money }
+    - id: ot-issuance-method
+      name: IssuanceMethod
+      kind: value
+      definition: The channel through which an issuance reaches the recipient.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [EBT, warrant, direct deposit, vendor payment, voucher]
+    - id: ot-document-type
+      name: DocumentType
+      kind: value
+      definition: The eligibility factor a verification document verifies.
+      data_type: { name: text, length: 40 }
+      value_constraint:
+        values: [identity, citizenship, residency, earned income, unearned income, resources, shelter expense, medical expense, dependent care expense, school enrollment, pregnancy, disability, data exchange match]
+    - id: ot-received-date
+      name: ReceivedDate
+      kind: value
+      definition: The date the agency received a verification document.
+      data_type: { name: date }
+    - id: ot-verification-status
+      name: VerificationStatus
+      kind: value
+      definition: The state of a verification document in review.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [received, accepted, rejected, expired, pending review]
+    - id: ot-sanction-reason
+      name: SanctionReason
+      kind: value
+      definition: The compliance failure for which a sanction was imposed.
+      data_type: { name: text, length: 60 }
+      value_constraint:
+        values: [work requirement noncompliance, child support noncooperation, intentional program violation, voluntary quit, employment and training noncompliance, school attendance noncompliance]
+    - id: ot-sanction-level
+      name: SanctionLevel
+      kind: value
+      definition: The occurrence level of a sanction, which sets its minimum duration.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [first, second, third, permanent]
+    - id: ot-appeal-status
+      name: AppealStatus
+      kind: value
+      definition: The state of an appeal on the appeals docket.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [filed, scheduled, heard, decided, withdrawn, dismissed]
+    - id: ot-hearing-date
+      name: HearingDate
+      kind: value
+      definition: The date the fair hearing is scheduled to be held.
+      data_type: { name: date }
+    - id: ot-appeal-decision
+      name: AppealDecision
+      kind: value
+      definition: The hearing officer's disposition of the appeal.
+      data_type: { name: text, length: 20 }
+      value_constraint:
+        values: [affirmed, reversed, remanded, dismissed, withdrawn]
+
+  fact_types:
+    # ---- identification ----------------------------------------------
+    - id: ft-client-has-client-number
+      name: Client has ClientNumber
+      roles:
+        - { id: r-client-has-number-client, player: ot-client, role_name: has }
+        - { id: r-client-has-number-number, player: ot-client-number, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-client-has-number-client], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-client-has-number-number] }
+        - { type: mandatory, role: r-client-has-number-client }
+    - id: ft-household-has-household-number
+      name: Household has HouseholdNumber
+      roles:
+        - { id: r-household-has-number-household, player: ot-household, role_name: has }
+        - { id: r-household-has-number-number, player: ot-household-number, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-household-has-number-household], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-household-has-number-number] }
+        - { type: mandatory, role: r-household-has-number-household }
+    - id: ft-income-source-has-income-source-id
+      name: IncomeSource has IncomeSourceId
+      roles:
+        - { id: r-income-source-has-id-source, player: ot-income-source, role_name: has }
+        - { id: r-income-source-has-id-id, player: ot-income-source-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-income-source-has-id-source], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-income-source-has-id-id] }
+        - { type: mandatory, role: r-income-source-has-id-source }
+    - id: ft-case-has-case-id
+      name: Case has CaseId
+      roles:
+        - { id: r-case-has-id-case, player: ot-case, role_name: has }
+        - { id: r-case-has-id-id, player: ot-case-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-case-has-id-case], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-case-has-id-id] }
+        - { type: mandatory, role: r-case-has-id-case }
+    - id: ft-program-has-program-code
+      name: Program has ProgramCode
+      roles:
+        - { id: r-program-has-code-program, player: ot-program, role_name: has }
+        - { id: r-program-has-code-code, player: ot-program-code, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-program-has-code-program], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-program-has-code-code] }
+        - { type: mandatory, role: r-program-has-code-program }
+    - id: ft-certification-period-has-period-number
+      name: CertificationPeriod has PeriodNumber
+      roles:
+        - { id: r-period-has-number-period, player: ot-certification-period, role_name: has }
+        - { id: r-period-has-number-number, player: ot-period-number, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-period-has-number-period], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-period-has-number-number] }
+        - { type: mandatory, role: r-period-has-number-period }
+    - id: ft-benefit-has-benefit-type-code
+      name: Benefit has BenefitTypeCode
+      roles:
+        - { id: r-benefit-has-code-benefit, player: ot-benefit, role_name: has }
+        - { id: r-benefit-has-code-code, player: ot-benefit-type-code, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-benefit-has-code-benefit], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-benefit-has-code-code] }
+        - { type: mandatory, role: r-benefit-has-code-benefit }
+    - id: ft-statute-reference-has-citation
+      name: StatuteReference has Citation
+      roles:
+        - { id: r-statute-has-citation-statute, player: ot-statute-reference, role_name: has }
+        - { id: r-statute-has-citation-citation, player: ot-citation, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-statute-has-citation-statute], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-statute-has-citation-citation] }
+        - { type: mandatory, role: r-statute-has-citation-statute }
+    - id: ft-worker-has-worker-id
+      name: Worker has WorkerId
+      roles:
+        - { id: r-worker-has-id-worker, player: ot-worker, role_name: has }
+        - { id: r-worker-has-id-id, player: ot-worker-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-worker-has-id-worker], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-worker-has-id-id] }
+        - { type: mandatory, role: r-worker-has-id-worker }
+    - id: ft-supervisor-has-worker-id
+      name: Supervisor has WorkerId
+      roles:
+        - { id: r-supervisor-has-id-supervisor, player: ot-supervisor, role_name: has }
+        - { id: r-supervisor-has-id-id, player: ot-worker-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-supervisor-has-id-supervisor], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-supervisor-has-id-id] }
+        - { type: mandatory, role: r-supervisor-has-id-supervisor }
+    - id: ft-office-has-office-code
+      name: Office has OfficeCode
+      roles:
+        - { id: r-office-has-code-office, player: ot-office, role_name: has }
+        - { id: r-office-has-code-code, player: ot-office-code, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-office-has-code-office], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-office-has-code-code] }
+        - { type: mandatory, role: r-office-has-code-office }
+    - id: ft-verification-document-has-document-number
+      name: VerificationDocument has DocumentNumber
+      roles:
+        - { id: r-document-has-number-document, player: ot-verification-document, role_name: has }
+        - { id: r-document-has-number-number, player: ot-document-number, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-document-has-number-document], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-document-has-number-number] }
+        - { type: mandatory, role: r-document-has-number-document }
+    - id: ft-sanction-has-sanction-id
+      name: Sanction has SanctionId
+      roles:
+        - { id: r-sanction-has-id-sanction, player: ot-sanction, role_name: has }
+        - { id: r-sanction-has-id-id, player: ot-sanction-id, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-sanction-has-id-sanction], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-sanction-has-id-id] }
+        - { type: mandatory, role: r-sanction-has-id-sanction }
+    - id: ft-appeal-has-appeal-number
+      name: Appeal has AppealNumber
+      roles:
+        - { id: r-appeal-has-number-appeal, player: ot-appeal, role_name: has }
+        - { id: r-appeal-has-number-number, player: ot-appeal-number, role_name: identifies }
+      readings: ["{0} has {1}", "{1} identifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-appeal-has-number-appeal], is_preferred: true }
+        - { type: internal_uniqueness, roles: [r-appeal-has-number-number] }
+        - { type: mandatory, role: r-appeal-has-number-appeal }
+
+    # ---- clients and households --------------------------------------
+    - id: ft-client-has-client-name
+      name: Client has ClientName
+      roles:
+        - { id: r-client-has-name-client, player: ot-client, role_name: has }
+        - { id: r-client-has-name-name, player: ot-client-name, role_name: is of }
+      readings: ["{0} has {1}", "{1} is of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-client-has-name-client] }
+        - { type: mandatory, role: r-client-has-name-client }
+    - id: ft-client-was-born-on-date-of-birth
+      name: Client was born on DateOfBirth
+      roles:
+        - { id: r-client-born-on-client, player: ot-client, role_name: was born on }
+        - { id: r-client-born-on-date, player: ot-date-of-birth, role_name: is birth date of }
+      readings: ["{0} was born on {1}", "{1} is birth date of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-client-born-on-client] }
+        - { type: mandatory, role: r-client-born-on-client }
+    - id: ft-client-has-citizenship-status
+      name: Client has CitizenshipStatus
+      roles:
+        - { id: r-client-has-citizenship-client, player: ot-client, role_name: has }
+        - { id: r-client-has-citizenship-status, player: ot-citizenship-status, role_name: is verified for }
+      readings: ["{0} has {1}", "{1} is verified for {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-client-has-citizenship-client] }
+        - { type: mandatory, role: r-client-has-citizenship-client }
+    - id: ft-client-is-a-member-of-household
+      name: Client is a member of Household
+      definition: The household a client is counted in; a person is counted in one assistance unit at a time, and moving between units is a change of membership, not a second membership.
+      roles:
+        - { id: r-client-member-of-client, player: ot-client, role_name: is a member of }
+        - { id: r-client-member-of-household, player: ot-household, role_name: includes }
+      readings: ["{0} is a member of {1}", "{1} includes {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-client-member-of-client] }
+    - id: ft-household-is-headed-by-client
+      name: Household is headed by Client
+      definition: The head of household, who signs the application on the unit's behalf; a household shall designate exactly one head, and a determination must not be made for a household that has none.
+      roles:
+        - { id: r-household-headed-by-household, player: ot-household, role_name: is headed by }
+        - { id: r-household-headed-by-client, player: ot-client, role_name: heads }
+      readings: ["{0} is headed by {1}", "{1} heads {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-household-headed-by-household] }
+        - { type: mandatory, role: r-household-headed-by-household, modality: deontic }
+    - id: ft-household-has-household-size
+      name: Household has HouseholdSize
+      roles:
+        - { id: r-household-has-size-household, player: ot-household, role_name: has }
+        - { id: r-household-has-size-size, player: ot-household-size, role_name: is size of }
+      readings: ["{0} has {1}", "{1} is size of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-household-has-size-household] }
+        - { type: mandatory, role: r-household-has-size-household }
+    - id: ft-income-source-is-attributed-to-client
+      name: IncomeSource is attributed to Client
+      roles:
+        - { id: r-income-attributed-source, player: ot-income-source, role_name: is attributed to }
+        - { id: r-income-attributed-client, player: ot-client, role_name: receives }
+      readings: ["{0} is attributed to {1}", "{1} receives {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-income-attributed-source] }
+        - { type: mandatory, role: r-income-attributed-source }
+    - id: ft-income-source-has-income-type
+      name: IncomeSource has IncomeType
+      roles:
+        - { id: r-income-has-type-source, player: ot-income-source, role_name: has }
+        - { id: r-income-has-type-type, player: ot-income-type, role_name: classifies }
+      readings: ["{0} has {1}", "{1} classifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-income-has-type-source] }
+        - { type: mandatory, role: r-income-has-type-source }
+    - id: ft-income-source-pays-monthly-income-amount
+      name: IncomeSource pays MonthlyIncomeAmount
+      roles:
+        - { id: r-income-pays-source, player: ot-income-source, role_name: pays }
+        - { id: r-income-pays-amount, player: ot-monthly-income-amount, role_name: is paid by }
+      readings: ["{0} pays {1}", "{1} is paid by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-income-pays-source] }
+        - { type: mandatory, role: r-income-pays-source }
+
+    # ---- applications ------------------------------------------------
+    - id: ft-applicant-applied-on-application-date
+      name: Applicant applied on ApplicationDate
+      definition: The date the signed application was received; the thirty-day processing standard runs from this date.
+      roles:
+        - { id: r-applicant-applied-on-applicant, player: ot-applicant, role_name: applied on }
+        - { id: r-applicant-applied-on-date, player: ot-application-date, role_name: is application date of }
+      readings: ["{0} applied on {1}", "{1} is application date of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-applicant-applied-on-applicant] }
+        - { type: mandatory, role: r-applicant-applied-on-applicant }
+    - id: ft-applicant-applies-for-program
+      name: Applicant applies for Program
+      definition: The programs named on the application; an applicant shall apply for at least one program, and an office must not accept an application that names none.
+      roles:
+        - { id: r-applicant-applies-for-applicant, player: ot-applicant, role_name: applies for }
+        - { id: r-applicant-applies-for-program, player: ot-program, role_name: is applied for by }
+      readings: ["{0} applies for {1}", "{1} is applied for by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-applicant-applies-for-applicant, r-applicant-applies-for-program] }
+        - { type: mandatory, role: r-applicant-applies-for-applicant, modality: deontic }
+    - id: ft-recipient-receives-benefit
+      name: Recipient receives Benefit
+      roles:
+        - { id: r-recipient-receives-recipient, player: ot-recipient, role_name: receives }
+        - { id: r-recipient-receives-benefit, player: ot-benefit, role_name: is received by }
+      readings: ["{0} receives {1}", "{1} is received by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-recipient-receives-recipient, r-recipient-receives-benefit] }
+
+    # ---- cases -------------------------------------------------------
+    - id: ft-case-has-case-number
+      name: Case has CaseNumber
+      definition: The office-assigned case number; offices assign from their own ranges, so the number is unique only with the office that assigned it.
+      roles:
+        - { id: r-case-has-number-case, player: ot-case, role_name: has }
+        - { id: r-case-has-number-number, player: ot-case-number, role_name: is assigned to }
+      readings: ["{0} has {1}", "{1} is assigned to {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-case-has-number-case] }
+        - { type: mandatory, role: r-case-has-number-case }
+        # The legacy composite key: OFFCD plus CASENBR is what every
+        # copybook carries; CASEID is the surrogate the modernization added.
+        - { type: external_uniqueness, roles: [r-case-has-number-number, r-case-served-by-office] }
+    - id: ft-case-is-served-by-office
+      name: Case is served by Office
+      roles:
+        - { id: r-case-served-by-case, player: ot-case, role_name: is served by }
+        - { id: r-case-served-by-office, player: ot-office, role_name: serves }
+      readings: ["{0} is served by {1}", "{1} serves {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-case-served-by-case] }
+        - { type: mandatory, role: r-case-served-by-case }
+    - id: ft-case-is-for-household
+      name: Case is for Household
+      roles:
+        - { id: r-case-is-for-case, player: ot-case, role_name: is for }
+        - { id: r-case-is-for-household, player: ot-household, role_name: has }
+      readings: ["{0} is for {1}", "{1} has {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-case-is-for-case] }
+        - { type: mandatory, role: r-case-is-for-case }
+    - id: ft-case-is-assigned-to-eligibility-worker
+      name: Case is assigned to EligibilityWorker
+      definition: The worker of record; a case in the intake queue has none until it is picked up.
+      roles:
+        - { id: r-case-assigned-to-case, player: ot-case, role_name: is assigned to }
+        - { id: r-case-assigned-to-worker, player: ot-eligibility-worker, role_name: carries }
+      readings: ["{0} is assigned to {1}", "{1} carries {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-case-assigned-to-case] }
+    - id: ft-case-has-case-status
+      name: Case has CaseStatus
+      roles:
+        - { id: r-case-has-status-case, player: ot-case, role_name: has }
+        - { id: r-case-has-status-status, player: ot-case-status, role_name: is state of }
+      readings: ["{0} has {1}", "{1} is state of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-case-has-status-case] }
+        - { type: mandatory, role: r-case-has-status-case }
+    - id: ft-case-has-closure-reason-code
+      name: Case has ClosureReasonCode
+      definition: The coded reason on the closing or denial notice; a case shall carry exactly one closure reason once closed, and a worker must not close a case without coding one.
+      roles:
+        - { id: r-case-has-closure-case, player: ot-case, role_name: has }
+        - { id: r-case-has-closure-code, player: ot-closure-reason-code, role_name: is coded on }
+      readings: ["{0} has {1}", "{1} is coded on {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-case-has-closure-case] }
+        - { type: mandatory, role: r-case-has-closure-case, modality: deontic }
+
+    # ---- programs and periods ----------------------------------------
+    - id: ft-program-has-program-name
+      name: Program has ProgramName
+      roles:
+        - { id: r-program-has-name-program, player: ot-program, role_name: has }
+        - { id: r-program-has-name-name, player: ot-program-name, role_name: is of }
+      readings: ["{0} has {1}", "{1} is of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-program-has-name-program] }
+        - { type: mandatory, role: r-program-has-name-program }
+    - id: ft-benefit-is-provided-under-program
+      name: Benefit is provided under Program
+      roles:
+        - { id: r-benefit-provided-under-benefit, player: ot-benefit, role_name: is provided under }
+        - { id: r-benefit-provided-under-program, player: ot-program, role_name: provides }
+      readings: ["{0} is provided under {1}", "{1} provides {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-benefit-provided-under-benefit] }
+        - { type: mandatory, role: r-benefit-provided-under-benefit }
+    - id: ft-certification-period-begins-on-period-start-date
+      name: CertificationPeriod begins on PeriodStartDate
+      roles:
+        - { id: r-period-begins-period, player: ot-certification-period, role_name: begins on }
+        - { id: r-period-begins-date, player: ot-period-start-date, role_name: is start of }
+      readings: ["{0} begins on {1}", "{1} is start of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-period-begins-period] }
+        - { type: mandatory, role: r-period-begins-period }
+    - id: ft-certification-period-ends-on-period-end-date
+      name: CertificationPeriod ends on PeriodEndDate
+      roles:
+        - { id: r-period-ends-period, player: ot-certification-period, role_name: ends on }
+        - { id: r-period-ends-date, player: ot-period-end-date, role_name: is end of }
+      readings: ["{0} ends on {1}", "{1} is end of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-period-ends-period] }
+        - { type: mandatory, role: r-period-ends-period }
+
+    # ---- determinations (objectified) --------------------------------
+    - id: ft-case-is-determined-for-program-in-certification-period
+      name: Case is determined for Program in CertificationPeriod
+      definition: The eligibility decision; one determination per case, program and certification period, so the three together identify it.
+      roles:
+        - { id: r-determined-case, player: ot-case, role_name: is determined for }
+        - { id: r-determined-program, player: ot-program, role_name: is determined on }
+        - { id: r-determined-period, player: ot-certification-period, role_name: in }
+      readings: ["{0} is determined for {1} in {2}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-determined-case, r-determined-program, r-determined-period] }
+    - id: ft-determination-has-determination-outcome
+      name: Determination has DeterminationOutcome
+      roles:
+        - { id: r-determination-has-outcome-determination, player: ot-determination, role_name: has }
+        - { id: r-determination-has-outcome-outcome, player: ot-determination-outcome, role_name: is result of }
+      readings: ["{0} has {1}", "{1} is result of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-determination-has-outcome-determination] }
+        - { type: mandatory, role: r-determination-has-outcome-determination }
+    - id: ft-determination-was-made-on-determination-date
+      name: Determination was made on DeterminationDate
+      roles:
+        - { id: r-determination-made-on-determination, player: ot-determination, role_name: was made on }
+        - { id: r-determination-made-on-date, player: ot-determination-date, role_name: is date of }
+      readings: ["{0} was made on {1}", "{1} is date of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-determination-made-on-determination] }
+        - { type: mandatory, role: r-determination-made-on-determination }
+    - id: ft-determination-was-made-by-eligibility-worker
+      name: Determination was made by EligibilityWorker
+      roles:
+        - { id: r-determination-made-by-determination, player: ot-determination, role_name: was made by }
+        - { id: r-determination-made-by-worker, player: ot-eligibility-worker, role_name: made }
+      readings: ["{0} was made by {1}", "{1} made {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-determination-made-by-determination] }
+        - { type: mandatory, role: r-determination-made-by-determination }
+    - id: ft-determination-is-approved-by-supervisor
+      name: Determination is approved by Supervisor
+      definition: Second-level approval, required by policy when the issuance exceeds the worker's delegated authority.
+      roles:
+        - { id: r-determination-approved-by-determination, player: ot-determination, role_name: is approved by }
+        - { id: r-determination-approved-by-supervisor, player: ot-supervisor, role_name: approves }
+      readings: ["{0} is approved by {1}", "{1} approves {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-determination-approved-by-determination] }
+    - id: ft-determination-relies-on-verification-document
+      name: Determination relies on VerificationDocument
+      definition: The verification the decision rests on; a determination shall rely on at least one verification document, and a worker must not approve eligibility on the client's statement alone.
+      roles:
+        - { id: r-determination-relies-on-determination, player: ot-determination, role_name: relies on }
+        - { id: r-determination-relies-on-document, player: ot-verification-document, role_name: supports }
+      readings: ["{0} relies on {1}", "{1} supports {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-determination-relies-on-determination, r-determination-relies-on-document] }
+        - { type: mandatory, role: r-determination-relies-on-determination, modality: deontic }
+    - id: ft-determination-cites-statute-reference
+      name: Determination cites StatuteReference
+      definition: The authority on the notice; a determination shall cite the statute or rule it relies on, and a notice of adverse action must not issue without a citation.
+      roles:
+        - { id: r-determination-cites-determination, player: ot-determination, role_name: cites }
+        - { id: r-determination-cites-statute, player: ot-statute-reference, role_name: is cited by }
+      readings: ["{0} cites {1}", "{1} is cited by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-determination-cites-determination, r-determination-cites-statute] }
+        - { type: mandatory, role: r-determination-cites-determination, modality: deontic }
+    - id: ft-determination-supersedes-determination
+      name: Determination supersedes Determination
+      definition: A redetermination replaces the earlier decision for the same case and program; the chain runs one way, and a determination may never supersede one that supersedes it.
+      roles:
+        - { id: r-determination-supersedes-later, player: ot-determination, role_name: supersedes }
+        - { id: r-determination-supersedes-earlier, player: ot-determination, role_name: is superseded by }
+      readings: ["{0} supersedes {1}", "{1} is superseded by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-determination-supersedes-later] }
+        - { type: internal_uniqueness, roles: [r-determination-supersedes-earlier] }
+        - { type: ring, role_1: r-determination-supersedes-later, role_2: r-determination-supersedes-earlier, ring_type: acyclic }
+
+    # ---- issuance (objectified ternary) ------------------------------
+    - id: ft-case-issues-benefit-for-benefit-month
+      name: Case issues Benefit for BenefitMonth
+      definition: One issuance row; a case is issued a given benefit at most once for a benefit month, and a supplement is a correction to that row, not a second one.
+      roles:
+        - { id: r-issues-case, player: ot-case, role_name: issues }
+        - { id: r-issues-benefit, player: ot-benefit, role_name: is issued to }
+        - { id: r-issues-month, player: ot-benefit-month, role_name: for }
+      readings: ["{0} issues {1} for {2}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-issues-case, r-issues-benefit, r-issues-month] }
+    - id: ft-benefit-issuance-has-issuance-amount
+      name: BenefitIssuance has IssuanceAmount
+      roles:
+        - { id: r-issuance-has-amount-issuance, player: ot-benefit-issuance, role_name: has }
+        - { id: r-issuance-has-amount-amount, player: ot-issuance-amount, role_name: is amount of }
+      readings: ["{0} has {1}", "{1} is amount of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-issuance-has-amount-issuance] }
+        - { type: mandatory, role: r-issuance-has-amount-issuance }
+    - id: ft-benefit-issuance-is-issued-via-issuance-method
+      name: BenefitIssuance is issued via IssuanceMethod
+      roles:
+        - { id: r-issuance-via-issuance, player: ot-benefit-issuance, role_name: is issued via }
+        - { id: r-issuance-via-method, player: ot-issuance-method, role_name: delivers }
+      readings: ["{0} is issued via {1}", "{1} delivers {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-issuance-via-issuance] }
+        - { type: mandatory, role: r-issuance-via-issuance }
+
+    # ---- workforce ---------------------------------------------------
+    - id: ft-worker-works-at-office
+      name: Worker works at Office
+      roles:
+        - { id: r-worker-works-at-worker, player: ot-worker, role_name: works at }
+        - { id: r-worker-works-at-office, player: ot-office, role_name: employs }
+      readings: ["{0} works at {1}", "{1} employs {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-worker-works-at-worker] }
+        - { type: mandatory, role: r-worker-works-at-worker }
+
+    # ---- verification ------------------------------------------------
+    - id: ft-verification-document-is-furnished-by-client
+      name: VerificationDocument is furnished by Client
+      roles:
+        - { id: r-document-furnished-document, player: ot-verification-document, role_name: is furnished by }
+        - { id: r-document-furnished-client, player: ot-client, role_name: furnishes }
+      readings: ["{0} is furnished by {1}", "{1} furnishes {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-document-furnished-document] }
+        - { type: mandatory, role: r-document-furnished-document }
+    - id: ft-verification-document-has-document-type
+      name: VerificationDocument has DocumentType
+      roles:
+        - { id: r-document-has-type-document, player: ot-verification-document, role_name: has }
+        - { id: r-document-has-type-type, player: ot-document-type, role_name: classifies }
+      readings: ["{0} has {1}", "{1} classifies {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-document-has-type-document] }
+        - { type: mandatory, role: r-document-has-type-document }
+    - id: ft-verification-document-was-received-on-received-date
+      name: VerificationDocument was received on ReceivedDate
+      roles:
+        - { id: r-document-received-document, player: ot-verification-document, role_name: was received on }
+        - { id: r-document-received-date, player: ot-received-date, role_name: is receipt date of }
+      readings: ["{0} was received on {1}", "{1} is receipt date of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-document-received-document] }
+        - { type: mandatory, role: r-document-received-document }
+    - id: ft-verification-document-has-verification-status
+      name: VerificationDocument has VerificationStatus
+      roles:
+        - { id: r-document-has-status-document, player: ot-verification-document, role_name: has }
+        - { id: r-document-has-status-status, player: ot-verification-status, role_name: is state of }
+      readings: ["{0} has {1}", "{1} is state of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-document-has-status-document] }
+        - { type: mandatory, role: r-document-has-status-document }
+
+    # ---- sanctions ---------------------------------------------------
+    - id: ft-sanction-is-imposed-on-recipient
+      name: Sanction is imposed on Recipient
+      definition: The recipient penalized; a recipient may be under at most one sanction for a program at a time, and a second sanction for the same program must not be imposed while one stands.
+      roles:
+        - { id: r-sanction-imposed-on-sanction, player: ot-sanction, role_name: is imposed on }
+        - { id: r-sanction-imposed-on-recipient, player: ot-recipient, role_name: is penalized by }
+      readings: ["{0} is imposed on {1}", "{1} is penalized by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-sanction-imposed-on-sanction] }
+        - { type: mandatory, role: r-sanction-imposed-on-sanction }
+        - { type: external_uniqueness, roles: [r-sanction-imposed-on-recipient, r-sanction-applies-to-program], modality: deontic }
+    - id: ft-sanction-applies-to-program
+      name: Sanction applies to Program
+      roles:
+        - { id: r-sanction-applies-to-sanction, player: ot-sanction, role_name: applies to }
+        - { id: r-sanction-applies-to-program, player: ot-program, role_name: is subject of }
+      readings: ["{0} applies to {1}", "{1} is subject of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-sanction-applies-to-sanction] }
+        - { type: mandatory, role: r-sanction-applies-to-sanction }
+    - id: ft-sanction-has-sanction-reason
+      name: Sanction has SanctionReason
+      roles:
+        - { id: r-sanction-has-reason-sanction, player: ot-sanction, role_name: has }
+        - { id: r-sanction-has-reason-reason, player: ot-sanction-reason, role_name: is ground for }
+      readings: ["{0} has {1}", "{1} is ground for {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-sanction-has-reason-sanction] }
+        - { type: mandatory, role: r-sanction-has-reason-sanction }
+    - id: ft-sanction-has-sanction-level
+      name: Sanction has SanctionLevel
+      roles:
+        - { id: r-sanction-has-level-sanction, player: ot-sanction, role_name: has }
+        - { id: r-sanction-has-level-level, player: ot-sanction-level, role_name: is level of }
+      readings: ["{0} has {1}", "{1} is level of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-sanction-has-level-sanction] }
+        - { type: mandatory, role: r-sanction-has-level-sanction }
+
+    # ---- appeals -----------------------------------------------------
+    - id: ft-appeal-contests-determination
+      name: Appeal contests Determination
+      roles:
+        - { id: r-appeal-contests-appeal, player: ot-appeal, role_name: contests }
+        - { id: r-appeal-contests-determination, player: ot-determination, role_name: is contested by }
+      readings: ["{0} contests {1}", "{1} is contested by {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-appeal-contests-appeal] }
+        - { type: mandatory, role: r-appeal-contests-appeal }
+    - id: ft-appeal-is-filed-by-client
+      name: Appeal is filed by Client
+      roles:
+        - { id: r-appeal-filed-by-appeal, player: ot-appeal, role_name: is filed by }
+        - { id: r-appeal-filed-by-client, player: ot-client, role_name: files }
+      readings: ["{0} is filed by {1}", "{1} files {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-appeal-filed-by-appeal] }
+        - { type: mandatory, role: r-appeal-filed-by-appeal }
+    - id: ft-appeal-has-appeal-status
+      name: Appeal has AppealStatus
+      roles:
+        - { id: r-appeal-has-status-appeal, player: ot-appeal, role_name: has }
+        - { id: r-appeal-has-status-status, player: ot-appeal-status, role_name: is state of }
+      readings: ["{0} has {1}", "{1} is state of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-appeal-has-status-appeal] }
+        - { type: mandatory, role: r-appeal-has-status-appeal }
+    - id: ft-appeal-is-heard-by-hearing-officer
+      name: Appeal is heard by HearingOfficer
+      definition: The officer assigned to the docket; an appeal shall be assigned to a hearing officer within ten days of filing, and the officer must not be the worker who made the determination.
+      roles:
+        - { id: r-appeal-heard-by-appeal, player: ot-appeal, role_name: is heard by }
+        - { id: r-appeal-heard-by-officer, player: ot-hearing-officer, role_name: hears }
+      readings: ["{0} is heard by {1}", "{1} hears {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-appeal-heard-by-appeal] }
+        - { type: mandatory, role: r-appeal-heard-by-appeal, modality: deontic }
+    - id: ft-appeal-is-scheduled-for-hearing-date
+      name: Appeal is scheduled for HearingDate
+      roles:
+        - { id: r-appeal-scheduled-appeal, player: ot-appeal, role_name: is scheduled for }
+        - { id: r-appeal-scheduled-date, player: ot-hearing-date, role_name: is hearing date of }
+      readings: ["{0} is scheduled for {1}", "{1} is hearing date of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-appeal-scheduled-appeal] }
+    - id: ft-appeal-is-decided-with-appeal-decision
+      name: Appeal is decided with AppealDecision
+      roles:
+        - { id: r-appeal-decided-appeal, player: ot-appeal, role_name: is decided with }
+        - { id: r-appeal-decided-decision, player: ot-appeal-decision, role_name: disposes of }
+      readings: ["{0} is decided with {1}", "{1} disposes of {0}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-appeal-decided-appeal] }
+
+  subtype_facts:
+    - { id: st-applicant, subtype: ot-applicant, supertype: ot-client }
+    - { id: st-recipient, subtype: ot-recipient, supertype: ot-applicant }
+    - { id: st-eligibility-worker, subtype: ot-eligibility-worker, supertype: ot-worker, is_exclusive: true }
+    - { id: st-hearing-officer, subtype: ot-hearing-officer, supertype: ot-worker, is_exclusive: true }
+
+  objectified_fact_types:
+    - id: oft-determination
+      fact_type: ft-case-is-determined-for-program-in-certification-period
+      object_type: ot-determination
+    - id: oft-benefit-issuance
+      fact_type: ft-case-issues-benefit-for-benefit-month
+      object_type: ot-benefit-issuance
+
+  definitions:
+    - term: Case
+      definition: In eligibility, the household's record of participation across programs, opened by an office; in appeals, the docketed matter before a hearing officer. The appeals unit's "case" is an Appeal.
+      context: eligibility
+    - term: Client
+      definition: Any person the mainframe has a client number for, including household members who never applied; an Applicant or Recipient is a Client with a status, not a different person.
+      context: intake
