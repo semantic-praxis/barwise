@@ -27,7 +27,7 @@
     "@barwise/core": "1.7.0"
   },
   "devDependencies": {
-    "@types/node": "^25.2.3",
+    "@types/node": "^26.6.2",
     "@vitest/coverage-v8": "^4.1.11",
     "vitest": "^4.1.11"
   }
