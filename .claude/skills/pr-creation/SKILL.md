@@ -231,3 +231,49 @@ the body too: a new number, a reversed decision, a deviation a
 reviewer found. A reviewer reading a stale body verifies the wrong
 thing, and the reading guide is the first section to go stale when
 files are added.
+
+### Asking a reviewer for a judgment
+
+Sometimes the author wants a reviewer's opinion rather than its
+findings: which of two designs, whether a scope call holds, whether a
+rule is the right one. Ask it so the answer can disagree with you. On
+PR #509 five decisions went to Copilot, each stated with the author's
+position and its counterargument; it agreed with all five, mostly by
+restating the arguments it had been handed. That is one opinion
+counted twice, and it was recorded as weak evidence.
+
+1. **Get their answer before showing yours.** Give the problem, the
+   constraints, and where the evidence is -- files, lines, failing
+   rows -- and leave out your position and your ranking. Share the
+   position in a second round and ask where they disagree.
+2. **If you list options, make them symmetric.** The same length, the
+   strongest case for each, in no particular order -- or no list at
+   all: "what would you do here, and why?"
+3. **Point at the code, not at your summary of it.** A claim inside a
+   question becomes a premise. "`check:parity` only compares bytes"
+   gets accepted; "what can `check:parity` compare?" gets checked.
+4. **Ask what would make each option right.** "What would have to be
+   true for B to be the better choice?" draws out reasoning that
+   agreement does not.
+5. **Count only reasons you did not supply.** Agreement that repeats
+   your own argument adds nothing; say so where the decision is
+   recorded, as the #509 spec did.
+
+For Copilot specifically: an `@copilot` mention on a PR comment
+reaches the Copilot cloud agent only when the repository has it
+enabled, and without it the mention is silently ignored. The agent can
+also push or open a pull request, so say "reply in a comment; do not
+push or open a pull request." Its reply arrives as an ordinary PR
+comment within a minute or two.
+
+The #509 question about barwise-y6a, asked this way, would have read:
+"The rubric in
+`trial/customers/C06-logistics/personas/integration-architect.gym.yaml`
+requires a fact type between Shipment and Carrier.
+`trial/lib/generators/code.mjs` renders C06's kernel into the
+TypeScript the lane imports. What does the model imported from that
+code say about Shipment and Carrier, and how should the trial grade
+the check against it?" The first draft of this example said the
+code "holds that relationship as a `Booking` class" -- the disputed
+reading, stated as a premise, and Copilot's review of this section
+caught it.

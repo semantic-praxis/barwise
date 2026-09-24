@@ -2,7 +2,7 @@
 
 Status: Implemented (both skills and the shared checklist land alongside this spec)
 Created: 2026-09-05
-Last-updated: 2026-09-05
+Last-updated: 2026-09-24
 Tracking: barwise-922
 
 ## Principle
@@ -206,6 +206,19 @@ producing guides that miss files. Filed on barwise-922; not built.
   transcript, a non-empty "not checked", no approval). Iteration 1
   results are in the PR that landed the skills; the workspace is not
   committed.
+
+## Amendment, 2026-09-24: asking a reviewer for a judgment
+
+`pr-creation` section 6 gains "Asking a reviewer for a judgment": how
+to put a design question to a reviewer, human or Copilot, without
+stating the answer in the question. The trigger was PR #509, where
+five decisions went to Copilot framed with the author's position and
+counterargument, and every reply agreed by restating the argument it
+was given. The rules are the author's side of review, so they sit
+with the author's skill; `pr-review` is unchanged. Docs-only, like the
+rest of this spec: nothing checks them, and the signal that they work
+is a reviewer reply that gives a reason the question did not contain,
+whether it agrees or disagrees.
 
 ## Non-goals
 
