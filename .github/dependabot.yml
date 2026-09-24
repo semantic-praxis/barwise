@@ -7,6 +7,14 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     groups:
+      # vitest and its plugins pin each other exactly (@vitest/coverage-v8
+      # 4.1.11 peers on vitest 4.1.11), so they must move in one PR at every
+      # update type. Bumped alone, vitest 5 lost the peer conflict and the
+      # lockfile kept 4.1.11 in every package -- PR #542 went green while
+      # running the old vitest. Listed first: a dependency joins the first
+      # group it matches.
+      vitest:
+        patterns: ["vitest", "@vitest/*"]
       # Group routine updates so the backlog lands as a few PRs, not dozens.
       production:
         dependency-type: "production"
