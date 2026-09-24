@@ -28,17 +28,6 @@ export function verbalizeDisjunctiveMandatory(
   segments.push(refSeg(commonPlayer.name, commonPlayer.id));
 
   for (let i = 0; i < roleIds.length; i++) {
-    // Spanning constraints reach across fact types by definition, so
-    // resolve model-wide rather than against the owner fact type
-    // alone -- `factType.getRoleById` misses a legitimate foreign
-    // role and the fallback below then printed its raw id
-    // (barwise-884). Past this point the fallback means the role
-    // exists in NO fact type, which is a dangling reference.
-    const role = model.findRole(roleIds[i]!);
-    const ot = role ? model.getObjectType(role.playerId) : undefined;
-    const roleName = role?.name ?? roleIds[i]!;
-    const otName = ot?.name ?? roleName;
-
     if (i > 0 && i === roleIds.length - 1) {
       segments.push(textSeg(" or "));
     } else if (i > 0) {
@@ -46,8 +35,7 @@ export function verbalizeDisjunctiveMandatory(
     } else {
       segments.push(textSeg(" "));
     }
-    segments.push(textSeg(roleName + " some "));
-    segments.push(refSeg(otName, role?.playerId ?? roleIds[i]!));
+    segments.push(...spanningArm(model, roleIds[i]!));
   }
 
   segments.push(textSeg("."));
@@ -68,24 +56,12 @@ export function verbalizeExclusion(
   segments.push(textSeg(" both "));
 
   for (let i = 0; i < roleIds.length; i++) {
-    // Spanning constraints reach across fact types by definition, so
-    // resolve model-wide rather than against the owner fact type
-    // alone -- `factType.getRoleById` misses a legitimate foreign
-    // role and the fallback below then printed its raw id
-    // (barwise-884). Past this point the fallback means the role
-    // exists in NO fact type, which is a dangling reference.
-    const role = model.findRole(roleIds[i]!);
-    const ot = role ? model.getObjectType(role.playerId) : undefined;
-    const roleName = role?.name ?? roleIds[i]!;
-    const otName = ot?.name ?? roleName;
-
     if (i > 0 && i === roleIds.length - 1) {
       segments.push(textSeg(" and "));
     } else if (i > 0) {
       segments.push(textSeg(", "));
     }
-    segments.push(textSeg(roleName + " some "));
-    segments.push(refSeg(otName, role?.playerId ?? roleIds[i]!));
+    segments.push(...spanningArm(model, roleIds[i]!));
   }
 
   segments.push(textSeg("."));
@@ -106,24 +82,12 @@ export function verbalizeExclusiveOr(
   segments.push(textSeg(" either "));
 
   for (let i = 0; i < roleIds.length; i++) {
-    // Spanning constraints reach across fact types by definition, so
-    // resolve model-wide rather than against the owner fact type
-    // alone -- `factType.getRoleById` misses a legitimate foreign
-    // role and the fallback below then printed its raw id
-    // (barwise-884). Past this point the fallback means the role
-    // exists in NO fact type, which is a dangling reference.
-    const role = model.findRole(roleIds[i]!);
-    const ot = role ? model.getObjectType(role.playerId) : undefined;
-    const roleName = role?.name ?? roleIds[i]!;
-    const otName = ot?.name ?? roleName;
-
     if (i > 0 && i === roleIds.length - 1) {
       segments.push(textSeg(" or "));
     } else if (i > 0) {
       segments.push(textSeg(", "));
     }
-    segments.push(textSeg(roleName + " some "));
-    segments.push(refSeg(otName, role?.playerId ?? roleIds[i]!));
+    segments.push(...spanningArm(model, roleIds[i]!));
   }
 
   segments.push(kwSeg(" but not both"));
@@ -575,9 +539,9 @@ const objName = (model: OrmModel, otId: string): string => model.getObjectType(o
  * it belongs to (barwise-884).
  *
  * The other three spanning verbalizers -- disjunctive mandatory,
- * exclusion, exclusive-or -- already emit the role's own name beside the
- * player ("Vendor has some VendorStatus"), so their sentences
- * distinguish the roles without this and are left alone.
+ * exclusion, exclusive-or -- do not use this. They name a predicate and
+ * its object ("drives some Car"), not a player, and route through
+ * `spanningArm` below (barwise-1003).
  */
 function spanningRoleLabel(
   model: OrmModel,
@@ -597,6 +561,66 @@ function spanningRoleLabel(
     text: home ? `${name} in ${home.name}` : name,
     elementId: role.playerId,
   };
+}
+
+/**
+ * One arm of a one-subject spanning sentence -- disjunctive mandatory,
+ * exclusion, exclusive-or -- saying what the common player does in this
+ * role's fact type: "drives some Car", "walks", "works on some Project
+ * in some Department".
+ *
+ * The subject is already the common player, so the arm's objects are
+ * the players of the OTHER roles. The three callers each used to print
+ * the constrained role's own player instead, which gave "Each Person
+ * either drives some Person or rides some Person" and was pinned in a
+ * golden (barwise-1003).
+ *
+ * A reading that starts with this role's placeholder is the modeller's
+ * own phrasing, so it wins; without one, the role name stands in for the
+ * predicate. The role is resolved model-wide because spanning roles are
+ * foreign to the owner fact type by design (barwise-884); a role in NO
+ * fact type is a dangling reference, and the id is all there is to say.
+ */
+function spanningArm(model: OrmModel, roleId: string): VerbalizationSegment[] {
+  const home = factTypeOfRole(model, roleId);
+  const role = home?.getRoleById(roleId);
+  if (!home || !role) return [textSeg(roleId + " some "), refSeg(roleId, roleId)];
+
+  const playerRef = (index: number): VerbalizationSegment => {
+    const other = home.roles[index];
+    if (!other) return textSeg(`{${index}}`);
+    const name = model.getObjectType(other.playerId)?.name ?? other.name;
+    return refSeg(name, other.playerId);
+  };
+
+  const lead = `{${home.roles.indexOf(role)}}`;
+  const reading = home.readings.find((r) => r.template.trimStart().startsWith(lead));
+  if (reading) {
+    const rest = reading.template.trimStart().slice(lead.length).trimStart();
+    const segments: VerbalizationSegment[] = [];
+    // Odd indices are placeholder numbers, even ones the text between.
+    // `validateReadingTemplate` accepts a placeholder written flush
+    // against a word ("works on{1}in"), so the space the reading left out
+    // is supplied here rather than rendering "works onsome Projectin".
+    const parts = rest.split(/\{(\d+)\}/);
+    parts.forEach((part, i) => {
+      if (i % 2 === 1) {
+        segments.push(textSeg("some "), playerRef(Number(part)));
+        return;
+      }
+      let text = part;
+      if (i > 0 && /^\w/.test(text)) text = " " + text;
+      if (i < parts.length - 1 && text && !/\s$/.test(text)) text += " ";
+      if (text) segments.push(textSeg(text));
+    });
+    return segments;
+  }
+
+  const segments: VerbalizationSegment[] = [textSeg(role.name)];
+  home.roles.forEach((other, index) => {
+    if (other !== role) segments.push(textSeg(" some "), playerRef(index));
+  });
+  return segments;
 }
 
 /** The fact type owning a role id, scanning the whole model. */

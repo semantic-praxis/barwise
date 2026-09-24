@@ -68,6 +68,27 @@ run() {
 run npm install --no-audit --no-fund
 run npm run build
 
+# Wire the git hooks. `.npmrc` sets ignore-scripts=true, which suppresses the
+# root `prepare` lifecycle along with every dependency's install script, so
+# the `npm install` above never runs husky -- README's setup step says to run
+# `npm run prepare` by hand, and this script was the one clone that did not.
+# Every web session therefore committed without the pre-commit checks and
+# pushed without `ci:local`, silently, because a push with no hook looks
+# exactly like a push whose hook passed (barwise-950, barwise-1016).
+#
+# Then read the result back rather than trusting the exit status: an unset
+# core.hooksPath is the failure this block exists to prevent, and it is
+# reported loudly rather than as a quiet success. Non-fatal against `set -e`,
+# like the tool installs below: a session without hooks can still work, and
+# says so; a session that fails to start cannot.
+# shellcheck disable=SC2310  # `run` inside `||` is deliberate: see gitleaks below.
+run npm run prepare || true
+hooks_path="$(git -C "${CLAUDE_PROJECT_DIR}" config --get core.hooksPath || true)"
+if [[ "${hooks_path}" != "barwise/.husky/_" ]]; then
+  echo "session-start: git hooks NOT wired (core.hooksPath='${hooks_path}')." \
+    "Commits skip pre-commit and pushes skip ci:local; run 'npm run prepare' from barwise/." >&2
+fi
+
 # The linter behind `npm run check:shell`, one of the 32 gates ci:local
 # derives from ci.yml. GitHub's runners ship it and this container does not,
 # so without this block the gate REFUSES (exit 2, per

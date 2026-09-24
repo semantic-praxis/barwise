@@ -2,7 +2,7 @@
 
 Status: Implemented (WS1-WS4 landed with this spec)
 Created: 2026-08-26
-Last-updated: 2026-08-26
+Last-updated: 2026-09-24
 Tracking: `.github/workflows/ci.yml` carried the intent inline -- "Tighten
 to a blocking step once the backlog is cleared" -- against a
 `continue-on-error` audit step. This spec clears the backlog and removes
@@ -192,6 +192,16 @@ themselves.** The root `prepare` script is how husky wires
 npm run prepare`. README's "Clone and install dependencies" step is
 updated to say so. Existing clones already have `core.hooksPath` set and
 are unaffected -- which is also why this is easy to miss in review.
+
+**Correction, 2026-09-24.** "Existing clones are unaffected" missed the
+one clone made fresh every time: the web-session container. Its
+bootstrap, `.claude/hooks/session-start.sh`, ran `npm install` and never
+`npm run prepare`, so every web session committed without pre-commit and
+pushed without `ci:local` -- five or more recorded sightings under
+barwise-950 before the cause was traced to this line. The bootstrap now
+runs `prepare` and reads `core.hooksPath` back, printing a warning when it
+is not `barwise/.husky/_` (barwise-1016, option 1). Option 2 there, a gate
+that asserts the wiring, is still open.
 
 ## Open decisions (for review)
 

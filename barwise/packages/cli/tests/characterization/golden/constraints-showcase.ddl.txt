@@ -1,4 +1,4 @@
--- Constraint (not expressible in SQL DDL): Each Person either drives some Person or rides some Person but not both.
+-- Constraint (not expressible in SQL DDL): Each Person either drives some Car or rides some Bus but not both.
 -- Constraint (not expressible in SQL DDL): If Person then Person in Person rides Bus.
 -- Table: person
 -- Source: Person (ot-person)

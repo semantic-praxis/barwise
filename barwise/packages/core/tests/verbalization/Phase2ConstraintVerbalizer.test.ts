@@ -63,6 +63,84 @@ function buildTernaryModel(): { model: OrmModel; ft: FactType; } {
   return { model, ft };
 }
 
+/**
+ * One subject (Person) playing a role in five fact types: two binaries
+ * read from Person's side, a unary, a ternary read from Person's side,
+ * and a binary whose only reading starts from the other player.
+ */
+function buildTransportModel() {
+  const model = new OrmModel({ name: "Transport" });
+  const person = model.addObjectType({
+    name: "Person",
+    kind: "entity",
+    referenceMode: "person_id",
+  });
+  const car = model.addObjectType({ name: "Car", kind: "entity", referenceMode: "vin" });
+  const bus = model.addObjectType({ name: "Bus", kind: "entity", referenceMode: "bus_nr" });
+  const boat = model.addObjectType({ name: "Boat", kind: "entity", referenceMode: "hull_nr" });
+  const proj = model.addObjectType({ name: "Project", kind: "entity", referenceMode: "proj_id" });
+  const dept = model.addObjectType({
+    name: "Department",
+    kind: "entity",
+    referenceMode: "dept_id",
+  });
+  const drives = model.addFactType({
+    name: "Person drives Car",
+    roles: [
+      { id: "r-drives", name: "drives", playerId: person.id },
+      { id: "r-driven", name: "is driven by", playerId: car.id },
+    ],
+    readings: ["{0} drives {1}", "{1} is driven by {0}"],
+    constraints: [],
+  });
+  model.addFactType({
+    name: "Person rides Bus",
+    roles: [
+      { id: "r-rides", name: "rides", playerId: person.id },
+      { id: "r-ridden", name: "is ridden by", playerId: bus.id },
+    ],
+    readings: ["{0} rides {1}"],
+    constraints: [],
+  });
+  model.addFactType({
+    name: "Person walks",
+    roles: [{ id: "r-walks", name: "walks", playerId: person.id }],
+    readings: ["{0} walks"],
+    constraints: [],
+  });
+  model.addFactType({
+    name: "Person works on Project in Department",
+    roles: [
+      { id: "r-works", name: "works on", playerId: person.id },
+      { id: "r-staffs", name: "is staffed by", playerId: proj.id },
+      { id: "r-hosts", name: "hosts", playerId: dept.id },
+    ],
+    readings: ["{0} works on {1} in {2}"],
+    constraints: [],
+  });
+  model.addFactType({
+    name: "Boat is owned by Person",
+    roles: [
+      { id: "r-owned", name: "is owned by", playerId: boat.id },
+      { id: "r-owns", name: "owns", playerId: person.id },
+    ],
+    readings: ["{0} is owned by {1}"],
+    constraints: [],
+  });
+  return {
+    model,
+    drives,
+    roles: {
+      drives: "r-drives",
+      rides: "r-rides",
+      walks: "r-walks",
+      works: "r-works",
+      owns: "r-owns",
+    },
+    ids: { person: person.id, car: car.id, bus: bus.id },
+  };
+}
+
 function buildSelfRefModel(): { model: OrmModel; ft: FactType; } {
   const model = new OrmModel({ name: "Test" });
   const person = model.addObjectType({
@@ -125,32 +203,109 @@ describe("Phase 2 constraint verbalization", () => {
     expect(v.text).toContain("if and only if");
   });
 
-  it("verbalizes disjunctive mandatory across three roles with a comma-separated middle item", () => {
-    const { model, ft } = buildTernaryModel();
-    const c: Constraint = { type: "disjunctive_mandatory", roleIds: ["r1", "r2", "r3"] };
-    const v = verbalizer.verbalize(c, ft, model);
-    expect(v.text).toBe(
-      "Each Employee works on some Employee, has worker some Project or in some Department.",
-    );
-  });
+  // One subject, several arms: each arm names the player of the role
+  // the subject does NOT play. Printing the constrained role's own
+  // player gave "Each Person either drives some Person or rides some
+  // Person", pinned in a golden until barwise-1003.
+  describe("spanning arms name the other role's player (barwise-1003)", () => {
+    it("verbalizes exclusive-or across two fact types", () => {
+      const { model, drives, roles } = buildTransportModel();
+      const c: Constraint = { type: "exclusive_or", roleIds: [roles.drives, roles.rides] };
+      expect(verbalizer.verbalize(c, drives, model).text).toBe(
+        "Each Person either drives some Car or rides some Bus but not both.",
+      );
+    });
 
-  it("verbalizes exclusion across three roles with a comma-separated middle item", () => {
-    const { model, ft } = buildTernaryModel();
-    const c: Constraint = { type: "exclusion", roleIds: ["r1", "r2", "r3"] };
-    const v = verbalizer.verbalize(c, ft, model);
-    expect(v.text).toBe(
-      "No Employee both works on some Employee, has worker some Project and in some Department.",
-    );
-  });
+    it("verbalizes disjunctive mandatory across three roles with a comma-separated middle item", () => {
+      const { model, drives, roles } = buildTransportModel();
+      const c: Constraint = {
+        type: "disjunctive_mandatory",
+        roleIds: [roles.drives, roles.rides, roles.walks],
+      };
+      expect(verbalizer.verbalize(c, drives, model).text).toBe(
+        "Each Person drives some Car, rides some Bus or walks.",
+      );
+    });
 
-  it("verbalizes exclusive-or across three roles with a comma-separated middle item", () => {
-    const { model, ft } = buildTernaryModel();
-    const c: Constraint = { type: "exclusive_or", roleIds: ["r1", "r2", "r3"] };
-    const v = verbalizer.verbalize(c, ft, model);
-    expect(v.text).toBe(
-      "Each Employee either works on some Employee, has worker some Project or in some Department"
-        + " but not both.",
-    );
+    it("verbalizes exclusion across three roles with a comma-separated middle item", () => {
+      const { model, drives, roles } = buildTransportModel();
+      const c: Constraint = {
+        type: "exclusion",
+        roleIds: [roles.drives, roles.rides, roles.walks],
+      };
+      expect(verbalizer.verbalize(c, drives, model).text).toBe(
+        "No Person both drives some Car, rides some Bus and walks.",
+      );
+    });
+
+    it("verbalizes exclusive-or across three roles with a comma-separated middle item", () => {
+      const { model, drives, roles } = buildTransportModel();
+      const c: Constraint = {
+        type: "exclusive_or",
+        roleIds: [roles.drives, roles.rides, roles.walks],
+      };
+      expect(verbalizer.verbalize(c, drives, model).text).toBe(
+        "Each Person either drives some Car, rides some Bus or walks but not both.",
+      );
+    });
+
+    it("fills every other role of an n-ary reading that starts with the constrained role", () => {
+      const { model, drives, roles } = buildTransportModel();
+      const c: Constraint = { type: "exclusive_or", roleIds: [roles.drives, roles.works] };
+      expect(verbalizer.verbalize(c, drives, model).text).toBe(
+        "Each Person either drives some Car or works on some Project in some Department"
+          + " but not both.",
+      );
+    });
+
+    it("uses the role name and the other player when no reading starts with the role", () => {
+      const { model, drives, roles } = buildTransportModel();
+      const c: Constraint = { type: "exclusive_or", roleIds: [roles.drives, roles.owns] };
+      expect(verbalizer.verbalize(c, drives, model).text).toBe(
+        "Each Person either drives some Car or owns some Boat but not both.",
+      );
+    });
+
+    // validateReadingTemplate accepts a placeholder with no space beside
+    // it, so the arm supplies the space the reading left out rather than
+    // rendering "drivessome Car" (Copilot review of PR #545).
+    it("separates a placeholder the reading writes flush against its text", () => {
+      const model = new OrmModel({ name: "Flush" });
+      const person = model.addObjectType({ name: "Person", kind: "entity", referenceMode: "pid" });
+      const proj = model.addObjectType({ name: "Project", kind: "entity", referenceMode: "prid" });
+      const dept = model.addObjectType({
+        name: "Department",
+        kind: "entity",
+        referenceMode: "did",
+      });
+      const ft = model.addFactType({
+        name: "Person works on Project in Department",
+        roles: [
+          { id: "r-works", name: "works on", playerId: person.id },
+          { id: "r-staffs", name: "is staffed by", playerId: proj.id },
+          { id: "r-hosts", name: "hosts", playerId: dept.id },
+        ],
+        readings: ["{0} works on{1}in {2}"],
+        constraints: [],
+      });
+      const c: Constraint = { type: "disjunctive_mandatory", roleIds: ["r-works"] };
+      expect(verbalizer.verbalize(c, ft, model).text).toBe(
+        "Each Person works on some Project in some Department.",
+      );
+    });
+
+    it("refers each arm's object to that player's id", () => {
+      const { model, drives, roles, ids } = buildTransportModel();
+      const c: Constraint = { type: "exclusive_or", roleIds: [roles.drives, roles.rides] };
+      const refs = verbalizer.verbalize(c, drives, model).segments
+        .filter((s) => s.kind === "object_type_ref")
+        .map((s) => [s.text, s.elementId]);
+      expect(refs).toEqual([
+        ["Person", ids.person],
+        ["Car", ids.car],
+        ["Bus", ids.bus],
+      ]);
+    });
   });
 
   it("verbalizes subset over multi-role sides, spacing roles after the first", () => {
@@ -469,7 +624,7 @@ describe("Phase 2 constraint verbalization", () => {
       const { model, ft } = buildBinaryModel();
       const c: Constraint = { type: "exclusion", roleIds: ["bogus", "r1"] };
       const v = verbalizer.verbalize(c, ft, model);
-      expect(v.text).toBe("No Customer both bogus some bogus and places some Customer.");
+      expect(v.text).toBe("No Customer both bogus some bogus and places some Order.");
     });
 
     it("subset falls back to the role name, then the raw id, for an unresolved role", () => {

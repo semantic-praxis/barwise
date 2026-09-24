@@ -1,7 +1,7 @@
 Person drives Car
 Car is driven by Person
   Each Person drives at most one Car.
-  Each Person either drives some Person or rides some Person but not both.
+  Each Person either drives some Car or rides some Bus but not both.
 Person rides Bus
 Bus is ridden by Person
   Each Person rides at most one Bus.
