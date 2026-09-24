@@ -79,14 +79,15 @@ it was ever true.
   other, and this one did not hold.
 
 - **A fallback for a state the constructor forbids.**
-  `RelationalMapper.map` computes `ot.referenceMode ?? toSnake(ot.name)
-  - "_id"`inside`if (ot.kind === "entity")`, and `ObjectType`'s
-    constructor throws for an entity without a reference mode -- so the
-    right-hand side is unreachable. The runtime narrowing does not tell
-    the type system what it implies, so a defensive branch was written
-    for an impossible case and no reader can tell it is dead. A
-    discriminated `ObjectType`makes the`??` a compile error rather
-    than a puzzle.
+  `RelationalMapper.map` computes
+  `ot.referenceMode ?? toSnake(ot.name) + "_id"` inside
+  `if (ot.kind === "entity")`, and `ObjectType`'s constructor throws for
+  an entity without a reference mode -- so the right-hand side is
+  unreachable. The runtime narrowing does not tell
+  the type system what it implies, so a defensive branch was written
+  for an impossible case and no reader can tell it is dead. A
+  discriminated `ObjectType` makes the `??` a compile error rather
+  than a puzzle.
 
 The first two were the sharpest arguments for the sealed-record and
 typed-diff workstreams respectively, because each had a demonstrated

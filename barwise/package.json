@@ -56,22 +56,22 @@
     "regen:references": "node scripts/regen-references.mjs"
   },
   "devDependencies": {
-    "@dprint/json": "0.23.0",
-    "@dprint/markdown": "0.23.2",
+    "@dprint/json": "0.24.0",
+    "@dprint/markdown": "0.24.0",
     "@dprint/typescript": "0.96.1",
     "@eslint/js": "^10.0.1",
     "dependency-cruiser": "^17.4.3",
-    "dprint": "^0.57.0",
-    "eslint": "^10.9.1",
+    "dprint": "^0.57.4",
+    "eslint": "^10.10.0",
     "husky": "^9.1.7",
-    "jscpd": "^5.1.1",
-    "knip": "^5.86.0",
-    "lint-staged": "^17.4.1",
-    "oxlint": "^1.81.0",
+    "jscpd": "^5.2.1",
+    "knip": "^6.35.1",
+    "lint-staged": "^17.5.1",
+    "oxlint": "^1.83.0",
     "publint": "^0.3.24",
-    "turbo": "^2.3.0",
+    "turbo": "^2.10.13",
     "typescript": "^5.7.0",
-    "typescript-eslint": "^8.69.0"
+    "typescript-eslint": "^8.70.0"
   },
   "lint-staged": {
     "*.ts": [

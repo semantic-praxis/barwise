@@ -119,9 +119,9 @@ Out of scope:
   plausible summary). Related in shape, separate in mechanism, and its filed
   description rests on an assumption that does not hold: measured here,
   `node --test` isolates per file, so a load-time throw in one file does not
-  stop the others (a three-file probe reported `# tests 6 / # pass 5 /
-  # fail 1` with the third file running normally). The 41-of-99 truncation was
-  therefore inside the single 2195-line `gates.test.mjs`, which makes a
+  stop the others (a three-file probe reported
+  `# tests 6 / # pass 5 / # fail 1` with the third file running normally).
+  The 41-of-99 truncation was therefore inside the single 2195-line `gates.test.mjs`, which makes a
   per-file count floor the likely mechanism rather than anything about the
   runner's file handling. That needs its own grounding; it is not this spec.
 - `audit-duplication.mjs` gains no writer. It has none today, its baseline is

@@ -5,8 +5,8 @@ import {
   ValidationEngine,
 } from "@barwise/core";
 import type { TextDocument } from "vscode-languageserver-textdocument";
-import type { Connection } from "vscode-languageserver/node.js";
-import { Diagnostic, DiagnosticSeverity } from "vscode-languageserver/node.js";
+import type { Connection } from "vscode-languageserver/node";
+import { Diagnostic, DiagnosticSeverity } from "vscode-languageserver/node";
 import { YamlSourceMap } from "./YamlSourceMap.js";
 
 const ZERO_RANGE = {
