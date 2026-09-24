@@ -368,10 +368,9 @@ Acceptance: when the capability matrix is read, it shall carry the
 override row and the sentence beneath it; when `packages/llm/CLAUDE.md`
 is read, it shall state the promotion path, what may bypass it, and how
 a recorded `promptHash` is resolved back to a shipped artifact; and
-under option 2, when `barwise prompt run --surface review --artifacts
-
-<dir>` is given a model file, the system shall send the resolved
-candidate once and print the review it returned.
+under option 2, when
+`barwise prompt run --surface review --artifacts <dir>` is given a model
+file, the system shall send the resolved candidate once and print the review it returned.
 
 ## API and migration impact
 

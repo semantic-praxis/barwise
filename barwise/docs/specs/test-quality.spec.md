@@ -328,9 +328,10 @@ different findings and should not be read together:
 
 - The `StringLiteral` survivors concentrate in the renderers and in
   `elementDiff`, and they are output. `openapi.ts:201` renders
-  `operationId: \`list${schemaName}\``-- replaceable with an empty
-  template string, no test notices.`operationId`is what an OpenAPI
-  client generator keys on.`elementDiff.ts:53`sets`change: "referenceMode"`; blanking it survives, in a module whose
+  `` operationId: `list${schemaName}` `` -- replaceable with an empty
+  template string, no test notices. `operationId` is what an OpenAPI
+  client generator keys on. `elementDiff.ts:53` sets
+  `change: "referenceMode"`; blanking it survives, in a module whose
   sibling `changeDescription.ts` keeps a golden for every kind of change
   the diff can emit.
 - The `ConditionalExpression` survivors concentrate in
@@ -360,7 +361,8 @@ That is not a small correction. `elementDiff.ts` contributes 64 of the
 `change:` tags, so a substantial share of that cluster is
 type-protected rather than untested. The survivors that remain real are
 the ones in UNTYPED positions: `openapi.ts` builds its operations as
-`Record<string, unknown>`, so `operationId: ``` is valid TypeScript and
+`Record<string, unknown>`, so an empty template literal for `operationId` is
+valid TypeScript and
 the gap was genuine. Both are now killed by `tests/mapping/openapi.test.ts`.
 
 The general lesson is the one this spec keeps arriving at, and it took
