@@ -61,10 +61,12 @@ In scope, as EARS requirements:
 - **R1.** When a dbt model has an identifiable primary-key column, the
   importer shall create an identifier value type for it carrying the
   column's resolved `data_type` (model column first, then source column,
-  as `valueTypes.ts` already resolves non-key columns), and a binary
-  fact type between the entity and that value type whose value-side
-  uniqueness is preferred, with a uniqueness and a mandatory constraint
-  on the entity side.
+  as `valueTypes.ts` already resolves non-key columns) and the column's
+  description (explicit or inferred), and a binary fact type between
+  the entity and that value type whose value-side uniqueness is
+  preferred, with a uniqueness and a mandatory constraint on the entity
+  side. It shall never reuse an object type of another kind or another
+  data type as that identifier (D1).
 - **R2.** When the relational mapper types a key for an entity with no
   preferred identifying binary, it shall take a data type only from a
   binary whose value player's snake-cased name equals the entity's
@@ -168,7 +170,7 @@ RelationalMapper (unchanged path)          ExportAnnotationCollector (WS3)
   wrong `DECIMAL(10,2)` but turns every dbt key into `TEXT`, which is
   still not what the YAML says. Necessary, not sufficient.
 - **Delete the heuristic in `referenceModePkType` outright.** Measured
-  across this repository's 76 loadable models: the heuristic fires for
+  across this repository's 76 loadable models (see Risks for the script): the heuristic fires for
   93 entities and names the right value type for 3. Keeping it guarded
   by the reference-mode name keeps those 3; deleting it would move them
   to the fallback for no gain.
@@ -180,20 +182,49 @@ RelationalMapper (unchanged path)          ExportAnnotationCollector (WS3)
 
 ## Workstreams (each independently shippable)
 
-Ordered smallest blast radius first. WS2 and WS3 are independent of WS1
+Each workstream is written under the recommended option of the open
+decisions it depends on (D1-D3, below), and names them where it does.
+A different call on a decision changes the named part and nothing else.
+
+Order (D3): WS1, then WS2, then WS3. WS2 and WS3 are independent of WS1
 and of each other; WS1 is the change the user feels most.
 
 ### 1. dbt importer writes typed identifiers
 
-In `entityTypes.ts`, after creating the entity, create (or reuse by
-name, as `valueTypes.ts` does) the value type `toPascalCase(pk.columnName)`
-with the data type resolved by the same model-then-source rule, and the
-binary `"<Entity> has <IdValueType>"` with: internal uniqueness on the
-value role, `isPreferred: true`; internal uniqueness and mandatory on
-the entity role. Extract the data-type resolution from `valueTypes.ts`
-into one function both call, so key and non-key columns cannot resolve
-differently. Record in the import report which source the key's type
-came from, as non-key columns already do.
+Identifier value types are created in a second pass over the dbt
+models, after `createEntityTypes` has created every entity, so an
+entity name can never be taken by an identifier created earlier. For
+each model with a detected key:
+
+- **Type.** Resolve the key column's data type by the model-then-source
+  rule `valueTypes.ts` uses today. Extract that resolution into one
+  function both paths call, so key and non-key columns cannot resolve
+  differently, and record in the import report which source supplied
+  it.
+- **Definition.** Give the identifier value type the key column's
+  `description`, or `inferColumnDescription(col, model)` with an
+  import-report warning when there is none -- the rule non-key columns
+  already follow. Without this, WS3's description TODO would fire on
+  every key column.
+- **Name and reuse (D1).** The candidate name is
+  `toPascalCase(pk.columnName)`. Reuse the object type already holding
+  that name only when it is a value type whose data type equals the one
+  just resolved (name, length and scale). Otherwise -- an entity holds
+  the name, or a value type with a different or missing data type does
+  -- create `<Entity><Candidate>` (e.g. `OrdersId`) instead and emit an
+  import-report warning naming both models, the two types, and the key
+  column name the export will use (`orders_id` rather than `id`, since
+  the mapper names a key from its preferred value type). This keeps
+  every key's declared type; what a conflict costs is a column rename,
+  which is reported. `OrmModel.addObjectType` refuses a duplicate name,
+  so the kind check is also what stops the import throwing.
+- **Fact type.** The binary `"<Entity> has <IdValueType>"`, with
+  internal uniqueness on the value role marked `isPreferred: true`, and
+  internal uniqueness plus mandatory on the entity role.
+
+The same kind check applies to non-key columns: `valueTypes.ts` today
+reuses whatever `getObjectTypeByName` returns, entity or not. The
+shared resolver closes that for both paths.
 
 When the key's column name does not survive the mapper's round trip --
 `toSnake(toPascalCase(col)) !== col`, e.g. `customerID` -- emit an
@@ -201,11 +232,14 @@ import-report warning naming both spellings, since the exported key
 column will be spelled the second way.
 
 Acceptance: importing the two-model project above yields `CustomerId`
-and `OrderId` value types with `data_type: decimal`, and DDL export
-types `customers.customer_id`, `orders.order_id` and the FK
-`orders.customer_id` as `DECIMAL`. The diagram still shows `Customers
-(.customer_id)` with no separate `CustomerId` node (a test in
-`diagram` over the imported model).
+and `OrderId` value types with `data_type: decimal` and definitions,
+and DDL export types `customers.customer_id`, `orders.order_id` and the
+FK `orders.customer_id` as `DECIMAL`. Two models keyed `id number` and
+`id varchar` import without throwing, keep both types, and report the
+rename. A model whose entity name equals another model's candidate
+identifier name imports without throwing. The diagram still shows
+`Customers (.customer_id)` with no separate `CustomerId` node (a test
+in `diagram` over the imported model).
 
 ### 2. Mapper stops borrowing an unrelated attribute's type
 
@@ -216,35 +250,37 @@ binary "the reference-mode heuristic".
 
 Acceptance: an entity `Order(order_id)` with a single attribute
 `OrderTotal: decimal(10,2)` and no preferred binary maps its key as
-`TEXT` (or the configured strategy type), not `DECIMAL(10,2)`. The
-measurement script's three matching cases keep their types.
+`TEXT` (or the configured strategy type), not `DECIMAL(10,2)`. A mapper
+test over the repository's models replaces
+`packages/core/scripts/refmode-heuristic-audit.mjs` (see Risks), so the
+counts are asserted rather than quoted.
 
 This moves the key type of up to 90 entities in the repository's
 example and output models; `npm run validate:examples` and the CLI
 characterization goldens (`cli/tests/characterization/golden/*.ddl.txt`,
-regenerated with `UPDATE_GOLDEN=1`) show the change. Each moved type was taken from an
-unrelated attribute (e.g. `Doctor(provider_id)` typed from
-`Specialty`), so the change is a correction, but the PR must list the
-goldens it rewrites.
+regenerated with `UPDATE_GOLDEN=1`) show the change. Each moved type
+was taken from an unrelated attribute (e.g. `Doctor(provider_id)` typed
+from `Specialty`), so the change is a correction, but the PR must list
+the goldens it rewrites.
 
 ### 3. Annotations report only real gaps, in neutral words
 
-Add `dataTypeDefaulted: boolean` to `Column` in `RelationalSchema.ts`.
-The mapper sets it where it writes a type: `true` when
-`conceptualTypeToSql` received no `DataTypeDef` or when
+How the collector learns a type was defaulted is D2. Under its
+recommendation: add `dataTypeDefaulted: boolean` to `Column` in
+`RelationalSchema.ts`. The mapper sets it where it writes a type: `true`
+when `conceptualTypeToSql` received no `DataTypeDef` or when
 `referenceModePkType` returned the fallback, and FK columns copy it from
 the referenced key column alongside the type (the two
 `pkCol?.dataType ?? "TEXT"` sites). Making it required lets the compiler
 find every construction site.
 
-In `ExportAnnotationCollector`: emit "defaulted" iff
-`col.dataTypeDefaulted`; emit the column-description TODO iff the
-column's source value type is missing or has no definition; reword
-messages without a format name ("Data type was not declared; exported
-as TEXT. Add a data type to the value type."). `DbtExportAnnotator`
-appends " Or set it in the dbt YAML." for the `data_type` and
-`description` categories. `collectAnnotationMap` prefixes column-level
-lines with the column name.
+In `ExportAnnotationCollector`: emit "defaulted" iff the column's type
+was defaulted; emit the column-description TODO iff the column's source
+value type is missing or has no definition; reword messages without a
+format name ("Data type was not declared; exported as TEXT. Add a data
+type to the value type."). `DbtExportAnnotator` appends " Or set it in
+the dbt YAML." for the `data_type` and `description` categories.
+`collectAnnotationMap` prefixes column-level lines with the column name.
 
 Acceptance: in the reproduction above, after WS1-3 the DDL tab emits no
 TODO on any column; with WS3 alone, `customer_name` and `is_active`
@@ -252,10 +288,11 @@ carry no TODO, and the remaining TODOs name no format.
 
 ## API and migration impact
 
-- `Column` gains a required `dataTypeDefaulted` field. `Column` is
-  exported from `@barwise/core`; `@barwise/formats`, `@barwise/dbt` and
-  `@barwise/mcp` read columns but none constructs one outside tests
-  (to verify during WS3 with the compiler, not assumed).
+- Under D2's recommendation, `Column` gains a required
+  `dataTypeDefaulted` field. `Column` is exported from `@barwise/core`;
+  `@barwise/formats`, `@barwise/dbt` and `@barwise/mcp` read columns but
+  none constructs one outside tests (to verify during WS3 with the
+  compiler, not assumed).
 - Annotation message text changes. Tests that pin the old strings update
   in WS3; nothing parses the messages.
 - No `.orm.yaml` schema change and no `orm_version` bump. A model
@@ -264,23 +301,30 @@ carry no TODO, and the remaining TODOs name no format.
 
 ## Open decisions (for review)
 
-- **A shared key column name across models (`id`).** WS1 reuses a value
-  type by name, as non-key columns do, so every model keyed on `id`
-  would share one `Id` value type identifying several entities. That is
-  valid ORM and keeps the exported column named `id`, but conflates the
-  identifiers conceptually and, if two models type `id` differently,
-  first-wins. The alternative is a per-entity name (`CustomersId`),
-  which changes the exported column name to `customers_id` unless the
-  mapper also learns to name keys from the reference mode.
-  **Recommendation:** share by name, and emit an import-report warning
-  when two models declare different types for the same key name.
-- **`dataTypeDefaulted` on `Column` versus derivation in the
+Each has a recommended option, and the workstreams above are written
+under it. None is decided by merging this spec.
+
+- **D1. Key columns that share a name across models (`id`).**
+  (A) Share one identifier value type when the declared types agree;
+  on a conflict or a name held by an entity, create a per-entity
+  `<Entity><Name>` identifier and report that its exported column is
+  renamed. Mapper unchanged. (B) Always per-entity identifiers, and
+  change the mapper to name a key column from the entity's reference
+  mode rather than its preferred value type -- no renames, but it
+  reverses the mapper rule `RelationalMapper.ts:103-119` documents and
+  moves key column names in shipped models where the two disagree
+  (unmeasured). (C) Share by name unconditionally, first type wins --
+  rejected: it exports one of the keys with the wrong type.
+  **Recommendation:** A. A conflict costs a reported rename, never a
+  wrong type, and the mapper rule stays as it is.
+- **D2. `dataTypeDefaulted` on `Column` versus derivation in the
   collector.** The field widens a public core type; derivation keeps the
   type but duplicates the mapper's decision (see Alternatives).
   **Recommendation:** the field.
-- **Should R2 land before WS1?** Landing it first moves example-model
-  key types before the importer fix gives dbt users anything.
-  **Recommendation:** order as written; each is green on its own.
+- **D3. Should WS2 land before WS1?** Landing it first moves
+  example-model key types before the importer fix gives dbt users
+  anything. **Recommendation:** order as written; each is green on its
+  own.
 
 ## Risks and testing
 
@@ -295,10 +339,13 @@ carry no TODO, and the remaining TODOs name no format.
 - Per workstream: `npm run build` from `barwise/` (WS3 crosses a package
   boundary), then the dbt, core, formats and diagram suites, then
   `npm run ci:local` before push.
-- The measurement behind "90 of 93" is a scratch script over
-  `git ls-files '*.orm.yaml'` (76 of 84 files deserialize); WS2 turns it
-  into a mapper test over the repository's models so the number is
-  checked, not quoted.
+- **The measurement.** `node packages/core/scripts/refmode-heuristic-audit.mjs`
+  (after `npm run build`, from `barwise/`) reproduces every count this
+  spec quotes and lists the 90 unrelated picks. Output at commit
+  f8f90a5c: 84 tracked `.orm.yaml` files, 76 load; the fallback fires for
+  93 entities, names the reference-mode value type for 3, and picks an
+  unrelated attribute for 90. The script copies the mapper's private
+  `toSnake`; WS2 replaces it with a test that uses the mapper itself.
 
 ## Non-goals
 
