@@ -97,8 +97,10 @@ test("a sprint outside the known set is refused even when it is a number", () =>
  * parked small.json aside, which discards the output of a lane writing it
  * at the same time.
  */
+const TEST_TIER = `gate-test-${process.pid}`;
+
 function gateOver(rows) {
-  const tier = `gate-test-${process.pid}`;
+  const tier = TEST_TIER;
   const results = fileURLToPath(new URL(`../results/${tier}.json`, import.meta.url));
   const madeDir = !existsSync(dirname(results));
   mkdirSync(dirname(results), { recursive: true });
@@ -112,7 +114,10 @@ function gateOver(rows) {
   }
 }
 
-const row = (step, extra) => ({ customer: "C01", tier: "small", sprint: 6, step, ...extra });
+// The fixture's own tier, so no row of the real baseline (keyed by tier)
+// is in scope: with tier "small", the gate saw C01's other sprint-6 rows
+// missing from the fixture and reported them VANISHED.
+const row = (step, extra) => ({ customer: "C01", tier: TEST_TIER, sprint: 6, step, ...extra });
 
 test("an authoring failure refuses the gate instead of passing with a printed note", () => {
   // A persona rubric that no longer passes on its own kernel means the

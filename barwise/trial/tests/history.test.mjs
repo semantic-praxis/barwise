@@ -108,3 +108,23 @@ test("the add_subtype expectation is satisfied by the CLI's own diff output", ()
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("the rename expectation is satisfied by the CLI's own synonym candidate", () => {
+  // Same reason as the subtype test above: the rename grader's fixture was
+  // a candidate shape the CLI never emits.
+  const dir = mkdtempSync(join(tmpdir(), "trial-rename-"));
+  try {
+    const step = applyChange(doc, { kind: "rename_object_type", from: "Encounter", to: "Visit" });
+    const before = join(dir, "before.orm.yaml");
+    const after = join(dir, "after.orm.yaml");
+    writeFileSync(before, stringify(doc, { lineWidth: 0 }));
+    writeFileSync(after, stringify(step.doc, { lineWidth: 0 }));
+    const d = runCli(["diff", before, after, "--format", "json"]);
+    assert.equal(d.exit, 0, d.stderr);
+    assert.equal(gradeHistoryStep(step.expect, JSON.parse(d.stdout)).status, "pass");
+    const same = runCli(["diff", before, before, "--format", "json"]);
+    assert.notEqual(gradeHistoryStep(step.expect, JSON.parse(same.stdout)).status, "pass");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

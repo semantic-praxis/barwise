@@ -985,11 +985,37 @@ export function sprint5ChangeStorm(customer, tier, record) {
   }
 }
 
+/**
+ * The models a persona's rubric is graded over. Only the hand-written
+ * kernel is the authoring control: a rubric that fails on it is the
+ * package's defect, not the product's. The scaled model (medium and
+ * enterprise tiers) and the models barwise imported from the customer's
+ * artifacts are product candidates -- and a persona that `judges` one
+ * artifact is graded over that artifact's import alone.
+ */
+export function acceptanceCandidates({ kernel, scaled = null, imported = [], own = null }) {
+  return [
+    { label: "kernel", path: kernel, authoring: true },
+    ...(scaled ? [{ label: "scaled", path: scaled, authoring: false }] : []),
+    ...imported
+      .filter(([id]) => !own || id === own)
+      .map(([id, path]) => ({ label: id, path, authoring: false })),
+  ];
+}
+
 /** Sprint 6: personas accept or reject; MCP and CLI agree; the release bundle works as shipped. */
 export async function sprint6Surfaces(customer, tier, record) {
   const budget = customer.budgets?.[tier] ?? 600_000;
   const gen = generatedDir(customer.dir, tier);
-  const model = tier === "small" ? customer.kernelPath : join(gen, "scaled.orm.yaml");
+  // The authoring control is always the hand-written kernel (AUTHORING.md,
+  // "judges"). At medium and enterprise tiers the scaled model used to take
+  // its place under the label "kernel", so a failure there -- a timeout at
+  // scale is a product finding -- was filed as an authoring defect and
+  // never reached the baseline. The scaled model is graded as its own
+  // candidate instead.
+  const scaled = tier === "small" ? null : join(gen, "scaled.orm.yaml");
+  // The surface checks below (parity) do run at scale.
+  const model = scaled ?? customer.kernelPath;
   for (const p of customer.personas ?? []) {
     const exercisePath = join(customer.dir, p.acceptance);
     if (!existsSync(exercisePath)) {
@@ -1003,15 +1029,17 @@ export async function sprint6Surfaces(customer, tier, record) {
     }
     // A persona judges the model barwise produced from their own artifact, not the kernel.
     const own = (customer.artifacts ?? []).find((a) => (p.judges ?? [])[0] === a.id) ?? null;
-    const candidates = [["kernel", model]];
-    for (const a of customer.artifacts ?? []) {
-      const imported = join(gen, `${a.id}.imported.orm.yaml`);
-      if (existsSync(imported) && (modelSummaryOf(imported)?.objectTypes ?? 0) > 0) {
-        candidates.push([a.id, imported]);
-      }
-    }
-    for (const [label, candidate] of candidates) {
-      if (label !== "kernel" && own && own.id !== label) continue;
+    const imported = (customer.artifacts ?? []).flatMap((a) => {
+      const path = join(gen, `${a.id}.imported.orm.yaml`);
+      return existsSync(path) && (modelSummaryOf(path)?.objectTypes ?? 0) > 0 ? [[a.id, path]] : [];
+    });
+    const candidates = acceptanceCandidates({
+      kernel: customer.kernelPath,
+      scaled,
+      imported,
+      own: own?.id ?? null,
+    });
+    for (const { label, path: candidate, authoring } of candidates) {
       const res = runCli([
         "gym",
         "check",
@@ -1033,7 +1061,7 @@ export async function sprint6Surfaces(customer, tier, record) {
         over: label,
         importer: (customer.artifacts ?? []).find((a) => a.id === label)?.importer,
         ...outcome,
-        severity: label === "kernel" && outcome.status === "fail" ? "authoring" : outcome.severity,
+        severity: authoring && outcome.status === "fail" ? "authoring" : outcome.severity,
         ms: res.ms,
         exit: res.exit,
       });
@@ -1059,12 +1087,7 @@ export async function sprint6Surfaces(customer, tier, record) {
           ["validate", model, "--format", "json"],
           "validate_model",
           { source: model },
-          (cli, m) =>
-            grade.gradeParity(
-              JSON.stringify(summarizeValidation(parseJson(cli))),
-              JSON.stringify(summarizeValidation(parseJson(m), true)),
-              "validate",
-            ),
+          (cli, m) => grade.gradeValidationParity(cli, m),
         ],
         ["export-ddl", ["export", model, "--format", "ddl"], "export_model", {
           source: model,
@@ -1127,15 +1150,6 @@ export async function sprint6Surfaces(customer, tier, record) {
       detail: `MCP session failed: ${String(e.message).split("\n")[0]}`,
     });
   }
-}
-
-function summarizeValidation(v, fromMcp = false) {
-  if (!v) return { unreadable: true };
-  const list = fromMcp ? [...(v.errors ?? []), ...(v.warnings ?? [])] : v;
-  return {
-    errors: (list ?? []).filter((d) => d.severity === "error").length,
-    warnings: (list ?? []).filter((d) => d.severity === "warning").length,
-  };
 }
 
 export function tail(text, n = 6) {

@@ -18,8 +18,10 @@ import {
   gradeRoundTrip,
   gradeSplit,
   gradeStaleness,
+  gradeValidationParity,
   gradeWroteOutput,
 } from "../lib/oracles/grade.mjs";
+import { acceptanceCandidates } from "../lib/steps.mjs";
 
 const ok = {
   exit: 0,
@@ -124,13 +126,39 @@ test("gradeSplit: an object type in no domain is S1; a warned drop is refused; c
 
 test("gradeHistoryStep: a rename must appear as a synonym candidate; removal and addition alone is S5; nothing is S1", () => {
   const expect = { renamed: { from: "Encounter", to: "Visit" } };
+  // The candidate shape barwise diff --format json emits. This fixture used
+  // to be { removed, added }, a shape the CLI never produces, which a
+  // substring matcher over the serialised candidate happened to accept;
+  // history.test.mjs now pins the shape against the real CLI.
+  const candidate = (elementType, removedName, addedName) => ({
+    elementType,
+    removedName,
+    addedName,
+    removedIndex: 0,
+    addedIndex: 1,
+    reasons: ["matching reference mode suffix"],
+  });
   assert.equal(
     gradeHistoryStep(expect, {
       deltas: [],
-      synonymCandidates: [{ removed: "Encounter", added: "Visit" }],
+      synonymCandidates: [candidate("object_type", "Encounter", "Visit")],
     }).status,
     "pass",
   );
+  // Near-misses the substring matcher accepted: a fact-type candidate that
+  // mentions both names, and an object-type candidate for a longer name.
+  for (
+    const near of [
+      candidate("fact_type", "Encounter has Id", "Visit has Id"),
+      candidate("object_type", "EncounterType", "VisitType"),
+    ]
+  ) {
+    assert.notEqual(
+      gradeHistoryStep(expect, { deltas: [], synonymCandidates: [near] }).status,
+      "pass",
+      JSON.stringify(near),
+    );
+  }
   assert.equal(
     gradeHistoryStep(expect, {
       deltas: [{ kind: "removed", elementType: "object_type", name: "Encounter" }, {
@@ -529,4 +557,163 @@ test("evaluateGate: a row is classified only with a note, an issue, and for a fi
     findings: { [key]: { severity: "S1", note: "why", issue: "barwise-zzz" } },
   }, { hasReproduction: () => true });
   assert.equal(complete.unclassified.length + complete.unreproduced.length, 0);
+});
+
+test("evaluateGate: a blind-spot row whose step now fails is a definite finding, not exempt", () => {
+  // The reproduction exemption read the baseline's old status, so a known
+  // could_not_answer row that started failing passed under the blind-spot
+  // issue with nothing reproducing it.
+  const key = "C01/small/4/read-back:avro";
+  const baseline = {
+    findings: {
+      [key]: { status: "could_not_answer", note: "no avro importer", issue: "barwise-s4x" },
+    },
+  };
+  const noRepro = { hasReproduction: () => false };
+  const nowFails = [{
+    customer: "C01",
+    tier: "small",
+    sprint: 4,
+    step: "read-back:avro",
+    status: "fail",
+    severity: "S1",
+  }];
+  const v = evaluateGate(nowFails, baseline, noRepro);
+  assert.deepEqual(v.changed, [{ key, was: "could_not_answer", now: "fail" }]);
+  assert.deepEqual(v.unreproduced, [{ key, issue: "barwise-s4x" }]);
+  // The same row still blind is exempt, and unchanged.
+  const stillBlind = [{ ...nowFails[0], status: "could_not_answer", severity: undefined }];
+  const w = evaluateGate(stillBlind, baseline, noRepro);
+  assert.deepEqual(w.changed, []);
+  assert.deepEqual(w.unreproduced, []);
+  // And the reverse: a finding whose step can no longer answer.
+  const finding = { findings: { [key]: { severity: "S1", note: "real", issue: "barwise-aaa" } } };
+  const x = evaluateGate(stillBlind, finding, { hasReproduction: () => true });
+  assert.deepEqual(x.changed, [{ key, was: "fail", now: "could_not_answer" }]);
+});
+
+test("evaluateGate: a baseline row whose step stopped being emitted is not silently kept", () => {
+  // `stale` compares only rows that ran, so a step that vanished took its
+  // open finding with it and the gate passed.
+  const baseline = {
+    findings: {
+      "C01/small/5/diff:4:add_subtype": { severity: "S1", note: "n", issue: "barwise-aaa" },
+      "C02/small/5/diff:1:rename": { severity: "S5", note: "n", issue: "barwise-bbb" },
+      "C01/medium/5/diff:4:add_subtype": { severity: "S1", note: "n", issue: "barwise-aaa" },
+    },
+  };
+  // C01 sprint 5 ran without the step; C02 never ran; medium is another tier.
+  const results = [{
+    customer: "C01",
+    tier: "small",
+    sprint: 5,
+    step: "diff:1:rename",
+    status: "pass",
+  }];
+  const v = evaluateGate(results, baseline, { hasReproduction: () => true });
+  assert.deepEqual(v.vanished, ["C01/small/5/diff:4:add_subtype"]);
+  assert.deepEqual(v.unrun, ["C02/small/5/diff:1:rename"]);
+});
+
+test("acceptanceCandidates: only the hand-written kernel is the authoring control", () => {
+  // At medium and enterprise tiers the scaled model was graded under the
+  // label "kernel", so a failure at scale was filed as authoring and never
+  // reached the baseline.
+  const c = acceptanceCandidates({
+    kernel: "k.orm.yaml",
+    scaled: "scaled.orm.yaml",
+    imported: [["a-ddl", "a.orm.yaml"], ["b-dbt", "b.orm.yaml"]],
+    own: "b-dbt",
+  });
+  assert.deepEqual(c, [
+    { label: "kernel", path: "k.orm.yaml", authoring: true },
+    { label: "scaled", path: "scaled.orm.yaml", authoring: false },
+    { label: "b-dbt", path: "b.orm.yaml", authoring: false },
+  ]);
+  // Small tier: no scaled model; a persona with no `judges` sees every import.
+  const small = acceptanceCandidates({ kernel: "k.orm.yaml", imported: [["a-ddl", "a.orm.yaml"]] });
+  assert.deepEqual(small.map((x) => [x.label, x.authoring]), [["kernel", true], ["a-ddl", false]]);
+});
+
+test("gradeValidationParity: payloads it cannot read are not agreement", () => {
+  // Shapes copied from the products: the CLI prints an array of
+  // diagnostics, MCP validate_model returns { errors, warnings }.
+  const cli = JSON.stringify([
+    { severity: "error", ruleId: "r1", message: "m" },
+    { severity: "warning", ruleId: "r2", message: "m" },
+    { severity: "info", ruleId: "r3", message: "m" },
+  ]);
+  const mcp = JSON.stringify({
+    valid: false,
+    errorCount: 1,
+    warningCount: 1,
+    errors: [{ severity: "error", ruleId: "r1", message: "m" }],
+    warnings: [{ severity: "warning", ruleId: "r2", message: "m" }],
+  });
+  assert.equal(gradeValidationParity(cli, mcp).status, "pass");
+  // A real disagreement is still a finding.
+  const mcpClean = JSON.stringify({
+    valid: true,
+    errorCount: 0,
+    warningCount: 0,
+    errors: [],
+    warnings: [],
+  });
+  assert.equal(gradeValidationParity(cli, mcpClean).severity, "S1");
+  // The planted control: both unreadable used to compare equal and pass.
+  assert.equal(gradeValidationParity("not json", "also not").status, "could_not_answer");
+  // A wrong shape on either side used to summarise to zero errors.
+  assert.equal(gradeValidationParity("{}", mcpClean).status, "could_not_answer");
+  assert.equal(gradeValidationParity("[]", "[]").status, "could_not_answer");
+});
+
+test("gradeImport: a prefix is tolerated only at an identifier boundary", () => {
+  // The name check used endsWith over normalised strings, so a model that
+  // held only SuperUser satisfied an expected User.
+  const users = { generator: "code", classes: [{ name: "User" }, { name: "CustomerOrder" }] };
+  const grade = (names) =>
+    gradeImport(ok, users, "import", { objectTypes: names.length, names }).status;
+  assert.equal(grade(["SuperUser", "CustomerOrder"]), "fail");
+  assert.equal(grade(["User", "PriorCustomerOrder"]), "fail");
+  // The prefixes the loose match existed for still pass.
+  assert.equal(grade(["dbo.User", "sales.customer_order"]), "pass");
+  assert.equal(grade(["stg_user", "CustomerOrder"]), "pass");
+});
+
+test("gradeHistoryStep: a fact-type rename is matched on the candidate's own pair", () => {
+  const expect = {
+    renamedFactType: {
+      from: "Faculty teaches CourseSection",
+      to: "Faculty instructs CourseSection",
+    },
+  };
+  const candidate = (elementType, removedName, addedName) => ({
+    elementType,
+    removedName,
+    addedName,
+  });
+  const graded = (c) => gradeHistoryStep(expect, { deltas: [], synonymCandidates: [c] }).status;
+  assert.equal(
+    graded(
+      candidate("fact_type", "Faculty teaches CourseSection", "Faculty instructs CourseSection"),
+    ),
+    "pass",
+  );
+  // Near-misses a substring matcher over the serialised candidate accepted.
+  assert.notEqual(
+    graded(
+      candidate(
+        "fact_type",
+        "Faculty teaches CourseSection in Term",
+        "Faculty instructs CourseSection in Term",
+      ),
+    ),
+    "pass",
+  );
+  assert.notEqual(
+    graded(
+      candidate("object_type", "Faculty teaches CourseSection", "Faculty instructs CourseSection"),
+    ),
+    "pass",
+  );
 });

@@ -16,6 +16,18 @@ import { crashed } from "../exec.mjs";
 
 export const norm = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
+/**
+ * Every normalised form of a name with zero or more whole leading
+ * segments dropped, where segments are separated by anything that is not
+ * a letter or digit: "sales.customer_order" gives salescustomerorder,
+ * customerorder and order. "SuperUser" is one segment, so it gives only
+ * superuser.
+ */
+export function prefixStripped(raw) {
+  const segs = String(raw ?? "").split(/[^A-Za-z0-9]+/).filter(Boolean);
+  return new Set(segs.map((_, i) => norm(segs.slice(i).join(""))));
+}
+
 const NAMED_REFUSAL =
   /not supported|unsupported|no importer|unknown format|unknown dialect|is not a registered|cannot (?:read|parse|import)|not (?:a )?(?:valid|recognized)/i;
 
@@ -83,10 +95,17 @@ export function gradeImport(result, manifest, expect, modelSummary) {
       evidence: { expected: expected.length, imported: 0 },
     };
   }
-  const got = new Set((modelSummary?.names ?? []).map(norm));
+  const gotRaw = modelSummary?.names ?? [];
+  const got = new Set(gotRaw.map(norm));
+  // A schema or layer prefix is tolerated only at an identifier boundary:
+  // `dbo.User` and `stg_user` satisfy `User`, `SuperUser` does not. The
+  // first version compared normalised strings with endsWith, so a model
+  // holding only SuperUser passed an import that dropped User.
   const missing = expected.filter((n) =>
     !got.has(n.norm)
-    && ![...got].some((g) => g.endsWith(n.norm) || n.norm.endsWith(g) && g.length > 3)
+    && !gotRaw.some((g) =>
+      prefixStripped(g).has(n.norm) || prefixStripped(n.raw).has(norm(g)) && norm(g).length > 3
+    )
   );
   const stderr = result.stderr;
   const missingNamed = missing.filter((n) => stderr.toLowerCase().includes(n.raw.toLowerCase()));
@@ -363,8 +382,12 @@ export function gradeHistoryStep(expect, diff) {
     deltas.some((d) => d.kind === kind && d.elementType === elementType && d.name === name);
   if (expect.renamed) {
     const { from, to } = expect.renamed;
+    // A synonym candidate names its pair as removedName and addedName
+    // (barwise diff --format json). Matched on the serialised candidate as a
+    // substring, an object-type rename passed on the strength of a
+    // fact-type candidate that merely mentions both names.
     const asRename = synonyms.some((s) =>
-      JSON.stringify(s).includes(from) && JSON.stringify(s).includes(to)
+      s.elementType === "object_type" && s.removedName === from && s.addedName === to
     );
     if (asRename) {
       return { status: "pass", detail: `rename ${from} -> ${to} reported as a synonym candidate` };
@@ -446,7 +469,7 @@ export function gradeHistoryStep(expect, diff) {
   if (expect.renamedFactType) {
     const { from, to } = expect.renamedFactType;
     const asRename = synonyms.some((s) =>
-      JSON.stringify(s).includes(from) && JSON.stringify(s).includes(to)
+      s.elementType === "fact_type" && s.removedName === from && s.addedName === to
     );
     return asRename
       ? { status: "pass", detail: "fact-type rename reported as a synonym candidate" }
@@ -585,6 +608,43 @@ export function gradeAcceptance(result, report) {
     }`,
     evidence: { failed: failed.slice(0, 6) },
   };
+}
+
+/**
+ * Validation parity compares error and warning counts, and it can only
+ * do that over payloads it read. Both sides used to be summarised first
+ * and compared after, so two unreadable payloads became the same
+ * `{ unreadable: true }` and passed as agreement, and a payload of the
+ * wrong shape summarised to zero errors -- the shape of a clean model.
+ * The shapes are the products' own: `barwise validate --format json`
+ * prints an array of diagnostics; the MCP `validate_model` tool returns
+ * `{ errors: [...], warnings: [...] }` for a single model
+ * (packages/mcp/src/tools/validate.ts).
+ */
+export function gradeValidationParity(cliStdout, mcpText) {
+  const read = (text) => {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return undefined;
+    }
+  };
+  const cli = read(cliStdout);
+  const mcp = read(mcpText);
+  const cliOk = Array.isArray(cli);
+  const mcpOk = Array.isArray(mcp?.errors) && Array.isArray(mcp?.warnings);
+  if (!cliOk || !mcpOk) {
+    const side = !cliOk && !mcpOk ? "neither side's" : !cliOk ? "the CLI's" : "the MCP tool's";
+    return {
+      status: "could_not_answer",
+      detail:
+        `validate: ${side} payload is not the validation shape, so there are no counts to compare`,
+    };
+  }
+  const count = (list, severity) => list.filter((d) => d.severity === severity).length;
+  const summary = (list) =>
+    JSON.stringify({ errors: count(list, "error"), warnings: count(list, "warning") });
+  return gradeParity(summary(cli), summary([...mcp.errors, ...mcp.warnings]), "validate");
 }
 
 export function gradeParity(cliText, mcpText, label) {

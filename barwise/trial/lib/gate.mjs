@@ -50,12 +50,51 @@ export function evaluateGate(results, baseline, {
   const unclassified = Object.entries(rows).filter(([, v]) =>
     !v.note || /^\(unclassified\)/.test(v.note) || !v.issue
   ).map(([k]) => k);
+  // Whether a row is a blind spot is decided by what the step did THIS
+  // run, not by what the baseline recorded: a known could_not_answer row
+  // whose step starts failing is a definite finding, and exempting it from
+  // the reproduction rule on the strength of its old status let it pass
+  // under the blind-spot issue. The transition itself is reported too.
+  const current = new Map(results.map((r) => [keyOf(r), r]));
+  const blindNow = (k, v) => (current.get(k)?.status ?? v.status) === "could_not_answer";
   const unreproduced = Object.entries(rows).filter(([k, v]) =>
-    v.issue && v.status !== "could_not_answer" && !unclassified.includes(k)
+    v.issue && !blindNow(k, v) && !unclassified.includes(k)
     && !hasReproduction(v.issue)
   ).map(([k, v]) => ({ key: k, issue: v.issue }));
+  const changed = Object.entries(rows).flatMap(([k, v]) => {
+    const now = current.get(k)?.status;
+    const was = v.status === "could_not_answer" ? "could_not_answer" : "fail";
+    return now && now !== "pass" && now !== "refused" && now !== was ? [{ key: k, was, now }] : [];
+  });
+  // A baseline row the results never mention is invisible to `stale`,
+  // which only compares rows that ran, so a step that stopped being
+  // emitted took its open finding with it and the gate passed. Scoped by
+  // customer, tier and sprint: when that scope ran and the step did not,
+  // the row VANISHED (definite); when the scope never ran -- a partial
+  // results file -- the gate cannot vouch for the row (could not answer).
+  const tiers = new Set(results.map((r) => r.tier));
+  const ranScopes = new Set(results.map((r) => `${r.customer}/${r.tier}/${r.sprint}`));
+  const vanished = [];
+  const unrun = [];
+  for (const k of Object.keys(rows)) {
+    const [customer, tier, sprint] = k.split("/");
+    if (!tiers.has(tier) || ranKeys.has(k)) continue;
+    (ranScopes.has(`${customer}/${tier}/${sprint}`) ? vanished : unrun).push(k);
+  }
   const authoring = results.filter((r) => r.severity === "authoring");
-  return { failing, blind, fresh, freshBlind, stale, unclassified, unreproduced, authoring };
+  return {
+    failing,
+    blind,
+    fresh,
+    freshBlind,
+    stale,
+    unclassified,
+    unreproduced,
+    changed,
+    vanished,
+    unrun,
+    authoring,
+  };
 }
 
 export function runGate({ tier = "small", write = false } = {}) {
@@ -131,6 +170,21 @@ export function runGate({ tier = "small", write = false } = {}) {
   for (const { key, issue } of v.unreproduced) {
     console.log(`NO REPRO     ${key}  nothing under findings/${issue}/ reproduces it`);
     definite = true;
+  }
+  for (const { key, was, now } of v.changed) {
+    console.log(`CHANGED      ${key}  baseline says ${was}, this run ${now}; reclassify the row`);
+    if (now === "fail") definite = true;
+    else blindSpot = true;
+  }
+  for (const k of v.vanished) {
+    console.log(`VANISHED     ${k}  its sprint ran but the step was not emitted`);
+    definite = true;
+  }
+  if (v.unrun.length) {
+    console.log(
+      `NOT RUN      ${v.unrun.length} baseline row(s) in customer/sprint scopes these results never ran (a partial run?)`,
+    );
+    blindSpot = true;
   }
   for (const r of v.freshBlind) {
     console.log(`NEW BLIND    ${keyOf(r)}  could not answer: ${r.detail}`);
