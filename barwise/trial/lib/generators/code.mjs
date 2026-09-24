@@ -23,6 +23,37 @@ export function generateCode(doc, skin, dir, { factor = 1, artifactId = "code" }
     files: 0,
   };
   const supOf = new Map((doc.model.subtype_facts ?? []).map((s) => [s.subtype, s.supertype]));
+  // A fact type with more than two roles, or one an entity objectifies,
+  // cannot be a field from one player to another: that shape kept only the
+  // first two roles, so C06's ternary Booking reached the repo with none
+  // (barwise-kt7). Code a team writes holds such a fact as a class with one
+  // field per role -- the objectifying entity's own class, or an
+  // association class named for the fact type.
+  const objectifier = new Map(
+    (doc.model.objectified_fact_types ?? []).map((o) => [o.fact_type, o.object_type]),
+  );
+  const typeOf = (other, sfx) =>
+    other.kind === "value"
+      ? (other.value_constraint?.values ? `${other.name}${sfx}` : scalar(lang, other))
+      : `${other.name}${sfx}`;
+  const asClass = (ft) => ft.roles.length > 2 || objectifier.has(ft.id);
+  const roleFields = (ft, sfx) => {
+    const seen = new Map();
+    return ft.roles.flatMap((r) => {
+      const player = ids.get(r.player);
+      if (!player) return [];
+      const base = camel(player.name);
+      const n = (seen.get(base) ?? 0) + 1;
+      seen.set(base, n);
+      return [{
+        name: n === 1 ? base : `${base}${n}`,
+        type: typeOf(player, sfx),
+        single: true,
+        mand: true,
+        isEntity: player.kind === "entity",
+      }];
+    });
+  };
   const ext = { typescript: "ts", java: "java", kotlin: "kt" }[lang];
   for (let m = 0; m < factor; m++) {
     const pkg = m === 0 ? "domain" : `domain${m + 1}`;
@@ -43,6 +74,8 @@ export function generateCode(doc, skin, dir, { factor = 1, artifactId = "code" }
       const name = `${e.name}${sfx}`;
       const fields = [];
       for (const ft of factTypes(doc)) {
+        if (objectifier.get(ft.id) === e.id) fields.push(...roleFields(ft, sfx));
+        if (asClass(ft)) continue;
         const [r0, r1] = ft.roles;
         if (!r1 || r0.player !== e.id) continue;
         const other = ids.get(r1.player);
@@ -51,9 +84,7 @@ export function generateCode(doc, skin, dir, { factor = 1, artifactId = "code" }
           c.type === "internal_uniqueness" && c.roles.length === 1 && c.roles[0] === r0.id
         );
         const mand = (ft.constraints ?? []).some((c) => c.type === "mandatory" && c.role === r0.id);
-        const type = other.kind === "value"
-          ? (other.value_constraint?.values ? `${other.name}${sfx}` : scalar(lang, other))
-          : `${other.name}${sfx}`;
+        const type = typeOf(other, sfx);
         fields.push({
           name: camel(other.name),
           type,
@@ -69,6 +100,16 @@ export function generateCode(doc, skin, dir, { factor = 1, artifactId = "code" }
         renderClass(lang, pkg, name, fields, parent, isSealedRoot, skin, e.definition),
       );
       manifest.classes.push({ name, source: e.name, module: m + 1, parent });
+      manifest.files++;
+    }
+    for (const ft of factTypes(doc)) {
+      if (!asClass(ft) || objectifier.has(ft.id)) continue;
+      const name = `${pascal(ft.name)}${sfx}`;
+      writeFileSync(
+        join(pkgDir, `${name}.${ext}`),
+        renderClass(lang, pkg, name, roleFields(ft, sfx), null, false, skin, ft.definition),
+      );
+      manifest.classes.push({ name, source: ft.name, module: m + 1, parent: null });
       manifest.files++;
     }
     // The layers a real service has, which are not domain types.
@@ -116,6 +157,11 @@ export function generateCode(doc, skin, dir, { factor = 1, artifactId = "code" }
 
 function camel(name) {
   return name.charAt(0).toLowerCase() + name.slice(1).replace(/[^A-Za-z0-9]/g, "");
+}
+
+function pascal(name) {
+  return name.split(/[^A-Za-z0-9]+/).filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join("");
 }
 
 function scalar(lang, vt) {

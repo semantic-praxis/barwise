@@ -605,8 +605,8 @@
     "C06/small/6/acceptance:integration-architect:platform-typescript": {
       "severity": "S5",
       "class": "acceptance-edit-distance-typescript",
-      "issue": "barwise-kt7",
-      "note": "A harness defect, not a product one (barwise-kt7): the trial's code generator keeps only the first two roles of each fact type, so C06's objectified ternary 'Shipper books Shipment with Carrier' reaches the TypeScript repo with no roles at all, and no importer could recover the fact the rubric checks. Closes when the generator renders every role.",
+      "issue": "barwise-y6a",
+      "note": "A format limit, not a defect (barwise-y6a): TypeScript has no notion of objectification. Since the code generator renders every role (barwise-kt7, code half), C06's objectified ternary reaches the repo as class Booking with shipper, shipment and carrier fields, and the importer faithfully reads three binaries on Booking. The persona check asks for a fact type connecting Shipment and Carrier, which code cannot express; only the path through Booking survives. Closes when persona checks declare which artifact kinds can satisfy them, or the importers infer association classes.",
       "detail": "1 of 5 persona checks fail: The model has no fact type connecting \"Shipment\" and \"Carrier\"."
     },
     "C06/small/6/acceptance:tms-dba:tms-ddl": {

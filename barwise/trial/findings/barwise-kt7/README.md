@@ -4,7 +4,14 @@ This is a defect in the trial harness, not in barwise. It was first
 filed as a TypeScript importer defect, which was wrong: the importer
 cannot recover a relationship the generated code never contained.
 
-## 1. The code generator keeps only the first two roles of a fact type
+## 1. The code generator keeps only the first two roles of a fact type (fixed)
+
+Fixed on PR #509: an objectified or n-ary fact type is now a class with
+one field per role, and `trial/tests/code.test.mjs` checks every role of
+every fact type in all twelve kernels. With the input fixed, the C06
+check below still fails, for the reason predicted at the end of this
+section: code cannot express objectification. That is barwise-y6a. The
+record of the original defect follows.
 
 ```sh
 npm run trial:generate -- --customer C06 --tier small
