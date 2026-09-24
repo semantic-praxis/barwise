@@ -2,6 +2,13 @@
   "$comment": "The finding classes the trial has surfaced, one per beads issue. gate.mjs --write classifies a new failing step by the first class whose matchers fit and writes the class's note into trial-baseline.json; a failure no class fits stays unclassified and keeps the gate red. A class is removed here, with its baseline rows, in the PR that fixes the issue.",
   "classes": [
     {
+      "id": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "severity": "S1",
+      "step": "^read-back-diff-ddl:",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509."
+    },
+    {
       "id": "lineage-impact-by-name",
       "issue": "barwise-5m9",
       "severity": "S1",

@@ -63,6 +63,27 @@
       "note": "The OpenAPI importer derives role ids from the property name, so two schemas with a 'related' or 'has' property collide and every imported model fails structural/duplicate-role-id (barwise-lh9).",
       "detail": "the model the importer wrote has 57 structural error(s): structural/duplicate-role-id"
     },
+    "C01/small/4.5/late:impact-id": {
+      "severity": "S1",
+      "class": "lineage-impact-no-sources",
+      "issue": "barwise-ofb",
+      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
+      "detail": "lineage impact reports no affected artifacts for ot-discharge-disposition, which the DDL exported before the change renders"
+    },
+    "C01/small/4.5/late:impact-name": {
+      "severity": "S1",
+      "class": "lineage-impact-by-name",
+      "issue": "barwise-5m9",
+      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
+      "detail": "lineage impact reports no affected artifacts for DischargeDisposition, which the DDL exported before the change renders"
+    },
+    "C01/small/4/read-back-diff-ddl:ansi": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "111 delta(s) outside the declared loss set: modified object_type Patient; modified object_type Provider; modified object_type Payer; modified object_type Facility; modified object_type Department; modified object_type Encounter; modified object_type InpatientEncounter; removed object_type Outpatient"
+    },
     "C01/small/4/read-back:avro": {
       "status": "could_not_answer",
       "class": "avro-no-read-back",
@@ -168,6 +189,34 @@
       "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "18 delta(s) outside the declared loss set: removed object_type Party; removed object_type Product; removed object_type Branch; removed object_type Currency; removed object_type LoanAccount; removed object_type GeneralLedgerAccount; removed object_type DepositAccount; removed object_type LegalEntity"
     },
+    "C02/small/4.5/late:impact-id": {
+      "severity": "S1",
+      "class": "lineage-impact-no-sources",
+      "issue": "barwise-ofb",
+      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
+      "detail": "lineage impact reports no affected artifacts for ot-transaction-type, which the DDL exported before the change renders"
+    },
+    "C02/small/4.5/late:impact-name": {
+      "severity": "S1",
+      "class": "lineage-impact-by-name",
+      "issue": "barwise-5m9",
+      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
+      "detail": "lineage impact reports no affected artifacts for TransactionType, which the DDL exported before the change renders"
+    },
+    "C02/small/4/read-back-diff-ddl:ansi": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "114 delta(s) outside the declared loss set: modified object_type Party; modified object_type LegalEntity; modified object_type NaturalPerson; removed object_type PartyId; removed object_type LegalName; removed object_type TaxIdentifier; modified object_type KycStatus; removed object_type KycScreenin"
+    },
+    "C02/small/4/read-back-diff-ddl:postgres": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "114 delta(s) outside the declared loss set: modified object_type Party; modified object_type LegalEntity; modified object_type NaturalPerson; removed object_type PartyId; removed object_type LegalName; removed object_type TaxIdentifier; modified object_type KycStatus; removed object_type KycScreenin"
+    },
     "C02/small/4/read-back:avro": {
       "status": "could_not_answer",
       "class": "avro-no-read-back",
@@ -258,6 +307,34 @@
       "issue": "barwise-jjd",
       "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "13 delta(s) outside the declared loss set: removed object_type PcContact; removed object_type PcAccount; removed object_type PcProducer; removed object_type PcPolicyPeriod; removed object_type PcRisk; removed object_type PcVehicleRisk; removed object_type PcAdjuster; removed object_type PcClaim"
+    },
+    "C03/small/4.5/late:impact-id": {
+      "severity": "S1",
+      "class": "lineage-impact-no-sources",
+      "issue": "barwise-ofb",
+      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
+      "detail": "lineage impact reports no affected artifacts for ot-claim, which the DDL exported before the change renders"
+    },
+    "C03/small/4.5/late:impact-name": {
+      "severity": "S1",
+      "class": "lineage-impact-by-name",
+      "issue": "barwise-5m9",
+      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
+      "detail": "lineage impact reports no affected artifacts for Claim, which the DDL exported before the change renders"
+    },
+    "C03/small/4/read-back-diff-ddl:ansi": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "122 delta(s) outside the declared loss set: modified object_type Contact; removed object_type Person; removed object_type Company; modified object_type Account; modified object_type Producer; modified object_type Adjuster; modified object_type Policy; modified object_type Term"
+    },
+    "C03/small/4/read-back-diff-ddl:redshift": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "122 delta(s) outside the declared loss set: modified object_type Contact; removed object_type Person; removed object_type Company; modified object_type Account; modified object_type Producer; modified object_type Adjuster; modified object_type Policy; modified object_type Term"
     },
     "C03/small/4/read-back:avro": {
       "status": "could_not_answer",
@@ -378,6 +455,34 @@
       "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "16 delta(s) outside the declared loss set: removed object_type Party; removed object_type Currency; removed object_type Category; removed object_type Product; removed object_type PhysicalProduct; removed object_type Seller; removed object_type ProductVariant; removed object_type Marketplace"
     },
+    "C04/small/4.5/late:impact-id": {
+      "severity": "S1",
+      "class": "lineage-impact-no-sources",
+      "issue": "barwise-ofb",
+      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
+      "detail": "lineage impact reports no affected artifacts for ot-currency-code, which the DDL exported before the change renders"
+    },
+    "C04/small/4.5/late:impact-name": {
+      "severity": "S1",
+      "class": "lineage-impact-by-name",
+      "issue": "barwise-5m9",
+      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
+      "detail": "lineage impact reports no affected artifacts for CurrencyCode, which the DDL exported before the change renders"
+    },
+    "C04/small/4/read-back-diff-ddl:ansi": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "118 delta(s) outside the declared loss set: modified object_type Party; removed object_type PartyId; modified object_type Buyer; modified object_type Seller; removed object_type PartyName; removed object_type EmailAddress; modified object_type Marketplace; removed object_type MarketplaceCode"
+    },
+    "C04/small/4/read-back-diff-ddl:snowflake": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "118 delta(s) outside the declared loss set: modified object_type Party; removed object_type PartyId; modified object_type Buyer; modified object_type Seller; removed object_type PartyName; removed object_type EmailAddress; modified object_type Marketplace; removed object_type MarketplaceCode"
+    },
     "C04/small/4/read-back:avro": {
       "status": "could_not_answer",
       "class": "avro-no-read-back",
@@ -483,6 +588,34 @@
       "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "15 delta(s) outside the declared loss set: removed object_type UnitOfMeasure; removed object_type Mat; removed object_type WorkCenter; removed object_type FinishedGood; removed object_type Werk; removed object_type Plko; removed object_type Charg; removed object_type Lifnr"
     },
+    "C05/small/4.5/late:impact-id": {
+      "severity": "S1",
+      "class": "lineage-impact-no-sources",
+      "issue": "barwise-ofb",
+      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
+      "detail": "lineage impact reports no affected artifacts for ot-uom-code, which the DDL exported before the change renders"
+    },
+    "C05/small/4.5/late:impact-name": {
+      "severity": "S1",
+      "class": "lineage-impact-by-name",
+      "issue": "barwise-5m9",
+      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
+      "detail": "lineage impact reports no affected artifacts for UomCode, which the DDL exported before the change renders"
+    },
+    "C05/small/4/read-back-diff-ddl:ansi": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "116 delta(s) outside the declared loss set: modified object_type Material; removed object_type MaterialNumber; modified object_type RawMaterial; removed object_type Assembly; modified object_type FinishedGood; modified object_type ConfigurableProduct; removed object_type MaterialDescription; modifie"
+    },
+    "C05/small/4/read-back-diff-ddl:databricks": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "116 delta(s) outside the declared loss set: modified object_type Material; removed object_type MaterialNumber; modified object_type RawMaterial; removed object_type Assembly; modified object_type FinishedGood; modified object_type ConfigurableProduct; removed object_type MaterialDescription; modifie"
+    },
     "C05/small/4/read-back:avro": {
       "status": "could_not_answer",
       "class": "avro-no-read-back",
@@ -573,6 +706,34 @@
       "issue": "barwise-jjd",
       "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "20 delta(s) outside the declared loss set: removed object_type Consignee; removed object_type Port; removed object_type Carrier; removed object_type Vehicle; removed object_type Container; removed object_type Voyage; removed object_type Leg; removed object_type Shipment"
+    },
+    "C06/small/4.5/late:impact-id": {
+      "severity": "S1",
+      "class": "lineage-impact-no-sources",
+      "issue": "barwise-ofb",
+      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
+      "detail": "lineage impact reports no affected artifacts for ot-imdg-class, which the DDL exported before the change renders"
+    },
+    "C06/small/4.5/late:impact-name": {
+      "severity": "S1",
+      "class": "lineage-impact-by-name",
+      "issue": "barwise-5m9",
+      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
+      "detail": "lineage impact reports no affected artifacts for ImdgClass, which the DDL exported before the change renders"
+    },
+    "C06/small/4/read-back-diff-ddl:ansi": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "108 delta(s) outside the declared loss set: modified object_type Shipper; removed object_type ShipperId; modified object_type Consignee; removed object_type ConsigneeId; modified object_type Carrier; removed object_type ScacCode; modified object_type Shipment; removed object_type ShipmentNumber"
+    },
+    "C06/small/4/read-back-diff-ddl:postgres": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "108 delta(s) outside the declared loss set: modified object_type Shipper; removed object_type ShipperId; modified object_type Consignee; removed object_type ConsigneeId; modified object_type Carrier; removed object_type ScacCode; modified object_type Shipment; removed object_type ShipmentNumber"
     },
     "C06/small/4/read-back:avro": {
       "status": "could_not_answer",
@@ -686,6 +847,34 @@
       "note": "The OpenAPI importer derives role ids from the property name, so two schemas with a 'related' or 'has' property collide and every imported model fails structural/duplicate-role-id (barwise-lh9).",
       "detail": "the model the importer wrote has 48 structural error(s): structural/duplicate-role-id"
     },
+    "C07/small/4.5/late:impact-id": {
+      "severity": "S1",
+      "class": "lineage-impact-no-sources",
+      "issue": "barwise-ofb",
+      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
+      "detail": "lineage impact reports no affected artifacts for ot-rate-plan-code, which the DDL exported before the change renders"
+    },
+    "C07/small/4.5/late:impact-name": {
+      "severity": "S1",
+      "class": "lineage-impact-by-name",
+      "issue": "barwise-5m9",
+      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
+      "detail": "lineage impact reports no affected artifacts for RatePlanCode, which the DDL exported before the change renders"
+    },
+    "C07/small/4/read-back-diff-ddl:ansi": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "119 delta(s) outside the declared loss set: modified object_type Party; modified object_type Individual; removed object_type Organization; modified object_type Customer; modified object_type Subscriber; modified object_type Country; modified object_type Operator; modified object_type ProductSpecific"
+    },
+    "C07/small/4/read-back-diff-ddl:bigquery": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "119 delta(s) outside the declared loss set: modified object_type Party; modified object_type Individual; removed object_type Organization; modified object_type Customer; modified object_type Subscriber; modified object_type Country; modified object_type Operator; modified object_type ProductSpecific"
+    },
     "C07/small/4/read-back:avro": {
       "status": "could_not_answer",
       "class": "avro-no-read-back",
@@ -769,6 +958,34 @@
       "issue": "barwise-jjd",
       "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "14 delta(s) outside the declared loss set: removed object_type Premise; removed object_type Transformer; removed object_type Manufacturer; removed object_type ServicePoint; removed object_type Meter; removed object_type SmartMeter; removed object_type Customer; removed object_type Tariff"
+    },
+    "C08/small/4.5/late:impact-id": {
+      "severity": "S1",
+      "class": "lineage-impact-no-sources",
+      "issue": "barwise-ofb",
+      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
+      "detail": "lineage impact reports no affected artifacts for ot-rate-code, which the DDL exported before the change renders"
+    },
+    "C08/small/4.5/late:impact-name": {
+      "severity": "S1",
+      "class": "lineage-impact-by-name",
+      "issue": "barwise-5m9",
+      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
+      "detail": "lineage impact reports no affected artifacts for RateCode, which the DDL exported before the change renders"
+    },
+    "C08/small/4/read-back-diff-ddl:ansi": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "107 delta(s) outside the declared loss set: modified object_type ServicePoint; modified object_type Meter; modified object_type SmartMeter; removed object_type IntervalMeter; modified object_type Manufacturer; modified object_type Premise; modified object_type Customer; modified object_type Account"
+    },
+    "C08/small/4/read-back-diff-ddl:mysql": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "107 delta(s) outside the declared loss set: modified object_type ServicePoint; modified object_type Meter; modified object_type SmartMeter; removed object_type IntervalMeter; modified object_type Manufacturer; modified object_type Premise; modified object_type Customer; modified object_type Account"
     },
     "C08/small/4/read-back:avro": {
       "status": "could_not_answer",
@@ -874,6 +1091,27 @@
       "issue": "barwise-lh9",
       "note": "The DDL importer has the same role-id collision as the OpenAPI importer: role ids derived from column names collide across tables and the imported model fails structural/duplicate-role-id (barwise-lh9, second importer).",
       "detail": "the model the importer wrote has 29 structural error(s): structural/duplicate-role-id"
+    },
+    "C09/small/4.5/late:impact-id": {
+      "severity": "S1",
+      "class": "lineage-impact-no-sources",
+      "issue": "barwise-ofb",
+      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
+      "detail": "lineage impact reports no affected artifacts for ot-meddra-pt-code, which the DDL exported before the change renders"
+    },
+    "C09/small/4.5/late:impact-name": {
+      "severity": "S1",
+      "class": "lineage-impact-by-name",
+      "issue": "barwise-5m9",
+      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
+      "detail": "lineage impact reports no affected artifacts for MeddraPreferredTermCode, which the DDL exported before the change renders"
+    },
+    "C09/small/4/read-back-diff-ddl:ansi": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "118 delta(s) outside the declared loss set: modified object_type Study; modified object_type Protocol; modified object_type ProtocolAmendment; modified object_type Site; modified object_type Investigator; modified object_type Arm; modified object_type Treatment; modified object_type Subject"
     },
     "C09/small/4/read-back:avro": {
       "status": "could_not_answer",
@@ -1001,6 +1239,34 @@
       "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "16 delta(s) outside the declared loss set: removed object_type Spriden; removed object_type Stvcamp; removed object_type Sgbstdn; removed object_type Sibinst; removed object_type Pebempl; removed object_type Stvcoll; removed object_type Stvdept; removed object_type Scbcrse"
     },
+    "C10/small/4.5/late:impact-id": {
+      "severity": "S1",
+      "class": "lineage-impact-no-sources",
+      "issue": "barwise-ofb",
+      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
+      "detail": "lineage impact reports no affected artifacts for vt-grade-code, which the DDL exported before the change renders"
+    },
+    "C10/small/4.5/late:impact-name": {
+      "severity": "S1",
+      "class": "lineage-impact-by-name",
+      "issue": "barwise-5m9",
+      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
+      "detail": "lineage impact reports no affected artifacts for GradeCode, which the DDL exported before the change renders"
+    },
+    "C10/small/4/read-back-diff-ddl:ansi": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "121 delta(s) outside the declared loss set: modified object_type Person; modified object_type Student; removed object_type GraduateStudent; modified object_type Employee; modified object_type Faculty; modified object_type Campus; modified object_type College; modified object_type Department"
+    },
+    "C10/small/4/read-back-diff-ddl:postgres": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "121 delta(s) outside the declared loss set: modified object_type Person; modified object_type Student; removed object_type GraduateStudent; modified object_type Employee; modified object_type Faculty; modified object_type Campus; modified object_type College; modified object_type Department"
+    },
     "C10/small/4/read-back:avro": {
       "status": "could_not_answer",
       "class": "avro-no-read-back",
@@ -1120,6 +1386,27 @@
       "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-a0h).",
       "detail": "170 delta(s) outside the declared loss set: modified object_type TenantId; modified object_type RegionCode; modified object_type WorkspaceId; modified object_type ProjectId; modified object_type ApiKeyId; modified object_type ServiceAccountId; modified object_type TenantName; modified object_type Ap"
     },
+    "C11/small/4.5/late:impact-id": {
+      "severity": "S1",
+      "class": "lineage-impact-no-sources",
+      "issue": "barwise-ofb",
+      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
+      "detail": "lineage impact reports no affected artifacts for ot-reserved-event-name, which the DDL exported before the change renders"
+    },
+    "C11/small/4.5/late:impact-name": {
+      "severity": "S1",
+      "class": "lineage-impact-by-name",
+      "issue": "barwise-5m9",
+      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
+      "detail": "lineage impact reports no affected artifacts for ReservedEventName, which the DDL exported before the change renders"
+    },
+    "C11/small/4/read-back-diff-ddl:ansi": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "121 delta(s) outside the declared loss set: modified object_type Tenant; removed object_type TenantId; modified object_type DataRegion; modified object_type RegionCode; modified object_type Workspace; removed object_type WorkspaceId; modified object_type Project; removed object_type ProjectId"
+    },
     "C11/small/4/read-back:avro": {
       "status": "could_not_answer",
       "class": "avro-no-read-back",
@@ -1224,6 +1511,34 @@
       "issue": "barwise-jjd",
       "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "29 delta(s) outside the declared loss set: removed object_type Hhld; removed object_type Clnt; removed object_type Aplct; removed object_type Ofc; removed object_type EligWrk; removed object_type Supv; removed object_type Detr; removed object_type Prgm"
+    },
+    "C12/small/4.5/late:impact-id": {
+      "severity": "S1",
+      "class": "lineage-impact-no-sources",
+      "issue": "barwise-ofb",
+      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
+      "detail": "lineage impact reports no affected artifacts for ot-closure-reason-code, which the DDL exported before the change renders"
+    },
+    "C12/small/4.5/late:impact-name": {
+      "severity": "S1",
+      "class": "lineage-impact-by-name",
+      "issue": "barwise-5m9",
+      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
+      "detail": "lineage impact reports no affected artifacts for ClosureReasonCode, which the DDL exported before the change renders"
+    },
+    "C12/small/4/read-back-diff-ddl:ansi": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "121 delta(s) outside the declared loss set: modified object_type Client; modified object_type Applicant; modified object_type Recipient; modified object_type Household; removed object_type IncomeSource; modified object_type Case; modified object_type Program; modified object_type CertificationPeriod"
+    },
+    "C12/small/4/read-back-diff-ddl:postgres": {
+      "severity": "S1",
+      "class": "sql-read-back-own-export",
+      "issue": "barwise-jjd",
+      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "detail": "121 delta(s) outside the declared loss set: modified object_type Client; modified object_type Applicant; modified object_type Recipient; modified object_type Household; removed object_type IncomeSource; modified object_type Case; modified object_type Program; modified object_type CertificationPeriod"
     },
     "C12/small/4/read-back:avro": {
       "status": "could_not_answer",
