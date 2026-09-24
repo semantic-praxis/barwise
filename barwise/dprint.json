@@ -9,10 +9,12 @@
   },
   "json": {
     "indentWidth": 2,
-    "useTabs": false
+    "useTabs": false,
+    "packageJson.applyConventions": false
   },
   "markdown": {
-    "lineWidth": 80
+    "lineWidth": 80,
+    "wrapCodeSpans": false
   },
   "excludes": [
     "**/node_modules",

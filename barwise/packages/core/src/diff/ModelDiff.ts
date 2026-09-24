@@ -27,7 +27,6 @@ import {
 } from "./elementDiff.js";
 import { detectSynonymCandidates } from "./synonyms.js";
 
-export { type ChangeDescription, describeChange, type RoleSummary } from "./changeDescription.js";
 export {
   deltaLabel,
   ELEMENT_TYPES,

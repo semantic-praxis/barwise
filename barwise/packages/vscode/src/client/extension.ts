@@ -7,7 +7,7 @@ import {
   LanguageClientOptions,
   ServerOptions,
   TransportKind,
-} from "vscode-languageclient/node.js";
+} from "vscode-languageclient/node";
 import { registerChatParticipant } from "../chat/ChatParticipant.js";
 import { AnalyzeRepositoryCommand } from "../commands/AnalyzeRepositoryCommand.js";
 import { ExportCommand } from "../commands/ExportCommand.js";

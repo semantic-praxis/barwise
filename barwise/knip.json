@@ -2,8 +2,8 @@
   "$schema": "https://unpkg.com/knip@latest/schema.json",
   "ignoreExportsUsedInFile": true,
   "ignore": ["test-plan/**"],
-  "ignoreBinaries": ["depcruise", "jscpd", "shellcheck", "uv"],
-  "ignoreDependencies": ["@dprint/json", "@dprint/markdown", "@dprint/typescript", "dependency-cruiser", "jscpd"],
+  "ignoreBinaries": ["gitleaks", "pkill", "shellcheck", "uv"],
+  "ignoreDependencies": ["@dprint/json", "@dprint/markdown", "@dprint/typescript"],
   "workspaces": {
     ".": { "entry": ["scripts/at-root.mjs", "scripts/tests/*.test.mjs"] },
     "packages/core": {
@@ -12,19 +12,11 @@
     "packages/diagram": {},
     "packages/llm": {},
     "packages/promptlab": {},
-    "packages/cli": {
-      "entry": ["src/bundle-entry.ts"]
-    },
+    "packages/cli": {},
     "packages/mcp": {
-      "entry": ["src/index.ts", "src/bundle-entry.ts"]
+      "entry": ["src/index.ts"]
     },
     "packages/vscode": {
-      "entry": [
-        "src/client/extension.ts",
-        "src/server/OrmLanguageServer.ts",
-        "src/mcp/stdio-entry.ts",
-        "webview/src/main.tsx"
-      ],
       "ignore": [
         ".vscode-test.mjs",
         "tests/integration/**"

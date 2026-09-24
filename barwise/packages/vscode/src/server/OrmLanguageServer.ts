@@ -9,7 +9,7 @@ import {
   type TextDocumentPositionParams,
   TextDocuments,
   TextDocumentSyncKind,
-} from "vscode-languageserver/node.js";
+} from "vscode-languageserver/node";
 import { CompletionProvider } from "./CompletionProvider.js";
 import { DiagnosticsProvider } from "./DiagnosticsProvider.js";
 import { HoverProvider } from "./HoverProvider.js";

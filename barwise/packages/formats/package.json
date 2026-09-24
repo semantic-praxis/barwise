@@ -26,7 +26,7 @@
   "dependencies": {
     "@barwise/core": "1.7.0",
     "fast-xml-parser": "^5.11.1",
-    "yaml": "^2.8.2"
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",

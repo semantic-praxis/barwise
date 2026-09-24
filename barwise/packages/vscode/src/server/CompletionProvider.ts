@@ -1,6 +1,6 @@
 import { OrmYamlSerializer } from "@barwise/core";
 import type { TextDocument } from "vscode-languageserver-textdocument";
-import { CompletionItem, CompletionItemKind, type Position } from "vscode-languageserver/node.js";
+import { CompletionItem, CompletionItemKind, type Position } from "vscode-languageserver/node";
 import { parse } from "yaml";
 
 /**
