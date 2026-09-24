@@ -2,7 +2,7 @@
 
 Status: Implemented (both skills and the shared checklist land alongside this spec)
 Created: 2026-09-05
-Last-updated: 2026-09-05
+Last-updated: 2026-09-24
 Tracking: barwise-922
 
 ## Principle
@@ -217,8 +217,8 @@ counterargument, and every reply agreed by restating the argument it
 was given. The rules are the author's side of review, so they sit
 with the author's skill; `pr-review` is unchanged. Docs-only, like the
 rest of this spec: nothing checks them, and the signal that they work
-is a reviewer reply that disagrees for a reason the question did not
-contain.
+is a reviewer reply that gives a reason the question did not contain,
+whether it agrees or disagrees.
 
 ## Non-goals
 

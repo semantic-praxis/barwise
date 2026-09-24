@@ -267,8 +267,13 @@ push or open a pull request." Its reply arrives as an ordinary PR
 comment within a minute or two.
 
 The #509 question about barwise-y6a, asked this way, would have read:
-"C06's rubric requires a fact type between Shipment and Carrier. The
-generated TypeScript holds that relationship as a `Booking` class with
-`shipper`, `shipment` and `carrier` fields
-(`trial/customers/C06-logistics/`). How should the trial grade that
-check against a model imported from code, and why?"
+"The rubric in
+`trial/customers/C06-logistics/personas/integration-architect.gym.yaml`
+requires a fact type between Shipment and Carrier.
+`trial/lib/generators/code.mjs` renders C06's kernel into the
+TypeScript the lane imports. What does the model imported from that
+code say about Shipment and Carrier, and how should the trial grade
+the check against it?" The first draft of this example said the
+code "holds that relationship as a `Booking` class" -- the disputed
+reading, stated as a premise, and Copilot's review of this section
+caught it.
