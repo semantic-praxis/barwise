@@ -33,6 +33,18 @@ const ftId = (m: OrmModel, name: string) => m.getFactTypeByName(name)!.id;
 const serializer = new OrmYamlSerializer();
 const reparse = (m: OrmModel): OrmModel => serializer.deserialize(serializer.serialize(m));
 
+/** Ids of the fact-type nodes the session currently draws. */
+async function factTypeNodeIds(session: DiagramSession): Promise<string[]> {
+  const p = await session.present();
+  return p.graph.nodes.filter((n) => n.kind === "fact_type").map((n) => n.id);
+}
+
+/** [subtype, supertype] id pairs of the subtype edges the session draws. */
+async function subtypeEdgePairs(session: DiagramSession): Promise<string[][]> {
+  const p = await session.present();
+  return p.graph.subtypeEdges.map((e) => [e.subtypeNodeId, e.supertypeNodeId]);
+}
+
 /** Sorted names of the object types the session currently draws. */
 async function objectTypeNames(session: DiagramSession, model: OrmModel): Promise<string[]> {
   const p = await session.present();
@@ -233,11 +245,37 @@ describe("DiagramSession", () => {
     });
     session.setModel(edited);
     expect(await objectTypeNames(session, edited)).toEqual(["A", "D"]);
+    expect(await factTypeNodeIds(session)).toEqual(["ft-a-d"]);
 
     // B is one hop from A through a fact that already existed, so it never
     // appears, on this reload or the next.
     session.setModel(reparse(edited));
     expect(await objectTypeNames(session, edited)).toEqual(["A", "D"]);
+    expect(await factTypeNodeIds(session)).toEqual(["ft-a-d"]);
+  });
+
+  it("recognizes a new fact type when the caller mutates the current model", async () => {
+    const model = chainModel();
+    model.addDiagramLayout({ name: "JustA", positions: {}, orientations: {}, elements: ["A"] });
+    const session = new DiagramSession(model);
+    session.apply({ type: "loadView", viewName: "JustA" });
+    await session.present();
+
+    // Same object, mutated in place: the session must compare against its
+    // own snapshot, not against a "previous" model that now has the fact.
+    model.addObjectType({ name: "D", id: "ot-d", kind: "entity", referenceMode: "d_id" });
+    model.addFactType({
+      id: "ft-a-d",
+      name: "A owns D",
+      roles: [
+        { id: "r-a-d-1", name: "owns", playerId: otId(model, "A") },
+        { id: "r-a-d-2", name: "is owned by", playerId: "ot-d" },
+      ],
+      readings: ["{0} owns {1}"],
+    });
+    session.setModel(model);
+    expect(await objectTypeNames(session, model)).toEqual(["A", "D"]);
+    expect(await factTypeNodeIds(session)).toEqual(["ft-a-d"]);
   });
 
   it("assembles a save-layout with sorted center positions", async () => {
@@ -748,10 +786,12 @@ describe("DiagramSession", () => {
     });
     session.setModel(edited);
     expect(await objectTypeNames(session, edited)).toEqual(["Contractor", "Person"]);
+    expect(await subtypeEdgePairs(session)).toEqual([["ot-contractor", otId(edited, "Person")]]);
 
     // Reloading again finds it already in the filter and skips it.
     session.setModel(reparse(edited));
     expect(await objectTypeNames(session, edited)).toEqual(["Contractor", "Person"]);
+    expect(await subtypeEdgePairs(session)).toEqual([["ot-contractor", otId(edited, "Person")]]);
   });
 
   it("drops a fact type's stale position and orientation overrides after a model swap", async () => {

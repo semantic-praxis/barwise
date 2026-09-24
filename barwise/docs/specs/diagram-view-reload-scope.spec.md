@@ -57,13 +57,18 @@ Out of scope:
 
 ## Inventory
 
-| Module                                                  | Change                                                        |
-| ------------------------------------------------------- | ------------------------------------------------------------- |
-| `packages/diagram/src/session/DiagramSession.ts`        | `setModel` passes the previous model; expansion skips its ids |
-| `packages/diagram/tests/session/DiagramSession.test.ts` | Three tests that pinned the growth rewritten; two added       |
-| `packages/vscode/src/diagram/DiagramPanel.ts`           | Doc comment on the watcher corrected; no behavior change      |
+| Module                                                  | Change                                                          |
+| ------------------------------------------------------- | --------------------------------------------------------------- |
+| `packages/diagram/src/session/DiagramSession.ts`        | Session snapshots relation ids; expansion skips known ones      |
+| `packages/diagram/tests/session/DiagramSession.test.ts` | Three tests that pinned the growth rewritten; three added       |
+| `scripts/beads-crud.mjs`                                | `update --status` off `closed` drops `closed_at`/`close_reason` |
+| `packages/vscode/src/diagram/DiagramPanel.ts`           | Doc comment on the watcher corrected; no behavior change        |
 
-"New since the previous model" is decided by id. Ids are required on
+"New since the previous model" is decided by id, against a set the
+session copies at construction and after each `setModel`. Reading the
+ids back from the previous model object instead would fail when a caller
+mutates the current model and passes it back: the new relation would
+already be in "previous" (Copilot review on #553). Ids are required on
 object types, fact types and subtype facts in `orm-model.schema.json`,
 so a re-parse of unchanged text yields the same ids.
 
