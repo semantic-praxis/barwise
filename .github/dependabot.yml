@@ -30,6 +30,21 @@ updates:
       # and CI does not run vsce -- only release.yml does. Raising both
       # drops users on older editors, so it is a deliberate change.
       - dependency-name: "@types/vscode"
+      # TypeScript 7 is out, but typescript-eslint peers on
+      # "typescript": ">=4.8.4 <6.1.0". Dependabot cannot bump across that
+      # range, so every run on main ended red with "Error while updating
+      # peer dependency" for typescript. Majors wait until typescript-eslint
+      # supports 7; moving is a compiler migration, not a routine bump.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # The integration tests run on @vscode/test-cli's own mocha, which it
+      # resolves from its own dependency (^11.7.6). vscode's direct `mocha`
+      # is loaded by nothing (knip lists it in ignoreDependencies), so a
+      # major bump here installs a second, unused copy and leaves the
+      # runner where it was -- PR #548 did exactly that. Majors follow
+      # test-cli.
+      - dependency-name: "mocha"
+        update-types: ["version-update:semver-major"]
 
   # Keep the GitHub Actions used by the workflows current.
   - package-ecosystem: "github-actions"
