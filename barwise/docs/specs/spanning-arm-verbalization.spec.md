@@ -41,7 +41,7 @@ since spanning roles are foreign by design):
    after it and replace every other placeholder with "some {Player}".
    Binary: "drives some Car". Unary: "smokes". Ternary: "works on some
    Project in some Department". This is the FORML shape and it follows
-   the modeller's own reading rather than the role name.
+   the modeller's own reading rather than the role name. A placeholder the reading writes flush against a word (`{0} works on{1}in {2}`, which `validateReadingTemplate` accepts) gets the missing space, so the arm never reads "works onsome Projectin".
 2. **No such reading.** The role name, then "some {Player}" for each
    other role in the fact type. For a binary whose only reading is
    written from the other side this gives "is driven by some Person".
@@ -98,3 +98,7 @@ Each player is a reference segment carrying the player's id, as before.
   player; whether that shape should be reported is a separate question.
 - Subset, equality and external uniqueness are unchanged; they already
   route through `spanningRoleLabel`.
+
+## Implementation notes
+
+- The first cut assumed readings put spaces around placeholders. They need not: `validateReadingTemplate` checks only which placeholders appear. Found by Copilot review on PR #545; the arm now supplies the space, pinned by a test with a flush reading.

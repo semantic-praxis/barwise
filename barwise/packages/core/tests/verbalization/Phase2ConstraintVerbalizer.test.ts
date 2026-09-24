@@ -266,6 +266,34 @@ describe("Phase 2 constraint verbalization", () => {
       );
     });
 
+    // validateReadingTemplate accepts a placeholder with no space beside
+    // it, so the arm supplies the space the reading left out rather than
+    // rendering "drivessome Car" (Copilot review of PR #545).
+    it("separates a placeholder the reading writes flush against its text", () => {
+      const model = new OrmModel({ name: "Flush" });
+      const person = model.addObjectType({ name: "Person", kind: "entity", referenceMode: "pid" });
+      const proj = model.addObjectType({ name: "Project", kind: "entity", referenceMode: "prid" });
+      const dept = model.addObjectType({
+        name: "Department",
+        kind: "entity",
+        referenceMode: "did",
+      });
+      const ft = model.addFactType({
+        name: "Person works on Project in Department",
+        roles: [
+          { id: "r-works", name: "works on", playerId: person.id },
+          { id: "r-staffs", name: "is staffed by", playerId: proj.id },
+          { id: "r-hosts", name: "hosts", playerId: dept.id },
+        ],
+        readings: ["{0} works on{1}in {2}"],
+        constraints: [],
+      });
+      const c: Constraint = { type: "disjunctive_mandatory", roleIds: ["r-works"] };
+      expect(verbalizer.verbalize(c, ft, model).text).toBe(
+        "Each Person works on some Project in some Department.",
+      );
+    });
+
     it("refers each arm's object to that player's id", () => {
       const { model, drives, roles, ids } = buildTransportModel();
       const c: Constraint = { type: "exclusive_or", roleIds: [roles.drives, roles.rides] };

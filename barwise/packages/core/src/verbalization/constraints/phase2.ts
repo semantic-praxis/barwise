@@ -539,9 +539,9 @@ const objName = (model: OrmModel, otId: string): string => model.getObjectType(o
  * it belongs to (barwise-884).
  *
  * The other three spanning verbalizers -- disjunctive mandatory,
- * exclusion, exclusive-or -- already emit the role's own name beside the
- * player ("Vendor has some VendorStatus"), so their sentences
- * distinguish the roles without this and are left alone.
+ * exclusion, exclusive-or -- do not use this. They name a predicate and
+ * its object ("drives some Car"), not a player, and route through
+ * `spanningArm` below (barwise-1003).
  */
 function spanningRoleLabel(
   model: OrmModel,
@@ -598,12 +598,20 @@ function spanningArm(model: OrmModel, roleId: string): VerbalizationSegment[] {
   if (reading) {
     const rest = reading.template.trimStart().slice(lead.length).trimStart();
     const segments: VerbalizationSegment[] = [];
-    rest.split(/\{(\d+)\}/).forEach((part, i) => {
-      if (i % 2 === 0) {
-        if (part) segments.push(textSeg(part));
-      } else {
+    // Odd indices are placeholder numbers, even ones the text between.
+    // `validateReadingTemplate` accepts a placeholder written flush
+    // against a word ("works on{1}in"), so the space the reading left out
+    // is supplied here rather than rendering "works onsome Projectin".
+    const parts = rest.split(/\{(\d+)\}/);
+    parts.forEach((part, i) => {
+      if (i % 2 === 1) {
         segments.push(textSeg("some "), playerRef(Number(part)));
+        return;
       }
+      let text = part;
+      if (i > 0 && /^\w/.test(text)) text = " " + text;
+      if (i < parts.length - 1 && text && !/\s$/.test(text)) text += " ";
+      if (text) segments.push(textSeg(text));
     });
     return segments;
   }
