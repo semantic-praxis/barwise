@@ -518,6 +518,13 @@
       "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
       "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
     },
+    "C06/small/1/import:platform-typescript": {
+      "severity": "S1",
+      "class": "code-import-utility-name-skip",
+      "issue": "barwise-tn4",
+      "note": "The code importers skip any class whose name is on a fixed utility list (Event, Request, Result, Error, Context, ...) with exit 0 and no warning naming it (barwise-tn4). C06 has a domain class Event; the import returns ScanEvent and ShipmentEvent but no Event. Hidden until the import oracle stopped accepting a name as present because another name ended with it.",
+      "detail": "exit 0 but 1 of 22 expected names are absent from the model and 1 of them are not mentioned on stderr (5% silently dropped)"
+    },
     "C06/small/1/import:tms-ddl": {
       "severity": "S1",
       "class": "sql-importer-fk-targets",

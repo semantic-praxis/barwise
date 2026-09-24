@@ -157,6 +157,15 @@
       "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm)."
     },
     {
+      "id": "code-import-utility-name-skip",
+      "issue": "barwise-tn4",
+      "severity": "S1",
+      "step": "^import:",
+      "importer": "typescript",
+      "detail": "expected names are absent",
+      "note": "The code importers skip any class whose name is on a fixed utility list (Event, Request, Result, Error, Context, ...) with exit 0 and no warning naming it (barwise-tn4). C06 has a domain class Event; the import returns ScanEvent and ShipmentEvent but no Event. Hidden until the import oracle stopped accepting a name as present because another name ended with it."
+    },
+    {
       "id": "kotlin-importer-empty",
       "issue": "barwise-dyq",
       "severity": "S1",
