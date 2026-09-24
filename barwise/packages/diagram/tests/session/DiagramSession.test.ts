@@ -4,7 +4,7 @@
  * DiagramPresentation -- the behavioral parity guard for logic that had
  * no coverage while it lived in the VS Code panel.
  */
-import type { OrmModel } from "@barwise/core";
+import { type OrmModel, OrmYamlSerializer } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { ModelBuilder } from "../../../core/tests/helpers/ModelBuilder.js";
 import { DiagramSession } from "../../src/session/DiagramSession.js";
@@ -28,6 +28,31 @@ function chainModel(): OrmModel {
 
 const otId = (m: OrmModel, name: string) => m.getObjectTypeByName(name)!.id;
 const ftId = (m: OrmModel, name: string) => m.getFactTypeByName(name)!.id;
+
+/** What the panel's document watcher does on every edit: re-parse the text. */
+const serializer = new OrmYamlSerializer();
+const reparse = (m: OrmModel): OrmModel => serializer.deserialize(serializer.serialize(m));
+
+/** Ids of the fact-type nodes the session currently draws. */
+async function factTypeNodeIds(session: DiagramSession): Promise<string[]> {
+  const p = await session.present();
+  return p.graph.nodes.filter((n) => n.kind === "fact_type").map((n) => n.id);
+}
+
+/** [subtype, supertype] id pairs of the subtype edges the session draws. */
+async function subtypeEdgePairs(session: DiagramSession): Promise<string[][]> {
+  const p = await session.present();
+  return p.graph.subtypeEdges.map((e) => [e.subtypeNodeId, e.supertypeNodeId]);
+}
+
+/** Sorted names of the object types the session currently draws. */
+async function objectTypeNames(session: DiagramSession, model: OrmModel): Promise<string[]> {
+  const p = await session.present();
+  return p.graph.nodes
+    .filter((n) => n.kind === "object_type")
+    .map((n) => model.getObjectType(n.id)?.name ?? n.id)
+    .sort();
+}
 
 /** A relates to B relates to C, plus a disconnected D-E pair. */
 function chainWithDisconnectedPair(): OrmModel {
@@ -182,22 +207,75 @@ describe("DiagramSession", () => {
     expect(p.focus).not.toBeNull();
   });
 
-  it("expands an active view filter by one hop on live reload", async () => {
+  // Live reload re-parses the whole document on every edit, the panel's own
+  // layout save included. Fact types that were already in the model are not
+  // news: treating them as news grew a scoped view by one hop per reload
+  // until it showed the full connected graph.
+  it("keeps a named view's scope across live reloads that add nothing", async () => {
     const model = chainModel();
     model.addDiagramLayout({ name: "JustA", positions: {}, orientations: {}, elements: ["A"] });
     const session = new DiagramSession(model);
     session.apply({ type: "loadView", viewName: "JustA" });
-    expect((await session.present()).graph.nodes).toHaveLength(1); // only A
+    expect(await objectTypeNames(session, model)).toEqual(["A"]);
 
-    // A document change re-parses the model (ids are stable); the active
-    // view expands one hop to pull in fact types / entities that touch the
-    // displayed submodel.
+    for (let i = 0; i < 3; i++) {
+      session.setModel(reparse(model));
+      expect(await objectTypeNames(session, model)).toEqual(["A"]);
+    }
+  });
+
+  it("pulls in a fact type added since the last model, and only that one", async () => {
+    const model = chainModel();
+    model.addDiagramLayout({ name: "JustA", positions: {}, orientations: {}, elements: ["A"] });
+    const session = new DiagramSession(model);
+    session.apply({ type: "loadView", viewName: "JustA" });
+    await session.present();
+
+    // The user adds a fact involving an entity already in the view.
+    const edited = reparse(model);
+    edited.addObjectType({ name: "D", id: "ot-d", kind: "entity", referenceMode: "d_id" });
+    edited.addFactType({
+      id: "ft-a-d",
+      name: "A owns D",
+      roles: [
+        { id: "r-a-d-1", name: "owns", playerId: otId(edited, "A") },
+        { id: "r-a-d-2", name: "is owned by", playerId: "ot-d" },
+      ],
+      readings: ["{0} owns {1}"],
+    });
+    session.setModel(edited);
+    expect(await objectTypeNames(session, edited)).toEqual(["A", "D"]);
+    expect(await factTypeNodeIds(session)).toEqual(["ft-a-d"]);
+
+    // B is one hop from A through a fact that already existed, so it never
+    // appears, on this reload or the next.
+    session.setModel(reparse(edited));
+    expect(await objectTypeNames(session, edited)).toEqual(["A", "D"]);
+    expect(await factTypeNodeIds(session)).toEqual(["ft-a-d"]);
+  });
+
+  it("recognizes a new fact type when the caller mutates the current model", async () => {
+    const model = chainModel();
+    model.addDiagramLayout({ name: "JustA", positions: {}, orientations: {}, elements: ["A"] });
+    const session = new DiagramSession(model);
+    session.apply({ type: "loadView", viewName: "JustA" });
+    await session.present();
+
+    // Same object, mutated in place: the session must compare against its
+    // own snapshot, not against a "previous" model that now has the fact.
+    model.addObjectType({ name: "D", id: "ot-d", kind: "entity", referenceMode: "d_id" });
+    model.addFactType({
+      id: "ft-a-d",
+      name: "A owns D",
+      roles: [
+        { id: "r-a-d-1", name: "owns", playerId: otId(model, "A") },
+        { id: "r-a-d-2", name: "is owned by", playerId: "ot-d" },
+      ],
+      readings: ["{0} owns {1}"],
+    });
     session.setModel(model);
-    const p = await session.present();
-    const names = p.graph.nodes
-      .filter((n) => n.kind === "object_type")
-      .map((n) => model.getObjectType(n.id)?.name);
-    expect(names).toContain("B");
+    expect(await objectTypeNames(session, model)).toEqual(["A", "D"]);
+    expect(await factTypeNodeIds(session)).toEqual(["ft-a-d"]);
   });
 
   it("assembles a save-layout with sorted center positions", async () => {
@@ -564,22 +642,18 @@ describe("DiagramSession", () => {
     expect(Object.keys(layout.positions)).toEqual(["A", "B", "C"]);
   });
 
-  it("reloads the same model unchanged, extending an already-included fact type by continuing past it", async () => {
+  it("reloads the same model unchanged without widening the view", async () => {
     const model = chainModel();
     model.addDiagramLayout({ name: "AB", positions: {}, orientations: {}, elements: ["A", "B"] });
     const session = new DiagramSession(model);
     session.apply({ type: "loadView", viewName: "AB" });
     await session.present();
 
-    session.setModel(model);
-    const p = await session.present();
+    session.setModel(reparse(model));
 
-    const names = p.graph.nodes
-      .filter((n) => n.kind === "object_type")
-      .map((n) => model.getObjectType(n.id)?.name);
-    // The already-included A-B fact type is skipped on reload; B relates
-    // to C is newly reachable and pulls C into the expanded filter.
-    expect(names).toContain("C");
+    // A-B is already in the filter; B-C touches the view but existed in
+    // the previous model, so C stays out.
+    expect(await objectTypeNames(session, model)).toEqual(["A", "B"]);
   });
 
   it("cleans a stale entity out of an active view filter after removing it from the model", async () => {
@@ -681,7 +755,7 @@ describe("DiagramSession", () => {
     expect(cleared.ghostNodeIds).toEqual([]);
   });
 
-  it("expands a subtype filter's fact ids on reload, then skips them once already included", async () => {
+  it("takes in a new subtype fact on reload, never an existing one", async () => {
     const model = subtypeChainModel();
     model.addDiagramLayout({
       name: "JustPerson",
@@ -693,20 +767,31 @@ describe("DiagramSession", () => {
     session.apply({ type: "loadView", viewName: "JustPerson" });
     await session.present();
 
-    // Person's own subtype link (to Party) and the link where Person is the
-    // supertype (from Employee) both become reachable from the Person seed.
-    session.setModel(model);
-    const expanded = await session.present();
-    const names = expanded.graph.nodes
-      .filter((n) => n.kind === "object_type")
-      .map((n) => model.getObjectType(n.id)?.name);
-    expect(names.sort()).toEqual(["Employee", "Party", "Person"]);
+    // Person's links to Party and Employee both existed before the reload.
+    session.setModel(reparse(model));
+    expect(await objectTypeNames(session, model)).toEqual(["Person"]);
 
-    // Reloading again finds both subtype facts already in the filter and
-    // must skip re-adding them.
-    session.setModel(model);
-    const reloaded = await session.present();
-    expect(reloaded.graph.nodes.length).toBe(expanded.graph.nodes.length);
+    // A subtype link added to Person since the last model is shown.
+    const edited = reparse(model);
+    edited.addObjectType({
+      name: "Contractor",
+      id: "ot-contractor",
+      kind: "entity",
+      referenceMode: "party_id",
+    });
+    edited.addSubtypeFact({
+      id: "sf-contractor",
+      subtypeId: "ot-contractor",
+      supertypeId: otId(edited, "Person"),
+    });
+    session.setModel(edited);
+    expect(await objectTypeNames(session, edited)).toEqual(["Contractor", "Person"]);
+    expect(await subtypeEdgePairs(session)).toEqual([["ot-contractor", otId(edited, "Person")]]);
+
+    // Reloading again finds it already in the filter and skips it.
+    session.setModel(reparse(edited));
+    expect(await objectTypeNames(session, edited)).toEqual(["Contractor", "Person"]);
+    expect(await subtypeEdgePairs(session)).toEqual([["ot-contractor", otId(edited, "Person")]]);
   });
 
   it("drops a fact type's stale position and orientation overrides after a model swap", async () => {
