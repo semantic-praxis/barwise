@@ -29,12 +29,14 @@ const CONSTRAINTS_DIR = resolve(
  * `requiresLocalRoles` marks false, for which a role of another fact
  * type is correct rather than a defect.
  *
- * `spanningRoleLabel` is here and holds no `??` today -- it degrades
- * with an explicit `if (!role)` instead, which this file's regex does
- * not match. It is listed because it is the shared degradation point
- * that `verbalizeSubset` and `verbalizeEquality` now route through
- * (barwise-884), so a `??` appearing there later is legitimate and
- * should not be reported.
+ * `spanningRoleLabel` and `spanningArm` are here and hold no `??`
+ * today -- each degrades with an explicit `if (!role)` instead, which
+ * this file's regex does not match. They are listed because they are the
+ * shared degradation points: `verbalizeSubset` and `verbalizeEquality`
+ * route through the first (barwise-884), and disjunctive mandatory,
+ * exclusion and exclusive-or through the second (barwise-1003), so a
+ * `??` appearing in either later is legitimate and should not be
+ * reported.
  */
 const SPANNING_FALLBACK_SITES = new Set([
   "verbalizeExternalUniqueness",
@@ -42,10 +44,11 @@ const SPANNING_FALLBACK_SITES = new Set([
   "verbalizeExclusion",
   "verbalizeExclusiveOr",
   "spanningRoleLabel",
+  "spanningArm",
 ]);
 
 /** How many of those sites hold a matching fallback today. */
-const EXPECTED_FALLBACK_SITES = 4;
+const EXPECTED_FALLBACK_SITES = 1;
 
 // `roleId[12]?` and not `roleId\b`: the ring and value-comparison
 // verbalizers spell their parameters `roleId1`/`roleId2`, and `\b` does
