@@ -5,7 +5,9 @@
  * grader that says PASS to everything (the barwise-906 class).
  */
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
+import { parse } from "yaml";
 import { evaluateGate } from "../lib/gate.mjs";
 import {
   gradeAcceptance,
@@ -23,6 +25,7 @@ import {
   gradeValidationParity,
   gradeWroteOutput,
 } from "../lib/oracles/grade.mjs";
+import { exemptPositions, personaProblems } from "../lib/personas.mjs";
 import { acceptanceCandidates } from "../lib/steps.mjs";
 
 const ok = {
@@ -638,17 +641,139 @@ test("acceptanceCandidates: only the hand-written kernel is the authoring contro
   const c = acceptanceCandidates({
     kernel: "k.orm.yaml",
     scaled: "scaled.orm.yaml",
-    imported: [["a-ddl", "a.orm.yaml"], ["b-dbt", "b.orm.yaml"]],
-    own: "b-dbt",
+    imported: [["a-ddl", "a.orm.yaml", "ddl"], ["b-dbt", "b.orm.yaml", "dbt"]],
+    judges: ["b-dbt"],
   });
   assert.deepEqual(c, [
     { label: "kernel", path: "k.orm.yaml", authoring: true },
     { label: "scaled", path: "scaled.orm.yaml", authoring: false },
-    { label: "b-dbt", path: "b.orm.yaml", authoring: false },
+    { label: "b-dbt", path: "b.orm.yaml", authoring: false, kind: "dbt" },
   ]);
-  // Small tier: no scaled model; a persona with no `judges` sees every import.
-  const small = acceptanceCandidates({ kernel: "k.orm.yaml", imported: [["a-ddl", "a.orm.yaml"]] });
-  assert.deepEqual(small.map((x) => [x.label, x.authoring]), [["kernel", true], ["a-ddl", false]]);
+  // Every judged artifact is graded, not only the first: the runner used to
+  // read judges[0] and silently ignore the rest.
+  const both = acceptanceCandidates({
+    kernel: "k.orm.yaml",
+    imported: [["a-ddl", "a.orm.yaml", "ddl"], ["b-dbt", "b.orm.yaml", "dbt"]],
+    judges: ["a-ddl", "b-dbt"],
+  });
+  assert.deepEqual(both.map((x) => x.label), ["kernel", "a-ddl", "b-dbt"]);
+  // No judges, no imports: the old fallback to "every import" is gone, and
+  // the package check (personaProblems) refuses such a persona before a run.
+  const none = acceptanceCandidates({ kernel: "k.orm.yaml", imported: [["a-ddl", "a.orm.yaml"]] });
+  assert.deepEqual(none.map((x) => x.label), ["kernel"]);
+});
+
+test("personaProblems: judges is required and must name real artifacts", () => {
+  const customer = {
+    id: "C99",
+    artifacts: [{ id: "repo", generator: "code" }, { id: "db", generator: "ddl" }],
+    personas: [
+      { id: "no-judges", acceptance: "a.gym.yaml" },
+      { id: "empty", acceptance: "a.gym.yaml", judges: [] },
+      { id: "ghost", acceptance: "a.gym.yaml", judges: ["nope"] },
+      { id: "ok", acceptance: "a.gym.yaml", judges: ["repo", "db"] },
+    ],
+  };
+  const problems = personaProblems(customer, () => []);
+  assert.equal(problems.length, 3);
+  assert.match(problems[0], /no-judges: judges is required/);
+  assert.match(problems[1], /empty: judges is required/);
+  assert.match(problems[2], /ghost: judges names nope, which is not an artifact/);
+});
+
+test("personaProblems: a not_expressible entry must name one check, a judged kind and a reason", () => {
+  const checks = [
+    { kind: "requires_element", element: { entity: "Booking" } },
+    { kind: "requires_element", element: { factTypeBetween: ["Shipment", "Carrier"] } },
+  ];
+  const persona = (x) => ({
+    id: "p",
+    acceptance: "a.gym.yaml",
+    judges: ["repo"],
+    not_expressible: [x],
+  });
+  const run = (x) =>
+    personaProblems({
+      id: "C99",
+      artifacts: [{ id: "repo", generator: "code" }],
+      personas: [persona(x)],
+    }, () => checks);
+  const good = {
+    artifact_kind: "code",
+    check: { factTypeBetween: ["Shipment", "Carrier"] },
+    reason: "r",
+  };
+  assert.deepEqual(run(good), []);
+  assert.match(run({ ...good, reason: undefined })[0], /has no reason/);
+  assert.match(run({ ...good, artifact_kind: "ddl" })[0], /judges none of/);
+  // Matched on the element exactly: the reversed pair is a different check.
+  assert.match(
+    run({ ...good, check: { factTypeBetween: ["Carrier", "Shipment"] } })[0],
+    /matches 0 rubric checks/,
+  );
+});
+
+test("the real customer packages satisfy the persona rules", () => {
+  // Pins the packages themselves: a persona added without judges fails here
+  // before it reaches the runner's refusal.
+  const root = new URL("../customers/", import.meta.url);
+  for (const d of readdirSync(root).filter((x) => /^C\d+/.test(x))) {
+    const customer = parse(readFileSync(new URL(`${d}/customer.yaml`, root), "utf8"));
+    const problems = personaProblems(
+      customer,
+      (p) => parse(readFileSync(new URL(`${d}/${p.acceptance}`, root), "utf8")).checks ?? [],
+    );
+    assert.deepEqual(problems, [], d);
+  }
+});
+
+test("exemptPositions and gradeAcceptance: an excused check is excluded only for its artifact kind", () => {
+  const checks = [
+    { element: { entity: "Booking" } },
+    { element: { factTypeBetween: ["Shipment", "Carrier"] } },
+  ];
+  const notExpressible = [
+    { artifact_kind: "code", check: { factTypeBetween: ["Shipment", "Carrier"] }, reason: "r" },
+  ];
+  assert.deepEqual([...exemptPositions(checks, notExpressible, "code")], [1]);
+  assert.deepEqual([...exemptPositions(checks, notExpressible, "ddl")], []);
+  // The shape barwise gym check --format json emits.
+  const report = {
+    exerciseId: "p",
+    passed: false,
+    results: [
+      {
+        kind: "requires_element",
+        passed: true,
+        message: 'The model has an object type "Booking".',
+      },
+      {
+        kind: "requires_element",
+        passed: false,
+        message: 'The model has no fact type connecting "Shipment" and "Carrier".',
+      },
+    ],
+  };
+  const exit1 = { exit: 1, stdout: "", stderr: "", timedOut: false };
+  const excused = gradeAcceptance(exit1, report, { exempt: new Set([1]), checkCount: 2 });
+  assert.equal(excused.status, "pass");
+  assert.match(excused.detail, /1 not expressible/);
+  // The same report without the exemption is the S5 it always was.
+  assert.equal(gradeAcceptance(exit1, report).severity, "S5");
+  // A second, unexcused failure still fails.
+  const worse = {
+    ...report,
+    results: [{ ...report.results[0], passed: false, message: "no Booking" }, report.results[1]],
+  };
+  assert.equal(
+    gradeAcceptance(exit1, worse, { exempt: new Set([1]), checkCount: 2 }).status,
+    "fail",
+  );
+  // Positions only mean something when the report lines up with the rubric.
+  assert.equal(
+    gradeAcceptance(exit1, report, { exempt: new Set([1]), checkCount: 3 }).status,
+    "could_not_answer",
+  );
 });
 
 test("gradeValidationParity: payloads it cannot read are not agreement", () => {

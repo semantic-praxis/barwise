@@ -211,6 +211,12 @@
       "caught_by": "execution",
       "note": "The Status header announcing that corrections are recorded below. It points at the records; it is not one. Re-keyed from ::714e7e934891 (and before that ::2e97ec924e21, ::b20d229deee7) when this branch's issue ids changed again -- the key hashes a window of normalised text that reaches the ids, so every renumbering drops the old row and adds this one. Fourth re-key of the same record; the content has never changed."
     },
+    "enterprise-trial::15bee4bd4978": {
+      "spec": "enterprise-trial.spec.md",
+      "excerpt": "trial:offline is the lane: it regenerates the customer artifacts and drives 1025 steps through the built bundles. measured at 788 steps it took about twelve min",
+      "caught_by": "not-a-correction",
+      "note": "An Open decision argued for review, not a correction: it splits the CI question into the harness unit tests (test:trial, argued in now) and the lane (trial:offline, deferred to WS6), and keeps the earlier one-customer-per-PR recommendation as the lane's starting point. It records nothing the draft got wrong. Re-keyed from ::69e34343e5e3 when the heading above it changed from \"open; argued for review\" to \"resolved\"; the paragraph is unchanged."
+    },
     "enterprise-trial::3551935b55a1": {
       "spec": "enterprise-trial.spec.md",
       "excerpt": "deviations from the draft, recorded so the next workstream starts from reality (the spec-writer convention).",
@@ -222,12 +228,6 @@
       "excerpt": "the journey is not per-customer. the draft gave each package a journey.yaml listing its steps. twelve copies of one list is the must-agree duplication claude.md",
       "caught_by": "execution",
       "note": "Real correction. The draft gave every customer package a journey.yaml listing its steps; writing the runner for the first customer showed every sprint is the same six commands over whatever the package declares, so twelve copies would have been the must-agree duplication CLAUDE.md forbids. Caught by building it, not by reading the draft."
-    },
-    "enterprise-trial::69e34343e5e3": {
-      "spec": "enterprise-trial.spec.md",
-      "excerpt": "trial:offline is the lane: it regenerates the customer artifacts and drives 1025 steps through the built bundles. measured at 788 steps it took about twelve min",
-      "caught_by": "not-a-correction",
-      "note": "An Open decision argued for review, not a correction: it splits the CI question into the harness unit tests (test:trial, argued in now) and the lane (trial:offline, deferred to WS6), and keeps the earlier one-customer-per-PR recommendation as the lane's starting point. It records nothing the draft got wrong."
     },
     "enterprise-trial::6aa83b9e74b2": {
       "spec": "enterprise-trial.spec.md",

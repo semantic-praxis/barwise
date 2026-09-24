@@ -232,13 +232,6 @@
       "note": "Edit distance to acceptance on a Kotlin repo: the persona's checks fail because the Kotlin importer returned an empty model (barwise-dyq). A consequence row; closes with that importer issue."
     },
     {
-      "id": "acceptance-edit-distance-typescript",
-      "issue": "barwise-y6a",
-      "severity": "S5",
-      "step": "^acceptance:.*:(?!kernel).*-typescript$",
-      "note": "A format limit, not a defect (barwise-y6a): TypeScript has no notion of objectification. Since the code generator renders every role (barwise-kt7, code half), C06's objectified ternary reaches the repo as class Booking with shipper, shipment and carrier fields, and the importer faithfully reads three binaries on Booking. The persona check asks for a fact type connecting Shipment and Carrier, which code cannot express; only the path through Booking survives. Closes when persona checks declare which artifact kinds can satisfy them, or the importers infer association classes."
-    },
-    {
       "id": "acceptance-edit-distance-norma",
       "issue": "barwise-nm4",
       "severity": "S5",

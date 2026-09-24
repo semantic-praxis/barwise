@@ -678,7 +678,7 @@ do not.
   deterministic" is a property the design rests on and no gate asserts.
   A drift check is a few lines and belongs in the CI wiring workstream;
   until it lands, treat the determinism claim as unverified.
-- **What of the trial runs in CI (open; argued for review).** Two
+- **What of the trial runs in CI (resolved: `test:trial` in CI, the lane later).** Two
   different things hide under "the trial", and they deserve different
   answers.
 
@@ -709,8 +709,8 @@ do not.
   recommendation stands as the starting point: one customer in
   `ci:local`, the full small tier as its own CI job, medium weekly,
   enterprise on demand.
-- **The code generator drops roles past the second (open; argued for
-  review).** `trial/lib/generators/code.mjs` renders every fact type as
+- **The code generator drops roles past the second (resolved: fixed in
+  this PR).** `trial/lib/generators/code.mjs` renders every fact type as
   a field from its first role's player to its second's
   (`const [r0, r1] = ft.roles`), so an n-ary fact type loses its third
   role and an objectified one reaches the TypeScript, Java and Kotlin
@@ -727,8 +727,8 @@ do not.
   designed, and those findings are the reason to have the lane; leaving
   the defect in means the baseline carries a row that measures the
   harness.
-- **How `docs/IMPORT_EXPORT.md` is kept honest (open; argued for
-  review).** barwise-4hh records the audit: the doc's format matrix is
+- **How `docs/IMPORT_EXPORT.md` is kept honest (resolved: a drift test,
+  in its own PR).** barwise-4hh records the audit: the doc's format matrix is
   wrong in two rows and missing four, and three of the lane's loss sets
   cite it as their authority. The mechanism question is a drift test or
   a `parity.manifest.json` entry. **Position: a drift test in
@@ -744,6 +744,18 @@ do not.
   and multi-file columns are not registry facts. **Scope: not this PR.**
   It is a docs repair plus a test in a package this PR does not touch,
   and the convention asks for a spec first; it follows as its own PR.
+- **How the three above were settled, and two that followed.** The
+  maintainer took all three positions on 2026-09-24, together with two
+  decisions the generator fix exposed: a persona check an artifact kind
+  cannot satisfy by construction is declared on the persona
+  (`not_expressible`, barwise-y6a), and `judges` is required, so which
+  imports a persona grades is never inferred from the field's absence
+  (barwise-uzn). Both rules live in `trial/AUTHORING.md` and are enforced
+  by `trial/lib/personas.mjs`, which refuses a package that breaks them.
+  Copilot was asked for its assessment of all five and agreed with each.
+  That is weak evidence, recorded as such: each question stated the
+  position and its counterargument, and the replies mostly restated the
+  arguments they were given.
 - **The agent channel for K19.** Claude Code subagents pinned to a
   model, as `docs/agent-eval-2026-08-09.md` did (no key, but one
   session channel and hand-run), or an API-driven harness that can

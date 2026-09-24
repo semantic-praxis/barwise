@@ -646,7 +646,13 @@ export function gradeStaleness(result, report) {
   };
 }
 
-export function gradeAcceptance(result, report) {
+/**
+ * `exempt` holds the rubric positions this artifact kind cannot satisfy
+ * by construction (lib/personas.mjs, barwise-y6a), and `checkCount` the
+ * rubric's length, which the report must match for positions to mean
+ * anything.
+ */
+export function gradeAcceptance(result, report, { exempt = new Set(), checkCount = null } = {}) {
   if (crashed(result)) {
     return {
       status: "fail",
@@ -664,15 +670,35 @@ export function gradeAcceptance(result, report) {
     };
   }
   const results = report.results;
-  const failed = results.filter((r) => !r.passed);
-  if (result.exit === 0 && failed.length === 0) {
+  if (exempt.size > 0 && checkCount !== results.length) {
+    return {
+      status: "could_not_answer",
+      detail:
+        `gym check returned ${results.length} results for a rubric of ${checkCount} checks, so the excused check cannot be located`,
+    };
+  }
+  const excused = results.filter((r, i) => !r.passed && exempt.has(i));
+  const failed = results.filter((r, i) => !r.passed && !exempt.has(i));
+  // gym check exits 1 on any failed check, excused or not; an exit that is
+  // explained entirely by excused checks is still a clean answer.
+  const cleanExit = result.exit === 0 || (result.exit === 1 && excused.length > 0);
+  if (cleanExit && failed.length === 0) {
     if (results.length === 0) {
       return {
         status: "could_not_answer",
         detail: "gym check reported zero persona checks, so acceptance was never exercised",
       };
     }
-    return { status: "pass", detail: `${results.length} persona checks pass` };
+    return {
+      status: "pass",
+      detail: excused.length
+        ? `${
+          results.length - excused.length
+        } persona checks pass; ${excused.length} not expressible in this artifact kind: ${
+          excused.map((f) => f.message ?? f.kind).join("; ")
+        }`
+        : `${results.length} persona checks pass`,
+    };
   }
   const invalid = failed.some((f) => f.kind === "must_validate");
   return {

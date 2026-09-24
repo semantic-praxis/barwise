@@ -35,6 +35,7 @@ import {
   MCP_BUNDLE,
   TRIAL_DIR,
 } from "./paths.mjs";
+import { exemptPositions } from "./personas.mjs";
 
 export function loadCustomer(dir) {
   const customer = parse(readFileSync(join(dir, "customer.yaml"), "utf8"));
@@ -1048,13 +1049,13 @@ export function sprint5ChangeStorm(customer, tier, record) {
  * artifacts are product candidates -- and a persona that `judges` one
  * artifact is graded over that artifact's import alone.
  */
-export function acceptanceCandidates({ kernel, scaled = null, imported = [], own = null }) {
+export function acceptanceCandidates({ kernel, scaled = null, imported = [], judges = [] }) {
   return [
     { label: "kernel", path: kernel, authoring: true },
     ...(scaled ? [{ label: "scaled", path: scaled, authoring: false }] : []),
     ...imported
-      .filter(([id]) => !own || id === own)
-      .map(([id, path]) => ({ label: id, path, authoring: false })),
+      .filter(([id]) => judges.includes(id))
+      .map(([id, path, kind = null]) => ({ label: id, path, authoring: false, kind })),
   ];
 }
 
@@ -1082,19 +1083,23 @@ export async function sprint6Surfaces(customer, tier, record) {
       });
       continue;
     }
-    // A persona judges the model barwise produced from their own artifact, not the kernel.
-    const own = (customer.artifacts ?? []).find((a) => (p.judges ?? [])[0] === a.id) ?? null;
+    // A persona grades the imports of the artifacts it declares in
+    // `judges` (required; lib/personas.mjs), plus the kernel as the
+    // authoring control.
     const imported = (customer.artifacts ?? []).flatMap((a) => {
       const path = join(gen, `${a.id}.imported.orm.yaml`);
-      return existsSync(path) && (modelSummaryOf(path)?.objectTypes ?? 0) > 0 ? [[a.id, path]] : [];
+      return existsSync(path) && (modelSummaryOf(path)?.objectTypes ?? 0) > 0
+        ? [[a.id, path, a.generator]]
+        : [];
     });
     const candidates = acceptanceCandidates({
       kernel: customer.kernelPath,
       scaled,
       imported,
-      own: own?.id ?? null,
+      judges: p.judges ?? [],
     });
-    for (const { label, path: candidate, authoring } of candidates) {
+    const checks = parse(readFileSync(exercisePath, "utf8")).checks ?? [];
+    for (const { label, path: candidate, authoring, kind } of candidates) {
       const res = runCli([
         "gym",
         "check",
@@ -1107,7 +1112,8 @@ export async function sprint6Surfaces(customer, tier, record) {
         "json",
       ], { timeoutMs: budget });
       const report = parseJson(res.stdout);
-      const outcome = grade.gradeAcceptance(res, report);
+      const exempt = kind ? exemptPositions(checks, p.not_expressible, kind) : new Set();
+      const outcome = grade.gradeAcceptance(res, report, { exempt, checkCount: checks.length });
       // The kernel must satisfy its own personas: a failure there is an authoring defect, not a product one.
       record({
         sprint: 6,

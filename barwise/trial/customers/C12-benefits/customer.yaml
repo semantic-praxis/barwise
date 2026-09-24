@@ -12,6 +12,9 @@ summary: >-
   platform is built against them.
 stressors: [K1, K2, K5, K15, K17, K18]
 personas:
+  # Every persona declares judges (barwise-uzn). These judge every import:
+  # that was the runner's implicit rule for a persona without judges, kept
+  # as a declaration rather than inferred from the field's absence.
   - id: policy-analyst
     name: Marguerite Okafor
     role: Eligibility policy analyst, policy and procedures unit
@@ -19,6 +22,7 @@ personas:
       Every "shall" and "must not" in the eligibility manual present as a
       constraint on the right fact type, at the grain the statute uses.
     acceptance: personas/policy-analyst.gym.yaml
+    judges: [mainframe-ddl, modern-ddl]
   - id: mainframe-dba
     name: Len Prakash
     role: Database administrator, DB2 for z/OS
@@ -26,6 +30,7 @@ personas:
       The keys the nightly batch reads by, in the same parts and order,
       with the office-plus-case-number composite intact.
     acceptance: personas/mainframe-dba.gym.yaml
+    judges: [mainframe-ddl, modern-ddl]
   - id: modernization-architect
     name: Tomas Reyes
     role: Solution architect, modernization program
@@ -34,6 +39,7 @@ personas:
       objectified facts and a one-way supersession chain the new
       platform can build against.
     acceptance: personas/modernization-architect.gym.yaml
+    judges: [mainframe-ddl, modern-ddl]
   - id: hearing-officer
     name: Beverly Chen
     role: Hearing officer, appeals unit
@@ -41,6 +47,7 @@ personas:
       An appeal docketed against the determination it contests, with the
       assignment and sanction rules the hearing turns on.
     acceptance: personas/hearing-officer.gym.yaml
+    judges: [mainframe-ddl, modern-ddl]
 artifacts:
   - id: mainframe-ddl
     generator: ddl

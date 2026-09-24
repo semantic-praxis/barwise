@@ -207,13 +207,38 @@ seeded:
   the kernel, spelled exactly.
 - No emoji anywhere. No client or vendor-proprietary material.
 
-## `judges` and the key's `expect` shapes
+## `judges`, `not_expressible`, and the key's `expect` shapes
 
-A persona may carry `judges: [<artifact id>]`: the runner then grades
-that persona's rubric over the model barwise produced from that
-artifact (and always over the kernel, where a failure is an authoring
-defect, not a product one). A persona without `judges` is graded over
-the kernel alone.
+Every persona carries `judges: [<artifact id>, ...]`, and it is
+required. The runner grades that persona's rubric over the model barwise
+imported from each listed artifact, and always over the kernel, where a
+failure is an authoring defect rather than a product one. A persona that
+cares about every artifact lists every artifact. There is no default:
+this section used to say a persona without `judges` was graded over the
+kernel alone, while the runner graded it over every import, and eleven
+baseline rows rested on the undocumented rule (barwise-uzn). The runner
+refuses a package, with exit 2, when a persona has no `judges` or names
+an artifact that does not exist.
+
+A rubric check that one kind of artifact cannot satisfy by construction
+is declared on the persona, not removed from the rubric:
+
+```yaml
+not_expressible:
+  - artifact_kind: code # an artifact's `generator`
+    check: { factTypeBetween: [Shipment, Carrier] } # the check's `element`, exactly
+    reason: >-
+      TypeScript has no objectification ...
+```
+
+For an artifact of that kind, a failure of that check is excluded and
+named in the step's detail. The check still grades the kernel and every
+other artifact kind. Use it only for a limit of the format, never for a
+defect of the importer: "code has no objectification" qualifies,
+"the Kotlin importer drops data classes" does not. The runner refuses an
+entry with no reason, a kind the persona judges no artifact of, or a
+`check` that matches anything other than exactly one rubric check
+(barwise-y6a).
 
 The seeded key's `expect` block is recorded and remapped by the
 transcript generator; the keyed lane's grader for it is workstream 3

@@ -10,24 +10,30 @@ summary: >-
   definition of a subject, and the next submission needs one.
 stressors: [K3, K4, K5, K9, K11, K17]
 personas:
+  # Every persona declares judges (barwise-uzn). These judge every import:
+  # that was the runner's implicit rule for a persona without judges, kept
+  # as a declaration rather than inferred from the field's absence.
   - id: clinical-data-manager
     name: Mira Kessler
     role: Clinical data manager, clinical database and SDTM mapping
     wants: >-
       The composite subject key and the visit number survive the model so the SDTM merges still work at lock.
     acceptance: personas/clinical-data-manager.gym.yaml
+    judges: [legacy-norma, sdtm-ddl]
   - id: biostatistician
     name: Tomas Reyes
     role: Biostatistician, statistical analysis plan
     wants: >-
       Randomized, enrolled and exposed subjects stay distinct so the analysis populations derive without guessing.
     acceptance: personas/biostatistician.gym.yaml
+    judges: [legacy-norma, sdtm-ddl]
   - id: pharmacovigilance-lead
     name: Anneke Voss
     role: Pharmacovigilance lead, safety reporting
     wants: >-
       Serious events are their own kind, the 24-hour reporting obligation is stated as an obligation, and follow-up chains cannot loop.
     acceptance: personas/pharmacovigilance-lead.gym.yaml
+    judges: [legacy-norma, sdtm-ddl]
 artifacts:
   - id: legacy-norma
     generator: norma

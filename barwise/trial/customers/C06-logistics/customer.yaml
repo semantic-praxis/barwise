@@ -22,6 +22,14 @@ personas:
     wants: The booking platform's classes come back as entities with their discriminated unions as subtypes, all of them, not the first five hundred files.
     acceptance: personas/integration-architect.gym.yaml
     judges: [platform-typescript]
+    not_expressible:
+      - artifact_kind: code
+        check: { factTypeBetween: [Shipment, Carrier] }
+        reason: >-
+          TypeScript has no objectification: the booking is a class with
+          shipper, shipment and carrier fields, which a faithful importer
+          reads as three binaries on Booking. The ternary survives only as
+          a path through Booking (barwise-y6a).
 artifacts:
   - id: tms-ddl
     generator: ddl

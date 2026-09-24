@@ -44,6 +44,7 @@ import {
   TIERS,
   TRIAL_DIR,
 } from "./paths.mjs";
+import { personaProblems } from "./personas.mjs";
 import { mergeResults } from "./results.mjs";
 import * as steps from "./steps.mjs";
 
@@ -301,6 +302,24 @@ async function main() {
   );
   if (customers.length === 0) {
     console.error("trial: no customer.yaml in any package directory; nothing to run");
+    process.exit(2);
+  }
+  // A persona declaration the runner cannot honour is an authoring
+  // defect: grading anyway would fall back to a rule nobody wrote down,
+  // which is how eleven rows came to rest on one (barwise-uzn).
+  const problems = customers.flatMap((c) =>
+    personaProblems(c, (persona) => {
+      const rubric = join(c.dir, persona.acceptance ?? "");
+      return persona.acceptance && existsSync(rubric)
+        ? parse(readFileSync(rubric, "utf8")).checks ?? []
+        : [];
+    })
+  );
+  if (problems.length) {
+    for (const m of problems) console.error(`trial: ${m}`);
+    console.error(
+      `trial: ${problems.length} persona declaration problem(s); see trial/AUTHORING.md`,
+    );
     process.exit(2);
   }
   if (cmd === "list") {
