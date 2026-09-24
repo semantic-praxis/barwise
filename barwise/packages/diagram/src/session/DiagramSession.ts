@@ -43,6 +43,14 @@ export class DiagramSession {
    * package as input data, per the annotation-propagation spec).
    */
   private annotations: ReadonlyMap<string, readonly string[]> | undefined;
+  /**
+   * Relation ids of the model as of the last `setModel`, copied rather
+   * than read back from the previous model object: a caller that mutates
+   * the current model and passes it back would otherwise show the new
+   * relation as already known.
+   */
+  private knownFactTypeIds = new Set<string>();
+  private knownSubtypeFactIds = new Set<string>();
 
   constructor(
     model: OrmModel,
@@ -51,6 +59,7 @@ export class DiagramSession {
   ) {
     this.model = model;
     this.annotations = annotations;
+    this.snapshotRelationIds();
     this.seedOverridesFromSavedLayout(model, savedLayout);
   }
 
@@ -65,8 +74,9 @@ export class DiagramSession {
   }
 
   /**
-   * Hot-swap the model (live reload). Stale filter ids are pruned and an
-   * active view filter is expanded to touch the new model.
+   * Hot-swap the model (live reload). Stale filter ids are pruned, and an
+   * active view filter takes in the fact types and subtype facts that are
+   * new since the previous model and touch the view.
    */
   setModel(
     model: OrmModel,
@@ -76,6 +86,7 @@ export class DiagramSession {
     if (annotations !== undefined) this.annotations = annotations;
     this.cleanStaleFilterIds();
     this.expandFilterForNewModel();
+    this.snapshotRelationIds();
   }
 
   /** Run the layout for the current state and return the presentation. */
@@ -388,26 +399,39 @@ export class DiagramSession {
     }
   }
 
+  /**
+   * Show a fact the user just added to an entity already in view. Only
+   * relations absent from the last snapshot qualify: the watcher re-parses
+   * on every edit, so testing "touches the view" alone admitted every
+   * existing neighbor each time and grew a scoped view one hop per reload
+   * until it was the whole connected graph. Ids are required in
+   * `.orm.yaml`, so they are stable across a re-parse.
+   */
   private expandFilterForNewModel(): void {
     if (!this.activeViewFilter) return;
     const { objectTypeIds, factTypeIds, subtypeFactIds } = this.activeViewFilter;
     const seedIds = new Set(objectTypeIds);
 
     for (const ft of this.model.factTypes) {
-      if (factTypeIds.has(ft.id)) continue;
+      if (factTypeIds.has(ft.id) || this.knownFactTypeIds.has(ft.id)) continue;
       if (ft.roles.some((r) => seedIds.has(r.playerId))) {
         factTypeIds.add(ft.id);
         for (const r of ft.roles) objectTypeIds.add(r.playerId);
       }
     }
     for (const sf of this.model.subtypeFacts) {
-      if (subtypeFactIds.has(sf.id)) continue;
+      if (subtypeFactIds.has(sf.id) || this.knownSubtypeFactIds.has(sf.id)) continue;
       if (seedIds.has(sf.subtypeId) || seedIds.has(sf.supertypeId)) {
         subtypeFactIds.add(sf.id);
         objectTypeIds.add(sf.subtypeId);
         objectTypeIds.add(sf.supertypeId);
       }
     }
+  }
+
+  private snapshotRelationIds(): void {
+    this.knownFactTypeIds = new Set(this.model.factTypes.map((ft) => ft.id));
+    this.knownSubtypeFactIds = new Set(this.model.subtypeFacts.map((sf) => sf.id));
   }
 
   private seedOverridesFromSavedLayout(model: OrmModel, saved?: DiagramLayout): void {

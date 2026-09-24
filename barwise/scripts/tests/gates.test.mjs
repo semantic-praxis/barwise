@@ -814,6 +814,30 @@ test("beads-crud update refuses to blank a non-empty field, and clears it on req
   );
 });
 
+test("beads-crud update --status reopens a closed issue without its closure stamps", () => {
+  const dir = tempRepo();
+  try {
+    mkdirSync(join(dir, ".beads"), { recursive: true });
+    const file = join(dir, ".beads", "issues.jsonl");
+    writeFileSync(
+      file,
+      issueLine({ status: "closed", closed_at: "2026-01-02T00:00:00Z", close_reason: "done" }),
+    );
+    const run = spawnSync(
+      process.execPath,
+      [join(SCRIPTS, "beads-crud.mjs"), "update", "t-1", "--status", "in_progress"],
+      { cwd: dir, encoding: "utf8" },
+    );
+    assert.equal(run.status, 0, run.stdout + run.stderr);
+    const after = JSON.parse(readFileSync(file, "utf8").trim());
+    assert.equal(after.status, "in_progress");
+    assert.equal(after.closed_at, undefined, "a reopened issue must not keep closed_at");
+    assert.equal(after.close_reason, undefined, "a reopened issue must not keep close_reason");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // --- barwise-906: the helper that produces the red-then-green reading ---
 
 /**
