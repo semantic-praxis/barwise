@@ -215,8 +215,8 @@ export class DiagramPanel {
 
   /**
    * Watch the backing .orm.yaml document and auto-refresh on change. The
-   * session prunes stale filter ids and expands an active view to touch
-   * the new model.
+   * session prunes stale filter ids and adds to an active view only the
+   * relations that are new since the previous model.
    */
   private setupDocumentWatcher(): void {
     this.docChangeDisposable = vscode.workspace.onDidChangeTextDocument((e) => {
