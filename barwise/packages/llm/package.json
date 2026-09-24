@@ -24,15 +24,15 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.126.0",
+    "@anthropic-ai/sdk": "^0.127.0",
     "@barwise/core": "1.7.0",
     "openai": "^7.17.0",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@barwise/diagram": "1.7.0",
-    "@types/node": "^25.2.3",
-    "@vitest/coverage-v8": "^4.1.11",
-    "vitest": "^4.1.11"
+    "@types/node": "^26.6.2",
+    "@vitest/coverage-v8": "^5.0.1",
+    "vitest": "^5.0.1"
   }
 }

@@ -110,6 +110,7 @@ const ROOT_DEPENDENT_GATES = [
   "check-file-size.mjs",
   "check-secrets.mjs",
   "audit-corrections.mjs",
+  "check-lockfile-agrees.mjs",
 ];
 
 for (const script of ROOT_DEPENDENT_GATES) {
@@ -319,6 +320,61 @@ test("audit-gate refuses a root with no npm project rather than reporting PASS",
 });
 
 // --- barwise-906: every gate proven red before it is trusted green ---
+
+/** A one-dependency npm project declaring `foo@^2.0.0`, with `installed` on disk. */
+function lockfileFixture(installed) {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-lockfile-"));
+  writeFileSync(
+    join(dir, "package.json"),
+    JSON.stringify({ name: "fx", version: "1.0.0", dependencies: { foo: "^2.0.0" } }),
+  );
+  if (installed) {
+    mkdirSync(join(dir, "node_modules", "foo"), { recursive: true });
+    writeFileSync(
+      join(dir, "node_modules", "foo", "package.json"),
+      JSON.stringify({ name: "foo", version: installed }),
+    );
+  }
+  return dir;
+}
+
+test("check-lockfile-agrees fails when an installed version is outside its declared range", () => {
+  // PR #542's shape: the manifest asked for ^5, the tree held 4.1.11.
+  const dir = lockfileFixture("1.0.0");
+  try {
+    const red = gate("check-lockfile-agrees.mjs", REPO, "--dir", dir);
+    assert.equal(red.status, 1, `expected a finding, got ${red.status}:\n${red.stderr}`);
+    assert.match(red.stderr, /invalid: foo@1\.0\.0/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-lockfile-agrees passes when every installed version satisfies its range", () => {
+  const dir = lockfileFixture("2.1.0");
+  try {
+    const r = gate("check-lockfile-agrees.mjs", REPO, "--dir", dir);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /1 installed entries satisfy their declared ranges\. OK/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-lockfile-agrees refuses with exit 2 when nothing is installed", () => {
+  // Without node_modules `npm ls` calls every dependency "missing" and
+  // exits 1 -- a finding about the lockfile, when the truth is that the
+  // gate had nothing to read.
+  const dir = lockfileFixture(null);
+  try {
+    const r = gate("check-lockfile-agrees.mjs", REPO, "--dir", dir);
+    assert.equal(r.status, 2, `expected refusal, got ${r.status}:\n${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /no node_modules/);
+    assert.doesNotMatch(r.stdout, /OK/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("check-no-nul fails on a TRACKED NUL byte and passes without one", () => {
   const dir = tempRepo();

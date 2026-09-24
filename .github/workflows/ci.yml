@@ -173,6 +173,14 @@ jobs:
       # eslint and oxlint all accept NUL, so nothing else catches it.
       - run: npm run check:no-nul
 
+      # npm ci installs what the lockfile says without checking it against
+      # each package.json. Dependabot PR #542 declared vitest ^5.0.1 while
+      # its lockfile kept 4.1.11 in all twelve packages (the coverage
+      # plugin still pinned vitest 4 exactly), and every test passed on
+      # the version the PR was upgrading away from. `npm ls` names each
+      # such `invalid:` entry; the wrapper refuses when nothing is installed.
+      - run: npm run check:lockfile
+
       # A credential is the one defect in this list that a follow-up commit
       # does not fix: reverting, deleting the branch and rewriting history
       # all leave the key valid and already disclosed, so it has to be
