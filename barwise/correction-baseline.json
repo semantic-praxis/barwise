@@ -223,6 +223,12 @@
       "caught_by": "execution",
       "note": "Real correction. The draft gave every customer package a journey.yaml listing its steps; writing the runner for the first customer showed every sprint is the same six commands over whatever the package declares, so twelve copies would have been the must-agree duplication CLAUDE.md forbids. Caught by building it, not by reading the draft."
     },
+    "enterprise-trial::69e34343e5e3": {
+      "spec": "enterprise-trial.spec.md",
+      "excerpt": "trial:offline is the lane: it regenerates the customer artifacts and drives 1025 steps through the built bundles. measured at 788 steps it took about twelve min",
+      "caught_by": "not-a-correction",
+      "note": "An Open decision argued for review, not a correction: it splits the CI question into the harness unit tests (test:trial, argued in now) and the lane (trial:offline, deferred to WS6), and keeps the earlier one-customer-per-PR recommendation as the lane's starting point. It records nothing the draft got wrong."
+    },
     "enterprise-trial::6aa83b9e74b2": {
       "spec": "enterprise-trial.spec.md",
       "excerpt": "- twelve customers or six (resolved: twelve, built). all nineteen stressor rows are covered, across nine sql dialects, 686 object types and 710 fact types of ha",

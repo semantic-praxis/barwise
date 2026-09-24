@@ -678,15 +678,72 @@ do not.
   deterministic" is a property the design rests on and no gate asserts.
   A drift check is a few lines and belongs in the CI wiring workstream;
   until it lands, treat the determinism claim as unverified.
-- **How much of `trial:offline` runs per PR.** Measured: the small tier
-  is about twelve minutes for twelve customers (788 steps, each a
-  process spawn), the medium tier about four minutes for one customer,
-  the enterprise tier about a minute per sprint for one. Twelve minutes
-  per PR is too much for the pre-push hook and defensible in CI as its
-  own job. Recommend one customer per PR (about a minute) in
-  `ci:local`, the full small tier as a separate CI job, medium weekly,
-  enterprise on demand. This is the one decision the implementation did
-  not settle, because nothing is wired into `ci.yml` yet.
+- **What of the trial runs in CI (open; argued for review).** Two
+  different things hide under "the trial", and they deserve different
+  answers.
+
+  `test:trial` is the harness's own unit tests: 45 tests, under two
+  seconds, one of which spawns the built CLI. It is in neither `ci.yml`
+  nor `ci:local`, so a change to a grader is checked only when someone
+  remembers to run it. **Position: add it to `ci.yml` in this PR**, after
+  the build step it needs. The case is the second Copilot round: the
+  subtype grader was fixed against a delta shape the CLI never emits,
+  and the unit tests passed because their fixture had the same wrong
+  shape. The test that now runs the real `barwise diff` is exactly the
+  kind of check that only protects anything if it runs unattended. The
+  counterargument is that the harness is dev tooling and CI is for the
+  product; but the trial ratchet makes claims about the product, and an
+  unchecked grader makes those claims unfalsifiable.
+
+  `trial:offline` is the lane: it regenerates the customer artifacts and
+  drives 1025 steps through the built bundles. Measured at 788 steps it
+  took about twelve minutes for the small tier; the medium tier is about
+  four minutes for one customer, the enterprise tier about a minute per
+  sprint for one. The lane is what caught both harness errors this week,
+  which argues for running it often. **Position: not in this PR.** Wiring
+  it is WS6's CI workstream and needs its own decisions: whether a
+  product PR whose change moves a baseline row must update
+  `trial-baseline.json` itself (the ratchet says yes, which couples every
+  importer change to the lane), and whether one customer per PR in
+  `ci:local` catches enough to justify the minute. The earlier
+  recommendation stands as the starting point: one customer in
+  `ci:local`, the full small tier as its own CI job, medium weekly,
+  enterprise on demand.
+- **The code generator drops roles past the second (open; argued for
+  review).** `trial/lib/generators/code.mjs` renders every fact type as
+  a field from its first role's player to its second's
+  (`const [r0, r1] = ft.roles`), so an n-ary fact type loses its third
+  role and an objectified one reaches the TypeScript, Java and Kotlin
+  repos with no roles at all (barwise-kt7; C06's `Booking`). A persona
+  rubric then fails on input the harness never wrote, and one baseline
+  row carries a harness defect as if it were a finding. **Position: fix it
+  in this PR.** The generator is new code this PR introduces, and a PR
+  should not ship a known defect in its own new code when the fix is
+  local: render an n-ary or objectified fact type as a class holding one
+  field per role, which is what a team would write, then re-run the lane
+  and grade what the importers make of it. The counterargument is scope:
+  the PR is large, and a fixed generator will surface new importer
+  findings that each need classifying. That is the lane working as
+  designed, and those findings are the reason to have the lane; leaving
+  the defect in means the baseline carries a row that measures the
+  harness.
+- **How `docs/IMPORT_EXPORT.md` is kept honest (open; argued for
+  review).** barwise-4hh records the audit: the doc's format matrix is
+  wrong in two rows and missing four, and three of the lane's loss sets
+  cite it as their authority. The mechanism question is a drift test or
+  a `parity.manifest.json` entry. **Position: a drift test in
+  `packages/cli/tests`**, which enumerates the `FormatDescriptor`
+  registry, parses the doc's matrix, and fails on any disagreement or on
+  a registered format with no section. `check:parity` compares bytes in
+  three forms only (a whole file, one function's source, one JSON
+  field), and its own header says a pair that needs more is not a parity
+  pair and should get a behavioural test; a markdown table and a set of
+  TypeScript registrations are the same facts in two representations,
+  which none of the three forms can compare. Generating the table from
+  the registry was considered and rejected, because the doc's confidence
+  and multi-file columns are not registry facts. **Scope: not this PR.**
+  It is a docs repair plus a test in a package this PR does not touch,
+  and the convention asks for a spec first; it follows as its own PR.
 - **The agent channel for K19.** Claude Code subagents pinned to a
   model, as `docs/agent-eval-2026-08-09.md` did (no key, but one
   session channel and hand-run), or an API-driven harness that can
