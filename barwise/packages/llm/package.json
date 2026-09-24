@@ -24,7 +24,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.126.0",
+    "@anthropic-ai/sdk": "^0.127.0",
     "@barwise/core": "1.7.0",
     "openai": "^7.17.0",
     "yaml": "^2.9.1"
