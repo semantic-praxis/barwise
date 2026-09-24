@@ -256,6 +256,20 @@ ${diagram}
     expect(layout.elements).toEqual(["ot-customer", "Invoice"]);
   });
 
+  it("lets a resolved name win over an unmatched key spelled like its id", () => {
+    // "ot-customer" matched no name in 1.x, so it pointed at nothing. After
+    // Customer resolves to ot-customer the two would share a key; the stale
+    // one must not overwrite Customer's real position and then look valid.
+    const collide = `    - name: Sales
+      elements: [Customer, ot-customer]
+      positions:
+        Customer: { x: 10, y: 20 }
+        ot-customer: { x: 99, y: 99 }`;
+    const layout = serializer.deserialize(v1Doc("1.1", collide)).getDiagramLayout("Sales")!;
+    expect(layout.elements).toEqual(["ot-customer"]);
+    expect(layout.positions).toEqual({ "ot-customer": { x: 10, y: 20 } });
+  });
+
   it("leaves a 2.0 document's ids alone, even one equal to an element name", () => {
     // In 2.0 a key is an id and nothing else; "Customer" is not an id here,
     // so it must not be quietly resolved as a name.

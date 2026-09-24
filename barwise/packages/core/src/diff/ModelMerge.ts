@@ -445,8 +445,12 @@ function carryUnmodelledElements(merged: OrmModel, existing: OrmModel): void {
   // from `existing` keeps its id -- a rename included -- so the layout
   // carries through. The one loss is an element an accepted removal took
   // out: its id is dropped here, as `OrmModel.removeObjectType` would.
-  const present = (id: string) =>
-    merged.getObjectType(id) !== undefined || merged.getFactType(id) !== undefined;
+  // Only those ids. A reference that was already dangling in `existing` --
+  // a 1.x name the 2.0 migration kept on purpose, a hand edit -- is not
+  // the merge's to delete; validation reports it.
+  const inModel = (m: OrmModel, id: string) =>
+    m.getObjectType(id) !== undefined || m.getFactType(id) !== undefined;
+  const present = (id: string) => !inModel(existing, id) || inModel(merged, id);
   for (const layout of existing.diagramLayouts) {
     const keep = <T>(record: Readonly<Record<string, T>>) =>
       Object.fromEntries(Object.entries(record).filter(([id]) => present(id)));

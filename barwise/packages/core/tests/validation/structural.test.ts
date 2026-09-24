@@ -378,7 +378,7 @@ describe("structural/diagram-dangling-reference", () => {
       [
         "warning",
         "V",
-        'Diagram "V" lists "Customer" in elements, but no object type or fact type has that id.',
+        'Diagram "V" lists "Customer" in elements, but no object type has that id.',
       ],
       [
         "warning",
@@ -388,8 +388,26 @@ describe("structural/diagram-dangling-reference", () => {
       [
         "warning",
         "V",
-        'Diagram "V" lists "ft-gone" in orientations, but no object type or fact type has that id.',
+        'Diagram "V" lists "ft-gone" in orientations, but no fact type has that id.',
       ],
+    ]);
+  });
+
+  it("warns on an id of the wrong kind for its field", () => {
+    // The session reads object types from `elements` and fact types from
+    // `orientations`; the other kind there is ignored just as silently.
+    const m = model();
+    const c = m.getObjectTypeByName("Customer")!.id;
+    const ft = m.getFactTypeByName("Customer places Order")!.id;
+    m.addDiagramLayout({
+      name: "V",
+      elements: [ft],
+      positions: {},
+      orientations: { [c]: "vertical" },
+    });
+    expect(dangling(m).map((d) => d.message)).toEqual([
+      `Diagram "V" lists "${ft}" in elements, but no object type has that id.`,
+      `Diagram "V" lists "${c}" in orientations, but no fact type has that id.`,
     ]);
   });
 });

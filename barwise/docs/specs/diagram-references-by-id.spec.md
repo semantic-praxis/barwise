@@ -44,14 +44,21 @@ In scope:
   reference that matches an element name in the same document to that
   element's id, and stamp the document `2.0`.
 - When a 1.x diagram reference matches no element name, the migration
-  shall keep it verbatim rather than drop it.
-- When a diagram references an id that no object type or fact type in the
-  model carries, validation shall report `structural/diagram-dangling-reference`
-  as a warning that names the diagram and the reference.
+  shall keep it verbatim rather than drop it, unless its spelling equals
+  the id another reference in the same field resolved to. In that case the
+  resolved reference wins: the unmatched one pointed at nothing, and
+  keeping it would overwrite a real position with a stale one that then
+  validates.
+- When a diagram references an id that does not resolve to the kind its
+  field holds (`elements`: object types, `orientations`: fact types,
+  `positions`: either), validation shall report
+  `structural/diagram-dangling-reference` as a warning that names the
+  diagram, the field, the reference and the expected kind.
 - When an object type or fact type is removed through `OrmModel`, the
   system shall remove its id from every diagram layout.
 - When a merge drops an element, the merged model's carried layouts shall
-  not reference it.
+  not reference it. A reference that was already dangling before the merge
+  is carried unchanged, so validation still reports it.
 - When the diagram panel saves a layout or a view, or the editor's
   "Create view" and "Add to view" commands write one, the system shall
   write ids.

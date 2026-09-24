@@ -156,6 +156,27 @@ describe("mergeModels", () => {
     });
   });
 
+  it("keeps a layout reference that was already dangling before the merge", () => {
+    // A 1.x name the 2.0 migration could not resolve is kept so validation
+    // can report it; merging must not delete it on the way through.
+    const existing = baseModel();
+    const customerId = existing.getObjectTypeByName("Customer")!.id;
+    existing.addDiagramLayout({
+      name: "V",
+      elements: [customerId, "Invoice"],
+      positions: { Invoice: { x: 1, y: 2 } },
+      orientations: { "Invoice pays Order": "vertical" },
+    });
+    const merged = mergeModels(
+      existing,
+      existing,
+      diffModels(existing, existing).deltas,
+      new Set(),
+    );
+
+    expect(merged.getDiagramLayout("V")).toEqual(existing.getDiagramLayout("V"));
+  });
+
   it("keeps existing object type when removal delta is rejected", () => {
     const existing = baseModel();
     const incoming = new ModelBuilder("Test")

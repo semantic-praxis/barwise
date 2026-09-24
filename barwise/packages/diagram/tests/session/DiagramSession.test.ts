@@ -880,8 +880,8 @@ describe("DiagramSession", () => {
     session.setModel(chainModel());
     const layout = session.buildLayout("Stale");
 
-    expect(layout.positions["A relates to B"]).toBeUndefined();
-    expect(layout.orientations["A relates to B"]).toBeUndefined();
+    expect(layout.positions[abFtId]).toBeUndefined();
+    expect(layout.orientations[abFtId]).toBeUndefined();
   });
 
   it("drops a stale subtype fact from an active filter while keeping a still-valid one", async () => {

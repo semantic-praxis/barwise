@@ -803,10 +803,10 @@ const RULE_DESCRIPTORS = {
   [RULE_ID.diagramDanglingReference]: {
     severity: "warning",
     description:
-      "A saved diagram references an element id that no object type or fact type carries, so that entry has no effect.",
+      "A saved diagram references an id that no element of the kind its field expects carries, so that entry has no effect.",
     messages: {
-      default: (diagramName: string, field: string, reference: string): string =>
-        `Diagram "${diagramName}" lists "${reference}" in ${field}, but no object type or fact type has that id.`,
+      default: (diagramName: string, field: string, reference: string, expected: string): string =>
+        `Diagram "${diagramName}" lists "${reference}" in ${field}, but no ${expected} has that id.`,
     },
   },
   [RULE_ID.duplicateFactTypeName]: {

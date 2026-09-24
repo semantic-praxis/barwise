@@ -69,17 +69,25 @@ export function structuralWellFormedness(model: OrmModel): Diagnostic[] {
  */
 function checkDiagramReferences(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const known = (id: string) =>
-    model.getObjectType(id) !== undefined || model.getFactType(id) !== undefined;
+  const isObjectType = (id: string) => model.getObjectType(id) !== undefined;
+  const isFactType = (id: string) => model.getFactType(id) !== undefined;
+  // Each field resolves only the kinds the diagram session reads from it:
+  // a fact type id in `elements` is ignored as surely as a missing one.
+  type Field = [string, readonly string[], (id: string) => boolean, string];
   for (const layout of model.diagramLayouts) {
-    const refs: Array<[string, readonly string[]]> = [
-      ["elements", layout.elements ?? []],
-      ["positions", Object.keys(layout.positions)],
-      ["orientations", Object.keys(layout.orientations)],
+    const refs: Field[] = [
+      ["elements", layout.elements ?? [], isObjectType, "object type"],
+      [
+        "positions",
+        Object.keys(layout.positions),
+        (id) => isObjectType(id) || isFactType(id),
+        "object type or fact type",
+      ],
+      ["orientations", Object.keys(layout.orientations), isFactType, "fact type"],
     ];
-    for (const [field, ids] of refs) {
+    for (const [field, ids, resolves, expected] of refs) {
       for (const id of ids) {
-        if (!known(id)) {
+        if (!resolves(id)) {
           diagnostics.push(
             report(
               RULE_ID.diagramDanglingReference,
@@ -88,6 +96,7 @@ function checkDiagramReferences(model: OrmModel): Diagnostic[] {
               layout.name,
               field,
               id,
+              expected,
             ),
           );
         }
