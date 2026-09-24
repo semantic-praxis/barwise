@@ -2,6 +2,22 @@
   "$comment": "The finding classes the trial has surfaced, one per beads issue. gate.mjs --write classifies a new failing step by the first class whose matchers fit and writes the class's note into trial-baseline.json; a failure no class fits stays unclassified and keeps the gate red. A class is removed here, with its baseline rows, in the PR that fixes the issue.",
   "classes": [
     {
+      "id": "lineage-impact-by-name",
+      "issue": "barwise-5m9",
+      "severity": "S1",
+      "step": "^late:impact-name$",
+      "detail": "no affected artifacts",
+      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer."
+    },
+    {
+      "id": "lineage-impact-no-sources",
+      "issue": "barwise-ofb",
+      "severity": "S1",
+      "step": "^late:impact-id$",
+      "detail": "no affected artifacts",
+      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509."
+    },
+    {
       "id": "sql-importer-fk-targets",
       "issue": "barwise-jjd",
       "severity": "S1",

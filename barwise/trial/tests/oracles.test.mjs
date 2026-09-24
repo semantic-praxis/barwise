@@ -12,9 +12,11 @@ import {
   gradeCommand,
   gradeConsumer,
   gradeHistoryStep,
+  gradeImpact,
   gradeImport,
   gradeParity,
   gradeProducedModelValidation,
+  gradeReadBackNotEmpty,
   gradeRoundTrip,
   gradeSplit,
   gradeStaleness,
@@ -263,11 +265,25 @@ test("gradeStaleness: a real staleness report passes, a clean one after a change
   // The shape lineage status actually emits. The first version of this
   // oracle read a field named `stale` and graded this very payload as a
   // product failure; the test exists because nothing else caught that.
+  // manifestFound is part of that shape; these fixtures once omitted it and
+  // still produced verdicts, which is what the oracle must not do.
   assert.equal(
-    gradeStaleness(ok, { staleArtifacts: [{ artifact: "a.sql" }], freshArtifacts: [] }).status,
+    gradeStaleness(ok, {
+      staleArtifacts: ["/w/schema.sql"],
+      freshArtifacts: [],
+      manifestFound: true,
+    }).status,
     "pass",
   );
-  const clean = gradeStaleness(ok, { staleArtifacts: [], freshArtifacts: ["a.sql"] });
+  assert.equal(
+    gradeStaleness(ok, { staleArtifacts: ["/w/schema.sql"], freshArtifacts: [] }).status,
+    "could_not_answer",
+  );
+  const clean = gradeStaleness(ok, {
+    staleArtifacts: [],
+    freshArtifacts: ["/w/schema.sql"],
+    manifestFound: true,
+  });
   assert.equal(clean.status, "fail");
   assert.equal(clean.severity, "S1");
   // Neither a missing payload nor a differently shaped one may produce a
@@ -716,4 +732,56 @@ test("gradeHistoryStep: a fact-type rename is matched on the candidate's own pai
     ),
     "pass",
   );
+});
+
+test("gradeReadBackNotEmpty: an empty model read back from a non-empty export is S1", () => {
+  const pass = { status: "pass", detail: "exit 0" };
+  const empty = gradeReadBackNotEmpty(pass, { objectTypes: 0 }, { objectTypes: 40 }, "sql");
+  assert.equal(empty.severity, "S1");
+  assert.match(empty.detail, /empty model/);
+  assert.equal(gradeReadBackNotEmpty(pass, { objectTypes: 12 }, { objectTypes: 40 }, "sql"), pass);
+  // An unreadable file is not an empty one.
+  assert.equal(
+    gradeReadBackNotEmpty(
+      pass,
+      { objectTypes: 0, unreadable: "bad yaml" },
+      { objectTypes: 40 },
+      "sql",
+    ).status,
+    "could_not_answer",
+  );
+  // A failure upstream passes through untouched.
+  const failed = { status: "fail", severity: "S3", detail: "exit 1" };
+  assert.equal(
+    gradeReadBackNotEmpty(failed, { objectTypes: 0 }, { objectTypes: 40 }, "sql"),
+    failed,
+  );
+});
+
+test("gradeWroteOutput: names the tool, so an exporter that wrote nothing is graded too", () => {
+  const pass = { status: "pass", detail: "exit 0" };
+  const r = gradeWroteOutput(pass, false, "ddl", { tool: "ddl exporter", output: "artifact" });
+  assert.equal(r.severity, "S1");
+  assert.equal(r.detail, "the ddl exporter exited 0 but wrote no artifact");
+  assert.equal(gradeWroteOutput(pass, true, "ddl", { tool: "ddl exporter" }), pass);
+});
+
+test("gradeImpact: an empty affected list for an exported element is a wrong answer", () => {
+  // The shape barwise lineage impact --format json emits.
+  const ok = { exit: 0, stdout: "", stderr: "", timedOut: false };
+  const none = gradeImpact(
+    ok,
+    { changedElement: "ot-grade-code", affectedArtifacts: [] },
+    "ot-grade-code",
+  );
+  assert.equal(none.severity, "S1");
+  assert.equal(
+    gradeImpact(ok, {
+      changedElement: "ot-grade-code",
+      affectedArtifacts: [{ artifact: "/w/schema.sql", format: "ddl", relationship: "table" }],
+    }, "ot-grade-code").status,
+    "pass",
+  );
+  assert.equal(gradeImpact(ok, null, "x").status, "could_not_answer");
+  assert.equal(gradeImpact(ok, { changedElement: "x" }, "x").status, "could_not_answer");
 });

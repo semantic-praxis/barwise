@@ -585,9 +585,10 @@ export function sprint4Downstream(customer, tier, record) {
       timeoutMs: budget,
       cwd: gen,
     });
-    const rg = grade.gradeWroteOutput(
-      grade.gradeCommand(r, { budgetMs: budget }),
-      existsSync(back),
+    const rg = grade.gradeReadBackNotEmpty(
+      grade.gradeWroteOutput(grade.gradeCommand(r, { budgetMs: budget }), existsSync(back), "sql"),
+      modelSummaryOf(back),
+      modelSummaryOf(model),
       "sql",
     );
     record({
@@ -610,6 +611,22 @@ export function sprint4Downstream(customer, tier, record) {
       ...grade.gradeProducedModelValidation(vd, parseJson(vd.stdout)),
       ms: vd.ms,
       exit: vd.exit,
+    });
+    // Validation passes a partial model; a diff under the DDL loss set is
+    // what says whether the read-back kept what DDL can carry. Sprint 1's
+    // model round trip does this through `import model --format ddl`; this
+    // is the only place barwise's own per-dialect export meets `import sql`.
+    const dd = runCli(["diff", model, back, "--format", "json"], { timeoutMs: budget });
+    record({
+      sprint: 4,
+      step: `read-back-diff-ddl:${dialect}`,
+      dialect,
+      importer: "sql",
+      ...(dd.exit === 0
+        ? grade.gradeRoundTrip(parseJson(dd.stdout), lossSet("ddl"))
+        : grade.gradeCommand(dd, { budgetMs: budget })),
+      ms: dd.ms,
+      exit: dd.exit,
     });
   }
   // Every other format, read back the same way. Avro has no importer, so
@@ -652,9 +669,14 @@ export function sprint4Downstream(customer, tier, record) {
       timeoutMs: budget,
       cwd: gen,
     });
-    const rg = grade.gradeWroteOutput(
-      grade.gradeCommand(r, { budgetMs: budget }),
-      existsSync(back),
+    const rg = grade.gradeReadBackNotEmpty(
+      grade.gradeWroteOutput(
+        grade.gradeCommand(r, { budgetMs: budget }),
+        existsSync(back),
+        importer,
+      ),
+      modelSummaryOf(back),
+      modelSummaryOf(model),
       importer,
     );
     if (rg.status !== "pass") {
@@ -793,22 +815,44 @@ export function sprint4bLateRequirement(customer, tier, record) {
   });
 
   if (late.element) {
-    const impact = runCli(
-      ["lineage", "impact", after, "--element", late.element, "--format", "json"],
-      { timeoutMs: budget, cwd: dir },
-    );
-    record({
-      sprint: 4.5,
-      step: "late:impact",
-      element: late.element,
-      ...grade.gradeCommand(impact, {
-        budgetMs: budget,
-        expectedNonZero: EXPECTED_NONZERO.lineageUntracked,
-      }),
-      ms: impact.ms,
-      exit: impact.exit,
-      stderr: tail(impact.stderr),
-    });
+    // Asked twice: by name, as docs/CLI.md's example does, and by the id the
+    // option actually takes. Graded on the report, not the exit code: this
+    // step used to pass on exit 0 alone, and all of them passed while the
+    // manifest recorded no sources (barwise-ofb) and a name matched nothing
+    // (barwise-5m9).
+    const doc = readModel(after);
+    const id = byName(doc).get(late.element)?.id
+      ?? factTypes(doc).find((f) => f.name === late.element)?.id;
+    for (const [how, element] of [["name", late.element], ["id", id]]) {
+      if (!element) {
+        record({
+          sprint: 4.5,
+          step: `late:impact-${how}`,
+          status: "could_not_answer",
+          detail: `no element named ${late.element} in the changed model to resolve an id from`,
+        });
+        continue;
+      }
+      const impact = runCli(
+        ["lineage", "impact", after, "--element", element, "--format", "json"],
+        { timeoutMs: budget, cwd: dir },
+      );
+      const outcome = impact.exit === 0
+        ? grade.gradeImpact(impact, parseJson(impact.stdout), element)
+        : grade.gradeCommand(impact, {
+          budgetMs: budget,
+          expectedNonZero: EXPECTED_NONZERO.lineageUntracked,
+        });
+      record({
+        sprint: 4.5,
+        step: `late:impact-${how}`,
+        element,
+        ...outcome,
+        ms: impact.ms,
+        exit: impact.exit,
+        stderr: tail(impact.stderr),
+      });
+    }
   }
 
   // 4. Is the requirement visible as a change at all?
@@ -828,19 +872,30 @@ export function sprint4bLateRequirement(customer, tier, record) {
   });
 
   // 5. Re-export, and confirm the requirement reached the artifact.
+  // The first export wrote this same path; remove it, or an export that
+  // writes nothing would be read as having written the old file.
+  rmSync(ddl, { force: true });
   const reexport = runCli(["export", after, "--format", "ddl", "--output", ddl], {
     timeoutMs: budget,
     cwd: dir,
   });
+  // An export that exits 0 and writes nothing is the product's answer, and
+  // it is graded; reading the missing file used to throw and end the lane.
+  const reexported = grade.gradeWroteOutput(
+    grade.gradeCommand(reexport, { budgetMs: budget }),
+    existsSync(ddl),
+    "ddl",
+    { tool: "ddl exporter", output: "artifact" },
+  );
   record({
     sprint: 4.5,
     step: "late:export-after",
-    ...grade.gradeCommand(reexport, { budgetMs: budget }),
+    ...reexported,
     ms: reexport.ms,
     exit: reexport.exit,
     stderr: tail(reexport.stderr),
   });
-  if (reexport.exit === 0 && late.expectInExport) {
+  if (reexported.status === "pass" && late.expectInExport) {
     const text = readFileSync(ddl, "utf8");
     const present = text.toLowerCase().includes(String(late.expectInExport).toLowerCase());
     record({

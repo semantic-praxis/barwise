@@ -212,12 +212,82 @@ export function gradeCommand(result, { budgetMs, expectedNonZero = null } = {}) 
  * pass and skipped the validation after it. One place, so a new
  * read-back path cannot forget it.
  */
-export function gradeWroteOutput(commandOutcome, wrote, importer) {
+export function gradeWroteOutput(
+  commandOutcome,
+  wrote,
+  importer,
+  { tool = `${importer} importer`, output = "model to read back" } = {},
+) {
   if (commandOutcome.status !== "pass" || wrote) return commandOutcome;
   return {
     status: "fail",
     severity: "S1",
-    detail: `the ${importer} importer exited 0 but wrote no model to read back`,
+    detail: `the ${tool} exited 0 but wrote no ${output}`,
+  };
+}
+
+/**
+ * A read-back that wrote a model with nothing in it. Structural validation
+ * passes an empty model -- there is nothing in it to be invalid -- so the
+ * read-back steps certified an importer that exits 0 and writes an empty
+ * file. Partial models are graded where a loss set says what may go:
+ * sprint 1's model round trip, and the per-dialect SQL read-back diff.
+ */
+export function gradeReadBackNotEmpty(commandOutcome, backSummary, sourceSummary, importer) {
+  if (commandOutcome.status !== "pass") return commandOutcome;
+  if (!backSummary || backSummary.unreadable) {
+    return {
+      status: "could_not_answer",
+      detail: `the read-back model could not be read: ${backSummary?.unreadable ?? "no file"}`,
+    };
+  }
+  if (backSummary.objectTypes === 0 && (sourceSummary?.objectTypes ?? 0) > 0) {
+    return {
+      status: "fail",
+      severity: "S1",
+      detail:
+        `the ${importer} importer exited 0 and wrote an empty model from an export of ${sourceSummary.objectTypes} object types`,
+    };
+  }
+  return commandOutcome;
+}
+
+/**
+ * `lineage impact --format json` is { changedElement, affectedArtifacts }.
+ * The late requirement's element is rendered in the DDL exported a moment
+ * earlier, so an empty list is a wrong answer, not an absent one. This
+ * step graded the exit code alone, and every impact check passed while
+ * the manifest recorded no sources at all (barwise-ofb).
+ */
+export function gradeImpact(result, report, element) {
+  if (crashed(result)) {
+    return {
+      status: "fail",
+      severity: "S2",
+      detail: `lineage impact crashed: ${firstLine(result.stderr)}`,
+    };
+  }
+  if (
+    !report || typeof report.changedElement !== "string" || !Array.isArray(report.affectedArtifacts)
+  ) {
+    return {
+      status: "could_not_answer",
+      detail: `lineage impact returned no { changedElement, affectedArtifacts } to read: ${
+        String(result.stdout).slice(0, 160)
+      }`,
+    };
+  }
+  if (report.affectedArtifacts.length === 0) {
+    return {
+      status: "fail",
+      severity: "S1",
+      detail:
+        `lineage impact reports no affected artifacts for ${element}, which the DDL exported before the change renders`,
+    };
+  }
+  return {
+    status: "pass",
+    detail: `${report.affectedArtifacts.length} artifact(s) affected by ${element}`,
   };
 }
 
@@ -549,11 +619,16 @@ export function gradeStaleness(result, report) {
   // `manifestFound: false` with both artifact lists empty, which satisfies
   // the shape check above and then reads as a product that tracked nothing.
   // A harness with no manifest to read cannot answer the staleness question.
-  if (report.manifestFound === false) {
+  // Only an explicit manifestFound: true licenses a verdict. The check used
+  // to refuse only on an explicit false, so a payload missing the field --
+  // which the product never emits, and the fixtures here once did -- was
+  // graded as a real report.
+  if (report.manifestFound !== true) {
     return {
       status: "could_not_answer",
-      detail:
-        "lineage status reports manifestFound: false, so there is no manifest to read staleness from",
+      detail: `lineage status reports manifestFound: ${
+        JSON.stringify(report.manifestFound)
+      }, so there is no manifest to read staleness from`,
     };
   }
   if (report.staleArtifacts.length > 0) {
