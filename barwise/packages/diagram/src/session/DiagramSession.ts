@@ -247,8 +247,8 @@ export class DiagramSession {
     }
     const existing = this.model.getDiagramLayout(name);
     const persistedElements = elements.length === 0
-      && existing?.elements
-      && existing.elements.length > 0
+        && existing?.elements
+        && existing.elements.length > 0
       ? [...existing.elements]
       : elements;
     return {
