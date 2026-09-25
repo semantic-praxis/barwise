@@ -29,3 +29,32 @@ export interface DiagramLayout {
    */
   readonly orientations: Readonly<Record<string, "horizontal" | "vertical">>;
 }
+
+/**
+ * A layout with the references `isGone` names taken out -- the one rule
+ * shared by `OrmModel`'s removals and model merge.
+ *
+ * `elements` is the exception. An empty list means "show every element"
+ * (`DiagramSession.applyNamedView`), so pruning a filtered view's last
+ * element would silently turn it into a show-all view, and saving would
+ * drop the filter for good. When the prune would empty a list that had
+ * entries, the list is kept as it was: the view stays narrowed, as it did
+ * under 1.x, and `structural/diagram-dangling-reference` reports the id.
+ */
+export function withoutDiagramReferences(
+  layout: DiagramLayout,
+  isGone: (id: string) => boolean,
+): DiagramLayout {
+  const keep = <T>(record: Readonly<Record<string, T>>) =>
+    Object.fromEntries(Object.entries(record).filter(([id]) => !isGone(id)));
+  const remaining = layout.elements?.filter((id) => !isGone(id));
+  const elements = remaining && remaining.length === 0 && layout.elements!.length > 0
+    ? layout.elements
+    : remaining;
+  return {
+    ...layout,
+    ...(elements ? { elements } : {}),
+    positions: keep(layout.positions),
+    orientations: keep(layout.orientations),
+  };
+}

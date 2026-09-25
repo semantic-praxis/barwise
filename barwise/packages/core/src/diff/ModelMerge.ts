@@ -14,6 +14,7 @@
  * Returns a freshly constructed OrmModel (no mutation of inputs).
  */
 
+import { withoutDiagramReferences } from "../model/DiagramLayout.js";
 import { type FactTypeConfig, toFactTypeConfig } from "../model/FactType.js";
 import { graphOf } from "../model/graph.js";
 import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
@@ -450,16 +451,9 @@ function carryUnmodelledElements(merged: OrmModel, existing: OrmModel): void {
   // the merge's to delete; validation reports it.
   const inModel = (m: OrmModel, id: string) =>
     m.getObjectType(id) !== undefined || m.getFactType(id) !== undefined;
-  const present = (id: string) => !inModel(existing, id) || inModel(merged, id);
+  const removed = (id: string) => inModel(existing, id) && !inModel(merged, id);
   for (const layout of existing.diagramLayouts) {
-    const keep = <T>(record: Readonly<Record<string, T>>) =>
-      Object.fromEntries(Object.entries(record).filter(([id]) => present(id)));
-    merged.addDiagramLayout({
-      ...layout,
-      ...(layout.elements ? { elements: layout.elements.filter(present) } : {}),
-      positions: keep(layout.positions),
-      orientations: keep(layout.orientations),
-    });
+    merged.addDiagramLayout(withoutDiagramReferences(layout, removed));
   }
 }
 

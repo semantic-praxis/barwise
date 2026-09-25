@@ -56,6 +56,12 @@ In scope:
   diagram, the field, the reference and the expected kind.
 - When an object type or fact type is removed through `OrmModel`, the
   system shall remove its id from every diagram layout.
+- When that removal would empty a view's `elements` list, the list shall
+  be kept as it was. An empty list means "show every element", so emptying
+  it would turn a filtered view into a show-all view on the next render
+  and drop the filter on the next save. The kept id is reported by
+  validation. The same rule applies to a merge, through one shared helper
+  (`withoutDiagramReferences`).
 - When a merge drops an element, the merged model's carried layouts shall
   not reference it. A reference that was already dangling before the merge
   is carried unchanged, so validation still reports it.

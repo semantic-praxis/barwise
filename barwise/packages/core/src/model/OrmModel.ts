@@ -1,5 +1,5 @@
 import type { Definition } from "./Definition.js";
-import type { DiagramLayout } from "./DiagramLayout.js";
+import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
 import { FactType, type FactTypeConfig } from "./FactType.js";
 import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
 import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
@@ -573,14 +573,7 @@ export class OrmModel {
         || id in layout.positions
         || id in layout.orientations;
       if (!mentions) continue;
-      const { [id]: _p, ...positions } = layout.positions;
-      const { [id]: _o, ...orientations } = layout.orientations;
-      this._diagramLayouts[i] = {
-        ...layout,
-        ...(layout.elements ? { elements: layout.elements.filter((e) => e !== id) } : {}),
-        positions,
-        orientations,
-      };
+      this._diagramLayouts[i] = withoutDiagramReferences(layout, (ref) => ref === id);
     }
   }
 

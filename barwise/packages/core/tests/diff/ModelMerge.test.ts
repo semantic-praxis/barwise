@@ -156,6 +156,34 @@ describe("mergeModels", () => {
     });
   });
 
+  it("keeps a filtered view filtered when a merge removes its only element", () => {
+    const existing = baseModel();
+    const nameId = existing.getObjectTypeByName("Name")!.id;
+    existing.addDiagramLayout({
+      name: "OnlyName",
+      elements: [nameId],
+      positions: {},
+      orientations: {},
+    });
+    const incoming = new ModelBuilder("Test")
+      .withEntityType("Customer", { referenceMode: "customer_id" })
+      .withEntityType("Order", { referenceMode: "order_number" })
+      .withBinaryFactType("Customer places Order", {
+        role1: { player: "Customer", name: "places" },
+        role2: { player: "Order", name: "is placed by" },
+        uniqueness: "role2",
+        mandatory: "role2",
+      })
+      .withDefinition("Customer", "A person or organization that purchases goods.")
+      .build();
+
+    const diff = diffModels(existing, incoming);
+    const removedIdx = diff.deltas.findIndex((d) => d.kind === "removed" && d.name === "Name");
+    const merged = mergeModels(existing, incoming, diff.deltas, new Set([removedIdx]));
+
+    expect(merged.getDiagramLayout("OnlyName")!.elements).toEqual([nameId]);
+  });
+
   it("keeps a layout reference that was already dangling before the merge", () => {
     // A 1.x name the 2.0 migration could not resolve is kept so validation
     // can report it; merging must not delete it on the way through.
