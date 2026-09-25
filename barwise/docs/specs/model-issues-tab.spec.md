@@ -3,7 +3,7 @@
 Status: Draft -- no workstream implemented
 
 Created: 2026-09-24
-Last-updated: 2026-09-24
+Last-updated: 2026-09-25
 Tracking: barwise-1061 (related bug found while grounding: barwise-1062)
 
 The diagram view gains an **Issues** tab that lists validation
@@ -204,8 +204,8 @@ must-agree rule; no parity entry needed).
 
 ## Workstreams (each independently shippable)
 
-Written under the recommended option of each open decision (D1-D4); a
-different call changes the part that names it. Ordered by dependency:
+Written under the option chosen for each decision (D1-D4, resolved
+2026-09-25). Ordered by dependency:
 WS1 has no UI and ships alone; WS2 needs WS1; WS3 and WS4 need WS2 and
 not each other.
 
@@ -291,26 +291,29 @@ happens unless the button is pressed.
 - `vscode/tests/unit/toolRegistration.test.ts` is untouched: no new
   language-model tool.
 
-## Open decisions (for review)
+## Decisions (resolved 2026-09-25)
+
+All four were resolved by the requester, each as recommended. The
+options are kept so a later reader can see what was rejected.
 
 - **D1. Where the tab lives.** (A) A sixth tab in the diagram webview,
   beside Verbalization. (B) A separate webview panel. (C) A sidebar
-  tree. **Recommendation:** A -- it reuses the host-computed-content
+  tree. **Resolved: A** -- it reuses the host-computed-content
   pattern and the diagram highlight R2 needs.
 - **D2. Also offer the same fixes as quick fixes in the YAML editor?**
   The language server would call `proposeFixes`; `choice` and `input`
-  fixes become a quick pick or input box. **Recommendation:** yes, as a
-  follow-up after WS2, not in this spec's workstreams.
+  fixes become a quick pick or input box. **Resolved: yes, as a
+  follow-up after WS2** (barwise-1067), not in this spec's workstreams.
 - **D3. AI review suggestions: go-to only, or AI-proposed edits
   reviewed as a diff?** You chose deterministic one-click fixes, which
-  rules out the second as the default. **Recommendation:** go-to only
-  now; revisit once the review prompt can emit structured `FixOp`s that
+  rules out the second as the default. **Resolved: go-to only
+  now**; revisit once the review prompt can emit structured `FixOp`s that
   core validates before applying.
 - **D4. CLI and MCP.** `barwise fix` and an MCP `fix_model` tool would
-  be thin over the same core API. **Recommendation:** mark the gap
+  be thin over the same core API. **Resolved:** mark the gap
   deliberate in the matrix for now ("an interactive, per-issue choice"),
-  and file a follow-up for a non-interactive `barwise fix --rule <id>`
-  for `apply`-shape fixes.
+  with a follow-up for a non-interactive `barwise fix --rule <id>`
+  for `apply`-shape fixes (barwise-1068).
 
 ## Risks and testing
 
