@@ -3,7 +3,7 @@
 Status: Draft -- no workstream implemented
 
 Created: 2026-09-24
-Last-updated: 2026-09-24
+Last-updated: 2026-09-25
 Tracking: barwise-1057 (follow-up for the DDL importer: barwise-1058)
 
 A dbt `data_type` on a primary-key or foreign-key column is dropped on
@@ -111,7 +111,7 @@ Out of scope:
 | `dbt/src/dbtMapping/entityTypes.ts`                          | Creates the entity with `referenceMode: pk.columnName`; the key's type is never read             | WS1: also create the identifier value type and its preferred binary                  |
 | `dbt/src/dbtMapping/valueTypes.ts`                           | Skips PK and FK columns (lines 19-21); resolves `data_type` for the rest                         | WS1: share its data-type resolution with the key path; skip logic stays              |
 | `core/src/mapping/RelationalMapper.ts` `referenceModePkType` | First binary with any value player supplies the key type                                         | WS2: accept only the value player the reference mode names                           |
-| `core/src/mapping/RelationalSchema.ts` `Column`              | `dataType: string` only; nothing records whether it was declared or a fallback                   | WS3: add `dataTypeDefaulted` (see Open decisions)                                    |
+| `core/src/mapping/RelationalSchema.ts` `Column`              | `dataType: string` only; nothing records whether it was declared or a fallback                   | WS3: add `dataTypeDefaulted` (see Decisions, D2)                                     |
 | `core/src/annotation/ExportAnnotationCollector.ts`           | "defaulted" keyed on the SQL string `"TEXT"`; "no column description" unconditional; dbt wording | WS3: key on `dataTypeDefaulted` and the source definition; format-neutral messages   |
 | `core/src/mapping/renderers/DbtExportAnnotator.ts`           | Renders collector messages verbatim                                                              | WS3: appends the dbt remedy to the neutral message                                   |
 | `core/src/annotation/exportAnnotationMap.ts`                 | `TODO(barwise): <message>`; column dropped                                                       | WS3: `TODO(barwise): <column>: <message>` for column-level annotations               |
@@ -182,7 +182,7 @@ RelationalMapper (unchanged path)          ExportAnnotationCollector (WS3)
 
 ## Workstreams (each independently shippable)
 
-Each workstream is written under the recommended option of the open
+Each workstream is written under the option chosen for the
 decisions it depends on (D1-D3, below), and names them where it does.
 A different call on a decision changes the named part and nothing else.
 
@@ -265,8 +265,7 @@ the goldens it rewrites.
 
 ### 3. Annotations report only real gaps, in neutral words
 
-How the collector learns a type was defaulted is D2. Under its
-recommendation: add `dataTypeDefaulted: boolean` to `Column` in
+How the collector learns a type was defaulted is D2. As resolved: add `dataTypeDefaulted: boolean` to `Column` in
 `RelationalSchema.ts`. The mapper sets it where it writes a type: `true`
 when `conceptualTypeToSql` received no `DataTypeDef` or when
 `referenceModePkType` returned the fallback, and FK columns copy it from
@@ -288,7 +287,7 @@ carry no TODO, and the remaining TODOs name no format.
 
 ## API and migration impact
 
-- Under D2's recommendation, `Column` gains a required
+- Per D2, `Column` gains a required
   `dataTypeDefaulted` field. `Column` is exported from `@barwise/core`;
   `@barwise/formats`, `@barwise/dbt` and `@barwise/mcp` read columns but
   none constructs one outside tests (to verify during WS3 with the
@@ -299,10 +298,10 @@ carry no TODO, and the remaining TODOs name no format.
   imported before WS1 keeps loading and keeps its untyped keys until
   re-imported.
 
-## Open decisions (for review)
+## Decisions (resolved 2026-09-25)
 
-Each has a recommended option, and the workstreams above are written
-under it. None is decided by merging this spec.
+All three were resolved by the requester, each as recommended. The
+options are kept so a later reader can see what was rejected.
 
 - **D1. Key columns that share a name across models (`id`).**
   (A) Share one identifier value type when the declared types agree;
@@ -315,16 +314,15 @@ under it. None is decided by merging this spec.
   moves key column names in shipped models where the two disagree
   (unmeasured). (C) Share by name unconditionally, first type wins --
   rejected: it exports one of the keys with the wrong type.
-  **Recommendation:** A. A conflict costs a reported rename, never a
-  wrong type, and the mapper rule stays as it is.
+  **Resolved: A.** A conflict costs a reported rename, never a wrong
+  type, and the mapper rule stays as it is.
 - **D2. `dataTypeDefaulted` on `Column` versus derivation in the
   collector.** The field widens a public core type; derivation keeps the
   type but duplicates the mapper's decision (see Alternatives).
-  **Recommendation:** the field.
+  **Resolved: the field.**
 - **D3. Should WS2 land before WS1?** Landing it first moves
   example-model key types before the importer fix gives dbt users
-  anything. **Recommendation:** order as written; each is green on its
-  own.
+  anything. **Resolved: order as written**; each is green on its own.
 
 ## Risks and testing
 
