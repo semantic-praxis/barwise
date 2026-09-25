@@ -65,6 +65,42 @@ run() {
   return "${status}"
 }
 
+# Select the Node that .nvmrc pins before anything runs npm. The container
+# image puts Node 22 / npm 10 first on the PATH, CI reads .nvmrc (26), and the
+# difference showed up twice: npm 10 strips the `libc` fields npm 11 wrote
+# into package-lock.json, dirtying the tree on every start and resume, and
+# every local ci:local ran its coverage gate on a Node CI never uses
+# (docs/specs/session-node-pin.spec.md). The version is read, never copied,
+# so .nvmrc stays its one home. nvm ships in the image and checks the
+# download against the release's SHASUMS256.txt; it runs in a child bash
+# because nvm.sh does not survive this script's `set -u`. `--no-use` is
+# load-bearing twice over: without it, sourcing nvm.sh returns 3 when no
+# default Node is installed yet (so an `&&` never reaches `nvm install`), and
+# nvm reads the sourcing shell's positional arguments as its own. Both failed
+# silently, exit 3 and no output, in the first draft of this block.
+node_want="$(tr -d '[:space:]' <"${CLAUDE_PROJECT_DIR}/.nvmrc")"
+export NVM_DIR="${NVM_DIR:-/opt/nvm}"
+node_bin="${NVM_DIR}/versions/node/v${node_want}/bin"
+if [[ ! -x "${node_bin}/node" && -s "${NVM_DIR}/nvm.sh" ]]; then
+  # shellcheck disable=SC2016,SC2310  # $1 and NVM_DIR expand in the child
+  # bash, not here; and `|| true` is deliberate, as for gitleaks below: the
+  # read-back after this block is what reports a failed install.
+  run bash -c 'source "${NVM_DIR}/nvm.sh" --no-use && nvm install "$1"' _ "${node_want}" || true
+fi
+if [[ -x "${node_bin}/node" ]]; then
+  export PATH="${node_bin}:${PATH}"
+  echo "export PATH=\"${node_bin}:\$PATH\"" >>"${CLAUDE_ENV_FILE}"
+fi
+# Read back rather than trust the install: the wrong Node is the failure this
+# block exists to prevent. Non-fatal like the tool installs below -- a session
+# that starts degraded and says so beats one that cannot start -- but never
+# silent, per docs/specs/gate-refusal-contract.spec.md.
+node_have="$(node --version 2>/dev/null || echo none)"
+if [[ "${node_have}" != "v${node_want}" ]]; then
+  echo "session-start: running Node ${node_have}, not v${node_want} from .nvmrc." \
+    "npm will rewrite package-lock.json and ci:local will not match CI." >&2
+fi
+
 run npm install --no-audit --no-fund
 run npm run build
 
