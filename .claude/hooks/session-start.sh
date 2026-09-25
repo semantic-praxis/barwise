@@ -65,6 +65,14 @@ run() {
   return "${status}"
 }
 
+# Append a line to CLAUDE_ENV_FILE once. SessionStart fires on resume, clear
+# and compact as well as startup, and an unconditional append added the same
+# PATH export on every fire, so a long session accumulated duplicates
+# (barwise-1035). Matched as a whole fixed-string line, never a pattern.
+persist_env() {
+  grep -qxF -- "$1" "${CLAUDE_ENV_FILE}" 2>/dev/null || echo "$1" >>"${CLAUDE_ENV_FILE}"
+}
+
 # Select the Node that .nvmrc pins before anything runs npm. The container
 # image puts Node 22 / npm 10 first on the PATH, CI reads .nvmrc (26), and the
 # difference showed up twice: npm 10 strips the `libc` fields npm 11 wrote
@@ -89,19 +97,26 @@ if [[ ! -x "${node_bin}/node" && -s "${NVM_DIR}/nvm.sh" ]]; then
 fi
 if [[ -x "${node_bin}/node" ]]; then
   export PATH="${node_bin}:${PATH}"
-  echo "export PATH=\"${node_bin}:\$PATH\"" >>"${CLAUDE_ENV_FILE}"
+  persist_env "export PATH=\"${node_bin}:\$PATH\""
 fi
 # Read back rather than trust the install: the wrong Node is the failure this
 # block exists to prevent. Non-fatal like the tool installs below -- a session
 # that starts degraded and says so beats one that cannot start -- but never
 # silent, per docs/specs/gate-refusal-contract.spec.md.
+#
+# On the degraded path, install with `npm ci`, which never writes the
+# lockfile: an older npm running `npm install` is exactly what stripped the
+# `libc` fields, so falling back to it would reproduce the bug this block
+# fixes whenever the pin is unavailable. The matched path keeps `npm
+# install`, which leaves an existing node_modules in place on resume.
 node_have="$(node --version 2>/dev/null || echo none)"
-if [[ "${node_have}" != "v${node_want}" ]]; then
+if [[ "${node_have}" == "v${node_want}" ]]; then
+  run npm install --no-audit --no-fund
+else
   echo "session-start: running Node ${node_have}, not v${node_want} from .nvmrc." \
-    "npm will rewrite package-lock.json and ci:local will not match CI." >&2
+    "Installing with npm ci so package-lock.json is left alone; ci:local will not match CI." >&2
+  run npm ci --no-audit --no-fund
 fi
-
-run npm install --no-audit --no-fund
 run npm run build
 
 # Wire the git hooks. `.npmrc` sets ignore-scripts=true, which suppresses the
@@ -181,4 +196,4 @@ fi
 # writes the literal ${HOME}/${PATH} expansion into the env file, to be
 # resolved by the shell that later sources it. Expanding it here would
 # bake in this session's paths.
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> "${CLAUDE_ENV_FILE}"
+persist_env 'export PATH="$HOME/.local/bin:$PATH"'
