@@ -13,6 +13,7 @@
  * into OrmModel's private maps, simulating a corrupted deserialization.
  */
 import { describe, expect, it } from "vitest";
+import { isScopedView } from "../../src/model/DiagramLayout.js";
 import { FactType } from "../../src/model/FactType.js";
 import { createObjectType } from "../../src/model/ObjectType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
@@ -408,6 +409,36 @@ describe("structural/diagram-dangling-reference", () => {
     expect(dangling(m).map((d) => d.message)).toEqual([
       `Diagram "V" lists "${ft}" in elements, but no object type has that id.`,
       `Diagram "V" lists "${c}" in orientations, but no fact type has that id.`,
+    ]);
+  });
+});
+
+describe("structural/diagram-empty-view and isScopedView", () => {
+  const view = (elements?: string[]) => ({
+    name: "V",
+    ...(elements ? { elements } : {}),
+    positions: {},
+    orientations: {},
+  });
+
+  it("treats an absent list as show-all and any list, [] included, as scoped", () => {
+    expect(isScopedView(view())).toBe(false);
+    expect(isScopedView(view([]))).toBe(true);
+    expect(isScopedView(view(["ot-a"]))).toBe(true);
+  });
+
+  it("reports an empty view as info, and nothing for a show-all or populated view", () => {
+    const m = new ModelBuilder("Test").withEntityType("A", { referenceMode: "a_id" }).build();
+    const a = m.getObjectTypeByName("A")!.id;
+    m.addDiagramLayout({ name: "Empty", elements: [], positions: {}, orientations: {} });
+    m.addDiagramLayout({ name: "All", positions: {}, orientations: {} });
+    m.addDiagramLayout({ name: "JustA", elements: [a], positions: {}, orientations: {} });
+
+    const empty = structuralWellFormedness(m).filter((d) =>
+      d.ruleId === "structural/diagram-empty-view"
+    );
+    expect(empty.map((d) => [d.severity, d.elementId, d.message])).toEqual([
+      ["info", "Empty", 'Diagram "Empty" lists no elements, so it draws an empty canvas.'],
     ]);
   });
 });

@@ -10,6 +10,7 @@ import {
   isInternalUniqueness,
   isMandatoryRole,
   isRing,
+  isScopedView,
   isSubset,
   isValueConstraint,
   type ObjectType,
@@ -199,9 +200,8 @@ function buildTree(model: OrmModel): ModelTreeItem[] {
       label: "Diagrams",
       iconId: "layout",
       children: model.diagramLayouts.map((dl) => {
-        const elCount = dl.elements?.length;
-        const desc = elCount
-          ? `${elCount} elements`
+        const desc = isScopedView(dl)
+          ? `${dl.elements.length} elements`
           : `${Object.keys(dl.positions).length} positions`;
         return {
           kind: "diagram_layout" as const,

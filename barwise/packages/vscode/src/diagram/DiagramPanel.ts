@@ -1,4 +1,4 @@
-import { type DiagramLayout, type OrmModel, OrmYamlSerializer } from "@barwise/core";
+import { type DiagramLayout, isScopedView, type OrmModel, OrmYamlSerializer } from "@barwise/core";
 import { collectAnnotationMap } from "@barwise/core/annotation";
 import { type DiagramPresentation, DiagramSession } from "@barwise/diagram";
 import * as fs from "node:fs";
@@ -366,8 +366,11 @@ export class DiagramPanel {
       const freshModel = saveSerializer.deserialize(fs.readFileSync(this.filePath, "utf-8"));
       name = freshModel.getObjectType(id)?.name ?? id;
       const layout = freshModel.getDiagramLayout(viewName);
-      if (layout) {
-        const elements = layout.elements ? [...layout.elements] : [];
+      // A show-all view already contains the ghost; only a scoped view
+      // needs it added. Treating an absent list as [] would narrow a
+      // show-all view to this one element.
+      if (layout && isScopedView(layout)) {
+        const elements = [...layout.elements];
         if (!elements.includes(id)) elements.push(id);
         freshModel.updateDiagramLayout({ ...layout, elements });
         fs.writeFileSync(this.filePath, saveSerializer.serialize(freshModel), "utf-8");

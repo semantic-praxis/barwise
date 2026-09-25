@@ -102,6 +102,7 @@ export const RULE_ID = {
   binaryMissingInverseReading: "structural/binary-missing-inverse-reading",
   danglingRoleReference: "structural/dangling-role-reference",
   diagramDanglingReference: "structural/diagram-dangling-reference",
+  diagramEmptyView: "structural/diagram-empty-view",
   duplicateFactTypeName: "structural/duplicate-fact-type-name",
   duplicateObjectTypeName: "structural/duplicate-object-type-name",
   duplicateObjectification: "structural/duplicate-objectification",
@@ -807,6 +808,15 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (diagramName: string, field: string, reference: string, expected: string): string =>
         `Diagram "${diagramName}" lists "${reference}" in ${field}, but no ${expected} has that id.`,
+    },
+  },
+  [RULE_ID.diagramEmptyView]: {
+    severity: "info",
+    description:
+      "A saved diagram view lists no elements, so it draws an empty canvas. Usually its last element was removed.",
+    messages: {
+      default: (diagramName: string): string =>
+        `Diagram "${diagramName}" lists no elements, so it draws an empty canvas.`,
     },
   },
   [RULE_ID.duplicateFactTypeName]: {

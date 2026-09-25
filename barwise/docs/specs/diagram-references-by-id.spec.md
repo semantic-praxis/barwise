@@ -2,7 +2,7 @@
 
 Status: Implemented 2026-09-24 (single workstream). D1-D3 were built at their recommended defaults: 2.0, unknown names kept, dangling references warn.
 Created: 2026-09-24
-Last-updated: 2026-09-24
+Last-updated: 2026-09-25
 Tracking: barwise-1063
 
 ## Principle
@@ -56,12 +56,12 @@ In scope:
   diagram, the field, the reference and the expected kind.
 - When an object type or fact type is removed through `OrmModel`, the
   system shall remove its id from every diagram layout.
-- When that removal would empty a view's `elements` list, the list shall
-  be kept as it was. An empty list means "show every element", so emptying
-  it would turn a filtered view into a show-all view on the next render
-  and drop the filter on the next save. The kept id is reported by
-  validation. The same rule applies to a merge, through one shared helper
-  (`withoutDiagramReferences`).
+- Superseded by `diagram-empty-view.spec.md` (barwise-1066): ~~When that
+  removal would empty a view's `elements` list, the list shall be kept as
+  it was.~~ Under 2.0 an empty list is an empty view and an absent one
+  means "show every element", so a removal that empties the list leaves
+  `elements: []`, and `structural/diagram-empty-view` reports it. Do not
+  restore the keep-the-list guard.
 - When a merge drops an element, the merged model's carried layouts shall
   not reference it. A reference that was already dangling before the merge
   is carried unchanged, so validation still reports it.

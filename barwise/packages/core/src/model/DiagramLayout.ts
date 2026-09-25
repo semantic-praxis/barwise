@@ -14,8 +14,8 @@ export interface DiagramLayout {
   readonly name: string;
   /**
    * Ids of the object types included in this view. When present, only these
-   * elements (and fact types connecting them) are shown. When absent
-   * or empty, all elements are shown.
+   * elements (and fact types connecting them) are shown, so an empty list
+   * is an empty view. When absent, all elements are shown.
    */
   readonly elements?: readonly string[];
   /**
@@ -31,15 +31,24 @@ export interface DiagramLayout {
 }
 
 /**
+ * Whether a layout is scoped to a list of elements. The one place the
+ * 2.0 rule lives: an absent `elements` means "show every element", and
+ * any list -- the empty one included -- is the view's whole content.
+ * Every reader of `elements` asks here rather than restating the test,
+ * because restating it is how "absent" and "empty" came to mean the same
+ * thing in the first place (barwise-1066).
+ */
+export function isScopedView(
+  layout: DiagramLayout,
+): layout is DiagramLayout & { readonly elements: readonly string[]; } {
+  return layout.elements !== undefined;
+}
+
+/**
  * A layout with the references `isGone` names taken out -- the one rule
- * shared by `OrmModel`'s removals and model merge.
- *
- * `elements` is the exception. An empty list means "show every element"
- * (`DiagramSession.applyNamedView`), so pruning a filtered view's last
- * element would silently turn it into a show-all view, and saving would
- * drop the filter for good. When the prune would empty a list that had
- * entries, the list is kept as it was: the view stays narrowed, as it did
- * under 1.x, and `structural/diagram-dangling-reference` reports the id.
+ * shared by `OrmModel`'s removals and model merge. An `elements` list
+ * pruned to nothing stays `[]`, an empty view, not absent, which would
+ * mean "show every element".
  */
 export function withoutDiagramReferences(
   layout: DiagramLayout,
@@ -47,13 +56,9 @@ export function withoutDiagramReferences(
 ): DiagramLayout {
   const keep = <T>(record: Readonly<Record<string, T>>) =>
     Object.fromEntries(Object.entries(record).filter(([id]) => !isGone(id)));
-  const remaining = layout.elements?.filter((id) => !isGone(id));
-  const elements = remaining && remaining.length === 0 && layout.elements!.length > 0
-    ? layout.elements
-    : remaining;
   return {
     ...layout,
-    ...(elements ? { elements } : {}),
+    ...(isScopedView(layout) ? { elements: layout.elements.filter((id) => !isGone(id)) } : {}),
     positions: keep(layout.positions),
     orientations: keep(layout.orientations),
   };

@@ -600,7 +600,7 @@ describe("DiagramSession", () => {
     expect(view.elements).toEqual([]);
   });
 
-  it("keeps existing elements when saving a stale-only named view", async () => {
+  it("saves a view emptied by a removal as an empty view, not a show-all one", async () => {
     const model = chainModel();
     const aId = otId(model, "A");
     model.addDiagramLayout({
@@ -626,7 +626,41 @@ describe("DiagramSession", () => {
     await session.present();
 
     const view = session.buildViewLayout("OnlyA");
-    expect(view.elements).toEqual([aId]);
+    expect(view.elements).toEqual([]);
+
+    // Loading what was saved draws nothing; before 2.0's [] it drew B.
+    afterRemoval.updateDiagramLayout(view);
+    session.apply({ type: "loadView", viewName: "OnlyA" });
+    expect(await objectTypeNames(session, afterRemoval)).toEqual([]);
+  });
+
+  it("saves a loaded view's elements before the first render, not []", () => {
+    // Before present() there is no render to read. A render-derived [] would
+    // overwrite the saved view with an empty one; the filter is the source.
+    const model = chainModel();
+    model.addDiagramLayout({
+      name: "AB",
+      positions: {},
+      orientations: {},
+      elements: ids(model, "A", "B"),
+    });
+    const session = new DiagramSession(model);
+    session.apply({ type: "loadView", viewName: "AB" });
+
+    const view = session.buildViewLayout("AB");
+    expect([...(view.elements ?? [])].sort()).toEqual(ids(model, "A", "B").sort());
+  });
+
+  it("draws everything for a view with no elements field, nothing for []", async () => {
+    const model = chainModel();
+    model.addDiagramLayout({ name: "All", positions: {}, orientations: {} });
+    model.addDiagramLayout({ name: "None", elements: [], positions: {}, orientations: {} });
+    const session = new DiagramSession(model);
+
+    session.apply({ type: "loadView", viewName: "All" });
+    expect(await objectTypeNames(session, model)).toEqual(["A", "B", "C"]);
+    session.apply({ type: "loadView", viewName: "None" });
+    expect(await objectTypeNames(session, model)).toEqual([]);
   });
 
   it("marks the layout saved, optionally recording the active view name", () => {

@@ -52,7 +52,7 @@ export {
   type MappingPattern,
 } from "./model/ContextMapping.js";
 export { type Definition } from "./model/Definition.js";
-export { type DiagramLayout } from "./model/DiagramLayout.js";
+export { type DiagramLayout, isScopedView } from "./model/DiagramLayout.js";
 export { DomainModel, type DomainModelConfig } from "./model/DomainModel.js";
 export { EntityMapping, type EntityMappingConfig } from "./model/EntityMapping.js";
 export {

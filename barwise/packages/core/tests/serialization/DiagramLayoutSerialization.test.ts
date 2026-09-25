@@ -243,6 +243,15 @@ ${diagram}
     expect(layout.orientations).toEqual({ "ft-places": "vertical" });
   });
 
+  it("turns a 1.x empty elements list into an absent field (show all)", () => {
+    // In 1.x, [] meant "show every element"; in 2.0 that is the absent
+    // field, and [] is an empty view.
+    const empty = `    - name: Sales
+      elements: []`;
+    const layout = serializer.deserialize(v1Doc("1.1", empty)).getDiagramLayout("Sales")!;
+    expect(layout.elements).toBeUndefined();
+  });
+
   it("chains a 1.0 document through 1.1 to 2.0", () => {
     const model = serializer.deserialize(v1Doc("1.0", byName));
     expect(model.getDiagramLayout("Sales")!.elements).toEqual(["ot-customer", "ot-order"]);
@@ -291,5 +300,21 @@ ${diagram}
     const layout = renamed.getDiagramLayout("Sales")!;
     expect(layout.elements).toContain("ot-customer");
     expect(layout.positions["ot-customer"]).toEqual({ x: 10, y: 20 });
+  });
+});
+
+describe("empty view versus show-all view", () => {
+  const serializer = new OrmYamlSerializer();
+
+  it("round-trips an empty elements list as [] and an absent one as absent", () => {
+    const model = new OrmModel({ name: "Views" });
+    model.addDiagramLayout({ name: "Empty", elements: [], positions: {}, orientations: {} });
+    model.addDiagramLayout({ name: "All", positions: {}, orientations: {} });
+
+    const yaml = serializer.serialize(model);
+    expect(yaml).toContain("elements: []");
+    const back = serializer.deserialize(yaml);
+    expect(back.getDiagramLayout("Empty")!.elements).toEqual([]);
+    expect(back.getDiagramLayout("All")!.elements).toBeUndefined();
   });
 });
