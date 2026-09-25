@@ -1,3 +1,4 @@
+import { isScopedView } from "../../model/DiagramLayout.js";
 import type { ModelGraph } from "../../model/graph.js";
 import { identificationOrder } from "../../model/identification.js";
 import type { OrmModel } from "../../model/OrmModel.js";
@@ -75,6 +76,12 @@ function checkDiagramReferences(model: OrmModel): Diagnostic[] {
   // a fact type id in `elements` is ignored as surely as a missing one.
   type Field = [string, readonly string[], (id: string) => boolean, string];
   for (const layout of model.diagramLayouts) {
+    // [] is a legitimate empty view (2.0), not a dangling reference, but it
+    // is almost always what is left after a removal emptied the view, and
+    // nothing else would tell the user their view now draws nothing.
+    if (isScopedView(layout) && layout.elements.length === 0) {
+      diagnostics.push(report(RULE_ID.diagramEmptyView, "default", layout.name, layout.name));
+    }
     const refs: Field[] = [
       ["elements", layout.elements ?? [], isObjectType, "object type"],
       [

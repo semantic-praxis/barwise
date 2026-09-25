@@ -1,4 +1,4 @@
-import type { DiagramLayout } from "../../model/DiagramLayout.js";
+import { type DiagramLayout, isScopedView } from "../../model/DiagramLayout.js";
 
 export interface OrmYamlDiagramLayout {
   name: string;
@@ -9,7 +9,9 @@ export interface OrmYamlDiagramLayout {
 
 export function serializeDiagramLayout(dl: DiagramLayout): OrmYamlDiagramLayout {
   const result: OrmYamlDiagramLayout = { name: dl.name };
-  if (dl.elements && dl.elements.length > 0) {
+  // [] is an empty view and must be written, or it would read back as
+  // absent -- "show every element".
+  if (isScopedView(dl)) {
     result.elements = [...dl.elements];
   }
   if (Object.keys(dl.positions).length > 0) {

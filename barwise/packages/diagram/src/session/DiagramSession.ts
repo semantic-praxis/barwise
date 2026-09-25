@@ -11,7 +11,7 @@
  * Persistence (reading/writing the `.orm.yaml`) and the async stale-render
  * guard stay in the host adapter; this class only assembles the data.
  */
-import type { DiagramLayout, OrmModel } from "@barwise/core";
+import { type DiagramLayout, isScopedView, type OrmModel } from "@barwise/core";
 import { generateDiagram } from "../DiagramGenerator.js";
 import { computeNeighborhood } from "../graph/NeighborhoodFilter.js";
 import type { PositionedFactTypeNode, PositionedGraph } from "../layout/LayoutTypes.js";
@@ -237,23 +237,24 @@ export class DiagramSession {
     };
   }
 
-  /** Assemble a `DiagramLayout` for the current filtered view (save-view). */
+  /**
+   * Assemble a `DiagramLayout` for the current filtered view (save-view).
+   *
+   * With a view filter active, the elements come from the filter itself,
+   * not from the last render. The render can be missing or stale (before
+   * the first `present()`, or between a model swap and the next one), and
+   * a render-derived `[]` would overwrite a saved view with an empty one.
+   * Without a filter (focus or unfiltered), what was drawn is the view.
+   */
   buildViewLayout(name: string): DiagramLayout {
-    const elements: string[] = [];
-    for (const node of this.lastLayout?.nodes ?? []) {
-      if (node.kind === "object_type") {
-        if (this.model.getObjectType(node.id)) elements.push(node.id);
-      }
-    }
-    const existing = this.model.getDiagramLayout(name);
-    const persistedElements = elements.length === 0
-        && existing?.elements
-        && existing.elements.length > 0
-      ? [...existing.elements]
-      : elements;
+    const filter = this.buildEffectiveFilter();
+    const candidates = filter
+      ? [...filter.objectTypeIds]
+      : (this.lastLayout?.nodes ?? []).filter((n) => n.kind === "object_type").map((n) => n.id);
+    const elements = candidates.filter((id) => this.model.getObjectType(id) !== undefined);
     return {
       name,
-      elements: persistedElements,
+      elements,
       positions: this.collectPositions(),
       orientations: this.collectOrientations(),
     };
@@ -297,7 +298,7 @@ export class DiagramSession {
     const layout = this.model.getDiagramLayout(viewName);
     if (!layout) return;
 
-    if (layout.elements && layout.elements.length > 0) {
+    if (isScopedView(layout)) {
       const objectTypeIds = new Set<string>();
       for (const id of layout.elements) {
         if (this.model.getObjectType(id)) objectTypeIds.add(id);

@@ -1323,7 +1323,7 @@
             "type": "string",
             "minLength": 1
           },
-          "description": "Ids of the object types included in this view. When absent, all elements are shown."
+          "description": "Ids of the object types included in this view. An empty list is an empty view. When absent, all elements are shown."
         },
         "positions": {
           "type": "object",

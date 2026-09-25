@@ -91,7 +91,11 @@ export function migrateDiagramReferencesToIds(doc: Doc): Doc {
   const migrated = diagrams.map((d) => {
     if (typeof d !== "object" || d === null) return d;
     const layout = { ...(d as Doc) };
-    if (Array.isArray(layout.elements)) {
+    // In 1.x an empty list meant "show every element", which 2.0 spells
+    // by leaving the field out; 2.0's [] is an empty view.
+    if (Array.isArray(layout.elements) && layout.elements.length === 0) {
+      delete layout.elements;
+    } else if (Array.isArray(layout.elements)) {
       layout.elements = reList(layout.elements, ot);
     }
     if ("positions" in layout) layout.positions = rekey(layout.positions, either);

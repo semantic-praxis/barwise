@@ -443,10 +443,9 @@ describe("OrmModel", () => {
       expect(model.getDiagramLayout("Unrelated")!.positions).toEqual({ [b.id]: { x: 5, y: 6 } });
     });
 
-    it("keeps a filtered view filtered when its only element is removed", () => {
-      // An empty `elements` means "show everything", so pruning the last
-      // entry would turn a one-element view into a show-all view. The stale
-      // id stays (validation reports it); positions are still pruned.
+    it("leaves an empty view when its only element is removed", () => {
+      // [] is an empty view and absent means "show everything" (2.0), so
+      // pruning the last entry must leave [] rather than drop the field.
       const model = new OrmModel({ name: "Test" });
       const a = model.addObjectType({ name: "A", kind: "value" });
       model.addObjectType({ name: "B", kind: "value" });
@@ -461,7 +460,7 @@ describe("OrmModel", () => {
 
       expect(model.getDiagramLayout("OnlyA")).toEqual({
         name: "OnlyA",
-        elements: [a.id],
+        elements: [],
         positions: {},
         orientations: {},
       });

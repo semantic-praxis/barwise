@@ -156,7 +156,7 @@ describe("mergeModels", () => {
     });
   });
 
-  it("keeps a filtered view filtered when a merge removes its only element", () => {
+  it("leaves an empty view when a merge removes its only element", () => {
     const existing = baseModel();
     const nameId = existing.getObjectTypeByName("Name")!.id;
     existing.addDiagramLayout({
@@ -181,7 +181,7 @@ describe("mergeModels", () => {
     const removedIdx = diff.deltas.findIndex((d) => d.kind === "removed" && d.name === "Name");
     const merged = mergeModels(existing, incoming, diff.deltas, new Set([removedIdx]));
 
-    expect(merged.getDiagramLayout("OnlyName")!.elements).toEqual([nameId]);
+    expect(merged.getDiagramLayout("OnlyName")!.elements).toEqual([]);
   });
 
   it("keeps a layout reference that was already dangling before the merge", () => {

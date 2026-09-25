@@ -1,4 +1,4 @@
-import { OrmYamlSerializer } from "@barwise/core";
+import { isScopedView, OrmYamlSerializer } from "@barwise/core";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
@@ -179,7 +179,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
         // Get existing views that have element subsets.
         const views = model.diagramLayouts.filter(
-          (dl) => dl.elements && dl.elements.length > 0,
+          isScopedView,
         );
 
         if (views.length === 0) {
@@ -204,9 +204,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
         // Add element to the view.
         const view = model.getDiagramLayout(picked.label);
-        if (!view) return;
+        if (!view || !isScopedView(view)) return;
 
-        const currentElements = view.elements ? [...view.elements] : [];
+        const currentElements = [...view.elements];
         if (currentElements.includes(ot.id)) {
           vscode.window.showInformationMessage(
             `"${elementName}" is already in "${view.name}".`,
