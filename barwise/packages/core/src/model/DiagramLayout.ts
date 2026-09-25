@@ -58,7 +58,7 @@ export function withoutDiagramReferences(
     Object.fromEntries(Object.entries(record).filter(([id]) => !isGone(id)));
   return {
     ...layout,
-    ...(layout.elements ? { elements: layout.elements.filter((id) => !isGone(id)) } : {}),
+    ...(isScopedView(layout) ? { elements: layout.elements.filter((id) => !isGone(id)) } : {}),
     positions: keep(layout.positions),
     orientations: keep(layout.orientations),
   };

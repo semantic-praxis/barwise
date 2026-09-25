@@ -193,8 +193,8 @@ export function activate(context: vscode.ExtensionContext): void {
         const picked = await vscode.window.showQuickPick(
           views.map((v) => ({
             label: v.name,
-            description: `${v.elements!.length} elements`,
-            detail: v.elements!.includes(ot.id)
+            description: `${v.elements.length} elements`,
+            detail: v.elements.includes(ot.id)
               ? "(already included)"
               : undefined,
           })),
