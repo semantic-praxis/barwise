@@ -336,3 +336,78 @@ describe("identification cycles", () => {
     expect(diagnostic?.message).toContain("Reservation -> Reservation");
   });
 });
+
+describe("structural/diagram-dangling-reference", () => {
+  function model() {
+    return new ModelBuilder("Test")
+      .withEntityType("Customer", { referenceMode: "customer_id" })
+      .withEntityType("Order", { referenceMode: "order_number" })
+      .withBinaryFactType("Customer places Order", {
+        role1: { player: "Customer", name: "places" },
+        role2: { player: "Order", name: "is placed by" },
+        uniqueness: "role2",
+      })
+      .build();
+  }
+  const dangling = (m: OrmModel) =>
+    structuralWellFormedness(m).filter((d) => d.ruleId === "structural/diagram-dangling-reference");
+
+  it("reports nothing when every reference resolves", () => {
+    const m = model();
+    const c = m.getObjectTypeByName("Customer")!.id;
+    const ft = m.getFactTypeByName("Customer places Order")!.id;
+    m.addDiagramLayout({
+      name: "V",
+      elements: [c],
+      positions: { [c]: { x: 0, y: 0 }, [ft]: { x: 1, y: 1 } },
+      orientations: { [ft]: "vertical" },
+    });
+    expect(dangling(m)).toEqual([]);
+  });
+
+  it("warns once per unresolved reference, naming the diagram, field and id", () => {
+    const m = model();
+    m.addDiagramLayout({
+      name: "V",
+      elements: ["Customer"],
+      positions: { "ot-gone": { x: 0, y: 0 } },
+      orientations: { "ft-gone": "vertical" },
+    });
+    const found = dangling(m);
+    expect(found.map((d) => [d.severity, d.elementId, d.message])).toEqual([
+      [
+        "warning",
+        "V",
+        'Diagram "V" lists "Customer" in elements, but no object type has that id.',
+      ],
+      [
+        "warning",
+        "V",
+        'Diagram "V" lists "ot-gone" in positions, but no object type or fact type has that id.',
+      ],
+      [
+        "warning",
+        "V",
+        'Diagram "V" lists "ft-gone" in orientations, but no fact type has that id.',
+      ],
+    ]);
+  });
+
+  it("warns on an id of the wrong kind for its field", () => {
+    // The session reads object types from `elements` and fact types from
+    // `orientations`; the other kind there is ignored just as silently.
+    const m = model();
+    const c = m.getObjectTypeByName("Customer")!.id;
+    const ft = m.getFactTypeByName("Customer places Order")!.id;
+    m.addDiagramLayout({
+      name: "V",
+      elements: [ft],
+      positions: {},
+      orientations: { [c]: "vertical" },
+    });
+    expect(dangling(m).map((d) => d.message)).toEqual([
+      `Diagram "V" lists "${ft}" in elements, but no object type has that id.`,
+      `Diagram "V" lists "${c}" in orientations, but no fact type has that id.`,
+    ]);
+  });
+});

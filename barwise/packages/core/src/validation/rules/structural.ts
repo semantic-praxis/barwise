@@ -44,8 +44,8 @@ export function structuralRules(model: OrmModel, graph: ModelGraph): Diagnostic[
 }
 
 /**
- * The structural checks that read no reference, so they run whether or
- * not the model's ids resolve.
+ * The structural checks that need no resolved graph, so they run whether
+ * or not the model's conceptual references resolve.
  */
 export function structuralWellFormedness(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -54,7 +54,55 @@ export function structuralWellFormedness(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkDuplicateFactTypeNames(model));
   diagnostics.push(...checkBinaryFactTypeReadings(model));
   diagnostics.push(...checkSubtypeCycles(model));
+  diagnostics.push(...checkDiagramReferences(model));
 
+  return diagnostics;
+}
+
+/**
+ * Every id a saved diagram names should belong to an element. A stale
+ * entry breaks nothing conceptual, so this is a warning: the entry is
+ * ignored when the view renders. `OrmModel` removal and merge prune ids
+ * as they go; what reaches here is a hand edit or a 1.x name the 2.0
+ * migration could not resolve. The diagram's name stands in as the
+ * element id, since a layout has no id of its own.
+ */
+function checkDiagramReferences(model: OrmModel): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const isObjectType = (id: string) => model.getObjectType(id) !== undefined;
+  const isFactType = (id: string) => model.getFactType(id) !== undefined;
+  // Each field resolves only the kinds the diagram session reads from it:
+  // a fact type id in `elements` is ignored as surely as a missing one.
+  type Field = [string, readonly string[], (id: string) => boolean, string];
+  for (const layout of model.diagramLayouts) {
+    const refs: Field[] = [
+      ["elements", layout.elements ?? [], isObjectType, "object type"],
+      [
+        "positions",
+        Object.keys(layout.positions),
+        (id) => isObjectType(id) || isFactType(id),
+        "object type or fact type",
+      ],
+      ["orientations", Object.keys(layout.orientations), isFactType, "fact type"],
+    ];
+    for (const [field, ids, resolves, expected] of refs) {
+      for (const id of ids) {
+        if (!resolves(id)) {
+          diagnostics.push(
+            report(
+              RULE_ID.diagramDanglingReference,
+              "default",
+              layout.name,
+              layout.name,
+              field,
+              id,
+              expected,
+            ),
+          );
+        }
+      }
+    }
+  }
   return diagnostics;
 }
 

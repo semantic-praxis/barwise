@@ -32,10 +32,10 @@ describe("OrmYamlSerializer version handling", () => {
   });
 
   it("rejects a newer version with an upgrade message", () => {
-    expect(() => serializer.deserialize(modelYaml("2.0"))).toThrow(DeserializationError);
-    expect(() => serializer.deserialize(modelYaml("2.0"))).toThrow(/newer barwise/);
+    expect(() => serializer.deserialize(modelYaml("3.0"))).toThrow(DeserializationError);
+    expect(() => serializer.deserialize(modelYaml("3.0"))).toThrow(/newer barwise/);
     // The old cryptic schema-const message must no longer surface.
-    expect(() => serializer.deserialize(modelYaml("2.0"))).not.toThrow(/must be equal to constant/);
+    expect(() => serializer.deserialize(modelYaml("3.0"))).not.toThrow(/must be equal to constant/);
   });
 
   it("rejects an unknown older version with a no-path message", () => {

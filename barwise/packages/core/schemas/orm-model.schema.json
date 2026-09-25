@@ -12,8 +12,8 @@
   "properties": {
     "orm_version": {
       "type": "string",
-      "const": "1.1",
-      "description": "Schema version. Must be \"1.1\" for this schema revision."
+      "const": "2.0",
+      "description": "Schema version. Must be \"2.0\" for this schema revision."
     },
     "model": {
       "type": "object",
@@ -1323,11 +1323,11 @@
             "type": "string",
             "minLength": 1
           },
-          "description": "Object type names included in this view. When absent, all elements are shown."
+          "description": "Ids of the object types included in this view. When absent, all elements are shown."
         },
         "positions": {
           "type": "object",
-          "description": "Entity type positions keyed by element name. Values are {x, y} in integer pixels, screen coordinates (0,0 top-left, x right, y down).",
+          "description": "Element positions keyed by object type or fact type id. Values are {x, y} in integer pixels, screen coordinates (0,0 top-left, x right, y down).",
           "additionalProperties": {
             "type": "object",
             "required": [
@@ -1349,7 +1349,7 @@
         },
         "orientations": {
           "type": "object",
-          "description": "Fact type orientation overrides keyed by fact type name. Only includes explicitly set orientations.",
+          "description": "Fact type orientation overrides keyed by fact type id. Only includes explicitly set orientations.",
           "additionalProperties": {
             "type": "string",
             "enum": [

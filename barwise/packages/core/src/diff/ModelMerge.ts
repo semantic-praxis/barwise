@@ -14,6 +14,7 @@
  * Returns a freshly constructed OrmModel (no mutation of inputs).
  */
 
+import { withoutDiagramReferences } from "../model/DiagramLayout.js";
 import { type FactTypeConfig, toFactTypeConfig } from "../model/FactType.js";
 import { graphOf } from "../model/graph.js";
 import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
@@ -441,11 +442,18 @@ function addableSubtypeFact(merged: OrmModel, subtypeId: string, supertypeId: st
  * `addableSubtypeFact` and `addableObjectification`.
  */
 function carryUnmodelledElements(merged: OrmModel, existing: OrmModel): void {
-  // A layout references object and fact types by name rather than by
-  // id, and already tolerates naming an element that is not present, so
-  // it carries through whole.
+  // A layout references elements by id, and every element the merge keeps
+  // from `existing` keeps its id -- a rename included -- so the layout
+  // carries through. The one loss is an element an accepted removal took
+  // out: its id is dropped here, as `OrmModel.removeObjectType` would.
+  // Only those ids. A reference that was already dangling in `existing` --
+  // a 1.x name the 2.0 migration kept on purpose, a hand edit -- is not
+  // the merge's to delete; validation reports it.
+  const inModel = (m: OrmModel, id: string) =>
+    m.getObjectType(id) !== undefined || m.getFactType(id) !== undefined;
+  const removed = (id: string) => inModel(existing, id) && !inModel(merged, id);
   for (const layout of existing.diagramLayouts) {
-    merged.addDiagramLayout(layout);
+    merged.addDiagramLayout(withoutDiagramReferences(layout, removed));
   }
 }
 

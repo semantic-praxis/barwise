@@ -214,7 +214,7 @@ export class DiagramSession {
 
   /**
    * Promote a ghost entity into the active view filter. Returns the
-   * entity's name for the host to persist into the saved view's element
+   * entity's id for the host to persist into the saved view's element
    * list, or null when there is nothing to promote.
    */
   addGhostToView(entityId: string): string | null {
@@ -225,7 +225,7 @@ export class DiagramSession {
     this.ghostObjectTypeIds.delete(entityId);
     this.activeViewFilter.objectTypeIds.add(entityId);
     this.expandFilterFromObjectTypes(this.activeViewFilter);
-    return ot.name;
+    return ot.id;
   }
 
   /** Assemble a `DiagramLayout` for the current full layout (save-layout). */
@@ -242,13 +242,18 @@ export class DiagramSession {
     const elements: string[] = [];
     for (const node of this.lastLayout?.nodes ?? []) {
       if (node.kind === "object_type") {
-        const ot = this.model.getObjectType(node.id);
-        if (ot) elements.push(ot.name);
+        if (this.model.getObjectType(node.id)) elements.push(node.id);
       }
     }
+    const existing = this.model.getDiagramLayout(name);
+    const persistedElements = elements.length === 0
+      && existing?.elements
+      && existing.elements.length > 0
+      ? [...existing.elements]
+      : elements;
     return {
       name,
-      elements,
+      elements: persistedElements,
       positions: this.collectPositions(),
       orientations: this.collectOrientations(),
     };
@@ -294,9 +299,8 @@ export class DiagramSession {
 
     if (layout.elements && layout.elements.length > 0) {
       const objectTypeIds = new Set<string>();
-      for (const name of layout.elements) {
-        const ot = this.model.getObjectTypeByName(name);
-        if (ot) objectTypeIds.add(ot.id);
+      for (const id of layout.elements) {
+        if (this.model.getObjectType(id)) objectTypeIds.add(id);
       }
       const filter: ViewFilter = {
         objectTypeIds,
@@ -440,18 +444,16 @@ export class DiagramSession {
     this.hasUnsavedChanges = false;
     if (!saved) return;
 
-    for (const [name, pos] of Object.entries(saved.positions)) {
-      const ot = model.getObjectTypeByName(name);
-      if (ot) {
-        this.positionOverrides[ot.id] = { x: pos.x, y: pos.y };
-      } else {
-        const ft = model.getFactTypeByName(name);
-        if (ft) this.positionOverrides[ft.id] = { x: pos.x, y: pos.y };
+    // Saved keys are element ids (orm_version 2.0). An id the model no
+    // longer carries is skipped; validation reports it as
+    // structural/diagram-dangling-reference.
+    for (const [id, pos] of Object.entries(saved.positions)) {
+      if (model.getObjectType(id) || model.getFactType(id)) {
+        this.positionOverrides[id] = { x: pos.x, y: pos.y };
       }
     }
-    for (const [name, ori] of Object.entries(saved.orientations)) {
-      const ft = model.getFactTypeByName(name);
-      if (ft) this.orientationOverrides[ft.id] = ori;
+    for (const [id, ori] of Object.entries(saved.orientations)) {
+      if (model.getFactType(id)) this.orientationOverrides[id] = ori;
     }
   }
 
@@ -459,11 +461,9 @@ export class DiagramSession {
     const positions: Record<string, { x: number; y: number; }> = {};
     for (const node of this.lastLayout?.nodes ?? []) {
       if (node.kind === "object_type") {
-        const ot = this.model.getObjectType(node.id);
-        if (ot) positions[ot.name] = this.centerOf(node);
+        if (this.model.getObjectType(node.id)) positions[node.id] = this.centerOf(node);
       } else if (node.kind === "fact_type" && this.positionOverrides[node.id]) {
-        const ft = this.model.getFactType(node.id);
-        if (ft) positions[ft.name] = this.centerOf(node);
+        if (this.model.getFactType(node.id)) positions[node.id] = this.centerOf(node);
       }
     }
     return this.sortKeys(positions);
@@ -472,8 +472,7 @@ export class DiagramSession {
   private collectOrientations(): Record<string, Orientation> {
     const orientations: Record<string, Orientation> = {};
     for (const [ftId, ori] of Object.entries(this.orientationOverrides)) {
-      const ft = this.model.getFactType(ftId);
-      if (ft) orientations[ft.name] = ori;
+      if (this.model.getFactType(ftId)) orientations[ftId] = ori;
     }
     return this.sortKeys(orientations);
   }

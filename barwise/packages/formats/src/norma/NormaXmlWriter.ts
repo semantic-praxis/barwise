@@ -796,13 +796,13 @@ function estimateShapeSize(
 function writeDiagrams(model: OrmModel): NormaDiagram[] {
   return model.diagramLayouts.map((layout, di) => {
     const shapes: NormaShape[] = [];
-    for (const [name, pos] of Object.entries(layout.positions)) {
-      const ot = model.getObjectTypeByName(name);
-      const ft = ot ? undefined : model.getFactTypeByName(name);
+    for (const [id, pos] of Object.entries(layout.positions)) {
+      const ot = model.getObjectType(id);
+      const ft = ot ? undefined : model.getFactType(id);
       const element = ot ?? ft;
       if (!element) continue;
       const kind = ot ? "object_type" as const : "fact_type" as const;
-      const size = estimateShapeSize(kind, name, ft ? ft.roles.length : 0);
+      const size = estimateShapeSize(kind, element.name, ft ? ft.roles.length : 0);
       shapes.push({
         id: derivedNormaId(toNormaId(element.id), `_shape${di}`),
         kind,

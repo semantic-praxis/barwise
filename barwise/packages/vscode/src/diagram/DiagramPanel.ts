@@ -352,21 +352,23 @@ export class DiagramPanel {
 
   /**
    * Move a ghost entity into the active view permanently and persist. The
-   * session promotes the ghost and returns its name; the panel appends it
+   * session promotes the ghost and returns its id; the panel appends it
    * to the saved view's element list.
    */
   private async addGhostToView(entityId: string): Promise<void> {
     if (!this.filePath) return;
-    const name = this.session.addGhostToView(entityId);
+    const id = this.session.addGhostToView(entityId);
     const viewName = this.session.viewName;
-    if (!name || !viewName) return;
+    if (!id || !viewName) return;
+    let name = id;
 
     try {
       const freshModel = saveSerializer.deserialize(fs.readFileSync(this.filePath, "utf-8"));
+      name = freshModel.getObjectType(id)?.name ?? id;
       const layout = freshModel.getDiagramLayout(viewName);
       if (layout) {
         const elements = layout.elements ? [...layout.elements] : [];
-        if (!elements.includes(name)) elements.push(name);
+        if (!elements.includes(id)) elements.push(id);
         freshModel.updateDiagramLayout({ ...layout, elements });
         fs.writeFileSync(this.filePath, saveSerializer.serialize(freshModel), "utf-8");
       }

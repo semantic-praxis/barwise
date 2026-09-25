@@ -122,6 +122,89 @@ describe("mergeModels", () => {
     );
   });
 
+  it("carries layouts by id and drops ids an accepted removal took out", () => {
+    const existing = baseModel();
+    const nameId = existing.getObjectTypeByName("Name")!.id;
+    const customerId = existing.getObjectTypeByName("Customer")!.id;
+    existing.addDiagramLayout({
+      name: "V",
+      elements: [customerId, nameId],
+      positions: { [customerId]: { x: 1, y: 2 }, [nameId]: { x: 3, y: 4 } },
+      orientations: {},
+    });
+    const incoming = new ModelBuilder("Test")
+      .withEntityType("Customer", { referenceMode: "customer_id" })
+      .withEntityType("Order", { referenceMode: "order_number" })
+      .withBinaryFactType("Customer places Order", {
+        role1: { player: "Customer", name: "places" },
+        role2: { player: "Order", name: "is placed by" },
+        uniqueness: "role2",
+        mandatory: "role2",
+      })
+      .withDefinition("Customer", "A person or organization that purchases goods.")
+      .build();
+
+    const diff = diffModels(existing, incoming);
+    const removedIdx = diff.deltas.findIndex((d) => d.kind === "removed" && d.name === "Name");
+    const merged = mergeModels(existing, incoming, diff.deltas, new Set([removedIdx]));
+
+    expect(merged.getDiagramLayout("V")).toEqual({
+      name: "V",
+      elements: [customerId],
+      positions: { [customerId]: { x: 1, y: 2 } },
+      orientations: {},
+    });
+  });
+
+  it("keeps a filtered view filtered when a merge removes its only element", () => {
+    const existing = baseModel();
+    const nameId = existing.getObjectTypeByName("Name")!.id;
+    existing.addDiagramLayout({
+      name: "OnlyName",
+      elements: [nameId],
+      positions: {},
+      orientations: {},
+    });
+    const incoming = new ModelBuilder("Test")
+      .withEntityType("Customer", { referenceMode: "customer_id" })
+      .withEntityType("Order", { referenceMode: "order_number" })
+      .withBinaryFactType("Customer places Order", {
+        role1: { player: "Customer", name: "places" },
+        role2: { player: "Order", name: "is placed by" },
+        uniqueness: "role2",
+        mandatory: "role2",
+      })
+      .withDefinition("Customer", "A person or organization that purchases goods.")
+      .build();
+
+    const diff = diffModels(existing, incoming);
+    const removedIdx = diff.deltas.findIndex((d) => d.kind === "removed" && d.name === "Name");
+    const merged = mergeModels(existing, incoming, diff.deltas, new Set([removedIdx]));
+
+    expect(merged.getDiagramLayout("OnlyName")!.elements).toEqual([nameId]);
+  });
+
+  it("keeps a layout reference that was already dangling before the merge", () => {
+    // A 1.x name the 2.0 migration could not resolve is kept so validation
+    // can report it; merging must not delete it on the way through.
+    const existing = baseModel();
+    const customerId = existing.getObjectTypeByName("Customer")!.id;
+    existing.addDiagramLayout({
+      name: "V",
+      elements: [customerId, "Invoice"],
+      positions: { Invoice: { x: 1, y: 2 } },
+      orientations: { "Invoice pays Order": "vertical" },
+    });
+    const merged = mergeModels(
+      existing,
+      existing,
+      diffModels(existing, existing).deltas,
+      new Set(),
+    );
+
+    expect(merged.getDiagramLayout("V")).toEqual(existing.getDiagramLayout("V"));
+  });
+
   it("keeps existing object type when removal delta is rejected", () => {
     const existing = baseModel();
     const incoming = new ModelBuilder("Test")

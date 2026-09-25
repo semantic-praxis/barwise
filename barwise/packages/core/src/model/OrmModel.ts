@@ -1,5 +1,5 @@
 import type { Definition } from "./Definition.js";
-import type { DiagramLayout } from "./DiagramLayout.js";
+import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
 import { FactType, type FactTypeConfig } from "./FactType.js";
 import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
 import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
@@ -148,6 +148,7 @@ export class OrmModel {
     }
 
     this._objectTypes.delete(id);
+    this.pruneDiagramReferences(id);
   }
 
   // ---- Fact Types ----
@@ -239,6 +240,7 @@ export class OrmModel {
     }
 
     this._factTypes.delete(id);
+    this.pruneDiagramReferences(id);
   }
 
   // ---- Subtype Facts ----
@@ -557,6 +559,22 @@ export class OrmModel {
       throw new Error(`Diagram layout "${layout.name}" not found.`);
     }
     this._diagramLayouts[idx] = layout;
+  }
+
+  /**
+   * Drop a removed element's id from every layout. Conceptual references
+   * make a removal throw; a diagram entry is presentation, so it follows
+   * the element out rather than blocking it or dangling.
+   */
+  private pruneDiagramReferences(id: string): void {
+    for (let i = 0; i < this._diagramLayouts.length; i++) {
+      const layout = this._diagramLayouts[i]!;
+      const mentions = layout.elements?.includes(id)
+        || id in layout.positions
+        || id in layout.orientations;
+      if (!mentions) continue;
+      this._diagramLayouts[i] = withoutDiagramReferences(layout, (ref) => ref === id);
+    }
   }
 
   /** Remove a diagram layout by name. */
