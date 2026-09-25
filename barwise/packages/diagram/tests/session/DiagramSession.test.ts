@@ -600,6 +600,35 @@ describe("DiagramSession", () => {
     expect(view.elements).toEqual([]);
   });
 
+  it("keeps existing elements when saving a stale-only named view", async () => {
+    const model = chainModel();
+    const aId = otId(model, "A");
+    model.addDiagramLayout({
+      name: "OnlyA",
+      positions: {},
+      orientations: {},
+      elements: [aId],
+    });
+    const session = new DiagramSession(model);
+    session.apply({ type: "loadView", viewName: "OnlyA" });
+    await session.present();
+
+    const afterRemoval = new ModelBuilder("AfterRemoval")
+      .withEntityType("B", { referenceMode: "id" })
+      .build();
+    afterRemoval.addDiagramLayout({
+      name: "OnlyA",
+      positions: {},
+      orientations: {},
+      elements: [aId],
+    });
+    session.setModel(afterRemoval);
+    await session.present();
+
+    const view = session.buildViewLayout("OnlyA");
+    expect(view.elements).toEqual([aId]);
+  });
+
   it("marks the layout saved, optionally recording the active view name", () => {
     const model = chainModel();
     const session = new DiagramSession(model);

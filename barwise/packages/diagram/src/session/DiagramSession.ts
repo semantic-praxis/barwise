@@ -245,9 +245,15 @@ export class DiagramSession {
         if (this.model.getObjectType(node.id)) elements.push(node.id);
       }
     }
+    const existing = this.model.getDiagramLayout(name);
+    const persistedElements = elements.length === 0
+      && existing?.elements
+      && existing.elements.length > 0
+      ? [...existing.elements]
+      : elements;
     return {
       name,
-      elements,
+      elements: persistedElements,
       positions: this.collectPositions(),
       orientations: this.collectOrientations(),
     };
