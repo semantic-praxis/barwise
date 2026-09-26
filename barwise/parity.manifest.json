@@ -137,6 +137,20 @@
           "field": "version"
         }
       ]
+    },
+    {
+      "name": "create-table-prefix",
+      "why": "the trial generator names the tables it expects with the same CREATE TABLE grammar the importer reads; when they disagreed, the ground truth invented extra_N names and graded a table barwise imported as silently dropped (PR #577 review). The lane may not import a package, so the constant is copied rather than shared",
+      "members": [
+        {
+          "file": "packages/formats/src/ddl/sqlIdentifiers.ts",
+          "symbol": "CREATE_TABLE_PREFIX"
+        },
+        {
+          "file": "trial/lib/generators/ddl.mjs",
+          "symbol": "CREATE_TABLE_PREFIX"
+        }
+      ]
     }
   ]
 }

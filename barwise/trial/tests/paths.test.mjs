@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { staleBundles } from "../lib/paths.mjs";
+import { generationInputs, staleBundles, staleGenerated } from "../lib/paths.mjs";
 
 /**
  * A package directory with src/nested/file.ts, schemas/model.json,
@@ -135,4 +135,58 @@ test("a bundle with no recorded inputs is refused, not trusted", () => {
   const v = staleBundles({ bundles: [f.bundle], roots: [f.pkg], readInputs: () => null });
   assert.equal(v.length, 1);
   assert.match(v[0].why, /no inputs\.json/);
+});
+
+// staleGenerated compares the inputs a tier recorded when it was generated
+// with the inputs on disk now. The first version compared mtimes against
+// the files that exist, so a deleted skin or generator read as current,
+// and run.mjs and paths.mjs were not inputs at all (PR #577 review).
+test("staleGenerated: a changed, added or deleted customer input marks the tier stale", () => {
+  const dir = mkdtempSync(join(tmpdir(), "trial-gen-"));
+  try {
+    mkdirSync(join(dir, "skins"));
+    mkdirSync(join(dir, "generated", "small"), { recursive: true });
+    writeFileSync(join(dir, "customer.yaml"), "id: C99\n");
+    writeFileSync(join(dir, "kernel.orm.yaml"), "model: {}\n");
+    writeFileSync(join(dir, "skins", "a.yaml"), "dialect: ansi\n");
+    const record = () =>
+      writeFileSync(
+        join(dir, "generated", "small", "manifest.json"),
+        JSON.stringify({ inputs: generationInputs(dir) }),
+      );
+
+    record();
+    assert.equal(staleGenerated(dir, "small"), undefined);
+
+    writeFileSync(join(dir, "kernel.orm.yaml"), "model: { name: x }\n");
+    assert.match(staleGenerated(dir, "small"), /generated before .*kernel\.orm\.yaml changed/);
+
+    record();
+    rmSync(join(dir, "skins", "a.yaml"));
+    assert.match(staleGenerated(dir, "small"), /skins\/a\.yaml, which no longer exists/);
+
+    record();
+    writeFileSync(join(dir, "skins", "b.yaml"), "dialect: postgres\n");
+    assert.match(staleGenerated(dir, "small"), /predates .*skins\/b\.yaml/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("staleGenerated: a manifest that recorded no inputs is refused, not trusted", () => {
+  const dir = mkdtempSync(join(tmpdir(), "trial-gen-"));
+  try {
+    mkdirSync(join(dir, "generated", "small"), { recursive: true });
+    writeFileSync(join(dir, "generated", "small", "manifest.json"), JSON.stringify({ hashes: {} }));
+    assert.match(staleGenerated(dir, "small"), /records no generation inputs/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("generationInputs: the orchestration and every generator module are inputs", () => {
+  const files = Object.keys(generationInputs(mkdtempSync(join(tmpdir(), "trial-gen-"))));
+  for (const f of ["trial/lib/run.mjs", "trial/lib/paths.mjs", "trial/lib/generators/ddl.mjs"]) {
+    assert.ok(files.includes(f), `${f} missing from ${files.join(", ")}`);
+  }
 });

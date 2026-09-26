@@ -7,8 +7,9 @@
  * made the same call); it never imports a package. That is why the
  * bundle paths are here and no `@barwise/*` import is anywhere in trial/.
  */
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const TRIAL_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -169,32 +170,64 @@ function bundledPackageDirs() {
 }
 
 /**
- * The input a generated tier is older than, or undefined when the tier is
- * current. `trial:offline` grades the files `trial:generate` last wrote and
- * never regenerates, so a change to a generator -- or to a customer's
- * kernel, skins, transcripts or customer.yaml -- was graded against the
- * previous output with nothing said. On 2026-09-26 a generator fix was "verified" by a run
- * over files written that morning, and the rows it retires still failed.
+ * Every file `trial:generate` reads to produce a tier, keyed by its path
+ * relative to barwise/, with a content hash: the generator modules and what
+ * orchestrates them (`run.mjs`'s `generate()`, `paths.mjs`'s SCALE), and the
+ * customer's customer.yaml, kernel, skins and transcripts. Personas are left
+ * out: they are read when a run grades, not when a tier is generated.
  *
- * The generator modules are the ones `generate()` in run.mjs imports.
- * Personas are left out: they are read when a run grades, not when a tier
- * is generated, so editing one needs no regeneration.
+ * Recorded in the tier's manifest.json by `generate()` and compared by
+ * `staleGenerated`. Content, not mtime, and the set, not only its members,
+ * so a deleted skin or generator reads as a change too (PR #577 review of
+ * the first, mtime-based version).
  */
-export function staleGenerated(customerDir, tier, { stat = statSync } = {}) {
-  const manifest = join(generatedDir(customerDir, tier), "manifest.json");
-  const built = stat(manifest).mtimeMs;
+export function generationInputs(customerDir) {
   const lib = join(TRIAL_DIR, "lib");
-  const inputs = [
-    ...readdirSync(join(lib, "generators")).map((f) => join(lib, "generators", f)),
+  const filesIn = (dir) =>
+    existsSync(dir)
+      ? readdirSync(dir, { withFileTypes: true })
+        .filter((e) => e.isFile())
+        .map((e) => join(dir, e.name))
+      : [];
+  const files = [
+    ...filesIn(join(lib, "generators")),
     join(lib, "model.mjs"),
     join(lib, "prng.mjs"),
+    join(lib, "run.mjs"),
+    join(lib, "paths.mjs"),
     join(customerDir, "customer.yaml"),
     join(customerDir, "kernel.orm.yaml"),
-    ...["skins", "transcripts"].flatMap((d) =>
-      existsSync(join(customerDir, d))
-        ? readdirSync(join(customerDir, d)).map((f) => join(customerDir, d, f))
-        : []
-    ),
-  ];
-  return inputs.find((f) => existsSync(f) && stat(f).mtimeMs > built);
+    ...filesIn(join(customerDir, "skins")),
+    ...filesIn(join(customerDir, "transcripts")),
+  ].filter((f) => existsSync(f));
+  const inputs = {};
+  for (const f of files.sort()) {
+    inputs[relative(BARWISE_DIR, f)] = createHash("sha256").update(readFileSync(f)).digest("hex")
+      .slice(0, 16);
+  }
+  return inputs;
+}
+
+/**
+ * Why a generated tier is not what `trial:generate` would write now, or
+ * undefined when it is. `trial:offline` grades the files the last generate
+ * wrote and never regenerates, so a generator fix was once "verified" by a
+ * run over the previous output, and the rows it retires still failed with
+ * nothing said.
+ */
+export function staleGenerated(customerDir, tier) {
+  const manifest = JSON.parse(
+    readFileSync(join(generatedDir(customerDir, tier), "manifest.json"), "utf8"),
+  );
+  const recorded = manifest.inputs;
+  if (!recorded) return "records no generation inputs, so what it was generated from is unknown";
+  const now = generationInputs(customerDir);
+  for (const [file, hash] of Object.entries(now)) {
+    if (!(file in recorded)) return `predates ${file}`;
+    if (recorded[file] !== hash) return `was generated before ${file} changed`;
+  }
+  for (const file of Object.keys(recorded)) {
+    if (!(file in now)) return `was generated from ${file}, which no longer exists`;
+  }
+  return undefined;
 }

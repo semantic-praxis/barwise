@@ -38,6 +38,7 @@ import { readModel, writeModel } from "./model.mjs";
 import {
   bundlesPresent,
   generatedDir,
+  generationInputs,
   listCustomerDirs,
   resultsPath,
   SCALE,
@@ -200,7 +201,11 @@ export function generate(customer, tier) {
   }
   writeFileSync(
     join(gen, "manifest.json"),
-    JSON.stringify({ customer: customer.id, tier, factor, hashes }, null, 2),
+    JSON.stringify(
+      { customer: customer.id, tier, factor, hashes, inputs: generationInputs(customer.dir) },
+      null,
+      2,
+    ),
   );
   return hashes;
 }
@@ -236,12 +241,10 @@ async function offline(customers, tier, sprints, opts) {
       );
       process.exit(2);
     }
-    const newer = staleGenerated(customer.dir, tier);
-    if (newer) {
+    const stale = staleGenerated(customer.dir, tier);
+    if (stale) {
       console.error(
-        `trial: ${customer.id}'s generated ${tier} tier is older than ${
-          relative(TRIAL_DIR, newer)
-        }; grading it would grade the previous output. Run: npm run trial:generate -- --customer ${customer.id} --tier ${tier}`,
+        `trial: ${customer.id}'s generated ${tier} tier ${stale}; grading it would grade the previous output. Run: npm run trial:generate -- --customer ${customer.id} --tier ${tier}`,
       );
       process.exit(2);
     }

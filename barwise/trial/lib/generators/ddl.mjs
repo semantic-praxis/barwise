@@ -16,6 +16,15 @@
 import { columnName, relationalView, tableName } from "../model.mjs";
 import { hashSeed, prng } from "../prng.mjs";
 
+/**
+ * The CREATE TABLE modifiers the importer reads, up to the table name. A
+ * byte-identical copy of `CREATE_TABLE_PREFIX` in
+ * `packages/formats/src/ddl/sqlIdentifiers.ts`: the lane never imports a
+ * package, so the pair is registered in `parity.manifest.json` instead.
+ */
+const CREATE_TABLE_PREFIX = String
+  .raw`\bCREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:GLOBAL|LOCAL)\s+)?(?:(?:TEMP|TEMPORARY|TRANSIENT|EXTERNAL)\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`;
+
 const TYPE_MAPS = {
   ansi: {
     text: "VARCHAR(255)",
@@ -304,14 +313,11 @@ export function generateDdl(doc, skin, { factor = 1, seed = 1, artifactId = "ddl
     }
   }
   for (const extra of skin.extra_tables ?? []) {
-    // The table modifiers are the ones the importer reads (sqlIdentifiers.ts).
     // A statement that is not a CREATE TABLE -- a skin's CREATE TYPE -- is
     // context, not an expected entity. Both used to become `extra_N`, a name
     // no file contains, so the grader counted it as silently dropped whatever
     // the importer did (C04's TRANSIENT table, C06's two types).
-    const m =
-      /CREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:GLOBAL|LOCAL)\s+)?(?:(?:TEMP|TEMPORARY|TRANSIENT|EXTERNAL)\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)/i
-        .exec(extra);
+    const m = new RegExp(String.raw`${CREATE_TABLE_PREFIX}([^\s(]+)`, "i").exec(extra);
     const rawName = m
       ? m[1].split(".").pop().replace(/[`"\[\]]/g, "")
       : `extra_${manifest.tables.length}`;
