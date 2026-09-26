@@ -118,8 +118,8 @@ export class RelationalMapper {
       // provably gone is the narrowing above: `ot` is an `EntityType`
       // here, whose `referenceMode` is a `string`.
       const pkColName = preferred ? toSnake(preferred.valuePlayer.name) : ot.referenceMode;
-      const pkDataType = preferred
-        ? conceptualTypeToSql(preferred.valuePlayer.dataType)
+      const pkType = preferred
+        ? sqlTypeOf(preferred.valuePlayer.dataType)
         : referenceModePkType(ot, model, fallbackPkType);
       if (preferred && !absorbing) identifyingFactTypeIds.add(preferred.factType.id);
 
@@ -127,7 +127,7 @@ export class RelationalMapper {
         name: toSnake(ot.name),
         columns: absorbing ? [] : [{
           name: pkColName,
-          dataType: pkDataType,
+          ...pkType,
           nullable: false,
           sourceRoleId: preferred?.entityRole.id,
         }],
@@ -230,6 +230,7 @@ export class RelationalMapper {
     pushColumn(table.columns, {
       name: toSnake(ft.name),
       dataType: "BOOLEAN",
+      dataTypeDefaulted: false,
       nullable: true,
       sourceRoleId: role.id,
     });
@@ -365,7 +366,7 @@ export class RelationalMapper {
 
     pushColumn(table.columns, {
       name: toSnake(valuePlayer.name),
-      dataType: conceptualTypeToSql(valuePlayer.dataType),
+      ...sqlTypeOf(valuePlayer.dataType),
       nullable: !isMandatory,
       sourceRoleId: entityRole.id,
       defaultValue: valuePlayer.defaultValue,
@@ -431,7 +432,7 @@ export class RelationalMapper {
       const pkCol = targetTable.columns.find((c) => c.name === pkColName);
       localNames.push(pushColumn(sourceColumns, {
         name: pkColName,
-        dataType: pkCol?.dataType ?? "TEXT",
+        ...copiedKeyType(pkCol),
         nullable,
         sourceRoleId,
       }, disambiguate(pkColName)));
@@ -521,7 +522,7 @@ export class RelationalMapper {
       const pkCol = supertypeTable.columns.find((c) => c.name === supertypeCol);
       sharedCols.push(pushColumn(subtypeTable.columns, {
         name: supertypeCol,
-        dataType: pkCol?.dataType ?? "TEXT",
+        ...copiedKeyType(pkCol),
         nullable: false,
       }, `fk_${supertypeCol}`));
     }
@@ -831,16 +832,36 @@ function strategyToSqlType(strategy: PreferredIdentifierStrategy | undefined): s
  * guess the annotations can report; a borrowed type is a wrong answer
  * that looks declared.
  */
-function referenceModePkType(ot: EntityType, model: OrmModel, fallbackPkType: string): string {
+function referenceModePkType(ot: EntityType, model: OrmModel, fallbackPkType: string): SqlType {
   for (const ft of model.factTypes) {
     if (ft.arity !== 2) continue;
     const vp = findValuePlayer(ft, ot, model);
     if (vp && toSnake(vp.name) === ot.referenceMode) {
-      return conceptualTypeToSql(vp.dataType);
+      return sqlTypeOf(vp.dataType);
     }
   }
 
-  return fallbackPkType;
+  return { dataType: fallbackPkType, dataTypeDefaulted: true };
+}
+
+/** A column's SQL type, and whether it was declared or a fallback. */
+type SqlType = Pick<Column, "dataType" | "dataTypeDefaulted">;
+
+/** The SQL type of a declared data type; defaulted when none is declared. */
+function sqlTypeOf(dataType: DataTypeDef | undefined): SqlType {
+  return { dataType: conceptualTypeToSql(dataType), dataTypeDefaulted: dataType === undefined };
+}
+
+/**
+ * A foreign-key column's type: the referenced key column's, defaulted
+ * exactly when that key's was. A missing key column is unreachable by
+ * construction (the FK is built from the key's own column names), and
+ * gets the TEXT fallback it always had.
+ */
+function copiedKeyType(pkCol: Column | undefined): SqlType {
+  return pkCol
+    ? { dataType: pkCol.dataType, dataTypeDefaulted: pkCol.dataTypeDefaulted }
+    : { dataType: "TEXT", dataTypeDefaulted: true };
 }
 
 /**

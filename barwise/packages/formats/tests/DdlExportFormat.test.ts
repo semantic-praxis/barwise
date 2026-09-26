@@ -134,7 +134,9 @@ describe("DdlExportFormat", () => {
       const result = ddlFormat.export(model, { annotate: true });
 
       // Column-level TODO for defaulted TEXT type.
-      expect(result.text).toContain("-- TODO(barwise): Data type defaulted to TEXT");
+      expect(result.text).toContain(
+        "-- TODO(barwise): Data type was not declared; exported as TEXT",
+      );
     });
 
     it("injects NOTE for value constraints", () => {

@@ -228,6 +228,103 @@ describe("ExportAnnotationCollector", () => {
     });
   });
 
+  // dbt-key-type-fidelity.spec.md, WS3: each TODO fires only on the gap
+  // it names, and no message names an export format.
+  describe("only real gaps (WS3)", () => {
+    /** Customer identified by a typed, defined CustomerId; Order references it. */
+    function identifiedModel() {
+      return new ModelBuilder("Identified")
+        .withEntityType("Customer", { referenceMode: "customer_id", definition: "A buyer." })
+        .withEntityType("Order", { referenceMode: "order_id", definition: "A purchase." })
+        .withValueType("CustomerId", { dataType: { name: "integer" }, definition: "Customer key." })
+        .withValueType("OrderId", { dataType: { name: "integer" }, definition: "Order key." })
+        .withValueType("CustomerName", { dataType: { name: "text" }, definition: "Full name." })
+        .withBinaryFactType("Customer has CustomerId", {
+          role1: { player: "Customer", name: "has" },
+          role2: { player: "CustomerId", name: "is of" },
+          uniqueness: "role2",
+          isPreferred: true,
+        })
+        .withBinaryFactType("Order has OrderId", {
+          role1: { player: "Order", name: "has" },
+          role2: { player: "OrderId", name: "is of" },
+          uniqueness: "role2",
+          isPreferred: true,
+        })
+        .withBinaryFactType("Customer has CustomerName", {
+          role1: { player: "Customer", name: "has" },
+          role2: { player: "CustomerName", name: "is of" },
+          uniqueness: "role1",
+        })
+        .withBinaryFactType("Order is placed by Customer", {
+          role1: { player: "Order", name: "is placed by" },
+          role2: { player: "Customer", name: "places" },
+          uniqueness: "role1",
+          mandatory: "role1",
+        })
+        .build();
+    }
+
+    it("emits no TODO on a column whose type and definition are declared", () => {
+      // Includes a declared `text` with no length, which renders as TEXT and
+      // used to be reported as defaulted, and the FK order.customer_id,
+      // which is described by the identifier it copies.
+      const model = identifiedModel();
+      const todos = collectExportAnnotations(model, mapper.map(model))
+        .filter((a) => a.severity === "todo" && a.columnName);
+      expect(todos).toEqual([]);
+    });
+
+    it("reports a defaulted key typed by the identifier strategy, with the type used", () => {
+      const model = new ModelBuilder("Strategy")
+        .withEntityType("Customer", { referenceMode: "customer_id" })
+        .build();
+      const schema = mapper.map(model, { preferredIdentifierStrategy: "integer" });
+      const todo = collectExportAnnotations(model, schema).find(
+        (a) => a.columnName === "customer_id" && a.category === "data_type",
+      );
+      expect(todo?.message).toBe(
+        "Data type was not declared; exported as INTEGER. Add a data type to the value type.",
+      );
+    });
+
+    it("reports a foreign key as defaulted exactly when the key it copies was", () => {
+      const model = new ModelBuilder("DefaultedKey")
+        .withEntityType("Customer", { referenceMode: "customer_id" })
+        .withEntityType("Order", { referenceMode: "order_id" })
+        .withBinaryFactType("Order is placed by Customer", {
+          role1: { player: "Order", name: "is placed by" },
+          role2: { player: "Customer", name: "places" },
+          uniqueness: "role1",
+        })
+        .build();
+      const schema = mapper.map(model);
+      const orderTable = schema.tables.find((t) => t.name === "order")!;
+      const fk = orderTable.foreignKeys[0]!.columnNames[0]!;
+      expect(orderTable.columns.find((c) => c.name === fk)?.dataTypeDefaulted).toBe(true);
+
+      const typed = identifiedModel();
+      const typedOrder = mapper.map(typed).tables.find((t) => t.name === "order")!;
+      const typedFk = typedOrder.foreignKeys[0]!.columnNames[0]!;
+      expect(typedOrder.columns.find((c) => c.name === typedFk)?.dataTypeDefaulted).toBe(false);
+    });
+
+    it("names no export format in any message", () => {
+      const model = new ModelBuilder("Gaps")
+        .withEntityType("Customer", { referenceMode: "customer_id" })
+        .withValueType("Status")
+        .withBinaryFactType("Customer has Status", {
+          role1: { player: "Customer", name: "has" },
+          role2: { player: "Status", name: "is of" },
+          uniqueness: "role1",
+        })
+        .build();
+      const messages = collectExportAnnotations(model, mapper.map(model)).map((a) => a.message);
+      expect(messages.length).toBeGreaterThan(0);
+      for (const m of messages) expect(m).not.toMatch(/dbt|yaml|ddl|openapi|avro/i);
+    });
+  });
+
   describe("empty model", () => {
     it("returns no annotations for a model with no entity types", () => {
       const model = new ModelBuilder("Test").build();

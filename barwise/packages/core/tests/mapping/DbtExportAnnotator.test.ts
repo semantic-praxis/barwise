@@ -114,7 +114,9 @@ describe("DbtExportAnnotator", () => {
       );
       expect(textTodo).toBeDefined();
       expect(textTodo!.severity).toBe("todo");
-      expect(result.schemaYaml).toContain("# TODO(barwise): Data type defaulted to TEXT");
+      expect(result.schemaYaml).toContain(
+        "# TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type. Or set it in the dbt YAML.",
+      );
     });
 
     it("does not flag columns with explicit data types", () => {

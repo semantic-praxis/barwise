@@ -74,7 +74,14 @@ export function collectAnnotationMap(
     const elementId = tableSource.get(a.tableName);
     if (!elementId) continue;
     const list = byElement.get(elementId) ?? [];
-    list.push(`TODO(barwise): ${a.message}`);
+    // A column-level line names its column: one entity can carry the
+    // same gap on several columns, and the panel otherwise showed the
+    // identical line once per column with nothing to tell them apart.
+    list.push(
+      a.columnName
+        ? `TODO(barwise): ${a.columnName}: ${a.message}`
+        : `TODO(barwise): ${a.message}`,
+    );
     byElement.set(elementId, list);
   }
   return byElement;

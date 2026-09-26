@@ -711,11 +711,11 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
               },
               {
                 "severity": "todo",
-                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           },
@@ -724,11 +724,11 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
               },
               {
                 "severity": "todo",
-                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           },
@@ -737,11 +737,11 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
               },
               {
                 "severity": "todo",
-                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           }
@@ -752,7 +752,7 @@
         "x-barwise-annotations": [
           {
             "severity": "todo",
-            "message": "No model description. Add a definition to the ORM entity type or edit the dbt YAML."
+            "message": "No model description. Add a definition to the entity type."
           }
         ]
       },
@@ -764,11 +764,11 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
               },
               {
                 "severity": "todo",
-                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           }
@@ -779,7 +779,7 @@
         "x-barwise-annotations": [
           {
             "severity": "todo",
-            "message": "No model description. Add a definition to the ORM entity type or edit the dbt YAML."
+            "message": "No model description. Add a definition to the entity type."
           }
         ]
       },
@@ -791,11 +791,11 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
               },
               {
                 "severity": "todo",
-                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           }
@@ -806,7 +806,7 @@
         "x-barwise-annotations": [
           {
             "severity": "todo",
-            "message": "No model description. Add a definition to the ORM entity type or edit the dbt YAML."
+            "message": "No model description. Add a definition to the entity type."
           }
         ]
       },
@@ -818,11 +818,11 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
               },
               {
                 "severity": "todo",
-                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           },
@@ -831,11 +831,11 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
               },
               {
                 "severity": "todo",
-                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           }
@@ -847,7 +847,7 @@
         "x-barwise-annotations": [
           {
             "severity": "todo",
-            "message": "No model description. Add a definition to the ORM entity type or edit the dbt YAML."
+            "message": "No model description. Add a definition to the entity type."
           }
         ]
       },
@@ -859,11 +859,11 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
               },
               {
                 "severity": "todo",
-                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           },
@@ -872,11 +872,11 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
               },
               {
                 "severity": "todo",
-                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           }

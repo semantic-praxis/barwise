@@ -201,7 +201,9 @@ describe("OpenApiExportFormat", () => {
         message: string;
       }>;
       const textTodo = colAnnotations.find(
-        (a) => a.severity === "todo" && a.message.includes("Data type defaulted to TEXT"),
+        (a) =>
+          a.severity === "todo"
+          && a.message.includes("Data type was not declared; exported as TEXT"),
       );
       expect(textTodo).toBeDefined();
     });

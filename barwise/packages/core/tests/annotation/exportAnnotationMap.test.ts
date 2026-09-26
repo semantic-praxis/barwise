@@ -54,6 +54,17 @@ describe("collectAnnotationMap", () => {
     expect(entries!.some((m) => m.startsWith("TODO(barwise):"))).toBe(true);
   });
 
+  it("names the column on a column-level line", () => {
+    // CustomerName has no data type, so customer_name carries the
+    // defaulted-type TODO; the line must say which column it is about.
+    const model = modelWithGap();
+    const customer = model.getObjectTypeByName("Customer")!;
+    const entries = collectAnnotationMap(model).get(customer.id) ?? [];
+    expect(entries).toContain(
+      "TODO(barwise): customer_name: Data type was not declared; exported as TEXT. Add a data type to the value type.",
+    );
+  });
+
   it("excludes note-severity annotations", () => {
     // Give the entity a definition: the description gap flips from a
     // table-level todo to an informational note, which must not mark

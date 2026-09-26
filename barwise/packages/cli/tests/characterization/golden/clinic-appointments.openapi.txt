@@ -846,22 +846,10 @@
         "type": "object",
         "properties": {
           "medical_record_number": {
-            "type": "string",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "type": "string"
           },
           "provider_id": {
-            "$ref": "#/components/schemas/Doctor",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "$ref": "#/components/schemas/Doctor"
           }
         },
         "required": [
@@ -879,21 +867,11 @@
         "type": "object",
         "properties": {
           "provider_id": {
-            "type": "string",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "type": "string"
           },
           "specialty": {
             "type": "string",
             "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              },
               {
                 "severity": "note",
                 "message": "Value constraint available: ['cardiology', 'dermatology', 'family medicine', 'orthopedics', 'pediatrics']. Consider adding an accepted_values test."
@@ -916,31 +894,15 @@
         "type": "object",
         "properties": {
           "confirmation_number": {
-            "type": "string",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "type": "string"
           },
           "visit_reason": {
             "type": "string",
-            "nullable": true,
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "nullable": true
           },
           "appointment_status": {
             "type": "string",
             "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              },
               {
                 "severity": "note",
                 "message": "Value constraint available: ['scheduled', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show']. Consider adding an accepted_values test."
@@ -949,13 +911,7 @@
           },
           "follow_up_note": {
             "type": "string",
-            "nullable": true,
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "nullable": true
           }
         },
         "required": [
@@ -973,13 +929,7 @@
         "type": "object",
         "properties": {
           "room_number": {
-            "type": "string",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "type": "string"
           }
         },
         "required": [
@@ -996,31 +946,13 @@
         "type": "object",
         "properties": {
           "confirmation_number": {
-            "$ref": "#/components/schemas/Appointment",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "$ref": "#/components/schemas/Appointment"
           },
           "medical_record_number": {
-            "$ref": "#/components/schemas/Patient",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "$ref": "#/components/schemas/Patient"
           },
           "provider_id": {
-            "$ref": "#/components/schemas/Doctor",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "$ref": "#/components/schemas/Doctor"
           }
         },
         "required": [
@@ -1039,22 +971,10 @@
         "type": "object",
         "properties": {
           "provider_id": {
-            "$ref": "#/components/schemas/Doctor",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "$ref": "#/components/schemas/Doctor"
           },
           "room_number": {
-            "$ref": "#/components/schemas/ExamRoom",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "$ref": "#/components/schemas/ExamRoom"
           }
         },
         "required": [

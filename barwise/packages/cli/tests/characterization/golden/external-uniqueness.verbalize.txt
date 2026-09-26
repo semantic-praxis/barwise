@@ -6,9 +6,9 @@ Room has RoomNumber
 RoomNumber numbers Room
   Each Room has at most one RoomNumber.
 == Open questions ==
-[room] No model description. Add a definition to the ORM entity type or edit the dbt YAML.
-[room.room_id] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
-[room.building_code] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
-[room.room_number] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
-[building] No model description. Add a definition to the ORM entity type or edit the dbt YAML.
-[building.building_code] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+[room] No model description. Add a definition to the entity type.
+[room.room_id] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[room.building_code] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[room.room_number] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[building] No model description. Add a definition to the entity type.
+[building.building_code] Data type was not declared; exported as TEXT. Add a data type to the value type.

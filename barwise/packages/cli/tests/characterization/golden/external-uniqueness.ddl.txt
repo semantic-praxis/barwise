@@ -1,15 +1,15 @@
 -- Table: room
 -- Source: Room (ot-room)
--- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+-- TODO(barwise): No model description. Add a definition to the entity type.
 CREATE TABLE room (
-  -- TODO(barwise): No column description. Add one to the dbt YAML.
-  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  -- TODO(barwise): No column description. Add a definition to the value type.
+  -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
   room_id TEXT NOT NULL,
-  -- TODO(barwise): No column description. Add one to the dbt YAML.
-  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  -- TODO(barwise): No column description. Add a definition to the value type.
+  -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
   building_code TEXT,
-  -- TODO(barwise): No column description. Add one to the dbt YAML.
-  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  -- TODO(barwise): No column description. Add a definition to the value type.
+  -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
   room_number TEXT,
   PRIMARY KEY (room_id),
   FOREIGN KEY (building_code) REFERENCES building (building_code),
@@ -18,10 +18,10 @@ CREATE TABLE room (
 
 -- Table: building
 -- Source: Building (ot-building)
--- TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.
+-- TODO(barwise): No model description. Add a definition to the entity type.
 CREATE TABLE building (
-  -- TODO(barwise): No column description. Add one to the dbt YAML.
-  -- TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+  -- TODO(barwise): No column description. Add a definition to the value type.
+  -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
   building_code TEXT NOT NULL,
   PRIMARY KEY (building_code)
 );

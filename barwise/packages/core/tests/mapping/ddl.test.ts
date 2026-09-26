@@ -38,7 +38,12 @@ describe("DDL renderer", () => {
       tables: [
         {
           name: "log_entry",
-          columns: [{ name: "message", dataType: "TEXT", nullable: false }],
+          columns: [{
+            name: "message",
+            dataType: "TEXT",
+            dataTypeDefaulted: false,
+            nullable: false,
+          }],
           primaryKey: { columnNames: [] },
           foreignKeys: [],
           sourceElementId: "ft-log-entry",
@@ -55,7 +60,7 @@ describe("DDL renderer", () => {
       tables: [
         {
           name: "Customer Table",
-          columns: [{ name: "id", dataType: "TEXT", nullable: false }],
+          columns: [{ name: "id", dataType: "TEXT", dataTypeDefaulted: false, nullable: false }],
           primaryKey: { columnNames: ["id"] },
           foreignKeys: [],
           sourceElementId: "ot-customer",
