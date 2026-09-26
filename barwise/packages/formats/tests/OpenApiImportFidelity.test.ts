@@ -6,7 +6,8 @@
  * it asserts that some uniqueness or mandatory exists. These assert the
  * role, by its player, as DdlImportFidelity.test.ts does for DDL.
  */
-import type { Constraint, FactType, OrmModel } from "@barwise/core";
+import { type Constraint, type FactType, type OrmModel, ValidationEngine } from "@barwise/core";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { DdlExportFormat } from "../src/ddl/DdlExportFormat.js";
 import { OpenApiImportFormat } from "../src/openapi/OpenApiImportFormat.js";
@@ -153,5 +154,23 @@ describe("the acceptance round trip through DDL export", () => {
       "  FOREIGN KEY (fk_id) REFERENCES customer (id)",
       ");",
     ].join("\n"));
+  });
+});
+
+describe("schemas that share a property name import as a valid model (barwise-lh9)", () => {
+  // The trial's reproduction, moved here when the fix landed
+  // (trial/README.md). Role ids used to be built as
+  // `<schema uuid>-<property>-role`, so two schemas with a `related`
+  // property collided and every imported model failed
+  // structural/duplicate-role-id. #563 mints them through generateId.
+  it("validates with no errors", () => {
+    const input = readFileSync(
+      new URL("./fixtures/openapi-shared-property-names.json", import.meta.url),
+      "utf8",
+    );
+    const { model } = importer.parse(input);
+    expect(model.objectTypes.filter((o) => o.kind === "entity").map((o) => o.name).sort())
+      .toEqual(["Patient", "Payer", "Provider"]);
+    expect(new ValidationEngine().errors(model)).toEqual([]);
   });
 });
