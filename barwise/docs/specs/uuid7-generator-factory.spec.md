@@ -8,8 +8,9 @@ Tracking: barwise-1071
 
 The UUIDv7 generator's logic moves into `@barwise/core` as a factory,
 `createUuidv7Generator({ now, randomBytes })`, and each surface installs it
-with one line. Core still never reads a clock or a random source: it calls
-the functions a surface hands it. The three byte-identical copies of
+with one line. The factory reads no clock or random source of its own: it
+calls only the functions a surface hands it. (Core's existing v4 fallback in
+`generateId()`, `randomUUID()`, is unchanged and out of scope.) The three byte-identical copies of
 `installUuidv7IdGenerator` in the CLI, MCP server and VS Code extension, and
 the parity-manifest entry that keeps them identical, go away. The same-
 millisecond ordering, today tested only by whatever the real clock happens
@@ -45,17 +46,37 @@ receives `now` and `randomBytes` contains none of them.
 
 **A latent edge the current tests cannot reach.** The counter is masked to
 12 bits (`& 0xfff`), so the 4,097th id in one millisecond wraps to 0 and
-sorts before the 4,096th. Measured on a web container: a tight
-`generateId()` loop peaks at 236 ids in one millisecond (32,049 ids over
-200 ms, none out of order), so the wrap is not reachable today. RFC 9562
+sorts before the 4,096th. One run on a web container (Node 26.7.0), from
+`barwise/` after `npm run build`:
+
+```sh
+node --input-type=module -e '
+const core = await import("./packages/core/dist/index.js");
+const { installUuidv7IdGenerator } = await import("./packages/cli/dist/workspace/idGenerator.js");
+installUuidv7IdGenerator();
+const ids = []; const t0 = Date.now();
+while (Date.now() - t0 < 200) ids.push(core.generateId());
+const perMs = new Map();
+for (const id of ids) perMs.set(id.slice(0, 13), (perMs.get(id.slice(0, 13)) ?? 0) + 1);
+let back = 0; for (let i = 1; i < ids.length; i++) if (ids[i] < ids[i - 1]) back++;
+console.log({ total: ids.length, busiestMs: Math.max(...perMs.values()), outOfOrderPairs: back });'
+```
+
+printed `{ total: 32049, busiestMs: 236, outOfOrderPairs: 0 }`. In that run the
+busiest millisecond held 236 ids, about 17 times short of the wrap. That is
+one observation of one machine, not a bound: a faster `randomBytes` or a
+future batch path could get closer. RFC 9562
 section 6.2 says what to do on counter overflow: advance the timestamp.
 The factory does that, and a fake clock that never moves tests it.
 
 ## Requirements
 
 - **R1.** Core shall export `createUuidv7Generator({ now, randomBytes })`,
-  returning an `IdGenerator`. It shall call `now()` and `randomBytes(10)` and
-  nothing else ambient, so `check:core-purity` stays green.
+  returning an `IdGenerator`. The returned generator shall call `now()` once
+  and `randomBytes(10)` once for every id it mints -- never once at
+  construction with the result reused -- and shall call nothing else
+  ambient, so `check:core-purity` stays green and every id carries fresh
+  randomness.
 - **R2.** When two ids are minted in the same millisecond, the second shall
   sort after the first; when more than 4,096 are minted in one millisecond,
   the generator shall advance the timestamp it encodes rather than wrap the
@@ -113,7 +134,14 @@ A single workstream: small, and the parts only make sense together.
    source: v7 shape and exact bytes for a fixed input; same-millisecond
    ordering; 5,000 ids on a clock that never moves still sort (R2); a
    clock that steps back 10 ms still sorts (R3); two generators do not
-   share a counter.
+   share a counter; a byte source that records its calls shows one
+   `randomBytes(10)` per id (R1).
+   In the same change, update the contract in `core/src/model/id.ts` (the
+   module docblock says fresh ids "embed their creation time"): under R2's
+   overflow and R3's rollback the encoded timestamp is a logical one -- the
+   last timestamp used, advanced -- not the wall clock at mint time. The
+   docs must say ids sort in mint order and approximate creation time, not
+   that they record it exactly.
 2. Replace the three installers with the one-line call at each entry point
    (`cli/src/index.ts`, `mcp/src/index.ts`, `vscode/src/client/extension.ts`),
    delete the three `idGenerator.ts` files and the two surface tests that
@@ -129,17 +157,26 @@ A single workstream: small, and the parts only make sense together.
   counter starts at 1 and fills `rand_b` differently, so every regenerated
   reference file would change bytes. **Recommendation:** leave it; it is a
   fixture policy with a different purpose, not a fourth copy of this one.
-- **D2. Keep a named `installUuidv7IdGenerator()` in core** as a
-  convenience? It would have to import `node:crypto` and call `Date.now`,
-  which the purity gate forbids. **Recommendation:** no; the one-line call
-  at each surface is the point.
+- **D2. Keep a named installer in core** as a convenience, for example
+  `installUuidv7IdGenerator(sources)`? It could take `Uuidv7Sources` and
+  stay pure. **Recommendation:** no. It would be exactly
+  `setIdGenerator(createUuidv7Generator(sources))` under another name --
+  a second interface to learn that hides nothing, the shallow-module case
+  CLAUDE.md names.
 
 ## Risks and testing
 
 - Id format is unchanged for the same inputs (`uuidv7FromParts` does not
-  change), so existing models and history are unaffected; only R2 and R3
-  change behaviour, and only in cases the measurement above shows are not
-  reached today.
+  change), so existing models and history are unaffected.
+- **R2 and R3 are behaviour changes, and R3's case does happen.** R2 fires
+  only past 4,096 ids in a millisecond, which the one run above did not
+  approach. R3 is different: NTP corrections, manual clock changes, and VM
+  suspend/resume all step the wall clock back, and nothing measured here
+  says how often. Today such a step makes the next id sort before earlier
+  ones; after this change it sorts after them, with an encoded time up to
+  the size of the step later than the wall clock. That trade -- mint order
+  kept, embedded time approximate -- is the one RFC 9562 section 6.2
+  describes, and the workstream's docblock update states it.
 - `npm run check:core-purity` must stay green; `npm run check:parity` must
   pass with the set removed.
 - Build from `barwise/` before per-package type checks: the change crosses
