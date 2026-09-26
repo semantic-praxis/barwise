@@ -1,6 +1,6 @@
 # One UUIDv7 generator, built in core from an injected clock
 
-Status: Draft -- no workstream implemented
+Status: Implemented -- both workstreams landed together
 
 Created: 2026-09-26
 Last-updated: 2026-09-26
@@ -181,6 +181,26 @@ A single workstream: small, and the parts only make sense together.
   pass with the set removed.
 - Build from `barwise/` before per-package type checks: the change crosses
   from core into three packages.
+
+## Implementation notes
+
+- **The VS Code wiring test needed a stand-in editor, not a real one.**
+  The integration suite runs in a real editor but not in CI, so it could
+  not be the guard. `vscode/tests/unit/activateIdGenerator.test.ts`
+  mocks `vscode`, the language client and `@vscode/chat-extension-utils`
+  (a CommonJS dependency that `require`s `vscode` itself) with an inert
+  proxy, runs the real `activate()`, and reads the result through
+  `generateId()`. The module stand-in answers `has` for every key,
+  because vitest checks each named import against the mock.
+- **The CLI wiring test spawns the built binary.** The CLI rule is that
+  command tests go through `runCli`, but `runCli` never executes
+  `src/index.ts`, which is the file under test here. The MCP test reuses
+  the existing stdio spawn in `serverSpawn.test.ts`.
+- **Mutation checks, run by hand.** Restoring the old counter logic (wrap
+  at 4,096, reset on a backward step) fails exactly the R2 overflow test
+  and the R3 test in core. Removing the install line from each of the
+  three entry points, with the rest of the file compiling, fails that
+  surface's wiring test and nothing else.
 
 ## Non-goals
 

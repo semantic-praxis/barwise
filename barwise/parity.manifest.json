@@ -2,15 +2,6 @@
   "$comment": "Declared must-agree copies, checked byte-for-byte by scripts/check-parity.mjs (npm run check:parity; CI runs it). Each entry keeps a deliberately-parallel pair honest: DRY stays secondary, agreement becomes loud. Add a copy that must agree with existing code here (or share/derive/drift-test it) in the same commit that creates it; retire an entry only together with the shared owner or behavioral test that replaces it. Spec: docs/specs/duplication-drift-guards.spec.md.",
   "sets": [
     {
-      "name": "surface-id-generator",
-      "why": "UUIDv7 ids from all three surfaces land in the same model files and must sort consistently; the packages deliberately do not import each other",
-      "members": [
-        "packages/cli/src/workspace/idGenerator.ts",
-        "packages/mcp/src/workspace/idGenerator.ts",
-        "packages/vscode/src/client/idGenerator.ts"
-      ]
-    },
-    {
       "name": "sqlglot-bridge",
       "why": "the same SQL must parse the same way whichever connector asks; each connector owns its subprocess I/O by design, so the bridge is deliberately parallel (headers differ, everything else may not)",
       "ignore": "leading-docblock",

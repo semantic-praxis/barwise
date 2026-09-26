@@ -1,4 +1,10 @@
-import { isScopedView, OrmYamlSerializer } from "@barwise/core";
+import {
+  createUuidv7Generator,
+  isScopedView,
+  OrmYamlSerializer,
+  setIdGenerator,
+} from "@barwise/core";
+import { randomBytes } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
@@ -21,12 +27,11 @@ import { setAnthropicApiKey } from "../llm/anthropicKey.js";
 import { registerMcpServerProvider } from "../mcp/McpServerProvider.js";
 import { registerLanguageModelTools } from "../mcp/ToolRegistration.js";
 import { ModelTreeProvider } from "../sidebar/ModelTreeProvider.js";
-import { installUuidv7IdGenerator } from "./idGenerator.js";
 
 let client: LanguageClient;
 
 export function activate(context: vscode.ExtensionContext): void {
-  installUuidv7IdGenerator();
+  setIdGenerator(createUuidv7Generator({ now: Date.now, randomBytes }));
 
   // Start language server.
   const serverModule = context.asAbsolutePath(
