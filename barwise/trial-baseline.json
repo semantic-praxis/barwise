@@ -1,19 +1,5 @@
 {
   "findings": {
-    "C01/small/1/import:clarity-ddl": {
-      "severity": "S3",
-      "class": "sql-importer-fk-targets",
-      "issue": "barwise-jjd",
-      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
-      "detail": "exit 0 and an empty model for a format barwise does not read (sqlserver); the refusal is invisible"
-    },
-    "C01/small/1/import:clarity-ddl-regex": {
-      "severity": "S3",
-      "class": "ddl-regex-importer",
-      "issue": "barwise-zuk",
-      "note": "import model --format ddl is a single regex; schema-qualified, bracket-quoted, backtick-quoted and unterminated statements do not match and the only warning claims the file has no CREATE TABLE at all (barwise-zuk).",
-      "detail": "exit 0 and an empty model from an artifact with 65 expected names; the only signal is 1 warning(s): - No CREATE TABLE statements found in input"
-    },
     "C01/small/1/model-roundtrip:dbt": {
       "severity": "S1",
       "class": "dbt-roundtrip",
@@ -42,19 +28,19 @@
       "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-a0h).",
       "detail": "163 delta(s) outside the declared loss set: modified object_type SpecimenType; modified object_type PatientId; modified object_type MedicalRecordNumber; modified object_type NationalProviderIdentifier; modified object_type PayerId; modified object_type FacilityCode; modified object_type DepartmentId"
     },
+    "C01/small/1/roundtrip-diff:clarity-ddl-regex": {
+      "severity": "S1",
+      "class": "ddl-regex-roundtrip",
+      "issue": "barwise-dnm",
+      "note": "Consequence of barwise-dnm: the DDL export of the imported model does not read back to the same model -- value types and fact types are lost beyond the declared loss set. Closes with the parent.",
+      "detail": "616 delta(s) outside the declared loss set: modified object_type ZcPreferredLanguage; modified object_type ZcProvspecialty; modified object_type ZcEnctype; modified object_type ZcTriageAcuity; modified object_type ZcTraumaActivationLevel; modified object_type ZcDischdisp; modified object_type ZcOrde"
+    },
     "C01/small/1/roundtrip-diff:fhir-openapi": {
       "severity": "S1",
       "class": "openapi-export-comment-header",
       "issue": "barwise-sxh",
       "note": "The default OpenAPI export writes a /* comment */ header when the model has diagnostics (which it always has after barwise-lh9), so the .json is not JSON and the importer returns an empty model with exit 0 (barwise-sxh).",
       "detail": "145 delta(s) outside the declared loss set: removed object_type Patient; removed object_type Provider; removed object_type Payer; removed object_type Facility; removed object_type Department; removed object_type Encounter; removed object_type InpatientEncounter; removed object_type OutpatientEncount"
-    },
-    "C01/small/4.5/late:impact-id": {
-      "severity": "S1",
-      "class": "lineage-impact-no-sources",
-      "issue": "barwise-ofb",
-      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
-      "detail": "lineage impact reports no affected artifacts for ot-discharge-disposition, which the DDL exported before the change renders"
     },
     "C01/small/4.5/late:impact-name": {
       "severity": "S1",
@@ -66,8 +52,8 @@
     "C01/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "111 delta(s) outside the declared loss set: modified object_type Patient; modified object_type Provider; modified object_type Payer; modified object_type Facility; modified object_type Department; modified object_type Encounter; modified object_type InpatientEncounter; removed object_type Outpatient"
     },
     "C01/small/4/read-back:avro": {
@@ -98,20 +84,6 @@
       "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
       "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
     },
-    "C02/small/1/import:core-ddl": {
-      "severity": "S1",
-      "class": "sql-importer-fk-targets",
-      "issue": "barwise-jjd",
-      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
-      "detail": "exit 0 and 19 object types from a oracle artifact barwise does not support; nothing says which statements were understood"
-    },
-    "C02/small/1/import:regmart-ddl": {
-      "severity": "S1",
-      "class": "sql-importer-fk-targets",
-      "issue": "barwise-jjd",
-      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
-      "detail": "exit 0 but 5 of 18 expected names are absent from the model and 5 of them are not mentioned on stderr (28% silently dropped)"
-    },
     "C02/small/1/model-roundtrip:dbt": {
       "severity": "S1",
       "class": "dbt-roundtrip",
@@ -140,26 +112,12 @@
       "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-a0h).",
       "detail": "151 delta(s) outside the declared loss set: modified object_type PartyId; modified object_type LegalName; modified object_type TaxIdentifier; modified object_type KycStatus; modified object_type KycScreeningDate; modified object_type DateOfBirth; modified object_type GivenName; modified object_type "
     },
-    "C02/small/1/roundtrip-diff:core-ddl": {
-      "severity": "S1",
-      "class": "sql-importer-fk-targets-roundtrip",
-      "issue": "barwise-jjd",
-      "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
-      "detail": "19 delta(s) outside the declared loss set: removed object_type Cbs.party; removed object_type Cbs.prod; removed object_type Cbs.brch; removed object_type Cbs.ccy; removed object_type Cbs.loanAcct; removed object_type Cbs.generalLedgerAcct; removed object_type Cbs.depAcct; removed object_type Cbs.leg"
-    },
     "C02/small/1/roundtrip-diff:regmart-ddl": {
       "severity": "S1",
-      "class": "sql-importer-fk-targets-roundtrip",
-      "issue": "barwise-jjd",
-      "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "class": "sql-import-roundtrip",
+      "issue": "barwise-dnm",
+      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
       "detail": "18 delta(s) outside the declared loss set: removed object_type Party; removed object_type Product; removed object_type Branch; removed object_type Currency; removed object_type LoanAccount; removed object_type GeneralLedgerAccount; removed object_type DepositAccount; removed object_type LegalEntity"
-    },
-    "C02/small/4.5/late:impact-id": {
-      "severity": "S1",
-      "class": "lineage-impact-no-sources",
-      "issue": "barwise-ofb",
-      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
-      "detail": "lineage impact reports no affected artifacts for ot-transaction-type, which the DDL exported before the change renders"
     },
     "C02/small/4.5/late:impact-name": {
       "severity": "S1",
@@ -171,15 +129,15 @@
     "C02/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "114 delta(s) outside the declared loss set: modified object_type Party; modified object_type LegalEntity; modified object_type NaturalPerson; removed object_type PartyId; removed object_type LegalName; removed object_type TaxIdentifier; modified object_type KycStatus; removed object_type KycScreenin"
     },
     "C02/small/4/read-back-diff-ddl:postgres": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "114 delta(s) outside the declared loss set: modified object_type Party; modified object_type LegalEntity; modified object_type NaturalPerson; removed object_type PartyId; removed object_type LegalName; removed object_type TaxIdentifier; modified object_type KycStatus; removed object_type KycScreenin"
     },
     "C02/small/4/read-back:avro": {
@@ -192,16 +150,9 @@
     "C02/small/6/acceptance:bank-data-architect:regmart-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
       "detail": "2 of 7 persona checks fail: The model has no fact type connecting \"Transaction\" and \"GeneralLedgerAccount\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Party holds DepositAccount\"), so it cannot rule out: Rules out: two facts of Party holds DepositAccount"
-    },
-    "C02/small/6/acceptance:core-banking-dba:core-ddl": {
-      "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
-      "detail": "4 of 5 persona checks fail: The model has no object type named \"Transaction\".; The model has no object type named \"Branch\".; The model has no object type named \"Currency\".; The model has no fact type connecting \"DepositAccount\" and \"Branch\"."
     },
     "C02/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -209,13 +160,6 @@
       "issue": "barwise-fbi",
       "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
       "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
-    },
-    "C03/small/1/import:pc-ddl": {
-      "severity": "S1",
-      "class": "sql-importer-fk-targets",
-      "issue": "barwise-jjd",
-      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
-      "detail": "exit 0 but 15 of 28 expected names are absent from the model and 15 of them are not mentioned on stderr (54% silently dropped)"
     },
     "C03/small/1/model-roundtrip:dbt": {
       "severity": "S1",
@@ -254,17 +198,10 @@
     },
     "C03/small/1/roundtrip-diff:pc-ddl": {
       "severity": "S1",
-      "class": "sql-importer-fk-targets-roundtrip",
-      "issue": "barwise-jjd",
-      "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "class": "sql-import-roundtrip",
+      "issue": "barwise-dnm",
+      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
       "detail": "13 delta(s) outside the declared loss set: removed object_type PcContact; removed object_type PcAccount; removed object_type PcProducer; removed object_type PcPolicyPeriod; removed object_type PcRisk; removed object_type PcVehicleRisk; removed object_type PcAdjuster; removed object_type PcClaim"
-    },
-    "C03/small/4.5/late:impact-id": {
-      "severity": "S1",
-      "class": "lineage-impact-no-sources",
-      "issue": "barwise-ofb",
-      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
-      "detail": "lineage impact reports no affected artifacts for ot-claim, which the DDL exported before the change renders"
     },
     "C03/small/4.5/late:impact-name": {
       "severity": "S1",
@@ -276,15 +213,15 @@
     "C03/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "122 delta(s) outside the declared loss set: modified object_type Contact; removed object_type Person; removed object_type Company; modified object_type Account; modified object_type Producer; modified object_type Adjuster; modified object_type Policy; modified object_type Term"
     },
     "C03/small/4/read-back-diff-ddl:redshift": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "122 delta(s) outside the declared loss set: modified object_type Contact; removed object_type Person; removed object_type Company; modified object_type Account; modified object_type Producer; modified object_type Adjuster; modified object_type Policy; modified object_type Term"
     },
     "C03/small/4/read-back:avro": {
@@ -325,8 +262,8 @@
     "C03/small/6/acceptance:policy-admin-dba:pc-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
       "detail": "9 of 10 persona checks fail: The model has no object type named \"Policy\".; The model has no object type named \"PolicyPeriod\".; The model has no object type named \"Term\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"PolicyPeriod has PolicyPeriodId\"), so it "
     },
     "C03/small/6/release-bundle:gym-list": {
@@ -335,13 +272,6 @@
       "issue": "barwise-fbi",
       "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
       "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
-    },
-    "C04/small/1/import:snowflake-ddl": {
-      "severity": "S1",
-      "class": "sql-importer-fk-targets",
-      "issue": "barwise-jjd",
-      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
-      "detail": "exit 0 but 9 of 29 expected names are absent from the model and 9 of them are not mentioned on stderr (31% silently dropped)"
     },
     "C04/small/1/model-roundtrip-validate:norma": {
       "severity": "S1",
@@ -380,9 +310,9 @@
     },
     "C04/small/1/roundtrip-diff:snowflake-ddl": {
       "severity": "S1",
-      "class": "sql-importer-fk-targets-roundtrip",
-      "issue": "barwise-jjd",
-      "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "class": "sql-import-roundtrip",
+      "issue": "barwise-dnm",
+      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
       "detail": "16 delta(s) outside the declared loss set: removed object_type Party; removed object_type Currency; removed object_type Category; removed object_type Product; removed object_type PhysicalProduct; removed object_type Seller; removed object_type ProductVariant; removed object_type Marketplace"
     },
     "C04/small/1/roundtrip-diff:warehouse-dbt": {
@@ -391,13 +321,6 @@
       "issue": "barwise-vsp",
       "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-vsp).",
       "detail": "68 delta(s) outside the declared loss set: modified object_type Category; modified object_type Product; modified object_type PhysicalProduct; modified object_type HazmatProduct; modified object_type ProductVariant; modified object_type Listing; modified object_type Order; modified object_type OrderL"
-    },
-    "C04/small/4.5/late:impact-id": {
-      "severity": "S1",
-      "class": "lineage-impact-no-sources",
-      "issue": "barwise-ofb",
-      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
-      "detail": "lineage impact reports no affected artifacts for ot-currency-code, which the DDL exported before the change renders"
     },
     "C04/small/4.5/late:impact-name": {
       "severity": "S1",
@@ -409,15 +332,15 @@
     "C04/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "118 delta(s) outside the declared loss set: modified object_type Party; removed object_type PartyId; modified object_type Buyer; modified object_type Seller; removed object_type PartyName; removed object_type EmailAddress; modified object_type Marketplace; removed object_type MarketplaceCode"
     },
     "C04/small/4/read-back-diff-ddl:snowflake": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "118 delta(s) outside the declared loss set: modified object_type Party; removed object_type PartyId; modified object_type Buyer; modified object_type Seller; removed object_type PartyName; removed object_type EmailAddress; modified object_type Marketplace; removed object_type MarketplaceCode"
     },
     "C04/small/4/read-back:avro": {
@@ -458,8 +381,8 @@
     "C04/small/6/acceptance:catalog-steward:snowflake-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
       "detail": "3 of 5 persona checks fail: The model has no object type named \"HazmatProduct\".; The model has no object type named \"Listing\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Product bundles Product\"), so it cannot rule out: Rules out: a acyclic ring violatio"
     },
     "C04/small/6/release-bundle:gym-list": {
@@ -468,13 +391,6 @@
       "issue": "barwise-fbi",
       "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
       "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
-    },
-    "C05/small/1/import:erp-ddl": {
-      "severity": "S1",
-      "class": "sql-importer-fk-targets",
-      "issue": "barwise-jjd",
-      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
-      "detail": "exit 0 but 17 of 33 expected names are absent from the model and 17 of them are not mentioned on stderr (52% silently dropped)"
     },
     "C05/small/1/import:scheduling-kotlin": {
       "severity": "S1",
@@ -513,17 +429,10 @@
     },
     "C05/small/1/roundtrip-diff:erp-ddl": {
       "severity": "S1",
-      "class": "sql-importer-fk-targets-roundtrip",
-      "issue": "barwise-jjd",
-      "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "class": "sql-import-roundtrip",
+      "issue": "barwise-dnm",
+      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
       "detail": "15 delta(s) outside the declared loss set: removed object_type UnitOfMeasure; removed object_type Mat; removed object_type WorkCenter; removed object_type FinishedGood; removed object_type Werk; removed object_type Plko; removed object_type Charg; removed object_type Lifnr"
-    },
-    "C05/small/4.5/late:impact-id": {
-      "severity": "S1",
-      "class": "lineage-impact-no-sources",
-      "issue": "barwise-ofb",
-      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
-      "detail": "lineage impact reports no affected artifacts for ot-uom-code, which the DDL exported before the change renders"
     },
     "C05/small/4.5/late:impact-name": {
       "severity": "S1",
@@ -535,15 +444,15 @@
     "C05/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "116 delta(s) outside the declared loss set: modified object_type Material; removed object_type MaterialNumber; modified object_type RawMaterial; removed object_type Assembly; modified object_type FinishedGood; modified object_type ConfigurableProduct; removed object_type MaterialDescription; modifie"
     },
     "C05/small/4/read-back-diff-ddl:databricks": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "116 delta(s) outside the declared loss set: modified object_type Material; removed object_type MaterialNumber; modified object_type RawMaterial; removed object_type Assembly; modified object_type FinishedGood; modified object_type ConfigurableProduct; removed object_type MaterialDescription; modifie"
     },
     "C05/small/4/read-back:avro": {
@@ -563,8 +472,8 @@
     "C05/small/6/acceptance:master-data-lead:erp-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
       "detail": "5 of 6 persona checks fail: The model has no object type named \"Material\".; The model has no object type named \"Plant\".; The model has no object type named \"MaterialPlantData\".; The model has no fact type connecting \"Material\" and \"Plant\"."
     },
     "C05/small/6/release-bundle:gym-list": {
@@ -580,13 +489,6 @@
       "issue": "barwise-tn4",
       "note": "The code importers skip any class whose name is on a fixed utility list (Event, Request, Result, Error, Context, ...) with exit 0 and no warning naming it (barwise-tn4). C06 has a domain class Event; the import returns ScanEvent and ShipmentEvent but no Event. Hidden until the import oracle stopped accepting a name as present because another name ended with it.",
       "detail": "exit 0 but 1 of 22 expected names are absent from the model and 1 of them are not mentioned on stderr (5% silently dropped)"
-    },
-    "C06/small/1/import:tms-ddl": {
-      "severity": "S1",
-      "class": "sql-importer-fk-targets",
-      "issue": "barwise-jjd",
-      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
-      "detail": "exit 0 but 11 of 33 expected names are absent from the model and 9 of them are not mentioned on stderr (33% silently dropped)"
     },
     "C06/small/1/model-roundtrip:dbt": {
       "severity": "S1",
@@ -618,17 +520,10 @@
     },
     "C06/small/1/roundtrip-diff:tms-ddl": {
       "severity": "S1",
-      "class": "sql-importer-fk-targets-roundtrip",
-      "issue": "barwise-jjd",
-      "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "class": "sql-import-roundtrip",
+      "issue": "barwise-dnm",
+      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
       "detail": "20 delta(s) outside the declared loss set: removed object_type Consignee; removed object_type Port; removed object_type Carrier; removed object_type Vehicle; removed object_type Container; removed object_type Voyage; removed object_type Leg; removed object_type Shipment"
-    },
-    "C06/small/4.5/late:impact-id": {
-      "severity": "S1",
-      "class": "lineage-impact-no-sources",
-      "issue": "barwise-ofb",
-      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
-      "detail": "lineage impact reports no affected artifacts for ot-imdg-class, which the DDL exported before the change renders"
     },
     "C06/small/4.5/late:impact-name": {
       "severity": "S1",
@@ -640,15 +535,15 @@
     "C06/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "108 delta(s) outside the declared loss set: modified object_type Shipper; removed object_type ShipperId; modified object_type Consignee; removed object_type ConsigneeId; modified object_type Carrier; removed object_type ScacCode; modified object_type Shipment; removed object_type ShipmentNumber"
     },
     "C06/small/4/read-back-diff-ddl:postgres": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "108 delta(s) outside the declared loss set: modified object_type Shipper; removed object_type ShipperId; modified object_type Consignee; removed object_type ConsigneeId; modified object_type Carrier; removed object_type ScacCode; modified object_type Shipment; removed object_type ShipmentNumber"
     },
     "C06/small/4/read-back:avro": {
@@ -675,8 +570,8 @@
     "C06/small/6/acceptance:tms-dba:tms-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
       "detail": "2 of 6 persona checks fail: The model has no fact type connecting \"Shipment\" and \"Container\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Shipment travels Leg on Vehicle\"), so it cannot rule out: Rules out: two facts of Shipment travels Leg on Vehicle tha"
     },
     "C06/small/6/release-bundle:gym-list": {
@@ -685,13 +580,6 @@
       "issue": "barwise-fbi",
       "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
       "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
-    },
-    "C07/small/1/import:bq-ddl": {
-      "severity": "S3",
-      "class": "sql-importer-fk-targets",
-      "issue": "barwise-jjd",
-      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
-      "detail": "exit 0 and an empty model from an artifact with 38 expected names; the only signal is 0 warning(s): (none)"
     },
     "C07/small/1/model-roundtrip:dbt": {
       "severity": "S1",
@@ -721,19 +609,19 @@
       "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-a0h).",
       "detail": "181 delta(s) outside the declared loss set: modified object_type PartyId; modified object_type CustomerId; modified object_type SubscriberId; modified object_type CountryCode; modified object_type OperatorCode; modified object_type ProductSpecificationId; modified object_type ProductOfferingId; modi"
     },
+    "C07/small/1/roundtrip-diff:bq-ddl": {
+      "severity": "S1",
+      "class": "sql-import-roundtrip",
+      "issue": "barwise-dnm",
+      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
+      "detail": "204 delta(s) outside the declared loss set: removed object_type PartyId; removed object_type CustomerId; removed object_type SubscriberId; removed object_type CountryCode; removed object_type OperatorCode; removed object_type ProductSpecificationId; removed object_type ProductOfferingId; removed obj"
+    },
     "C07/small/1/roundtrip-diff:tmf-openapi": {
       "severity": "S1",
       "class": "openapi-export-comment-header",
       "issue": "barwise-sxh",
       "note": "The default OpenAPI export writes a /* comment */ header when the model has diagnostics (which it always has after barwise-lh9), so the .json is not JSON and the importer returns an empty model with exit 0 (barwise-sxh).",
       "detail": "140 delta(s) outside the declared loss set: removed object_type Party; removed object_type Individual; removed object_type Organization; removed object_type Customer; removed object_type Subscriber; removed object_type Country; removed object_type Operator; removed object_type ProductSpecification"
-    },
-    "C07/small/4.5/late:impact-id": {
-      "severity": "S1",
-      "class": "lineage-impact-no-sources",
-      "issue": "barwise-ofb",
-      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
-      "detail": "lineage impact reports no affected artifacts for ot-rate-plan-code, which the DDL exported before the change renders"
     },
     "C07/small/4.5/late:impact-name": {
       "severity": "S1",
@@ -745,15 +633,15 @@
     "C07/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "119 delta(s) outside the declared loss set: modified object_type Party; modified object_type Individual; removed object_type Organization; modified object_type Customer; modified object_type Subscriber; modified object_type Country; modified object_type Operator; modified object_type ProductSpecific"
     },
     "C07/small/4/read-back-diff-ddl:bigquery": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "119 delta(s) outside the declared loss set: modified object_type Party; modified object_type Individual; removed object_type Organization; modified object_type Customer; modified object_type Subscriber; modified object_type Country; modified object_type Operator; modified object_type ProductSpecific"
     },
     "C07/small/4/read-back:avro": {
@@ -763,19 +651,19 @@
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
     },
+    "C07/small/6/acceptance:network-inventory-architect:bq-ddl": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance-sql",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
+      "detail": "4 of 10 persona checks fail: The model has no fact type connecting \"NetworkDevice\" and \"Site\".; Your model still allows what it should forbid: Rules out: a NetworkDevice that exists but never plays \"NetworkDevice is installed at Site\" -- e.g. NetworkDevice#1 appears in NetworkDevice has ManagementIp"
+    },
     "C07/small/6/release-bundle:gym-list": {
       "severity": "S3",
       "class": "bundle-gym-catalog",
       "issue": "barwise-fbi",
       "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
       "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
-    },
-    "C08/small/1/import:cis-ddl": {
-      "severity": "S1",
-      "class": "sql-importer-fk-targets",
-      "issue": "barwise-jjd",
-      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
-      "detail": "exit 0 but 6 of 25 expected names are absent from the model and 6 of them are not mentioned on stderr (24% silently dropped)"
     },
     "C08/small/1/model-roundtrip:dbt": {
       "severity": "S1",
@@ -807,17 +695,10 @@
     },
     "C08/small/1/roundtrip-diff:cis-ddl": {
       "severity": "S1",
-      "class": "sql-importer-fk-targets-roundtrip",
-      "issue": "barwise-jjd",
-      "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "class": "sql-import-roundtrip",
+      "issue": "barwise-dnm",
+      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
       "detail": "14 delta(s) outside the declared loss set: removed object_type Premise; removed object_type Transformer; removed object_type Manufacturer; removed object_type ServicePoint; removed object_type Meter; removed object_type SmartMeter; removed object_type Customer; removed object_type Tariff"
-    },
-    "C08/small/4.5/late:impact-id": {
-      "severity": "S1",
-      "class": "lineage-impact-no-sources",
-      "issue": "barwise-ofb",
-      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
-      "detail": "lineage impact reports no affected artifacts for ot-rate-code, which the DDL exported before the change renders"
     },
     "C08/small/4.5/late:impact-name": {
       "severity": "S1",
@@ -829,15 +710,15 @@
     "C08/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "107 delta(s) outside the declared loss set: modified object_type ServicePoint; modified object_type Meter; modified object_type SmartMeter; removed object_type IntervalMeter; modified object_type Manufacturer; modified object_type Premise; modified object_type Customer; modified object_type Account"
     },
     "C08/small/4/read-back-diff-ddl:mysql": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "107 delta(s) outside the declared loss set: modified object_type ServicePoint; modified object_type Meter; modified object_type SmartMeter; removed object_type IntervalMeter; modified object_type Manufacturer; modified object_type Premise; modified object_type Customer; modified object_type Account"
     },
     "C08/small/4/read-back:avro": {
@@ -864,15 +745,15 @@
     "C08/small/6/acceptance:c08-billing-analyst:cis-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
       "detail": "5 of 8 persona checks fail: The model has no object type named \"ServiceAgreement\".; The model has no fact type connecting \"ServiceAgreement\" and \"Tariff\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"ServiceAgreement is billed under Tariff\"), so it cannot "
     },
     "C08/small/6/acceptance:c08-metering-data-engineer:cis-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
       "detail": "6 of 8 persona checks fail: The model has no object type named \"IntervalMeter\".; The model has no fact type connecting \"Meter\" and \"IntervalTimestamp\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Meter records ReadingValue at IntervalTimestamp\"), so it ca"
     },
     "C08/small/6/release-bundle:gym-list": {
@@ -914,15 +795,8 @@
       "severity": "S1",
       "class": "ddl-regex-roundtrip",
       "issue": "barwise-dnm",
-      "note": "Consequence of barwise-dnm and barwise-zuk: the DDL export of the imported model is not readable back by the regex importer. Closes with the parents.",
+      "note": "Consequence of barwise-dnm: the DDL export of the imported model does not read back to the same model -- value types and fact types are lost beyond the declared loss set. Closes with the parent.",
       "detail": "503 delta(s) outside the declared loss set: removed object_type StudyTitle; removed object_type StudyPhase; removed object_type ProtocolTitle; removed object_type AmendmentApprovalDate; removed object_type CountryCode; removed object_type InvestigatorName; removed object_type SubjectNumber; removed "
-    },
-    "C09/small/4.5/late:impact-id": {
-      "severity": "S1",
-      "class": "lineage-impact-no-sources",
-      "issue": "barwise-ofb",
-      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
-      "detail": "lineage impact reports no affected artifacts for ot-meddra-pt-code, which the DDL exported before the change renders"
     },
     "C09/small/4.5/late:impact-name": {
       "severity": "S1",
@@ -934,8 +808,8 @@
     "C09/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "118 delta(s) outside the declared loss set: modified object_type Study; modified object_type Protocol; modified object_type ProtocolAmendment; modified object_type Site; modified object_type Investigator; modified object_type Arm; modified object_type Treatment; modified object_type Subject"
     },
     "C09/small/4/read-back:avro": {
@@ -1008,13 +882,6 @@
       "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
       "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
     },
-    "C10/small/1/import:sis-ddl": {
-      "severity": "S1",
-      "class": "sql-importer-fk-targets",
-      "issue": "barwise-jjd",
-      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
-      "detail": "exit 0 but 10 of 31 expected names are absent from the model and 10 of them are not mentioned on stderr (32% silently dropped)"
-    },
     "C10/small/1/model-roundtrip:dbt": {
       "severity": "S1",
       "class": "dbt-roundtrip",
@@ -1045,17 +912,10 @@
     },
     "C10/small/1/roundtrip-diff:sis-ddl": {
       "severity": "S1",
-      "class": "sql-importer-fk-targets-roundtrip",
-      "issue": "barwise-jjd",
-      "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "class": "sql-import-roundtrip",
+      "issue": "barwise-dnm",
+      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
       "detail": "16 delta(s) outside the declared loss set: removed object_type Spriden; removed object_type Stvcamp; removed object_type Sgbstdn; removed object_type Sibinst; removed object_type Pebempl; removed object_type Stvcoll; removed object_type Stvdept; removed object_type Scbcrse"
-    },
-    "C10/small/4.5/late:impact-id": {
-      "severity": "S1",
-      "class": "lineage-impact-no-sources",
-      "issue": "barwise-ofb",
-      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
-      "detail": "lineage impact reports no affected artifacts for vt-grade-code, which the DDL exported before the change renders"
     },
     "C10/small/4.5/late:impact-name": {
       "severity": "S1",
@@ -1067,15 +927,15 @@
     "C10/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "121 delta(s) outside the declared loss set: modified object_type Person; modified object_type Student; removed object_type GraduateStudent; modified object_type Employee; modified object_type Faculty; modified object_type Campus; modified object_type College; modified object_type Department"
     },
     "C10/small/4/read-back-diff-ddl:postgres": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "121 delta(s) outside the declared loss set: modified object_type Person; modified object_type Student; removed object_type GraduateStudent; modified object_type Employee; modified object_type Faculty; modified object_type Campus; modified object_type College; modified object_type Department"
     },
     "C10/small/4/read-back:avro": {
@@ -1102,29 +962,29 @@
     "C10/small/6/acceptance:financial-aid-director:sis-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
       "detail": "6 of 9 persona checks fail: The model has no object type named \"FinancialAidAward\".; The model has no fact type connecting \"FinancialAidAward\" and \"Student\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"FinancialAidAward is awarded to Student\"), so it cann"
     },
     "C10/small/6/acceptance:ir-analyst:sis-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
       "detail": "7 of 9 persona checks fail: The model has no object type named \"Grade\".; The model has no object type named \"GraduateStudent\".; The model does not verbalize as \"GraduateStudent is a subtype of Student.\". Check the fact type, its reading, and its constraints.; The model does not verbalize as \"Enrollm"
     },
     "C10/small/6/acceptance:registrar-data-steward:sis-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
       "detail": "8 of 9 persona checks fail: The model has no object type named \"Term\".; The model has no object type named \"Enrollment\".; The model has no fact type connecting \"Student\" and \"CourseSection\".; The model has no fact type connecting \"Course\" and \"Course\"."
     },
     "C10/small/6/acceptance:sis-dba:sis-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
       "detail": "8 of 9 persona checks fail: The model has no object type named \"Person\".; The model has no fact type connecting \"Person\" and \"Pidm\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Person has Pidm\"), so it cannot rule out: Rules out: two facts of Person has P"
     },
     "C10/small/6/release-bundle:gym-list": {
@@ -1183,13 +1043,6 @@
       "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-vsp).",
       "detail": "75 delta(s) outside the declared loss set: modified object_type Workspace; modified object_type Project; modified object_type ApiKey; modified object_type ServiceAccount; modified object_type Plan; modified object_type Subscription; modified object_type EventDefinition; modified object_type Event"
     },
-    "C11/small/4.5/late:impact-id": {
-      "severity": "S1",
-      "class": "lineage-impact-no-sources",
-      "issue": "barwise-ofb",
-      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
-      "detail": "lineage impact reports no affected artifacts for ot-reserved-event-name, which the DDL exported before the change renders"
-    },
     "C11/small/4.5/late:impact-name": {
       "severity": "S1",
       "class": "lineage-impact-by-name",
@@ -1200,8 +1053,8 @@
     "C11/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "121 delta(s) outside the declared loss set: modified object_type Tenant; removed object_type TenantId; modified object_type DataRegion; modified object_type RegionCode; modified object_type Workspace; removed object_type WorkspaceId; modified object_type Project; removed object_type ProjectId"
     },
     "C11/small/4/read-back:avro": {
@@ -1253,20 +1106,6 @@
       "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
       "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
     },
-    "C12/small/1/import:mainframe-ddl": {
-      "severity": "S3",
-      "class": "sql-importer-fk-targets",
-      "issue": "barwise-jjd",
-      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
-      "detail": "exit 0 and an empty model for a format barwise does not read (db2); the refusal is invisible"
-    },
-    "C12/small/1/import:modern-ddl": {
-      "severity": "S1",
-      "class": "sql-importer-fk-targets",
-      "issue": "barwise-jjd",
-      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
-      "detail": "exit 0 but 10 of 26 expected names are absent from the model and 10 of them are not mentioned on stderr (38% silently dropped)"
-    },
     "C12/small/1/model-roundtrip:dbt": {
       "severity": "S1",
       "class": "dbt-roundtrip",
@@ -1297,17 +1136,10 @@
     },
     "C12/small/1/roundtrip-diff:modern-ddl": {
       "severity": "S1",
-      "class": "sql-importer-fk-targets-roundtrip",
-      "issue": "barwise-jjd",
-      "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
+      "class": "sql-import-roundtrip",
+      "issue": "barwise-dnm",
+      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
       "detail": "29 delta(s) outside the declared loss set: removed object_type Hhld; removed object_type Clnt; removed object_type Aplct; removed object_type Ofc; removed object_type EligWrk; removed object_type Supv; removed object_type Detr; removed object_type Prgm"
-    },
-    "C12/small/4.5/late:impact-id": {
-      "severity": "S1",
-      "class": "lineage-impact-no-sources",
-      "issue": "barwise-ofb",
-      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509.",
-      "detail": "lineage impact reports no affected artifacts for ot-closure-reason-code, which the DDL exported before the change renders"
     },
     "C12/small/4.5/late:impact-name": {
       "severity": "S1",
@@ -1319,15 +1151,15 @@
     "C12/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "121 delta(s) outside the declared loss set: modified object_type Client; modified object_type Applicant; modified object_type Recipient; modified object_type Household; removed object_type IncomeSource; modified object_type Case; modified object_type Program; modified object_type CertificationPeriod"
     },
     "C12/small/4/read-back-diff-ddl:postgres": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
+      "issue": "barwise-dnm",
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509.",
       "detail": "121 delta(s) outside the declared loss set: modified object_type Client; modified object_type Applicant; modified object_type Recipient; modified object_type Household; removed object_type IncomeSource; modified object_type Case; modified object_type Program; modified object_type CertificationPeriod"
     },
     "C12/small/4/read-back:avro": {
@@ -1340,29 +1172,29 @@
     "C12/small/6/acceptance:hearing-officer:modern-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
       "detail": "9 of 10 persona checks fail: The model has no object type named \"Appeal\".; The model has no object type named \"HearingOfficer\".; The model has no fact type connecting \"Appeal\" and \"Determination\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Appeal contest"
     },
     "C12/small/6/acceptance:mainframe-dba:modern-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
       "detail": "8 of 10 persona checks fail: The model has no object type named \"Client\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Client has ClientNumber\"), so it cannot rule out: Rules out: two facts of Client has ClientNumber that agree on Client -- e.g. {Client=Cl"
     },
     "C12/small/6/acceptance:modernization-architect:modern-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
       "detail": "9 of 10 persona checks fail: The model has no object type named \"Applicant\".; The model has no object type named \"Recipient\".; The model has no object type named \"Household\".; The model has no fact type connecting \"Client\" and \"Household\"."
     },
     "C12/small/6/acceptance:policy-analyst:modern-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
       "detail": "8 of 9 persona checks fail: The model has no object type named \"Determination\".; The model has no object type named \"CertificationPeriod\".; The model does not verbalize as \"Each combination of Case, Program and CertificationPeriod is unique in Case is determined for Program in CertificationPeriod.\"."
     },
     "C12/small/6/release-bundle:gym-list": {
