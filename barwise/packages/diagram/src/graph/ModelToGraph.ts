@@ -135,6 +135,18 @@ export function modelToGraph(
     }
   }
 
+  // An identifying value type that also plays an ordinary role stays a
+  // node: hiding it would leave that role's edge pointing at nothing. The
+  // dbt importer writes this shape whenever a non-key column shares a key
+  // column's name. The identifying fact type is still folded into the
+  // entity's "(.ref_mode)" label either way.
+  for (const vtId of [...absorbedValueTypeIds]) {
+    const playsOtherRole = model
+      .factTypesForObjectType(vtId)
+      .some((ft) => !absorbedFactTypeIds.has(ft.id));
+    if (playsOtherRole) absorbedValueTypeIds.delete(vtId);
+  }
+
   // Build a lookup from fact type id to objectified entity name, and
   // collect objectified entity IDs that don't play roles in any other
   // fact type.  Pure objectifications are already represented by their
