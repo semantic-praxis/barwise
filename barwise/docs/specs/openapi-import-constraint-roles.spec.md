@@ -1,10 +1,10 @@
 # OpenAPI import puts a property's constraints on the entity's role
 
-Status: Implemented 2026-09-26 -- the single workstream (see Implementation notes)
+Status: Implemented 2026-09-26 -- R1-R2 in PR #572, R3 in PR #573 (see Implementation notes)
 
 Created: 2026-09-26
 Last-updated: 2026-09-26
-Tracking: barwise-1076
+Tracking: barwise-1076 (R1-R2, closed); barwise-1081 (R3)
 
 `barwise import model api.json --format openapi` turns each scalar
 property into a fact type whose roles are ordered value-first, and puts
@@ -59,6 +59,16 @@ mostly on the uniqueness and mandatory checks this causes.
   the same enum or none on both sides),
   and otherwise create `<Entity><Name>` and warn. This is
   `ddl-import-fidelity.spec.md` R5.
+- **R3.** When a property is the one the schema's reference mode names,
+  the importer shall give it the preferred identifying binary --
+  preferred uniqueness on the value's role, uniqueness and mandatory on
+  the entity's role, whether or not it is `required` -- the shape
+  `ddl-import-fidelity.spec.md` R4 gives a DDL key. The reference mode
+  is the property named `id`, else `<schema>Id` or `<schema>_id`
+  (`purchaseOrderId`, `purchase_order_id`) chosen by spelling rather
+  than property order, else `<schema>_id` in snake case; and every
+  schema's key is created before any other property, so an ordinary
+  property never takes the key's value-type name.
 
 Acceptance: the input above verbalizes as "Each Customer has at most
 one Name" and "Each Customer has at least one Name", and its DDL export
@@ -73,10 +83,6 @@ Out of scope:
   awkward, which is not this defect.
 - `maxLength`, `format` details and value constraints lost on a round
   trip (barwise-a0h).
-- An `id` property that is also the inferred reference mode is still
-  imported as an ordinary attribute as well; making it a typed
-  identifier, as #570 did for a DDL key, is a separate change (the same
-  double mapping as barwise-1074).
 - OpenAPI has no single-property `unique` keyword, so there is no
   value-side uniqueness to import (DDL's R3 `UNIQUE` clause has no
   counterpart here).
@@ -134,3 +140,22 @@ Landed as specified, in `createPropertyFactType` and a new
   verbalizes "Each Customer has at most one Name." and "Each Customer
   has at least one Name.", and exports `name TEXT NOT NULL` with no
   `UNIQUE`.
+
+**R3 (PR #573).** The `id` property was an ordinary attribute, so the
+mapper mapped it twice: measured on main at 56c6101c, the spec's
+two-schema input exported `has_id INTEGER NOT NULL` beside the key in
+every table. R3 removes that column. It also fixes two defects in
+`inferReferenceMode` that R3 would otherwise inherit, both found by
+review of #573: a multi-word schema never matched its own
+`purchaseOrderId`, because the candidate was built as
+`${name.toLowerCase()}Id`; and when both `userId` and `user_id`
+existed, the key depended on which came first. Mutations through
+`scripts/mutate.mjs` against `tests/OpenApiConstraintRoles.test.ts`,
+each caught: no identifier; keys not created first; no exact-spelling
+priority; the key's mandatory tied to `required`. A first version of
+the last one changed nothing (it removed a mandatory and pushed the same
+one back) and went uncaught; the real mutation was caught.
+
+#573 first carried R1 and R2 as well. #572 landed them independently
+first, with the enum rule on top, so #573 was reduced by a merge to R3
+alone.
