@@ -121,3 +121,32 @@ describe("barwise-zuk's reproduction: four idioms in one file", () => {
     expect(warnings.some((w) => /No CREATE TABLE/.test(w))).toBe(false);
   });
 });
+
+describe("PR #577 review: what is not a statement, and what a skipped table keeps", () => {
+  it("does not read a CREATE TABLE stored as data in a string literal", () => {
+    const sql = "CREATE TABLE audit_log (id INT, note TEXT, PRIMARY KEY (id));\n"
+      + "INSERT INTO audit_log (id, note) VALUES (1, 'CREATE TABLE ghost (id INT)');";
+    expect(entities(sql)).toEqual(["AuditLog"]);
+  });
+
+  it("does not read a CREATE TABLE inside a dollar-quoted function body", () => {
+    const sql =
+      "CREATE FUNCTION f() RETURNS void AS $body$ CREATE TABLE ghost (id INT); $body$ LANGUAGE sql;\n"
+      + "CREATE TABLE real_table (id INT, PRIMARY KEY (id));";
+    expect(entities(sql)).toEqual(["RealTable"]);
+  });
+
+  it("does not take a -- inside a string literal for a comment", () => {
+    const sql =
+      "CREATE TABLE party (party_id INT, sep VARCHAR(2) DEFAULT '--', PRIMARY KEY (party_id));";
+    expect(entities(sql)).toEqual(["Party"]);
+  });
+
+  it("does not merge a skipped same-named table's columns into the one imported", () => {
+    const sql = "CREATE TABLE a.party (party_id INT, PRIMARY KEY (party_id));\n"
+      + "CREATE TABLE b.party (party_code INT, region TEXT, PRIMARY KEY (party_code));";
+    const { model } = ddl.parse(sql);
+    expect(model.getObjectTypeByName("Region")).toBeUndefined();
+    expect(model.factTypes.some((f) => /Region|PartyCode/.test(f.name))).toBe(false);
+  });
+});

@@ -110,6 +110,11 @@ export class DdlImportFormat implements ImportFormat {
     // Keyed by the table's unqualified name in lower case: a foreign key
     // may name its target `CBS.PARTY`, `party` or `[PARTY]`.
     const entityMap = new Map<string, string>(); // table key -> entity type id
+    // Only the tables that became entities go on to steps 2 and 3. A table
+    // skipped for its name still shares its key with the one that took it,
+    // so looking it up by key merged its key and columns into that entity
+    // while the warning said it was not imported (PR #577 review).
+    const accepted: ParsedTable[] = [];
     for (const table of tables) {
       const entityName = toPascalCase(table.name);
       if (entityMap.has(tableKey(table.name)) || model.getObjectTypeByName(entityName)) {
@@ -127,18 +132,19 @@ export class DdlImportFormat implements ImportFormat {
         referenceMode,
       });
       entityMap.set(tableKey(table.name), entityType.id);
+      accepted.push(table);
     }
 
     // Step 2: Give each single-column key a typed identifier. Before the
     // ordinary columns, so a key gets its plain name ahead of a non-key
     // column that shares it, as the dbt importer does.
-    for (const table of tables) {
+    for (const table of accepted) {
       const entity = model.getObjectType(entityMap.get(tableKey(table.name)) ?? "");
       if (entity) this.createKeyIdentifier(model, entity, table, warnings);
     }
 
     // Step 3: Create value types and fact types for the other columns
-    for (const table of tables) {
+    for (const table of accepted) {
       const entityId = entityMap.get(tableKey(table.name));
       if (!entityId) continue;
 

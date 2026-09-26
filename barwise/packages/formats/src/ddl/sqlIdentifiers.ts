@@ -57,16 +57,20 @@ export interface CreateTableStatement {
 
 /**
  * `CREATE [OR REPLACE] [GLOBAL|LOCAL] [TEMP|TEMPORARY|TRANSIENT|EXTERNAL]
- * TABLE [IF NOT EXISTS] <name> (`. The body is found by balanced
+ * TABLE [IF NOT EXISTS]`, up to the name. The trial's DDL generator keeps
+ * a byte-identical copy to name the tables it expects (it may not import a
+ * package); `parity.manifest.json` fails CI when the two disagree, which is
+ * how its ground truth once invented `extra_N` names (PR #577 review).
+ */
+const CREATE_TABLE_PREFIX = String
+  .raw`\bCREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:GLOBAL|LOCAL)\s+)?(?:(?:TEMP|TEMPORARY|TRANSIENT|EXTERNAL)\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`;
+
+/**
+ * `<prefix> <name> (`. The body is found by balanced
  * parentheses from here, not by the first `);`, so table options after
  * the definition (`ENGINE=`, `PARTITION BY`, `WITH (...)`) are left out.
  */
-const CREATE_TABLE = new RegExp(
-  String.raw`\bCREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:GLOBAL|LOCAL)\s+)?`
-    + String.raw`(?:(?:TEMP|TEMPORARY|TRANSIENT|EXTERNAL)\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`
-    + `(${QUALIFIED})\\s*\\(`,
-  "gi",
-);
+const CREATE_TABLE = new RegExp(`${CREATE_TABLE_PREFIX}(${QUALIFIED})\\s*\\(`, "gi");
 
 /** Any CREATE ... TABLE, readable or not: what R3 counts against. */
 const ANY_CREATE_TABLE =
@@ -81,7 +85,7 @@ export function findCreateTables(input: string): {
   readonly tables: readonly CreateTableStatement[];
   readonly unread: readonly string[];
 } {
-  const code = blankComments(input);
+  const code = blankNonCode(input);
   const tables: CreateTableStatement[] = [];
   const readAt = new Set<number>();
   for (const m of code.matchAll(CREATE_TABLE)) {
@@ -110,7 +114,7 @@ export function otherStatements(input: string): Map<string, number> {
   const counts = new Map<string, number>();
   const kinds =
     /(?:^|;)\s*(CREATE\s+(?:OR\s+REPLACE\s+)?(?:UNIQUE\s+)?(?:INDEX|VIEW|SCHEMA|SEQUENCE|TRIGGER|PROCEDURE|FUNCTION|MATERIALIZED\s+VIEW|TYPE|DATABASE)|ALTER\s+TABLE|COMMENT\s+ON|INSERT\s+INTO|GRANT|DROP\s+\w+)\b/gim;
-  for (const m of blankComments(input).matchAll(kinds)) {
+  for (const m of blankNonCode(input).matchAll(kinds)) {
     const kind = m[1]!.toUpperCase().replace(/\s+/g, " ").replace(/^CREATE OR REPLACE /, "CREATE ");
     counts.set(kind, (counts.get(kind) ?? 0) + 1);
   }
@@ -139,9 +143,55 @@ function matchingParen(text: string, open: number): number {
 }
 
 /**
- * The input with `--` and `/* ... *\/` comments replaced by spaces, so a
- * commented-out statement is not read and offsets still line up.
+ * The input with everything that is not SQL text blanked to spaces, offsets
+ * kept: `--` and `/* ... *\/` comments, and the contents of string literals
+ * (`'...'` with `''` escapes, and PostgreSQL `$tag$ ... $tag$` bodies). A
+ * statement inside a comment or stored as data --
+ * `VALUES ('CREATE TABLE ghost (id INT)')` -- is not a statement, and a `--`
+ * inside a literal (`DEFAULT '--'`) is not a comment (PR #577 review). The
+ * quotes themselves are kept, so `matchingParen` still sees a literal.
+ * Quoted identifiers are skipped, not blanked: `"a--b"` is a name.
  */
-function blankComments(input: string): string {
-  return input.replace(/--[^\n]*|\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
+function blankNonCode(input: string): string {
+  const out = input.split("");
+  const blank = (from: number, to: number) => {
+    for (let k = from; k < to; k++) if (out[k] !== "\n") out[k] = " ";
+  };
+  let i = 0;
+  while (i < input.length) {
+    const c = input[i]!;
+    const next = input[i + 1];
+    if (c === "-" && next === "-") {
+      const end = input.indexOf("\n", i);
+      const stop = end < 0 ? input.length : end;
+      blank(i, stop);
+      i = stop;
+    } else if (c === "/" && next === "*") {
+      const end = input.indexOf("*/", i + 2);
+      const stop = end < 0 ? input.length : end + 2;
+      blank(i, stop);
+      i = stop;
+    } else if (c === "'") {
+      let j = i + 1;
+      while (j < input.length && !(input[j] === "'" && input[j + 1] !== "'")) {
+        j += input[j] === "'" ? 2 : 1;
+      }
+      blank(i + 1, j);
+      i = j + 1;
+    } else if (c === "$" && DOLLAR_TAG.test(input.slice(i, i + 64))) {
+      const tag = DOLLAR_TAG.exec(input.slice(i, i + 64))![0];
+      const end = input.indexOf(tag, i + tag.length);
+      blank(i + tag.length, end < 0 ? input.length : end);
+      i = end < 0 ? input.length : end + tag.length;
+    } else if (c === '"' || c === "`" || c === "[") {
+      const end = input.indexOf(c === "[" ? "]" : c, i + 1);
+      i = end < 0 ? input.length : end + 1;
+    } else {
+      i++;
+    }
+  }
+  return out.join("");
 }
+
+/** A PostgreSQL dollar-quote opener: `$$` or `$body$`. */
+const DOLLAR_TAG = /^\$[A-Za-z_]*\$/;

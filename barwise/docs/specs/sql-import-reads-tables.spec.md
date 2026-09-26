@@ -143,7 +143,23 @@ limitation rather than a defect.
 - **`trial:offline` did not notice a stale tier.** A generator change
   takes effect only after `npm run trial:generate`, and the first rerun
   after the fix above still graded that morning's files with nothing said.
-  `trial:offline` now refuses (exit 2) a tier older than a generator
-  module or the customer's kernel, skins, transcripts or customer.yaml
-  (`staleGenerated` in `trial/lib/paths.mjs`, with a refusal test that
-  drives the real offline path).
+  `trial:offline` now refuses (exit 2) a tier whose recorded generation
+  inputs -- the generator modules, `run.mjs`, `paths.mjs`, and the
+  customer's customer.yaml, kernel, skins and transcripts, by content hash
+  -- differ from those on disk (`staleGenerated` in `trial/lib/paths.mjs`).
+  The first version compared mtimes and could not see a deleted input.
+- **What the PR #577 review found.** The scanner blanked comments but not
+  string literals, so a `CREATE TABLE` stored as data was read as a table
+  and a `--` inside a literal ate the rest of its line; it now blanks
+  literal contents (including dollar quotes) too. A table skipped for a
+  name another schema took still had its key and columns merged into that
+  entity. Input whose only `CREATE TABLE` was unreadable fell back to query
+  mining instead of naming it. The declared path only reported joins,
+  where workstream 2 said it would merge them: a join between declared
+  tables no foreign key relates now adds the relationship, and says so. A
+  join pattern lists the joined table first and then the ON clause's
+  qualifiers on the regex tier, but only the joined table on the sqlglot
+  tier, so the other side is read from the ON clause, and an alias neither
+  tier resolves adds nothing. The generator's copy of the CREATE TABLE
+  grammar is now a parity pair (`create-table-prefix` in
+  `parity.manifest.json`).

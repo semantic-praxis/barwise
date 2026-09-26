@@ -64,6 +64,43 @@ describe("R4: tables come from the CREATE TABLEs the input declares", () => {
     }
   });
 
+  it("names a declared table it cannot read, rather than falling back to query mining", () => {
+    const { warnings } = sql.parse("CREATE TABLE child PARTITION OF parent FOR VALUES IN (1);");
+    expect(warnings.some((w) => w.includes("child") && /not imported/.test(w))).toBe(true);
+  });
+
+  it("adds the relationship a query shows between declared tables no foreign key relates", () => {
+    const input = `
+      CREATE TABLE customers (customer_id INT, PRIMARY KEY (customer_id));
+      CREATE TABLE orders (order_id INT, customer_id INT, PRIMARY KEY (order_id));
+      SELECT orders.order_id FROM orders JOIN customers ON customers.customer_id = orders.customer_id;`;
+    const { model, warnings } = sql.parse(input);
+    expect(model.factTypes.map((f) => f.name)).toContain("Orders references Customers");
+    expect(warnings.some((w) => /no foreign key relates/.test(w))).toBe(true);
+  });
+
+  it("does not add a join relationship a foreign key already states", () => {
+    const input = `
+      CREATE TABLE customers (customer_id INT, PRIMARY KEY (customer_id));
+      CREATE TABLE orders (order_id INT, customer_id INT, PRIMARY KEY (order_id),
+        FOREIGN KEY (customer_id) REFERENCES customers (customer_id));
+      SELECT orders.order_id FROM orders JOIN customers ON customers.customer_id = orders.customer_id;`;
+    const { model, warnings } = sql.parse(input);
+    expect(model.factTypes.filter((f) => /Orders/.test(f.name) && /Customers/.test(f.name)))
+      .toHaveLength(1);
+    expect(warnings.some((w) => /no foreign key relates/.test(w))).toBe(false);
+  });
+
+  it("adds nothing for a join through aliases it cannot resolve, and does not report the aliases", () => {
+    const input = `
+      CREATE TABLE customers (customer_id INT, PRIMARY KEY (customer_id));
+      CREATE TABLE orders (order_id INT, customer_id INT, PRIMARY KEY (order_id));
+      SELECT o.order_id FROM orders o JOIN customers c ON c.customer_id = o.customer_id;`;
+    const { model, warnings } = sql.parse(input);
+    expect(model.factTypes.some((f) => /references/.test(f.name))).toBe(false);
+    expect(warnings.some((w) => /never declares/.test(w))).toBe(false);
+  });
+
   it("keeps pattern mining for input that declares no table", () => {
     // Unchanged path: the mined tables become entities, as before.
     const input = "SELECT * FROM orders o JOIN customers c ON c.customer_id = o.customer_id;";
