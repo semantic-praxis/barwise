@@ -17,7 +17,13 @@
  * here) can improve naming and add definitions.
  */
 
-import { type ImportFormat, type ImportOptions, type ImportResult, OrmModel } from "@barwise/core";
+import {
+  generateId,
+  type ImportFormat,
+  type ImportOptions,
+  type ImportResult,
+  OrmModel,
+} from "@barwise/core";
 import { mapSqlTypeToConceptual } from "@barwise/core/sql";
 
 /**
@@ -343,7 +349,12 @@ export class DdlImportFormat implements ImportFormat {
       const constraints: any[] = [];
 
       // Add uniqueness constraint on the foreign key side (many-to-one)
-      const role2Id = `${entityType.id}-${verb}-role`;
+      // Role ids are minted, never built from names: `<entity id>-<verb>-role`
+      // collided for two foreign keys with the same inferred verb, and
+      // `<value type id>-has-role` for every table sharing a column name,
+      // producing models that fail validation (importer-role-ids.spec.md).
+      const role1Id = generateId();
+      const role2Id = generateId();
       constraints.push({
         type: "internal_uniqueness",
         roleIds: [role2Id],
@@ -361,7 +372,7 @@ export class DdlImportFormat implements ImportFormat {
       model.addFactType({
         name: factTypeName,
         roles: [
-          { name: verb, playerId: referencedEntity.id, id: `${referencedEntity.id}-${verb}-role` },
+          { name: verb, playerId: referencedEntity.id, id: role1Id },
           { name: `is ${verb} by`, playerId: entityType.id, id: role2Id },
         ],
         readings: [`{0} ${verb} {1}`],
@@ -410,8 +421,9 @@ export class DdlImportFormat implements ImportFormat {
       // Check if this column has a UNIQUE constraint
       const isUnique = table.uniqueConstraints.some((cols) => cols.includes(column.name));
 
-      const role0Id = `${valueType.id}-has-role`;
-      const role1Id = `${entityType.id}-has-${valueTypeName}-role`;
+      // Minted, not built from names; see createForeignKeyFactType.
+      const role0Id = generateId();
+      const role1Id = generateId();
 
       // Add uniqueness constraint
       // If unique, make it unique on the entity side
