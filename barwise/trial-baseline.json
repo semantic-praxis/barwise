@@ -87,9 +87,9 @@
     "C01/small/6/acceptance:clinical-informaticist:fhir-openapi": {
       "severity": "S5",
       "class": "acceptance-edit-distance-openapi",
-      "issue": "barwise-1079",
-      "note": "Edit distance to acceptance on an OpenAPI artifact. barwise-lh9 and barwise-1076 are fixed; what remains is mostly checks OpenAPI cannot express (rings, deontic rules, external and value-side uniqueness, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer gaps to split out (barwise-1079).",
-      "detail": "4 of 9 persona checks fail: Your model does not yet carry the relationship this rule guards (no fact type matching \"Encounter has Diagnosis at DiagnosisRank\"), so it cannot rule out: Rules out: two facts of Encounter has Diagnosis at DiagnosisRank that agree on Encounter, Diagnosis -- e.g. {Encounte"
+      "issue": "barwise-nul",
+      "note": "Edit distance to acceptance on an OpenAPI artifact. Checks OpenAPI cannot state (rings, deontic rules, composite and value-side uniqueness, n-ary uniqueness) are declared not_expressible on the personas (barwise-1079). What remains is the importer ignoring discriminator subtypes (barwise-nul).",
+      "detail": "1 of 9 persona checks fail: Your model still allows what it should forbid: Rules out: a EmergencyEncounter that exists but never plays \"EmergencyEncounter has TriageAcuity\" -- e.g. EmergencyEncounter#1 appears in TraumaEncounter has TraumaActivationLevel but not in EmergencyEncounter has TriageAcuit"
     },
     "C01/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -311,16 +311,16 @@
     "C03/small/6/acceptance:actuarial-analyst:claims-dbt": {
       "severity": "S5",
       "class": "acceptance-edit-distance-dbt",
-      "issue": "barwise-1079",
-      "note": "Edit distance to acceptance on a dbt project. barwise-bvl is fixed; what remains is mostly checks dbt cannot express (rings, deontic rules, subtypes, relationship verbs, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer and generator gaps to split out (barwise-1079).",
-      "detail": "4 of 9 persona checks fail: Your model does not yet carry the relationship this rule guards (no fact type matching \"Claim has LossDate\"), so it cannot rule out: Rules out: a Claim that exists but never plays \"Claim has LossDate\" -- e.g. Claim#1 appears in Claim has ClaimNumber but not in Claim has L"
+      "issue": "barwise-nkn",
+      "note": "Edit distance to acceptance on a dbt project. Ring constraints, which dbt cannot state, are declared not_expressible on the personas (barwise-1079). What remains are checks dbt can state and the round trip does not carry: multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn).",
+      "detail": "1 of 9 persona checks fail: The model does not verbalize as \"For each Coverage and Risk combination, at most one PolicyPeriod applies.\". Check the fact type, its reading, and its constraints."
     },
     "C03/small/6/acceptance:claims-data-steward:claims-dbt": {
       "severity": "S5",
       "class": "acceptance-edit-distance-dbt",
-      "issue": "barwise-1079",
-      "note": "Edit distance to acceptance on a dbt project. barwise-bvl is fixed; what remains is mostly checks dbt cannot express (rings, deontic rules, subtypes, relationship verbs, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer and generator gaps to split out (barwise-1079).",
-      "detail": "5 of 10 persona checks fail: Your model does not yet carry the relationship this rule guards (no fact type matching \"Claim has ClaimNumber\"), so it cannot rule out: Rules out: two facts of Claim has ClaimNumber that agree on Claim -- e.g. {Claim=Claim#1, ClaimNumber=ClaimNumber#1}; {Claim=Claim#1, C"
+      "issue": "barwise-nkn",
+      "note": "Edit distance to acceptance on a dbt project. Ring constraints, which dbt cannot state, are declared not_expressible on the personas (barwise-1079). What remains are checks dbt can state and the round trip does not carry: multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn).",
+      "detail": "2 of 10 persona checks fail: The model does not verbalize as \"It is obligatory that each Reserve is approved by at least one Adjuster.\". Check the fact type, its reading, and its constraints.; The model has no fact type connecting \"Subrogation\" and \"Contact\"."
     },
     "C03/small/6/acceptance:policy-admin-dba:pc-ddl": {
       "severity": "S5",
@@ -451,8 +451,8 @@
     "C04/small/6/acceptance:analytics-engineer:warehouse-dbt": {
       "severity": "S5",
       "class": "acceptance-edit-distance-dbt",
-      "issue": "barwise-1079",
-      "note": "Edit distance to acceptance on a dbt project. barwise-bvl is fixed; what remains is mostly checks dbt cannot express (rings, deontic rules, subtypes, relationship verbs, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer and generator gaps to split out (barwise-1079).",
+      "issue": "barwise-nkn",
+      "note": "Edit distance to acceptance on a dbt project. Ring constraints, which dbt cannot state, are declared not_expressible on the personas (barwise-1079). What remains are checks dbt can state and the round trip does not carry: multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn).",
       "detail": "3 of 6 persona checks fail: The model has no object type named \"Seller\".; The model has no fact type connecting \"Order\" and \"Buyer\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Order includes ProductVariant in Quantity\"), so it cannot rule out: Rules out:"
     },
     "C04/small/6/acceptance:catalog-steward:snowflake-ddl": {
@@ -762,20 +762,6 @@
       "issue": "barwise-s4x",
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
-    },
-    "C07/small/6/acceptance:catalog-product-manager:tmf-openapi": {
-      "severity": "S5",
-      "class": "acceptance-edit-distance-openapi",
-      "issue": "barwise-1079",
-      "note": "Edit distance to acceptance on an OpenAPI artifact. barwise-lh9 and barwise-1076 are fixed; what remains is mostly checks OpenAPI cannot express (rings, deontic rules, external and value-side uniqueness, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer gaps to split out (barwise-1079).",
-      "detail": "2 of 9 persona checks fail: Your model still allows what it should forbid: Rules out: a acyclic ring violation among ProductOffering instances -- e.g. {ProductOffering=ProductOffering#1, ProductOffering=ProductOffering#2}; {ProductOffering=ProductOffering#2, ProductOffering=ProductOffering#1}; The m"
-    },
-    "C07/small/6/acceptance:integration-engineer:tmf-openapi": {
-      "severity": "S5",
-      "class": "acceptance-edit-distance-openapi",
-      "issue": "barwise-1079",
-      "note": "Edit distance to acceptance on an OpenAPI artifact. barwise-lh9 and barwise-1076 are fixed; what remains is mostly checks OpenAPI cannot express (rings, deontic rules, external and value-side uniqueness, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer gaps to split out (barwise-1079).",
-      "detail": "2 of 10 persona checks fail: The model does not verbalize as \"The combination of Msisdn and Country is unique across fact types.\". Check the fact type, its reading, and its constraints.; The model does not verbalize as \"It is obligatory that each PortInRequest carries at least one LetterOfAuthorizat"
     },
     "C07/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -1245,13 +1231,6 @@
       "issue": "barwise-rkm",
       "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
       "detail": "rename Team -> Workspace reported as a removal plus an addition with no synonym candidate"
-    },
-    "C11/small/6/acceptance:data-platform-lead:metrics-dbt": {
-      "severity": "S5",
-      "class": "acceptance-edit-distance-dbt",
-      "issue": "barwise-1079",
-      "note": "Edit distance to acceptance on a dbt project. barwise-bvl is fixed; what remains is mostly checks dbt cannot express (rings, deontic rules, subtypes, relationship verbs, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer and generator gaps to split out (barwise-1079).",
-      "detail": "1 of 5 persona checks fail: Your model does not yet carry the relationship this rule guards (no fact type matching \"FunnelStep precedes FunnelStep\"), so it cannot rule out: Rules out: a acyclic ring violation among FunnelStep instances -- e.g. {FunnelStep=FunnelStep#1, FunnelStep=FunnelStep#2}; {Fun"
     },
     "C11/small/6/acceptance:founding-engineer:backend-kotlin": {
       "severity": "S5",

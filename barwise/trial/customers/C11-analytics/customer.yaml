@@ -22,6 +22,14 @@ personas:
     wants: The dbt project on duckdb is imported with its adapter named, not silently treated as ANSI, and the funnel ordering ring holds.
     acceptance: personas/data-platform-lead.gym.yaml
     judges: [metrics-dbt]
+    not_expressible:
+      - artifact_kind: dbt
+        check: { factType: "FunnelStep precedes FunnelStep", constraint: "ring" }
+        reason: >-
+          dbt tests cannot state a ring constraint: a relationships test
+          checks that a referenced row exists, and nothing in the format says
+          the reference may not reach back to the same row or loop.
+          (barwise-1079)
 artifacts:
   - id: backend-kotlin
     generator: code

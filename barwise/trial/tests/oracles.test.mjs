@@ -780,6 +780,39 @@ test("personaProblems: a not_expressible entry must name one check, a judged kin
   );
 });
 
+test("not_expressible names a verbalization check by its sentence and a population check by fact type and constraint", () => {
+  // barwise-1079: only requires_element checks could be named, so OpenAPI's
+  // missing deontic modality and ring constraints had no seat.
+  const checks = [
+    { kind: "must_validate" },
+    { kind: "requires_verbalization", sentence: "It is obligatory that each A has some B." },
+    { kind: "forbids_population", factType: "A precedes A", constraint: "ring" },
+    { kind: "forbids_population", factType: "A precedes A", constraint: "mandatory" },
+  ];
+  const run = (check) =>
+    personaProblems({
+      id: "C99",
+      artifacts: [{ id: "api", generator: "openapi" }],
+      personas: [{
+        id: "p",
+        acceptance: "a.gym.yaml",
+        judges: ["api"],
+        not_expressible: [{ artifact_kind: "openapi", check, reason: "r" }],
+      }],
+    }, () => checks);
+  const sentence = { sentence: "It is obligatory that each A has some B." };
+  const ring = { constraint: "ring", factType: "A precedes A" }; // key order is not identity
+  assert.deepEqual(run(sentence), []);
+  assert.deepEqual(run(ring), []);
+  assert.match(run({ factType: "A precedes A" })[0], /matches 0 rubric checks/);
+  assert.match(run({ sentence: "It is obligatory" })[0], /matches 0 rubric checks/);
+  const x = (check) => [{ artifact_kind: "openapi", check, reason: "r" }];
+  assert.deepEqual([...exemptPositions(checks, x(sentence), "openapi")], [1]);
+  assert.deepEqual([...exemptPositions(checks, x(ring), "openapi")], [2]);
+  // must_validate has no key: nothing can excuse a model that does not validate.
+  assert.deepEqual([...exemptPositions(checks, x({}), "openapi")], []);
+});
+
 test("the real customer packages satisfy the persona rules", () => {
   // Pins the packages themselves: a persona added without judges fails here
   // before it reaches the runner's refusal.
@@ -796,8 +829,8 @@ test("the real customer packages satisfy the persona rules", () => {
 
 test("exemptPositions and gradeAcceptance: an excused check is excluded only for its artifact kind", () => {
   const checks = [
-    { element: { entity: "Booking" } },
-    { element: { factTypeBetween: ["Shipment", "Carrier"] } },
+    { kind: "requires_element", element: { entity: "Booking" } },
+    { kind: "requires_element", element: { factTypeBetween: ["Shipment", "Carrier"] } },
   ];
   const notExpressible = [
     { artifact_kind: "code", check: { factTypeBetween: ["Shipment", "Carrier"] }, reason: "r" },

@@ -1,0 +1,23 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Encounters", "version": "1" },
+  "paths": {},
+  "components": {
+    "schemas": {
+      "Encounter": {
+        "type": "object",
+        "properties": { "resourceType": { "type": "string" } },
+        "required": ["resourceType"],
+        "discriminator": {
+          "propertyName": "resourceType",
+          "mapping": { "EmergencyEncounter": "#/components/schemas/EmergencyEncounter" }
+        }
+      },
+      "EmergencyEncounter": {
+        "type": "object",
+        "properties": { "triageAcuity": { "type": "integer" } },
+        "required": ["triageAcuity"]
+      }
+    }
+  }
+}
