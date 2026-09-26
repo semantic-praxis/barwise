@@ -26,6 +26,7 @@ import { identificationOrder, preferredIdentifyingBinary } from "../model/identi
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import {
   type DataTypeDef,
+  type EntityType,
   isEntityType,
   type ObjectType,
   type ValueType,
@@ -815,17 +816,28 @@ function strategyToSqlType(strategy: PreferredIdentifierStrategy | undefined): s
  * mapped twice (barwise-967).
  *
  * Strategy:
- * 1. The first binary fact type linking this entity to a value type
- *    (the reference-mode heuristic).
+ * 1. A binary fact type linking this entity to the value type its
+ *    reference mode names -- `toSnake(valueType.name) === referenceMode`,
+ *    the same spelling phase 0 gives the key column.
  * 2. Otherwise the configured fallbackPkType (derived from the
  *    project's preferredIdentifierStrategy, or "TEXT" when unset).
+ *
+ * Step 1 used to accept the FIRST value type the entity played, named
+ * or not. Over this repository's models that rule fired for 93 entities
+ * and named the reference mode's value type for 3; the other 90 keys took
+ * an unrelated attribute's type -- `Doctor(provider_id)` typed from
+ * `Specialty`, a dbt `orders.order_id` typed DECIMAL(10,2) from
+ * `order_total` (dbt-key-type-fidelity.spec.md, WS2). A fallback is a
+ * guess the annotations can report; a borrowed type is a wrong answer
+ * that looks declared.
  */
-function referenceModePkType(ot: ObjectType, model: OrmModel, fallbackPkType: string): string {
-  // Heuristic: first binary fact type with a value type.
+function referenceModePkType(ot: EntityType, model: OrmModel, fallbackPkType: string): string {
   for (const ft of model.factTypes) {
     if (ft.arity !== 2) continue;
     const vp = findValuePlayer(ft, ot, model);
-    if (vp) return conceptualTypeToSql(vp.dataType);
+    if (vp && toSnake(vp.name) === ot.referenceMode) {
+      return conceptualTypeToSql(vp.dataType);
+    }
   }
 
   return fallbackPkType;

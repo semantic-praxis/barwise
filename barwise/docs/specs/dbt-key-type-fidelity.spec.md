@@ -1,6 +1,6 @@
 # Key-column data types survive dbt import, and export annotations stop reporting gaps that are not there
 
-Status: WS1 implemented 2026-09-26 (see Implementation notes); WS2 and WS3 not started
+Status: WS1 and WS2 implemented 2026-09-26 (see Implementation notes); WS3 not started
 
 Created: 2026-09-24
 Last-updated: 2026-09-26
@@ -391,3 +391,24 @@ Reproduction after WS1, through the CLI: `customers.customer_id`,
 `orders.order_id` and the foreign key `orders.customer_id` all export as
 `DECIMAL`. The false "defaulted" and "no description" TODOs remain until
 WS3.
+
+**WS2 (2026-09-26).** Landed as specified. Three details:
+
+- `packages/core/tests/mapping/referenceModePkType.test.ts` replaces
+  `scripts/refmode-heuristic-audit.mjs`, as the spec asked. It does not
+  copy `toSnake` to classify each key. It maps every tracked model under
+  two fallback strategies, and a key whose type does not move with the
+  fallback took its type from a value type. Restricted to what
+  `referenceModePkType` types (a single key column named for the
+  reference mode, not an objectified entity, not a subtype), that list is
+  exactly the three keys the audit counted as "named", and the test pins
+  it. Against the old mapper all three sweep and rule tests fail.
+- `core/tests/mapping/dbt.test.ts` asserted the defect as correct: a
+  `Customer(customer_id)` key typed `VARCHAR(100)` from its `Name`
+  attribute. It now asserts `TEXT`.
+- The predicted golden churn did not happen. The characterization
+  goldens are built from `examples/transcripts/` and `test-plan/fixtures/`
+  models whose entities have preferred identifying binaries, so the
+  fallback never reaches them; `examples/output/clinic-appointments.orm.yaml`,
+  where the audit found `Doctor(provider_id)` typed from `Specialty`, has
+  no DDL golden. `npm run test` passed with no golden rewritten.
