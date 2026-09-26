@@ -17,10 +17,21 @@
  *   a match), and an ordinary column shares unless it declares a type
  *   the holder does not have -- otherwise the column would export as the
  *   holder's type. An ordinary column with no type of its own shares.
+ * - the value constraints are the same set of values and ranges, or both
+ *   absent. A value type's constraint is part of what it means: sharing
+ *   `Status` enum [active] with a property declaring enum [pending]
+ *   would constrain the second to the first's domain, and sharing it with
+ *   a property declaring no enum would impose one it never had.
  *
  * Anything else gets `<Entity><Name>`, and the caller reports it.
  */
-import { type DataTypeDef, dataTypeOf, type ObjectType } from "../model/ObjectType.js";
+import {
+  type DataTypeDef,
+  dataTypeOf,
+  type ObjectType,
+  type ValueConstraintDef,
+  valueConstraintOf,
+} from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 
 export type ValueTypeClaim =
@@ -34,6 +45,7 @@ export function claimValueTypeName(
   candidate: string,
   dataType: DataTypeDef | undefined,
   role: "key" | "attribute",
+  valueConstraint?: ValueConstraintDef,
 ): ValueTypeClaim {
   const holder = model.getObjectTypeByName(candidate);
   if (!holder) return { kind: "create", name: candidate };
@@ -45,7 +57,9 @@ export function claimValueTypeName(
     ? sameDataType(dataTypeOf(holder), dataType)
     : dataType === undefined || sameDataType(dataTypeOf(holder), dataType);
 
-  if (holder.kind === "value" && !alreadyPlayed && typesAgree) {
+  const constraintsAgree = sameValueConstraint(valueConstraintOf(holder), valueConstraint);
+
+  if (holder.kind === "value" && !alreadyPlayed && typesAgree && constraintsAgree) {
     return { kind: "share", valueType: holder };
   }
   return {
@@ -59,6 +73,20 @@ export function claimValueTypeName(
 function sameDataType(a: DataTypeDef | undefined, b: DataTypeDef | undefined): boolean {
   if (!a || !b) return false;
   return a.name === b.name && a.length === b.length && a.scale === b.scale;
+}
+
+/** Whether two value constraints admit the same values; order does not matter. */
+function sameValueConstraint(
+  a: ValueConstraintDef | undefined,
+  b: ValueConstraintDef | undefined,
+): boolean {
+  if (!a || !b) return !a && !b;
+  const key = (c: ValueConstraintDef) =>
+    JSON.stringify([
+      [...c.values].sort(),
+      (c.ranges ?? []).map((r) => JSON.stringify(r)).sort(),
+    ]);
+  return key(a) === key(b);
 }
 
 /**

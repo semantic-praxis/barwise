@@ -16,6 +16,8 @@ import {
   renameSync,
   rmdirSync,
   rmSync,
+  statSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -155,4 +157,24 @@ test("a regression outranks a blind spot: the gate exits 1, not 2", () => {
   assert.equal(r.status, 1);
   assert.match(r.stdout, /NEW FINDING/);
   assert.match(r.stdout, /NEW BLIND/);
+});
+
+test("a bundle older than a package input is refused before anything is graded", () => {
+  // PR #572 review: the staleBundles unit tests pass with the refusal
+  // block in run.mjs deleted, so this drives the real offline path. It
+  // moves one real input's mtime ahead of both bundles and restores the
+  // exact original in `finally` -- no content changes, and no file is
+  // created, whose directory mtime could not be put back.
+  const input = fileURLToPath(new URL("../../packages/core/src/index.ts", import.meta.url));
+  const { atime, mtime } = statSync(input);
+  const future = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  utimesSync(input, future, future);
+  try {
+    const r = run("run.mjs", "offline", "--customer", "C01", "--sprint", "1");
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /older than .*packages\/core\/src\/index\.ts/);
+    assert.match(r.stderr, /--workspace=@barwise\/cli bundle/);
+  } finally {
+    utimesSync(input, atime, mtime);
+  }
 });

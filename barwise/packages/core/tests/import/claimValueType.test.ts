@@ -82,4 +82,34 @@ describe("claimValueTypeName", () => {
       claimValueTypeName(model, order.id, "Order", "Name", { name: "integer" }, "attribute"),
     ).toEqual({ kind: "create", name: "OrderName2", displaced: name });
   });
+
+  it("shares only when the value constraints admit the same values", () => {
+    // PR #572 review: a constraint is part of what a value type means.
+    const { model, order } = setup();
+    const status = model.addObjectType({
+      name: "Status",
+      kind: "value",
+      dataType: { name: "text" },
+      valueConstraint: { values: ["active", "closed"] },
+    });
+    const text = { name: "text" as const };
+    const claim = (vc?: { values: string[]; }) =>
+      claimValueTypeName(model, order.id, "Order", "Status", text, "attribute", vc);
+    expect(claim({ values: ["closed", "active"] })).toEqual({ kind: "share", valueType: status });
+    expect(claim({ values: ["pending"] })).toEqual({
+      kind: "create",
+      name: "OrderStatus",
+      displaced: status,
+    });
+    expect(claim(undefined).kind).toBe("create");
+  });
+
+  it("does not let a constrained column share an unconstrained value type", () => {
+    const { model, order, name } = setup();
+    expect(
+      claimValueTypeName(model, order.id, "Order", "Name", undefined, "attribute", {
+        values: ["x"],
+      }),
+    ).toEqual({ kind: "create", name: "OrderName", displaced: name });
+  });
 });

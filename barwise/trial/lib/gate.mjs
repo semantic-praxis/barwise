@@ -33,6 +33,7 @@ export const keyOf = (r) => `${r.customer}/${r.tier}/${r.sprint}/${r.step}`;
  */
 export function evaluateGate(results, baseline, {
   hasReproduction = (issue) => existsSync(join(FINDINGS_DIR, issue)),
+  catalog = loadCatalog(),
 } = {}) {
   const failing = results.filter((r) => r.status === "fail" && r.severity !== "authoring");
   const blind = results.filter((r) => r.status === "could_not_answer");
@@ -81,8 +82,41 @@ export function evaluateGate(results, baseline, {
     if (!tiers.has(tier) || ranKeys.has(k)) continue;
     (ranScopes.has(`${customer}/${tier}/${sprint}`) ? vanished : unrun).push(k);
   }
+  // A row names the catalog class that classified it, and carries that
+  // class's issue. The two are copies that must agree, and nothing checked
+  // them: retiring barwise-lh9 deleted its classes while eight rows still
+  // named them, and the gate printed PASS because it compares only keys
+  // and statuses (PR #572 review). A class the catalog no longer has, or
+  // an issue the class does not carry, is a stale classification.
+  // Agreeing with each other is not enough: the row must also still be
+  // what the catalog makes of THIS run's result. A step whose importer or
+  // detail changed can match another class first while the row keeps the
+  // old class and its old issue, internally consistent and wrong (PR #572
+  // second review). Only a row that ran is re-classified; one that did
+  // not has no current result to classify.
+  const classById = new Map(catalog.map((c) => [c.id, c]));
+  const misclassified = Object.entries(rows).flatMap(([k, v]) => {
+    if (!v.class) return [];
+    const c = classById.get(v.class);
+    if (!c) return [{ key: k, why: `class ${v.class} is not in the catalog` }];
+    if (c.issue !== v.issue) {
+      return [{ key: k, why: `class ${v.class} carries ${c.issue}, the row says ${v.issue}` }];
+    }
+    const now = current.get(k);
+    if (now && open.has(k)) {
+      const fits = classify(now, catalog)?.id ?? null;
+      if (fits !== v.class) {
+        return [{
+          key: k,
+          why: `this run classifies as ${fits ?? "no class"}, the row says ${v.class}`,
+        }];
+      }
+    }
+    return [];
+  });
   const authoring = results.filter((r) => r.severity === "authoring");
   return {
+    misclassified,
     failing,
     blind,
     fresh,
@@ -169,6 +203,10 @@ export function runGate({ tier = "small", write = false } = {}) {
   }
   for (const { key, issue } of v.unreproduced) {
     console.log(`NO REPRO     ${key}  nothing under findings/${issue}/ reproduces it`);
+    definite = true;
+  }
+  for (const { key, why } of v.misclassified) {
+    console.log(`MISCLASSIFIED ${key}  ${why}; reclassify the row`);
     definite = true;
   }
   for (const { key, was, now } of v.changed) {

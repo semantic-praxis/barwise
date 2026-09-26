@@ -57,62 +57,12 @@
       "note": "Consequence of barwise-dnm and barwise-zuk: the DDL export of the imported model is not readable back by the regex importer. Closes with the parents."
     },
     {
-      "id": "openapi-importer-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "severity": "S1",
-      "step": "^validate-imported:",
-      "importer": "openapi",
-      "note": "The OpenAPI importer derives role ids from the property name, so two schemas with a 'related' or 'has' property collide and every imported model fails structural/duplicate-role-id (barwise-lh9)."
-    },
-    {
-      "id": "openapi-importer-duplicate-role-ids-acceptance",
-      "issue": "barwise-lh9",
-      "severity": "S1",
-      "step": "^acceptance:",
-      "importer": "openapi",
-      "detail": "validation error",
-      "note": "Consequence of barwise-lh9: the persona's must_validate check fails on the importer's duplicate role ids. Closes with the parent."
-    },
-    {
-      "id": "read-back-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "severity": "S1",
-      "step": "^read-back:",
-      "detail": "duplicate-role-id",
-      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-lh9 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model."
-    },
-    {
-      "id": "roundtrip-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "severity": "S1",
-      "step": "^(model-)?roundtrip-validate:",
-      "detail": "duplicate-role-id",
-      "note": "barwise-lh9 reached from the sprint-1 round trip: the model that comes back from barwise's own export carries duplicate role ids and fails validation. The round trip used to grade only the diff, whose deltas sat inside the declared loss set, so the invalid model went unrecorded."
-    },
-    {
       "id": "roundtrip-norma-mandatory-violation",
       "issue": "barwise-oph",
       "severity": "S1",
       "step": "^(model-)?roundtrip-validate:norma$",
       "detail": "mandatory-violation",
       "note": "barwise-oph reached from the sprint-1 round trip: NORMA has no place for the population sample flag, so the re-imported populations count as real, their instances enter the object universe, and every mandatory role they do not play reports a violation. The model that was exported validates clean."
-    },
-    {
-      "id": "ddl-importer-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "severity": "S1",
-      "step": "^validate-imported:",
-      "importer": "ddl",
-      "note": "The DDL importer has the same role-id collision as the OpenAPI importer: role ids derived from column names collide across tables and the imported model fails structural/duplicate-role-id (barwise-lh9, second importer)."
-    },
-    {
-      "id": "ddl-importer-duplicate-role-ids-acceptance",
-      "issue": "barwise-lh9",
-      "severity": "S1",
-      "step": "^acceptance:",
-      "importer": "ddl",
-      "detail": "validation error",
-      "note": "Consequence of barwise-lh9 in the DDL importer: the persona's must_validate check fails on duplicate role ids. Closes with the parent."
     },
     {
       "id": "openapi-export-comment-header",
@@ -135,20 +85,6 @@
       "severity": "S1",
       "step": "^model-roundtrip:ddl$",
       "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-dnm)."
-    },
-    {
-      "id": "dbt-importer-duplicate-fact-type",
-      "issue": "barwise-bvl",
-      "severity": "S3",
-      "detail": "already exists in model \"dbt Import\"",
-      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-bvl)."
-    },
-    {
-      "id": "read-back-dbt-duplicate-fact-type",
-      "issue": "barwise-bvl",
-      "severity": "S3",
-      "step": "^read-back:dbt$",
-      "note": "Reading barwise's own dbt export back throws 'Fact type X already exists' (barwise-bvl)."
     },
     {
       "id": "dbt-roundtrip",
@@ -215,14 +151,15 @@
       "issue": "barwise-jjd",
       "severity": "S5",
       "step": "^acceptance:.*:(?!kernel).*-ddl$",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue."
+      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "importer": "sql"
     },
     {
       "id": "acceptance-edit-distance-dbt",
-      "issue": "barwise-bvl",
+      "issue": "barwise-1079",
       "severity": "S5",
       "step": "^acceptance:.*:(?!kernel).*-dbt$",
-      "note": "Edit distance to acceptance on a dbt project: the persona's checks fail because the model barwise produced is missing what the dbt importer dropped (barwise-bvl). A consequence row; closes with that importer issue."
+      "note": "Edit distance to acceptance on a dbt project. barwise-bvl is fixed; what remains is mostly checks dbt cannot express (rings, deontic rules, subtypes, relationship verbs, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer and generator gaps to split out (barwise-1079)."
     },
     {
       "id": "acceptance-edit-distance-kotlin",
@@ -243,6 +180,22 @@
       "issue": "barwise-s4x",
       "step": "^read-back:avro$",
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail."
+    },
+    {
+      "id": "acceptance-edit-distance-openapi",
+      "issue": "barwise-1079",
+      "severity": "S5",
+      "step": "^acceptance:",
+      "importer": "openapi",
+      "note": "Edit distance to acceptance on an OpenAPI artifact. barwise-lh9 and barwise-1076 are fixed; what remains is mostly checks OpenAPI cannot express (rings, deontic rules, external and value-side uniqueness, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer gaps to split out (barwise-1079)."
+    },
+    {
+      "id": "acceptance-edit-distance-ddl",
+      "issue": "barwise-1077",
+      "severity": "S5",
+      "step": "^acceptance:",
+      "importer": "ddl",
+      "note": "Edit distance to acceptance on a DDL artifact read by the DDL importer: the persona checks fail partly on composite keys and multi-column uniqueness the importer replaces with an invented key (barwise-1077). Checks DDL cannot express keep a row open after the fix; reclassify it then."
     }
   ]
 }
