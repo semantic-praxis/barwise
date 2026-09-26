@@ -271,6 +271,91 @@ models:
     expect(new ValidationEngine().errors(model)).toEqual([]);
   });
 
+  it("does not bind a typed non-key column to a same-named value type of another type", () => {
+    // PR #564 review: customers.customer_id is a numeric key; an unrelated
+    // orders.customer_id attribute is varchar(36). Sharing CustomerId
+    // would export the varchar column as DECIMAL.
+    const yaml = `
+models:
+  - name: customers
+    columns:
+      - name: customer_id
+        data_type: number
+        data_tests: [not_null, unique]
+  - name: orders
+    columns:
+      - name: order_id
+        data_type: number
+        data_tests: [not_null, unique]
+      - name: customer_id
+        data_type: varchar(36)
+`;
+    const { model, report } = importDbtProject([yaml]);
+    // The attribute gets its own value type, and the mapper names the
+    // column after it: a reported rename, never a wrong type (as D1 does
+    // for keys).
+    expect(columnType(yaml, "orders", "orders_customer_id")).toBe("VARCHAR(36)");
+    expect(columnType(yaml, "customers", "customer_id")).toBe("DECIMAL");
+    expect(model.getObjectTypeByName("OrdersCustomerId")?.kind).toBe("value");
+    const warnings = report.entries
+      .filter((e) =>
+        e.severity === "warning" && e.columnName === "customer_id" && e.modelName === "orders"
+      )
+      .map((e) => e.message);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(`Created value type "OrdersCustomerId"`),
+    );
+    expect(warnings).toContainEqual(expect.stringContaining(`will export as "orders_customer_id"`));
+  });
+
+  it("still shares a same-named value type when the column declares no type of its own", () => {
+    const yaml = `
+models:
+  - name: customers
+    columns:
+      - name: customer_id
+        data_type: number
+        data_tests: [not_null, unique]
+      - name: status
+        data_type: varchar
+  - name: orders
+    columns:
+      - name: order_id
+        data_type: number
+        data_tests: [not_null, unique]
+      - name: status
+`;
+    const { model } = importDbtProject([yaml]);
+    expect(model.getObjectTypeByName("OrdersStatus")).toBeUndefined();
+    expect(model.getFactTypeByName("Orders has Status")).toBeDefined();
+  });
+
+  it("does not throw when an ordinary column's name equals its own entity's renamed identifier", () => {
+    // PR #564 review: the key `orders` of order_lines falls back to
+    // OrderLinesOrders (an entity holds "Orders"), and the ordinary column
+    // order_lines_orders PascalCases to the same name. Reusing that value
+    // type would give OrderLines two fact types named
+    // "OrderLines has OrderLinesOrders", and addFactType throws.
+    const yaml = `
+models:
+  - name: orders
+    columns:
+      - name: order_id
+        data_type: number
+        data_tests: [not_null, unique]
+  - name: order_lines
+    columns:
+      - name: orders
+        data_type: varchar
+        data_tests: [not_null, unique]
+      - name: order_lines_orders
+        data_type: varchar
+`;
+    const { model } = importDbtProject([yaml]);
+    expect(model.getFactTypeByName("OrderLines has OrderLinesOrders")).toBeDefined();
+    expect(new ValidationEngine().errors(model)).toEqual([]);
+  });
+
   it("does not make an entity the player of an ordinary attribute", () => {
     const yaml = `
 models:

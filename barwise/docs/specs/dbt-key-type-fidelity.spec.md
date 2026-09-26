@@ -355,19 +355,31 @@ options are kept so a later reader can see what was rejected.
 
 ## Implementation notes
 
-**WS1 (2026-09-26).** Landed as specified, with three details the spec
+**WS1 (2026-09-26).** Landed as specified, with four details the spec
 left open:
 
-- Resolving a column's data type, resolving its description, and the
-  kind check live in one module, `dbt/src/dbtMapping/columnTypes.ts`,
-  which both `identifierTypes.ts` (keys) and `valueTypes.ts` (other
-  columns) call.
-- The "key column will export as X" warning is not predicted from a
-  copy of the mapper's private `toSnake`. `keyColumns.ts` runs
-  `RelationalMapper` over the imported model and compares each entity's
-  exported key column with the dbt column. One check covers both causes
-  named above -- the D1 rename and a spelling such as `customerID` -- and
-  it cannot drift from what export does.
+- A column's data type, its description, and which value type it plays
+  are decided in one module, `dbt/src/dbtMapping/columnTypes.ts`. Both
+  `identifierTypes.ts` (keys) and `valueTypes.ts` (other columns) call
+  `claimValueType` for the last of these; they create what it decides
+  and word their own report messages.
+- D1's rule reached ordinary columns too (found in review of PR #564).
+  An ordinary column used to share any same-named value type, so a
+  `varchar(36)` attribute named like a numeric key exported as
+  `DECIMAL`, and a column named like its own entity's renamed identifier
+  made the import throw on a duplicate fact type. `claimValueType` now
+  shares a name only with a value type, never one this entity already
+  plays, and -- for an ordinary column -- only when the column declares
+  no type or the same type. An ordinary column with no type of its own
+  still shares, as before. A column that cannot share gets
+  `<Entity><Name>` and a reported rename, as a key does under D1.
+- The "will export as X" warning is not predicted from a copy of the
+  mapper's private `toSnake`. `exportedColumns.ts` runs
+  `RelationalMapper` over the imported model and compares each column it
+  emits with the dbt column it came from, matched on the entity-side
+  role both record. One check covers every cause -- a D1 rename, the
+  ordinary-column rename above, and a spelling such as `customerID` --
+  and it cannot drift from what export does.
 - The diagram risk under Risks and testing was real: a value type that
   identifies one entity and is also an attribute of another lost the
   attribute's edge. `ModelToGraph` now keeps such a value type as a node

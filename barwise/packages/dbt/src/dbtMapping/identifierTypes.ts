@@ -19,14 +19,13 @@
 import type { Constraint, ObjectType } from "@barwise/core";
 import type { DbtColumn } from "../DbtSchemaTypes.js";
 import {
+  claimValueType,
   describeHolder,
   formatDataType,
-  freeObjectTypeName,
   reportColumnType,
   resolveColumnDescription,
   resolveColumnType,
   type ResolvedColumnType,
-  sameDataType,
 } from "./columnTypes.js";
 import type { DbtMapperContext } from "./context.js";
 import { toPascalCase } from "./naming.js";
@@ -47,12 +46,21 @@ export function createIdentifierTypes(ctx: DbtMapperContext): void {
     const resolved = resolveColumnType(ctx, col);
     reportColumnType(ctx, m.name, col, resolved);
 
-    const identifier = claimIdentifier(ctx, m.name, entityName, col, resolved, identifierOwner);
+    const identifier = claimIdentifier(
+      ctx,
+      m.name,
+      entityName,
+      entityId,
+      col,
+      resolved,
+      identifierOwner,
+    );
     identifierOwner.set(identifier.id, identifierOwner.get(identifier.id) ?? m.name);
 
     const factName = `${entityName} has ${identifier.name}`;
     const entityRoleId = `${factName}::role1`;
     const valueRoleId = `${factName}::role2`;
+    ctx.columnRoleIdMap.set(`${m.name}::${col.name}`, entityRoleId);
     const constraints: Constraint[] = [
       { type: "internal_uniqueness", roleIds: [valueRoleId], isPreferred: true },
       { type: "internal_uniqueness", roleIds: [entityRoleId] },
@@ -71,58 +79,55 @@ export function createIdentifierTypes(ctx: DbtMapperContext): void {
 }
 
 /**
- * The value type that identifies this model's entity: an existing one
- * when it already holds the column's name AND the same declared type,
- * otherwise a new one.
- *
- * Sharing by name alone would export one of two same-named keys with the
- * other's type, so a shared name with a different type -- or a name an
- * entity holds -- gets a per-entity `<Entity><Name>` identifier instead
- * (decision D1). That costs a renamed key column, which the post-mapping
- * check in `keyColumns.ts` reports; it never costs a wrong type.
+ * The value type that identifies this model's entity. `claimValueType`
+ * decides whether an existing one may be shared (decision D1: only an
+ * identical declared type) or a per-entity `<Entity><Name>` is created.
+ * A per-entity identifier costs a renamed key column, which the
+ * post-mapping check in `exportedColumns.ts` reports; it never costs a wrong
+ * type.
  */
 function claimIdentifier(
   ctx: DbtMapperContext,
   modelName: string,
   entityName: string,
+  entityId: string,
   col: DbtColumn,
   resolved: ResolvedColumnType,
   identifierOwner: ReadonlyMap<string, string>,
 ): ObjectType {
+  const claim = claimValueType(ctx, entityName, entityId, col, resolved, "key");
   const candidate = toPascalCase(col.name);
-  const holder = ctx.model.getObjectTypeByName(candidate);
 
-  if (holder && holder.kind === "value" && sameDataType(holder.dataType, resolved.dataType)) {
+  if (claim.kind === "share") {
     ctx.report.info(
       "identifier",
       modelName,
       `Key column "${col.name}" shares identifier value type "${candidate}" (${
         formatDataType(resolved.dataType)
-      }) with model "${identifierOwner.get(holder.id) ?? "?"}".`,
+      }) with model "${identifierOwner.get(claim.valueType.id) ?? "?"}".`,
       col.name,
     );
-    return holder;
+    return claim.valueType;
   }
 
-  const name = holder ? freeObjectTypeName(ctx, `${entityName}${candidate}`) : candidate;
-  if (holder) {
-    const owner = identifierOwner.get(holder.id);
+  if (claim.displaced) {
+    const owner = identifierOwner.get(claim.displaced.id);
     ctx.report.warning(
       "identifier",
       modelName,
       `Key column "${col.name}" (${
         formatDataType(resolved.dataType)
       }) cannot share the name "${candidate}": `
-        + `${describeHolder(holder)}${
+        + `${describeHolder(claim.displaced)}${
           owner ? ` identifies model "${owner}"` : ""
         } already holds it. `
-        + `Created identifier value type "${name}" instead.`,
+        + `Created identifier value type "${claim.name}" instead.`,
       col.name,
     );
   }
 
   return ctx.model.addObjectType({
-    name,
+    name: claim.name,
     kind: "value",
     definition: resolveColumnDescription(ctx, modelName, col),
     ...(resolved.dataType ? { dataType: resolved.dataType } : {}),

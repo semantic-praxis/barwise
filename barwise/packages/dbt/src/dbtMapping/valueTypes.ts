@@ -3,8 +3,9 @@
  */
 
 import {
+  claimValueType,
   describeHolder,
-  freeObjectTypeName,
+  formatDataType,
   reportColumnType,
   resolveColumnDescription,
   resolveColumnType,
@@ -20,43 +21,37 @@ export function createValueTypes(ctx: DbtMapperContext): void {
     const pk = ctx.pkMap.get(m.name);
     const rels = ctx.relMap.get(m.name) ?? [];
     const relColNames = new Set(rels.map((r) => r.columnName));
+    const entityName = toPascalCase(m.name);
 
     for (const col of m.columns) {
       // Skip PK column (identifierTypes.ts) and FK columns (factTypes.ts).
       if (col.name === pk?.columnName) continue;
       if (relColNames.has(col.name)) continue;
 
-      const candidate = toPascalCase(col.name);
+      const resolved = resolveColumnType(ctx, col);
+      const claim = claimValueType(ctx, entityName, entityId, col, resolved, "attribute");
 
-      // A value type of this name is shared across models. An entity of
-      // this name is not a value type at all, and making it the player of
-      // an attribute fact type would turn the column into a reference.
-      const holder = ctx.model.getObjectTypeByName(candidate);
-      if (holder?.kind === "value") {
-        ctx.valueTypeIdMap.set(`${m.name}::${col.name}`, holder.id);
+      if (claim.kind === "share") {
+        ctx.valueTypeIdMap.set(`${m.name}::${col.name}`, claim.valueType.id);
         continue;
       }
 
-      const vtName = holder
-        ? freeObjectTypeName(ctx, `${toPascalCase(m.name)}${candidate}`)
-        : candidate;
-      if (holder) {
+      if (claim.displaced) {
         ctx.report.warning(
           "data_type",
           m.name,
-          `Column "${col.name}" cannot use the name "${candidate}": ${
-            describeHolder(holder)
-          } already holds it. `
-            + `Created value type "${vtName}" instead.`,
+          `Column "${col.name}" (${formatDataType(resolved.dataType)}) cannot use the name "${
+            toPascalCase(col.name)
+          }": ${describeHolder(claim.displaced)} already holds it. `
+            + `Created value type "${claim.name}" instead.`,
           col.name,
         );
       }
 
-      const resolved = resolveColumnType(ctx, col);
       const definition = resolveColumnDescription(ctx, m.name, col);
 
       const vt = ctx.model.addObjectType({
-        name: vtName,
+        name: claim.name,
         kind: "value",
         definition,
         ...(resolved.dataType ? { dataType: resolved.dataType } : {}),

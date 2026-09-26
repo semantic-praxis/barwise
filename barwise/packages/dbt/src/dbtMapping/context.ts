@@ -36,6 +36,12 @@ export interface DbtMapperContext {
   readonly entityIdMap: Map<string, string>;
   /** "modelName::columnName" -> value type id. */
   readonly valueTypeIdMap: Map<string, string>;
+  /**
+   * "modelName::columnName" -> the entity-side role of the fact type the
+   * column became. The relational mapper records the same role on the
+   * column it emits, which is how `exportedColumns.ts` finds it.
+   */
+  readonly columnRoleIdMap: Map<string, string>;
   /** Source table data types: "sourceName.tableName.columnName" -> data_type string. */
   readonly sourceDataTypes: Map<string, string>;
   /** Column-level source data types: "columnName" -> data_type string (if unambiguous). */
@@ -52,6 +58,7 @@ export function createContext(doc: DbtProjectDocument): DbtMapperContext {
     relMap: new Map<string, RelationshipInfo[]>(),
     entityIdMap: new Map<string, string>(),
     valueTypeIdMap: new Map<string, string>(),
+    columnRoleIdMap: new Map<string, string>(),
     sourceDataTypes: new Map<string, string>(),
     sourceColumnTypes: new Map<string, string | null>(),
   };

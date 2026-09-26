@@ -19,7 +19,7 @@
  *             preferred identifying binary a reference mode abbreviates
  *   Phase 2: Create value types for non-key, non-FK columns
  *   Phase 3: Create fact types with roles and constraints
- *   Phase 4: Report key columns the relational mapping will rename
+ *   Phase 4: Report columns the relational mapping will rename
  */
 
 import type { OrmModel } from "@barwise/core";
@@ -27,9 +27,9 @@ import type { DbtImportReport } from "./DbtImportReport.js";
 import { analyzeModels } from "./dbtMapping/analyze.js";
 import { createContext } from "./dbtMapping/context.js";
 import { createEntityTypes } from "./dbtMapping/entityTypes.js";
+import { reportColumnRenames } from "./dbtMapping/exportedColumns.js";
 import { createFactTypes } from "./dbtMapping/factTypes.js";
 import { createIdentifierTypes } from "./dbtMapping/identifierTypes.js";
-import { reportKeyColumnRenames } from "./dbtMapping/keyColumns.js";
 import { indexSourceDataTypes } from "./dbtMapping/sourceTypes.js";
 import { createValueTypes } from "./dbtMapping/valueTypes.js";
 import type { DbtProjectDocument } from "./DbtSchemaTypes.js";
@@ -67,6 +67,6 @@ export function mapDbtToOrm(doc: DbtProjectDocument): DbtMapResult {
   createIdentifierTypes(ctx);
   createValueTypes(ctx);
   createFactTypes(ctx);
-  reportKeyColumnRenames(ctx);
+  reportColumnRenames(ctx);
   return { model: ctx.model, report: ctx.report.build() };
 }

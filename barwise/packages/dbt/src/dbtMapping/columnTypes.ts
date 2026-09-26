@@ -1,7 +1,8 @@
 /**
- * Column-level resolution shared by the key and non-key paths: which
- * data type a column declares, what its description is, and which value
- * type it may play.
+ * Column-level decisions shared by the key and non-key paths: which data
+ * type a column declares, what its description is, and which value type
+ * it plays (`claimValueType`). The callers create what this decides and
+ * word their own report messages.
  *
  * Key columns and ordinary columns used to be resolved by two different
  * paths -- ordinary columns here, key columns not at all -- so a declared
@@ -13,7 +14,7 @@
 import { type DataTypeDef, dataTypeOf, type ObjectType } from "@barwise/core";
 import type { DbtColumn } from "../DbtSchemaTypes.js";
 import type { DbtMapperContext } from "./context.js";
-import { inferColumnDescription, resolveDataType } from "./naming.js";
+import { inferColumnDescription, resolveDataType, toPascalCase } from "./naming.js";
 import { resolveSourceColumnType } from "./sourceTypes.js";
 
 /** A column's data type, and which definition supplied it. */
@@ -93,7 +94,7 @@ export function resolveColumnDescription(
 }
 
 /** Whether two data types are the same type: name, length and scale. */
-export function sameDataType(
+function sameDataType(
   a: DataTypeDef | undefined,
   b: DataTypeDef | undefined,
 ): boolean {
@@ -102,12 +103,69 @@ export function sameDataType(
 }
 
 /**
+ * Which value type a column plays: an existing one it may share, or a
+ * new one under a name no object type holds.
+ */
+export type ValueTypeClaim =
+  | { readonly kind: "share"; readonly valueType: ObjectType; }
+  | { readonly kind: "create"; readonly name: string; readonly displaced?: ObjectType; };
+
+/**
+ * Decide which value type a column of `entityName` plays, for both the
+ * key path and the ordinary-column path, so the two cannot disagree
+ * about when a name may be shared.
+ *
+ * A same-named object type is shared only when sharing loses nothing:
+ *
+ * - it is a value type, never an entity (an entity would turn the column
+ *   into a reference);
+ * - this entity does not already play it, since a second fact type
+ *   "<Entity> has <Name>" would collide with the first and
+ *   `OrmModel.addFactType` throws (PR #564 review);
+ * - a key shares only an identical declared type (decision D1: a missing
+ *   type is not a match), and an ordinary column shares unless it
+ *   declares a type the holder does not have -- otherwise the column
+ *   would export as the holder's type (PR #564 review). An ordinary
+ *   column with no type of its own still shares, as it always has.
+ *
+ * Anything else gets `<Entity><Name>`, and the caller reports it.
+ */
+export function claimValueType(
+  ctx: DbtMapperContext,
+  entityName: string,
+  entityId: string,
+  col: DbtColumn,
+  resolved: ResolvedColumnType,
+  role: "key" | "attribute",
+): ValueTypeClaim {
+  const candidate = toPascalCase(col.name);
+  const holder = ctx.model.getObjectTypeByName(candidate);
+  if (!holder) return { kind: "create", name: candidate };
+
+  const alreadyPlayed = ctx.model
+    .factTypesForObjectType(holder.id)
+    .some((ft) => ft.roles.some((r) => r.playerId === entityId));
+  const typesAgree = role === "key"
+    ? sameDataType(dataTypeOf(holder), resolved.dataType)
+    : resolved.dataType === undefined || sameDataType(dataTypeOf(holder), resolved.dataType);
+
+  if (holder.kind === "value" && !alreadyPlayed && typesAgree) {
+    return { kind: "share", valueType: holder };
+  }
+  return {
+    kind: "create",
+    name: freeObjectTypeName(ctx, `${entityName}${candidate}`),
+    displaced: holder,
+  };
+}
+
+/**
  * The first name, starting from `preferred`, that no object type holds.
  *
  * `OrmModel.addObjectType` refuses a duplicate name by throwing, so every
  * fallback name is checked rather than assumed free.
  */
-export function freeObjectTypeName(ctx: DbtMapperContext, preferred: string): string {
+function freeObjectTypeName(ctx: DbtMapperContext, preferred: string): string {
   if (!ctx.model.getObjectTypeByName(preferred)) return preferred;
   for (let i = 2;; i += 1) {
     const name = `${preferred}${i}`;

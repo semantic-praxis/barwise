@@ -43,13 +43,14 @@ src/
   sql/SqlglotBridge.ts   Optional sqlglot sidecar for SQL mining (parallel
                          to formats' bridge by design; connectors own
                          their subprocess I/O)
-  dbtMapping/columnTypes.ts  One resolver for a column's data type,
-                         description and value-type name, shared by the
-                         key and non-key paths
+  dbtMapping/columnTypes.ts  Column decisions shared by the key and non-key
+                         paths: data type, description, and which value
+                         type a column plays (claimValueType); callers
+                         create the value type and word the report
   dbtMapping/identifierTypes.ts  Typed identifier value type + preferred
                          identifying binary per entity (the long form of a
                          reference mode)
-  dbtMapping/keyColumns.ts  Reports key columns the relational mapping
+  dbtMapping/exportedColumns.ts  Reports columns the relational mapping
                          will rename (runs RelationalMapper, not a copy of it)
   dbtMapping/sqlPatterns.ts  Merge mined SQL patterns (WHERE guards, CASE
                          branches, DDL constraints, joins) into the model

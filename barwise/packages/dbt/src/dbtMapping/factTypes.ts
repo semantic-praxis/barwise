@@ -32,6 +32,7 @@ export function createFactTypes(ctx: DbtMapperContext): void {
 
       const role1Id = `${factName}::role1`;
       const role2Id = `${factName}::role2`;
+      ctx.columnRoleIdMap.set(`${m.name}::${col.name}`, role1Id);
 
       // Build constraints from tests.
       const constraints = buildConstraints(col, role1Id, role2Id, ctx.report, m.name);
