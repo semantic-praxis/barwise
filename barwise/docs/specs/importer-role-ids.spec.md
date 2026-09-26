@@ -43,6 +43,42 @@ role ids.
 Nothing parses these ids: a search of `packages/*/src` for `::role` or a
 `-role` suffix finds only the three sites that build them.
 
+## Requirements
+
+- **R1.** When an importer creates a role, it shall take the role's id
+  from `generateId()`, never from a string built out of names or other
+  ids.
+- **R2.** When two imported fact types share a player or a name (two
+  tables with a `name` column, two foreign keys with the same inferred
+  verb), the importer shall still produce distinct role ids, so that
+  `barwise validate` reports no duplicate-role-id error on the result.
+- **R3.** When an importer is registered in the format registry, the
+  registry test shall either run it over a fixture and check every id it
+  emits, or name it in a stated exemption; an importer in neither fails
+  the test.
+
+## Alternatives considered
+
+- **Omit role ids and let the `Role` default mint them.** A role with no
+  `id` already gets one from `generateId()`. It fails here because every
+  one of these sites passes the role id into a constraint (`roleIds`,
+  `roleId`) in the same `addFactType` call that creates the role, so the
+  id has to exist first. Supporting it would mean constraints that name
+  roles by position and a resolution step inside core -- a new API to fix
+  three call sites.
+- **Keep readable ids but make them unique** (for example,
+  `<fact type id>::role1`). Fixes the collision and keeps ids legible in
+  the YAML. Rejected: it keeps a second id policy alive beside
+  `generateId()`, so creation order stays invisible for roles, and the
+  next importer would copy it. The UUIDv7 spec made the id policy a single
+  decision; this restores that rather than adding a sanctioned exception.
+- **Assert id shape (a UUIDv7 regex) in each importer's own tests** instead
+  of one registry test. Rejected on evidence: the DDL/OpenAPI ids were
+  `<uuid>-has-Name-role`, which a prefix-anchored shape check passes, and
+  a per-package test does not notice a newly registered importer. The
+  counting generator is an oracle no hand-built id can satisfy, and
+  iterating the registry covers importers by declaration.
+
 ## Design
 
 - The three importers call `generateId()` (exported from `@barwise/core`)
@@ -59,16 +95,19 @@ Nothing parses these ids: a search of `packages/*/src` for `::role` or a
   exemption fails the test, so a new importer is covered by declaration,
   not by someone remembering.
 
-## Exemptions, and why
+## Exemption, and why
 
 - **norma** keeps the role ids from the source `.orm` file on purpose
   (`formats/src/norma/mapping/factTypes.ts:30`, "Preserve NORMA role id for
   constraint mapping"). Those are the source tool's GUIDs, not names built
   from names. Whether NORMA imports should re-mint is a separate question,
   filed as barwise-1070.
-- **typescript, java, kotlin** need a live language server, which the test
-  environment does not have. A search of `code-analysis/src` finds no
-  hand-built ids; the exemption says so and names that search.
+
+The three code importers (typescript, java, kotlin) are covered, not
+exempt: with no language server on PATH they fall back to regex analysis,
+which runs in milliseconds, so the test gives them one small source tree.
+The first draft exempted them as needing a live server; review showed the
+fallback, and the test now runs it.
 
 ## Out of scope
 
@@ -83,6 +122,11 @@ Nothing parses these ids: a search of `packages/*/src` for `::role` or a
 - No output format depends on role ids being readable; exports name
   columns and fields from object types and role names.
 - Mutation check: reverting any one importer to its hand-built ids turns
-  the registry test red for that importer.
+  the registry test red for that importer. For the DDL foreign-key path
+  this needed table-level `FOREIGN KEY` lines in the fixture: the importer
+  does not read an inline `REFERENCES`, so the first fixture never reached
+  that path and a reverted fix stayed green. Measured after the change:
+  reverting only `createForeignKeyFactType` fails the DDL case with four
+  hand-built ids named.
 - Per package: `npm run build`, then the dbt, formats and cli suites, then
   `npm run ci:local` before push.

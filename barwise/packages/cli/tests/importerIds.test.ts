@@ -37,15 +37,23 @@ registerStandardFormats();
 registerDbtFormats();
 registerCodeFormats();
 
-/** Two tables share a `name` column: the case that made DDL role ids collide. */
+/**
+ * Two tables share a `name` column (the value-side collision), and `orders`
+ * has two foreign keys, so both of the DDL importer's role-minting paths run.
+ * Table-level `FOREIGN KEY` lines, because the importer does not read an
+ * inline `REFERENCES` on a column: with inline clauses the foreign-key path
+ * never ran, and reverting its fix left this test green (caught in review).
+ */
 const DDL = `
 CREATE TABLE customers (customer_id INTEGER PRIMARY KEY, name VARCHAR(50) NOT NULL);
 CREATE TABLE suppliers (supplier_id INTEGER PRIMARY KEY, name VARCHAR(50));
 CREATE TABLE orders (
   order_id INTEGER PRIMARY KEY,
-  customer_id INTEGER NOT NULL REFERENCES customers(customer_id),
-  supplier_id INTEGER REFERENCES suppliers(supplier_id),
-  total DECIMAL(10,2)
+  customer_id INTEGER NOT NULL,
+  supplier_id INTEGER,
+  total DECIMAL(10,2),
+  FOREIGN KEY (customer_id) REFERENCES customers (customer_id),
+  FOREIGN KEY (supplier_id) REFERENCES suppliers (supplier_id)
 );
 `;
 
@@ -128,20 +136,51 @@ function dbtProject(): string {
   return dir;
 }
 
+/**
+ * One small source tree for the three code importers. With no language
+ * server on PATH they fall back to regex analysis, which is what runs here
+ * and in CI; an LSP-backed run mints ids through the same model API.
+ */
+function codeProject(): string {
+  const dir = mkdtempSync(join(tmpdir(), "importer-ids-code-"));
+  tempDirs.push(dir);
+  const files: Record<string, string> = {
+    "src/model.ts": 'export type Status = "open" | "closed";\n'
+      + "export interface Customer { id: string; name: string; }\n"
+      + "export interface Order { id: string; customer: Customer; status: Status; total: number; }\n",
+    "src/main/java/demo/Customer.java":
+      "package demo;\npublic class Customer { private String id; private String name; }\n",
+    "src/main/java/demo/Order.java": "package demo;\npublic enum Status { OPEN, CLOSED }\n"
+      + "public class Order { private String id; private Customer customer; private Status status; }\n",
+    "src/main/kotlin/demo/Model.kt": "package demo\nenum class Status { OPEN, CLOSED }\n"
+      + "data class Customer(val id: String, val name: String)\n"
+      + "data class Order(val id: String, val customer: Customer, val status: Status)\n",
+  };
+  for (const [path, body] of Object.entries(files)) {
+    mkdirSync(join(dir, path, ".."), { recursive: true });
+    writeFileSync(join(dir, path), body);
+  }
+  return dir;
+}
+
+async function directory(name: string, dir: string): Promise<OrmModel> {
+  return (await importerFor(name).parseAsync!(dir)).model;
+}
+
 /** How to feed each importer. Keys must cover every registered importer. */
 const FIXTURES: Record<string, () => Promise<OrmModel>> = {
   ddl: async () => text("ddl", DDL),
   openapi: async () => text("openapi", OPENAPI),
   sql: async () => text("sql", SQL),
-  dbt: async () => (await importerFor("dbt").parseAsync!(dbtProject())).model,
+  dbt: async () => directory("dbt", dbtProject()),
+  typescript: async () => directory("typescript", codeProject()),
+  java: async () => directory("java", codeProject()),
+  kotlin: async () => directory("kotlin", codeProject()),
 };
 
 /** Importers deliberately not run here, each with the reason. */
 const EXEMPT: Record<string, string> = {
   norma: "keeps the source .orm file's role GUIDs on purpose; barwise-1070 tracks re-minting them",
-  typescript: "needs a live language server; code-analysis/src has no hand-built ids",
-  java: "needs a live language server; code-analysis/src has no hand-built ids",
-  kotlin: "needs a live language server; code-analysis/src has no hand-built ids",
 };
 
 function importerFor(name: string): ImportFormat {
