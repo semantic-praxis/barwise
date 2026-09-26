@@ -4,7 +4,7 @@ Status: Implemented 2026-09-26 -- R1-R2 in PR #572, R3 in PR #573 (see Implement
 
 Created: 2026-09-26
 Last-updated: 2026-09-26
-Tracking: barwise-1076
+Tracking: barwise-1076 (R1-R2, closed); barwise-1081 (R3)
 
 `barwise import model api.json --format openapi` turns each scalar
 property into a fact type whose roles are ordered value-first, and puts
