@@ -175,6 +175,18 @@
       "caught_by": "reasoning",
       "note": "A reviewer's objection, in one sentence -- do not build what others have built better -- before anything was re-run. The draft had rejected gitleaks on two grounds that both turn out weak: CLAUDE.md's no-trivial-dependencies rule is about what Node core provides, and the first-party-actions constraint is satisfied by a pinned tarball with a verified digest."
     },
+    "ddl-import-fidelity::0d08b981db76": {
+      "spec": "ddl-import-fidelity.spec.md",
+      "excerpt": "the existing tests did not catch any of this. ddlimportformat.test.ts asserts that some mandatory constraint exists (tobegreaterthan(0)), never which role it is",
+      "caught_by": "not-a-correction",
+      "note": "Explains why pre-existing importer defects escaped the old tests (existence-only assertions); it records nothing this spec's draft got wrong."
+    },
+    "ddl-import-fidelity::77d42bf43d19": {
+      "spec": "ddl-import-fidelity.spec.md",
+      "excerpt": "- the conceptual types are coarser than sql. bigint re-exports as integer, double precision as float, and timestamp with time zone as timestamp, because the mod",
+      "caught_by": "execution",
+      "note": "The first round-trip test called renderDdl directly and failed on a missing UNIQUE (email): UNIQUE comes from DdlExportFormat's constraint routing. Running the test caught it; the test now goes through DdlExportFormat."
+    },
     "diagram-layout-laws::6cdf956a0090": {
       "spec": "diagram-layout-laws.spec.md",
       "excerpt": "the draft gave a different first reason and it was wrong. it said reuse would require either reaching into another package's tests/, \"which depcruise exists to ",
