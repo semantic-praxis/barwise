@@ -465,7 +465,7 @@ export class OpenApiImportFormat implements ImportFormat {
   /**
    * The value type a property plays, shared across schemas only under
    * core's `claimValueTypeName` -- never an entity, never one this entity
-   * already plays, never one of a different declared type. The importer
+   * already plays, never one of a different declared type or enum. The importer
    * used to reuse whatever object type held the name, so a string
    * property `customer` on Order became a fact type played by the
    * Customer entity.
@@ -479,6 +479,9 @@ export class OpenApiImportFormat implements ImportFormat {
   ) {
     const candidate = this.toPascalCase(propName);
     const dataType = { name: this.mapOpenApiTypeToConceptual(propDef.type, propDef.format) };
+    const valueConstraint = propDef.enum && propDef.enum.length > 0
+      ? { values: propDef.enum.map((v) => String(v)) }
+      : undefined;
     const claim = claimValueTypeName(
       model,
       entityType.id,
@@ -486,18 +489,16 @@ export class OpenApiImportFormat implements ImportFormat {
       candidate,
       dataType,
       "attribute",
+      valueConstraint,
     );
     if (claim.kind === "share") return claim.valueType;
     if (claim.displaced) {
       warnings.push(
         `Schema "${entityType.name}", property "${propName}" (${dataType.name}): the name "${candidate}" is `
-          + `already held by ${claim.displaced.kind} type "${claim.displaced.name}" with a different type or role; `
+          + `already held by ${claim.displaced.kind} type "${claim.displaced.name}" with a different type, enum or role; `
           + `created value type "${claim.name}" instead.`,
       );
     }
-    const valueConstraint = propDef.enum && propDef.enum.length > 0
-      ? { values: propDef.enum.map((v) => String(v)) }
-      : undefined;
     return model.addObjectType({
       name: claim.name,
       kind: "value",

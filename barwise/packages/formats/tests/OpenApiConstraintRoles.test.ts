@@ -119,4 +119,38 @@ describe("R2: a held value-type name is shared only under claimValueTypeName", (
     expect(factType(model, "Order has OrderCustomer")).toBeDefined();
     expect(new ValidationEngine().errors(model)).toEqual([]);
   });
+
+  it("does not share a value type whose enum differs, in either direction", () => {
+    // PR #572 review: Order.status reused Customer's Status and took its domain.
+    const { model, warnings } = importer.parse(spec({
+      Customer: {
+        type: "object",
+        properties: { status: { type: "string", enum: ["active"] } },
+      },
+      Order: {
+        type: "object",
+        properties: { status: { type: "string", enum: ["pending"] } },
+      },
+      Note: { type: "object", properties: { status: { type: "string" } } },
+    }));
+    const domain = (name: string) => {
+      const ot = model.getObjectTypeByName(name);
+      return ot?.kind === "value" ? ot.valueConstraint?.values : "missing";
+    };
+    expect(domain("Status")).toEqual(["active"]);
+    expect(domain("OrderStatus")).toEqual(["pending"]);
+    expect(domain("NoteStatus")).toBeUndefined();
+    expect(factType(model, "Order has OrderStatus")).toBeDefined();
+    expect(factType(model, "Note has NoteStatus")).toBeDefined();
+    expect(warnings.filter((w) => w.includes("enum"))).toHaveLength(2);
+  });
+
+  it("shares a value type whose enum is the same set", () => {
+    const { model } = importer.parse(spec({
+      Customer: { type: "object", properties: { tier: { type: "string", enum: ["a", "b"] } } },
+      Supplier: { type: "object", properties: { tier: { type: "string", enum: ["b", "a"] } } },
+    }));
+    expect(factType(model, "Supplier has Tier")).toBeDefined();
+    expect(model.getObjectTypeByName("SupplierTier")).toBeUndefined();
+  });
 });

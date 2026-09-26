@@ -55,7 +55,8 @@ mostly on the uniqueness and mandatory checks this causes.
   entity's role mandatory. This is `ddl-import-fidelity.spec.md` R3.
 - **R2.** When a property's value-type name is already held, the
   importer shall share it only under `claimValueTypeName` (a value
-  type, not already played by this entity, and no declared type lost),
+  type, not already played by this entity, no declared type lost, and
+  the same enum or none on both sides),
   and otherwise create `<Entity><Name>` and warn. This is
   `ddl-import-fidelity.spec.md` R5.
 
@@ -120,6 +121,12 @@ Landed as specified, in `createPropertyFactType` and a new
   like another schema's entity (`Order.customer` next to `Customer`)
   became a fact type played by the `Customer` entity -- an attribute
   imported as a reference. It now gets `OrderCustomer` and a warning.
+- The PR #572 review found that sharing ignored the enum: with
+  `Customer.status` enum [active] imported first, `Order.status` enum
+  [pending] reused `Status` and took the first domain. The value
+  constraint is now part of `claimValueTypeName`'s rule, in core, so it
+  holds for every importer; dbt and DDL put their value constraints on
+  roles rather than value types, so their imports do not change.
 - No existing test pinned the old role order, which is the point the
   spec made about asserting by count: the formats suite passed before
   and after, and 6 of the 8 new tests failed before.
