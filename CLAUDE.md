@@ -429,6 +429,14 @@ skill (`.claude/skills/release/`).
   a command, which is what makes this checkable where "activate the
   venv first" is not (barwise-921). The one standing exception is
   bootstrapping uv itself.
+
+  Two checks read it, from one rule module
+  (`scripts/lib/python-uv-rules.mjs`): `npm run check:python-uv` over
+  tracked files, and a `PreToolUse` hook on an agent's own Bash
+  commands (`scripts/hooks/python-uv-guard.mjs`), which refuses a bare
+  interpreter before it runs. The hook exists because the gate never
+  saw the `python3 - <<EOF` an agent types, which ran twice in one day
+  (barwise-1060).
 - A copy that must agree with other code is never guarded by a
   comment: share it, derive it from the authority, register the pair
   in `barwise/parity.manifest.json` (checked by `npm run
