@@ -16,6 +16,7 @@ import {
   ValidationEngine,
 } from "@barwise/core";
 import { collectExportAnnotations, type ExportAnnotation } from "@barwise/core/annotation";
+import { generateDdlLineage } from "@barwise/core/lineage";
 import { openApiToJson, RelationalMapper, renderOpenApi } from "@barwise/core/mapping";
 
 /**
@@ -84,6 +85,9 @@ export class OpenApiExportFormat implements ExportFormatAdapter {
 
     return {
       text: validationWarnings + text,
+      // What each artifact was built from, for `lineage impact`. No format
+      // set it, so every manifest recorded `sources: []` (barwise-ofb).
+      lineage: generateDdlLineage(model, schema),
       annotations: annotations.length > 0 ? annotations : undefined,
     };
   }
