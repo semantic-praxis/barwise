@@ -63,12 +63,18 @@ export function bundlesPresent() {
  * bundle -- empty when every bundle is current.
  *
  * A present bundle is not a current one. `npm run build` does not rebuild
- * the bundles, so after a merge the lane ran yesterday's CLI and graded
- * it: a run on 2026-09-26 reported "0 stale" over 28 baseline rows that
- * the code on disk had already fixed (barwise-lh9), and would have
- * reported a regression as absent just as quietly. A bundle is built
- * from every package except the editor's, so any newer file under a
- * package's src/ means the bundle may not contain it.
+ * the bundles, so after editing a package the lane grades the CLI as it
+ * was at the last `bundle` run. A bundle is built from every package
+ * except the editor's, so any newer file under a package's src/ means
+ * the bundle may not contain it.
+ *
+ * mtime is only a proxy for "built from this source", and on 2026-09-26
+ * it was defeated: turbo cached dist/bundle/ as a `build` output and a
+ * cache hit restored an old bundle with a FRESH mtime, so the lane
+ * reported "0 stale" over 28 rows main had already fixed (barwise-lh9).
+ * That cause is removed at the source (turbo.json excludes dist/bundle/
+ * from `build` outputs); this check covers the remaining one, forgetting
+ * to rebuild.
  *
  * `roots` and `stat` are injectable so the rule is testable without a
  * build.
