@@ -181,6 +181,12 @@
       "caught_by": "not-a-correction",
       "note": "Explains why pre-existing importer defects escaped the old tests (existence-only assertions); it records nothing this spec's draft got wrong."
     },
+    "ddl-import-fidelity::3c41f16994fa": {
+      "spec": "ddl-import-fidelity.spec.md",
+      "excerpt": "- composite primary keys (barwise-1077). the importer replaces them with an invented <table>id. the faithful shape is an external uniqueness over the key column",
+      "caught_by": "reasoning",
+      "note": "The draft did not consider a single-column key that is also a foreign key; review of PR #570 found it by reading the key-skip order in DdlImportFormat. Measuring two candidate model shapes through DdlExportFormat then showed neither round-trips, so it became a warning and barwise-1078."
+    },
     "ddl-import-fidelity::77d42bf43d19": {
       "spec": "ddl-import-fidelity.spec.md",
       "excerpt": "- the conceptual types are coarser than sql. bigint re-exports as integer, double precision as float, and timestamp with time zone as timestamp, because the mod",

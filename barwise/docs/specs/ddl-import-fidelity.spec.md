@@ -4,7 +4,7 @@ Status: Implemented -- all three steps of the single workstream, landed with thi
 
 Created: 2026-09-26
 Last-updated: 2026-09-26
-Tracking: barwise-1058 (follow-ups filed during grounding: barwise-1076, barwise-1077)
+Tracking: barwise-1058 (follow-ups: barwise-1076, barwise-1077, barwise-1078)
 
 `barwise import model schema.sql --format ddl` loses most of what a
 `CREATE TABLE` says. It drops the primary key's type, which barwise-1058
@@ -126,9 +126,11 @@ re-exported DDL contains `PRIMARY KEY` and `FOREIGN KEY`.
   the importer shall share one only under the rule the dbt importer
   uses (same declared type, a value type, not already played by this
   entity), and otherwise create `<Entity><Name>` and warn.
-- **R6.** When a column carries an inline `REFERENCES t (c)`, the
-  importer shall import it as a foreign key, as it does the table-level
-  form.
+- **R6.** When a non-key column carries an inline `REFERENCES t (c)`,
+  the importer shall import it as a foreign key, as it does the
+  table-level form. When a single-column key also references another
+  table, the importer shall keep the typed key and warn that the
+  reference is not imported (see Scope).
 
 Acceptance: the first input above round-trips to the same columns,
 types, lengths, nullability, uniqueness and keys, and the second
@@ -144,6 +146,14 @@ Out of scope, each filed:
   own. A multi-column `UNIQUE` needs the same mechanism, so under this
   spec it gets a warning instead of the per-column uniqueness it gets
   today, which over-constrains every column in it.
+- **A key that is also a foreign key** (barwise-1078): an entity
+  identified by its relationship, such as `user_profiles.user_id`
+  referencing `users.id`. The relational mapper exports one column as
+  both key and foreign key only for a subtype. Modelled either as an
+  identifier plus a one-to-one relationship, or as a preferred
+  uniqueness on the relationship, it re-exports a second foreign-key
+  column the source never had. So the importer keeps the key and warns;
+  before this change the reference was dropped silently.
 - **The OpenAPI importer's identical constraint defect** (barwise-1076).
   Same fix, different file and fixtures.
 - **Column comments** (`COMMENT ON COLUMN`). The DDL export's
@@ -338,3 +348,19 @@ the same type share one identifier value type.
   | Scope       | a multi-column `UNIQUE` applied to each of its columns (the old behaviour)   |
   | R5          | `sameDataType` comparing names only (core)                                   |
   | R5          | the already-played check removed (core)                                      |
+
+Review of PR #570 found three more gaps. Each is fixed, with a test the
+helper showed red against `tests/DdlImportFidelity.test.ts`:
+
+- A `DEFAULT` expression was matched by a regex for its shape, which
+  stopped inside `nextval('seq'::regclass)` and left the column
+  nullable. `skipDefaultExpression` now consumes the expression to the
+  next clause keyword outside strings and parentheses. The first version
+  of its test could not catch a scanner that ignored nesting: no default
+  in it had a keyword inside parentheses, so that mutation went uncaught
+  (exit 1) until `DEFAULT (coalesce(1, NULL)) NOT NULL` was added.
+- `splitTableParts` split `DEFAULT 'a, b'` at the quoted comma. It is
+  now quote-aware.
+- A key that also references another table dropped the reference
+  silently. It now warns (barwise-1078), and R6 is narrowed to non-key
+  columns, with the reason in Scope.

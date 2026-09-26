@@ -287,9 +287,18 @@ export class DdlImportFormat implements ImportFormat {
     let current = "";
     let depth = 0;
 
+    // Quote-aware: a comma or parenthesis inside a string literal, as in
+    // `DEFAULT 'a, b'`, is text, not structure. A doubled quote ('') toggles
+    // twice and so stays inside the string.
+    let inString = false;
     for (let i = 0; i < body.length; i++) {
       const char = body[i]!;
-      if (char === "(") {
+      if (char === "'") {
+        inString = !inString;
+        current += char;
+      } else if (inString) {
+        current += char;
+      } else if (char === "(") {
         depth++;
         current += char;
       } else if (char === ")") {
@@ -342,6 +351,10 @@ export class DdlImportFormat implements ImportFormat {
     let unique = false;
     let references: ParsedColumn["references"];
     while (rest) {
+      if (/^DEFAULT\b/i.test(rest)) {
+        rest = skipDefaultExpression(rest.slice("DEFAULT".length));
+        continue;
+      }
       const clause = COLUMN_CLAUSES.map((re) => re.exec(rest)).find((m) => m);
       if (!clause) {
         warnings.push(
@@ -438,6 +451,19 @@ export class DdlImportFormat implements ImportFormat {
         `Table "${table.name}": PRIMARY KEY names "${table.primaryKey[0]}", which is not a column.`,
       );
       return;
+    }
+
+    // A key that is also a foreign key identifies this entity by its
+    // relationship. The relational mapper has no shape that exports one
+    // column as both, short of a subtype, so importing the relationship as
+    // well would add a second key column on export. Keep the typed key and
+    // say what was not imported (barwise-1078).
+    const fk = table.foreignKeys.find((f) => f.columns.includes(column.name));
+    if (fk) {
+      warnings.push(
+        `Table "${table.name}": key column "${column.name}" also references "${fk.referencedTable}"; `
+          + `the key is imported, the reference is not (barwise-1078).`,
+      );
     }
 
     const identifier = this.claimValueType(model, entity, column, "key", table, warnings);
@@ -654,8 +680,8 @@ const TYPE_PATTERN = new RegExp(
 
 /**
  * The column clauses the importer reads, each anchored at the start of
- * what is left. `DEFAULT` is read so it does not end the parse, and not
- * imported: the model has no place for a default.
+ * what is left. `DEFAULT` is handled by `skipDefaultExpression`, because
+ * its expression has no fixed shape.
  */
 const COLUMN_CLAUSES: readonly RegExp[] = [
   /^NOT\s+NULL\b/i,
@@ -663,8 +689,33 @@ const COLUMN_CLAUSES: readonly RegExp[] = [
   /^PRIMARY\s+KEY\b/i,
   /^UNIQUE\b/i,
   /^REFERENCES\s+"?(\w+)"?\s*\(\s*"?(\w+)"?\s*\)/i,
-  /^DEFAULT\s+(?:'(?:[^']|'')*'|\([^)]*\)|[\w.+-]+(?:\s*\(\s*\))?)/i,
 ];
+
+/** A clause keyword that ends a DEFAULT expression at nesting depth 0. */
+const AFTER_DEFAULT =
+  /^\s+(?:NOT\s+NULL|NULL|PRIMARY\s+KEY|UNIQUE|REFERENCES|CHECK|CONSTRAINT|COLLATE|GENERATED)\b/i;
+
+/**
+ * Skip a DEFAULT's expression and return what follows it. The expression
+ * runs to the next clause keyword outside any string or parentheses, so
+ * `nextval('t_id_seq'::regclass) NOT NULL` keeps its NOT NULL. A regex for
+ * the expression's shape stopped inside the call and left the column
+ * nullable (review of PR #570). Defaults are read, not imported: the model
+ * has no place for one.
+ */
+function skipDefaultExpression(text: string): string {
+  let depth = 0;
+  let inString = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]!;
+    if (char === "'") inString = !inString;
+    else if (inString) continue;
+    else if (char === "(") depth++;
+    else if (char === ")") depth--;
+    else if (depth === 0 && AFTER_DEFAULT.test(text.slice(i))) return text.slice(i).trim();
+  }
+  return "";
+}
 
 /**
  * A column's conceptual data type, with length and scale. "other" is DDL

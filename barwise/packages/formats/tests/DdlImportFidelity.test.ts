@@ -161,6 +161,31 @@ describe("column types: several words, length and scale, trailing clauses (R2, R
     expect(warnings).toEqual([`Table "t": "CHECK (length(f) > 0)" is not imported.`]);
   });
 
+  it("reads a DEFAULT expression through to the next clause (review of PR #570)", () => {
+    const result = importer.parse(`
+      CREATE TABLE seq (
+        id INTEGER DEFAULT nextval('seq_id_seq'::regclass) NOT NULL,
+        note VARCHAR(20) DEFAULT 'a, b' NOT NULL,
+        made TIMESTAMP DEFAULT (now() at time zone 'utc') UNIQUE,
+        score INTEGER DEFAULT (coalesce(1, NULL)) NOT NULL,
+        PRIMARY KEY (id)
+      );
+    `);
+    expect(result.warnings).toEqual([]);
+    expect(constraintsByPlayer(result.model, factType(result.model, "Seq has Note"))).toEqual([
+      "mandatory:Seq",
+      "unique:Seq",
+    ]);
+    expect(constraintsByPlayer(result.model, factType(result.model, "Seq has Made"))).toContain(
+      "unique:Made",
+    );
+    // A clause keyword inside the expression's parentheses does not end it.
+    expect(constraintsByPlayer(result.model, factType(result.model, "Seq has Score"))).toEqual([
+      "mandatory:Seq",
+      "unique:Seq",
+    ]);
+  });
+
   it("imports a column with an unknown clause, and says what it skipped", () => {
     const result = importer.parse(`
       CREATE TABLE test (
@@ -220,6 +245,19 @@ describe("value types are shared only when sharing loses nothing (R5)", () => {
     expect(dataType(model, "Name")).toEqual({ name: "text", length: 50 });
     expect(dataType(model, "SuppliersName")).toEqual({ name: "text", length: 100 });
     expect(warnings).toHaveLength(2);
+  });
+});
+
+describe("a key that is also a foreign key (review of PR #570)", () => {
+  it("keeps the typed key and reports the reference it does not import", () => {
+    const { model, warnings } = importer.parse(`
+      CREATE TABLE users (id INTEGER PRIMARY KEY);
+      CREATE TABLE user_profiles (user_id INTEGER PRIMARY KEY REFERENCES users (id), bio TEXT);
+    `);
+    expect(model.getObjectTypeByName("UserId")?.dataType).toEqual({ name: "integer" });
+    expect(warnings).toEqual([
+      `Table "user_profiles": key column "user_id" also references "users"; the key is imported, the reference is not (barwise-1078).`,
+    ]);
   });
 });
 
