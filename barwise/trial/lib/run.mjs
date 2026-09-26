@@ -41,6 +41,7 @@ import {
   listCustomerDirs,
   resultsPath,
   SCALE,
+  staleBundles,
   TIERS,
   TRIAL_DIR,
 } from "./paths.mjs";
@@ -207,6 +208,17 @@ async function offline(customers, tier, sprints, opts) {
   if (!bundlesPresent()) {
     console.error(
       "trial: CLI or MCP bundle missing. Build them first:\n  npm run build && npm run --workspace=@barwise/cli bundle && npm run --workspace=@barwise/mcp bundle",
+    );
+    process.exit(2);
+  }
+  const stale = staleBundles();
+  if (stale.length) {
+    console.error(
+      `trial: ${stale.map((s) => s.bundle).join(" and ")} ${
+        stale.length > 1 ? "are" : "is"
+      } older than ${
+        stale[0].newerSource
+      }; grading it would grade old code. Rebuild first:\n  npm run build && npm run --workspace=@barwise/cli bundle && npm run --workspace=@barwise/mcp bundle`,
     );
     process.exit(2);
   }

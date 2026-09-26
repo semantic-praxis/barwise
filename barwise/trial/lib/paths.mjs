@@ -7,7 +7,7 @@
  * made the same call); it never imports a package. That is why the
  * bundle paths are here and no `@barwise/*` import is anywhere in trial/.
  */
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -56,4 +56,48 @@ export function listCustomerDirs(filter) {
 
 export function bundlesPresent() {
   return existsSync(CLI_BUNDLE) && existsSync(MCP_BUNDLE);
+}
+
+/**
+ * The newest package source file that is newer than a bundle, per
+ * bundle -- empty when every bundle is current.
+ *
+ * A present bundle is not a current one. `npm run build` does not rebuild
+ * the bundles, so after a merge the lane ran yesterday's CLI and graded
+ * it: a run on 2026-09-26 reported "0 stale" over 28 baseline rows that
+ * the code on disk had already fixed (barwise-lh9), and would have
+ * reported a regression as absent just as quietly. A bundle is built
+ * from every package except the editor's, so any newer file under a
+ * package's src/ means the bundle may not contain it.
+ *
+ * `roots` and `stat` are injectable so the rule is testable without a
+ * build.
+ */
+export function staleBundles({
+  bundles = [CLI_BUNDLE, MCP_BUNDLE],
+  roots = packageSourceRoots(),
+  stat = statSync,
+} = {}) {
+  let newest = { file: undefined, mtimeMs: -Infinity };
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else {
+        const { mtimeMs } = stat(path);
+        if (mtimeMs > newest.mtimeMs) newest = { file: path, mtimeMs };
+      }
+    }
+  };
+  for (const root of roots) if (existsSync(root)) walk(root);
+  return bundles
+    .filter((b) => stat(b).mtimeMs < newest.mtimeMs)
+    .map((bundle) => ({ bundle, newerSource: newest.file }));
+}
+
+function packageSourceRoots() {
+  const packagesDir = join(BARWISE_DIR, "packages");
+  return readdirSync(packagesDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && d.name !== "vscode")
+    .map((d) => join(packagesDir, d.name, "src"));
 }
