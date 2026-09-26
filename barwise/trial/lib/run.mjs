@@ -214,11 +214,9 @@ async function offline(customers, tier, sprints, opts) {
   const stale = staleBundles();
   if (stale.length) {
     console.error(
-      `trial: ${stale.map((s) => s.bundle).join(" and ")} ${
-        stale.length > 1 ? "are" : "is"
-      } older than ${
-        stale[0].newerSource
-      }; grading it would grade old code. Rebuild first:\n  npm run build && npm run --workspace=@barwise/cli bundle && npm run --workspace=@barwise/mcp bundle`,
+      `${
+        stale.map((s) => `trial: ${s.bundle} ${s.why}`).join("\n")
+      }\nGrading it would grade old code. Rebuild first:\n  npm run build && npm run --workspace=@barwise/cli bundle && npm run --workspace=@barwise/mcp bundle`,
     );
     process.exit(2);
   }

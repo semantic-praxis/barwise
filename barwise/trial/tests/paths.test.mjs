@@ -1,8 +1,8 @@
 /**
  * staleBundles: a present bundle is not a current one. The offline lane
- * refuses to grade a bundle older than any of its package inputs, because
- * on 2026-09-26 it graded a stale CLI and reported 28 fixed rows as still
- * open (barwise-lh9).
+ * refuses to grade a bundle older than any of its package inputs, or one
+ * built from an input that is gone, because on 2026-09-26 it graded a
+ * stale CLI and reported 28 fixed rows as still open (barwise-lh9).
  */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
@@ -37,7 +37,9 @@ function fixture(old = 1_000) {
   ) {
     f.at(p, old);
   }
-  f.check = () => staleBundles({ bundles: [f.bundle], roots: [pkg] });
+  // What the bundle script recorded; empty unless a test names inputs.
+  f.inputs = [];
+  f.check = () => staleBundles({ bundles: [f.bundle], roots: [pkg], readInputs: () => f.inputs });
   return f;
 }
 
@@ -51,7 +53,7 @@ test("a source newer than the bundle, however deep, makes it stale and is named"
   const f = fixture();
   f.at(f.bundle, 2_000);
   f.at(f.source, 3_000);
-  assert.deepEqual(f.check(), [{ bundle: f.bundle, newerSource: f.source }]);
+  assert.deepEqual(f.check(), [{ bundle: f.bundle, why: `is older than ${f.source}` }]);
 });
 
 test("a deleted source makes the bundle stale through its directory's mtime", () => {
@@ -60,7 +62,7 @@ test("a deleted source makes the bundle stale through its directory's mtime", ()
   f.at(f.bundle, 2_000);
   rmSync(f.source);
   f.at(f.nested, 3_000); // what the deletion does to the parent, pinned
-  assert.deepEqual(f.check(), [{ bundle: f.bundle, newerSource: f.nested }]);
+  assert.deepEqual(f.check(), [{ bundle: f.bundle, why: `is older than ${f.nested}` }]);
 });
 
 test("an input outside src/ counts: a schema and package.json", () => {
@@ -69,10 +71,10 @@ test("an input outside src/ counts: a schema and package.json", () => {
   const f = fixture();
   f.at(f.bundle, 2_000);
   f.at(f.schema, 3_000);
-  assert.deepEqual(f.check(), [{ bundle: f.bundle, newerSource: f.schema }]);
+  assert.deepEqual(f.check(), [{ bundle: f.bundle, why: `is older than ${f.schema}` }]);
   f.at(f.schema, 1_000);
   f.at(f.manifest, 3_000);
-  assert.deepEqual(f.check(), [{ bundle: f.bundle, newerSource: f.manifest }]);
+  assert.deepEqual(f.check(), [{ bundle: f.bundle, why: `is older than ${f.manifest}` }]);
 });
 
 test("runtime state and build output are not inputs: hidden dirs, dist, tests, and the package root's own mtime", () => {
@@ -91,5 +93,46 @@ test("runtime state and build output are not inputs: hidden dirs, dist, tests, a
 test("a missing package directory is skipped, not an error", () => {
   const f = fixture();
   f.at(f.bundle, 2_000);
-  assert.deepEqual(staleBundles({ bundles: [f.bundle], roots: [join(f.pkg, "..", "nope")] }), []);
+  assert.deepEqual(
+    staleBundles({
+      bundles: [f.bundle],
+      roots: [join(f.pkg, "..", "nope")],
+      readInputs: () => [],
+    }),
+    [],
+  );
+});
+
+test("a recorded input that no longer exists makes the bundle stale, even at the package's top level", () => {
+  // PR #572 second review: deleting packages/core/schemas/ moves only the
+  // package root's mtime, which the source walk must ignore.
+  const f = fixture();
+  f.at(f.bundle, 2_000);
+  f.inputs = [f.schema, f.source];
+  assert.deepEqual(f.check(), []);
+  rmSync(join(f.pkg, "schemas"), { recursive: true });
+  assert.deepEqual(f.check(), [{
+    bundle: f.bundle,
+    why: `was built from ${f.schema}, which no longer exists`,
+  }]);
+});
+
+test("a recorded input outside the package roots counts when it is newer", () => {
+  // esbuild reads a dependency's dist/, which the source walk skips.
+  const f = fixture();
+  f.at(f.bundle, 2_000);
+  const dep = join(f.pkg, "dist.js");
+  writeFileSync(dep, "");
+  f.at(dep, 3_000);
+  f.inputs = [dep];
+  const walkOnly = staleBundles({ bundles: [f.bundle], roots: [], readInputs: () => f.inputs });
+  assert.deepEqual(walkOnly, [{ bundle: f.bundle, why: `is older than ${dep}` }]);
+});
+
+test("a bundle with no recorded inputs is refused, not trusted", () => {
+  const f = fixture();
+  f.at(f.bundle, 2_000);
+  const v = staleBundles({ bundles: [f.bundle], roots: [f.pkg], readInputs: () => null });
+  assert.equal(v.length, 1);
+  assert.match(v[0].why, /no inputs\.json/);
 });
