@@ -14,13 +14,6 @@
       "note": "import model --format ddl is a single regex; schema-qualified, bracket-quoted, backtick-quoted and unterminated statements do not match and the only warning claims the file has no CREATE TABLE at all (barwise-zuk).",
       "detail": "exit 0 and an empty model from an artifact with 65 expected names; the only signal is 1 warning(s): - No CREATE TABLE statements found in input"
     },
-    "C01/small/1/model-roundtrip-validate:openapi": {
-      "severity": "S1",
-      "class": "roundtrip-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "barwise-lh9 reached from the sprint-1 round trip: the model that comes back from barwise's own export carries duplicate role ids and fails validation. The round trip used to grade only the diff, whose deltas sat inside the declared loss set, so the invalid model went unrecorded.",
-      "detail": "the model the importer wrote has 26 structural error(s): structural/duplicate-role-id"
-    },
     "C01/small/1/model-roundtrip:dbt": {
       "severity": "S3",
       "class": "dbt-importer-duplicate-fact-type",
@@ -55,13 +48,6 @@
       "issue": "barwise-sxh",
       "note": "The default OpenAPI export writes a /* comment */ header when the model has diagnostics (which it always has after barwise-lh9), so the .json is not JSON and the importer returns an empty model with exit 0 (barwise-sxh).",
       "detail": "145 delta(s) outside the declared loss set: removed object_type Patient; removed object_type Provider; removed object_type Payer; removed object_type Facility; removed object_type Department; removed object_type Encounter; removed object_type InpatientEncounter; removed object_type OutpatientEncount"
-    },
-    "C01/small/1/validate-imported:fhir-openapi": {
-      "severity": "S1",
-      "class": "openapi-importer-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "The OpenAPI importer derives role ids from the property name, so two schemas with a 'related' or 'has' property collide and every imported model fails structural/duplicate-role-id (barwise-lh9).",
-      "detail": "the model the importer wrote has 57 structural error(s): structural/duplicate-role-id"
     },
     "C01/small/4.5/late:impact-id": {
       "severity": "S1",
@@ -98,13 +84,6 @@
       "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-bvl).",
       "detail": "exit 1: Error: Fact type \"OutpatientEncounter has Encounter\" already exists in model \"dbt Import\"."
     },
-    "C01/small/4/read-back:openapi": {
-      "severity": "S1",
-      "class": "read-back-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-lh9 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
-      "detail": "the model the importer wrote has 26 structural error(s): structural/duplicate-role-id"
-    },
     "C01/small/5/diff:5:rename_object_type": {
       "severity": "S5",
       "class": "diff-rename-no-synonym",
@@ -115,8 +94,8 @@
     "C01/small/6/acceptance:clinical-informaticist:fhir-openapi": {
       "severity": "S1",
       "class": "openapi-importer-duplicate-role-ids-acceptance",
-      "issue": "barwise-lh9",
-      "note": "Consequence of barwise-lh9: the persona's must_validate check fails on the importer's duplicate role ids. Closes with the parent.",
+      "issue": "barwise-1076",
+      "note": "Edit distance to acceptance on an OpenAPI artifact. The duplicate role ids that first failed this row (barwise-lh9) are fixed; what remains is mostly uniqueness and mandatory constraints the imported model allows but should forbid, because the OpenAPI importer puts them on the value role (barwise-1076). Some checks here (rings, deontic rules, ternary facts, external uniqueness) OpenAPI cannot express, so this row may stay open after barwise-1076; reclassify it then.",
       "detail": "5 of 9 persona checks fail: The model has 57 validation error(s): Role \"related\" in fact type \"Provider related Patient\" has id \"bc2abfcd-f073-4828-8dd5-6272c5232afd-related-role\", which another role already uses. Role ids must be unique across the model. (and 56 more); Your model does not yet carry"
     },
     "C01/small/6/release-bundle:gym-list": {
@@ -139,13 +118,6 @@
       "issue": "barwise-jjd",
       "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
       "detail": "exit 0 but 5 of 18 expected names are absent from the model and 5 of them are not mentioned on stderr (28% silently dropped)"
-    },
-    "C02/small/1/model-roundtrip-validate:openapi": {
-      "severity": "S1",
-      "class": "roundtrip-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "barwise-lh9 reached from the sprint-1 round trip: the model that comes back from barwise's own export carries duplicate role ids and fails validation. The round trip used to grade only the diff, whose deltas sat inside the declared loss set, so the invalid model went unrecorded.",
-      "detail": "the model the importer wrote has 14 structural error(s): structural/duplicate-role-id"
     },
     "C02/small/1/model-roundtrip:dbt": {
       "severity": "S1",
@@ -224,13 +196,6 @@
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
     },
-    "C02/small/4/read-back:openapi": {
-      "severity": "S1",
-      "class": "read-back-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-lh9 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
-      "detail": "the model the importer wrote has 14 structural error(s): structural/duplicate-role-id"
-    },
     "C02/small/6/acceptance:bank-data-architect:regmart-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
@@ -258,13 +223,6 @@
       "issue": "barwise-jjd",
       "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
       "detail": "exit 0 but 15 of 28 expected names are absent from the model and 15 of them are not mentioned on stderr (54% silently dropped)"
-    },
-    "C03/small/1/model-roundtrip-validate:openapi": {
-      "severity": "S1",
-      "class": "roundtrip-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "barwise-lh9 reached from the sprint-1 round trip: the model that comes back from barwise's own export carries duplicate role ids and fails validation. The round trip used to grade only the diff, whose deltas sat inside the declared loss set, so the invalid model went unrecorded.",
-      "detail": "the model the importer wrote has 25 structural error(s): structural/duplicate-role-id"
     },
     "C03/small/1/model-roundtrip:dbt": {
       "severity": "S1",
@@ -343,13 +301,6 @@
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
     },
-    "C03/small/4/read-back:openapi": {
-      "severity": "S1",
-      "class": "read-back-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-lh9 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
-      "detail": "the model the importer wrote has 25 structural error(s): structural/duplicate-role-id"
-    },
     "C03/small/5/diff:1:rename_object_type": {
       "severity": "S5",
       "class": "diff-rename-no-synonym",
@@ -412,13 +363,6 @@
       "issue": "barwise-oph",
       "note": "barwise-oph reached from the sprint-1 round trip: NORMA has no place for the population sample flag, so the re-imported populations count as real, their instances enter the object universe, and every mandatory role they do not play reports a violation. The model that was exported validates clean.",
       "detail": "the model the importer wrote has 49 structural error(s): population/mandatory-violation"
-    },
-    "C04/small/1/model-roundtrip-validate:openapi": {
-      "severity": "S1",
-      "class": "roundtrip-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "barwise-lh9 reached from the sprint-1 round trip: the model that comes back from barwise's own export carries duplicate role ids and fails validation. The round trip used to grade only the diff, whose deltas sat inside the declared loss set, so the invalid model went unrecorded.",
-      "detail": "the model the importer wrote has 22 structural error(s): structural/duplicate-role-id"
     },
     "C04/small/1/model-roundtrip:dbt": {
       "severity": "S1",
@@ -497,13 +441,6 @@
       "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation. The cause is the lost `sample: true` flag: NORMA has no seat for a sample instance, so the populations come back significant, their instances enter the object universe, and every mandatory role they must play reports a violation (barwise-oph). Restoring only that flag takes the round-tripped model from 49 errors to 0.",
       "detail": "the model the importer wrote has 49 structural error(s): population/mandatory-violation"
     },
-    "C04/small/4/read-back:openapi": {
-      "severity": "S1",
-      "class": "read-back-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-lh9 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
-      "detail": "the model the importer wrote has 22 structural error(s): structural/duplicate-role-id"
-    },
     "C04/small/5/diff:1:rename_object_type": {
       "severity": "S5",
       "class": "diff-rename-no-synonym",
@@ -545,13 +482,6 @@
       "issue": "barwise-dyq",
       "note": "The Kotlin importer returns an empty model for data classes and sealed classes with constructor properties, exit 0, no warning naming a class (barwise-dyq).",
       "detail": "exit 0 but 20 of 20 expected names are absent from the model and 20 of them are not mentioned on stderr (100% silently dropped)"
-    },
-    "C05/small/1/model-roundtrip-validate:openapi": {
-      "severity": "S1",
-      "class": "roundtrip-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "barwise-lh9 reached from the sprint-1 round trip: the model that comes back from barwise's own export carries duplicate role ids and fails validation. The round trip used to grade only the diff, whose deltas sat inside the declared loss set, so the invalid model went unrecorded.",
-      "detail": "the model the importer wrote has 30 structural error(s): structural/duplicate-role-id"
     },
     "C05/small/1/model-roundtrip:dbt": {
       "severity": "S1",
@@ -623,13 +553,6 @@
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
     },
-    "C05/small/4/read-back:openapi": {
-      "severity": "S1",
-      "class": "read-back-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-lh9 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
-      "detail": "the model the importer wrote has 30 structural error(s): structural/duplicate-role-id"
-    },
     "C05/small/5/merge:8:rename_fact_type": {
       "severity": "S3",
       "class": "merge-rename-structural-error",
@@ -664,13 +587,6 @@
       "issue": "barwise-jjd",
       "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
       "detail": "exit 0 but 11 of 33 expected names are absent from the model and 9 of them are not mentioned on stderr (33% silently dropped)"
-    },
-    "C06/small/1/model-roundtrip-validate:openapi": {
-      "severity": "S1",
-      "class": "roundtrip-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "barwise-lh9 reached from the sprint-1 round trip: the model that comes back from barwise's own export carries duplicate role ids and fails validation. The round trip used to grade only the diff, whose deltas sat inside the declared loss set, so the invalid model went unrecorded.",
-      "detail": "the model the importer wrote has 17 structural error(s): structural/duplicate-role-id"
     },
     "C06/small/1/model-roundtrip:dbt": {
       "severity": "S3",
@@ -749,13 +665,6 @@
       "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-bvl).",
       "detail": "exit 1: Error: Fact type \"Leg has Port\" already exists in model \"dbt Import\"."
     },
-    "C06/small/4/read-back:openapi": {
-      "severity": "S1",
-      "class": "read-back-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-lh9 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
-      "detail": "the model the importer wrote has 17 structural error(s): structural/duplicate-role-id"
-    },
     "C06/small/5/diff:1:rename_object_type": {
       "severity": "S5",
       "class": "diff-rename-no-synonym",
@@ -790,13 +699,6 @@
       "issue": "barwise-jjd",
       "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
       "detail": "exit 0 and an empty model from an artifact with 38 expected names; the only signal is 0 warning(s): (none)"
-    },
-    "C07/small/1/model-roundtrip-validate:openapi": {
-      "severity": "S1",
-      "class": "roundtrip-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "barwise-lh9 reached from the sprint-1 round trip: the model that comes back from barwise's own export carries duplicate role ids and fails validation. The round trip used to grade only the diff, whose deltas sat inside the declared loss set, so the invalid model went unrecorded.",
-      "detail": "the model the importer wrote has 31 structural error(s): structural/duplicate-role-id"
     },
     "C07/small/1/model-roundtrip:dbt": {
       "severity": "S1",
@@ -833,13 +735,6 @@
       "note": "The default OpenAPI export writes a /* comment */ header when the model has diagnostics (which it always has after barwise-lh9), so the .json is not JSON and the importer returns an empty model with exit 0 (barwise-sxh).",
       "detail": "140 delta(s) outside the declared loss set: removed object_type Party; removed object_type Individual; removed object_type Organization; removed object_type Customer; removed object_type Subscriber; removed object_type Country; removed object_type Operator; removed object_type ProductSpecification"
     },
-    "C07/small/1/validate-imported:tmf-openapi": {
-      "severity": "S1",
-      "class": "openapi-importer-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "The OpenAPI importer derives role ids from the property name, so two schemas with a 'related' or 'has' property collide and every imported model fails structural/duplicate-role-id (barwise-lh9).",
-      "detail": "the model the importer wrote has 48 structural error(s): structural/duplicate-role-id"
-    },
     "C07/small/4.5/late:impact-id": {
       "severity": "S1",
       "class": "lineage-impact-no-sources",
@@ -875,25 +770,18 @@
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
     },
-    "C07/small/4/read-back:openapi": {
-      "severity": "S1",
-      "class": "read-back-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-lh9 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
-      "detail": "the model the importer wrote has 31 structural error(s): structural/duplicate-role-id"
-    },
     "C07/small/6/acceptance:catalog-product-manager:tmf-openapi": {
       "severity": "S1",
       "class": "openapi-importer-duplicate-role-ids-acceptance",
-      "issue": "barwise-lh9",
-      "note": "Consequence of barwise-lh9: the persona's must_validate check fails on the importer's duplicate role ids. Closes with the parent.",
+      "issue": "barwise-1076",
+      "note": "Edit distance to acceptance on an OpenAPI artifact. The duplicate role ids that first failed this row (barwise-lh9) are fixed; what remains is mostly uniqueness and mandatory constraints the imported model allows but should forbid, because the OpenAPI importer puts them on the value role (barwise-1076). Some checks here (rings, deontic rules, ternary facts, external uniqueness) OpenAPI cannot express, so this row may stay open after barwise-1076; reclassify it then.",
       "detail": "5 of 9 persona checks fail: The model has 48 validation error(s): Role \"related\" in fact type \"Customer related Party\" has id \"1ebc923b-ec6b-4c8b-bbf1-168ca3239ea0-related-role\", which another role already uses. Role ids must be unique across the model. (and 47 more); Your model still allows what it"
     },
     "C07/small/6/acceptance:integration-engineer:tmf-openapi": {
       "severity": "S1",
       "class": "openapi-importer-duplicate-role-ids-acceptance",
-      "issue": "barwise-lh9",
-      "note": "Consequence of barwise-lh9: the persona's must_validate check fails on the importer's duplicate role ids. Closes with the parent.",
+      "issue": "barwise-1076",
+      "note": "Edit distance to acceptance on an OpenAPI artifact. The duplicate role ids that first failed this row (barwise-lh9) are fixed; what remains is mostly uniqueness and mandatory constraints the imported model allows but should forbid, because the OpenAPI importer puts them on the value role (barwise-1076). Some checks here (rings, deontic rules, ternary facts, external uniqueness) OpenAPI cannot express, so this row may stay open after barwise-1076; reclassify it then.",
       "detail": "4 of 10 persona checks fail: The model has 48 validation error(s): Role \"related\" in fact type \"Customer related Party\" has id \"1ebc923b-ec6b-4c8b-bbf1-168ca3239ea0-related-role\", which another role already uses. Role ids must be unique across the model. (and 47 more); Your model still allows what i"
     },
     "C07/small/6/release-bundle:gym-list": {
@@ -909,13 +797,6 @@
       "issue": "barwise-jjd",
       "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
       "detail": "exit 0 but 6 of 25 expected names are absent from the model and 6 of them are not mentioned on stderr (24% silently dropped)"
-    },
-    "C08/small/1/model-roundtrip-validate:openapi": {
-      "severity": "S1",
-      "class": "roundtrip-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "barwise-lh9 reached from the sprint-1 round trip: the model that comes back from barwise's own export carries duplicate role ids and fails validation. The round trip used to grade only the diff, whose deltas sat inside the declared loss set, so the invalid model went unrecorded.",
-      "detail": "the model the importer wrote has 9 structural error(s): structural/duplicate-role-id"
     },
     "C08/small/1/model-roundtrip:dbt": {
       "severity": "S1",
@@ -987,13 +868,6 @@
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
     },
-    "C08/small/4/read-back:openapi": {
-      "severity": "S1",
-      "class": "read-back-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-lh9 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
-      "detail": "the model the importer wrote has 9 structural error(s): structural/duplicate-role-id"
-    },
     "C08/small/5/diff:1:rename_object_type": {
       "severity": "S5",
       "class": "diff-rename-no-synonym",
@@ -1028,13 +902,6 @@
       "issue": "barwise-fbi",
       "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
       "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
-    },
-    "C09/small/1/model-roundtrip-validate:openapi": {
-      "severity": "S1",
-      "class": "roundtrip-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "barwise-lh9 reached from the sprint-1 round trip: the model that comes back from barwise's own export carries duplicate role ids and fails validation. The round trip used to grade only the diff, whose deltas sat inside the declared loss set, so the invalid model went unrecorded.",
-      "detail": "the model the importer wrote has 16 structural error(s): structural/duplicate-role-id"
     },
     "C09/small/1/model-roundtrip:dbt": {
       "severity": "S1",
@@ -1071,20 +938,6 @@
       "note": "Consequence of barwise-dnm and barwise-zuk: the DDL export of the imported model is not readable back by the regex importer. Closes with the parents.",
       "detail": "503 delta(s) outside the declared loss set: removed object_type StudyTitle; removed object_type StudyPhase; removed object_type ProtocolTitle; removed object_type AmendmentApprovalDate; removed object_type CountryCode; removed object_type InvestigatorName; removed object_type SubjectNumber; removed "
     },
-    "C09/small/1/roundtrip-validate:sdtm-ddl": {
-      "severity": "S1",
-      "class": "roundtrip-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "barwise-lh9 reached from the sprint-1 round trip: the model that comes back from barwise's own export carries duplicate role ids and fails validation. The round trip used to grade only the diff, whose deltas sat inside the declared loss set, so the invalid model went unrecorded.",
-      "detail": "the model the importer wrote has 5 structural error(s): structural/duplicate-role-id"
-    },
-    "C09/small/1/validate-imported:sdtm-ddl": {
-      "severity": "S1",
-      "class": "ddl-importer-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "The DDL importer has the same role-id collision as the OpenAPI importer: role ids derived from column names collide across tables and the imported model fails structural/duplicate-role-id (barwise-lh9, second importer).",
-      "detail": "the model the importer wrote has 29 structural error(s): structural/duplicate-role-id"
-    },
     "C09/small/4.5/late:impact-id": {
       "severity": "S1",
       "class": "lineage-impact-no-sources",
@@ -1113,13 +966,6 @@
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
     },
-    "C09/small/4/read-back:openapi": {
-      "severity": "S1",
-      "class": "read-back-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-lh9 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
-      "detail": "the model the importer wrote has 16 structural error(s): structural/duplicate-role-id"
-    },
     "C09/small/5/diff:1:rename_object_type": {
       "severity": "S5",
       "class": "diff-rename-no-synonym",
@@ -1144,8 +990,8 @@
     "C09/small/6/acceptance:biostatistician:sdtm-ddl": {
       "severity": "S1",
       "class": "ddl-importer-duplicate-role-ids-acceptance",
-      "issue": "barwise-lh9",
-      "note": "Consequence of barwise-lh9 in the DDL importer: the persona's must_validate check fails on duplicate role ids. Closes with the parent.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by the DDL importer. The duplicate role ids that first failed this row (barwise-lh9) are fixed; what remains includes composite uniqueness the importer replaces with an invented key (barwise-1077). Some checks here (subtypes, deontic rules, rings) DDL cannot express, so this row may stay open after barwise-1077; reclassify it then.",
       "detail": "4 of 10 persona checks fail: The model has 29 validation error(s): Role \"study\" in fact type \"Subject study Study\" has id \"691c2b02-fe93-4b56-b90d-6055d6b5d0d1-study-role\", which another role already uses. Role ids must be unique across the model. (and 28 more); The model does not verbalize as \"Rand"
     },
     "C09/small/6/acceptance:clinical-data-manager:legacy-norma": {
@@ -1158,8 +1004,8 @@
     "C09/small/6/acceptance:clinical-data-manager:sdtm-ddl": {
       "severity": "S1",
       "class": "ddl-importer-duplicate-role-ids-acceptance",
-      "issue": "barwise-lh9",
-      "note": "Consequence of barwise-lh9 in the DDL importer: the persona's must_validate check fails on duplicate role ids. Closes with the parent.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by the DDL importer. The duplicate role ids that first failed this row (barwise-lh9) are fixed; what remains includes composite uniqueness the importer replaces with an invented key (barwise-1077). Some checks here (subtypes, deontic rules, rings) DDL cannot express, so this row may stay open after barwise-1077; reclassify it then.",
       "detail": "6 of 10 persona checks fail: The model has 29 validation error(s): Role \"study\" in fact type \"Subject study Study\" has id \"691c2b02-fe93-4b56-b90d-6055d6b5d0d1-study-role\", which another role already uses. Role ids must be unique across the model. (and 28 more); Your model does not yet carry the rel"
     },
     "C09/small/6/acceptance:pharmacovigilance-lead:legacy-norma": {
@@ -1172,8 +1018,8 @@
     "C09/small/6/acceptance:pharmacovigilance-lead:sdtm-ddl": {
       "severity": "S1",
       "class": "ddl-importer-duplicate-role-ids-acceptance",
-      "issue": "barwise-lh9",
-      "note": "Consequence of barwise-lh9 in the DDL importer: the persona's must_validate check fails on duplicate role ids. Closes with the parent.",
+      "issue": "barwise-1077",
+      "note": "Edit distance to acceptance on a DDL artifact read by the DDL importer. The duplicate role ids that first failed this row (barwise-lh9) are fixed; what remains includes composite uniqueness the importer replaces with an invented key (barwise-1077). Some checks here (subtypes, deontic rules, rings) DDL cannot express, so this row may stay open after barwise-1077; reclassify it then.",
       "detail": "7 of 10 persona checks fail: The model has 29 validation error(s): Role \"study\" in fact type \"Subject study Study\" has id \"691c2b02-fe93-4b56-b90d-6055d6b5d0d1-study-role\", which another role already uses. Role ids must be unique across the model. (and 28 more); Your model does not yet carry the rel"
     },
     "C09/small/6/release-bundle:gym-list": {
@@ -1189,13 +1035,6 @@
       "issue": "barwise-jjd",
       "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
       "detail": "exit 0 but 10 of 31 expected names are absent from the model and 10 of them are not mentioned on stderr (32% silently dropped)"
-    },
-    "C10/small/1/model-roundtrip-validate:openapi": {
-      "severity": "S1",
-      "class": "roundtrip-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "barwise-lh9 reached from the sprint-1 round trip: the model that comes back from barwise's own export carries duplicate role ids and fails validation. The round trip used to grade only the diff, whose deltas sat inside the declared loss set, so the invalid model went unrecorded.",
-      "detail": "the model the importer wrote has 19 structural error(s): structural/duplicate-role-id"
     },
     "C10/small/1/model-roundtrip:dbt": {
       "severity": "S1",
@@ -1267,13 +1106,6 @@
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
     },
-    "C10/small/4/read-back:openapi": {
-      "severity": "S1",
-      "class": "read-back-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-lh9 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
-      "detail": "the model the importer wrote has 19 structural error(s): structural/duplicate-role-id"
-    },
     "C10/small/5/diff:1:rename_object_type": {
       "severity": "S5",
       "class": "diff-rename-no-synonym",
@@ -1344,13 +1176,6 @@
       "note": "barwise-oph reached from the sprint-1 round trip: NORMA has no place for the population sample flag, so the re-imported populations count as real, their instances enter the object universe, and every mandatory role they do not play reports a violation. The model that was exported validates clean.",
       "detail": "the model the importer wrote has 37 structural error(s): population/mandatory-violation"
     },
-    "C11/small/1/model-roundtrip-validate:openapi": {
-      "severity": "S1",
-      "class": "roundtrip-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "barwise-lh9 reached from the sprint-1 round trip: the model that comes back from barwise's own export carries duplicate role ids and fails validation. The round trip used to grade only the diff, whose deltas sat inside the declared loss set, so the invalid model went unrecorded.",
-      "detail": "the model the importer wrote has 15 structural error(s): structural/duplicate-role-id"
-    },
     "C11/small/1/model-roundtrip:dbt": {
       "severity": "S1",
       "class": "dbt-roundtrip",
@@ -1414,13 +1239,6 @@
       "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation. The cause is the lost `sample: true` flag: NORMA has no seat for a sample instance, so the populations come back significant, their instances enter the object universe, and every mandatory role they must play reports a violation (barwise-oph). Restoring only that flag takes the round-tripped model from 49 errors to 0.",
       "detail": "the model the importer wrote has 37 structural error(s): population/mandatory-violation"
     },
-    "C11/small/4/read-back:openapi": {
-      "severity": "S1",
-      "class": "read-back-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-lh9 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
-      "detail": "the model the importer wrote has 15 structural error(s): structural/duplicate-role-id"
-    },
     "C11/small/5/diff:1:rename_object_type": {
       "severity": "S5",
       "class": "diff-rename-no-synonym",
@@ -1462,13 +1280,6 @@
       "issue": "barwise-jjd",
       "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
       "detail": "exit 0 but 10 of 26 expected names are absent from the model and 10 of them are not mentioned on stderr (38% silently dropped)"
-    },
-    "C12/small/1/model-roundtrip-validate:openapi": {
-      "severity": "S1",
-      "class": "roundtrip-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "barwise-lh9 reached from the sprint-1 round trip: the model that comes back from barwise's own export carries duplicate role ids and fails validation. The round trip used to grade only the diff, whose deltas sat inside the declared loss set, so the invalid model went unrecorded.",
-      "detail": "the model the importer wrote has 32 structural error(s): structural/duplicate-role-id"
     },
     "C12/small/1/model-roundtrip:dbt": {
       "severity": "S1",
@@ -1539,13 +1350,6 @@
       "issue": "barwise-s4x",
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
-    },
-    "C12/small/4/read-back:openapi": {
-      "severity": "S1",
-      "class": "read-back-duplicate-role-ids",
-      "issue": "barwise-lh9",
-      "note": "Sprint 4 reads each export back through barwise's own importer. The model that comes back carries duplicate role ids and fails validation, which is barwise-lh9 reached from the export side: barwise cannot read its own OpenAPI or DDL output into a valid model.",
-      "detail": "the model the importer wrote has 32 structural error(s): structural/duplicate-role-id"
     },
     "C12/small/6/acceptance:hearing-officer:modern-ddl": {
       "severity": "S5",
