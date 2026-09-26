@@ -89,7 +89,7 @@ export function createFactTypes(ctx: DbtMapperContext): void {
         ctx.report.warning(
           "relationship",
           m.name,
-          `Relationship "${rel.columnName}" would be named "${plainName}", which another relationship already has; named "${factName}" instead.`,
+          `Relationship "${rel.columnName}" would be named "${plainName}", which another fact type already has; named "${factName}" instead.`,
           rel.columnName,
         );
       }
