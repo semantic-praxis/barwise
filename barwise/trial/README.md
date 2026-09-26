@@ -25,7 +25,9 @@ npm run trial:keyed    -- --customer C11    # sprint 2; needs a provider key
 
 Exit codes follow `docs/specs/gate-refusal-contract.spec.md`: 0 the
 run completed and every failure is classified, 1 a new or stale
-finding, 2 the lane could not answer (no bundle, nothing generated).
+finding, 2 the lane could not answer (no bundle or a stale one, nothing
+generated, or a tier generated before its generator or customer inputs
+last changed).
 
 ## Where things are
 

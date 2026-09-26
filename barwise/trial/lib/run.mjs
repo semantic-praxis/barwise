@@ -42,6 +42,7 @@ import {
   resultsPath,
   SCALE,
   staleBundles,
+  staleGenerated,
   TIERS,
   TRIAL_DIR,
 } from "./paths.mjs";
@@ -232,6 +233,15 @@ async function offline(customers, tier, sprints, opts) {
     if (!existsSync(join(gen, "manifest.json"))) {
       console.error(
         `trial: ${customer.id} has no generated ${tier} tier. Run: npm run trial:generate -- --customer ${customer.id} --tier ${tier}`,
+      );
+      process.exit(2);
+    }
+    const newer = staleGenerated(customer.dir, tier);
+    if (newer) {
+      console.error(
+        `trial: ${customer.id}'s generated ${tier} tier is older than ${
+          relative(TRIAL_DIR, newer)
+        }; grading it would grade the previous output. Run: npm run trial:generate -- --customer ${customer.id} --tier ${tier}`,
       );
       process.exit(2);
     }

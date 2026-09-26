@@ -178,3 +178,25 @@ test("a bundle older than a package input is refused before anything is graded",
     utimesSync(input, atime, mtime);
   }
 });
+
+test("a generated tier older than its generator is refused, and names the command that regenerates it", () => {
+  // trial:offline grades the files trial:generate last wrote. A generator
+  // fix was once "verified" by a run over the previous output, and the rows
+  // it retires still failed with nothing said. Generate the tier here, so
+  // the condition does not depend on what an earlier run left on disk, then
+  // move one generator's mtime past it and restore the exact original.
+  const gen = run("run.mjs", "generate", "--customer", "C01", "--tier", "small");
+  assert.equal(gen.status, 0, gen.stderr);
+  const input = fileURLToPath(new URL("../lib/generators/ddl.mjs", import.meta.url));
+  const { atime, mtime } = statSync(input);
+  const future = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  utimesSync(input, future, future);
+  try {
+    const r = run("run.mjs", "offline", "--customer", "C01", "--tier", "small", "--sprint", "1");
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, /older than lib\/generators\/ddl\.mjs/);
+    assert.match(r.stderr, /trial:generate -- --customer C01 --tier small/);
+  } finally {
+    utimesSync(input, atime, mtime);
+  }
+});

@@ -140,6 +140,10 @@ limitation rather than a defect.
   generator now knows the table modifiers the importer reads, and marks a
   statement that declares no table as not expected
   (`trial/tests/generators.test.mjs`).
-- **`trial:offline` does not regenerate.** A generator change takes
-  effect only after `npm run trial:generate`. The first rerun after the
-  fix above still graded this morning's files.
+- **`trial:offline` did not notice a stale tier.** A generator change
+  takes effect only after `npm run trial:generate`, and the first rerun
+  after the fix above still graded that morning's files with nothing said.
+  `trial:offline` now refuses (exit 2) a tier older than a generator
+  module or the customer's kernel, skins, transcripts or customer.yaml
+  (`staleGenerated` in `trial/lib/paths.mjs`, with a refusal test that
+  drives the real offline path).

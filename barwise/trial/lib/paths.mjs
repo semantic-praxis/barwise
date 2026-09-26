@@ -167,3 +167,34 @@ function bundledPackageDirs() {
     .filter((d) => d.isDirectory() && d.name !== "vscode")
     .map((d) => join(packagesDir, d.name));
 }
+
+/**
+ * The input a generated tier is older than, or undefined when the tier is
+ * current. `trial:offline` grades the files `trial:generate` last wrote and
+ * never regenerates, so a change to a generator -- or to a customer's
+ * kernel, skins, transcripts or customer.yaml -- was graded against the
+ * previous output with nothing said. On 2026-09-26 a generator fix was "verified" by a run
+ * over files written that morning, and the rows it retires still failed.
+ *
+ * The generator modules are the ones `generate()` in run.mjs imports.
+ * Personas are left out: they are read when a run grades, not when a tier
+ * is generated, so editing one needs no regeneration.
+ */
+export function staleGenerated(customerDir, tier, { stat = statSync } = {}) {
+  const manifest = join(generatedDir(customerDir, tier), "manifest.json");
+  const built = stat(manifest).mtimeMs;
+  const lib = join(TRIAL_DIR, "lib");
+  const inputs = [
+    ...readdirSync(join(lib, "generators")).map((f) => join(lib, "generators", f)),
+    join(lib, "model.mjs"),
+    join(lib, "prng.mjs"),
+    join(customerDir, "customer.yaml"),
+    join(customerDir, "kernel.orm.yaml"),
+    ...["skins", "transcripts"].flatMap((d) =>
+      existsSync(join(customerDir, d))
+        ? readdirSync(join(customerDir, d)).map((f) => join(customerDir, d, f))
+        : []
+    ),
+  ];
+  return inputs.find((f) => existsSync(f) && stat(f).mtimeMs > built);
+}
