@@ -7,7 +7,7 @@ import { ValidationEngine } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { importDbtProject } from "../../src/DbtProjectImporter.js";
 
-/** The enterprise trial's reproduction (trial/findings/barwise-bvl). */
+/** The enterprise trial's reproduction, moved here from trial/findings/barwise-bvl when the fix landed. */
 const TWO_PORTS = `
 version: 2
 models:

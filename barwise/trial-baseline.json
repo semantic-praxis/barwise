@@ -17,8 +17,8 @@
     "C01/small/1/model-roundtrip:dbt": {
       "severity": "S3",
       "class": "dbt-importer-duplicate-fact-type",
-      "issue": "barwise-bvl",
-      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-bvl).",
+      "issue": "barwise-vsp",
+      "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-vsp).",
       "detail": "exit 1: Error: Fact type \"OutpatientEncounter has Encounter\" already exists in model \"dbt Import\"."
     },
     "C01/small/1/model-roundtrip:ddl": {
@@ -77,13 +77,6 @@
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
     },
-    "C01/small/4/read-back:dbt": {
-      "severity": "S3",
-      "class": "dbt-importer-duplicate-fact-type",
-      "issue": "barwise-bvl",
-      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-bvl).",
-      "detail": "exit 1: Error: Fact type \"OutpatientEncounter has Encounter\" already exists in model \"dbt Import\"."
-    },
     "C01/small/5/diff:5:rename_object_type": {
       "severity": "S5",
       "class": "diff-rename-no-synonym",
@@ -94,8 +87,8 @@
     "C01/small/6/acceptance:clinical-informaticist:fhir-openapi": {
       "severity": "S1",
       "class": "openapi-importer-duplicate-role-ids-acceptance",
-      "issue": "barwise-1076",
-      "note": "Edit distance to acceptance on an OpenAPI artifact. The duplicate role ids that first failed this row (barwise-lh9) are fixed; what remains is mostly uniqueness and mandatory constraints the imported model allows but should forbid, because the OpenAPI importer puts them on the value role (barwise-1076). Some checks here (rings, deontic rules, ternary facts, external uniqueness) OpenAPI cannot express, so this row may stay open after barwise-1076; reclassify it then.",
+      "issue": "barwise-1079",
+      "note": "Edit distance to acceptance on an OpenAPI artifact. barwise-lh9 and barwise-1076 are fixed; what remains is mostly checks OpenAPI cannot express (rings, deontic rules, external and value-side uniqueness, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer gaps to split out (barwise-1079).",
       "detail": "5 of 9 persona checks fail: The model has 57 validation error(s): Role \"related\" in fact type \"Provider related Patient\" has id \"bc2abfcd-f073-4828-8dd5-6272c5232afd-related-role\", which another role already uses. Role ids must be unique across the model. (and 56 more); Your model does not yet carry"
     },
     "C01/small/6/release-bundle:gym-list": {
@@ -318,15 +311,15 @@
     "C03/small/6/acceptance:actuarial-analyst:claims-dbt": {
       "severity": "S5",
       "class": "acceptance-edit-distance-dbt",
-      "issue": "barwise-bvl",
-      "note": "Edit distance to acceptance on a dbt project: the persona's checks fail because the model barwise produced is missing what the dbt importer dropped (barwise-bvl). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1079",
+      "note": "Edit distance to acceptance on a dbt project. barwise-bvl is fixed; what remains is mostly checks dbt cannot express (rings, deontic rules, subtypes, relationship verbs, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer and generator gaps to split out (barwise-1079).",
       "detail": "4 of 9 persona checks fail: Your model does not yet carry the relationship this rule guards (no fact type matching \"Claim has LossDate\"), so it cannot rule out: Rules out: a Claim that exists but never plays \"Claim has LossDate\" -- e.g. Claim#1 appears in Claim has ClaimNumber but not in Claim has L"
     },
     "C03/small/6/acceptance:claims-data-steward:claims-dbt": {
       "severity": "S5",
       "class": "acceptance-edit-distance-dbt",
-      "issue": "barwise-bvl",
-      "note": "Edit distance to acceptance on a dbt project: the persona's checks fail because the model barwise produced is missing what the dbt importer dropped (barwise-bvl). A consequence row; closes with that importer issue.",
+      "issue": "barwise-1079",
+      "note": "Edit distance to acceptance on a dbt project. barwise-bvl is fixed; what remains is mostly checks dbt cannot express (rings, deontic rules, subtypes, relationship verbs, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer and generator gaps to split out (barwise-1079).",
       "detail": "5 of 10 persona checks fail: Your model does not yet carry the relationship this rule guards (no fact type matching \"Claim has ClaimNumber\"), so it cannot rule out: Rules out: two facts of Claim has ClaimNumber that agree on Claim -- e.g. {Claim=Claim#1, ClaimNumber=ClaimNumber#1}; {Claim=Claim#1, C"
     },
     "C03/small/6/acceptance:policy-admin-dba:pc-ddl": {
@@ -349,13 +342,6 @@
       "issue": "barwise-jjd",
       "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them.",
       "detail": "exit 0 but 9 of 29 expected names are absent from the model and 9 of them are not mentioned on stderr (31% silently dropped)"
-    },
-    "C04/small/1/import:warehouse-dbt": {
-      "severity": "S3",
-      "class": "dbt-importer-duplicate-fact-type",
-      "issue": "barwise-bvl",
-      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-bvl).",
-      "detail": "exit 1: Error: Fact type \"ProductBundlesProduct has Product\" already exists in model \"dbt Import\"."
     },
     "C04/small/1/model-roundtrip-validate:norma": {
       "severity": "S1",
@@ -398,6 +384,13 @@
       "issue": "barwise-jjd",
       "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent.",
       "detail": "16 delta(s) outside the declared loss set: removed object_type Party; removed object_type Currency; removed object_type Category; removed object_type Product; removed object_type PhysicalProduct; removed object_type Seller; removed object_type ProductVariant; removed object_type Marketplace"
+    },
+    "C04/small/1/roundtrip-diff:warehouse-dbt": {
+      "severity": "S1",
+      "class": "dbt-roundtrip",
+      "issue": "barwise-vsp",
+      "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-vsp).",
+      "detail": "68 delta(s) outside the declared loss set: modified object_type Category; modified object_type Product; modified object_type PhysicalProduct; modified object_type HazmatProduct; modified object_type ProductVariant; modified object_type Listing; modified object_type Order; modified object_type OrderL"
     },
     "C04/small/4.5/late:impact-id": {
       "severity": "S1",
@@ -454,6 +447,13 @@
       "issue": "barwise-rkm",
       "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
       "detail": "rename Offer -> Listing reported as a removal plus an addition with no synonym candidate"
+    },
+    "C04/small/6/acceptance:analytics-engineer:warehouse-dbt": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance-dbt",
+      "issue": "barwise-1079",
+      "note": "Edit distance to acceptance on a dbt project. barwise-bvl is fixed; what remains is mostly checks dbt cannot express (rings, deontic rules, subtypes, relationship verbs, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer and generator gaps to split out (barwise-1079).",
+      "detail": "3 of 6 persona checks fail: The model has no object type named \"Seller\".; The model has no fact type connecting \"Order\" and \"Buyer\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Order includes ProductVariant in Quantity\"), so it cannot rule out: Rules out:"
     },
     "C04/small/6/acceptance:catalog-steward:snowflake-ddl": {
       "severity": "S5",
@@ -591,8 +591,8 @@
     "C06/small/1/model-roundtrip:dbt": {
       "severity": "S3",
       "class": "dbt-importer-duplicate-fact-type",
-      "issue": "barwise-bvl",
-      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-bvl).",
+      "issue": "barwise-vsp",
+      "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-vsp).",
       "detail": "exit 1: Error: Fact type \"Leg has Port\" already exists in model \"dbt Import\"."
     },
     "C06/small/1/model-roundtrip:ddl": {
@@ -657,13 +657,6 @@
       "issue": "barwise-s4x",
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
-    },
-    "C06/small/4/read-back:dbt": {
-      "severity": "S3",
-      "class": "dbt-importer-duplicate-fact-type",
-      "issue": "barwise-bvl",
-      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-bvl).",
-      "detail": "exit 1: Error: Fact type \"Leg has Port\" already exists in model \"dbt Import\"."
     },
     "C06/small/5/diff:1:rename_object_type": {
       "severity": "S5",
@@ -773,15 +766,15 @@
     "C07/small/6/acceptance:catalog-product-manager:tmf-openapi": {
       "severity": "S1",
       "class": "openapi-importer-duplicate-role-ids-acceptance",
-      "issue": "barwise-1076",
-      "note": "Edit distance to acceptance on an OpenAPI artifact. The duplicate role ids that first failed this row (barwise-lh9) are fixed; what remains is mostly uniqueness and mandatory constraints the imported model allows but should forbid, because the OpenAPI importer puts them on the value role (barwise-1076). Some checks here (rings, deontic rules, ternary facts, external uniqueness) OpenAPI cannot express, so this row may stay open after barwise-1076; reclassify it then.",
+      "issue": "barwise-1079",
+      "note": "Edit distance to acceptance on an OpenAPI artifact. barwise-lh9 and barwise-1076 are fixed; what remains is mostly checks OpenAPI cannot express (rings, deontic rules, external and value-side uniqueness, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer gaps to split out (barwise-1079).",
       "detail": "5 of 9 persona checks fail: The model has 48 validation error(s): Role \"related\" in fact type \"Customer related Party\" has id \"1ebc923b-ec6b-4c8b-bbf1-168ca3239ea0-related-role\", which another role already uses. Role ids must be unique across the model. (and 47 more); Your model still allows what it"
     },
     "C07/small/6/acceptance:integration-engineer:tmf-openapi": {
       "severity": "S1",
       "class": "openapi-importer-duplicate-role-ids-acceptance",
-      "issue": "barwise-1076",
-      "note": "Edit distance to acceptance on an OpenAPI artifact. The duplicate role ids that first failed this row (barwise-lh9) are fixed; what remains is mostly uniqueness and mandatory constraints the imported model allows but should forbid, because the OpenAPI importer puts them on the value role (barwise-1076). Some checks here (rings, deontic rules, ternary facts, external uniqueness) OpenAPI cannot express, so this row may stay open after barwise-1076; reclassify it then.",
+      "issue": "barwise-1079",
+      "note": "Edit distance to acceptance on an OpenAPI artifact. barwise-lh9 and barwise-1076 are fixed; what remains is mostly checks OpenAPI cannot express (rings, deontic rules, external and value-side uniqueness, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer gaps to split out (barwise-1079).",
       "detail": "4 of 10 persona checks fail: The model has 48 validation error(s): Role \"related\" in fact type \"Customer related Party\" has id \"1ebc923b-ec6b-4c8b-bbf1-168ca3239ea0-related-role\", which another role already uses. Role ids must be unique across the model. (and 47 more); Your model still allows what i"
     },
     "C07/small/6/release-bundle:gym-list": {
@@ -1162,13 +1155,6 @@
       "note": "The Kotlin importer returns an empty model for data classes and sealed classes with constructor properties, exit 0, no warning naming a class (barwise-dyq).",
       "detail": "exit 0 but 20 of 20 expected names are absent from the model and 18 of them are not mentioned on stderr (100% silently dropped)"
     },
-    "C11/small/1/import:metrics-dbt": {
-      "severity": "S3",
-      "class": "dbt-importer-duplicate-fact-type",
-      "issue": "barwise-bvl",
-      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-bvl).",
-      "detail": "exit 1: Error: Fact type \"FunnelStepPrecedesFunnelStep has FunnelStep\" already exists in model \"dbt Import\"."
-    },
     "C11/small/1/model-roundtrip-validate:norma": {
       "severity": "S1",
       "class": "roundtrip-norma-mandatory-violation",
@@ -1203,6 +1189,13 @@
       "issue": "barwise-a0h",
       "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-a0h).",
       "detail": "170 delta(s) outside the declared loss set: modified object_type TenantId; modified object_type RegionCode; modified object_type WorkspaceId; modified object_type ProjectId; modified object_type ApiKeyId; modified object_type ServiceAccountId; modified object_type TenantName; modified object_type Ap"
+    },
+    "C11/small/1/roundtrip-diff:metrics-dbt": {
+      "severity": "S1",
+      "class": "dbt-roundtrip",
+      "issue": "barwise-vsp",
+      "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-vsp).",
+      "detail": "75 delta(s) outside the declared loss set: modified object_type Workspace; modified object_type Project; modified object_type ApiKey; modified object_type ServiceAccount; modified object_type Plan; modified object_type Subscription; modified object_type EventDefinition; modified object_type Event"
     },
     "C11/small/4.5/late:impact-id": {
       "severity": "S1",
@@ -1252,6 +1245,13 @@
       "issue": "barwise-rkm",
       "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
       "detail": "rename Team -> Workspace reported as a removal plus an addition with no synonym candidate"
+    },
+    "C11/small/6/acceptance:data-platform-lead:metrics-dbt": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance-dbt",
+      "issue": "barwise-1079",
+      "note": "Edit distance to acceptance on a dbt project. barwise-bvl is fixed; what remains is mostly checks dbt cannot express (rings, deontic rules, subtypes, relationship verbs, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer and generator gaps to split out (barwise-1079).",
+      "detail": "1 of 5 persona checks fail: Your model does not yet carry the relationship this rule guards (no fact type matching \"FunnelStep precedes FunnelStep\"), so it cannot rule out: Rules out: a acyclic ring violation among FunnelStep instances -- e.g. {FunnelStep=FunnelStep#1, FunnelStep=FunnelStep#2}; {Fun"
     },
     "C11/small/6/acceptance:founding-engineer:backend-kotlin": {
       "severity": "S5",

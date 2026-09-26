@@ -30,7 +30,8 @@ schema written two ways.
 
 ## What the user sees (measured 2026-09-26, main at 2671c247, fresh bundle)
 
-Input: `trial/findings/barwise-1076/api.json`, one schema `Customer`
+Input: the trial reproduction then at `trial/findings/barwise-1076/api.json`
+(now the `CUSTOMER` fixture in `formats/tests/OpenApiConstraintRoles.test.ts`), one schema `Customer`
 with a required `name: string (maxLength 50)`.
 
 ```

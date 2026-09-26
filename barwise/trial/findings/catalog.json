@@ -87,20 +87,6 @@
       "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-dnm)."
     },
     {
-      "id": "dbt-importer-duplicate-fact-type",
-      "issue": "barwise-bvl",
-      "severity": "S3",
-      "detail": "already exists in model \"dbt Import\"",
-      "note": "The dbt importer throws 'Fact type X already exists' when two relationship tests derive the same reading, which barwise's own dbt export produces from any ring or double foreign key (barwise-bvl)."
-    },
-    {
-      "id": "read-back-dbt-duplicate-fact-type",
-      "issue": "barwise-bvl",
-      "severity": "S3",
-      "step": "^read-back:dbt$",
-      "note": "Reading barwise's own dbt export back throws 'Fact type X already exists' (barwise-bvl)."
-    },
-    {
       "id": "dbt-roundtrip",
       "issue": "barwise-vsp",
       "severity": "S1",
@@ -169,10 +155,10 @@
     },
     {
       "id": "acceptance-edit-distance-dbt",
-      "issue": "barwise-bvl",
+      "issue": "barwise-1079",
       "severity": "S5",
       "step": "^acceptance:.*:(?!kernel).*-dbt$",
-      "note": "Edit distance to acceptance on a dbt project: the persona's checks fail because the model barwise produced is missing what the dbt importer dropped (barwise-bvl). A consequence row; closes with that importer issue."
+      "note": "Edit distance to acceptance on a dbt project. barwise-bvl is fixed; what remains is mostly checks dbt cannot express (rings, deontic rules, subtypes, relationship verbs, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer and generator gaps to split out (barwise-1079)."
     },
     {
       "id": "acceptance-edit-distance-kotlin",
@@ -196,11 +182,11 @@
     },
     {
       "id": "acceptance-edit-distance-openapi",
-      "issue": "barwise-1076",
+      "issue": "barwise-1079",
       "severity": "S5",
       "step": "^acceptance:",
       "importer": "openapi",
-      "note": "Edit distance to acceptance on an OpenAPI artifact: the persona checks fail mostly on uniqueness and mandatory constraints the OpenAPI importer puts on the value role (barwise-1076). Checks OpenAPI cannot express keep a row open after the fix; reclassify it then."
+      "note": "Edit distance to acceptance on an OpenAPI artifact. barwise-lh9 and barwise-1076 are fixed; what remains is mostly checks OpenAPI cannot express (rings, deontic rules, external and value-side uniqueness, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer gaps to split out (barwise-1079)."
     },
     {
       "id": "acceptance-edit-distance-ddl",

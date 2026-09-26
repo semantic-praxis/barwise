@@ -25,7 +25,7 @@ ordinary project, including one barwise wrote, has pushed a naming
 decision onto every user. The name is derivable from what the project
 already says -- the column -- so the importer decides it.
 
-## What the user sees (1.7.0; reproduction `trial/findings/barwise-bvl`)
+## What the user sees (1.7.0; reproduction then at `trial/findings/barwise-bvl`, now `TWO_PORTS` in `dbt/tests/dbtMapping/parallelRelationships.test.ts`)
 
 `stg_leg` has `origin_port_id` and `destination_port_id`, each with a
 `relationships` test to `stg_port.port_id`:
