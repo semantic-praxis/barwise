@@ -94,35 +94,39 @@ describe("referenceModePkType over this repository's models", () => {
     expect(files.length).toBeGreaterThan(50);
   });
 
-  it("types only the keys whose reference mode names a value type", () => {
-    const typedFromValueType: string[] = [];
-    let fallbackKeys = 0;
+  // One test per model: mapping every model twice in a single test ran
+  // past the 30s limit under coverage instrumentation on a loaded machine.
+  // Vitest runs a file's tests in order, so the aggregate test below sees
+  // what every per-model test recorded.
+  const typedFromValueType: string[] = [];
+  let fallbackKeys = 0;
 
-    for (const file of files) {
-      const model = load(file);
-      if (!model) continue;
-      const asText = mapper.map(model);
-      const asInteger = mapper.map(model, { preferredIdentifierStrategy: "integer" });
-      // Keys this function does not type: an objectified entity's comes
-      // from the fact type it objectifies, a subtype's from its supertype.
-      const elsewhere = new Set([
-        ...model.objectifiedFactTypes.map((o) => o.objectTypeId),
-        ...model.subtypeFacts.map((s) => s.subtypeId),
-      ]);
-      for (const ot of model.objectTypes) {
-        if (ot.kind !== "entity" || preferredIdentifyingBinary(model, ot)) continue;
-        if (elsewhere.has(ot.id)) continue;
-        const t = asText.tables.find((x) => x.sourceElementId === ot.id);
-        if (!t || t.primaryKey.columnNames.join() !== ot.referenceMode) continue;
-        const table = t.name;
-        const a = keyType(asText, table);
-        const b = keyType(asInteger, table);
-        if (a === undefined || b === undefined) continue;
-        if (a === b) typedFromValueType.push(`${file}: ${ot.name}(${ot.referenceMode}) ${a}`);
-        else fallbackKeys++;
-      }
+  it.each(files)("classifies the keys of %s", (file) => {
+    const model = load(file);
+    if (!model) return;
+    const asText = mapper.map(model);
+    const asInteger = mapper.map(model, { preferredIdentifierStrategy: "integer" });
+    // Keys this function does not type: an objectified entity's comes
+    // from the fact type it objectifies, a subtype's from its supertype.
+    const elsewhere = new Set([
+      ...model.objectifiedFactTypes.map((o) => o.objectTypeId),
+      ...model.subtypeFacts.map((s) => s.subtypeId),
+    ]);
+    for (const ot of model.objectTypes) {
+      if (ot.kind !== "entity" || preferredIdentifyingBinary(model, ot)) continue;
+      if (elsewhere.has(ot.id)) continue;
+      const t = asText.tables.find((x) => x.sourceElementId === ot.id);
+      if (!t || t.primaryKey.columnNames.join() !== ot.referenceMode) continue;
+      const table = t.name;
+      const a = keyType(asText, table);
+      const b = keyType(asInteger, table);
+      if (a === undefined || b === undefined) continue;
+      if (a === b) typedFromValueType.push(`${file}: ${ot.name}(${ot.referenceMode}) ${a}`);
+      else fallbackKeys++;
     }
+  });
 
+  it("types only the keys whose reference mode names a value type", () => {
     // Measured at the commit that landed WS2: the old first-match rule
     // typed 93 of these keys from a value type, and 90 of those were an
     // unrelated attribute. These three are the ones whose reference mode
