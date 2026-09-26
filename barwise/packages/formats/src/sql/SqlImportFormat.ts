@@ -4,16 +4,100 @@
  * Parses raw SQL files (DDL, migrations, queries) into ORM models.
  * Supports both single-file (text) and directory (async) input.
  *
- * Uses the SQL cascade parser for pattern extraction and maps
- * extracted patterns to ORM constraints. Handles dialect detection
- * via explicit flags, file-level hints, or syntax probing.
+ * Tables come from the CREATE TABLE statements the input declares, read
+ * by the DDL importer; the cascade's mined patterns (joins, CHECK, CASE)
+ * are reported on top. Only input that declares no table at all -- a
+ * file of queries -- builds its entities from the tables the patterns
+ * mention. The importer used to do that for every input, so a schema's
+ * tables became the targets of its foreign keys and every other table
+ * was dropped without a word (sql-import-reads-tables.spec.md,
+ * barwise-jjd).
  */
 
 import { type ImportFormat, type ImportOptions, type ImportResult, OrmModel } from "@barwise/core";
-import { parseSqlFile, type SqlDialect, type SqlPatternContext } from "@barwise/core/sql";
+import {
+  parseSqlFile,
+  SQL_DIALECTS,
+  type SqlDialect,
+  type SqlPatternContext,
+} from "@barwise/core/sql";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { DdlImportFormat } from "../ddl/DdlImportFormat.js";
+import { findCreateTables } from "../ddl/sqlIdentifiers.js";
 import { normalizeCascadeResult, parseSqlWithSqlglot } from "./SqlglotBridge.js";
+
+/**
+ * The explicit dialect, refused when barwise does not support it, the way
+ * `export --dialect` refuses one. It used to be accepted silently, so
+ * Oracle, DB2 and SQL Server imports read as ANSI with no word said
+ * (sql-import-reads-tables.spec.md, R5).
+ */
+function explicitDialect(options?: ImportOptions): SqlDialect | undefined {
+  const dialect = options?.dialect;
+  if (dialect === undefined) return undefined;
+  if (!(SQL_DIALECTS as readonly unknown[]).includes(dialect)) {
+    throw new Error(
+      `SQL dialect "${String(dialect)}" is not supported. Supported dialects: ${
+        SQL_DIALECTS.join(", ")
+      }.`,
+    );
+  }
+  return dialect as SqlDialect;
+}
+
+/**
+ * Build the model from the SQL: the declared tables through the DDL
+ * importer when there are any, otherwise the tables the patterns mention.
+ */
+function buildModel(
+  sql: string,
+  patterns: readonly SqlPatternContext[],
+  modelName: string,
+  warnings: string[],
+): OrmModel {
+  if (findCreateTables(sql).tables.length === 0) {
+    return buildModelFromPatterns(patterns, modelName, warnings);
+  }
+  const ddl = new DdlImportFormat().parse(sql, { modelName });
+  warnings.push(...ddl.warnings);
+  reportPatterns(ddl.model, patterns, warnings);
+  return ddl.model;
+}
+
+/**
+ * What the mined patterns suggest about a model built from declared
+ * tables. Reported, not asserted: a join says two tables are related but
+ * not how, and a table only a query mentions was never declared, so it is
+ * named rather than invented (R4).
+ */
+function reportPatterns(
+  model: OrmModel,
+  patterns: readonly SqlPatternContext[],
+  warnings: string[],
+): void {
+  const declared = new Set(model.objectTypes.map((o) => o.name.toLowerCase()));
+  const undeclared = new Set<string>();
+  for (const p of patterns) {
+    for (const t of p.tables ?? []) {
+      const name = t.split(".").pop()!;
+      if (!declared.has(toPascalCase(name).toLowerCase())) undeclared.add(t);
+    }
+    if (p.kind === "case" && p.details?.values && p.columns?.length) {
+      const values = p.details.values as string[];
+      warnings.push(
+        `CASE branch on "${p.columns[0]}" suggests value constraint: ${values.join(", ")}`,
+      );
+    }
+  }
+  if (undeclared.size > 0) {
+    warnings.push(
+      `Tables the SQL mentions but never declares, not imported: ${
+        [...undeclared].sort().join(", ")
+      }.`,
+    );
+  }
+}
 
 /**
  * Detect dialect from file-level hints in SQL content.
@@ -236,21 +320,20 @@ export class SqlImportFormat implements ImportFormat {
   parse(input: string, options?: ImportOptions): ImportResult {
     const warnings: string[] = [];
     const modelName = options?.modelName ?? "SQL Import";
-    const dialect = (options?.dialect as SqlDialect) ?? detectDialectFromHints(input) ?? "ansi";
+    const dialect = explicitDialect(options) ?? detectDialectFromHints(input) ?? "ansi";
 
     const fileResult = parseSqlWithSqlglot(input, "input.sql", dialect)
       ?? normalizeCascadeResult(parseSqlFile(input, "input.sql", dialect));
 
-    if (fileResult.patterns.length === 0) {
+    const model = buildModel(input, fileResult.patterns, modelName, warnings);
+    if (model.objectTypes.length === 0 && fileResult.patterns.length === 0) {
       warnings.push("No ORM-relevant patterns found in SQL input");
     }
-
-    const model = buildModelFromPatterns(fileResult.patterns, modelName, warnings);
 
     return {
       model,
       warnings,
-      confidence: fileResult.patterns.length > 0 ? "medium" : "low",
+      confidence: model.objectTypes.length > 0 ? "medium" : "low",
     };
   }
 
@@ -261,7 +344,7 @@ export class SqlImportFormat implements ImportFormat {
     const dir = resolve(input);
     const warnings: string[] = [];
     const modelName = options?.modelName ?? "SQL Import";
-    const explicitDialect = options?.dialect as SqlDialect | undefined;
+    const dialectOption = explicitDialect(options);
 
     const sqlFiles = findSqlFiles(dir);
     if (sqlFiles.length === 0) {
@@ -274,11 +357,13 @@ export class SqlImportFormat implements ImportFormat {
     }
 
     const allPatterns: SqlPatternContext[] = [];
-    let detectedDialect: SqlDialect | undefined = explicitDialect;
+    let detectedDialect: SqlDialect | undefined = dialectOption;
+    const sources: string[] = [];
 
     for (const filePath of sqlFiles) {
       try {
         const sql = readFileSync(filePath, "utf-8");
+        sources.push(sql);
 
         // Detect dialect from first file if not already known
         if (!detectedDialect) {
@@ -295,16 +380,17 @@ export class SqlImportFormat implements ImportFormat {
       }
     }
 
-    if (allPatterns.length === 0) {
+    // Every file's CREATE TABLEs are read together, so a foreign key in
+    // one file finds its target table in another.
+    const model = buildModel(sources.join("\n;\n"), allPatterns, modelName, warnings);
+    if (model.objectTypes.length === 0 && allPatterns.length === 0) {
       warnings.push(`Found ${sqlFiles.length} SQL file(s) but no ORM-relevant patterns`);
     }
-
-    const model = buildModelFromPatterns(allPatterns, modelName, warnings);
 
     return {
       model,
       warnings,
-      confidence: allPatterns.length > 0 ? "medium" : "low",
+      confidence: model.objectTypes.length > 0 ? "medium" : "low",
     };
   }
 }

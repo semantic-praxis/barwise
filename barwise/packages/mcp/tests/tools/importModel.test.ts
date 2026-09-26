@@ -295,8 +295,12 @@ public class Customer {
         const yaml = result.content[0]!.text;
 
         expect(yaml).toContain("name: SQL Dir Model");
-        // Proves the directory (async) route ran, not the single-file parse.
-        expect(yaml).toContain("SQL file(s)");
+        // Proves the directory (async) route ran: only it reads orders.sql,
+        // since the single-file parse would treat the path itself as SQL.
+        // This used to look for the "no ORM-relevant patterns" warning,
+        // which a CREATE TABLE file produced only because import sql did
+        // not read CREATE TABLE (barwise-jjd).
+        expect(yaml).toContain("name: Orders");
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }

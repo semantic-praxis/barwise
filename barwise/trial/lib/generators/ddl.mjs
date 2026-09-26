@@ -304,9 +304,14 @@ export function generateDdl(doc, skin, { factor = 1, seed = 1, artifactId = "ddl
     }
   }
   for (const extra of skin.extra_tables ?? []) {
-    const m = /CREATE\s+(?:OR\s+REPLACE\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)/i.exec(
-      extra,
-    );
+    // The table modifiers are the ones the importer reads (sqlIdentifiers.ts).
+    // A statement that is not a CREATE TABLE -- a skin's CREATE TYPE -- is
+    // context, not an expected entity. Both used to become `extra_N`, a name
+    // no file contains, so the grader counted it as silently dropped whatever
+    // the importer did (C04's TRANSIENT table, C06's two types).
+    const m =
+      /CREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:GLOBAL|LOCAL)\s+)?(?:(?:TEMP|TEMPORARY|TRANSIENT|EXTERNAL)\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)/i
+        .exec(extra);
     const rawName = m
       ? m[1].split(".").pop().replace(/[`"\[\]]/g, "")
       : `extra_${manifest.tables.length}`;
@@ -317,7 +322,7 @@ export function generateDdl(doc, skin, { factor = 1, seed = 1, artifactId = "ddl
       columns: [],
       pk: [],
       fks: [],
-      importable: true,
+      importable: m !== null,
       semicolon: true,
     });
   }
