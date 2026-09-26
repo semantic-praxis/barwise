@@ -6,9 +6,12 @@
  * ORM concepts from API schemas:
  *
  * - Schemas (objects with properties) become EntityTypes
- * - Schema properties become binary FactTypes (Entity has ValueType)
+ * - Schema properties become binary FactTypes (Entity has ValueType), the
+ *   entity's role first, with uniqueness on it
+ * - The property the reference mode names becomes a preferred identifying
+ *   binary, the shape the DDL and dbt importers write
  * - $ref relationships become FactTypes between entities
- * - required arrays become mandatory constraints
+ * - required arrays become mandatory constraints on the entity's role
  * - enum values become value constraints
  * - string constraints (minLength, maxLength, pattern) become value constraints where expressible
  *
@@ -17,11 +20,14 @@
  */
 
 import {
+  claimValueTypeName,
   type ConceptualDataTypeName,
+  type Constraint,
   generateId,
   type ImportFormat,
   type ImportOptions,
   type ImportResult,
+  type ObjectType,
   OrmModel,
 } from "@barwise/core";
 import { parse as parseYaml } from "yaml";
@@ -409,71 +415,91 @@ export class OpenApiImportFormat implements ImportFormat {
   }
 
   /**
-   * Create a fact type for a regular property (Entity has ValueType).
+   * Create a fact type for a regular property: `<Entity> has <Value>`, the
+   * entity's role first.
+   *
+   * The first version put the value's role first and hung the uniqueness
+   * and `required`'s mandatory on it, so the model said "each Name has at
+   * least one Customer", and a DDL export of it added UNIQUE to every
+   * property, dropped NOT NULL, and invented a `belongs_to_id` column
+   * (barwise-1076, openapi-import-constraint-roles.spec.md). A property
+   * holds one value per object (uniqueness on the entity's role), and
+   * `required` makes the entity's role mandatory.
+   *
+   * The property the reference mode names is the entity's identifier, so
+   * it gets the preferred identifying binary instead: without it the
+   * relational mapper also maps the property as an ordinary column.
    */
   private createPropertyFactType(
     model: OrmModel,
-    entityType: { readonly id: string; readonly name: string; },
+    entityType: ObjectType,
     propName: string,
     propDef: ParsedProperty,
     requiredProps: readonly string[],
     warnings: string[],
   ): void {
-    // Create value type
-    const valueTypeName = this.toPascalCase(propName);
-    const conceptualType = this.mapOpenApiTypeToConceptual(
-      propDef.type,
-      propDef.format,
-    );
-
-    let valueType = model.getObjectTypeByName(valueTypeName);
-    if (!valueType) {
-      // Check for enum values
-      const valueConstraint = propDef.enum && propDef.enum.length > 0
-        ? { values: propDef.enum.map((v) => String(v)) }
-        : undefined;
-
-      valueType = model.addObjectType({
-        name: valueTypeName,
-        kind: "value",
-        dataType: { name: conceptualType },
-        valueConstraint,
-        definition: propDef.description,
-      });
-    }
-
-    // Create fact type
-    const factTypeName = `${entityType.name} has ${valueTypeName}`;
+    const isKey = entityType.kind === "entity" && propName === entityType.referenceMode;
+    const dataType = {
+      name: this.mapOpenApiTypeToConceptual(propDef.type, propDef.format),
+    };
 
     try {
-      const constraints: any[] = [];
-
-      // Minted, not built from names; see the $ref case above.
-      const role0Id = generateId();
-      const role1Id = generateId();
-
-      // Uniqueness constraint (unique on entity side by default)
-      constraints.push({
-        type: "internal_uniqueness",
-        roleIds: [role0Id],
-        isPreferred: false,
-      });
-
-      // Mandatory constraint if property is required
-      if (requiredProps.includes(propName)) {
-        constraints.push({
-          type: "mandatory",
-          roleId: role0Id,
+      // The sharing rule the DDL and dbt importers use (core's
+      // claimValueTypeName): a same-named value type is shared only when it
+      // has the same type and this entity does not already play it.
+      const candidate = this.toPascalCase(propName);
+      const claim = claimValueTypeName(
+        model,
+        entityType.id,
+        entityType.name,
+        candidate,
+        dataType,
+        isKey ? "key" : "attribute",
+      );
+      let valueType: ObjectType;
+      if (claim.kind === "share") {
+        valueType = claim.valueType;
+      } else {
+        if (claim.displaced) {
+          warnings.push(
+            `Schema "${entityType.name}", property "${propName}" (${dataType.name}): the name "${candidate}" is `
+              + `already held by ${claim.displaced.kind} type "${claim.displaced.name}" with a different type or role; `
+              + `created value type "${claim.name}" instead.`,
+          );
+        }
+        const valueConstraint = propDef.enum && propDef.enum.length > 0
+          ? { values: propDef.enum.map((v) => String(v)) }
+          : undefined;
+        valueType = model.addObjectType({
+          name: claim.name,
+          kind: "value",
+          dataType,
+          valueConstraint,
+          definition: propDef.description,
         });
       }
 
+      // Minted, not built from names; see the $ref case above.
+      const entityRoleId = generateId();
+      const valueRoleId = generateId();
+      const constraints: Constraint[] = isKey
+        ? [
+          { type: "internal_uniqueness", roleIds: [valueRoleId], isPreferred: true },
+          { type: "internal_uniqueness", roleIds: [entityRoleId] },
+          { type: "mandatory", roleId: entityRoleId },
+        ]
+        : [{ type: "internal_uniqueness", roleIds: [entityRoleId] }];
+      if (!isKey && requiredProps.includes(propName)) {
+        constraints.push({ type: "mandatory", roleId: entityRoleId });
+      }
+
       model.addFactType({
-        name: factTypeName,
+        name: `${entityType.name} has ${valueType.name}`,
         roles: [
-          { name: "has", playerId: valueType.id, id: role0Id },
-          { name: `belongs to`, playerId: entityType.id, id: role1Id },
+          { name: "has", playerId: entityType.id, id: entityRoleId },
+          { name: "is of", playerId: valueType.id, id: valueRoleId },
         ],
-        readings: [`{0} has {1}`],
+        readings: ["{0} has {1}", "{1} is of {0}"],
         constraints,
         definition: propDef.description,
       });
