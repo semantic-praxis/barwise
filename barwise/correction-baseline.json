@@ -588,6 +588,12 @@
       "excerpt": "status: implemented (ws1, ws2 and ws3). carryunmodelledelements carries diagram layouts and nothing else, which is the resolved decision rather than work outsta",
       "caught_by": "execution",
       "note": "The population key gained an ordinal the resolved decision did not anticipate; found on shipping WS3."
+    },
+    "uuid7-generator-factory::c1d7e18a0549": {
+      "spec": "uuid7-generator-factory.spec.md",
+      "excerpt": "- the vs code wiring test needed a stand-in editor, not a real one. the integration suite runs in a real editor but not in ci, so it could not be the guard. vsc",
+      "caught_by": "provenance",
+      "note": "The implementation notes first reported the mutation checks as hand-run sed edits; review on #566 cited the pr-review checklist's rule that a new test is reddened through scripts/mutate.mjs. All six re-run through the helper and caught; the notes now carry each --old/--new pair and command."
     }
   }
 }
