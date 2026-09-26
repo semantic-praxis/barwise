@@ -2,7 +2,7 @@
  * Phase 3: create fact types with roles and constraints.
  */
 
-import type { Constraint } from "@barwise/core";
+import { type Constraint, generateId } from "@barwise/core";
 import { buildConstraints, hasTest } from "./constraints.js";
 import type { DbtMapperContext } from "./context.js";
 import { toPascalCase } from "./naming.js";
@@ -28,8 +28,10 @@ export function createFactTypes(ctx: DbtMapperContext): void {
       const vtName = toPascalCase(col.name);
       const factName = `${entityName} has ${vtName}`;
 
-      const role1Id = `${factName}::role1`;
-      const role2Id = `${factName}::role2`;
+      // Minted, never built from names: the id policy is generateId's, and
+      // the surface installs UUIDv7 behind it (importer-role-ids.spec.md).
+      const role1Id = generateId();
+      const role2Id = generateId();
 
       // Build constraints from tests.
       const constraints = buildConstraints(col, role1Id, role2Id, ctx.report, m.name);
@@ -65,8 +67,10 @@ export function createFactTypes(ctx: DbtMapperContext): void {
       const targetEntityName = toPascalCase(rel.targetModelName);
       const factName = `${sourceEntityName} has ${targetEntityName}`;
 
-      const role1Id = `${factName}::role1`;
-      const role2Id = `${factName}::role2`;
+      // Minted, never built from names: the id policy is generateId's, and
+      // the surface installs UUIDv7 behind it (importer-role-ids.spec.md).
+      const role1Id = generateId();
+      const role2Id = generateId();
 
       // FK column: find the column to get its tests.
       const fkCol = m.columns.find((c) => c.name === rel.columnName);
