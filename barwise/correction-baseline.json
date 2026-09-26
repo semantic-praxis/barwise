@@ -457,12 +457,6 @@
       "caught_by": "execution",
       "note": "The sharpest of seven defects an offline rehearsal surfaced."
     },
-    "openapi-import-constraint-roles::df942bbcbd5f": {
-      "spec": "openapi-import-constraint-roles.spec.md",
-      "excerpt": "- multi-word schemas never found their own id property. inferreferencemode built the candidate as ${name.tolowercase()}id, so purchaseorder.purchaseorderid was ",
-      "caught_by": "reasoning",
-      "note": "Review of PR #573 found, by reading inferReferenceMode and the property loop, that multi-word schemas missed their id property and that the key name depended on property order; the draft covered neither. The first fix for order was itself order-dependent, which its two-order test caught by execution."
-    },
     "output-budget::206952685bcc": {
       "spec": "output-budget.spec.md",
       "excerpt": "- production extraction derives a budget too. processtranscript had the same exposure -- a user importing a long transcript got a silently truncated model with ",

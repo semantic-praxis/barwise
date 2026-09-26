@@ -1,180 +1,161 @@
-# OpenAPI import puts a property's constraints on the entity's role, and imports its id as the key
+# OpenAPI import puts a property's constraints on the entity's role
 
-Status: Implemented -- the single workstream, landed with this spec
+Status: Implemented 2026-09-26 -- R1-R2 in PR #572, R3 in PR #573 (see Implementation notes)
 
 Created: 2026-09-26
 Last-updated: 2026-09-26
 Tracking: barwise-1076
 
-The OpenAPI importer builds each property's fact type with the value's
-role first and hangs the uniqueness and `required`'s mandatory on it, the
-defect `ddl-import-fidelity.spec.md` fixed in the DDL importer. A
-property's fact type now reads `<Entity> has <Value>` with its
-constraints on the entity's role, and the property the reference mode
-names becomes the entity's preferred identifier, the shape the DDL and
-dbt importers write.
+`barwise import model api.json --format openapi` turns each scalar
+property into a fact type whose roles are ordered value-first, and puts
+the property's uniqueness and, for a `required` property, its
+mandatory constraint on the value's role. The model then says the
+opposite of the schema: a required `name` on `Customer` verbalizes as
+"Each Name has at most one Customer" and "Each Name has at least one
+Customer", and a DDL export makes `name` nullable. The DDL importer had
+the identical defect and `ddl-import-fidelity.spec.md` (#570) fixed it
+there; this applies the same shape and the same sharing rule to the
+OpenAPI importer, so a schema imports the same way whichever importer
+reads it.
 
 ## Principle
 
-**Composability.** Three importers turn a column or a property into
-`<Entity> has <Value>`. Two of them now build the same shape and share
-one value-type sharing rule (`claimValueTypeName` in core). The third
-should too, so a schema models the same way whichever format it came
-in.
+**Composability.** #570 moved the value-type sharing decision into
+core (`claimValueTypeName`) so every importer answers it the same way.
+The OpenAPI importer still answers it on its own -- it reuses whatever
+object type holds the name, entity included -- and orders roles its own
+way. One shape and one rule for "a record's scalar field" is the whole
+point; a third answer would make the importers disagree about the same
+schema written two ways.
 
-## What the user sees (measured 2026-09-26, on main at 13a82b83)
+## What the user sees (measured 2026-09-26, main at 2671c247, fresh bundle)
 
-```json
-{
-  "Customer": {
-    "required": ["id", "name"],
-    "properties": {
-      "id": { "type": "integer" },
-      "name": { "type": "string" },
-      "email": { "type": "string" }
-    }
-  },
-  "Order": {
-    "required": ["id", "customer"],
-    "properties": {
-      "id": { "type": "integer" },
-      "placedAt": { "type": "string", "format": "date-time" },
-      "customer": { "$ref": "#/components/schemas/Customer" }
-    }
-  }
-}
+Input: the trial reproduction then at `trial/findings/barwise-1076/api.json`
+(now the `CUSTOMER` fixture in `formats/tests/OpenApiConstraintRoles.test.ts`), one schema `Customer`
+with a required `name: string (maxLength 50)`.
+
+```
+Name has Customer
+  Each Name has at most one Customer.
+  Each Name has at least one Customer.
 ```
 
-`barwise import model api.json --format openapi`, then `barwise verbalize`,
-reads "Each Id has at least one Customer" and "Each Name has at most one
-Customer". `barwise export --format ddl` gives:
+DDL export: `name TEXT` -- nullable. (The lost `maxLength` is
+barwise-a0h, out of scope.)
 
-```sql
-CREATE TABLE customer (
-  id INTEGER NOT NULL,
-  belongs_to_id INTEGER,      -- invented
-  name TEXT,                  -- was required
-  email TEXT,
-  PRIMARY KEY (id),
-  UNIQUE (name),              -- invented
-  UNIQUE (email)              -- invented
-);
-```
-
-`orders` is the same: a `belongs_to_id` column, and `UNIQUE (placed_at)`.
-The `id` property is an ordinary `Id has Customer` fact type, so the
-mapper maps it twice: once as the key, whose type it takes from `Id`
-by name, and once as the `belongs_to_id` column.
-
-`OpenApiImportFormat.test.ts` passes before and after the fix. It
-asserts that a uniqueness or mandatory constraint exists, never which
-role holds it, and its comment ("unique on entity side by default") says
-the opposite of what the code did.
+In the enterprise trial, the C01 and C07 OpenAPI acceptance rows fail
+mostly on the uniqueness and mandatory checks this causes.
 
 ## Requirements
 
-- **R1.** When a property is imported, its fact type shall read
-  `<Entity> has <Value>` and `<Value> is of <Entity>`, with the entity's
-  role first, uniqueness on the entity's role, and a mandatory on the
-  entity's role when the property is `required`.
-- **R2.** When a property is the one the schema's reference mode names
-  (`id`, or `<schema>Id`), the importer shall make its fact type the
-  entity's preferred identifying binary: preferred uniqueness on the
-  value's role, uniqueness and mandatory on the entity's role.
-- **R3.** When two properties would create value types with the same
-  name, the importer shall share one only under core's
-  `claimValueTypeName`, and otherwise create `<Entity><Name>` and warn.
+- **R1.** When a scalar property is imported, its fact type shall read
+  `<Entity> has <Value>` with the entity's role first and the reading
+  `{1} is of {0}` as well; uniqueness shall sit on the entity's role;
+  and a property listed in the schema's `required` shall make the
+  entity's role mandatory. This is `ddl-import-fidelity.spec.md` R3.
+- **R2.** When a property's value-type name is already held, the
+  importer shall share it only under `claimValueTypeName` (a value
+  type, not already played by this entity, no declared type lost, and
+  the same enum or none on both sides),
+  and otherwise create `<Entity><Name>` and warn. This is
+  `ddl-import-fidelity.spec.md` R5.
+- **R3.** When a property is the one the schema's reference mode names,
+  the importer shall give it the preferred identifying binary --
+  preferred uniqueness on the value's role, uniqueness and mandatory on
+  the entity's role, whether or not it is `required` -- the shape
+  `ddl-import-fidelity.spec.md` R4 gives a DDL key. The reference mode
+  is the property named `id`, else `<schema>Id` or `<schema>_id`
+  (`purchaseOrderId`, `purchase_order_id`) chosen by spelling rather
+  than property order, else `<schema>_id` in snake case; and every
+  schema's key is created before any other property, so an ordinary
+  property never takes the key's value-type name.
 
-Acceptance: the input above exports as
-
-```sql
-CREATE TABLE customer (id INTEGER NOT NULL, name TEXT NOT NULL, email TEXT, PRIMARY KEY (id));
-CREATE TABLE order (id INTEGER NOT NULL, placed_at DATETIME, fk_id INTEGER NOT NULL,
-  PRIMARY KEY (id), FOREIGN KEY (fk_id) REFERENCES customer (id));
-```
-
-and validates with no errors.
+Acceptance: the input above verbalizes as "Each Customer has at most
+one Name" and "Each Customer has at least one Name", and its DDL export
+has `name ... NOT NULL` with no `UNIQUE`.
 
 ## Scope
 
 Out of scope:
 
-- **The `$ref` fact type's reading and the `fk_id` column name.** The
-  reference fact type lists the referenced entity first ("Customer
-  references Order"), but its constraints are on the right role, so the
-  foreign key exports correctly. The column name comes from the mapper.
-  The DDL importer's foreign keys have the same reading, and the DDL
-  spec left it too.
-- **Lengths, formats and value constraints lost on a round trip**
-  (barwise-a0h). `maxLength` is still not imported.
-- **Two same-named enums with different values** still share one value
-  type when their data type agrees; `claimValueTypeName` compares data
-  types, not value constraints. Unchanged from before.
+- `$ref` properties. `createRefFactType` already puts uniqueness and
+  mandatory on the referencing entity's role; only its reading is
+  awkward, which is not this defect.
+- `maxLength`, `format` details and value constraints lost on a round
+  trip (barwise-a0h).
+- OpenAPI has no single-property `unique` keyword, so there is no
+  value-side uniqueness to import (DDL's R3 `UNIQUE` clause has no
+  counterpart here).
 
-## Alternatives considered
+## Workstream (single)
 
-- **Fix only the constraint roles, and leave `id` as an ordinary
-  property.** The mapper would then map `id` twice, as the key and as an
-  `id` attribute column; that is barwise-1074's double mapping, reached
-  from a new direction. The identifier shape is what the other two
-  importers already write.
-- **Skip the reference-mode property, as the DDL importer used to skip
-  its key column.** The key's type would be lost, which is barwise-1058
-  in a third importer.
+In `formats/src/openapi/OpenApiImportFormat.ts` `createPropertyFactType`:
+order the roles entity-first (`has`, `is of`), add the reverse reading,
+put uniqueness and `required`'s mandatory on the entity's role, and
+claim the value type through `claimValueTypeName` with role
+`"attribute"` and the property's conceptual data type, warning on a
+displaced name the way the DDL importer does.
 
-## Workstreams
-
-One, in one PR with the spec: `createPropertyFactType` in
-`formats/src/openapi/OpenApiImportFormat.ts` changes shape per R1-R3.
-Nothing outside that function changes.
+Tests assert constraints by the role's player, not by count -- the
+existing tests asserted only that some constraint existed, which is how
+both importers shipped this defect.
 
 ## Risks and testing
 
-- Models already imported from OpenAPI keep their reversed constraints
-  until re-imported.
-- A new test file asserts constraints by the player of the role that
-  holds them, as `DdlImportFidelity.test.ts` does, and a round-trip test
-  compares the acceptance DDL line by line. Each is seen failing through
-  `scripts/mutate.mjs`.
+- **Models already imported from OpenAPI** keep their reversed
+  constraints until re-imported. No migration.
+- **Split value types.** Two schemas with a same-named property of
+  different types now get two value types and a warning instead of
+  silently sharing one -- intended, as in the DDL importer.
+- **The trial rows** classified under barwise-1076 may still fail on
+  checks OpenAPI cannot express; each row's note says so, and they are
+  reclassified rather than closed when that is what remains.
+- Gates: `npx vitest run` in `formats`, `npm run build`, the offline
+  trial on a fresh bundle, and `ci:local` before push.
+
+## Open decisions
+
+None. R1 and R2 restate decisions `ddl-import-fidelity.spec.md` already
+made for the DDL importer.
 
 ## Implementation notes
 
-Landed as specified. The acceptance DDL above is the exact output, and
-the model validates with 0 errors and 1 warning (the `$ref` fact type's
-single reading, out of scope).
+Landed as specified, in `createPropertyFactType` and a new
+`claimPropertyValueType` beside it.
 
-Mutations through `scripts/mutate.mjs`, against
-`npx vitest run tests/OpenApiImportFidelity.test.ts` from
-`packages/formats`, each caught (exit 0): the entity-role uniqueness moved
-to the value's role (R1); `required`'s mandatory moved to the value's role
-(R1); the roles listed value first (R1); `isKey` forced false (R2);
-sharing any same-named value type regardless of its type (R3). A control
-mutation that changes no behaviour went uncaught (exit 1).
+- R2 found a worse case than a type clash: a string property named
+  like another schema's entity (`Order.customer` next to `Customer`)
+  became a fact type played by the `Customer` entity -- an attribute
+  imported as a reference. It now gets `OrderCustomer` and a warning.
+- The PR #572 review found that sharing ignored the enum: with
+  `Customer.status` enum [active] imported first, `Order.status` enum
+  [pending] reused `Status` and took the first domain. The value
+  constraint is now part of `claimValueTypeName`'s rule, in core, so it
+  holds for every importer; dbt and DDL put their value constraints on
+  roles rather than value types, so their imports do not change.
+- No existing test pinned the old role order, which is the point the
+  spec made about asserting by count: the formats suite passed before
+  and after, and 6 of the 8 new tests failed before.
+- Acceptance, through a freshly built CLI bundle: the reproduction
+  verbalizes "Each Customer has at most one Name." and "Each Customer
+  has at least one Name.", and exports `name TEXT NOT NULL` with no
+  `UNIQUE`.
 
-Review of PR #573 found three gaps, each fixed with a test the helper
-showed red against `tests/OpenApiImportFidelity.test.ts`:
+**R3 (PR #573).** The `id` property was an ordinary attribute, so the
+mapper mapped it twice: measured on main at 56c6101c, the spec's
+two-schema input exported `has_id INTEGER NOT NULL` beside the key in
+every table. R3 removes that column. It also fixes two defects in
+`inferReferenceMode` that R3 would otherwise inherit, both found by
+review of #573: a multi-word schema never matched its own
+`purchaseOrderId`, because the candidate was built as
+`${name.toLowerCase()}Id`; and when both `userId` and `user_id`
+existed, the key depended on which came first. Mutations through
+`scripts/mutate.mjs` against `tests/OpenApiConstraintRoles.test.ts`,
+each caught: no identifier; keys not created first; no exact-spelling
+priority; the key's mandatory tied to `required`. A first version of
+the last one changed nothing (it removed a mandatory and pushed the same
+one back) and went uncaught; the real mutation was caught.
 
-- **Multi-word schemas never found their own id property.**
-  `inferReferenceMode` built the candidate as `${name.toLowerCase()}Id`,
-  so `PurchaseOrder.purchaseOrderId` was not the key, and no identifier
-  was created. It now tries `id`, `purchaseOrderId` and
-  `purchase_order_id` exactly, in that order, then any spelling equal
-  ignoring case and underscores. The default reference mode is snake case
-  (`purchase_order_id`), the spelling the renderer writes.
-- **The key's name depended on property order.** Properties were
-  processed in source order, so `user_id` listed before the key `userId`
-  claimed `UserId` and the key was renamed. Every schema's identifier is
-  now created first, across all schemas, as the DDL and dbt importers
-  do. The first fix still chose the key by property order when both
-  spellings were present, because the case-insensitive match found
-  whichever came first. The test that lists them both ways caught it,
-  and the exact spellings now take priority.
-- **The optional-key test checked one constraint.** It now asserts the
-  full set, so a key whose mandatory depended on `required` would fail.
-
-Mutations, each caught (exit 0): restoring the original detection (the
-multi-word test); dropping the exact-spelling priority (the order test);
-skipping the keys-first pass; tying the key's mandatory to `required`.
-A narrower detection mutation, which left the case-insensitive fallback
-in place, went uncaught (exit 1), because the fallback finds the camel
-spelling anyway. That mutation removed nothing the tests depend on.
+#573 first carried R1 and R2 as well. #572 landed them independently
+first, with the enum rule on top, so #573 was reduced by a merge to R3
+alone.

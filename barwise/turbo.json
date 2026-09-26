@@ -20,7 +20,14 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      // dist/bundle/ is written by each package's separate `bundle`
+      // script, not by `build`. Caching it as a build output meant any
+      // later cache hit on `build` -- the pre-commit hook runs one on
+      // every commit -- restored whatever bundle sat in dist/ when that
+      // entry was made, with a fresh mtime. The enterprise trial then
+      // graded a CLI that predated two merged fixes and reported 28
+      // fixed baseline rows as still open (barwise-lh9, 2026-09-26).
+      "outputs": ["dist/**", "!dist/bundle/**"]
     },
     "test": {
       "dependsOn": ["build"],

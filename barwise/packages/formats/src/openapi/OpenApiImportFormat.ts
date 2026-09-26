@@ -6,12 +6,9 @@
  * ORM concepts from API schemas:
  *
  * - Schemas (objects with properties) become EntityTypes
- * - Schema properties become binary FactTypes (Entity has ValueType), the
- *   entity's role first, with uniqueness on it
- * - The property the reference mode names becomes a preferred identifying
- *   binary, the shape the DDL and dbt importers write
+ * - Schema properties become binary FactTypes (Entity has ValueType)
  * - $ref relationships become FactTypes between entities
- * - required arrays become mandatory constraints on the entity's role
+ * - required arrays become mandatory constraints
  * - enum values become value constraints
  * - string constraints (minLength, maxLength, pattern) become value constraints where expressible
  *
@@ -444,20 +441,15 @@ export class OpenApiImportFormat implements ImportFormat {
   }
 
   /**
-   * Create a fact type for a regular property: `<Entity> has <Value>`, the
-   * entity's role first.
+   * Create a fact type for a regular property: `<Entity> has <Value>`,
+   * entity's role first, with the property's uniqueness -- and, when the
+   * schema lists it in `required`, its mandatory -- on the ENTITY's role.
    *
-   * The first version put the value's role first and hung the uniqueness
-   * and `required`'s mandatory on it, so the model said "each Name has at
-   * least one Customer", and a DDL export of it added UNIQUE to every
-   * property, dropped NOT NULL, and invented a `belongs_to_id` column
-   * (barwise-1076, openapi-import-constraint-roles.spec.md). A property
-   * holds one value per object (uniqueness on the entity's role), and
-   * `required` makes the entity's role mandatory.
-   *
-   * The property the reference mode names is the entity's identifier, so
-   * it gets the preferred identifying binary instead: without it the
-   * relational mapper also maps the property as an ordinary column.
+   * Both used to sit on the value's role (roles were ordered value-first),
+   * so a required `name` read "Each Name has at least one Customer" and
+   * exported nullable. This is the shape the DDL and dbt importers write
+   * (ddl-import-fidelity.spec.md R3), so one schema imports the same way
+   * whichever importer reads it (openapi-import-constraint-roles.spec.md).
    */
   private createPropertyFactType(
     model: OrmModel,
@@ -467,50 +459,25 @@ export class OpenApiImportFormat implements ImportFormat {
     requiredProps: readonly string[],
     warnings: string[],
   ): void {
+    // The property the reference mode names is the entity's identifier. It
+    // gets the preferred identifying binary, the shape the DDL and dbt
+    // importers write: without it the relational mapper maps the property
+    // twice, as the key and again as a `has_id` column in every table.
     const isKey = entityType.kind === "entity" && propName === entityType.referenceMode;
-    const dataType = {
-      name: this.mapOpenApiTypeToConceptual(propDef.type, propDef.format),
-    };
-
     try {
-      // The sharing rule the DDL and dbt importers use (core's
-      // claimValueTypeName): a same-named value type is shared only when it
-      // has the same type and this entity does not already play it.
-      const candidate = this.toPascalCase(propName);
-      const claim = claimValueTypeName(
+      const valueType = this.claimPropertyValueType(
         model,
-        entityType.id,
-        entityType.name,
-        candidate,
-        dataType,
+        entityType,
+        propName,
+        propDef,
         isKey ? "key" : "attribute",
+        warnings,
       );
-      let valueType: ObjectType;
-      if (claim.kind === "share") {
-        valueType = claim.valueType;
-      } else {
-        if (claim.displaced) {
-          warnings.push(
-            `Schema "${entityType.name}", property "${propName}" (${dataType.name}): the name "${candidate}" is `
-              + `already held by ${claim.displaced.kind} type "${claim.displaced.name}" with a different type or role; `
-              + `created value type "${claim.name}" instead.`,
-          );
-        }
-        const valueConstraint = propDef.enum && propDef.enum.length > 0
-          ? { values: propDef.enum.map((v) => String(v)) }
-          : undefined;
-        valueType = model.addObjectType({
-          name: claim.name,
-          kind: "value",
-          dataType,
-          valueConstraint,
-          definition: propDef.description,
-        });
-      }
 
       // Minted, not built from names; see the $ref case above.
       const entityRoleId = generateId();
       const valueRoleId = generateId();
+
       const constraints: Constraint[] = isKey
         ? [
           { type: "internal_uniqueness", roleIds: [valueRoleId], isPreferred: true },
@@ -539,6 +506,53 @@ export class OpenApiImportFormat implements ImportFormat {
         }`,
       );
     }
+  }
+
+  /**
+   * The value type a property plays, shared across schemas only under
+   * core's `claimValueTypeName` -- never an entity, never one this entity
+   * already plays, never one of a different declared type or enum. The importer
+   * used to reuse whatever object type held the name, so a string
+   * property `customer` on Order became a fact type played by the
+   * Customer entity.
+   */
+  private claimPropertyValueType(
+    model: OrmModel,
+    entityType: { readonly id: string; readonly name: string; },
+    propName: string,
+    propDef: ParsedProperty,
+    role: "key" | "attribute",
+    warnings: string[],
+  ) {
+    const candidate = this.toPascalCase(propName);
+    const dataType = { name: this.mapOpenApiTypeToConceptual(propDef.type, propDef.format) };
+    const valueConstraint = propDef.enum && propDef.enum.length > 0
+      ? { values: propDef.enum.map((v) => String(v)) }
+      : undefined;
+    const claim = claimValueTypeName(
+      model,
+      entityType.id,
+      entityType.name,
+      candidate,
+      dataType,
+      role,
+      valueConstraint,
+    );
+    if (claim.kind === "share") return claim.valueType;
+    if (claim.displaced) {
+      warnings.push(
+        `Schema "${entityType.name}", property "${propName}" (${dataType.name}): the name "${candidate}" is `
+          + `already held by ${claim.displaced.kind} type "${claim.displaced.name}" with a different type, enum or role; `
+          + `created value type "${claim.name}" instead.`,
+      );
+    }
+    return model.addObjectType({
+      name: claim.name,
+      kind: "value",
+      dataType,
+      valueConstraint,
+      definition: propDef.description,
+    });
   }
 
   /**
