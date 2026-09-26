@@ -86,3 +86,11 @@ None.
   the code before the change. The R3 warning is tested through a format
   registered by the test, because no shipped format is left without
   lineage.
+- The PR #577 review found that neither generator named a subtype fact.
+  `RelationalMapper` records the subtype fact id on the subtype table's
+  foreign key (and a fact type id on an objectification's key), but
+  `generateDdlLineage` resolved that id only among constraints, and
+  `generateModelLineage` listed a subtype fact's two entities but not the
+  fact. Both now name it, tested in core and at the surface (impact on a
+  subtype fact of `examples/output/employee-hierarchy.orm.yaml`, all five
+  formats).

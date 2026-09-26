@@ -51,6 +51,36 @@ describe("export, then lineage impact", () => {
     },
   );
 
+  // PR #577 review: RelationalMapper records a subtype fact id on the
+  // subtype table's key, and NORMA writes every subtype fact, but the
+  // generators named neither, so impact on a subtype fact found nothing.
+  it.each(["ddl", "openapi", "avro", "norma", "dbt"])(
+    "impact on a subtype fact lists the %s artifact",
+    async (format) => {
+      const hierarchy = join(dir, "hierarchy.orm.yaml");
+      copyFileSync(
+        join(fixtures, "../../../../examples/output/employee-hierarchy.orm.yaml"),
+        hierarchy,
+      );
+      const out = join(dir, format === "dbt" ? "dbt" : `out.${format}`);
+      const exported = await runCli(["export", hierarchy, "--format", format, "--output", out]);
+      expect(exported.exitCode, exported.stderr).toBe(0);
+      const impact = await runCli([
+        "lineage",
+        "impact",
+        hierarchy,
+        "--element",
+        "9bb914ef-c751-469b-80f1-b449d0364495",
+        "--format",
+        "json",
+      ]);
+      const report = JSON.parse(impact.stdout);
+      expect(report.affectedArtifacts.map((a: { artifact: string; }) => a.artifact)).toContain(
+        resolve(out),
+      );
+    },
+  );
+
   it("names the model in the manifest, so the artifact can be traced back to it", async () => {
     await runCli(["export", model, "--format", "ddl", "--output", join(dir, "schema.sql")]);
     const manifest = readFileSync(join(dir, ".barwise", "lineage.yaml"), "utf8");
