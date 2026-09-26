@@ -215,8 +215,14 @@ describe("renderPopulationAsSql", () => {
         {
           name: "Customer Table", // needs quoting: space, uppercase
           columns: [
-            { name: "id", dataType: "TEXT", nullable: false }, // no sourceRoleId: skipped
-            { name: "nickname", dataType: "TEXT", nullable: true, sourceRoleId: "r1" },
+            { name: "id", dataType: "TEXT", dataTypeDefaulted: false, nullable: false }, // no sourceRoleId: skipped
+            {
+              name: "nickname",
+              dataType: "TEXT",
+              dataTypeDefaulted: false,
+              nullable: true,
+              sourceRoleId: "r1",
+            },
           ],
           primaryKey: { columnNames: ["id"] },
           foreignKeys: [],

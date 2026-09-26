@@ -1,6 +1,6 @@
 # Key-column data types survive dbt import, and export annotations stop reporting gaps that are not there
 
-Status: WS1 implemented 2026-09-26 (see Implementation notes); WS2 and WS3 not started
+Status: Implemented 2026-09-26 -- WS1, WS2 and WS3 (see Implementation notes)
 
 Created: 2026-09-24
 Last-updated: 2026-09-26
@@ -391,3 +391,64 @@ Reproduction after WS1, through the CLI: `customers.customer_id`,
 `orders.order_id` and the foreign key `orders.customer_id` all export as
 `DECIMAL`. The false "defaulted" and "no description" TODOs remain until
 WS3.
+
+**WS2 (2026-09-26).** Landed as specified. Three details:
+
+- `packages/core/tests/mapping/referenceModePkType.test.ts` replaces
+  `scripts/refmode-heuristic-audit.mjs`, as the spec asked. It does not
+  copy `toSnake` to classify each key. It maps every tracked model under
+  two fallback strategies, and a key whose type does not move with the
+  fallback took its type from a value type. Restricted to what
+  `referenceModePkType` types (a single key column named for the
+  reference mode, not an objectified entity, not a subtype), that list is
+  exactly the three keys the audit counted as "named", and the test pins
+  it. Against the old mapper all three sweep and rule tests fail.
+- `core/tests/mapping/dbt.test.ts` asserted the defect as correct: a
+  `Customer(customer_id)` key typed `VARCHAR(100)` from its `Name`
+  attribute. It now asserts `TEXT`.
+- The predicted golden churn did not happen. The characterization
+  goldens are built from `examples/transcripts/` and `test-plan/fixtures/`
+  models whose entities have preferred identifying binaries, so the
+  fallback never reaches them; `examples/output/clinic-appointments.orm.yaml`,
+  where the audit found `Doctor(provider_id)` typed from `Specialty`, has
+  no DDL golden. `npm run test` passed with no golden rewritten.
+
+**WS3 (2026-09-26).** Landed as specified under D2, with three details:
+
+- `dataTypeDefaulted` is set at the five places the mapper writes a type.
+  A declared data type gives `false` and none gives `true`. A key typed by
+  the preferred-identifier strategy gives `true`, so a defaulted `INTEGER`
+  or `UUID` key is now reported; the old `=== "TEXT"` check missed it. A
+  foreign key, including a subtype's shared key, copies the referenced
+  column's flag, and a unary fact type's `BOOLEAN` gives `false`. As the
+  API section asked, the compiler confirmed that no package outside core
+  builds a `Column`. Five core test files do, and their literals gained
+  the field (core's `tsc` does not see tests, barwise-944).
+- R4 needed one rule the spec did not state: a foreign-key column has no
+  value type of its own. It is described by the value type behind the
+  key it references, so `orders.customer_id` is described by
+  `CustomerId`'s definition. Without that rule, the acceptance check (no
+  TODO on any column of the reproduction) could not pass.
+- The CLI characterization goldens changed only in annotation text, as
+  expected (`UPDATE_GOLDEN=1`, 11 files): 27 column-description TODOs
+  became 13, each on a value type that has no definition, and the 13
+  defaulted-type TODOs stayed at 13 with the neutral wording, because
+  those fixtures do have untyped value types. Avro fields that had
+  carried a false TODO in `doc` now carry the default `"Primary key"`.
+
+Reproduction after WS1-3, through the CLI: `barwise export --format ddl`
+emits no TODO on any column. `--format dbt` on a model with real gaps
+appends "Or set it in the dbt YAML." to each data-type and description
+TODO; the DDL export of the same model does not.
+
+Review of PR #567 found three places where WS3's rules missed a column,
+each now covered by a test that fails without its fix. A key typed from
+a named but non-preferred binary recorded no source role, so its
+definition was not found (`reviewer.employee_id` in
+`examples/transcripts/pii-redaction.orm.yaml`). A foreign key into an
+objectified entity's composite key needs more than one hop to reach a
+value type. And an identified subtype's single shared key column kept
+its own phase-0 type instead of the supertype key's, which after WS2
+could leave a `TEXT` column referencing an `INTEGER` key. The same
+review surfaced barwise-1074: the named binary is still mapped a second
+time as an attribute column, which this spec does not cover.

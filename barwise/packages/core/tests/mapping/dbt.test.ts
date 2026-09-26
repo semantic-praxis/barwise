@@ -86,8 +86,11 @@ describe("dbt renderer", () => {
       const dbt = renderDbt(schema);
       const customerModel = dbt.models.find((m) => m.name === "customer")!;
 
-      // PK type is resolved from the value type's dataType -- both get VARCHAR(100).
-      expect(customerModel.sql).toContain("CAST(customer_id AS VARCHAR(100))");
+      // Name is an attribute, not the value type the reference mode names,
+      // so the key takes the fallback rather than Name's type. This line
+      // used to assert VARCHAR(100): it pinned the borrowed-type defect as
+      // correct (dbt-key-type-fidelity.spec.md, WS2).
+      expect(customerModel.sql).toContain("CAST(customer_id AS TEXT)");
       expect(customerModel.sql).toContain("CAST(name AS VARCHAR(100))");
     });
   });

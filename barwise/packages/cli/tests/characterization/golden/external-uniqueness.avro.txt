@@ -6,7 +6,7 @@
     {
       "name": "room_id",
       "type": "string",
-      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.] [TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.]"
+      "doc": "Primary key [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
     },
     {
       "name": "building_code",
@@ -14,7 +14,7 @@
         "null",
         "string"
       ],
-      "doc": "[TODO(barwise): No column description. Add one to the dbt YAML.] [TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.]"
+      "doc": "[TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
     },
     {
       "name": "room_number",
@@ -22,10 +22,10 @@
         "null",
         "string"
       ],
-      "doc": "[TODO(barwise): No column description. Add one to the dbt YAML.] [TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.]"
+      "doc": "[TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
     }
   ],
-  "doc": "[TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.]"
+  "doc": "[TODO(barwise): No model description. Add a definition to the entity type.]"
 }
 
 ---
@@ -38,8 +38,8 @@
     {
       "name": "building_code",
       "type": "string",
-      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.] [TODO(barwise): Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.]"
+      "doc": "Primary key [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
     }
   ],
-  "doc": "[TODO(barwise): No model description. Add a definition to the ORM entity type or edit the dbt YAML.]"
+  "doc": "[TODO(barwise): No model description. Add a definition to the entity type.]"
 }

@@ -330,7 +330,12 @@ describe("Avro renderer", () => {
         tables: [
           {
             name: "widget",
-            columns: [{ name: "payload", dataType: "JSONB", nullable: false }],
+            columns: [{
+              name: "payload",
+              dataType: "JSONB",
+              dataTypeDefaulted: false,
+              nullable: false,
+            }],
             primaryKey: { columnNames: ["payload"] },
             foreignKeys: [],
             sourceElementId: "ot-widget",

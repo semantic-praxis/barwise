@@ -261,7 +261,7 @@ describe("OpenAPI renderer", () => {
         tables: [
           {
             name: "note",
-            columns: [{ name: "body", dataType: "TEXT", nullable: true }],
+            columns: [{ name: "body", dataType: "TEXT", dataTypeDefaulted: false, nullable: true }],
             primaryKey: { columnNames: ["body"] },
             foreignKeys: [],
             sourceElementId: "ot-note",
@@ -498,7 +498,12 @@ describe("OpenAPI renderer", () => {
         tables: [
           {
             name: "widget",
-            columns: [{ name: "payload", dataType: "JSONB", nullable: false }],
+            columns: [{
+              name: "payload",
+              dataType: "JSONB",
+              dataTypeDefaulted: false,
+              nullable: false,
+            }],
             primaryKey: { columnNames: ["payload"] },
             foreignKeys: [],
             sourceElementId: "ot-widget",
@@ -704,7 +709,12 @@ describe("OpenAPI renderer", () => {
         tables: [
           {
             name: "log_entry",
-            columns: [{ name: "message", dataType: "TEXT", nullable: false }],
+            columns: [{
+              name: "message",
+              dataType: "TEXT",
+              dataTypeDefaulted: false,
+              nullable: false,
+            }],
             primaryKey: { columnNames: [] },
             foreignKeys: [],
             sourceElementId: "ft-log-entry",

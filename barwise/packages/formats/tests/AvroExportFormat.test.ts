@@ -155,7 +155,7 @@ describe("AvroExportFormat", () => {
       );
       expect(statusField).toBeDefined();
       expect(statusField.doc).toContain("[TODO(barwise):");
-      expect(statusField.doc).toContain("Data type defaulted to TEXT");
+      expect(statusField.doc).toContain("Data type was not declared; exported as TEXT");
     });
 
     it("returns annotations array in the result", () => {

@@ -192,6 +192,7 @@ describe("Lineage Generation", () => {
             columns: [{
               name: "id",
               dataType: "TEXT",
+              dataTypeDefaulted: false,
               nullable: false,
               sourceRoleId: "no-such-role",
             }],

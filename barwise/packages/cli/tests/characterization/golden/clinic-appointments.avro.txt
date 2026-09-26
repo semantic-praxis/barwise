@@ -6,12 +6,11 @@
     {
       "name": "medical_record_number",
       "type": "string",
-      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.]"
+      "doc": "Primary key"
     },
     {
       "name": "provider_id",
-      "type": "string",
-      "doc": "[TODO(barwise): No column description. Add one to the dbt YAML.]"
+      "type": "string"
     }
   ],
   "doc": "[NOTE(barwise): Definition available from ORM model: \"A person who books appointments at the clinic, identified by a medical record...\"]"
@@ -27,12 +26,12 @@
     {
       "name": "provider_id",
       "type": "string",
-      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.]"
+      "doc": "Primary key"
     },
     {
       "name": "specialty",
       "type": "string",
-      "doc": "[TODO(barwise): No column description. Add one to the dbt YAML.] [NOTE(barwise): Value constraint available: ['cardiology', 'dermatology', 'family medicine', 'orthopedics', 'pediatrics']. Consider adding an accepted_values test.]"
+      "doc": "[NOTE(barwise): Value constraint available: ['cardiology', 'dermatology', 'family medicine', 'orthopedics', 'pediatrics']. Consider adding an accepted_values test.]"
     }
   ],
   "doc": "[NOTE(barwise): Definition available from ORM model: \"A medical provider at the clinic, identified by a state-issued provider ID.\"]"
@@ -48,28 +47,26 @@
     {
       "name": "confirmation_number",
       "type": "string",
-      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.]"
+      "doc": "Primary key"
     },
     {
       "name": "visit_reason",
       "type": [
         "null",
         "string"
-      ],
-      "doc": "[TODO(barwise): No column description. Add one to the dbt YAML.]"
+      ]
     },
     {
       "name": "appointment_status",
       "type": "string",
-      "doc": "[TODO(barwise): No column description. Add one to the dbt YAML.] [NOTE(barwise): Value constraint available: ['scheduled', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show']. Consider adding an accepted_values test.]"
+      "doc": "[NOTE(barwise): Value constraint available: ['scheduled', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show']. Consider adding an accepted_values test.]"
     },
     {
       "name": "follow_up_note",
       "type": [
         "null",
         "string"
-      ],
-      "doc": "[TODO(barwise): No column description. Add one to the dbt YAML.]"
+      ]
     }
   ],
   "doc": "[NOTE(barwise): Definition available from ORM model: \"A scheduled visit between a patient and a doctor, identified by a unique conf...\"]"
@@ -85,7 +82,7 @@
     {
       "name": "room_number",
       "type": "string",
-      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.]"
+      "doc": "Primary key"
     }
   ],
   "doc": "[NOTE(barwise): Definition available from ORM model: \"A physical examination room in the clinic, identified by a room number.\"]"
@@ -101,17 +98,17 @@
     {
       "name": "confirmation_number",
       "type": "string",
-      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.]"
+      "doc": "Primary key"
     },
     {
       "name": "medical_record_number",
       "type": "string",
-      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.]"
+      "doc": "Primary key"
     },
     {
       "name": "provider_id",
       "type": "string",
-      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.]"
+      "doc": "Primary key"
     }
   ],
   "doc": "[NOTE(barwise): Composite primary key (confirmation_number, medical_record_number, provider_id). Individual unique tests are not generated.]"
@@ -127,12 +124,12 @@
     {
       "name": "provider_id",
       "type": "string",
-      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.]"
+      "doc": "Primary key"
     },
     {
       "name": "room_number",
       "type": "string",
-      "doc": "Primary key [TODO(barwise): No column description. Add one to the dbt YAML.]"
+      "doc": "Primary key"
     }
   ],
   "doc": "[NOTE(barwise): Composite primary key (provider_id, room_number). Individual unique tests are not generated.]"

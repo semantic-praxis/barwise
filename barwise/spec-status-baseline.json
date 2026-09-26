@@ -4,6 +4,17 @@
     "ci-local-condition-parity.spec.md": {
       "status": "Draft -- no workstream implemented",
       "commits": [
+        "ec1af289",
+        "cd883e1f",
+        "01b99b2e",
+        "45fdfc50",
+        "3d3c4f7f",
+        "ecdeb34a",
+        "aa31d1b9",
+        "da786723",
+        "94f6cfd9",
+        "658e1f6f",
+        "02800a0d",
         "e07f6ec6",
         "2e958d4a",
         "3617d2f2",
@@ -32,6 +43,8 @@
     "conformance-property.spec.md": {
       "status": "Accepted (all decisions resolved 2026-08-25; both workstreams\nopen -- design only, no implementation in this PR)",
       "commits": [
+        "788b02d5",
+        "6657985f",
         "3e8a981b",
         "592559c9",
         "8857a62e",
@@ -67,6 +80,7 @@
     "implicit-sensemaking.spec.md": {
       "status": "draft",
       "commits": [
+        "6657985f",
         "42b11436",
         "af4076f8",
         "d79977fe",
@@ -76,16 +90,28 @@
       ],
       "note": "Genuinely still a draft; the commits below are unrelated work on modules the spec happens to name. 8a62161 is model-lint's four workstreams touching populationValidation.ts; 8175c7c moved mcp output-size guidance, touching verbalize.ts. Neither implements anything here -- no rival-frame or premortem code exists in any package's src. The spec's own Tracking line says it files bd issues per workstream WHEN IT LANDS, so nothing has landed to report. Remove this row when the first workstream ships and the Status says so."
     },
+    "model-issues-tab.spec.md": {
+      "status": "Draft -- no workstream implemented",
+      "commits": [
+        "592dac69"
+      ],
+      "note": "Genuinely unimplemented, and the header is right: no part of the Issues tab exists yet. The commit is dbt-key-type-fidelity WS3 (barwise-1057), which changed ExportAnnotationCollector -- one of the finding sources this spec names -- so that a data-type TODO fires only on a real fallback and a description TODO only on a missing definition. The tab will read those findings; it has not been built. Remove this row when a workstream ships and the Status says so."
+    },
     "mutation-ratchet.spec.md": {
       "status": "Draft -- no workstream implemented. All five open decisions\nresolved 2026-09-10; the workstreams below reflect them.",
       "commits": [
-        "98b069d6",
+        "592dac69",
+        "d7aa6efb",
+        "6037f88c",
+        "01b99b2e",
+        "788b02d5",
+        "6657985f",
+        "658e1f6f",
+        "02800a0d",
         "e07f6ec6",
         "e49773e7",
         "bc93f06b",
-        "4000df85",
         "33ea339c",
-        "b983db1b",
         "b6324fd1",
         "ec9ae742"
       ],

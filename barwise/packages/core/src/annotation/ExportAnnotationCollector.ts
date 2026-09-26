@@ -7,10 +7,15 @@
  * DDL, OpenAPI, Avro, diagram, verbalization) so they share identical
  * gap detection logic.
  *
- * Extracted from `DbtExportAnnotator.collectAnnotations()`.
+ * Extracted from `DbtExportAnnotator.collectAnnotations()`. Its messages
+ * name no export format: the collector is shared by five surfaces, and a
+ * DDL reader told to "edit the dbt YAML" was reading one format's remedy
+ * in another's output. A format that has a remedy of its own appends it
+ * when it renders (`DbtExportAnnotator`; dbt-key-type-fidelity.spec.md,
+ * WS3).
  */
 
-import type { RelationalSchema } from "../mapping/RelationalSchema.js";
+import type { Column, RelationalSchema, Table } from "../mapping/RelationalSchema.js";
 import { isValueType, type ValueType } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { truncate } from "./helpers.js";
@@ -65,6 +70,8 @@ export function collectExportAnnotations(
     model.objectTypes.filter(isValueType).map((v) => [v.id, v]),
   );
 
+  const tableByName = new Map(schema.tables.map((t) => [t.name, t]));
+
   for (const table of schema.tables) {
     const entity = entityById.get(table.sourceElementId);
 
@@ -84,8 +91,7 @@ export function collectExportAnnotations(
           tableName: table.name,
           severity: "todo",
           category: "description",
-          message:
-            "No model description. Add a definition to the ORM entity type or edit the dbt YAML.",
+          message: "No model description. Add a definition to the entity type.",
         });
       }
     }
@@ -110,24 +116,32 @@ export function collectExportAnnotations(
         ? findValueTypeForRole(col.sourceRoleId, model, valueById)
         : undefined;
 
-      // Missing column description.
-      annotations.push({
-        tableName: table.name,
-        columnName: col.name,
-        severity: "todo",
-        category: "description",
-        message: "No column description. Add one to the dbt YAML.",
-      });
+      // Missing column description: only when the value type the column
+      // comes from has no definition. It used to fire on every column,
+      // described or not.
+      const describedBy = sourceValueType
+        ?? referencedKeyValueType(table, col, tableByName, model, valueById);
+      if (!describedBy?.definition) {
+        annotations.push({
+          tableName: table.name,
+          columnName: col.name,
+          severity: "todo",
+          category: "description",
+          message: "No column description. Add a definition to the value type.",
+        });
+      }
 
-      // Default TEXT data type.
-      if (col.dataType === "TEXT") {
+      // Undeclared data type: only when the mapper actually used a
+      // fallback. Comparing the SQL string to "TEXT" flagged a declared
+      // text column and missed a defaulted INTEGER or UUID key.
+      if (col.dataTypeDefaulted) {
         annotations.push({
           tableName: table.name,
           columnName: col.name,
           severity: "todo",
           category: "data_type",
           message:
-            "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.",
+            `Data type was not declared; exported as ${col.dataType}. Add a data type to the value type.`,
         });
       }
 
@@ -153,6 +167,48 @@ export function collectExportAnnotations(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * The value type behind the key column a foreign-key column references.
+ *
+ * A foreign-key column carries the relationship's role, not a value
+ * type, so it has no description of its own; what describes it is the
+ * identifier it copies -- `orders.customer_id` is described by the value
+ * type behind `customers.customer_id`.
+ *
+ * The referenced key column can itself be a copy: an objectified entity's
+ * key is made of foreign keys to the entities it relates, and a subtype's
+ * key references its supertype's. So the lineage is followed hop by hop
+ * until a column traces to a value type (PR #567 review), and a column
+ * already visited ends the walk, since a foreign-key cycle has no value
+ * type at the end of it.
+ */
+function referencedKeyValueType(
+  table: Table,
+  col: Column,
+  tableByName: ReadonlyMap<string, Table>,
+  model: OrmModel,
+  valueById: Map<string, ValueType>,
+  visited: Set<string> = new Set(),
+): ValueType | undefined {
+  const here = `${table.name}.${col.name}`;
+  if (visited.has(here)) return undefined;
+  visited.add(here);
+
+  for (const fk of table.foreignKeys) {
+    const i = fk.columnNames.indexOf(col.name);
+    if (i === -1) continue;
+    const keyTable = tableByName.get(fk.referencedTable);
+    const keyCol = keyTable?.columns.find((c) => c.name === fk.referencedColumns[i]);
+    if (!keyTable || !keyCol) return undefined;
+    const direct = keyCol.sourceRoleId
+      ? findValueTypeForRole(keyCol.sourceRoleId, model, valueById)
+      : undefined;
+    return direct
+      ?? referencedKeyValueType(keyTable, keyCol, tableByName, model, valueById, visited);
+  }
+  return undefined;
+}
 
 /**
  * Given a role ID from a relational column's sourceRoleId, find the

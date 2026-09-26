@@ -16,16 +16,16 @@ Person is child of Person
   No Person is parent of that same Person.
   If Person1 is parent of Person2 then Person2 does not is parent of Person1.
 == Open questions ==
-[person] No model description. Add a definition to the ORM entity type or edit the dbt YAML.
-[person.person_id] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
-[person.vin] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
-[person.bus_number] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
-[car] No model description. Add a definition to the ORM entity type or edit the dbt YAML.
-[car.vin] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
-[bus] No model description. Add a definition to the ORM entity type or edit the dbt YAML.
-[bus.bus_number] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
-[ticket] No model description. Add a definition to the ORM entity type or edit the dbt YAML.
-[ticket.ticket_id] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
-[ticket.person_id] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
-[person_is_parent_of_person.person_id] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
-[person_is_parent_of_person.is_child_of_person_id] Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML.
+[person] No model description. Add a definition to the entity type.
+[person.person_id] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[person.vin] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[person.bus_number] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[car] No model description. Add a definition to the entity type.
+[car.vin] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[bus] No model description. Add a definition to the entity type.
+[bus.bus_number] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[ticket] No model description. Add a definition to the entity type.
+[ticket.ticket_id] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[ticket.person_id] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[person_is_parent_of_person.person_id] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[person_is_parent_of_person.is_child_of_person_id] Data type was not declared; exported as TEXT. Add a data type to the value type.

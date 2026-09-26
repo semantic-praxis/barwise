@@ -121,6 +121,17 @@ export function annotateDbtExport(
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Categories whose gap a dbt user can also close in the schema YAML. The
+ * collector's messages are format-neutral (they reach DDL, OpenAPI, Avro
+ * and the diagram too), so the dbt-specific remedy is added here, where
+ * the reader is looking at dbt YAML.
+ */
+const DBT_REMEDY_CATEGORIES: ReadonlySet<string> = new Set(["data_type", "description"]);
+
 function formatAnnotationComment(annotation: ExportAnnotation): string {
-  return formatBarwiseComment(annotation.severity, annotation.message);
+  const message = annotation.severity === "todo" && DBT_REMEDY_CATEGORIES.has(annotation.category)
+    ? `${annotation.message} Or set it in the dbt YAML.`
+    : annotation.message;
+  return formatBarwiseComment(annotation.severity, message);
 }
