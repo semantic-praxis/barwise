@@ -1,6 +1,6 @@
 # One UUIDv7 generator, built in core from an injected clock
 
-Status: Implemented -- both workstreams landed together
+Status: Implemented -- both steps of the single workstream landed together
 
 Created: 2026-09-26
 Last-updated: 2026-09-26
@@ -196,11 +196,25 @@ A single workstream: small, and the parts only make sense together.
   command tests go through `runCli`, but `runCli` never executes
   `src/index.ts`, which is the file under test here. The MCP test reuses
   the existing stdio spawn in `serverSpawn.test.ts`.
-- **Mutation checks, run by hand.** Restoring the old counter logic (wrap
-  at 4,096, reset on a backward step) fails exactly the R2 overflow test
-  and the R3 test in core. Removing the install line from each of the
-  three entry points, with the rest of the file compiling, fails that
-  surface's wiring test and nothing else.
+- **Mutation checks, through `scripts/mutate.mjs`.** Each row plants one
+  mutation, runs the command from that package's directory, and restores
+  the file; exit 0 means the test caught it. All six exited 0.
+
+  | Mutation (`--old` -> `--new`)                                                | Command                                                                      |
+  | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+  | `sources.randomBytes(10)` -> `sources.randomBytes(16)` (R1)                  | `npx vitest run tests/model/id.test.ts` (core)                               |
+  | `lastMs++;` -> `lastMs += 0;` (R2, counter resets, no advance)               | same                                                                         |
+  | `if (wallMs > lastMs) {` -> `if (wallMs !== lastMs) {` (R3)                  | same                                                                         |
+  | install line -> `void [setIdGenerator, createUuidv7Generator, randomBytes];` | cli: `sh -c "npx tsc -p . && npx vitest run tests/entryIdGenerator.test.ts"` |
+  | same, in `mcp/src/index.ts`                                                  | mcp: `sh -c "npx tsc -p . && npx vitest run tests/serverSpawn.test.ts"`      |
+  | same, in `vscode/src/client/extension.ts`                                    | vscode: `npx vitest run tests/unit/activateIdGenerator.test.ts`              |
+
+  The CLI and MCP tests read the built `dist`, so their commands rebuild
+  first, and `dist` was rebuilt again after the helper restored the
+  source. The install line is
+  `setIdGenerator(createUuidv7Generator({ now: Date.now, randomBytes }));`,
+  and the replacement keeps each file compiling, so a red run means the
+  generator was not installed, not that the build broke.
 
 ## Non-goals
 
