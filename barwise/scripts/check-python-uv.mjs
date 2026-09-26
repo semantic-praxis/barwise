@@ -53,6 +53,14 @@
  */
 import { readFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
+import {
+  BANNED_UV_FLAGS,
+  bareInterpreter,
+  blankQuoted,
+  INTERPRETER,
+  logicalLines,
+  uvFindings,
+} from "./lib/python-uv-rules.mjs";
 import { REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
 
 /** Files whose contents are commands. */
@@ -69,7 +77,10 @@ const JSISH = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
  */
 const SELF = new Set([
   "barwise/scripts/check-python-uv.mjs",
+  "barwise/scripts/lib/python-uv-rules.mjs",
+  "barwise/scripts/hooks/python-uv-guard.mjs",
   "barwise/scripts/tests/gates.test.mjs",
+  "barwise/scripts/tests/python-uv-guard.test.mjs",
 ]);
 
 /**
@@ -88,14 +99,6 @@ const ALLOWLIST = [
   },
 ];
 
-/** Interpreter names, refusing `python-version` and `.python-version`. */
-const INTERPRETER = String.raw`(?:python3|python|pip3|pip)(?![\w.-])`;
-
-/** A command position in a shell line: start, or after a separator. */
-const COMMAND_POS = new RegExp(
-  String.raw`(?:^|[;&|(]|&&|\|\||\$\()\s*(?:[A-Za-z_]\w*=\S*\s+)*(${INTERPRETER})`,
-);
-
 /** `subprocess.run(["python3", ...])` and `os.system("python3 ...")`. A .py
  *  file spawning a bare interpreter escapes the lock exactly as a shell one
  *  does; scanning .py only for PEP 723 left that whole half unread. */
@@ -111,29 +114,6 @@ const CHILD_PROCESS = new RegExp(
     .raw`\b(?:execFileSync|execFile|spawnSync|spawn|execSync|exec)\s*\(\s*["'\`](${INTERPRETER})`,
 );
 
-const BANNED_UV_FLAGS = [
-  ["--with-requirements", "reads requirements outside the lockfile"],
-  ["--with", "resolves against the index, not uv.lock -- a lock bypass"],
-  ["--isolated", "resolves outside the project entirely"],
-  ["--no-project", "runs with no project, so no lock -- --isolated by another name"],
-];
-
-/** `uvx` and `uv tool run` resolve a tool from the index, never from
- *  uv.lock. Banned for the same reason as `uv pip`, and the obvious way
- *  round it once `uv pip` is closed. */
-const UV_TOOL = /\buvx\b|\buv\s+tool\s+run\b/;
-
-/**
- * Blank the contents of quoted strings before matching a COMMAND, so an
- * `echo "== uv sync"` heading is not read as an invocation. The trade is
- * explicit: a genuine `bash -c "python3 ..."` would be missed. None exists
- * here, and the alternative -- flagging every mention -- makes the gate
- * cry wolf on its own error messages, which is how a gate gets disabled.
- */
-function blankQuoted(line) {
-  return line.replace(/"[^"]*"|'[^']*'/g, (m) => m[0].repeat(m.length));
-}
-
 /** Strip a comment line, so this file's own prose is not a violation. */
 function isComment(line, ext) {
   const t = line.trimStart();
@@ -144,31 +124,13 @@ function isComment(line, ext) {
 /**
  * Strip the YAML that precedes a command, so a single-line step is read as
  * one. `- run: python3 -m tool` has no shell separator before `python3`, so
- * COMMAND_POS could not see it -- and the single-line form is how nearly
+ * bareInterpreter could not see it -- and the single-line form is how nearly
  * every step in this repo's own ci.yml is written, including this gate's.
  * The block form (`run: |` then the command on its own line) always worked,
  * and was the only form the tests planted.
  */
 function stripYamlPrefix(line) {
   return line.replace(/^(\s*)-\s+/, "$1").replace(/^\s*[\w.-]+:\s+/, "");
-}
-
-/** Join `\`-continued shell lines, so a flag on line 2 counts as line 1's. */
-function logicalLines(text) {
-  const out = [];
-  let buf = "";
-  let start = 0;
-  text.split("\n").forEach((raw, i) => {
-    if (buf === "") start = i + 1;
-    if (raw.endsWith("\\")) {
-      buf += raw.slice(0, -1) + " ";
-      return;
-    }
-    out.push({ line: start, text: buf + raw });
-    buf = "";
-  });
-  if (buf !== "") out.push({ line: start, text: buf });
-  return out;
 }
 
 /**
@@ -246,8 +208,8 @@ for (const file of trackedFiles()) {
     const cmd = SHELLISH.has(ext) || ext === ".py" ? blankQuoted(raw) : raw;
 
     if (SHELLISH.has(ext)) {
-      const m = COMMAND_POS.exec(ext === ".sh" ? cmd : stripYamlPrefix(cmd));
-      if (m) findings.push({ file, line, what: `bare \`${m[1]}\``, raw });
+      const bare = bareInterpreter(ext === ".sh" ? cmd : stripYamlPrefix(cmd));
+      if (bare) findings.push({ file, line, what: `bare \`${bare}\``, raw });
     }
     if (JSISH.has(ext)) {
       const m = CHILD_PROCESS.exec(raw);
@@ -258,27 +220,7 @@ for (const file of trackedFiles()) {
       if (m) findings.push({ file, line, what: `bare \`${m[1]}\` subprocess`, raw });
     }
 
-    if (UV_TOOL.test(cmd)) {
-      findings.push({ file, line, what: "`uvx`/`uv tool run` (resolves outside uv.lock)", raw });
-    }
-
-    if (/\buv\s+(?:run|sync|pip)\b/.test(cmd)) {
-      if (/\buv\s+pip\b/.test(cmd)) {
-        findings.push({ file, line, what: "`uv pip`", raw });
-      } else {
-        for (const [flag, why] of BANNED_UV_FLAGS) {
-          if (cmd.includes(flag)) findings.push({ file, line, what: `\`${flag}\` (${why})`, raw });
-        }
-        if (!/--frozen|--locked/.test(cmd)) {
-          findings.push({
-            file,
-            line,
-            what: "`uv run`/`uv sync` with neither --frozen nor --locked",
-            raw,
-          });
-        }
-      }
-    }
+    for (const what of uvFindings(cmd)) findings.push({ file, line, what, raw });
   }
 }
 

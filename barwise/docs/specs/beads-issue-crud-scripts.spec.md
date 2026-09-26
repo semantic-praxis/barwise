@@ -73,11 +73,10 @@ Out of scope, deferred:
   cycle detection beyond what `check-beads.sh` already flags, no
   search. This is a write path for the common CRUD cases, not a bd
   reimplementation.
-- Concurrent-session id allocation is best-effort (read current max,
-  add one) with no locking. Two sessions creating an issue at the same
-  moment in different worktrees can collide; a collision surfaces as
-  `check-beads.sh`'s existing duplicate-id error at merge time, same
-  as any other file conflict in this git-native tracker.
+- Concurrent-session id allocation was best-effort (read current max,
+  add one) with no locking. It collided at least five times across
+  branches, so it was replaced by random suffixes
+  (`beads-random-ids.spec.md`, barwise-w1u).
 
 ## Inventory
 

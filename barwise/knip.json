@@ -5,7 +5,7 @@
   "ignoreBinaries": ["gitleaks", "pkill", "shellcheck", "uv"],
   "ignoreDependencies": ["@dprint/json", "@dprint/markdown", "@dprint/typescript"],
   "workspaces": {
-    ".": { "entry": ["scripts/at-root.mjs", "scripts/tests/*.test.mjs"] },
+    ".": { "entry": ["scripts/at-root.mjs", "scripts/hooks/*.mjs", "scripts/tests/*.test.mjs"] },
     "packages/core": {
       "ignore": ["scripts/**", "vitest.mutation.config.ts"]
     },

@@ -429,6 +429,17 @@ skill (`.claude/skills/release/`).
   a command, which is what makes this checkable where "activate the
   venv first" is not (barwise-921). The one standing exception is
   bootstrapping uv itself.
+
+  Two checks read it, from one rule module
+  (`scripts/lib/python-uv-rules.mjs`): `npm run check:python-uv` over
+  tracked files, and a `PreToolUse` hook on an agent's own Bash
+  commands (`scripts/hooks/python-uv-guard.mjs`), which refuses a bare
+  interpreter before it runs. The hook also refuses a `uv run` outside
+  `barwise/` without `--project`, because the working directory is in
+  its input, and that directory is the one this section says `--frozen`
+  silently depends on. The hook exists because the gate never
+  saw the `python3 - <<EOF` an agent types, which ran twice in one day
+  (barwise-1060).
 - A copy that must agree with other code is never guarded by a
   comment: share it, derive it from the authority, register the pair
   in `barwise/parity.manifest.json` (checked by `npm run
@@ -559,6 +570,11 @@ validates the JSONL.
 
 The core loop is unchanged in shape: `list` to find work, `show <id>`
 to read it, `update <id>` to claim it, `close <id>` when it is done.
+
+`create` mints a random three-character suffix (`barwise-k3x`), not the
+highest number plus one. The counter read a tracker that is stale on
+every branch behind main, and two open branches minted the same id at
+least five times (barwise-w1u). Older numeric ids keep working.
 There is no `remember` subcommand -- persistent project knowledge goes
 in this file, as a convention with the reason attached, not a
 MEMORY.md.
