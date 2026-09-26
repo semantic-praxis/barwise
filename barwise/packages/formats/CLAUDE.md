@@ -50,7 +50,8 @@ src/
   norma/NormaXmlTypes.ts         NORMA XML types
 tests/
   helpers/ModelBuilder.ts  Fluent model builder (test-only)
-  fixtures/*.orm           NORMA XML fixtures
+  fixtures/                NORMA XML fixtures (*.orm) and importer inputs
+                           moved in from trial/findings/ when a fix lands
   *.test.ts                Mirrors src/
 ```
 
