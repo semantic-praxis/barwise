@@ -25,13 +25,16 @@ export function createFactTypes(ctx: DbtMapperContext): void {
       if (!vtId) continue;
 
       const entityName = toPascalCase(m.name);
-      const vtName = toPascalCase(col.name);
+      // The value type's own name, which differs from the column's when
+      // valueTypes.ts had to avoid a name another object type holds.
+      const vtName = ctx.model.getObjectType(vtId)?.name ?? toPascalCase(col.name);
       const factName = `${entityName} has ${vtName}`;
 
       // Minted, never built from names: the id policy is generateId's, and
       // the surface installs UUIDv7 behind it (importer-role-ids.spec.md).
       const role1Id = generateId();
       const role2Id = generateId();
+      ctx.columnRoleIdMap.set(`${m.name}::${col.name}`, role1Id);
 
       // Build constraints from tests.
       const constraints = buildConstraints(col, role1Id, role2Id, ctx.report, m.name);

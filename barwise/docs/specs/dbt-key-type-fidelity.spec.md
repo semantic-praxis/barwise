@@ -1,9 +1,9 @@
 # Key-column data types survive dbt import, and export annotations stop reporting gaps that are not there
 
-Status: Draft -- no workstream implemented
+Status: WS1 implemented 2026-09-26 (see Implementation notes); WS2 and WS3 not started
 
 Created: 2026-09-24
-Last-updated: 2026-09-25
+Last-updated: 2026-09-26
 Tracking: barwise-1057 (follow-up for the DDL importer: barwise-1058)
 
 A dbt `data_type` on a primary-key or foreign-key column is dropped on
@@ -331,6 +331,7 @@ options are kept so a later reader can see what was rejected.
   whose node the diagram absorbs, leaving that attribute's fact type
   with a hidden player. WS1 adds a test for this case and, if the edge
   is lost, restricts absorption to the entity the binary identifies.
+  Measured in WS1: the edge was lost. See Implementation notes.
 - **Examples drift.** WS2 changes DDL for existing models; run
   `npm run validate:examples` and regenerate the characterization
   goldens with `UPDATE_GOLDEN=1`, reviewing the diff.
@@ -351,3 +352,42 @@ options are kept so a later reader can see what was rejected.
 - No change to how non-key columns are typed or described on import.
 - No LLM involvement: every change is in the deterministic import,
   mapping and annotation path.
+
+## Implementation notes
+
+**WS1 (2026-09-26).** Landed as specified, with four details the spec
+left open:
+
+- A column's data type, its description, and which value type it plays
+  are decided in one module, `dbt/src/dbtMapping/columnTypes.ts`. Both
+  `identifierTypes.ts` (keys) and `valueTypes.ts` (other columns) call
+  `claimValueType` for the last of these; they create what it decides
+  and word their own report messages.
+- D1's rule reached ordinary columns too (found in review of PR #564).
+  An ordinary column used to share any same-named value type, so a
+  `varchar(36)` attribute named like a numeric key exported as
+  `DECIMAL`, and a column named like its own entity's renamed identifier
+  made the import throw on a duplicate fact type. `claimValueType` now
+  shares a name only with a value type, never one this entity already
+  plays, and -- for an ordinary column -- only when the column declares
+  no type or the same type. An ordinary column with no type of its own
+  still shares, as before. A column that cannot share gets
+  `<Entity><Name>` and a reported rename, as a key does under D1.
+- The "will export as X" warning is not predicted from a copy of the
+  mapper's private `toSnake`. `exportedColumns.ts` runs
+  `RelationalMapper` over the imported model and compares each column it
+  emits with the dbt column it came from, matched on the entity-side
+  role both record. One check covers every cause -- a D1 rename, the
+  ordinary-column rename above, and a spelling such as `customerID` --
+  and it cannot drift from what export does.
+- The diagram risk under Risks and testing was real: a value type that
+  identifies one entity and is also an attribute of another lost the
+  attribute's edge. `ModelToGraph` now keeps such a value type as a node
+  and still folds the identifying fact type into the entity's
+  "(.ref_mode)" label. A value type that plays no other role is absorbed
+  as before.
+
+Reproduction after WS1, through the CLI: `customers.customer_id`,
+`orders.order_id` and the foreign key `orders.customer_id` all export as
+`DECIMAL`. The false "defaulted" and "no description" TODOs remain until
+WS3.
