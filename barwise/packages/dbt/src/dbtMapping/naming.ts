@@ -3,25 +3,14 @@
  */
 
 import type { DataTypeDef } from "@barwise/core";
-import { mapSqlTypeToConceptual } from "@barwise/core/sql";
+import { parseSqlDataType } from "@barwise/core/sql";
 
 // ---------------------------------------------------------------------------
 // Data type resolution
 // ---------------------------------------------------------------------------
 
 export function resolveDataType(rawType: string | undefined): DataTypeDef | undefined {
-  if (!rawType) return undefined;
-
-  const conceptual = mapSqlTypeToConceptual(rawType);
-
-  if (!conceptual) return undefined;
-
-  // Extract length/scale from parenthesized suffix.
-  const parenMatch = rawType.match(/\((\d+)(?:\s*,\s*(\d+))?\)/);
-  const length = parenMatch ? parseInt(parenMatch[1]!, 10) : undefined;
-  const scale = parenMatch?.[2] ? parseInt(parenMatch[2], 10) : undefined;
-
-  return { name: conceptual, length, scale };
+  return rawType ? parseSqlDataType(rawType) : undefined;
 }
 
 // ---------------------------------------------------------------------------

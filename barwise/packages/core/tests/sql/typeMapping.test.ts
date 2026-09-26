@@ -7,7 +7,7 @@
  * swallowing an unrelated type.
  */
 import { describe, expect, it } from "vitest";
-import { mapSqlTypeToConceptual } from "../../src/sql/typeMapping.js";
+import { mapSqlTypeToConceptual, parseSqlDataType } from "../../src/sql/typeMapping.js";
 
 describe("mapSqlTypeToConceptual", () => {
   it("maps the common families, any case, with length suffixes", () => {
@@ -50,5 +50,21 @@ describe("mapSqlTypeToConceptual", () => {
 
   it("returns undefined for an unrecognized type -- the caller owns the fallback", () => {
     expect(mapSqlTypeToConceptual("geography")).toBeUndefined();
+  });
+});
+
+describe("parseSqlDataType", () => {
+  it("keeps length and scale", () => {
+    expect(parseSqlDataType("VARCHAR(50)")).toEqual({ name: "text", length: 50 });
+    expect(parseSqlDataType("decimal(10, 2)")).toEqual({ name: "decimal", length: 10, scale: 2 });
+    expect(parseSqlDataType("CHARACTER VARYING(20)")).toEqual({ name: "text", length: 20 });
+  });
+
+  it("omits length when the type has none", () => {
+    expect(parseSqlDataType("INTEGER")).toEqual({ name: "integer" });
+  });
+
+  it("leaves an unrecognized type to the caller", () => {
+    expect(parseSqlDataType("geography(point)")).toBeUndefined();
   });
 });

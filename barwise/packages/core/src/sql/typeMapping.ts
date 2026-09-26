@@ -13,7 +13,7 @@
  * dbt omits the data type), not this mapping's.
  */
 
-import type { ConceptualDataTypeName } from "../model/ObjectType.js";
+import type { ConceptualDataTypeName, DataTypeDef } from "../model/ObjectType.js";
 
 // Each keyword is guarded with (?![a-z]) so a keyword prefix does not
 // swallow an unrelated type ("interval" is not an integer, "time" does
@@ -47,4 +47,23 @@ export function mapSqlTypeToConceptual(sqlType: string): ConceptualDataTypeName 
     if (pattern.test(normalized)) return conceptual;
   }
   return undefined;
+}
+
+/**
+ * Parse a raw SQL type into a conceptual data type with its length and
+ * scale: `VARCHAR(50)` is text(50), `DECIMAL(10,2)` is decimal(10,2).
+ * `undefined` when `mapSqlTypeToConceptual` does not recognize the type,
+ * which leaves the unknown-type policy with the caller, as there.
+ *
+ * The DDL and dbt importers both need the length, not just the name: a
+ * type parsed to its name alone re-exports `VARCHAR(50)` as `TEXT`
+ * (ddl-import-fidelity.spec.md).
+ */
+export function parseSqlDataType(raw: string): DataTypeDef | undefined {
+  const name = mapSqlTypeToConceptual(raw);
+  if (!name) return undefined;
+  const size = /\((\d+)(?:\s*,\s*(\d+))?\)/.exec(raw);
+  if (!size) return { name };
+  const length = parseInt(size[1]!, 10);
+  return size[2] === undefined ? { name, length } : { name, length, scale: parseInt(size[2], 10) };
 }

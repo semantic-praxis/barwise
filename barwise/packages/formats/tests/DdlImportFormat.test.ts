@@ -168,8 +168,9 @@ describe("DdlImportFormat", () => {
       const entities = result.model.objectTypes.filter((ot) => ot.kind === "entity");
       expect(entities).toHaveLength(1);
 
-      // May have warnings about unsupported syntax
-      expect(result.warnings.length).toBeGreaterThanOrEqual(0);
+      // The clause it cannot read is reported, not dropped silently
+      // (ddl-import-fidelity.spec.md; this assertion was `>= 0`).
+      expect(result.warnings).toHaveLength(1);
     });
 
     it("should convert snake_case to PascalCase", () => {
