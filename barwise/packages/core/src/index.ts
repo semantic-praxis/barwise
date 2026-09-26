@@ -71,7 +71,14 @@ export {
   type ResolvedRole,
   type UnresolvedReference,
 } from "./model/graph.js";
-export { generateId, type IdGenerator, setIdGenerator, uuidv7FromParts } from "./model/id.js";
+export {
+  createUuidv7Generator,
+  generateId,
+  type IdGenerator,
+  setIdGenerator,
+  uuidv7FromParts,
+  type Uuidv7Sources,
+} from "./model/id.js";
 export { ModelElement } from "./model/ModelElement.js";
 export {
   ObjectifiedFactType,

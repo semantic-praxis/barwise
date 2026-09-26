@@ -98,7 +98,12 @@ it, so knip sees an unused file where there is a live edge.
   `generateId()` (`src/model/id.ts`): v4 `randomUUID()` unless a
   surface entry point installed the UUIDv7 generator (see
   `docs/specs/archive/uuid7-identifiers.spec.md`). Never add the `uuid` npm
-  package; the v7 bit layout is core's pure `uuidv7FromParts`.
+  package; the v7 bit layout is core's pure `uuidv7FromParts`, and the
+  counter around it is `createUuidv7Generator({ now, randomBytes })`,
+  which reads the clock and randomness only through those arguments. A
+  surface installs it in one line, `setIdGenerator(createUuidv7Generator({
+  now: Date.now, randomBytes }))`; do not wrap that in a named installer
+  (`docs/specs/uuid7-generator-factory.spec.md`, D2).
 - Constraint types use discriminated unions with type guard functions
   (`isInternalUniqueness`, `isMandatoryRole`, etc.) rather than class
   hierarchies.

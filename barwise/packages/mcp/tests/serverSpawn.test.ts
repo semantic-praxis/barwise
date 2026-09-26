@@ -80,6 +80,26 @@ describe("MCP server stdio spawn", () => {
     expect(JSON.parse(text)).toMatchObject({ valid: true });
   });
 
+  it("mints UUIDv7 ids, so the entry point installed the generator", async () => {
+    // The generator is tested in core with a fake clock; this is the
+    // wiring core cannot see. Without the install line in src/index.ts
+    // the import still succeeds, with v4 ids
+    // (docs/specs/uuid7-generator-factory.spec.md).
+    const result = await client.callTool({
+      name: "import_model",
+      arguments: {
+        source: "CREATE TABLE customers (customer_id INTEGER PRIMARY KEY, name TEXT);",
+        format: "ddl",
+      },
+    });
+    const text = (result.content as Array<{ type: string; text: string; }>)[0]!.text;
+    const ids = [...text.matchAll(/^\s*(?:- )?id: (\S+)$/gm)].map((m) => m[1]!);
+    expect(ids.length).toBeGreaterThan(0);
+    for (const id of ids) {
+      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    }
+  });
+
   it("lists resources", async () => {
     const { resources } = await client.listResources();
     expect(resources.length).toBeGreaterThan(0);
