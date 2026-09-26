@@ -772,6 +772,60 @@ describe("ModelToGraph", () => {
     }
   });
 
+  it("keeps an identifying value type visible when it also plays an ordinary role", () => {
+    // The shape the dbt importer writes when a non-key column shares a key
+    // column's name (orders.customer_id with no relationships test): the
+    // identifier value type of Customer is also an attribute of Order.
+    const model = new ModelBuilder("SharedIdentifier")
+      .withEntityType("Customer", { referenceMode: "customer_id" })
+      .withEntityType("Order", { referenceMode: "order_id" })
+      .withValueType("CustomerId")
+      .withBinaryFactType("Customer has CustomerId", {
+        role1: { player: "Customer", name: "has" },
+        role2: { player: "CustomerId", name: "is of" },
+        uniqueness: "role2",
+        isPreferred: true,
+      })
+      .withBinaryFactType("Order has CustomerId", {
+        role1: { player: "Order", name: "has" },
+        role2: { player: "CustomerId", name: "is of" },
+        uniqueness: "role1",
+      })
+      .build();
+
+    const graph = modelToGraph(model);
+    const nodeIds = new Set(graph.nodes.map((n) => n.id));
+
+    // Every edge lands on a node that exists: no role is left pointing at
+    // a player the diagram folded away.
+    for (const edge of graph.edges) {
+      expect(nodeIds.has(edge.sourceNodeId), edge.roleId).toBe(true);
+    }
+    const attribute = model.getFactTypeByName("Order has CustomerId")!;
+    expect(graph.nodes.some((n) => n.id === attribute.id)).toBe(true);
+    // The identification itself is still folded into "Customer (.customer_id)".
+    const identifying = model.getFactTypeByName("Customer has CustomerId")!;
+    expect(graph.nodes.some((n) => n.id === identifying.id)).toBe(false);
+  });
+
+  it("absorbs an imported identifier value type that plays no other role", () => {
+    const model = new ModelBuilder("ImportedIdentifier")
+      .withEntityType("Customers", { referenceMode: "customer_id" })
+      .withValueType("CustomerId")
+      .withBinaryFactType("Customers has CustomerId", {
+        role1: { player: "Customers", name: "has" },
+        role2: { player: "CustomerId", name: "is of" },
+        uniqueness: "role2",
+        isPreferred: true,
+      })
+      .build();
+
+    const graph = modelToGraph(model);
+    expect(graph.nodes.map((n) => n.kind === "object_type" ? n.name : n.kind)).toEqual([
+      "Customers",
+    ]);
+  });
+
   it("keeps an objectified entity as a visible node when it also plays a role elsewhere", () => {
     const model = new ModelBuilder("ObjectifiedButConnected")
       .withEntityType("Customer", { referenceMode: "customer_id" })
