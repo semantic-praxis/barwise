@@ -8,7 +8,7 @@
  * open-coded). See docs/specs/archive/orm-project-surface-wiring.spec.md.
  */
 
-import type { OrmModel } from "@barwise/core";
+import type { OrmModel, PreferredIdentifierStrategy } from "@barwise/core";
 import { isProjectFile, loadModel } from "./io.js";
 import { loadProject } from "./projectLoader.js";
 
@@ -23,6 +23,11 @@ export interface ResolvedDomains {
   readonly resolved: readonly ResolvedDomain[];
   /** Non-fatal assembly warnings (e.g. a domain file that failed to load). */
   readonly problems: readonly string[];
+  /**
+   * The project's identifier strategy, for an export to pass on; unset for
+   * a single-model file (identifier-strategy-in-exports.spec.md).
+   */
+  readonly preferredIdentifierStrategy?: PreferredIdentifierStrategy;
 }
 
 /**
@@ -41,6 +46,8 @@ export function resolveDomainModels(file: string, domain?: string): ResolvedDoma
   }
 
   const { project, problems } = loadProject(file);
+  const { preferredIdentifierStrategy } = project.settings;
+  const strategy = preferredIdentifierStrategy ? { preferredIdentifierStrategy } : {};
 
   if (domain !== undefined) {
     const dm = project.getDomain(domain);
@@ -53,12 +60,12 @@ export function resolveDomainModels(file: string, domain?: string): ResolvedDoma
     if (!dm.model) {
       throw new Error(`domain "${domain}" could not be loaded; see warnings above.`);
     }
-    return { resolved: [{ context: domain, model: dm.model }], problems };
+    return { resolved: [{ context: domain, model: dm.model }], problems, ...strategy };
   }
 
   const resolved: ResolvedDomain[] = [];
   for (const dm of project.domains) {
     if (dm.model) resolved.push({ context: dm.context, model: dm.model });
   }
-  return { resolved, problems };
+  return { resolved, problems, ...strategy };
 }

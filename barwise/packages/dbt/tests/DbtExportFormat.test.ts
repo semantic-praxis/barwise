@@ -240,3 +240,18 @@ describe("DbtExportFormat", () => {
     });
   });
 });
+
+describe("the project's identifier strategy (identifier-strategy-in-exports.spec.md)", () => {
+  it("types an undeclared key by it and keeps the TODO, saying where the type came from", () => {
+    const model = new ModelBuilder("Strategy")
+      .withEntityType("Customer", { referenceMode: "customer_id" })
+      .build();
+    const schemaYml = (options: object) =>
+      new DbtExportFormat().export(model, { includeExamples: false, ...options }).files!
+        .find((f) => f.name === "models/schema.yml")!.content;
+    const withStrategy = schemaYml({ preferredIdentifierStrategy: "integer" });
+    expect(withStrategy).toContain("data_type: INTEGER");
+    expect(withStrategy).toContain("exported as INTEGER by the project's identifier strategy");
+    expect(schemaYml({})).toContain("data_type: TEXT");
+  });
+});

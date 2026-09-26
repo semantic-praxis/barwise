@@ -111,8 +111,12 @@ export function executeExportModel(
   // Resolve the model to export. A single call yields one artifact, so a
   // multi-domain project must name the `domain` to export.
   let model;
+  let projectOptions = {};
   try {
-    const { resolved } = resolveModels(source, domain);
+    const { resolved, preferredIdentifierStrategy } = resolveModels(source, domain);
+    // A project export types undeclared keys by the project's strategy;
+    // an explicit value in the caller's options still wins.
+    if (preferredIdentifierStrategy) projectOptions = { preferredIdentifierStrategy };
     if (resolved.length > 1) {
       const available = resolved.map((r) => r.context).join(", ");
       return jsonError(
@@ -127,7 +131,7 @@ export function executeExportModel(
 
   try {
     // Export using the format adapter.
-    const result = exporter.export(model, options);
+    const result = exporter.export(model, { ...projectOptions, ...options });
 
     // Return the primary text output, spilling to a file when large.
     // For multi-file formats, the text field contains a combined view.

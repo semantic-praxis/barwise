@@ -125,6 +125,14 @@ Options:
 - `--strict` -- fail on validation errors
 - `--no-examples` -- exclude population example data
 
+Given a `.orm-project.yaml` manifest, `export` exports each domain (or
+the one named with `--domain`). A project's
+`settings.preferred_identifier_strategy` (`integer` or `uuid`) types
+every primary key whose identifier declares no data type. The export
+still marks such a key with a "Data type was not declared" TODO, which
+names the strategy as the source of the type. Exporting a single
+`.orm.yaml` never reads a project's settings: such keys export as `TEXT`.
+
 ### diagram
 
 Generate an SVG diagram from the model.

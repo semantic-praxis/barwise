@@ -4,7 +4,7 @@
  * OrmModel, and resolve a project manifest into its domains.
  */
 
-import { type OrmModel, OrmYamlSerializer } from "@barwise/core";
+import { type OrmModel, OrmYamlSerializer, type PreferredIdentifierStrategy } from "@barwise/core";
 import { existsSync, readFileSync } from "node:fs";
 import { loadProject } from "./projectLoader.js";
 
@@ -114,6 +114,11 @@ export interface ResolvedDomains {
   readonly resolved: readonly ResolvedDomain[];
   /** Non-fatal assembly warnings (e.g. a domain file that failed to load). */
   readonly problems: readonly string[];
+  /**
+   * The project's identifier strategy, for an export to pass on; unset for
+   * a single model (identifier-strategy-in-exports.spec.md).
+   */
+  readonly preferredIdentifierStrategy?: PreferredIdentifierStrategy;
 }
 
 /**
@@ -161,6 +166,8 @@ function resolveProject(
   options?: { lenient?: boolean; },
 ): ResolvedDomains {
   const { project, problems } = loadProject(manifestPath, options);
+  const { preferredIdentifierStrategy } = project.settings;
+  const strategy = preferredIdentifierStrategy ? { preferredIdentifierStrategy } : {};
 
   if (domain !== undefined) {
     const dm = project.getDomain(domain);
@@ -173,14 +180,14 @@ function resolveProject(
     if (!dm.model) {
       throw new Error(`domain "${domain}" could not be loaded; see warnings.`);
     }
-    return { resolved: [{ context: domain, model: dm.model }], problems };
+    return { resolved: [{ context: domain, model: dm.model }], problems, ...strategy };
   }
 
   const resolved: ResolvedDomain[] = [];
   for (const dm of project.domains) {
     if (dm.model) resolved.push({ context: dm.context, model: dm.model });
   }
-  return { resolved, problems };
+  return { resolved, problems, ...strategy };
 }
 
 /**
