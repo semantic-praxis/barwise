@@ -11,10 +11,21 @@ export const INTERPRETER = String.raw`(?:python3|python|pip3|pip)(?![\w.-])`;
 
 /**
  * Commands that run their argument as a command, so `timeout 60 python3`
- * is a bare interpreter as surely as `python3` is. `timeout` takes a
- * duration first.
+ * is a bare interpreter as surely as `python3` is. Each wrapper's own
+ * options and operands are skipped first: `env -i FOO=1 python3`,
+ * `nice -n 5 python3` and `timeout -s KILL 60 python3` each got past a
+ * pattern that allowed the wrapper's name alone (PR #575 review).
  */
-const WRAPPER = String.raw`(?:(?:env|exec|time|nohup|nice|timeout\s+\S+)\s+)*`;
+const WRAPPER = String.raw`(?:(?:${
+  [
+    String.raw`env(?:\s+(?:-\S+|[A-Za-z_]\w*=\S*))*`,
+    String.raw`exec(?:\s+-\S+)*`,
+    String.raw`time(?:\s+-\S+)*`,
+    "nohup",
+    String.raw`nice(?:\s+(?:-n\s+\S+|-\S+))*`,
+    String.raw`timeout(?:\s+(?:-[sk]\s+\S+|-\S+))*\s+\S+`,
+  ].join("|")
+})\s+)*`;
 
 /** A command position in a shell line: start, or after a separator. */
 const COMMAND_POS = new RegExp(
@@ -66,23 +77,73 @@ export function bareInterpreter(cmd) {
   return COMMAND_POS.exec(cmd)?.[1] ?? null;
 }
 
-/** What is wrong with the uv invocations on one line, as short phrases. */
+/**
+ * A line with its comment removed, cut into the commands a shell runs
+ * separately. Quotes must already be blanked, so a separator or `#`
+ * inside a string is not seen. `start` is each command's offset in the
+ * line, so a caller can recover its raw text.
+ */
+export function commandSegments(cmd) {
+  const code = cmd.replace(/(^|\s)#.*$/, "$1");
+  const out = [];
+  const sep = /&&|\|\||[;|&]/g;
+  let start = 0;
+  for (let m; (m = sep.exec(code));) {
+    out.push({ start, text: code.slice(start, m.index) });
+    start = m.index + m[0].length;
+  }
+  out.push({ start, text: code.slice(start) });
+  return out;
+}
+
+/** A command that runs or syncs through uv, so needs the lockfile. */
+export const UV_RUN = /\buv\s+(?:run|sync)\b/;
+
+/**
+ * What is wrong with the uv invocations on one line, as short phrases.
+ * Each command is judged on its own flags: searched over the whole line,
+ * `uv run python -V && echo --frozen` passed because an unrelated word
+ * carried the flag (PR #575 review).
+ */
 export function uvFindings(cmd) {
   const out = [];
-  if (UV_TOOL.test(cmd)) out.push("`uvx`/`uv tool run` (resolves outside uv.lock)");
-  if (/\buv\s+(?:run|sync|pip)\b/.test(cmd)) {
-    if (/\buv\s+pip\b/.test(cmd)) {
+  for (const { text } of commandSegments(cmd)) {
+    if (UV_TOOL.test(text)) out.push("`uvx`/`uv tool run` (resolves outside uv.lock)");
+    if (/\buv\s+pip\b/.test(text)) {
       out.push("`uv pip`");
-    } else {
-      for (const [flag, why] of BANNED_UV_FLAGS) {
-        if (cmd.includes(flag)) out.push(`\`${flag}\` (${why})`);
-      }
-      if (!/--frozen|--locked/.test(cmd)) {
-        out.push("`uv run`/`uv sync` with neither --frozen nor --locked");
-      }
+      continue;
+    }
+    if (!UV_RUN.test(text)) continue;
+    for (const [flag, why] of BANNED_UV_FLAGS) {
+      if (text.includes(flag)) out.push(`\`${flag}\` (${why})`);
+    }
+    if (!/--frozen|--locked/.test(text)) {
+      out.push("`uv run`/`uv sync` with neither --frozen nor --locked");
     }
   }
   return out;
+}
+
+/**
+ * The command with every heredoc body emptied. A body is data on a
+ * command's stdin, not shell: a node script's regex `(?:run|sync|p1p)`
+ * with the last word spelled right was refused as a bare interpreter,
+ * and an apostrophe in a body paired with a quote lines later and
+ * blanked real commands. The interpreter that reads the body sits on the
+ * `<<` line itself, so `python3 - <<EOF` is still refused there.
+ */
+export function withoutHeredocBodies(command) {
+  const lines = command.split("\n");
+  let end = null;
+  return lines.map((line) => {
+    if (end !== null) {
+      if (end.test(line)) end = null;
+      return "";
+    }
+    const m = /<<(-?)\s*(['"]?)([A-Za-z_]\w*)\2/.exec(line);
+    if (m) end = new RegExp(`^${m[1] ? "\\t*" : ""}${m[3]}\\s*$`);
+    return line;
+  }).join("\n");
 }
 
 /**
@@ -94,7 +155,7 @@ export function uvFindings(cmd) {
 export function shellCommandFindings(command) {
   const out = [];
   const raws = command.split("\n");
-  for (const { line, text: cmd } of logicalLines(blankQuoted(command))) {
+  for (const { line, text: cmd } of logicalLines(blankQuoted(withoutHeredocBodies(command)))) {
     const text = raws[line - 1];
     const bare = bareInterpreter(cmd);
     if (bare) out.push({ line, what: `bare \`${bare}\``, raw: text });

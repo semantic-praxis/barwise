@@ -312,14 +312,14 @@
       "severity": "S5",
       "class": "acceptance-edit-distance-dbt",
       "issue": "barwise-nkn",
-      "note": "Edit distance to acceptance on a dbt project. Ring constraints, which dbt cannot state, are declared not_expressible on the personas (barwise-1079). What remains are checks dbt can state and the round trip does not carry: multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn).",
+      "note": "Edit distance to acceptance on a dbt project. Nothing is declared not_expressible for dbt: a singular test is SQL, so even a ring constraint can be stated (PR #575 review). What remains are checks the round trip does not carry: rings, multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn).",
       "detail": "1 of 9 persona checks fail: The model does not verbalize as \"For each Coverage and Risk combination, at most one PolicyPeriod applies.\". Check the fact type, its reading, and its constraints."
     },
     "C03/small/6/acceptance:claims-data-steward:claims-dbt": {
       "severity": "S5",
       "class": "acceptance-edit-distance-dbt",
       "issue": "barwise-nkn",
-      "note": "Edit distance to acceptance on a dbt project. Ring constraints, which dbt cannot state, are declared not_expressible on the personas (barwise-1079). What remains are checks dbt can state and the round trip does not carry: multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn).",
+      "note": "Edit distance to acceptance on a dbt project. Nothing is declared not_expressible for dbt: a singular test is SQL, so even a ring constraint can be stated (PR #575 review). What remains are checks the round trip does not carry: rings, multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn).",
       "detail": "2 of 10 persona checks fail: The model does not verbalize as \"It is obligatory that each Reserve is approved by at least one Adjuster.\". Check the fact type, its reading, and its constraints.; The model has no fact type connecting \"Subrogation\" and \"Contact\"."
     },
     "C03/small/6/acceptance:policy-admin-dba:pc-ddl": {
@@ -452,7 +452,7 @@
       "severity": "S5",
       "class": "acceptance-edit-distance-dbt",
       "issue": "barwise-nkn",
-      "note": "Edit distance to acceptance on a dbt project. Ring constraints, which dbt cannot state, are declared not_expressible on the personas (barwise-1079). What remains are checks dbt can state and the round trip does not carry: multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn).",
+      "note": "Edit distance to acceptance on a dbt project. Nothing is declared not_expressible for dbt: a singular test is SQL, so even a ring constraint can be stated (PR #575 review). What remains are checks the round trip does not carry: rings, multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn).",
       "detail": "3 of 6 persona checks fail: The model has no object type named \"Seller\".; The model has no fact type connecting \"Order\" and \"Buyer\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Order includes ProductVariant in Quantity\"), so it cannot rule out: Rules out:"
     },
     "C04/small/6/acceptance:catalog-steward:snowflake-ddl": {
@@ -1231,6 +1231,13 @@
       "issue": "barwise-rkm",
       "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
       "detail": "rename Team -> Workspace reported as a removal plus an addition with no synonym candidate"
+    },
+    "C11/small/6/acceptance:data-platform-lead:metrics-dbt": {
+      "severity": "S5",
+      "class": "acceptance-edit-distance-dbt",
+      "issue": "barwise-nkn",
+      "note": "Edit distance to acceptance on a dbt project. Nothing is declared not_expressible for dbt: a singular test is SQL, so even a ring constraint can be stated (PR #575 review). What remains are checks the round trip does not carry: rings, multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn).",
+      "detail": "1 of 5 persona checks fail: Your model does not yet carry the relationship this rule guards (no fact type matching \"FunnelStep precedes FunnelStep\"), so it cannot rule out: Rules out: a acyclic ring violation among FunnelStep instances -- e.g. {FunnelStep=FunnelStep#1, FunnelStep=FunnelStep#2}; {Fun"
     },
     "C11/small/6/acceptance:founding-engineer:backend-kotlin": {
       "severity": "S5",

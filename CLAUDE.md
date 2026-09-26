@@ -434,7 +434,10 @@ skill (`.claude/skills/release/`).
   (`scripts/lib/python-uv-rules.mjs`): `npm run check:python-uv` over
   tracked files, and a `PreToolUse` hook on an agent's own Bash
   commands (`scripts/hooks/python-uv-guard.mjs`), which refuses a bare
-  interpreter before it runs. The hook exists because the gate never
+  interpreter before it runs. The hook also refuses a `uv run` outside
+  `barwise/` without `--project`, because the working directory is in
+  its input, and that directory is the one this section says `--frozen`
+  silently depends on. The hook exists because the gate never
   saw the `python3 - <<EOF` an agent types, which ran twice in one day
   (barwise-1060).
 - A copy that must agree with other code is never guarded by a

@@ -159,7 +159,7 @@
       "issue": "barwise-nkn",
       "severity": "S5",
       "step": "^acceptance:.*:(?!kernel).*-dbt$",
-      "note": "Edit distance to acceptance on a dbt project. Ring constraints, which dbt cannot state, are declared not_expressible on the personas (barwise-1079). What remains are checks dbt can state and the round trip does not carry: multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn)."
+      "note": "Edit distance to acceptance on a dbt project. Nothing is declared not_expressible for dbt: a singular test is SQL, so even a ring constraint can be stated (PR #575 review). What remains are checks the round trip does not carry: rings, multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn)."
     },
     {
       "id": "acceptance-edit-distance-kotlin",

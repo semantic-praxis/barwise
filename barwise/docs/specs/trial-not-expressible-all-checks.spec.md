@@ -9,8 +9,7 @@ Tracking: barwise-1079
 The enterprise trial grades each persona's acceptance rubric over the
 model barwise imports from each artifact. Some checks are ones a source
 format cannot satisfy by construction. OpenAPI has no ring constraints,
-no deontic modality and no composite keys; dbt tests cannot say a
-reference must not loop. A persona declares such a check under
+no deontic modality and no composite keys. A persona declares such a check under
 `not_expressible` with a reason, and the grader excludes it for that
 artifact kind only (barwise-y6a). The entry named a check by its
 `element`, which only `requires_element` checks have. So a
@@ -41,7 +40,7 @@ the importer gaps next to it.
 ## Scope
 
 In: `trial/lib/personas.mjs` (`checkKey`), `trial/AUTHORING.md`, the
-declarations on C01, C07 and C11, and the baseline and catalog rows they
+declarations on C01 and C07, and the baseline and catalog rows they
 move. Out: the gaps themselves (barwise-nul, barwise-nkn).
 
 ## Workstream (single)
@@ -53,11 +52,12 @@ Measured over the seven rows barwise-1079 held, on the small tier:
 | C01 `clinical-informaticist:fhir-openapi`            | two ternary uniqueness checks, the irreflexive ring | discriminator subtypes (barwise-nul) |
 | C07 `catalog-product-manager:tmf-openapi`            | acyclic ring, value-side uniqueness                 | none: the row passes                 |
 | C07 `integration-engineer:tmf-openapi`               | composite uniqueness, deontic obligation            | none: the row passes                 |
-| C11 `data-platform-lead:metrics-dbt`                 | acyclic ring                                        | none: the row passes                 |
+| C11 `data-platform-lead:metrics-dbt`                 | none (see below)                                    | all (barwise-nkn)                    |
 | C03 `actuarial-analyst`, `claims-data-steward` (dbt) | none                                                | all (barwise-nkn)                    |
 | C04 `analytics-engineer:warehouse-dbt`               | none                                                | all (barwise-nkn)                    |
 
-Kept as gaps, because dbt can state them: multi-column uniqueness
+Kept as gaps, because dbt can state them: rings (a singular test is
+SQL), multi-column uniqueness
 (`dbt_utils.unique_combination_of_columns`), an obligation (a test with
 `severity: warn`), subtypes and relationship roles (separate models and
 `relationships` tests), and a ternary from a composite key. The C04
@@ -65,7 +65,7 @@ persona says so itself: "the relationships test from orders to buyers
 ... must come back as a fact type."
 
 Result: `trial:gate --tier small`, 1,070 steps, 0 new, 0 stale, open
-rows 198 to 195.
+rows 198 to 196.
 
 ## Risks and testing
 
@@ -78,6 +78,16 @@ rows 198 to 195.
   check, ignores key order, refuses a partial key, and cannot excuse
   `must_validate`. Its real-package test checks that each declaration
   names exactly one check.
+
+## Implementation notes
+
+- The first push also declared C11's acyclic ring for dbt. The PR #575
+  review showed that was a gap, not a limit: a dbt singular test is SQL
+  and can state it, `packages/dbt/src/DbtSchemaTypes.ts` already models
+  custom tests, and an archived spec lists rings as expressible through
+  dbt tests. The declaration is gone and the row is back under
+  barwise-nkn. That leaves no dbt declarations at all, which is the
+  reading R4 asks for.
 
 ## Open decisions
 

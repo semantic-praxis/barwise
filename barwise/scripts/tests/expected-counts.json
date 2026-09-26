@@ -5,7 +5,7 @@
     "baseline-merge.test.mjs": 14,
     "beads-ids.test.mjs": 3,
     "gates.test.mjs": 172,
-    "python-uv-guard.test.mjs": 18,
+    "python-uv-guard.test.mjs": 32,
     "session-start.test.mjs": 5
   }
 }
