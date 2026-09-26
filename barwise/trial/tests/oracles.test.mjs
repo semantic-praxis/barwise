@@ -288,6 +288,34 @@ test("evaluateGate: a row whose class the catalog lacks, or whose issue its clas
   assert.match(v.misclassified[1].why, /carries barwise-aaa, the row says barwise-bbb/);
 });
 
+test("evaluateGate: a row whose current result now fits another class fails the gate", () => {
+  // PR #572 second review: class and issue agreed with each other while
+  // the step's importer had changed, so a different class now fit first.
+  const results = [
+    { customer: "C01", tier: "small", sprint: 1, step: "a", importer: "ddl", status: "fail" },
+    { customer: "C01", tier: "small", sprint: 1, step: "b", importer: "sql", status: "fail" },
+    { customer: "C01", tier: "small", sprint: 1, step: "c", importer: "dbt", status: "fail" },
+  ];
+  const opts = {
+    hasReproduction: () => true,
+    catalog: [
+      { id: "ddl-class", importer: "ddl", issue: "barwise-aaa" },
+      { id: "sql-class", importer: "sql", issue: "barwise-bbb" },
+    ],
+  };
+  const row = (cls, issue) => ({ class: cls, note: "n", issue, severity: "S1" });
+  const v = evaluateGate(results, {
+    findings: {
+      "C01/small/1/a": row("ddl-class", "barwise-aaa"),
+      "C01/small/1/b": row("ddl-class", "barwise-aaa"),
+      "C01/small/1/c": row("sql-class", "barwise-bbb"),
+    },
+  }, opts);
+  assert.deepEqual(v.misclassified.map((m) => m.key), ["C01/small/1/b", "C01/small/1/c"]);
+  assert.match(v.misclassified[0].why, /classifies as sql-class, the row says ddl-class/);
+  assert.match(v.misclassified[1].why, /classifies as no class, the row says sql-class/);
+});
+
 test("classify: each acceptance row on a DDL file reaches its importer's class, whatever the catalog order", () => {
   // First fit wins, and the SQL importer's class once matched every
   // "-ddl" acceptance step, so a DDL-importer row landed under the SQL

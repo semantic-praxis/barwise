@@ -88,6 +88,12 @@ export function evaluateGate(results, baseline, {
   // named them, and the gate printed PASS because it compares only keys
   // and statuses (PR #572 review). A class the catalog no longer has, or
   // an issue the class does not carry, is a stale classification.
+  // Agreeing with each other is not enough: the row must also still be
+  // what the catalog makes of THIS run's result. A step whose importer or
+  // detail changed can match another class first while the row keeps the
+  // old class and its old issue, internally consistent and wrong (PR #572
+  // second review). Only a row that ran is re-classified; one that did
+  // not has no current result to classify.
   const classById = new Map(catalog.map((c) => [c.id, c]));
   const misclassified = Object.entries(rows).flatMap(([k, v]) => {
     if (!v.class) return [];
@@ -95,6 +101,16 @@ export function evaluateGate(results, baseline, {
     if (!c) return [{ key: k, why: `class ${v.class} is not in the catalog` }];
     if (c.issue !== v.issue) {
       return [{ key: k, why: `class ${v.class} carries ${c.issue}, the row says ${v.issue}` }];
+    }
+    const now = current.get(k);
+    if (now && open.has(k)) {
+      const fits = classify(now, catalog)?.id ?? null;
+      if (fits !== v.class) {
+        return [{
+          key: k,
+          why: `this run classifies as ${fits ?? "no class"}, the row says ${v.class}`,
+        }];
+      }
     }
     return [];
   });
