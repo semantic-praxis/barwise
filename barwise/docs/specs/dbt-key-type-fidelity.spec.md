@@ -440,3 +440,15 @@ Reproduction after WS1-3, through the CLI: `barwise export --format ddl`
 emits no TODO on any column. `--format dbt` on a model with real gaps
 appends "Or set it in the dbt YAML." to each data-type and description
 TODO; the DDL export of the same model does not.
+
+Review of PR #567 found three places where WS3's rules missed a column,
+each now covered by a test that fails without its fix. A key typed from
+a named but non-preferred binary recorded no source role, so its
+definition was not found (`reviewer.employee_id` in
+`examples/transcripts/pii-redaction.orm.yaml`). A foreign key into an
+objectified entity's composite key needs more than one hop to reach a
+value type. And an identified subtype's single shared key column kept
+its own phase-0 type instead of the supertype key's, which after WS2
+could leave a `TEXT` column referencing an `INTEGER` key. The same
+review surfaced barwise-1074: the named binary is still mapped a second
+time as an attribute column, which this spec does not cover.

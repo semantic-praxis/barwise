@@ -309,6 +309,108 @@ describe("ExportAnnotationCollector", () => {
       expect(typedOrder.columns.find((c) => c.name === typedFk)?.dataTypeDefaulted).toBe(false);
     });
 
+    // PR #567 review findings, one test each.
+
+    it("describes a key typed from a named, non-preferred binary by that value type", () => {
+      // The pii-redaction shape: Reviewer(employee_id) and a defined
+      // EmployeeId, joined by a binary that is not marked preferred.
+      const model = new ModelBuilder("NamedKey")
+        .withEntityType("Reviewer", { referenceMode: "employee_id", definition: "A reviewer." })
+        .withValueType("EmployeeId", {
+          dataType: { name: "text", length: 20 },
+          definition: "The employee number.",
+        })
+        .withBinaryFactType("Reviewer has EmployeeId", {
+          role1: { player: "Reviewer", name: "has" },
+          role2: { player: "EmployeeId", name: "is of" },
+          uniqueness: "both",
+          mandatory: "role1",
+        })
+        .build();
+      const todos = collectExportAnnotations(model, mapper.map(model))
+        .filter((a) => a.columnName === "employee_id" && a.severity === "todo");
+      expect(todos).toEqual([]);
+    });
+
+    it("follows a foreign key through an objectified entity's key to its value type", () => {
+      // Review references Purchase, whose key is itself made of foreign
+      // keys to Customer and Product.
+      const model = new ModelBuilder("TwoHops")
+        .withEntityType("Customer", { referenceMode: "customer_id", definition: "A buyer." })
+        .withEntityType("Product", { referenceMode: "product_id", definition: "A good." })
+        .withEntityType("Purchase", { referenceMode: "purchase_id", definition: "A sale." })
+        .withEntityType("Review", { referenceMode: "review_id", definition: "An opinion." })
+        .withValueType("CustomerId", { dataType: { name: "integer" }, definition: "Customer key." })
+        .withValueType("ProductId", { dataType: { name: "integer" }, definition: "Product key." })
+        .withValueType("ReviewId", { dataType: { name: "integer" }, definition: "Review key." })
+        .withBinaryFactType("Customer has CustomerId", {
+          role1: { player: "Customer", name: "has" },
+          role2: { player: "CustomerId", name: "is of" },
+          uniqueness: "role2",
+          isPreferred: true,
+        })
+        .withBinaryFactType("Product has ProductId", {
+          role1: { player: "Product", name: "has" },
+          role2: { player: "ProductId", name: "is of" },
+          uniqueness: "role2",
+          isPreferred: true,
+        })
+        .withBinaryFactType("Review has ReviewId", {
+          role1: { player: "Review", name: "has" },
+          role2: { player: "ReviewId", name: "is of" },
+          uniqueness: "role2",
+          isPreferred: true,
+        })
+        .withBinaryFactType("Customer buys Product", {
+          role1: { player: "Customer", name: "buys" },
+          role2: { player: "Product", name: "is bought by" },
+          uniqueness: "spanning",
+        })
+        .withObjectifiedFactType("Customer buys Product", "Purchase")
+        .withBinaryFactType("Review is about Purchase", {
+          role1: { player: "Review", name: "is about" },
+          role2: { player: "Purchase", name: "is reviewed in" },
+          uniqueness: "role1",
+          mandatory: "role1",
+        })
+        .build();
+      const schema = mapper.map(model);
+      const review = schema.tables.find((t) => t.name === "review")!;
+      const fkCols = review.foreignKeys.flatMap((fk) => fk.columnNames);
+      // The shape the finding describes: two foreign-key columns into a
+      // composite key that is itself made of copies.
+      expect(fkCols).toHaveLength(2);
+
+      const todos = collectExportAnnotations(model, schema).filter(
+        (a) => a.tableName === "review" && a.category === "description" && a.columnName,
+      );
+      expect(todos).toEqual([]);
+    });
+
+    it("types an identified subtype's shared key column from its supertype's key", () => {
+      const model = new ModelBuilder("Subtype")
+        .withEntityType("Person", { referenceMode: "person_id", definition: "A person." })
+        .withEntityType("Employee", { referenceMode: "employee_nr", definition: "Staff." })
+        .withValueType("PersonId", { dataType: { name: "integer" }, definition: "Person key." })
+        .withBinaryFactType("Person has PersonId", {
+          role1: { player: "Person", name: "has" },
+          role2: { player: "PersonId", name: "is of" },
+          uniqueness: "role2",
+          isPreferred: true,
+        })
+        .withSubtypeFact("Employee", "Person", { providesIdentification: true })
+        .build();
+      const schema = mapper.map(model);
+      const employee = schema.tables.find((t) => t.name === "employee")!;
+      const key = employee.columns.find((c) => c.name === employee.primaryKey.columnNames[0]);
+      expect(key).toMatchObject({ dataType: "INTEGER", dataTypeDefaulted: false });
+
+      const typeTodos = collectExportAnnotations(model, schema).filter(
+        (a) => a.tableName === "employee" && a.category === "data_type",
+      );
+      expect(typeTodos).toEqual([]);
+    });
+
     it("names no export format in any message", () => {
       const model = new ModelBuilder("Gaps")
         .withEntityType("Customer", { referenceMode: "customer_id" })

@@ -175,6 +175,13 @@ export function collectExportAnnotations(
  * type, so it has no description of its own; what describes it is the
  * identifier it copies -- `orders.customer_id` is described by the value
  * type behind `customers.customer_id`.
+ *
+ * The referenced key column can itself be a copy: an objectified entity's
+ * key is made of foreign keys to the entities it relates, and a subtype's
+ * key references its supertype's. So the lineage is followed hop by hop
+ * until a column traces to a value type (PR #567 review), and a column
+ * already visited ends the walk, since a foreign-key cycle has no value
+ * type at the end of it.
  */
 function referencedKeyValueType(
   table: Table,
@@ -182,14 +189,23 @@ function referencedKeyValueType(
   tableByName: ReadonlyMap<string, Table>,
   model: OrmModel,
   valueById: Map<string, ValueType>,
+  visited: Set<string> = new Set(),
 ): ValueType | undefined {
+  const here = `${table.name}.${col.name}`;
+  if (visited.has(here)) return undefined;
+  visited.add(here);
+
   for (const fk of table.foreignKeys) {
     const i = fk.columnNames.indexOf(col.name);
     if (i === -1) continue;
-    const keyName = fk.referencedColumns[i];
-    const keyCol = tableByName.get(fk.referencedTable)?.columns.find((c) => c.name === keyName);
-    if (!keyCol?.sourceRoleId) return undefined;
-    return findValueTypeForRole(keyCol.sourceRoleId, model, valueById);
+    const keyTable = tableByName.get(fk.referencedTable);
+    const keyCol = keyTable?.columns.find((c) => c.name === fk.referencedColumns[i]);
+    if (!keyTable || !keyCol) return undefined;
+    const direct = keyCol.sourceRoleId
+      ? findValueTypeForRole(keyCol.sourceRoleId, model, valueById)
+      : undefined;
+    return direct
+      ?? referencedKeyValueType(keyTable, keyCol, tableByName, model, valueById, visited);
   }
   return undefined;
 }

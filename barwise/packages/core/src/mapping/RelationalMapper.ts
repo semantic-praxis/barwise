@@ -118,8 +118,8 @@ export class RelationalMapper {
       // provably gone is the narrowing above: `ot` is an `EntityType`
       // here, whose `referenceMode` is a `string`.
       const pkColName = preferred ? toSnake(preferred.valuePlayer.name) : ot.referenceMode;
-      const pkType = preferred
-        ? sqlTypeOf(preferred.valuePlayer.dataType)
+      const { sourceRoleId, ...pkType } = preferred
+        ? { ...sqlTypeOf(preferred.valuePlayer.dataType), sourceRoleId: preferred.entityRole.id }
         : referenceModePkType(ot, model, fallbackPkType);
       if (preferred && !absorbing) identifyingFactTypeIds.add(preferred.factType.id);
 
@@ -129,7 +129,7 @@ export class RelationalMapper {
           name: pkColName,
           ...pkType,
           nullable: false,
-          sourceRoleId: preferred?.entityRole.id,
+          sourceRoleId,
         }],
         primaryKey: { columnNames: absorbing ? [] : [pkColName] },
         foreignKeys: [],
@@ -517,6 +517,19 @@ export class RelationalMapper {
     const ownKey = subtypeTable.primaryKey.columnNames;
     if (ownKey.length !== 1) return; // see the comment above: unreachable by construction
 
+    // The subtype's own key column is also the first foreign-key column,
+    // so it takes the supertype key's type: phase 0 typed it on its own,
+    // and a TEXT column referencing an INTEGER key is a mismatched foreign
+    // key and a false "not declared" annotation (PR #567 review).
+    const ownIdx = subtypeTable.columns.findIndex((c) => c.name === ownKey[0]);
+    const firstPkCol = supertypeTable.columns.find((c) => c.name === firstSupertypeCol);
+    if (ownIdx !== -1) {
+      subtypeTable.columns[ownIdx] = {
+        ...subtypeTable.columns[ownIdx]!,
+        ...copiedKeyType(firstPkCol),
+      };
+    }
+
     const sharedCols = [ownKey[0]!];
     for (const supertypeCol of restSupertypeCols) {
       const pkCol = supertypeTable.columns.find((c) => c.name === supertypeCol);
@@ -832,12 +845,20 @@ function strategyToSqlType(strategy: PreferredIdentifierStrategy | undefined): s
  * guess the annotations can report; a borrowed type is a wrong answer
  * that looks declared.
  */
-function referenceModePkType(ot: EntityType, model: OrmModel, fallbackPkType: string): SqlType {
+function referenceModePkType(
+  ot: EntityType,
+  model: OrmModel,
+  fallbackPkType: string,
+): SqlType & { readonly sourceRoleId?: string; } {
   for (const ft of model.factTypes) {
     if (ft.arity !== 2) continue;
     const vp = findValuePlayer(ft, ot, model);
     if (vp && toSnake(vp.name) === ot.referenceMode) {
-      return sqlTypeOf(vp.dataType);
+      // The entity's role, as a preferred binary records it, so the key
+      // column traces to the value type that typed it -- the annotations
+      // read its definition through this (PR #567 review).
+      const entityRole = ft.roles.find((r) => r.playerId === ot.id);
+      return { ...sqlTypeOf(vp.dataType), sourceRoleId: entityRole?.id };
     }
   }
 
