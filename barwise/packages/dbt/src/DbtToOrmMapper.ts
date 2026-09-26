@@ -15,9 +15,11 @@
  *
  * Mapping proceeds in phases to respect OrmModel dependency ordering:
  *   Phase 1: Identify entity types from models
- *   Phase 2: Create value types for non-FK columns
+ *   Phase 1b: Give each entity a typed identifier value type and the
+ *             preferred identifying binary a reference mode abbreviates
+ *   Phase 2: Create value types for non-key, non-FK columns
  *   Phase 3: Create fact types with roles and constraints
- *   Phase 4: Apply descriptions (explicit or inferred)
+ *   Phase 4: Report key columns the relational mapping will rename
  */
 
 import type { OrmModel } from "@barwise/core";
@@ -26,6 +28,8 @@ import { analyzeModels } from "./dbtMapping/analyze.js";
 import { createContext } from "./dbtMapping/context.js";
 import { createEntityTypes } from "./dbtMapping/entityTypes.js";
 import { createFactTypes } from "./dbtMapping/factTypes.js";
+import { createIdentifierTypes } from "./dbtMapping/identifierTypes.js";
+import { reportKeyColumnRenames } from "./dbtMapping/keyColumns.js";
 import { indexSourceDataTypes } from "./dbtMapping/sourceTypes.js";
 import { createValueTypes } from "./dbtMapping/valueTypes.js";
 import type { DbtProjectDocument } from "./DbtSchemaTypes.js";
@@ -60,7 +64,9 @@ export function mapDbtToOrm(doc: DbtProjectDocument): DbtMapResult {
   indexSourceDataTypes(ctx);
   analyzeModels(ctx);
   createEntityTypes(ctx);
+  createIdentifierTypes(ctx);
   createValueTypes(ctx);
   createFactTypes(ctx);
+  reportKeyColumnRenames(ctx);
   return { model: ctx.model, report: ctx.report.build() };
 }

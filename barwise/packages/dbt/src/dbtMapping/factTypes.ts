@@ -25,7 +25,9 @@ export function createFactTypes(ctx: DbtMapperContext): void {
       if (!vtId) continue;
 
       const entityName = toPascalCase(m.name);
-      const vtName = toPascalCase(col.name);
+      // The value type's own name, which differs from the column's when
+      // valueTypes.ts had to avoid a name another object type holds.
+      const vtName = ctx.model.getObjectType(vtId)?.name ?? toPascalCase(col.name);
       const factName = `${entityName} has ${vtName}`;
 
       const role1Id = `${factName}::role1`;
