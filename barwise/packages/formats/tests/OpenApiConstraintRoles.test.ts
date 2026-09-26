@@ -154,3 +154,100 @@ describe("R2: a held value-type name is shared only under claimValueTypeName", (
     expect(model.getObjectTypeByName("SupplierTier")).toBeUndefined();
   });
 });
+
+describe("R3: the reference-mode property is the entity's preferred identifier", () => {
+  /** Constraints on a fact type as `<type>:<player>[:preferred]`, sorted. */
+  function shape(model: OrmModel, ft: FactType): string[] {
+    const player = (id: string) =>
+      model.getObjectType(ft.roles.find((r) => r.id === id)!.playerId)!.name;
+    return ft.constraints.map((c) => {
+      if (c.type === "mandatory") return `mandatory:${player(c.roleId)}`;
+      if (c.type === "internal_uniqueness") {
+        return `unique:${c.roleIds.map(player).join(",")}${c.isPreferred ? ":preferred" : ""}`;
+      }
+      return c.type;
+    }).sort();
+  }
+
+  it("gives id the identifying binary shape, mandatory even when not required", () => {
+    const { model } = importer.parse(spec({
+      Customer: { type: "object", properties: { id: { type: "integer" } } },
+    }));
+    expect(shape(model, factType(model, "Customer has Id"))).toEqual([
+      "mandatory:Customer",
+      "unique:Customer",
+      "unique:Id:preferred",
+    ]);
+  });
+
+  it("finds a multi-word schema's own id property, camel or snake case", () => {
+    for (const key of ["purchaseOrderId", "purchase_order_id"]) {
+      const { model } = importer.parse(spec({
+        PurchaseOrder: { type: "object", properties: { [key]: { type: "integer" } } },
+      }));
+      expect(model.getObjectTypeByName("PurchaseOrder")).toMatchObject({ referenceMode: key });
+      expect(shape(model, factType(model, "PurchaseOrder has PurchaseOrderId")))
+        .toContain("unique:PurchaseOrderId:preferred");
+    }
+  });
+
+  it("defaults a multi-word schema with no id property to snake case", () => {
+    const { model } = importer.parse(spec({
+      PurchaseOrder: { type: "object", properties: { total: { type: "number" } } },
+    }));
+    expect(model.getObjectTypeByName("PurchaseOrder")).toMatchObject({
+      referenceMode: "purchase_order_id",
+    });
+  });
+
+  it("gives the key its plain name whatever the property order", () => {
+    const keyFirst = { userId: { type: "string", format: "uuid" }, user_id: { type: "integer" } };
+    const keyLast = { user_id: { type: "integer" }, userId: { type: "string", format: "uuid" } };
+    for (const properties of [keyFirst, keyLast]) {
+      const { model } = importer.parse(spec({ User: { type: "object", properties } }));
+      expect(model.getObjectTypeByName("UserId")?.dataType).toEqual({ name: "uuid" });
+      expect(shape(model, factType(model, "User has UserId"))).toContain(
+        "unique:UserId:preferred",
+      );
+    }
+  });
+
+  it("creates every schema's key before any other schema's properties", () => {
+    const { model } = importer.parse(spec({
+      Account: {
+        type: "object",
+        properties: { id: { type: "integer" }, userId: { type: "string" } },
+      },
+      User: { type: "object", properties: { userId: { type: "string", format: "uuid" } } },
+    }));
+    expect(model.getObjectTypeByName("UserId")?.dataType).toEqual({ name: "uuid" });
+    expect(model.getObjectTypeByName("AccountUserId")?.dataType).toEqual({ name: "text" });
+  });
+
+  it("exports the id as the key alone, with no has_id column", async () => {
+    const { DdlExportFormat } = await import("../src/ddl/DdlExportFormat.js");
+    const { model } = importer.parse(spec({
+      Customer: {
+        type: "object",
+        required: ["id", "name"],
+        properties: {
+          id: { type: "integer" },
+          name: { type: "string" },
+          email: { type: "string" },
+        },
+      },
+    }));
+    const ddl = new DdlExportFormat().export(model).text
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("--") && line.trim() !== "")
+      .join("\n");
+    expect(ddl).toBe([
+      "CREATE TABLE customer (",
+      "  id INTEGER NOT NULL,",
+      "  name TEXT NOT NULL,",
+      "  email TEXT,",
+      "  PRIMARY KEY (id)",
+      ");",
+    ].join("\n"));
+  });
+});
