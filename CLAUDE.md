@@ -567,6 +567,11 @@ validates the JSONL.
 
 The core loop is unchanged in shape: `list` to find work, `show <id>`
 to read it, `update <id>` to claim it, `close <id>` when it is done.
+
+`create` mints a random three-character suffix (`barwise-k3x`), not the
+highest number plus one. The counter read a tracker that is stale on
+every branch behind main, and two open branches minted the same id at
+least five times (barwise-w1u). Older numeric ids keep working.
 There is no `remember` subcommand -- persistent project knowledge goes
 in this file, as a convention with the reason attached, not a
 MEMORY.md.

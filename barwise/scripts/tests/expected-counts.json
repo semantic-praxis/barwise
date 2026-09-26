@@ -3,6 +3,7 @@
   "counts": {
     "at-root.test.mjs": 3,
     "baseline-merge.test.mjs": 14,
+    "beads-ids.test.mjs": 3,
     "gates.test.mjs": 172,
     "python-uv-guard.test.mjs": 18,
     "session-start.test.mjs": 5
