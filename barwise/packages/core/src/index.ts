@@ -184,6 +184,7 @@ export { type ValidationRule } from "./validation/ValidationRule.js";
 
 // Import format interface (standard format connectors live in
 // @barwise/formats; the dbt connector in @barwise/dbt)
+export { claimValueTypeName, type ValueTypeClaim } from "./import/claimValueType.js";
 export type { ImportFormat, ImportOptions, ImportResult } from "./import/types.js";
 
 // Export format types

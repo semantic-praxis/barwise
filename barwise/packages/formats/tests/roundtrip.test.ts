@@ -9,6 +9,7 @@
 
 import { openApiToJson, RelationalMapper, renderDdl, renderOpenApi } from "@barwise/core/mapping";
 import { describe, expect, it } from "vitest";
+import { DdlExportFormat } from "../src/ddl/DdlExportFormat.js";
 import { DdlImportFormat } from "../src/ddl/DdlImportFormat.js";
 import { OpenApiImportFormat } from "../src/openapi/OpenApiImportFormat.js";
 import { ModelBuilder } from "./helpers/ModelBuilder.js";
@@ -294,6 +295,54 @@ describe("Round-trip tests", () => {
 
       // Should reference customer_id relationship
       expect(reExportedDdl.toLowerCase()).toContain("customer");
+    });
+
+    it("round-trips columns, types, nullability, uniqueness and keys exactly", () => {
+      // The acceptance input of docs/specs/ddl-import-fidelity.spec.md.
+      // Before that change this re-exported every key as TEXT, turned
+      // `name ... NOT NULL` nullable, dropped UNIQUE (email), and invented
+      // UNIQUE (name) and UNIQUE (placed_at). BIGINT comes back INTEGER:
+      // the model's conceptual types have one integer.
+      const ddl = `
+        CREATE TABLE customers (
+          customer_id INTEGER PRIMARY KEY,
+          name VARCHAR(50) NOT NULL,
+          email VARCHAR(100),
+          UNIQUE (email)
+        );
+        CREATE TABLE orders (
+          order_id BIGINT NOT NULL,
+          customer_id INTEGER NOT NULL,
+          placed_at TIMESTAMP,
+          PRIMARY KEY (order_id),
+          FOREIGN KEY (customer_id) REFERENCES customers (customer_id)
+        );
+      `;
+      const { model, warnings } = new DdlImportFormat().parse(ddl);
+      expect(warnings).toEqual([]);
+
+      // Through DdlExportFormat, which is what `barwise export` runs:
+      // its constraint routing is what emits UNIQUE.
+      const reExported = new DdlExportFormat().export(model).text
+        .split("\n")
+        .filter((line) => !line.trim().startsWith("--") && line.trim() !== "")
+        .join("\n");
+      expect(reExported).toBe([
+        "CREATE TABLE customers (",
+        "  customer_id INTEGER NOT NULL,",
+        "  name VARCHAR(50) NOT NULL,",
+        "  email VARCHAR(100),",
+        "  PRIMARY KEY (customer_id),",
+        "  UNIQUE (email)",
+        ");",
+        "CREATE TABLE orders (",
+        "  order_id INTEGER NOT NULL,",
+        "  customer_id INTEGER NOT NULL,",
+        "  placed_at TIMESTAMP,",
+        "  PRIMARY KEY (order_id),",
+        "  FOREIGN KEY (customer_id) REFERENCES customers (customer_id)",
+        ");",
+      ].join("\n"));
     });
 
     it("should preserve multiple foreign keys", () => {
