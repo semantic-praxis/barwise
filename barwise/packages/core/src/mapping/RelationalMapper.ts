@@ -62,7 +62,7 @@ export class RelationalMapper {
    * Map an ORM model to a relational schema.
    */
   map(model: OrmModel, options?: RelationalMapperOptions): RelationalSchema {
-    const fallbackPkType = strategyToSqlType(options?.preferredIdentifierStrategy);
+    const strategy = options?.preferredIdentifierStrategy;
     const associativeTables: MutableTable[] = [];
     const settling = new Map<string, SettlingTable>();
 
@@ -119,8 +119,11 @@ export class RelationalMapper {
       // here, whose `referenceMode` is a `string`.
       const pkColName = preferred ? toSnake(preferred.valuePlayer.name) : ot.referenceMode;
       const { sourceRoleId, ...pkType } = preferred
-        ? { ...sqlTypeOf(preferred.valuePlayer.dataType), sourceRoleId: preferred.entityRole.id }
-        : referenceModePkType(ot, model, fallbackPkType);
+        ? {
+          ...keyTypeOf(preferred.valuePlayer.dataType, strategy),
+          sourceRoleId: preferred.entityRole.id,
+        }
+        : referenceModePkType(ot, model, strategy);
       if (preferred && !absorbing) identifyingFactTypeIds.add(preferred.factType.id);
 
       settling.set(ot.id, {
@@ -833,8 +836,8 @@ function strategyToSqlType(strategy: PreferredIdentifierStrategy | undefined): s
  * 1. A binary fact type linking this entity to the value type its
  *    reference mode names -- `toSnake(valueType.name) === referenceMode`,
  *    the same spelling phase 0 gives the key column.
- * 2. Otherwise the configured fallbackPkType (derived from the
- *    project's preferredIdentifierStrategy, or "TEXT" when unset).
+ * 2. Otherwise the fallback: the project's preferredIdentifierStrategy,
+ *    or "TEXT" when unset (keyTypeOf).
  *
  * Step 1 used to accept the FIRST value type the entity played, named
  * or not. Over this repository's models that rule fired for 93 entities
@@ -848,7 +851,7 @@ function strategyToSqlType(strategy: PreferredIdentifierStrategy | undefined): s
 function referenceModePkType(
   ot: EntityType,
   model: OrmModel,
-  fallbackPkType: string,
+  strategy: PreferredIdentifierStrategy | undefined,
 ): SqlType & { readonly sourceRoleId?: string; } {
   for (const ft of model.factTypes) {
     if (ft.arity !== 2) continue;
@@ -858,15 +861,35 @@ function referenceModePkType(
       // column traces to the value type that typed it -- the annotations
       // read its definition through this (PR #567 review).
       const entityRole = ft.roles.find((r) => r.playerId === ot.id);
-      return { ...sqlTypeOf(vp.dataType), sourceRoleId: entityRole?.id };
+      return { ...keyTypeOf(vp.dataType, strategy), sourceRoleId: entityRole?.id };
     }
   }
 
-  return { dataType: fallbackPkType, dataTypeDefaulted: true };
+  return keyTypeOf(undefined, strategy);
 }
 
-/** A column's SQL type, and whether it was declared or a fallback. */
-type SqlType = Pick<Column, "dataType" | "dataTypeDefaulted">;
+/** A column's SQL type, whether it was declared or a fallback, and which fallback. */
+type SqlType = Pick<Column, "dataType" | "dataTypeDefaulted" | "defaultedByStrategy">;
+
+/**
+ * A primary key's SQL type. A declared type wins; an undeclared one takes
+ * the project's identifier strategy when there is one, and is marked so
+ * the annotation can say where the type came from. The strategy used to
+ * reach only a key with no identifying value type at all, so a key whose
+ * value type existed without a data type exported as TEXT whatever the
+ * project said (identifier-strategy-in-exports.spec.md).
+ */
+function keyTypeOf(
+  dataType: DataTypeDef | undefined,
+  strategy: PreferredIdentifierStrategy | undefined,
+): SqlType {
+  if (dataType !== undefined || strategy === undefined) return sqlTypeOf(dataType);
+  return {
+    dataType: strategyToSqlType(strategy),
+    dataTypeDefaulted: true,
+    defaultedByStrategy: strategy,
+  };
+}
 
 /** The SQL type of a declared data type; defaulted when none is declared. */
 function sqlTypeOf(dataType: DataTypeDef | undefined): SqlType {
@@ -881,7 +904,11 @@ function sqlTypeOf(dataType: DataTypeDef | undefined): SqlType {
  */
 function copiedKeyType(pkCol: Column | undefined): SqlType {
   return pkCol
-    ? { dataType: pkCol.dataType, dataTypeDefaulted: pkCol.dataTypeDefaulted }
+    ? {
+      dataType: pkCol.dataType,
+      dataTypeDefaulted: pkCol.dataTypeDefaulted,
+      ...(pkCol.defaultedByStrategy ? { defaultedByStrategy: pkCol.defaultedByStrategy } : {}),
+    }
     : { dataType: "TEXT", dataTypeDefaulted: true };
 }
 

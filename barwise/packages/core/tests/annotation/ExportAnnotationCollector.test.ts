@@ -283,8 +283,16 @@ describe("ExportAnnotationCollector", () => {
       const todo = collectExportAnnotations(model, schema).find(
         (a) => a.columnName === "customer_id" && a.category === "data_type",
       );
+      // Still a TODO (the owner kept it, 2026-09-26), and it says where
+      // the type came from (identifier-strategy-in-exports.spec.md, R3).
       expect(todo?.message).toBe(
-        "Data type was not declared; exported as INTEGER. Add a data type to the value type.",
+        "Data type was not declared; exported as INTEGER by the project's identifier strategy. Add a data type to the value type.",
+      );
+      const unset = collectExportAnnotations(model, mapper.map(model)).find(
+        (a) => a.columnName === "customer_id" && a.category === "data_type",
+      );
+      expect(unset?.message).toBe(
+        "Data type was not declared; exported as TEXT. Add a data type to the value type.",
       );
     });
 

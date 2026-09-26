@@ -23,6 +23,27 @@ personas:
     wants: Encounter, Admission and Diagnosis mean what clinicians mean by them, with the ranked-diagnosis and administration rules intact.
     acceptance: personas/clinical-informaticist.gym.yaml
     judges: [fhir-openapi]
+    not_expressible:
+      - artifact_kind: openapi
+        check: { factType: "Encounter has Diagnosis at DiagnosisRank", constraint: "internal_uniqueness" }
+        reason: >-
+          OpenAPI has no n-ary relationship and no key over several
+          properties: the triple is an array of objects under one parent, and
+          nothing in the format says which pair of its fields is unique.
+          (barwise-1079)
+      - artifact_kind: openapi
+        check: { factType: "MedicationOrder is administered at AdministrationDateTime by Provider", constraint: "internal_uniqueness" }
+        reason: >-
+          OpenAPI has no n-ary relationship and no key over several
+          properties: the triple is an array of objects under one parent, and
+          nothing in the format says which pair of its fields is unique.
+          (barwise-1079)
+      - artifact_kind: openapi
+        check: { sentence: "No Provider refers to that same Provider." }
+        reason: >-
+          OpenAPI cannot state a ring constraint: a schema can reference
+          itself, but nothing in the format says the reference may not reach
+          back to the same instance. (barwise-1079)
   - id: revenue-cycle-analyst
     name: Dana Whitfield
     role: Revenue-cycle analyst

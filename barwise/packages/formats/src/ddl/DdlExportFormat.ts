@@ -61,7 +61,9 @@ export class DdlExportFormat implements ExportFormatAdapter {
 
     // Map to relational schema.
     const mapper = new RelationalMapper();
-    const schema = mapper.map(model);
+    const schema = mapper.map(model, {
+      preferredIdentifierStrategy: options?.preferredIdentifierStrategy,
+    });
 
     // Collect annotations from the model and schema.
     const annotations = annotate

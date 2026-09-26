@@ -130,12 +130,20 @@ function writeExportResult(
  * manifest -- lineage is keyed to a single source model.)
  */
 function exportProject(source: string, exporter: ExportFormatAdapter, opts: ExportOptions): void {
-  const { resolved, problems } = resolveDomainModels(source, opts.domain);
+  const { resolved, problems, preferredIdentifierStrategy } = resolveDomainModels(
+    source,
+    opts.domain,
+  );
+  // A project export types undeclared keys by the project's strategy.
+  const options = {
+    ...exportOpts(opts),
+    ...(preferredIdentifierStrategy ? { preferredIdentifierStrategy } : {}),
+  };
   for (const p of problems) process.stderr.write(`Warning: ${p}\n`);
 
   if (opts.domain) {
     const { model } = resolved[0]!;
-    const result = exporter.export(model, exportOpts(opts));
+    const result = exporter.export(model, options);
     if (opts.output) {
       writeExportResult(result, opts.output);
     } else {
@@ -154,7 +162,7 @@ function exportProject(source: string, exporter: ExportFormatAdapter, opts: Expo
   mkdirSync(opts.output, { recursive: true });
   const written: string[] = [];
   for (const { context, model } of resolved) {
-    const result = exporter.export(model, exportOpts(opts));
+    const result = exporter.export(model, options);
     if (result.files && result.files.length > 0) {
       for (const file of result.files) {
         const p = join(opts.output, context ?? "domain", file.name);

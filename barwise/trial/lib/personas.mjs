@@ -20,8 +20,41 @@
  * still grades the kernel and every other artifact kind.
  */
 
-/** A check is named by its `element`, exactly as the rubric writes it. */
-const sameElement = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+/**
+ * The key a `not_expressible` entry names a check by: the fields that
+ * identify it in the rubric, exactly as written. A `requires_element`
+ * check is named by its element, which is what every entry used before
+ * barwise-1079. The other two kinds a format can fail by construction are
+ * named by their own identity: a verbalization check by its sentence, a
+ * population check by its fact type and constraint. OpenAPI has no
+ * deontic modality and no ring constraints, and until this those checks
+ * had no seat: the entry matched nothing and the runner refused it.
+ * `must_validate` has no key; a format that cannot validate is a defect.
+ */
+export function checkKey(c) {
+  switch (c.kind) {
+    case "requires_element":
+      return c.element;
+    case "requires_verbalization":
+      return { sentence: c.sentence };
+    case "forbids_population":
+      return { factType: c.factType, constraint: c.constraint };
+    default:
+      return undefined;
+  }
+}
+
+/** Key order is not identity: `{constraint, factType}` names the same check. */
+const canonical = (v) =>
+  JSON.stringify(v, (_, o) =>
+    o && typeof o === "object" && !Array.isArray(o)
+      ? Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)))
+      : o);
+
+const names = (c, x) => {
+  const key = checkKey(c);
+  return key !== undefined && canonical(key) === canonical(x.check);
+};
 
 /**
  * Everything wrong with a customer's persona declarations, as messages.
@@ -51,7 +84,7 @@ export function personaProblems(customer, rubricChecks) {
           `${at} names artifact kind ${x.artifact_kind}, which this persona judges none of`,
         );
       }
-      const matches = checks.filter((c) => sameElement(c.element, x.check));
+      const matches = checks.filter((c) => names(c, x));
       if (matches.length !== 1) {
         problems.push(`${at} matches ${matches.length} rubric checks; it must name exactly one`);
       }
@@ -71,7 +104,7 @@ export function exemptPositions(checks, notExpressible, artifactKind) {
   for (const x of notExpressible ?? []) {
     if (x.artifact_kind !== artifactKind) continue;
     checks.forEach((c, i) => {
-      if (sameElement(c.element, x.check)) positions.add(i);
+      if (names(c, x)) positions.add(i);
     });
   }
   return positions;

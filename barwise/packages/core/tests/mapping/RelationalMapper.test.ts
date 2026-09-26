@@ -1257,6 +1257,49 @@ describe("RelationalMapper", () => {
       expect(table.columns[0]!.dataType).toBe("INTEGER");
     });
 
+    it("types a key whose identifying value type has no data type, and marks it", () => {
+      // The strategy used to reach only a key with no value type at all;
+      // one whose value type existed untyped exported as TEXT regardless
+      // (identifier-strategy-in-exports.spec.md).
+      const model = new ModelBuilder("Test")
+        .withEntityType("Widget", { referenceMode: "widget_id" })
+        .withValueType("WidgetId")
+        .withBinaryFactType("Widget has WidgetId", {
+          role1: { player: "Widget", name: "has" },
+          role2: { player: "WidgetId", name: "identifies" },
+          uniqueness: "both",
+          mandatory: "role1",
+        })
+        .build();
+      const key = mapper.map(model, { preferredIdentifierStrategy: "uuid" }).tables
+        .find((t) => t.name === "widget")!.columns[0]!;
+      expect(key).toMatchObject({
+        name: "widget_id",
+        dataType: "UUID",
+        dataTypeDefaulted: true,
+        defaultedByStrategy: "uuid",
+      });
+      const plain = mapper.map(model).tables.find((t) => t.name === "widget")!.columns[0]!;
+      expect(plain.dataType).toBe("TEXT");
+      expect(plain.defaultedByStrategy).toBeUndefined();
+    });
+
+    it("marks a foreign key copying a strategy-typed key, and not a declared one", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Customer", { referenceMode: "customer_id" })
+        .withEntityType("Order", { referenceMode: "order_id" })
+        .withBinaryFactType("Order is placed by Customer", {
+          role1: { player: "Order", name: "is placed by" },
+          role2: { player: "Customer", name: "places" },
+          uniqueness: "role1",
+        })
+        .build();
+      const order = mapper.map(model, { preferredIdentifierStrategy: "integer" }).tables
+        .find((t) => t.name === "order")!;
+      const fk = order.columns.find((c) => c.name === order.foreignKeys[0]!.columnNames[0]);
+      expect(fk).toMatchObject({ dataType: "INTEGER", defaultedByStrategy: "integer" });
+    });
+
     it("strategy applies to all entity types without explicit value types", () => {
       const model = new ModelBuilder("Test")
         .withEntityType("Customer", { referenceMode: "customer_id" })

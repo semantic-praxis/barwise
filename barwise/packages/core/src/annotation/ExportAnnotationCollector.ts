@@ -140,8 +140,11 @@ export function collectExportAnnotations(
           columnName: col.name,
           severity: "todo",
           category: "data_type",
-          message:
-            `Data type was not declared; exported as ${col.dataType}. Add a data type to the value type.`,
+          // A strategy-typed key is still undeclared (the owner kept the TODO,
+          // 2026-09-26); the message only says where the type came from.
+          message: `Data type was not declared; exported as ${col.dataType}${
+            col.defaultedByStrategy ? " by the project's identifier strategy" : ""
+          }. Add a data type to the value type.`,
         });
       }
 

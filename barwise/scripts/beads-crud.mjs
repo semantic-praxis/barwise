@@ -27,6 +27,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { MAX_TRIES, mintId } from "./lib/beads-ids.mjs";
 
 const BLOCKS_TYPE = "blocks";
 const STATUS = new Set([
@@ -144,24 +145,14 @@ function recomputeCounts(records, ids) {
   }
 }
 
-function nextTopLevelId(records, prefix) {
-  let max = 0;
-  const re = new RegExp(`^${prefix}-(\\d+)$`);
-  for (const r of records) {
-    const m = re.exec(r.obj.id);
-    if (m) max = Math.max(max, Number(m[1]));
-  }
-  return `${prefix}-${max + 1}`;
-}
-
-function nextChildId(records, parentId) {
-  let max = 0;
-  const re = new RegExp(`^${parentId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.(\\d+)$`);
-  for (const r of records) {
-    const m = re.exec(r.obj.id);
-    if (m) max = Math.max(max, Number(m[1]));
-  }
-  return `${parentId}.${max + 1}`;
+/**
+ * A new id: random, so two branches creating issues at once do not mint
+ * the same one (scripts/lib/beads-ids.mjs, barwise-w1u).
+ */
+function newId(records, base, sep) {
+  const id = mintId(base, sep, new Set(records.map((r) => r.obj.id)));
+  if (!id) fail(`no free id under ${base} after ${MAX_TRIES} tries`);
+  return id;
 }
 
 function findOrFail(records, id) {
@@ -191,8 +182,8 @@ function cmdCreate(flags) {
   }
 
   const prefix = flags.prefix || "barwise";
-  const id = flags.parent ? nextChildId(records, flags.parent) : nextTopLevelId(records, prefix);
   if (flags.parent) findOrFail(records, flags.parent);
+  const id = flags.parent ? newId(records, flags.parent, ".") : newId(records, prefix, "-");
 
   const ts = now();
   const owner = flags.owner || "noreply@anthropic.com";

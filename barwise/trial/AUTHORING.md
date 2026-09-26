@@ -231,6 +231,21 @@ not_expressible:
       TypeScript has no objectification ...
 ```
 
+`check` names the rubric check by the fields that identify its kind,
+written exactly as the rubric writes them:
+
+| Check kind               | `check` is                                   |
+| ------------------------ | -------------------------------------------- |
+| `requires_element`       | its `element`, e.g. `{ entity: Seller }`     |
+| `requires_verbalization` | `{ sentence: "..." }`                        |
+| `forbids_population`     | `{ factType: "...", constraint: mandatory }` |
+
+`must_validate` cannot be declared: a format that cannot produce a valid
+model is a defect, not a limit. The verbalization and population forms
+arrived with barwise-1079. Before that, OpenAPI's missing deontic
+modality and ring constraints had no way to be declared, and those rows
+sat open.
+
 For an artifact of that kind, a failure of that check is excluded and
 named in the step's detail. The check still grades the kernel and every
 other artifact kind. Use it only for a limit of the format, never for a

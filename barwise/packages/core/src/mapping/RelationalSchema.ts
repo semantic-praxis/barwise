@@ -5,6 +5,8 @@
  * primary keys, and foreign keys.
  */
 
+import type { PreferredIdentifierStrategy } from "../model/OrmProject.js";
+
 export interface Column {
   readonly name: string;
   readonly dataType: string;
@@ -18,6 +20,14 @@ export interface Column {
    * defaulted INTEGER or UUID key (dbt-key-type-fidelity.spec.md, D2).
    */
   readonly dataTypeDefaulted: boolean;
+  /**
+   * Set when the fallback type came from the project's preferred
+   * identifier strategy rather than the TEXT default: a key typed by it,
+   * or a foreign key copying such a key. The column is still defaulted;
+   * this only lets the annotation say where the type came from
+   * (identifier-strategy-in-exports.spec.md, R3).
+   */
+  readonly defaultedByStrategy?: PreferredIdentifierStrategy;
   readonly nullable: boolean;
   /** The role id this column was derived from (traceability). */
   readonly sourceRoleId?: string;

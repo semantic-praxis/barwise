@@ -7,11 +7,11 @@
  */
 
 import { OrmYamlSerializer } from "@barwise/core";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeExportModel } from "../../src/tools/exportModel.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -231,5 +231,55 @@ model:
       const parsed = JSON.parse(result.content[0]!.text);
       expect(parsed.error).toContain("crm, billing");
     });
+  });
+});
+
+describe("the project's identifier strategy (identifier-strategy-in-exports.spec.md)", () => {
+  let dir: string;
+  let manifest: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "mcp-strategy-"));
+    // crm.orm.yaml declares no type for Customer's key.
+    copyFileSync(join(fixtures, "project", "domains", "crm.orm.yaml"), join(dir, "crm.orm.yaml"));
+    manifest = join(dir, "shop.orm-project.yaml");
+    writeFileSync(
+      manifest,
+      [
+        "project:",
+        '  name: "Shop"',
+        "  settings:",
+        "    preferred_identifier_strategy: uuid",
+        "  domains:",
+        '    - path: "./crm.orm.yaml"',
+        '      context: "crm"',
+        "",
+      ].join("\n"),
+    );
+  });
+
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("types undeclared keys by it when the source is a project (R2)", () => {
+    const ddl = readResult(executeExportModel(manifest, "ddl", { includeExamples: false }));
+    expect(ddl).toContain("customer_id UUID NOT NULL");
+    expect(ddl).toContain("exported as UUID by the project's identifier strategy");
+  });
+
+  it("lets an explicit option win over the project's setting", () => {
+    const ddl = readResult(
+      executeExportModel(manifest, "ddl", {
+        includeExamples: false,
+        preferredIdentifierStrategy: "integer",
+      }),
+    );
+    expect(ddl).toContain("customer_id INTEGER NOT NULL");
+  });
+
+  it("leaves a single model alone (R4)", () => {
+    const ddl = readResult(
+      executeExportModel(join(dir, "crm.orm.yaml"), "ddl", { includeExamples: false }),
+    );
+    expect(ddl).toContain("customer_id TEXT NOT NULL");
   });
 });

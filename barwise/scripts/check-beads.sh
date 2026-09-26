@@ -170,10 +170,11 @@ for n, obj, _ in rows:
 
 # -- an id names one issue, and created_at is what says which ---------------
 #
-# barwise-984, five occurrences across three sessions. The allocator reads
+# barwise-984, five occurrences across three sessions. The allocator read
 # the highest id in the LOCAL .beads/issues.jsonl, which is stale by
-# construction on any branch behind main, so two branches mint the same id
-# for unrelated issues. The duplicate-id rule above catches the merged file
+# construction on any branch behind main, so two branches minted the same id
+# for unrelated issues. It now mints random suffixes (barwise-w1u), which
+# makes a collision improbable, not impossible, so this check stays. The duplicate-id rule above catches the merged file
 # while it still has both rows -- and the resolution is where the damage
 # happens: union by id with the later updated_at winning treats a collision
 # as an edit, keeps one row, and deletes an issue. That resolution produces

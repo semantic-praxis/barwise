@@ -30,6 +30,17 @@
         ],
         "matcher": ""
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/barwise/scripts/hooks/python-uv-guard.mjs\""
+          }
+        ]
+      }
     ]
   }
 }

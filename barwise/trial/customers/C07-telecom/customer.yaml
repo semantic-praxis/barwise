@@ -19,6 +19,19 @@ personas:
       contain itself.
     acceptance: personas/catalog-product-manager.gym.yaml
     judges: [tmf-openapi]
+    not_expressible:
+      - artifact_kind: openapi
+        check: { factType: "ProductOffering bundles ProductOffering", constraint: "ring" }
+        reason: >-
+          OpenAPI cannot state a ring constraint: a schema can reference
+          itself, but nothing in the format says the reference may not reach
+          back to the same instance. (barwise-1079)
+      - artifact_kind: openapi
+        check: { sentence: "Each RatePlanCode rates at most one ProductOffering." }
+        reason: >-
+          OpenAPI has no uniqueness keyword for a property's value across
+          instances (uniqueItems is about one array's items), so a value that
+          identifies at most one offering cannot be written. (barwise-1079)
   - id: network-inventory-architect
     name: Tomasz Wierzbicki
     role: Network inventory architect
@@ -37,6 +50,18 @@ personas:
       obligation the request can exist without.
     acceptance: personas/integration-engineer.gym.yaml
     judges: [tmf-openapi]
+    not_expressible:
+      - artifact_kind: openapi
+        check: { sentence: "The combination of Msisdn and Country is unique across fact types." }
+        reason: >-
+          OpenAPI has no composite key: nothing in the format says two
+          properties are unique together. (barwise-1079)
+      - artifact_kind: openapi
+        check: { sentence: "It is obligatory that each PortInRequest carries at least one LetterOfAuthorizationReference." }
+        reason: >-
+          OpenAPI has no deontic modality: a property is required or it is
+          not, and an obligation that a request may exist without cannot be
+          written. (barwise-1079)
 artifacts:
   - id: bq-ddl
     generator: ddl

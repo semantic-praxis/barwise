@@ -156,10 +156,10 @@
     },
     {
       "id": "acceptance-edit-distance-dbt",
-      "issue": "barwise-1079",
+      "issue": "barwise-nkn",
       "severity": "S5",
       "step": "^acceptance:.*:(?!kernel).*-dbt$",
-      "note": "Edit distance to acceptance on a dbt project. barwise-bvl is fixed; what remains is mostly checks dbt cannot express (rings, deontic rules, subtypes, relationship verbs, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer and generator gaps to split out (barwise-1079)."
+      "note": "Edit distance to acceptance on a dbt project. Nothing is declared not_expressible for dbt: a singular test is SQL, so even a ring constraint can be stated (PR #575 review). What remains are checks the round trip does not carry: rings, multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn)."
     },
     {
       "id": "acceptance-edit-distance-kotlin",
@@ -183,11 +183,11 @@
     },
     {
       "id": "acceptance-edit-distance-openapi",
-      "issue": "barwise-1079",
+      "issue": "barwise-nul",
       "severity": "S5",
       "step": "^acceptance:",
       "importer": "openapi",
-      "note": "Edit distance to acceptance on an OpenAPI artifact. barwise-lh9 and barwise-1076 are fixed; what remains is mostly checks OpenAPI cannot express (rings, deontic rules, external and value-side uniqueness, n-ary fact types), which not_expressible cannot yet name because they are not requires_element checks, plus importer gaps to split out (barwise-1079)."
+      "note": "Edit distance to acceptance on an OpenAPI artifact. Checks OpenAPI cannot state (rings, deontic rules, composite and value-side uniqueness, n-ary uniqueness) are declared not_expressible on the personas (barwise-1079). What remains is the importer ignoring discriminator subtypes (barwise-nul)."
     },
     {
       "id": "acceptance-edit-distance-ddl",

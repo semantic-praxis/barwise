@@ -9,6 +9,7 @@
 
 import type { ExportAnnotation } from "../mapping/renderers/DbtExportAnnotator.js";
 import type { OrmModel } from "../model/OrmModel.js";
+import type { PreferredIdentifierStrategy } from "../model/OrmProject.js";
 
 /**
  * The result of an export operation.
@@ -76,6 +77,15 @@ export interface ExportOptions {
    * When false, export proceeds and validation errors are included as warnings.
    */
   readonly strict?: boolean;
+
+  /**
+   * The SQL type for a primary key whose identifier declares none: the
+   * project's `preferred_identifier_strategy`. A surface exporting a
+   * project sets it from the project's settings; a single-model export
+   * leaves it unset, and such keys export as TEXT
+   * (identifier-strategy-in-exports.spec.md).
+   */
+  readonly preferredIdentifierStrategy?: PreferredIdentifierStrategy;
 
   /**
    * Format-specific options.
