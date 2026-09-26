@@ -18,6 +18,7 @@
 
 import {
   type ConceptualDataTypeName,
+  generateId,
   type ImportFormat,
   type ImportOptions,
   type ImportResult,
@@ -314,8 +315,14 @@ export class OpenApiImportFormat implements ImportFormat {
     try {
       const constraints: any[] = [];
 
+      // Role ids are minted, never built from names: `<entity id>-<verb>-role`
+      // collided for two references with the same inferred verb, and the
+      // value-side `-has-role` form for every schema sharing a property name
+      // (importer-role-ids.spec.md).
+      const role0Id = generateId();
+      const role1Id = generateId();
+
       // Uniqueness constraint (many-to-one by default)
-      const role1Id = `${entityType.id}-${verb}-role`;
       constraints.push({
         type: "internal_uniqueness",
         roleIds: [role1Id],
@@ -336,7 +343,7 @@ export class OpenApiImportFormat implements ImportFormat {
           {
             name: verb,
             playerId: referencedEntity.id,
-            id: `${referencedEntity.id}-${verb}-role`,
+            id: role0Id,
           },
           { name: `is ${verb} by`, playerId: entityType.id, id: role1Id },
         ],
@@ -378,12 +385,12 @@ export class OpenApiImportFormat implements ImportFormat {
           {
             name: "has",
             playerId: entityType.id,
-            id: `${entityType.id}-has-${referencedEntity.name}-role`,
+            id: generateId(),
           },
           {
             name: "belongs to",
             playerId: referencedEntity.id,
-            id: `${referencedEntity.id}-belongs-to-${entityType.name}-role`,
+            id: generateId(),
           },
         ],
         readings: [`{0} has {1}`],
@@ -441,8 +448,9 @@ export class OpenApiImportFormat implements ImportFormat {
     try {
       const constraints: any[] = [];
 
-      const role0Id = `${valueType.id}-has-role`;
-      const role1Id = `${entityType.id}-has-${valueTypeName}-role`;
+      // Minted, not built from names; see the $ref case above.
+      const role0Id = generateId();
+      const role1Id = generateId();
 
       // Uniqueness constraint (unique on entity side by default)
       constraints.push({
