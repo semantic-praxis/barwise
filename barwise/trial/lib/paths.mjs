@@ -81,29 +81,47 @@ export function bundlesPresent() {
  */
 export function staleBundles({
   bundles = [CLI_BUNDLE, MCP_BUNDLE],
-  roots = packageSourceRoots(),
+  roots = bundledPackageDirs(),
   stat = statSync,
 } = {}) {
   let newest = { file: undefined, mtimeMs: -Infinity };
-  const walk = (dir) => {
+  const consider = (path) => {
+    const { mtimeMs } = stat(path);
+    if (mtimeMs > newest.mtimeMs) newest = { file: path, mtimeMs };
+  };
+  const walk = (dir, isRoot = false) => {
+    // A directory's own mtime moves when an entry is added, renamed or
+    // DELETED, which no remaining file's mtime shows: a bundle still
+    // holding a deleted module would otherwise read as current. Not the
+    // package root's, though: tests create and remove ignored entries
+    // there (coverage/, .barwise/), which would mark every bundle stale.
+    if (!isRoot) consider(dir);
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const path = join(dir, entry.name);
-      if (entry.isDirectory()) walk(path);
-      else {
-        const { mtimeMs } = stat(path);
-        if (mtimeMs > newest.mtimeMs) newest = { file: path, mtimeMs };
-      }
+      if (entry.isDirectory()) {
+        if (!NOT_BUNDLE_INPUTS.has(entry.name) && !entry.name.startsWith(".")) {
+          walk(join(dir, entry.name));
+        }
+      } else consider(join(dir, entry.name));
     }
   };
-  for (const root of roots) if (existsSync(root)) walk(root);
+  for (const root of roots) if (existsSync(root)) walk(root, true);
   return bundles
     .filter((b) => stat(b).mtimeMs < newest.mtimeMs)
     .map((bundle) => ({ bundle, newerSource: newest.file }));
 }
 
-function packageSourceRoots() {
+/**
+ * Directories inside a package that never feed a bundle. Everything else
+ * does, not only src/: the MCP bundle embeds core's schemas/ and the CLI
+ * bundle script reads package.json for its version (PR #572 review).
+ * Hidden directories are skipped too: they hold runtime state such as
+ * packages/mcp/.barwise, which tests write and git ignores.
+ */
+const NOT_BUNDLE_INPUTS = new Set(["node_modules", "dist", "tests", "coverage"]);
+
+function bundledPackageDirs() {
   const packagesDir = join(BARWISE_DIR, "packages");
   return readdirSync(packagesDir, { withFileTypes: true })
     .filter((d) => d.isDirectory() && d.name !== "vscode")
-    .map((d) => join(packagesDir, d.name, "src"));
+    .map((d) => join(packagesDir, d.name));
 }

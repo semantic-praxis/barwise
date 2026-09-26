@@ -151,7 +151,8 @@
       "issue": "barwise-jjd",
       "severity": "S5",
       "step": "^acceptance:.*:(?!kernel).*-ddl$",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue."
+      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "importer": "sql"
     },
     {
       "id": "acceptance-edit-distance-dbt",
