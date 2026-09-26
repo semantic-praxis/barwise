@@ -150,3 +150,31 @@ to the value's role (R1); `required`'s mandatory moved to the value's role
 (R1); the roles listed value first (R1); `isKey` forced false (R2);
 sharing any same-named value type regardless of its type (R3). A control
 mutation that changes no behaviour went uncaught (exit 1).
+
+Review of PR #573 found three gaps, each fixed with a test the helper
+showed red against `tests/OpenApiImportFidelity.test.ts`:
+
+- **Multi-word schemas never found their own id property.**
+  `inferReferenceMode` built the candidate as `${name.toLowerCase()}Id`,
+  so `PurchaseOrder.purchaseOrderId` was not the key, and no identifier
+  was created. It now tries `id`, `purchaseOrderId` and
+  `purchase_order_id` exactly, in that order, then any spelling equal
+  ignoring case and underscores. The default reference mode is snake case
+  (`purchase_order_id`), the spelling the renderer writes.
+- **The key's name depended on property order.** Properties were
+  processed in source order, so `user_id` listed before the key `userId`
+  claimed `UserId` and the key was renamed. Every schema's identifier is
+  now created first, across all schemas, as the DDL and dbt importers
+  do. The first fix still chose the key by property order when both
+  spellings were present, because the case-insensitive match found
+  whichever came first. The test that lists them both ways caught it,
+  and the exact spellings now take priority.
+- **The optional-key test checked one constraint.** It now asserts the
+  full set, so a key whose mandatory depended on `required` would fail.
+
+Mutations, each caught (exit 0): restoring the original detection (the
+multi-word test); dropping the exact-spelling priority (the order test);
+skipping the keys-first pass; tying the key's mandatory to `required`.
+A narrower detection mutation, which left the case-insensitive fallback
+in place, went uncaught (exit 1), because the fallback finds the camel
+spelling anyway. That mutation removed nothing the tests depend on.

@@ -104,9 +104,57 @@ describe("the reference-mode property is the preferred identifier (R2)", () => {
       User: { type: "object", properties: { userId: { type: "string", format: "uuid" } } },
     }));
     expect(model.getObjectTypeByName("User")).toMatchObject({ referenceMode: "userId" });
-    expect(constraintsByPlayer(model, factType(model, "User has UserId"))).toContain(
+    // userId is not in `required`, and the key is still mandatory: an
+    // identifier does not depend on the schema's required list.
+    expect(constraintsByPlayer(model, factType(model, "User has UserId"))).toEqual([
+      "mandatory:User",
+      "unique:User",
       "unique:UserId:preferred",
-    );
+    ]);
+  });
+
+  it("finds a multi-word schema's own id property, in camel or snake case (review of PR #573)", () => {
+    for (const key of ["purchaseOrderId", "purchase_order_id"]) {
+      const { model } = importer.parse(api({
+        PurchaseOrder: { type: "object", properties: { [key]: { type: "integer" } } },
+      }));
+      expect(model.getObjectTypeByName("PurchaseOrder")).toMatchObject({ referenceMode: key });
+      expect(constraintsByPlayer(model, factType(model, "PurchaseOrder has PurchaseOrderId")))
+        .toContain("unique:PurchaseOrderId:preferred");
+    }
+  });
+
+  it("defaults a multi-word schema with no id property to a snake-case reference mode", () => {
+    const { model } = importer.parse(api({
+      PurchaseOrder: { type: "object", properties: { total: { type: "number" } } },
+    }));
+    expect(model.getObjectTypeByName("PurchaseOrder")).toMatchObject({
+      referenceMode: "purchase_order_id",
+    });
+  });
+
+  it("gives the key its plain name whatever the property order (review of PR #573)", () => {
+    const keyFirst = { userId: { type: "string", format: "uuid" }, user_id: { type: "integer" } };
+    const keyLast = { user_id: { type: "integer" }, userId: { type: "string", format: "uuid" } };
+    for (const properties of [keyFirst, keyLast]) {
+      const { model } = importer.parse(api({ User: { type: "object", properties } }));
+      expect(model.getObjectTypeByName("UserId")?.dataType).toEqual({ name: "uuid" });
+      expect(constraintsByPlayer(model, factType(model, "User has UserId"))).toContain(
+        "unique:UserId:preferred",
+      );
+    }
+  });
+
+  it("creates every schema's key before any other schema's properties", () => {
+    const { model } = importer.parse(api({
+      Account: {
+        type: "object",
+        properties: { id: { type: "integer" }, userId: { type: "string" } },
+      },
+      User: { type: "object", properties: { userId: { type: "string", format: "uuid" } } },
+    }));
+    expect(model.getObjectTypeByName("UserId")?.dataType).toEqual({ name: "uuid" });
+    expect(model.getObjectTypeByName("AccountUserId")?.dataType).toEqual({ name: "text" });
   });
 });
 

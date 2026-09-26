@@ -147,7 +147,29 @@ export class OpenApiImportFormat implements ImportFormat {
       entityMap.set(schema.name, entityType.id);
     }
 
-    // Step 2: Create value types and fact types for properties
+    // Step 2: Give every entity its identifier before any other property,
+    // across all schemas, so a key gets its plain value-type name ahead of
+    // an ordinary property that shares it -- the DDL and dbt importers'
+    // order. Processing in source order let `user_id` listed before the
+    // key `userId` take `UserId` and rename the key (review of PR #573).
+    for (const schema of parsedSchemas) {
+      const entityType = model.getObjectType(entityMap.get(schema.name) ?? "");
+      if (!entityType || entityType.kind !== "entity" || !schema.properties) continue;
+      const key = entityType.referenceMode;
+      const keyDef = schema.properties[key];
+      if (keyDef && !keyDef.$ref && !keyDef.items?.$ref) {
+        this.createPropertyFactType(
+          model,
+          entityType,
+          key,
+          keyDef,
+          schema.required ?? [],
+          warnings,
+        );
+      }
+    }
+
+    // Step 3: Create value types and fact types for the other properties
     for (const schema of parsedSchemas) {
       const entityId = entityMap.get(schema.name);
       if (!entityId) continue;
@@ -156,6 +178,13 @@ export class OpenApiImportFormat implements ImportFormat {
       if (!entityType || !schema.properties) continue;
 
       for (const [propName, propDef] of Object.entries(schema.properties)) {
+        // The identifier was created in step 2.
+        const isIdentifier = entityType.kind === "entity"
+          && propName === entityType.referenceMode
+          && !propDef.$ref
+          && !propDef.items?.$ref;
+        if (isIdentifier) continue;
+
         // Check if this is a $ref to another schema
         if (propDef.$ref) {
           const refSchemaName = this.extractRefName(propDef.$ref);
@@ -270,29 +299,29 @@ export class OpenApiImportFormat implements ImportFormat {
   }
 
   /**
-   * Infer a reference mode (primary key field) for an entity.
-   * Looks for properties named "id", "{schema}Id", or uses a default.
+   * Infer a reference mode (primary key field) for an entity: a property
+   * named `id`, else one named for the schema (`purchaseOrderId`, then
+   * `purchase_order_id`, then any spelling equal ignoring case and
+   * underscores), else `<schema>_id` in snake case.
+   *
+   * The first version built the candidate as `${name.toLowerCase()}Id`, which missed every
+   * multi-word schema's own id property (`purchaseorderId` is not
+   * `purchaseOrderId`), so no identifier was created for it (review of
+   * PR #573).
    */
   private inferReferenceMode(schema: ParsedSchema): string {
-    if (!schema.properties) {
-      return `${schema.name.toLowerCase()}_id`;
+    const normalize = (name: string) => name.toLowerCase().replace(/_/g, "");
+    const props = Object.keys(schema.properties ?? {});
+    const snake = schema.name.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+    const camel = schema.name.charAt(0).toLowerCase() + schema.name.slice(1);
+    // Exact spellings first, in a fixed order, so that when `userId` and
+    // `user_id` both exist the choice does not depend on property order.
+    for (const exact of ["id", `${camel}Id`, `${snake}_id`]) {
+      if (props.includes(exact)) return exact;
     }
-
-    const props = Object.keys(schema.properties);
-
-    // Look for "id" property
-    if (props.includes("id")) {
-      return "id";
-    }
-
-    // Look for "{schema}Id" pattern (e.g., "userId" for "User" schema)
-    const expectedId = `${schema.name.toLowerCase()}Id`;
-    if (props.includes(expectedId)) {
-      return expectedId;
-    }
-
-    // Default
-    return `${schema.name.toLowerCase()}_id`;
+    const loose = props.find((p) => normalize(p) === "id")
+      ?? props.find((p) => normalize(p) === `${normalize(schema.name)}id`);
+    return loose ?? `${snake}_id`;
   }
 
   /**
