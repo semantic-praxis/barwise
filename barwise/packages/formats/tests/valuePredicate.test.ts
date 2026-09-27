@@ -21,6 +21,8 @@ const cases: [string, ValueConstraintDef][] = [
     { values: [], ranges: [{ min: "0", max: "100", minInclusive: false, maxInclusive: false }] },
   ],
   ["an open-above range", { values: [], ranges: [{ min: "18" }] }],
+  // PR #580 review: a quoted parenthesis is a value, not structure.
+  ["a range whose bound is a parenthesis", { values: [], ranges: [{ min: ")", max: "z" }] }],
   ["an open-below range", { values: [], ranges: [{ max: "9.99", maxInclusive: false }] }],
   ["values and ranges together", {
     values: ["N/A"],

@@ -179,17 +179,19 @@ export function routeConstraints(
     if (ot.kind !== "value" || !ot.valueConstraint) continue;
     for (const ft of model.factTypes) {
       if (ft.arity < 2) continue;
-      const valueRole = ft.roles.find((r) => r.playerId === ot.id);
-      if (!valueRole) continue;
-      routeValueConstraint(
-        {
-          type: "value_constraint",
-          roleId: valueRole.id,
-          values: ot.valueConstraint.values,
-          ranges: ot.valueConstraint.ranges,
-        },
-        ft,
-      );
+      // Every role it plays: an n-ary can use one value type twice (a
+      // start and an end date), and each is its own column (PR #580 review).
+      for (const valueRole of ft.roles.filter((r) => r.playerId === ot.id)) {
+        routeValueConstraint(
+          {
+            type: "value_constraint",
+            roleId: valueRole.id,
+            values: ot.valueConstraint.values,
+            ranges: ot.valueConstraint.ranges,
+          },
+          ft,
+        );
+      }
     }
   }
 

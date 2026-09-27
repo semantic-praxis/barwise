@@ -500,7 +500,14 @@ export class RelationalMapper {
     const table: MutableTable = {
       name: toSnake(ft.name),
       columns,
-      primaryKey: { columnNames: associativeKey(ft, roleColumns, columns) },
+      // A binary that lands here (an optional 1:1, or a many-to-many)
+      // keeps its key on both roles; only an n-ary table is keyed on its
+      // uniqueness constraint (PR #580 review).
+      primaryKey: {
+        columnNames: ft.arity > 2
+          ? associativeKey(ft, roleColumns, columns)
+          : columns.map((c) => c.name),
+      },
       foreignKeys,
       sourceElementId: ft.id,
     };

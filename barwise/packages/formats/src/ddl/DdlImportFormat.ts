@@ -571,27 +571,23 @@ export class DdlImportFormat implements ImportFormat {
   ): ObjectType {
     const dataType = columnDataType(column);
     const candidate = toPascalCase(column.name);
-    const claim = claimValueTypeName(model, entity.id, entity.name, candidate, dataType, role);
-    if (claim.kind === "share") {
-      if (
-        column.valueConstraint
-        && JSON.stringify(
-            claim.valueType.kind === "value" ? claim.valueType.valueConstraint : undefined,
-          )
-          !== JSON.stringify(column.valueConstraint)
-      ) {
-        warnings.push(
-          `Table "${table.name}", column "${column.name}": its CHECK differs from value type `
-            + `"${claim.valueType.name}", which another column already gave a value constraint; `
-            + `the first one is kept.`,
-        );
-      }
-      return claim.valueType;
-    }
+    // The constraint is part of the sharing decision: a constrained column
+    // may not share an unconstrained value type, or one with another
+    // constraint (PR #580 review). A refusal names the value type below.
+    const claim = claimValueTypeName(
+      model,
+      entity.id,
+      entity.name,
+      candidate,
+      dataType,
+      role,
+      column.valueConstraint,
+    );
+    if (claim.kind === "share") return claim.valueType;
     if (claim.displaced) {
       warnings.push(
         `Table "${table.name}", column "${column.name}" (${column.dataType}): the name "${candidate}" is `
-          + `already held by ${claim.displaced.kind} type "${claim.displaced.name}" with a different type or role; `
+          + `already held by ${claim.displaced.kind} type "${claim.displaced.name}" with a different type, value constraint or role; `
           + `created value type "${claim.name}" instead.`,
       );
     }

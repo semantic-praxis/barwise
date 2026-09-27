@@ -294,3 +294,37 @@ describe("n-ary fact types with a value role", () => {
     expect(lines[at - 1]).toMatch(/Value constraint available: \[.?1/);
   });
 });
+
+describe("a constrained value type playing two roles of one n-ary", () => {
+  it("puts its CHECK on both columns", () => {
+    // PR #580 review: the routing found the first role and stopped, so the
+    // second date column accepted values outside the value type's domain.
+    const model = new OrmModel({ name: "Leases" });
+    const unit = model.addObjectType({ name: "Unit", kind: "entity", referenceMode: "unit_id" });
+    const tenant = model.addObjectType({
+      name: "Tenant",
+      kind: "entity",
+      referenceMode: "tenant_id",
+    });
+    const day = model.addObjectType({
+      name: "LeaseDay",
+      kind: "value",
+      dataType: { name: "integer" },
+      valueConstraint: { values: [], ranges: [{ min: "1", max: "28" }] },
+    });
+    model.addFactType({
+      name: "Tenant leases Unit from LeaseDay to LeaseDay",
+      roles: [
+        { id: "r-t", name: "leases", playerId: tenant.id },
+        { id: "r-u", name: "is leased by", playerId: unit.id },
+        { id: "r-from", name: "from", playerId: day.id },
+        { id: "r-to", name: "to", playerId: day.id },
+      ],
+      readings: ["{0} leases {1} from {2} to {3}"],
+      constraints: [{ type: "internal_uniqueness", roleIds: ["r-t", "r-u", "r-from"] }],
+    });
+    const { text } = new DdlExportFormat().export(model, { annotate: false });
+    const checks = text.match(/CHECK \(\(\w+ >= 1 AND \w+ <= 28\)\)/g) ?? [];
+    expect(checks, text).toHaveLength(2);
+  });
+});

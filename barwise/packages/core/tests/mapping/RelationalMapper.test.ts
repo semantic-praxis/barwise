@@ -346,6 +346,32 @@ describe("RelationalMapper", () => {
       expect(table.primaryKey.columnNames).toEqual(["csn", "diagnosis_rank"]);
     });
 
+    it("leaves an optional one-to-one binary keyed on both roles", () => {
+      // PR #580 review: an optional 1:1 also becomes an associative table,
+      // and the n-ary key rule would have keyed it on one role.
+      const model = new OrmModel({ name: "Test" });
+      const person = model.addObjectType({
+        name: "Person",
+        kind: "entity",
+        referenceMode: "person_id",
+      });
+      const desk = model.addObjectType({ name: "Desk", kind: "entity", referenceMode: "desk_id" });
+      model.addFactType({
+        name: "Person sits at Desk",
+        roles: [
+          { id: "r-p", name: "sits at", playerId: person.id },
+          { id: "r-d", name: "seats", playerId: desk.id },
+        ],
+        readings: ["{0} sits at {1}"],
+        constraints: [
+          { type: "internal_uniqueness", roleIds: ["r-p"] },
+          { type: "internal_uniqueness", roleIds: ["r-d"] },
+        ],
+      });
+      const table = mapper.map(model).tables.find((t) => t.name === "person_sits_at_desk")!;
+      expect(table.primaryKey.columnNames).toEqual(["person_id", "desk_id"]);
+    });
+
     it("keys on every column when the fact type declares no uniqueness", () => {
       const table = rankedDiagnosis([]);
       expect(table.primaryKey.columnNames).toEqual(["csn", "code", "diagnosis_rank"]);

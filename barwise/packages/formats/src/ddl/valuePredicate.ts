@@ -149,7 +149,11 @@ function splitTopLevel(text: string, separator: RegExp): string[] {
 function stripParens(text: string): string {
   if (!text.startsWith("(") || !text.endsWith(")")) return text;
   let depth = 0;
+  let inString = false;
   for (let i = 0; i < text.length; i++) {
+    // A quoted `)` is a value, as in `(score >= ')' AND score <= 'z')`.
+    if (text[i] === "'") inString = !inString;
+    if (inString) continue;
     if (text[i] === "(") depth++;
     else if (text[i] === ")" && --depth === 0 && i < text.length - 1) return text;
   }
