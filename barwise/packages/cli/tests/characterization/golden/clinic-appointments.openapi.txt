@@ -953,18 +953,28 @@
           },
           "provider_id": {
             "$ref": "#/components/schemas/Doctor"
+          },
+          "appointment_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "time_slot": {
+            "type": "string",
+            "format": "time",
+            "x-barwise-annotations": [
+              {
+                "severity": "note",
+                "message": "Value constraint available: ['8:00', '8:30', '9:00', '9:30', '10:00', '10:30', '11:00', '11:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30']. Consider adding an accepted_values test."
+              }
+            ]
           }
         },
         "required": [
           "confirmation_number",
           "medical_record_number",
-          "provider_id"
-        ],
-        "x-barwise-annotations": [
-          {
-            "severity": "note",
-            "message": "Composite primary key (confirmation_number, medical_record_number, provider_id). Individual unique tests are not generated."
-          }
+          "provider_id",
+          "appointment_date",
+          "time_slot"
         ]
       },
       "DoctorIsAssignedToExamRoomOnAppointmentDate": {
@@ -975,16 +985,21 @@
           },
           "room_number": {
             "$ref": "#/components/schemas/ExamRoom"
+          },
+          "appointment_date": {
+            "type": "string",
+            "format": "date"
           }
         },
         "required": [
           "provider_id",
-          "room_number"
+          "room_number",
+          "appointment_date"
         ],
         "x-barwise-annotations": [
           {
             "severity": "note",
-            "message": "Composite primary key (provider_id, room_number). Individual unique tests are not generated."
+            "message": "Composite primary key (provider_id, appointment_date). Individual unique tests are not generated."
           }
         ]
       }

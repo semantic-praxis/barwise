@@ -245,6 +245,11 @@
       "status": "accepted-benign",
       "note": "CLAUDE.md's convention summary restating the spec's reason. Kept because this file's job is the convention with its reason attached, and the one half that is a CODE claim -- that audit-duplication.mjs has no writer -- is drift-tested in scripts/tests/gates.test.mjs rather than left to prose.",
       "detail": "../CLAUDE.md: hand-maintained, which is why it never had this defect."
+    },
+    "literal:7daecf42cb3e": {
+      "status": "accepted-benign",
+      "note": "doc-comment example: both comments cite the same n-ary fact type (barwise-kgh) to explain the mapping and the routing; repetition is not a decision that must agree",
+      "detail": "\"Encounter has Diagnosis at DiagnosisRank\" in packages/core/src/mapping/RelationalMapper.ts, packages/formats/src/ddl/constraintRouting.ts"
     }
   }
 }

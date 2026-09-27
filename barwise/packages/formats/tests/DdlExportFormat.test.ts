@@ -5,6 +5,7 @@
  * function as an ExportFormat, with validation, annotation support, and
  * proper ExportResult structure.
  */
+import { OrmModel } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { DdlExportFormat } from "../src/ddl/DdlExportFormat.js";
 import { ModelBuilder } from "./helpers/ModelBuilder.js";
@@ -241,5 +242,55 @@ describe("DdlExportFormat", () => {
       // DDL is a single-file format, so files should be undefined.
       expect(result.files).toBeUndefined();
     });
+  });
+});
+
+// barwise-kgh: an n-ary fact type's value role is a column of its table,
+// the table is keyed on one uniqueness constraint, and any other one is a
+// UNIQUE clause. The rank used to be missing from the export entirely.
+describe("n-ary fact types with a value role", () => {
+  function clinic(): OrmModel {
+    const model = new OrmModel({ name: "Clinic" });
+    const enc = model.addObjectType({ name: "Encounter", kind: "entity", referenceMode: "csn" });
+    const dx = model.addObjectType({ name: "Diagnosis", kind: "entity", referenceMode: "code" });
+    const rank = model.addObjectType({
+      name: "DiagnosisRank",
+      kind: "value",
+      dataType: { name: "integer" },
+      valueConstraint: { values: ["1", "2", "3"] },
+    });
+    model.addFactType({
+      name: "Encounter has Diagnosis at DiagnosisRank",
+      roles: [
+        { id: "r-enc", name: "has", playerId: enc.id },
+        { id: "r-dx", name: "is coded on", playerId: dx.id },
+        { id: "r-rank", name: "at", playerId: rank.id },
+      ],
+      readings: ["{0} has {1} at {2}"],
+      constraints: [
+        { type: "internal_uniqueness", roleIds: ["r-enc", "r-dx"] },
+        { type: "internal_uniqueness", roleIds: ["r-enc", "r-rank"] },
+      ],
+    });
+    return model;
+  }
+  const table = (text: string) => {
+    const from = text.slice(text.indexOf("CREATE TABLE encounter_has_diagnosis_at_diagnosis_rank"));
+    return from.slice(0, from.indexOf(");"));
+  };
+
+  it("exports the value column and routes the second uniqueness as UNIQUE", () => {
+    const body = table(new DdlExportFormat().export(clinic(), { annotate: false }).text);
+    expect(body).toMatch(/diagnosis_rank INTEGER NOT NULL/);
+    expect(body).toMatch(/PRIMARY KEY \(csn, code\)/);
+    expect(body).toMatch(/UNIQUE \(csn, diagnosis_rank\)/);
+    expect(body).toMatch(/CHECK \(diagnosis_rank IN /);
+  });
+
+  it("annotates the value column with its own value type's constraint", () => {
+    const body = table(new DdlExportFormat().export(clinic()).text);
+    const lines = body.split("\n");
+    const at = lines.findIndex((l) => /^\s*diagnosis_rank /.test(l));
+    expect(lines[at - 1]).toMatch(/Value constraint available: \[.?1/);
   });
 });

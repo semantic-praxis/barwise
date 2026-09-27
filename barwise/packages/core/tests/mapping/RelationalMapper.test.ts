@@ -292,6 +292,64 @@ describe("RelationalMapper", () => {
         "a ternary must not be absorbed into one of its players",
       ).toHaveLength(0);
     });
+
+    // barwise-kgh: value roles were skipped, and the key was every entity
+    // role whatever the constraints said. "Encounter has Diagnosis at
+    // DiagnosisRank" exported no rank column in any relational format.
+    function rankedDiagnosis(constraints: { roleIds: string[]; isPreferred?: boolean; }[]) {
+      const model = new OrmModel({ name: "Test" });
+      const enc = model.addObjectType({ name: "Encounter", kind: "entity", referenceMode: "csn" });
+      const dx = model.addObjectType({ name: "Diagnosis", kind: "entity", referenceMode: "code" });
+      const rank = model.addObjectType({
+        name: "DiagnosisRank",
+        kind: "value",
+        dataType: { name: "integer" },
+      });
+      model.addFactType({
+        name: "Encounter has Diagnosis at DiagnosisRank",
+        roles: [
+          { id: "r-enc", name: "has", playerId: enc.id },
+          { id: "r-dx", name: "is coded on", playerId: dx.id },
+          { id: "r-rank", name: "at", playerId: rank.id },
+        ],
+        readings: ["{0} has {1} at {2}"],
+        constraints: constraints.map((c) => ({ type: "internal_uniqueness" as const, ...c })),
+      });
+      return mapper.map(model).tables.find((t) =>
+        t.name === "encounter_has_diagnosis_at_diagnosis_rank"
+      )!;
+    }
+
+    it("gives an n-ary fact type's value role a typed column", () => {
+      const table = rankedDiagnosis([{ roleIds: ["r-enc", "r-dx"] }]);
+      const rank = table.columns.find((c) => c.name === "diagnosis_rank");
+      expect(rank, table.columns.map((c) => c.name).join(", ")).toMatchObject({
+        dataType: "INTEGER",
+        nullable: false,
+        sourceRoleId: "r-rank",
+      });
+      expect(table.foreignKeys).toHaveLength(2);
+    });
+
+    it("keys the table on the fact type's uniqueness constraint, not on every entity role", () => {
+      const table = rankedDiagnosis([{ roleIds: ["r-enc", "r-rank"] }, {
+        roleIds: ["r-enc", "r-dx"],
+      }]);
+      expect(table.primaryKey.columnNames).toEqual(["csn", "diagnosis_rank"]);
+    });
+
+    it("prefers the constraint marked preferred", () => {
+      const table = rankedDiagnosis([
+        { roleIds: ["r-enc", "r-dx"] },
+        { roleIds: ["r-enc", "r-rank"], isPreferred: true },
+      ]);
+      expect(table.primaryKey.columnNames).toEqual(["csn", "diagnosis_rank"]);
+    });
+
+    it("keys on every column when the fact type declares no uniqueness", () => {
+      const table = rankedDiagnosis([]);
+      expect(table.primaryKey.columnNames).toEqual(["csn", "code", "diagnosis_rank"]);
+    });
   });
 
   describe("value type columns", () => {

@@ -102,16 +102,28 @@
     },
     {
       "name": "medical_record_number",
-      "type": "string",
-      "doc": "Primary key"
+      "type": "string"
     },
     {
       "name": "provider_id",
-      "type": "string",
-      "doc": "Primary key"
+      "type": "string"
+    },
+    {
+      "name": "appointment_date",
+      "type": {
+        "type": "int",
+        "logicalType": "date"
+      }
+    },
+    {
+      "name": "time_slot",
+      "type": {
+        "type": "int",
+        "logicalType": "time-millis"
+      },
+      "doc": "[NOTE(barwise): Value constraint available: ['8:00', '8:30', '9:00', '9:30', '10:00', '10:30', '11:00', '11:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30']. Consider adding an accepted_values test.]"
     }
-  ],
-  "doc": "[NOTE(barwise): Composite primary key (confirmation_number, medical_record_number, provider_id). Individual unique tests are not generated.]"
+  ]
 }
 
 ---
@@ -128,9 +140,16 @@
     },
     {
       "name": "room_number",
-      "type": "string",
+      "type": "string"
+    },
+    {
+      "name": "appointment_date",
+      "type": {
+        "type": "int",
+        "logicalType": "date"
+      },
       "doc": "Primary key"
     }
   ],
-  "doc": "[NOTE(barwise): Composite primary key (provider_id, room_number). Individual unique tests are not generated.]"
+  "doc": "[NOTE(barwise): Composite primary key (provider_id, appointment_date). Individual unique tests are not generated.]"
 }

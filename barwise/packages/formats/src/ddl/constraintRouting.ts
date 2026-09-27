@@ -21,6 +21,7 @@ import { generateCounterexampleForConstraint } from "@barwise/core/counterexampl
 import type { RelationalSchema } from "@barwise/core/mapping";
 import { ConstraintVerbalizer } from "@barwise/core/verbalization";
 import type { DialectCapabilityProfile } from "./dialectCapabilities.js";
+import { renderValuePredicate } from "./valuePredicate.js";
 
 /** A constraint clause to inject into a rendered CREATE TABLE. */
 export interface RoutedClause {
@@ -111,6 +112,16 @@ export function routeConstraints(
           if (col && !isPrimaryKey(col, schema)) {
             route("unique", `UNIQUE (${col.column})`, col.table, c, ft);
           }
+          // An n-ary fact type's table is keyed on one of its uniqueness
+          // constraints; any other one is a UNIQUE on the same table
+          // (barwise-kgh). "Encounter has Diagnosis at DiagnosisRank" is
+          // keyed on (encounter, diagnosis) and unique on (encounter, rank).
+          if (ft.arity > 2) {
+            const spanned = associativeColumns(c.roleIds, schema);
+            if (spanned && !isWholePrimaryKey(spanned, schema)) {
+              route("unique", `UNIQUE (${spanned.columns.join(", ")})`, spanned.table, c, ft);
+            }
+          }
           break;
         }
 
@@ -161,11 +172,13 @@ export function routeConstraints(
   // Object-type-level value constraints (declared on the value type
   // rather than a role) apply to every column the value type produces:
   // synthesize a role-level constraint per fact type and route it the
-  // same way.
+  // same way. An n-ary fact type's value role has its own column since
+  // barwise-kgh, so it takes the CHECK too; before that there was no
+  // column to put one on.
   for (const ot of model.objectTypes) {
     if (ot.kind !== "value" || !ot.valueConstraint) continue;
     for (const ft of model.factTypes) {
-      if (ft.arity !== 2) continue;
+      if (ft.arity < 2) continue;
       const valueRole = ft.roles.find((r) => r.playerId === ot.id);
       if (!valueRole) continue;
       routeValueConstraint(
@@ -191,7 +204,7 @@ export function routeConstraints(
   ): void {
     const roleId = c.roleId ?? valueRoleOf(ft, model);
     const col = roleId ? columnForRole(roleId, model, schema) : undefined;
-    const predicate = col ? valuePredicate(col.column, c.values, c.ranges) : "";
+    const predicate = col ? renderValuePredicate(col.column, c.values, c.ranges) : "";
     if (col && predicate) {
       route("check", `CHECK (${predicate})`, col.table, c, ft);
     } else {
@@ -431,6 +444,35 @@ function isPrimaryKey(col: ResolvedColumn, schema: RelationalSchema): boolean {
 }
 
 /**
+ * The columns of one associative table that a set of roles maps to, in
+ * table order, or undefined when the roles do not all land in one table.
+ * An entity role can map to several columns (a composite foreign key), so
+ * every column carrying the role counts, not only the first.
+ */
+function associativeColumns(
+  roleIds: readonly string[],
+  schema: RelationalSchema,
+): { table: string; columns: string[]; } | undefined {
+  for (const table of schema.tables) {
+    const columns = table.columns.filter((c) => c.sourceRoleId && roleIds.includes(c.sourceRoleId));
+    const covered = new Set(columns.map((c) => c.sourceRoleId));
+    if (roleIds.every((r) => covered.has(r))) {
+      return { table: table.name, columns: columns.map((c) => c.name) };
+    }
+  }
+  return undefined;
+}
+
+/** Whether these columns are exactly the table's primary key. */
+function isWholePrimaryKey(
+  spanned: { table: string; columns: readonly string[]; },
+  schema: RelationalSchema,
+): boolean {
+  const key = schema.tables.find((t) => t.name === spanned.table)?.primaryKey.columnNames ?? [];
+  return key.length === spanned.columns.length && key.every((k) => spanned.columns.includes(k));
+}
+
+/**
  * For a single-role uniqueness constraint: the value column it makes
  * unique, when the role is the value side of an entity-value binary
  * (any other uniqueness is realized by the mapping itself).
@@ -478,52 +520,4 @@ function tableForFactType(
     }
   }
   return undefined;
-}
-
-// ---------------------------------------------------------------------------
-// CHECK predicate rendering
-// ---------------------------------------------------------------------------
-
-function valuePredicate(
-  column: string,
-  values: readonly string[],
-  ranges:
-    | readonly { min?: string; max?: string; minInclusive?: boolean; maxInclusive?: boolean; }[]
-    | undefined,
-): string {
-  const parts: string[] = [];
-
-  if (values.length > 0) {
-    parts.push(`${column} IN (${values.map(sqlLiteral).join(", ")})`);
-  }
-
-  for (const r of ranges ?? []) {
-    const conds: string[] = [];
-    if (r.min !== undefined) {
-      conds.push(`${column} >${r.minInclusive === false ? "" : "="} ${sqlLiteral(r.min)}`);
-    }
-    if (r.max !== undefined) {
-      conds.push(`${column} <${r.maxInclusive === false ? "" : "="} ${sqlLiteral(r.max)}`);
-    }
-    if (conds.length === 2) {
-      parts.push(`(${conds.join(" AND ")})`);
-    } else if (conds.length === 1) {
-      parts.push(conds[0]!);
-    }
-  }
-
-  if (parts.length === 0) return "";
-  return parts.length === 1 ? parts[0]! : parts.join(" OR ");
-}
-
-/**
- * Render a constraint value as a SQL literal: numeric and boolean
- * values bare, everything else single-quoted with embedded quotes
- * doubled (same convention as core's DEFAULT rendering).
- */
-function sqlLiteral(value: string): string {
-  if (/^-?\d+(\.\d+)?$/.test(value) || value === "TRUE" || value === "FALSE") {
-    return value;
-  }
-  return `'${value.replace(/'/g, "''")}'`;
 }

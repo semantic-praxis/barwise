@@ -32,9 +32,11 @@ import {
   type ImportResult,
   type ObjectType,
   OrmModel,
+  type ValueConstraintDef,
 } from "@barwise/core";
 import { parseSqlDataType } from "@barwise/core/sql";
 import {
+  blankComments,
   findCreateTables,
   IDENT,
   identifierList,
@@ -43,6 +45,7 @@ import {
   QUALIFIED,
   unquote,
 } from "./sqlIdentifiers.js";
+import { parseValuePredicate } from "./valuePredicate.js";
 
 /**
  * A parsed CREATE TABLE statement.
@@ -69,6 +72,8 @@ interface ParsedColumn {
   readonly unique: boolean;
   /** An inline REFERENCES t (c). */
   readonly references?: { readonly table: string; readonly column: string; };
+  /** An inline CHECK the value-predicate grammar reads. */
+  readonly valueConstraint?: ValueConstraintDef;
 }
 
 /**
@@ -250,9 +255,10 @@ export class DdlImportFormat implements ImportFormat {
     const foreignKeys: ParsedForeignKey[] = [];
     let primaryKey: string[] = [];
     const uniqueConstraints: string[][] = [];
+    const tableChecks: { column: string; constraint: ValueConstraintDef; text: string; }[] = [];
 
     // Split by comma, but not commas inside parentheses
-    const parts = this.splitTableParts(body);
+    const parts = this.splitTableParts(blankComments(body));
 
     for (const part of parts) {
       // A named table constraint reads the same once its name is gone.
@@ -279,7 +285,17 @@ export class DdlImportFormat implements ImportFormat {
         continue;
       }
 
-      // A CHECK or a MySQL index definition, not a column named "key".
+      // A CHECK the export's value-predicate grammar wrote is that column's
+      // value constraint; any other CHECK, or a MySQL index definition, is
+      // named rather than read (ddl-round-trip-fixed-point.spec.md, R2).
+      const check = readCheck(trimmed);
+      const read = check && check.text.length === trimmed.length
+        ? parseValuePredicate(check.predicate)
+        : undefined;
+      if (read) {
+        tableChecks.push({ ...read, text: trimmed });
+        continue;
+      }
       if (INDEX_OR_CHECK.test(trimmed)) {
         warnings.push(`Table "${tableName}": "${trimmed}" is not imported.`);
         continue;
@@ -300,9 +316,23 @@ export class DdlImportFormat implements ImportFormat {
       }
     }
 
+    // A table-level CHECK applies to the column it names, which can be
+    // declared before or after it.
+    const checked = columns.map((c) => {
+      const hit = tableChecks.find((t) => t.column === c.name.toLowerCase());
+      return hit ? { ...c, valueConstraint: hit.constraint } : c;
+    });
+    for (const t of tableChecks) {
+      if (!columns.some((c) => c.name.toLowerCase() === t.column)) {
+        warnings.push(
+          `Table "${tableName}": "${t.text}" names no column of the table; not imported.`,
+        );
+      }
+    }
+
     return {
       name: tableName,
-      columns,
+      columns: checked,
       primaryKey,
       uniqueConstraints,
       foreignKeys,
@@ -380,9 +410,20 @@ export class DdlImportFormat implements ImportFormat {
     let primaryKey = false;
     let unique = false;
     let references: ParsedColumn["references"];
+    let valueConstraint: ValueConstraintDef | undefined;
     while (rest) {
       if (/^DEFAULT\b/i.test(rest)) {
         rest = skipDefaultExpression(rest.slice("DEFAULT".length));
+        continue;
+      }
+      const check = readCheck(rest);
+      if (check) {
+        const read = parseValuePredicate(check.predicate);
+        if (read && read.column === name.toLowerCase()) valueConstraint = read.constraint;
+        else {
+          warnings.push(`Table "${tableName}", column "${name}": "${check.text}" is not imported.`);
+        }
+        rest = rest.slice(check.text.length).trim();
         continue;
       }
       const clause = COLUMN_CLAUSES.map((re) => re.exec(rest)).find((m) => m);
@@ -404,7 +445,15 @@ export class DdlImportFormat implements ImportFormat {
       rest = rest.slice(clause[0].length).trim();
     }
 
-    return { name, dataType, nullable, primaryKey, unique, ...(references ? { references } : {}) };
+    return {
+      name,
+      dataType,
+      nullable,
+      primaryKey,
+      unique,
+      ...(references ? { references } : {}),
+      ...(valueConstraint ? { valueConstraint } : {}),
+    };
   }
 
   /**
@@ -523,7 +572,22 @@ export class DdlImportFormat implements ImportFormat {
     const dataType = columnDataType(column);
     const candidate = toPascalCase(column.name);
     const claim = claimValueTypeName(model, entity.id, entity.name, candidate, dataType, role);
-    if (claim.kind === "share") return claim.valueType;
+    if (claim.kind === "share") {
+      if (
+        column.valueConstraint
+        && JSON.stringify(
+            claim.valueType.kind === "value" ? claim.valueType.valueConstraint : undefined,
+          )
+          !== JSON.stringify(column.valueConstraint)
+      ) {
+        warnings.push(
+          `Table "${table.name}", column "${column.name}": its CHECK differs from value type `
+            + `"${claim.valueType.name}", which another column already gave a value constraint; `
+            + `the first one is kept.`,
+        );
+      }
+      return claim.valueType;
+    }
     if (claim.displaced) {
       warnings.push(
         `Table "${table.name}", column "${column.name}" (${column.dataType}): the name "${candidate}" is `
@@ -531,7 +595,12 @@ export class DdlImportFormat implements ImportFormat {
           + `created value type "${claim.name}" instead.`,
       );
     }
-    return model.addObjectType({ name: claim.name, kind: "value", dataType });
+    return model.addObjectType({
+      name: claim.name,
+      kind: "value",
+      dataType,
+      ...(column.valueConstraint ? { valueConstraint: column.valueConstraint } : {}),
+    });
   }
 
   /**
@@ -785,4 +854,26 @@ function toCamelCase(str: string): string {
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
       .join("")
   );
+}
+
+/**
+ * A `CHECK (...)` at the start of `text`: the whole clause and the
+ * predicate inside it, found by balanced parentheses so an IN list's own
+ * parentheses do not end it. Undefined when `text` does not start with one.
+ */
+function readCheck(text: string): { text: string; predicate: string; } | undefined {
+  const head = /^CHECK\s*\(/i.exec(text);
+  if (!head) return undefined;
+  let depth = 0;
+  let inString = false;
+  for (let i = head[0].length - 1; i < text.length; i++) {
+    const c = text[i]!;
+    if (c === "'") inString = !inString;
+    if (inString) continue;
+    if (c === "(") depth++;
+    else if (c === ")" && --depth === 0) {
+      return { text: text.slice(0, i + 1), predicate: text.slice(head[0].length, i) };
+    }
+  }
+  return undefined;
 }

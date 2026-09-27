@@ -215,8 +215,12 @@ function referencedKeyValueType(
 
 /**
  * Given a role ID from a relational column's sourceRoleId, find the
- * value type in the same fact type. The sourceRoleId points to the
- * entity's role; the value type plays the *other* role.
+ * value type in the same fact type. On an entity table the sourceRoleId
+ * points to the entity's role and the value type plays the *other* role.
+ * An n-ary fact type's value column carries the value's own role, since
+ * barwise-kgh gave those roles columns; searching the other roles there
+ * found a DIFFERENT value type, and annotated `appointment_date` with the
+ * time slots' value constraint.
  */
 function findValueTypeForRole(
   roleId: string,
@@ -226,6 +230,9 @@ function findValueTypeForRole(
   for (const ft of model.factTypes) {
     const matchIdx = ft.roles.findIndex((r) => r.id === roleId);
     if (matchIdx === -1) continue;
+
+    const own = valueById.get(ft.roles[matchIdx]!.playerId);
+    if (own) return own;
 
     // The matched role is the entity's role. Look for a value type
     // among the other roles in this fact type.
