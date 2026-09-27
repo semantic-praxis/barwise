@@ -44,15 +44,20 @@ export function parseManifest(yamlContent: string): LineageManifest {
  * If the entry's artifact matches an existing export, that export is
  * replaced; otherwise the entry is appended. When no existing manifest
  * is given, a new one is created.
+ *
+ * `sourceModel` names the model file relative to the manifest's
+ * directory, which is how `resolveArtifact` finds it. It was never
+ * passed, so every manifest recorded "" (barwise-ofb).
  */
 export function updateManifest(
   entry: ManifestExport,
   existingManifest?: LineageManifest,
+  sourceModel?: string,
 ): LineageManifest {
   if (!existingManifest) {
     return {
       version: 1,
-      sourceModel: "",
+      sourceModel: sourceModel ?? "",
       sourceModelHash: entry.modelHash,
       exports: [entry],
     };
@@ -72,6 +77,7 @@ export function updateManifest(
 
   return {
     ...existingManifest,
+    ...(sourceModel !== undefined ? { sourceModel } : {}),
     sourceModelHash: entry.modelHash,
     exports: newExports,
   };

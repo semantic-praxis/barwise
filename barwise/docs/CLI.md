@@ -387,7 +387,14 @@ Options:
 - `--output <file>` -- write .orm.yaml to file instead of stdout
 - `--name <name>` -- model name (defaults to filename/dirname)
 - `--dialect <dialect>` -- SQL dialect: `ansi`, `snowflake`,
-  `bigquery`, `postgres`, `mysql`, `redshift`, or `databricks`
+  `bigquery`, `postgres`, `mysql`, `redshift`, or `databricks`. Any
+  other value is refused with exit 1.
+
+When the input declares tables, each `CREATE TABLE` becomes an entity,
+through the same reader as `import ddl`. A table the queries mention
+but no statement declares is named in a warning, not invented. Input
+with no `CREATE TABLE` at all (query files only) falls back to mining
+tables and joins from the queries.
 
 ### import typescript / java / kotlin
 
@@ -519,6 +526,12 @@ barwise lineage show model.orm.yaml --format json
 lists stale and fresh artifacts. `lineage impact` reports which
 exported artifacts depend on a model element -- the impact analysis in
 the capability matrix. `lineage show` prints the manifest itself.
+
+Each export records the model elements its artifact was built from:
+the DDL, dbt, OpenAPI and Avro formats trace through the relational
+mapping, and NORMA lists the model's own elements. An export in a
+format that records nothing still writes its manifest entry, but warns
+that `lineage impact` cannot see that artifact.
 
 Options:
 

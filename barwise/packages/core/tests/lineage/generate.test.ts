@@ -541,4 +541,36 @@ describe("Lineage Generation", () => {
       expect(constraintSources).toEqual([]);
     });
   });
+
+  // PR #577 review: a subtype fact id is what RelationalMapper stores on the
+  // subtype table's foreign key, and what the NORMA writer emits; neither
+  // generator named it, so impact on a changed subtype relationship found
+  // no artifact.
+  describe("subtype facts", () => {
+    const model = new ModelBuilder("Test Model")
+      .withEntityType("Person", { referenceMode: "person_id" })
+      .withEntityType("Customer", { referenceMode: "customer_id" })
+      .withSubtypeFact("Customer", "Person")
+      .build();
+    const sf = model.subtypeFacts[0]!;
+
+    it("DDL lineage names the subtype fact on the subtype table", () => {
+      const lineage = generateDdlLineage(model, new RelationalMapper().map(model));
+      const ids = lineage.flatMap((e) => e.sources.map((s) => s.elementId));
+      expect(ids).toContain(sf.id);
+      const ref = lineage.flatMap((e) => e.sources).find((s) => s.elementId === sf.id);
+      expect(ref).toMatchObject({
+        elementType: "SubtypeFact",
+        elementName: "Customer is a subtype of Person",
+      });
+    });
+
+    it("model lineage names the subtype fact on both entities", () => {
+      const lineage = generateModelLineage(model);
+      for (const artifact of ["Customer", "Person"]) {
+        const entry = lineage.find((e) => e.artifact === artifact)!;
+        expect(entry.sources.map((s) => s.elementId)).toContain(sf.id);
+      }
+    });
+  });
 });

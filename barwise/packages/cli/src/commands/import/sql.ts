@@ -48,36 +48,39 @@ export function addSqlSubcommand(importCmd: Command): void {
             `Importing ORM model from SQL: ${resolvedSource}\n`,
           );
 
-          // Detect if source is a file or directory
-          let result;
+          // Detect if source is a file or directory. Only the stat is
+          // guarded here: a parse error, such as an unsupported dialect, is
+          // reported as itself by the outer handler, not as "Cannot access".
+          let sourceStat;
           try {
-            const sourceStat = statSync(resolvedSource);
-            if (sourceStat.isDirectory()) {
-              if (!format.parseAsync) {
-                process.stderr.write(
-                  "Error: sql format does not support directory parsing.\n",
-                );
-                process.exitCode = 1;
-                return;
-              }
-              result = await format.parseAsync(resolvedSource, importOpts);
-            } else {
-              if (!format.parse) {
-                process.stderr.write(
-                  "Error: sql format does not support text parsing.\n",
-                );
-                process.exitCode = 1;
-                return;
-              }
-              const input = readFile(resolvedSource);
-              result = format.parse(input, importOpts);
-            }
+            sourceStat = statSync(resolvedSource);
           } catch (statErr) {
             process.stderr.write(
               `Error: Cannot access "${resolvedSource}": ${(statErr as Error).message}\n`,
             );
             process.exitCode = 1;
             return;
+          }
+          let result;
+          if (sourceStat.isDirectory()) {
+            if (!format.parseAsync) {
+              process.stderr.write(
+                "Error: sql format does not support directory parsing.\n",
+              );
+              process.exitCode = 1;
+              return;
+            }
+            result = await format.parseAsync(resolvedSource, importOpts);
+          } else {
+            if (!format.parse) {
+              process.stderr.write(
+                "Error: sql format does not support text parsing.\n",
+              );
+              process.exitCode = 1;
+              return;
+            }
+            const input = readFile(resolvedSource);
+            result = format.parse(input, importOpts);
           }
 
           // Serialize to YAML

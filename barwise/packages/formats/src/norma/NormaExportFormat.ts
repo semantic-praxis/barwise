@@ -18,6 +18,7 @@ import {
   type OrmModel,
   ValidationEngine,
 } from "@barwise/core";
+import { generateModelLineage } from "@barwise/core/lineage";
 import { serializeNormaDocument } from "./NormaXmlSerializer.js";
 import { writeOrmToNorma } from "./NormaXmlWriter.js";
 
@@ -50,6 +51,8 @@ export class NormaExportFormat implements ExportFormatAdapter {
     const document = writeOrmToNorma(model);
     const text = serializeNormaDocument(document);
 
-    return { text };
+    // NORMA renders the model itself, not a relational schema, so its
+    // lineage is traced from the model (barwise-ofb).
+    return { text, lineage: generateModelLineage(model) };
   }
 }

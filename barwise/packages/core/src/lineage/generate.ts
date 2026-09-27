@@ -5,6 +5,7 @@
 import type { RelationalSchema } from "../mapping/RelationalSchema.js";
 import type { Constraint } from "../model/Constraint.js";
 import type { OrmModel } from "../model/OrmModel.js";
+import type { SubtypeFact } from "../model/SubtypeFact.js";
 import type { LineageEntry, SourceReference } from "./types.js";
 
 /**
@@ -148,6 +149,27 @@ export function generateDdlLineage(
             }
           }
         }
+
+        // RelationalMapper also stores a subtype fact id here (the subtype
+        // table's key or foreign key to its supertype), and a fact type id
+        // for an objectification's key. Resolving only constraint ids left
+        // a changed subtype relationship with no affected artifact.
+        const sf = model.getSubtypeFact(fk.sourceConstraintId);
+        if (sf && !sources.has(sf.id)) {
+          sources.set(sf.id, {
+            elementId: sf.id,
+            elementType: "SubtypeFact",
+            elementName: subtypeFactName(model, sf),
+          });
+        }
+        const ft = model.getFactType(fk.sourceConstraintId);
+        if (ft && !sources.has(ft.id)) {
+          sources.set(ft.id, {
+            elementId: ft.id,
+            elementType: "FactType",
+            elementName: ft.name,
+          });
+        }
       }
     }
 
@@ -249,6 +271,17 @@ export function generateModelLineage(
       });
     }
 
+    // The subtype facts themselves: the NORMA writer emits each one, so
+    // impact on a subtype fact id must find this artifact too.
+    for (const sf of model.subtypeFacts) {
+      if (sf.subtypeId !== entity.id && sf.supertypeId !== entity.id) continue;
+      sources.push({
+        elementId: sf.id,
+        elementType: "SubtypeFact",
+        elementName: subtypeFactName(model, sf),
+      });
+    }
+
     entries.push({
       artifact: entity.name,
       sources,
@@ -315,4 +348,11 @@ function getConstraintName(
       return `Constraint: ${factType.name}`;
     }
   }
+}
+
+/** "Customer is a subtype of Person", by the names of its two entities. */
+function subtypeFactName(model: OrmModel, sf: SubtypeFact): string {
+  const sub = model.getObjectType(sf.subtypeId)?.name ?? sf.subtypeId;
+  const sup = model.getObjectType(sf.supertypeId)?.name ?? sf.supertypeId;
+  return `${sub} is a subtype of ${sup}`;
 }

@@ -14,6 +14,7 @@ import {
   type OrmModel,
   ValidationEngine,
 } from "@barwise/core";
+import { generateDdlLineage } from "@barwise/core/lineage";
 import {
   annotateDbtExport,
   RelationalMapper,
@@ -125,6 +126,9 @@ export class DbtExportFormat implements ExportFormatAdapter {
 
     return {
       text,
+      // What each artifact was built from, for `lineage impact`. No format
+      // set it, so every manifest recorded `sources: []` (barwise-ofb).
+      lineage: generateDdlLineage(model, schema),
       files,
       annotations,
     };

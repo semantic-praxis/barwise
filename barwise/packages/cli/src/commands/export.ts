@@ -14,7 +14,7 @@ import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
 import type { Command } from "commander";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { resolveDomainModels } from "../workspace/domainModels.js";
 import { isProjectFile, loadModel } from "../workspace/io.js";
 import { readManifest, writeManifest } from "../workspace/lineageIo.js";
@@ -72,6 +72,15 @@ export function registerExportCommand(program: Command): void {
         if (opts.output) {
           writeExportResult(result, opts.output);
 
+          // An empty sources list reads as "depends on nothing", so a format
+          // that records no lineage is named instead (barwise-ofb, R3).
+          if (!result.lineage) {
+            process.stderr.write(
+              `Warning: the ${opts.format} format records no lineage; `
+                + `lineage impact cannot see ${opts.output}.\n`,
+            );
+          }
+
           // Persist lineage manifest adjacent to the source model.
           const modelDir = dirname(resolve(source));
           const entry: ManifestExport = {
@@ -81,7 +90,10 @@ export function registerExportCommand(program: Command): void {
             modelHash: hashModel(model),
             sources: result.lineage?.flatMap((l) => l.sources) ?? [],
           };
-          writeManifest(modelDir, updateManifest(entry, readManifest(modelDir)));
+          writeManifest(
+            modelDir,
+            updateManifest(entry, readManifest(modelDir), basename(resolve(source))),
+          );
         } else {
           process.stdout.write(result.text);
           if (!result.text.endsWith("\n")) process.stdout.write("\n");

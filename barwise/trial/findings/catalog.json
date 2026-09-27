@@ -3,10 +3,10 @@
   "classes": [
     {
       "id": "sql-read-back-own-export",
-      "issue": "barwise-jjd",
+      "issue": "barwise-dnm",
       "severity": "S1",
       "step": "^read-back-diff-ddl:",
-      "note": "barwise's own per-dialect DDL export read back through import sql loses every value type, attribute fact type, subtype and objectification, keeping only the entities foreign keys point at, with no definitions (barwise-jjd: import sql mines query SQL and reads FOREIGN KEY targets, not CREATE TABLE). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509."
+      "note": "barwise's own per-dialect DDL export read back through import sql is not a fixed point. Since barwise-jjd, import sql reads CREATE TABLE through the DDL importer, and on every customer the read-back loses exactly as many elements as the sprint-1 model-roundtrip:ddl row does -- the same loss, reached through a second command (barwise-dnm). Graded since Copilot pointed out that the sprint-4 read-back validated structure only, on PR #509."
     },
     {
       "id": "lineage-impact-by-name",
@@ -17,36 +17,12 @@
       "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer."
     },
     {
-      "id": "lineage-impact-no-sources",
-      "issue": "barwise-ofb",
-      "severity": "S1",
-      "step": "^late:impact-id$",
-      "detail": "no affected artifacts",
-      "note": "barwise export writes the lineage manifest with sources: [] because no exporter sets result.lineage (generateDdlLineage has no call site), so lineage impact reports no affected artifacts for any element, even by the id the option takes (barwise-ofb). The trial graded only the exit code until Copilot flagged it on PR #509."
-    },
-    {
-      "id": "sql-importer-fk-targets",
-      "issue": "barwise-jjd",
-      "severity": "S1",
-      "step": "^import:",
-      "importer": "sql",
-      "note": "import sql reads FOREIGN KEY targets, not CREATE TABLE statements, and accepts unsupported dialects silently (barwise-jjd). The absent names are tables no foreign key points at; on an unsupported dialect the tables that come back are named as the FK clause spells them."
-    },
-    {
-      "id": "sql-importer-fk-targets-roundtrip",
-      "issue": "barwise-jjd",
+      "id": "sql-import-roundtrip",
+      "issue": "barwise-dnm",
       "severity": "S1",
       "step": "^roundtrip-(diff|reimport|export):",
       "importer": "sql",
-      "note": "Consequence of barwise-jjd: the model import sql produced carries FK-target names ('Cbs.party'), whose DDL export the importer cannot read back. Closes with the parent."
-    },
-    {
-      "id": "ddl-regex-importer",
-      "issue": "barwise-zuk",
-      "severity": "S3",
-      "step": "^import:",
-      "importer": "ddl",
-      "note": "import model --format ddl is a single regex; schema-qualified, bracket-quoted, backtick-quoted and unterminated statements do not match and the only warning claims the file has no CREATE TABLE at all (barwise-zuk)."
+      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent."
     },
     {
       "id": "ddl-regex-roundtrip",
@@ -54,7 +30,7 @@
       "severity": "S1",
       "step": "^roundtrip-(diff|reimport|export):",
       "importer": "ddl",
-      "note": "Consequence of barwise-dnm and barwise-zuk: the DDL export of the imported model is not readable back by the regex importer. Closes with the parents."
+      "note": "Consequence of barwise-dnm: the DDL export of the imported model does not read back to the same model -- value types and fact types are lost beyond the declared loss set. Closes with the parent."
     },
     {
       "id": "roundtrip-norma-mandatory-violation",
@@ -148,10 +124,10 @@
     },
     {
       "id": "acceptance-edit-distance-sql",
-      "issue": "barwise-jjd",
+      "issue": "barwise-1077",
       "severity": "S5",
       "step": "^acceptance:.*:(?!kernel).*-ddl$",
-      "note": "Edit distance to acceptance on a DDL artifact: the persona's checks fail because the model barwise produced is missing what the SQL importer dropped (barwise-jjd). A consequence row; closes with that importer issue.",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
       "importer": "sql"
     },
     {

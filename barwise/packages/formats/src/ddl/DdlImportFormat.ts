@@ -34,6 +34,15 @@ import {
   OrmModel,
 } from "@barwise/core";
 import { parseSqlDataType } from "@barwise/core/sql";
+import {
+  findCreateTables,
+  IDENT,
+  identifierList,
+  lastPart,
+  otherStatements,
+  QUALIFIED,
+  unquote,
+} from "./sqlIdentifiers.js";
 
 /**
  * A parsed CREATE TABLE statement.
@@ -98,9 +107,23 @@ export class DdlImportFormat implements ImportFormat {
     const model = new OrmModel({ name: modelName });
 
     // Step 1: Create entity types for all tables
-    const entityMap = new Map<string, string>(); // table name -> entity type id
+    // Keyed by the table's unqualified name in lower case: a foreign key
+    // may name its target `CBS.PARTY`, `party` or `[PARTY]`.
+    const entityMap = new Map<string, string>(); // table key -> entity type id
+    // Only the tables that became entities go on to steps 2 and 3. A table
+    // skipped for its name still shares its key with the one that took it,
+    // so looking it up by key merged its key and columns into that entity
+    // while the warning said it was not imported (PR #577 review).
+    const accepted: ParsedTable[] = [];
     for (const table of tables) {
       const entityName = toPascalCase(table.name);
+      if (entityMap.has(tableKey(table.name)) || model.getObjectTypeByName(entityName)) {
+        warnings.push(
+          `Table "${table.name}": another table already imports as "${entityName}" `
+            + `(two schemas can declare one name); not imported.`,
+        );
+        continue;
+      }
       const referenceMode = this.inferReferenceMode(table, warnings);
 
       const entityType = model.addObjectType({
@@ -108,20 +131,21 @@ export class DdlImportFormat implements ImportFormat {
         kind: "entity",
         referenceMode,
       });
-      entityMap.set(table.name, entityType.id);
+      entityMap.set(tableKey(table.name), entityType.id);
+      accepted.push(table);
     }
 
     // Step 2: Give each single-column key a typed identifier. Before the
     // ordinary columns, so a key gets its plain name ahead of a non-key
     // column that shares it, as the dbt importer does.
-    for (const table of tables) {
-      const entity = model.getObjectType(entityMap.get(table.name) ?? "");
+    for (const table of accepted) {
+      const entity = model.getObjectType(entityMap.get(tableKey(table.name)) ?? "");
       if (entity) this.createKeyIdentifier(model, entity, table, warnings);
     }
 
     // Step 3: Create value types and fact types for the other columns
-    for (const table of tables) {
-      const entityId = entityMap.get(table.name);
+    for (const table of accepted) {
+      const entityId = entityMap.get(tableKey(table.name));
       if (!entityId) continue;
 
       const entityType = model.getObjectType(entityId);
@@ -148,7 +172,7 @@ export class DdlImportFormat implements ImportFormat {
 
         if (fk) {
           // Foreign key: create a fact type between entities
-          const referencedEntityId = entityMap.get(fk.referencedTable);
+          const referencedEntityId = entityMap.get(tableKey(fk.referencedTable));
           if (referencedEntityId) {
             this.createForeignKeyFactType(
               model,
@@ -184,15 +208,9 @@ export class DdlImportFormat implements ImportFormat {
    */
   private parseCreateTables(input: string, warnings: string[]): ParsedTable[] {
     const tables: ParsedTable[] = [];
+    const { tables: statements, unread } = findCreateTables(input);
 
-    // Match CREATE TABLE statements (case-insensitive, multiline)
-    const createTablePattern = /CREATE\s+TABLE\s+(?:"?(\w+)"?)\s*\(([\s\S]*?)\);/gi;
-    let match: RegExpExecArray | null;
-
-    while ((match = createTablePattern.exec(input)) !== null) {
-      const tableName = match[1]!;
-      const tableBody = match[2]!;
-
+    for (const { name: tableName, body: tableBody } of statements) {
       try {
         const table = this.parseTableDefinition(tableName, tableBody, warnings);
         tables.push(table);
@@ -203,6 +221,18 @@ export class DdlImportFormat implements ImportFormat {
           }`,
         );
       }
+    }
+
+    // Nothing is dropped without a word (sql-import-reads-tables.spec.md, R3).
+    for (const name of unread) {
+      warnings.push(
+        `CREATE TABLE ${name} has no column list (a PARTITION OF, LIKE or AS SELECT table); not imported.`,
+      );
+    }
+    const others = otherStatements(input);
+    if (others.size > 0) {
+      const list = [...others].map(([kind, n]) => `${kind} (${n})`).join(", ");
+      warnings.push(`Statements not imported: ${list}.`);
     }
 
     return tables;
@@ -226,7 +256,7 @@ export class DdlImportFormat implements ImportFormat {
 
     for (const part of parts) {
       // A named table constraint reads the same once its name is gone.
-      const trimmed = part.trim().replace(/^CONSTRAINT\s+"?\w+"?\s+/i, "");
+      const trimmed = part.trim().replace(CONSTRAINT_NAME, "");
       if (!trimmed) continue;
 
       // Primary key constraint
@@ -250,7 +280,7 @@ export class DdlImportFormat implements ImportFormat {
       }
 
       // A CHECK or a MySQL index definition, not a column named "key".
-      if (/^(CHECK\s*\(|(INDEX|KEY)\s+"?\w+"?\s*\()/i.test(trimmed)) {
+      if (INDEX_OR_CHECK.test(trimmed)) {
         warnings.push(`Table "${tableName}": "${trimmed}" is not imported.`);
         continue;
       }
@@ -336,13 +366,13 @@ export class DdlImportFormat implements ImportFormat {
     def: string,
     warnings: string[],
   ): ParsedColumn | null {
-    const head = /^"?(\w+)"?\s+/.exec(def);
+    const head = COLUMN_NAME.exec(def);
     const typeMatch = head ? TYPE_PATTERN.exec(def.slice(head[0].length)) : null;
     if (!head || !typeMatch) {
       warnings.push(`Table "${tableName}": could not read column "${def}"; not imported.`);
       return null;
     }
-    const name = head[1]!;
+    const name = unquote(head[1]!);
     const dataType = typeMatch[0].trim();
     let rest = def.slice(head[0].length + typeMatch[0].length).trim();
 
@@ -369,7 +399,7 @@ export class DdlImportFormat implements ImportFormat {
         nullable = false;
       } else if (text.startsWith("UNIQUE")) unique = true;
       else if (text.startsWith("REFERENCES")) {
-        references = { table: clause[1]!, column: clause[2]! };
+        references = { table: lastPart(clause[1]!), column: unquote(clause[2]!) };
       }
       rest = rest.slice(clause[0].length).trim();
     }
@@ -384,10 +414,7 @@ export class DdlImportFormat implements ImportFormat {
     const match = /\((.*?)\)/i.exec(constraint);
     if (!match) return [];
 
-    return match[1]!
-      .split(",")
-      .map((col) => col.trim().replace(/"/g, ""))
-      .filter((col) => col.length > 0);
+    return identifierList(match[1]!);
   }
 
   /**
@@ -395,18 +422,12 @@ export class DdlImportFormat implements ImportFormat {
    */
   private parseForeignKey(constraint: string): ParsedForeignKey | null {
     // Match: FOREIGN KEY (col1, col2) REFERENCES table (ref1, ref2)
-    const match = /FOREIGN\s+KEY\s*\((.*?)\)\s*REFERENCES\s+(?:"?(\w+)"?)\s*\((.*?)\)/i.exec(
-      constraint,
-    );
+    const match = FOREIGN_KEY.exec(constraint);
     if (!match) return null;
 
-    const columns = match[1]!
-      .split(",")
-      .map((col) => col.trim().replace(/"/g, ""));
-    const referencedTable = match[2]!;
-    const referencedColumns = match[3]!
-      .split(",")
-      .map((col) => col.trim().replace(/"/g, ""));
+    const columns = identifierList(match[1]!);
+    const referencedTable = lastPart(match[2]!);
+    const referencedColumns = identifierList(match[3]!);
 
     return { columns, referencedTable, referencedColumns };
   }
@@ -678,6 +699,20 @@ const TYPE_PATTERN = new RegExp(
   "i",
 );
 
+/** A table's key in the entity map: its unqualified name, in lower case. */
+function tableKey(name: string): string {
+  return name.toLowerCase();
+}
+
+/** Names are read with `IDENT` and `QUALIFIED` (sqlIdentifiers.ts), not `"?(\w+)"?`. */
+const CONSTRAINT_NAME = new RegExp(`^CONSTRAINT\\s+${IDENT}\\s+`, "i");
+const INDEX_OR_CHECK = new RegExp(`^(CHECK\\s*\\(|(INDEX|KEY)\\s+${IDENT}\\s*\\()`, "i");
+const COLUMN_NAME = new RegExp(`^(${IDENT})\\s+`);
+const FOREIGN_KEY = new RegExp(
+  `FOREIGN\\s+KEY\\s*\\((.*?)\\)\\s*REFERENCES\\s+(${QUALIFIED})\\s*\\((.*?)\\)`,
+  "i",
+);
+
 /**
  * The column clauses the importer reads, each anchored at the start of
  * what is left. `DEFAULT` is handled by `skipDefaultExpression`, because
@@ -688,7 +723,7 @@ const COLUMN_CLAUSES: readonly RegExp[] = [
   /^NULL\b/i,
   /^PRIMARY\s+KEY\b/i,
   /^UNIQUE\b/i,
-  /^REFERENCES\s+"?(\w+)"?\s*\(\s*"?(\w+)"?\s*\)/i,
+  new RegExp(`^REFERENCES\\s+(${QUALIFIED})\\s*\\(\\s*(${IDENT})\\s*\\)`, "i"),
 ];
 
 /** A clause keyword that ends a DEFAULT expression at nesting depth 0. */

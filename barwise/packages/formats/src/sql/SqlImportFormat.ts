@@ -4,16 +4,174 @@
  * Parses raw SQL files (DDL, migrations, queries) into ORM models.
  * Supports both single-file (text) and directory (async) input.
  *
- * Uses the SQL cascade parser for pattern extraction and maps
- * extracted patterns to ORM constraints. Handles dialect detection
- * via explicit flags, file-level hints, or syntax probing.
+ * Tables come from the CREATE TABLE statements the input declares, read
+ * by the DDL importer; the cascade's mined patterns (joins, CHECK, CASE)
+ * are reported on top. Only input that declares no table at all -- a
+ * file of queries -- builds its entities from the tables the patterns
+ * mention. The importer used to do that for every input, so a schema's
+ * tables became the targets of its foreign keys and every other table
+ * was dropped without a word (sql-import-reads-tables.spec.md,
+ * barwise-jjd).
  */
 
 import { type ImportFormat, type ImportOptions, type ImportResult, OrmModel } from "@barwise/core";
-import { parseSqlFile, type SqlDialect, type SqlPatternContext } from "@barwise/core/sql";
+import {
+  parseSqlFile,
+  SQL_DIALECTS,
+  type SqlDialect,
+  type SqlPatternContext,
+} from "@barwise/core/sql";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { DdlImportFormat } from "../ddl/DdlImportFormat.js";
+import { findCreateTables } from "../ddl/sqlIdentifiers.js";
 import { normalizeCascadeResult, parseSqlWithSqlglot } from "./SqlglotBridge.js";
+
+/**
+ * The explicit dialect, refused when barwise does not support it, the way
+ * `export --dialect` refuses one. It used to be accepted silently, so
+ * Oracle, DB2 and SQL Server imports read as ANSI with no word said
+ * (sql-import-reads-tables.spec.md, R5).
+ */
+function explicitDialect(options?: ImportOptions): SqlDialect | undefined {
+  const dialect = options?.dialect;
+  if (dialect === undefined) return undefined;
+  if (!(SQL_DIALECTS as readonly unknown[]).includes(dialect)) {
+    throw new Error(
+      `SQL dialect "${String(dialect)}" is not supported. Supported dialects: ${
+        SQL_DIALECTS.join(", ")
+      }.`,
+    );
+  }
+  return dialect as SqlDialect;
+}
+
+/**
+ * Build the model from the SQL: the declared tables through the DDL
+ * importer when there are any, otherwise the tables the patterns mention.
+ */
+function buildModel(
+  sql: string,
+  patterns: readonly SqlPatternContext[],
+  modelName: string,
+  warnings: string[],
+): OrmModel {
+  // A CREATE TABLE the reader cannot parse (PARTITION OF, AS SELECT) still
+  // declares a table: the DDL importer names it, where pattern mining would
+  // drop it without a word (PR #577 review).
+  const declared = findCreateTables(sql);
+  if (declared.tables.length === 0 && declared.unread.length === 0) {
+    return buildModelFromPatterns(patterns, modelName, warnings);
+  }
+  const ddl = new DdlImportFormat().parse(sql, { modelName });
+  warnings.push(...ddl.warnings);
+  mergePatterns(ddl.model, patterns, warnings);
+  return ddl.model;
+}
+
+/**
+ * Merge the mined patterns into a model built from declared tables. A join
+ * between two declared tables that no foreign key already relates adds the
+ * same "references" fact type pattern mining would, and says so -- the
+ * declared path used to only report patterns, so a relationship a query
+ * showed was lost (PR #577 review). A table only a query mentions was
+ * never declared, so it is named rather than invented (R4).
+ */
+function mergePatterns(
+  model: OrmModel,
+  patterns: readonly SqlPatternContext[],
+  warnings: string[],
+): void {
+  const entityFor = (table: string) =>
+    model.getObjectTypeByName(toPascalCase(table.split(".").pop()!))?.id;
+  // A join pattern's first table is the joined table. The other side is
+  // not in `tables` on every tier -- sqlglot reports only the joined table,
+  // the regex tier adds the ON clause's qualifiers -- so it is read from
+  // the ON clause itself. A qualifier is often an alias (`c`, `o`) neither
+  // tier resolves; only one that names a declared table completes the pair,
+  // so an aliased join adds nothing rather than a guess.
+  const pairFor = (p: SqlPatternContext): [string, string] | undefined => {
+    const joined = p.tables?.[0] ? entityFor(p.tables[0]) : undefined;
+    const qualifiers = [...p.sourceText.matchAll(/([A-Za-z_][\w$]*)\s*\.\s*[A-Za-z_"`[]/g)]
+      .map((m) => m[1]!);
+    const other = qualifiers.map(entityFor).find((id) => id && id !== joined);
+    if (!joined || !other) return undefined;
+    // The table whose key is the join column is the one referenced.
+    const keyedByJoin = (id: string) => {
+      const ot = model.getObjectType(id);
+      const mode = ot?.kind === "entity" ? ot.referenceMode.toLowerCase() : undefined;
+      return (p.columns ?? []).some((c) => c.toLowerCase() === mode);
+    };
+    return keyedByJoin(joined) && !keyedByJoin(other) ? [other, joined] : [joined, other];
+  };
+  for (const name of addJoinFactTypes(model, patterns, pairFor, { skipRelated: true })) {
+    warnings.push(`A query joins tables no foreign key relates; added "${name}".`);
+  }
+  const undeclared = new Set<string>();
+  for (const p of patterns) {
+    const named = p.kind === "join" ? (p.tables ?? []).slice(0, 1) : (p.tables ?? []);
+    for (const t of named) if (!entityFor(t)) undeclared.add(t);
+    if (p.kind === "case" && p.details?.values && p.columns?.length) {
+      const values = p.details.values as string[];
+      warnings.push(
+        `CASE branch on "${p.columns[0]}" suggests value constraint: ${values.join(", ")}`,
+      );
+    }
+  }
+  if (undeclared.size > 0) {
+    warnings.push(
+      `Tables the SQL mentions but never declares, not imported: ${
+        [...undeclared].sort().join(", ")
+      }.`,
+    );
+  }
+}
+
+/**
+ * A binary "references" fact type for each JOIN whose pair of entities
+ * `pairFor` resolves, the first referencing the second. With
+ * `skipRelated`, a pair some fact type already relates is left alone: on
+ * the declared path that is the foreign key. Returns the names added.
+ */
+function addJoinFactTypes(
+  model: OrmModel,
+  patterns: readonly SqlPatternContext[],
+  pairFor: (p: SqlPatternContext) => [string, string] | undefined,
+  { skipRelated = false } = {},
+): string[] {
+  const added: string[] = [];
+  for (const p of patterns) {
+    if (p.kind !== "join") continue;
+    const pair = pairFor(p);
+    if (!pair) continue;
+    const [entity1Id, entity2Id] = pair;
+    const entity1 = model.getObjectType(entity1Id);
+    const entity2 = model.getObjectType(entity2Id);
+    if (!entity1 || !entity2) continue;
+    if (
+      skipRelated
+      && model.factTypes.some((ft) =>
+        ft.roles.some((r) => r.playerId === entity1Id)
+        && ft.roles.some((r) => r.playerId === entity2Id)
+      )
+    ) continue;
+    const factName = `${entity1.name} references ${entity2.name}`;
+    try {
+      model.addFactType({
+        name: factName,
+        roles: [
+          { name: "references", playerId: entity2Id },
+          { name: "is referenced by", playerId: entity1Id },
+        ],
+        readings: [`{0} references {1}`],
+      });
+      added.push(factName);
+    } catch {
+      // Skip duplicate fact types
+    }
+  }
+  return added;
+}
 
 /**
  * Detect dialect from file-level hints in SQL content.
@@ -134,34 +292,12 @@ function buildModelFromPatterns(
   }
 
   // Process JOIN patterns -> binary fact types between entities
-  for (const p of patterns) {
-    if (p.kind === "join" && p.tables && p.tables.length >= 2) {
-      const table1 = p.tables[0]!;
-      const table2 = p.tables[1]!;
-      const entity1Id = entityMap.get(table1.toLowerCase());
-      const entity2Id = entityMap.get(table2.toLowerCase());
-
-      if (entity1Id && entity2Id) {
-        const entity1 = model.getObjectType(entity1Id);
-        const entity2 = model.getObjectType(entity2Id);
-        if (entity1 && entity2) {
-          const factName = `${entity1.name} references ${entity2.name}`;
-          try {
-            model.addFactType({
-              name: factName,
-              roles: [
-                { name: "references", playerId: entity2Id },
-                { name: "is referenced by", playerId: entity1Id },
-              ],
-              readings: [`{0} references {1}`],
-            });
-          } catch {
-            // Skip duplicate fact types
-          }
-        }
-      }
-    }
-  }
+  addJoinFactTypes(model, patterns, (p) => {
+    if (!p.tables || p.tables.length < 2) return undefined;
+    const id1 = entityMap.get(p.tables![0]!.toLowerCase());
+    const id2 = entityMap.get(p.tables![1]!.toLowerCase());
+    return id1 && id2 ? [id1, id2] : undefined;
+  });
 
   // Process CHECK constraints with IN clauses -> value constraints
   for (const p of patterns) {
@@ -236,21 +372,20 @@ export class SqlImportFormat implements ImportFormat {
   parse(input: string, options?: ImportOptions): ImportResult {
     const warnings: string[] = [];
     const modelName = options?.modelName ?? "SQL Import";
-    const dialect = (options?.dialect as SqlDialect) ?? detectDialectFromHints(input) ?? "ansi";
+    const dialect = explicitDialect(options) ?? detectDialectFromHints(input) ?? "ansi";
 
     const fileResult = parseSqlWithSqlglot(input, "input.sql", dialect)
       ?? normalizeCascadeResult(parseSqlFile(input, "input.sql", dialect));
 
-    if (fileResult.patterns.length === 0) {
+    const model = buildModel(input, fileResult.patterns, modelName, warnings);
+    if (model.objectTypes.length === 0 && fileResult.patterns.length === 0) {
       warnings.push("No ORM-relevant patterns found in SQL input");
     }
-
-    const model = buildModelFromPatterns(fileResult.patterns, modelName, warnings);
 
     return {
       model,
       warnings,
-      confidence: fileResult.patterns.length > 0 ? "medium" : "low",
+      confidence: model.objectTypes.length > 0 ? "medium" : "low",
     };
   }
 
@@ -261,7 +396,7 @@ export class SqlImportFormat implements ImportFormat {
     const dir = resolve(input);
     const warnings: string[] = [];
     const modelName = options?.modelName ?? "SQL Import";
-    const explicitDialect = options?.dialect as SqlDialect | undefined;
+    const dialectOption = explicitDialect(options);
 
     const sqlFiles = findSqlFiles(dir);
     if (sqlFiles.length === 0) {
@@ -274,11 +409,13 @@ export class SqlImportFormat implements ImportFormat {
     }
 
     const allPatterns: SqlPatternContext[] = [];
-    let detectedDialect: SqlDialect | undefined = explicitDialect;
+    let detectedDialect: SqlDialect | undefined = dialectOption;
+    const sources: string[] = [];
 
     for (const filePath of sqlFiles) {
       try {
         const sql = readFileSync(filePath, "utf-8");
+        sources.push(sql);
 
         // Detect dialect from first file if not already known
         if (!detectedDialect) {
@@ -295,16 +432,17 @@ export class SqlImportFormat implements ImportFormat {
       }
     }
 
-    if (allPatterns.length === 0) {
+    // Every file's CREATE TABLEs are read together, so a foreign key in
+    // one file finds its target table in another.
+    const model = buildModel(sources.join("\n;\n"), allPatterns, modelName, warnings);
+    if (model.objectTypes.length === 0 && allPatterns.length === 0) {
       warnings.push(`Found ${sqlFiles.length} SQL file(s) but no ORM-relevant patterns`);
     }
-
-    const model = buildModelFromPatterns(allPatterns, modelName, warnings);
 
     return {
       model,
       warnings,
-      confidence: allPatterns.length > 0 ? "medium" : "low",
+      confidence: model.objectTypes.length > 0 ? "medium" : "low",
     };
   }
 }

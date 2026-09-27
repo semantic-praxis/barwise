@@ -15,6 +15,7 @@ import {
   ValidationEngine,
 } from "@barwise/core";
 import { collectExportAnnotations, type ExportAnnotation } from "@barwise/core/annotation";
+import { generateDdlLineage } from "@barwise/core/lineage";
 import {
   type AvroField,
   type AvroSchema,
@@ -100,6 +101,9 @@ export class AvroExportFormat implements ExportFormatAdapter {
 
     return {
       text,
+      // What each artifact was built from, for `lineage impact`. No format
+      // set it, so every manifest recorded `sources: []` (barwise-ofb).
+      lineage: generateDdlLineage(model, schema),
       files,
       annotations: annotations.length > 0 ? annotations : undefined,
     };
