@@ -359,15 +359,23 @@ export function gradeRoundTrip(diff, lossSet) {
   // (ddl-round-trip-fixed-point.spec.md, workstream 3).
   const changeEntries = entries.filter((a) => a.change !== undefined);
   const wholeEntries = entries.filter((a) => a.change === undefined);
-  if (
-    changeEntries.length > 0
-    && deltas.some((d) => d.kind === "modified" && !Array.isArray(d.changes))
-  ) {
-    // Reading a missing `changes` as "no changes" would put every modified
-    // delta inside the loss set vacuously.
+  // Reading a missing `changes` as "no changes" would put a modified delta
+  // inside the loss set vacuously. Only a delta a change entry would have to
+  // judge makes the diff ungradable: one a whole-delta entry covers, or one
+  // no change entry names, is graded as before (PR #582 review).
+  const unreadable = deltas.filter((d) =>
+    d.kind === "modified"
+    && !Array.isArray(d.changes)
+    && !wholeEntries.some((a) => matchesDelta(a, d))
+    && changeEntries.some((a) => matchesDelta(a, d))
+  );
+  if (unreadable.length > 0) {
     return {
       status: "could_not_answer",
-      detail: "the loss set names change kinds, but the diff's modified deltas carry no `changes`",
+      detail: `the loss set names change kinds, but ${unreadable.length} modified delta(s) it `
+        + `would judge carry no \`changes\` (first: ${unreadable[0].elementType} ${
+          unreadable[0].name
+        })`,
     };
   }
   const covers = (a, c) =>
@@ -376,7 +384,7 @@ export function gradeRoundTrip(diff, lossSet) {
       k === "elementType" || k === "kind" || k === "change" || isSubset(v, c[k])
     );
   const uncovered = (d) =>
-    d.kind === "modified" && d.changes.length > 0
+    d.kind === "modified" && Array.isArray(d.changes) && d.changes.length > 0
       ? d.changes.filter((c) => !changeEntries.some((a) => matchesDelta(a, d) && covers(a, c)))
       : [d];
   const outside = deltas

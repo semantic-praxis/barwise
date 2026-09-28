@@ -382,19 +382,34 @@ Compare two ORM models and return structural deltas.
       "elementType": "object_type",
       "name": "Manager",
       "breakingLevel": "safe",
+      "changes": [],
       "changeDescriptions": []
     },
     {
       "kind": "modified",
-      "elementType": "fact_type",
-      "name": "Employee works for Department",
-      "breakingLevel": "caution",
-      "changeDescriptions": ["Uniqueness constraint changed"]
+      "elementType": "object_type",
+      "name": "Employee",
+      "breakingLevel": "safe",
+      "changes": [
+        {
+          "change": "definition",
+          "from": "A person on the payroll.",
+          "to": "A person employed by the company."
+        }
+      ],
+      "changeDescriptions": ["definition changed"]
     }
   ],
   "synonymCandidates": []
 }
 ```
+
+`changes` is what changed, as data: one entry per change, discriminated
+by `change` (`definition`, `aliases`, `dataTypeChanged`, `readings`,
+`constraintsAdded`, and so on), usually with the `from` and `to`
+values. `changeDescriptions` is the same list rendered as sentences.
+Both are empty for an added or removed element. `barwise diff --format
+json` emits the same shape.
 
 Each delta has a `breakingLevel`:
 

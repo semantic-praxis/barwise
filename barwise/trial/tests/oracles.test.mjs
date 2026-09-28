@@ -130,6 +130,7 @@ test("gradeRoundTrip: a modified delta is inside only when each of its changes i
         kind: "modified",
         change: "dataTypeChanged",
         from: { name: "money" },
+        to: { name: "decimal" },
       },
     ],
   };
@@ -163,6 +164,29 @@ test("gradeRoundTrip: a modified delta is inside only when each of its changes i
     deltas: [{ kind: "modified", elementType: "object_type", name: "Amount" }],
   }, loss);
   assert.equal(blind.status, "could_not_answer");
+
+  // Both ends are matched: money read back as anything but decimal is a
+  // regression, not the declared loss (PR #582 review).
+  const moneyToBool = {
+    change: "dataTypeChanged",
+    from: { name: "money" },
+    to: { name: "boolean" },
+  };
+  assert.equal(gradeRoundTrip(modified(moneyToBool), loss).status, "fail");
+
+  // The refusal is limited to deltas a change entry would judge. A delta a
+  // whole-delta entry covers, or one no change entry names, is graded as
+  // before, with or without `changes` (PR #582 review).
+  const legacy = { kind: "modified", elementType: "population", name: "p" };
+  assert.equal(
+    gradeRoundTrip({ deltas: [legacy] }, {
+      allowed: [...loss.allowed, { elementType: "population", kind: "*" }],
+    }).status,
+    "pass",
+  );
+  const unnamed = gradeRoundTrip({ deltas: [legacy] }, loss);
+  assert.equal(unnamed.status, "fail");
+  assert.match(unnamed.detail, /modified population p/);
 });
 
 test("gradeSplit: an object type in no domain is S1; a warned drop is refused; clean is pass", () => {

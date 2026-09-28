@@ -168,6 +168,10 @@ Options:
 - `--format <text|json>` -- output format (default: text)
 - `--no-synonyms` -- hide synonym/rename candidates
 
+With `--format json`, each delta carries `changes` (what changed, as
+data) beside `changeDescriptions` (the same, as sentences). The shape is
+the MCP `diff_models` tool's; docs/MCP.md shows an example.
+
 ### merge
 
 Merge an incoming model into a base model: the sibling of `diff`, the

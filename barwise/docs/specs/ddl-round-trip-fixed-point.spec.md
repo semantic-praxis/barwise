@@ -157,8 +157,10 @@ types, constraint changes on 199, `sourceContext` 41, `aliases` 28,
 - **A loss-set entry's grammar.** `{elementType, kind}` as today, plus
   an optional `change` naming a `ChangeDescription` kind. Any other key
   on the entry is matched against the change's own fields as a subset,
-  so `{"change": "dataTypeChanged", "from": {"name": "money"}}` covers
-  a money column coming back as decimal and nothing else. An entry
+  so `{"change": "dataTypeChanged", "from": {"name": "money"}, "to":
+  {"name": "decimal"}}` covers a money column coming back as decimal and
+  nothing else. Both ends are named: with only `from`, money read back
+  as any type at all would have passed (PR #582 review). An entry
   without `change` covers the whole delta, as before.
 - **A modified delta is inside the loss set when every one of its
   changes is covered.** Coverage is per change, not per delta: one
@@ -166,10 +168,12 @@ types, constraint changes on 199, `sourceContext` 41, `aliases` 28,
   and the failure names the undeclared kind.
 - **A diff without `changes` cannot be graded against a change entry.**
   The grader reports `could_not_answer` rather than reading the missing
-  field as "no changes", which would pass every modified delta.
+  field as "no changes", which would pass every modified delta. It does
+  so only for a delta a change entry would judge; one a whole-delta
+  entry covers, or one no change entry names, is graded as before.
 - **What the DDL loss set gains.** `aliases`, `sourceContext` and `note`
-  on object and fact types, and `dataTypeChanged` from `money` and
-  `other`. Definitions are not declared: the export writes them, so they
+  on object and fact types, and `dataTypeChanged` from `money` to
+  `decimal` and from `other` to `text`. Definitions are not declared: the export writes them, so they
   are workstream 4's to read back, and until then they are findings.
 - **What is left out, and why.** `auto_counter` returns as `integer`,
   and a decimal with a scale but no precision returns with neither.
