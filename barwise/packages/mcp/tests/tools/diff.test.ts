@@ -95,6 +95,15 @@ model:
     );
     expect(definitionDelta).toBeDefined();
     expect(definitionDelta.name).toBe("Widget");
+    // The same shape as the CLI's JSON, structured changes included: both
+    // surfaces serialize through core's deltaToJson.
+    expect(definitionDelta.changes).toEqual([
+      {
+        change: "definitionText",
+        from: "A thing sold in the store.",
+        to: "A physical thing sold in the store.",
+      },
+    ]);
   });
 
   it("accepts file-object base and incoming", () => {

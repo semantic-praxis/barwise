@@ -6,8 +6,8 @@
 
 import {
   deltaLabel,
+  deltaToJson,
   diffModels,
-  elementName,
   type ModelDelta,
   type SynonymCandidate,
 } from "@barwise/core/diff";
@@ -40,13 +40,7 @@ export function registerDiffCommand(program: Command): void {
                   hasChanges: diff.hasChanges,
                   deltas: diff.deltas
                     .filter((d) => d.kind !== "unchanged")
-                    .map((d) => ({
-                      kind: d.kind,
-                      elementType: d.elementType,
-                      name: elementName(d),
-                      breakingLevel: d.breakingLevel,
-                      changeDescriptions: d.changeDescriptions,
-                    })),
+                    .map(deltaToJson),
                   synonymCandidates: opts.synonyms
                     ? diff.synonymCandidates
                     : [],

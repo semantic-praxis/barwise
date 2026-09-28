@@ -3,8 +3,10 @@ export { type ChangeDescription, describeChange, type RoleSummary } from "./chan
 export {
   type BreakingLevel,
   type DefinitionDelta,
+  type DeltaJson,
   type DeltaKind,
   deltaLabel,
+  deltaToJson,
   diffModels,
   ELEMENT_TYPES,
   elementLabel,

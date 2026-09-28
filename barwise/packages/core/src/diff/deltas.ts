@@ -257,6 +257,38 @@ export function elementName(delta: ModelDelta): string {
   }
 }
 
+/** One delta as the JSON the CLI's `diff --format json` and the MCP `diff_models` tool emit. */
+export interface DeltaJson {
+  readonly kind: DeltaKind;
+  readonly elementType: ModelDelta["elementType"];
+  readonly name: string;
+  readonly breakingLevel: BreakingLevel;
+  readonly changes: readonly ChangeDescription[];
+  readonly changeDescriptions: readonly string[];
+}
+
+/**
+ * A delta as plain JSON: what it is about and what changed, without the
+ * model elements it holds.
+ *
+ * The CLI and the MCP tool built this object in two places, field for
+ * field, and `changes` could only have been added to one of them without
+ * the other noticing. The trial's round-trip grader reads `changes` to
+ * tell a change the format declares lost from one it does not
+ * (`docs/specs/ddl-round-trip-fixed-point.spec.md`, R3); `changes` is
+ * plain data by construction, so it serializes as is.
+ */
+export function deltaToJson(delta: ModelDelta): DeltaJson {
+  return {
+    kind: delta.kind,
+    elementType: delta.elementType,
+    name: elementName(delta),
+    breakingLevel: delta.breakingLevel,
+    changes: delta.changes,
+    changeDescriptions: delta.changeDescriptions,
+  };
+}
+
 /**
  * A pair of removed + added elements that may represent a rename
  * (i.e. the same concept under a different name). Flagged for human

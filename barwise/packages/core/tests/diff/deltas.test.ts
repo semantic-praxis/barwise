@@ -18,6 +18,7 @@
 import { describe, expect, it } from "vitest";
 import {
   deltaLabel,
+  deltaToJson,
   ELEMENT_TYPES,
   elementLabel,
   elementName,
@@ -139,5 +140,32 @@ describe("labelling a delta", () => {
     // written out at each call site.
     expect(elementName(SAMPLES[2]!.delta)).toBe("Churn");
     expect(elementName(SAMPLES[0]!.delta)).toBe("Customer");
+  });
+});
+
+describe("a delta as JSON", () => {
+  it("carries the structured changes beside the sentences rendered from them", () => {
+    // The trial grader decides loss per change kind (ddl-round-trip-fixed-point
+    // R3), which it cannot do from `changeDescriptions` without matching prose.
+    const delta: ModelDelta = {
+      kind: "modified",
+      elementType: "object_type",
+      name: "Customer",
+      changes: [{ change: "aliases", from: ["Client"], to: [] }],
+      changeDescriptions: ["aliases changed"],
+      breakingLevel: "safe",
+    };
+    expect(JSON.parse(JSON.stringify(deltaToJson(delta)))).toEqual({
+      kind: "modified",
+      elementType: "object_type",
+      name: "Customer",
+      breakingLevel: "safe",
+      changes: [{ change: "aliases", from: ["Client"], to: [] }],
+      changeDescriptions: ["aliases changed"],
+    });
+  });
+
+  it("names a definition by its term, as the surfaces label it", () => {
+    expect(deltaToJson(SAMPLES[2]!.delta).name).toBe("Churn");
   });
 });
