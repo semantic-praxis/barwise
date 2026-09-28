@@ -152,7 +152,7 @@ function matchingParen(text: string, open: number): number {
  * quotes themselves are kept, so `matchingParen` still sees a literal.
  * Quoted identifiers are skipped, not blanked: `"a--b"` is a name.
  */
-function blankNonCode(input: string): string {
+function blankNonCode(input: string, { literals = true } = {}): string {
   const out = input.split("");
   const blank = (from: number, to: number) => {
     for (let k = from; k < to; k++) if (out[k] !== "\n") out[k] = " ";
@@ -176,12 +176,12 @@ function blankNonCode(input: string): string {
       while (j < input.length && !(input[j] === "'" && input[j + 1] !== "'")) {
         j += input[j] === "'" ? 2 : 1;
       }
-      blank(i + 1, j);
+      if (literals) blank(i + 1, j);
       i = j + 1;
     } else if (c === "$" && DOLLAR_TAG.test(input.slice(i, i + 64))) {
       const tag = DOLLAR_TAG.exec(input.slice(i, i + 64))![0];
       const end = input.indexOf(tag, i + tag.length);
-      blank(i + tag.length, end < 0 ? input.length : end);
+      if (literals) blank(i + tag.length, end < 0 ? input.length : end);
       i = end < 0 ? input.length : end + tag.length;
     } else if (c === '"' || c === "`" || c === "[") {
       const end = input.indexOf(c === "[" ? "]" : c, i + 1);
@@ -191,6 +191,18 @@ function blankNonCode(input: string): string {
     }
   }
   return out.join("");
+}
+
+/**
+ * The input with only its comments blanked, offsets kept: string literals
+ * stay, because a column's DEFAULT and CHECK values are its content. The
+ * DDL export writes a `-- NOTE(barwise)` line above a column, and a column
+ * list split on commas glued that line to the column after it, which the
+ * column reader then rejected -- every such column, its value type and its
+ * fact type were dropped (barwise-dnm).
+ */
+export function blankComments(input: string): string {
+  return blankNonCode(input, { literals: false });
 }
 
 /** A PostgreSQL dollar-quote opener: `$$` or `$body$`. */

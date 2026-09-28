@@ -5,6 +5,7 @@
  * function as an ExportFormat, with validation, annotation support, and
  * proper ExportResult structure.
  */
+import { OrmModel } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { DdlExportFormat } from "../src/ddl/DdlExportFormat.js";
 import { ModelBuilder } from "./helpers/ModelBuilder.js";
@@ -241,5 +242,89 @@ describe("DdlExportFormat", () => {
       // DDL is a single-file format, so files should be undefined.
       expect(result.files).toBeUndefined();
     });
+  });
+});
+
+// barwise-kgh: an n-ary fact type's value role is a column of its table,
+// the table is keyed on one uniqueness constraint, and any other one is a
+// UNIQUE clause. The rank used to be missing from the export entirely.
+describe("n-ary fact types with a value role", () => {
+  function clinic(): OrmModel {
+    const model = new OrmModel({ name: "Clinic" });
+    const enc = model.addObjectType({ name: "Encounter", kind: "entity", referenceMode: "csn" });
+    const dx = model.addObjectType({ name: "Diagnosis", kind: "entity", referenceMode: "code" });
+    const rank = model.addObjectType({
+      name: "DiagnosisRank",
+      kind: "value",
+      dataType: { name: "integer" },
+      valueConstraint: { values: ["1", "2", "3"] },
+    });
+    model.addFactType({
+      name: "Encounter has Diagnosis at DiagnosisRank",
+      roles: [
+        { id: "r-enc", name: "has", playerId: enc.id },
+        { id: "r-dx", name: "is coded on", playerId: dx.id },
+        { id: "r-rank", name: "at", playerId: rank.id },
+      ],
+      readings: ["{0} has {1} at {2}"],
+      constraints: [
+        { type: "internal_uniqueness", roleIds: ["r-enc", "r-dx"] },
+        { type: "internal_uniqueness", roleIds: ["r-enc", "r-rank"] },
+      ],
+    });
+    return model;
+  }
+  const table = (text: string) => {
+    const from = text.slice(text.indexOf("CREATE TABLE encounter_has_diagnosis_at_diagnosis_rank"));
+    return from.slice(0, from.indexOf(");"));
+  };
+
+  it("exports the value column and routes the second uniqueness as UNIQUE", () => {
+    const body = table(new DdlExportFormat().export(clinic(), { annotate: false }).text);
+    expect(body).toMatch(/diagnosis_rank INTEGER NOT NULL/);
+    expect(body).toMatch(/PRIMARY KEY \(csn, code\)/);
+    expect(body).toMatch(/UNIQUE \(csn, diagnosis_rank\)/);
+    expect(body).toMatch(/CHECK \(diagnosis_rank IN /);
+  });
+
+  it("annotates the value column with its own value type's constraint", () => {
+    const body = table(new DdlExportFormat().export(clinic()).text);
+    const lines = body.split("\n");
+    const at = lines.findIndex((l) => /^\s*diagnosis_rank /.test(l));
+    expect(lines[at - 1]).toMatch(/Value constraint available: \[.?1/);
+  });
+});
+
+describe("a constrained value type playing two roles of one n-ary", () => {
+  it("puts its CHECK on both columns", () => {
+    // PR #580 review: the routing found the first role and stopped, so the
+    // second date column accepted values outside the value type's domain.
+    const model = new OrmModel({ name: "Leases" });
+    const unit = model.addObjectType({ name: "Unit", kind: "entity", referenceMode: "unit_id" });
+    const tenant = model.addObjectType({
+      name: "Tenant",
+      kind: "entity",
+      referenceMode: "tenant_id",
+    });
+    const day = model.addObjectType({
+      name: "LeaseDay",
+      kind: "value",
+      dataType: { name: "integer" },
+      valueConstraint: { values: [], ranges: [{ min: "1", max: "28" }] },
+    });
+    model.addFactType({
+      name: "Tenant leases Unit from LeaseDay to LeaseDay",
+      roles: [
+        { id: "r-t", name: "leases", playerId: tenant.id },
+        { id: "r-u", name: "is leased by", playerId: unit.id },
+        { id: "r-from", name: "from", playerId: day.id },
+        { id: "r-to", name: "to", playerId: day.id },
+      ],
+      readings: ["{0} leases {1} from {2} to {3}"],
+      constraints: [{ type: "internal_uniqueness", roleIds: ["r-t", "r-u", "r-from"] }],
+    });
+    const { text } = new DdlExportFormat().export(model, { annotate: false });
+    const checks = text.match(/CHECK \(\(\w+ >= 1 AND \w+ <= 28\)\)/g) ?? [];
+    expect(checks, text).toHaveLength(2);
   });
 });

@@ -453,12 +453,29 @@ export class RelationalMapper {
     associativeTables: MutableTable[],
   ): void {
     const columns: Column[] = [];
-    const pkColNames: string[] = [];
     const foreignKeys: ForeignKey[] = [];
+    // The columns each role maps to, for building the key below.
+    const roleColumns = new Map<string, string[]>();
 
     for (const role of ft.roles) {
       const player = model.getObjectType(role.playerId);
-      if (!player || player.kind !== "entity") continue;
+      if (!player) continue;
+
+      // A value role is a column of this table. It used to be skipped, so
+      // "Encounter has Diagnosis at DiagnosisRank" exported the two foreign
+      // keys and no rank: the fact's value was lost in every relational
+      // format (barwise-kgh).
+      if (player.kind === "value") {
+        const name = pushColumn(columns, {
+          name: toSnake(player.name),
+          ...sqlTypeOf(player.dataType),
+          nullable: false,
+          sourceRoleId: role.id,
+          defaultValue: player.defaultValue,
+        }, `${toSnake(role.name)}_${toSnake(player.name)}`);
+        roleColumns.set(role.id, [name]);
+        continue;
+      }
 
       const targetTable = entityTables.get(player.id);
       if (!targetTable) continue;
@@ -471,7 +488,7 @@ export class RelationalMapper {
         role.id,
         (pkColName) => `${toSnake(role.name)}_${pkColName}`,
       );
-      pkColNames.push(...colNames);
+      roleColumns.set(role.id, colNames);
 
       foreignKeys.push({
         columnNames: colNames,
@@ -483,7 +500,14 @@ export class RelationalMapper {
     const table: MutableTable = {
       name: toSnake(ft.name),
       columns,
-      primaryKey: { columnNames: pkColNames },
+      // A binary that lands here (an optional 1:1, or a many-to-many)
+      // keeps its key on both roles; only an n-ary table is keyed on its
+      // uniqueness constraint (PR #580 review).
+      primaryKey: {
+        columnNames: ft.arity > 2
+          ? associativeKey(ft, roleColumns, columns)
+          : columns.map((c) => c.name),
+      },
       foreignKeys,
       sourceElementId: ft.id,
     };
@@ -749,6 +773,27 @@ function pushColumn(columns: Column[], column: Column, alternative?: string): st
   }
   columns.push({ ...column, name });
   return name;
+}
+
+/**
+ * An associative table's primary key: the columns of the fact type's
+ * preferred internal uniqueness constraint, else of its first one, else
+ * of every role (a fact type with no uniqueness at all is a set of rows).
+ * It used to be every entity role's columns, whatever the constraints
+ * said, so "Encounter has Diagnosis at DiagnosisRank" -- unique on
+ * (encounter, diagnosis) and on (encounter, rank) -- was keyed on
+ * neither once its rank column existed (barwise-kgh). A uniqueness not
+ * chosen here is emitted as UNIQUE by the DDL export's constraint routing.
+ */
+function associativeKey(
+  ft: FactType,
+  roleColumns: ReadonlyMap<string, readonly string[]>,
+  columns: readonly Column[],
+): string[] {
+  const uniqueness = ft.constraints.filter((c) => c.type === "internal_uniqueness");
+  const chosen = uniqueness.find((c) => c.isPreferred) ?? uniqueness[0];
+  if (!chosen) return columns.map((c) => c.name);
+  return chosen.roleIds.flatMap((id) => roleColumns.get(id) ?? []);
 }
 
 function toSnake(name: string): string {
