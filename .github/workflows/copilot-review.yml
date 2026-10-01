@@ -20,8 +20,9 @@ name: Copilot review
 #     widen the list and exempt itself from review. The checkout below is
 #     pinned to the default branch, so a workflow_dispatch started from
 #     another branch reads main's table too.
-#   - Dependabot PRs get a read-only token under pull_request, so the
-#     request would fail on exactly the supply-chain PRs worth reviewing.
+#   - Dependabot PRs get a read-only token under pull_request. Under
+#     pull_request_target the token can make the request -- and Copilot
+#     drops it all the same (see DEPENDABOT below).
 #   - The usual danger -- running the PR's code with a write token -- does
 #     not arise: no PR code is checked out, and the only PR-controlled
 #     input is the changed-file records, fetched from the API and read as
@@ -43,6 +44,14 @@ name: Copilot review
 # refusal, which is visible and costs nothing. A reset triggers nothing by
 # itself -- there is no schedule here -- so the first push after it gets
 # the review, and a PR with no later push goes unreviewed.
+#
+# DEPENDABOT IS NOT REQUESTED. On a PR authored by dependabot[bot] the POST
+# succeeds and no review_requested event ever appears: seven of seven such
+# PRs went red on the readback, and so did a workflow_dispatch the owner
+# started on #578, so it is the author, not the caller (barwise-ko7;
+# tiered-pr-review.spec.md, Amendment of 2026-10-01). The run says so and
+# finishes green, like a draft. Only that author is skipped; any other
+# still resolves toward requesting, below.
 #
 # EVERY UNCERTAINTY RESOLVES TOWARD REQUESTING. A files API call that
 # fails, a file list that may be truncated, pr-risk refusing (exit 2), and
@@ -135,6 +144,9 @@ jobs:
           need=true
           if [ "$(gh api "repos/$REPO/pulls/$PR" --jq .draft)" = "true" ]; then
             echo "PR #$PR is a draft; Copilot is requested when it is marked ready."
+            need=false
+          elif [ "$(gh api "repos/$REPO/pulls/$PR" --jq '.user.login // ""')" = "dependabot[bot]" ]; then
+            echo "PR #$PR is by dependabot[bot]; Copilot drops a request on a Dependabot PR, so none is made (barwise-ko7)."
             need=false
           else
             # Reading these is not optional: if either fails, set -e stops
