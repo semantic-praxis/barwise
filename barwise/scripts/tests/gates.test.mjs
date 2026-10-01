@@ -3868,6 +3868,28 @@ test("workflow, decide: requests only when Copilot has neither reviewed nor been
       "false",
       /already reviewed PR #7 \(1 review/,
     ],
+    // Copilot drops a request on a Dependabot PR: seven of seven went red
+    // on the readback, including one the owner started by hand
+    // (barwise-ko7). Only that author is skipped; another bot is still
+    // requested, because every uncertainty resolves toward requesting.
+    [
+      "a Dependabot PR",
+      { pr: { draft: false, user: { login: "dependabot[bot]", type: "Bot" } } },
+      "false",
+      /by dependabot\[bot\].*barwise-ko7/,
+    ],
+    [
+      "a PR by another bot",
+      { pr: { draft: false, user: { login: "renovate[bot]", type: "Bot" } } },
+      "true",
+      null,
+    ],
+    [
+      "a PR by a person",
+      { pr: { draft: false, user: { login: "alice", type: "User" } } },
+      "true",
+      null,
+    ],
   ];
   for (const [label, api, need, message] of cases) {
     const r = runWorkflowStep(DECIDE, api);

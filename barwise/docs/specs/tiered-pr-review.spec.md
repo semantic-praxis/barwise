@@ -18,12 +18,13 @@ merges high-risk, 70% of the last 40 -- stands as a description; with no
 gate reading the tier, it is no longer a budget anything fails against.
 
 Created: 2026-09-17
-Last-updated: 2026-09-23
+Last-updated: 2026-10-01
 Tracking: barwise-1036 (WS1, the Copilot review workflow); barwise-1037 (WS2,
 the tier table and its completeness gate); barwise-1038 (WS3, the
 classifier); barwise-1041 (WS4, the blocking gate -- withdrawn); barwise-1040
 (WS5, generated instructions and the measurement); barwise-1050 (WS6, the
-failure-mode review). Closes nothing on its own.
+failure-mode review); barwise-ko7 (Dependabot PRs, Amendment of
+2026-10-01). Closes nothing on its own.
 The finding is barwise-953 (the instance: PR skills exist, are discoverable,
 and are not invoked -- two recorded occurrences, and now the steady
 state). Extends `docs/specs/pr-skills.spec.md`, which wrote the review
@@ -70,6 +71,38 @@ What that settles:
   pull request was written, found and rewritten. WS6 looks across the
   findings for the failure that recurs and puts a mechanism in front of
   it, so the next pull request does not carry it to review at all.
+
+## Amendment of 2026-10-01: Dependabot pull requests are not requested (barwise-ko7)
+
+**What was claimed.** WS1 chose `pull_request_target` partly because it
+"gives Dependabot PRs a token that can request a reviewer", and the
+workflow header calls them "exactly the supply-chain PRs worth
+reviewing".
+
+**What was measured.** The token can make the call, and Copilot does not
+take it. Every Dependabot pull request since the workflow shipped -- seven
+runs, from 2026-09-24 to #578 on 2026-09-26 -- logged a request that
+"returned without error, but no review_requested event for Copilot
+appeared", and went red on the readback. To separate the PR from the
+caller, a `workflow_dispatch` run on #578 started by the owner on
+2026-10-01 (run 36865548327) failed the same way. The triggering actor is
+not the cause; the common factor is the author, `dependabot[bot]`. Why
+GitHub drops it is not established, and does not need to be for the fix.
+
+**The consequence.** A red check on every Dependabot pull request that
+says nothing about the dependency. It reads as a failure of the bump, and
+it trains the reader to ignore the job.
+
+**The decision.** The workflow reads the pull request's author in its
+first, cheap step. When the author is `dependabot[bot]`, it logs why and
+finishes green without requesting, the way a draft or an already reviewed
+pull request does. Only the measured author is skipped: another bot is
+requested as before, because the principle that every uncertainty
+resolves toward requesting still holds, and a request that is dropped
+for some other author will show up as the same red readback. A
+Dependabot bump is still reviewed the way every pull request is, by its
+CI and by the person who merges it; Copilot is the part that does not
+apply.
 
 ## Principle
 
@@ -581,7 +614,9 @@ looks at; a wrong request is one review's cost.
   itself -- under plain `pull_request` the checkout is the PR's own
   tree -- and a `workflow_dispatch` started from another branch reads
   main's table too, which the event's own ref would not. It also gives
-  Dependabot PRs a token that can request a reviewer. No PR code is run;
+  Dependabot PRs a token that can request a reviewer -- though Copilot
+  then drops the request, so they are skipped (Amendment of 2026-10-01).
+  No PR code is run;
   the only PR-controlled input is the changed-file records, read as
   data. A test pins the trigger, the checkout ref, and forbids checking
   out the PR head.
