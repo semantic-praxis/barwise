@@ -1,9 +1,63 @@
 {
-  "$comment": "What a round trip through the DDL exporter and importer may drop, from docs/IMPORT_EXPORT.md: CHECK constraints are not parsed (value constraints come back as plain value types), definitions are not extracted (column comments are not read), populations are not carried, subtypes and objectification flatten into tables. A delta outside this list is a finding. Shrink this list in the same PR that teaches the importer a construct.",
+  "$comment": "What a round trip through the DDL exporter and importer may drop. Populations are not carried; subtypes and objectification flatten into tables; standalone definitions have no table to live on. Of an object type or fact type, DDL has nowhere to write aliases, source context or notes, and barwise does not annotate them. A money or other data type has no DDL name, so it is written as DECIMAL or TEXT and reads back as decimal or text; the entries name both ends, so a regression to any other type stays a finding. A delta outside this list is a finding, and so is a modified delta with one change outside it. An entry with a `change` covers one change of a modified delta; its remaining keys must match that change's fields (docs/specs/ddl-round-trip-fixed-point.spec.md, workstream 3). Shrink this list in the same PR that teaches the importer a construct.",
   "allowed": [
-    { "elementType": "definition", "kind": "*" },
-    { "elementType": "population", "kind": "*" },
-    { "elementType": "subtype_fact", "kind": "removed" },
-    { "elementType": "objectified_fact_type", "kind": "removed" }
+    {
+      "elementType": "definition",
+      "kind": "*"
+    },
+    {
+      "elementType": "population",
+      "kind": "*"
+    },
+    {
+      "elementType": "subtype_fact",
+      "kind": "removed"
+    },
+    {
+      "elementType": "objectified_fact_type",
+      "kind": "removed"
+    },
+    {
+      "elementType": "object_type",
+      "kind": "modified",
+      "change": "aliases"
+    },
+    {
+      "elementType": "object_type",
+      "kind": "modified",
+      "change": "sourceContext"
+    },
+    {
+      "elementType": "object_type",
+      "kind": "modified",
+      "change": "note"
+    },
+    {
+      "elementType": "fact_type",
+      "kind": "modified",
+      "change": "note"
+    },
+    {
+      "elementType": "object_type",
+      "kind": "modified",
+      "change": "dataTypeChanged",
+      "from": {
+        "name": "money"
+      },
+      "to": {
+        "name": "decimal"
+      }
+    },
+    {
+      "elementType": "object_type",
+      "kind": "modified",
+      "change": "dataTypeChanged",
+      "from": {
+        "name": "other"
+      },
+      "to": {
+        "name": "text"
+      }
+    }
   ]
 }

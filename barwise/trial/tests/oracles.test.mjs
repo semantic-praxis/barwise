@@ -117,6 +117,78 @@ test("gradeRoundTrip: a delta outside the loss set fails, inside passes", () => 
   assert.equal(good.status, "pass");
 });
 
+// A loss set can declare a change kind rather than a whole delta
+// (ddl-round-trip-fixed-point.spec.md, workstream 3). Before that, a
+// modified object type was all in or all out: a declared alias loss and a
+// real definition loss on one element could not be told apart.
+test("gradeRoundTrip: a modified delta is inside only when each of its changes is declared", () => {
+  const loss = {
+    allowed: [
+      { elementType: "object_type", kind: "modified", change: "aliases" },
+      {
+        elementType: "object_type",
+        kind: "modified",
+        change: "dataTypeChanged",
+        from: { name: "money" },
+        to: { name: "decimal" },
+      },
+    ],
+  };
+  const modified = (...changes) => ({
+    deltas: [{ kind: "modified", elementType: "object_type", name: "Amount", changes }],
+  });
+  const aliases = { change: "aliases", from: ["Sum"], to: [] };
+  const money = { change: "dataTypeChanged", from: { name: "money" }, to: { name: "decimal" } };
+  assert.equal(gradeRoundTrip(modified(aliases), loss).status, "pass");
+  assert.equal(gradeRoundTrip(modified(aliases, money), loss).status, "pass");
+
+  // One undeclared change keeps the delta outside, and the detail names it.
+  const mixed = gradeRoundTrip(modified(aliases, { change: "definition", from: "x" }), loss);
+  assert.equal(mixed.status, "fail");
+  assert.match(mixed.detail, /Amount \(definition\)/);
+
+  // The entry's extra keys narrow it: a type change from anything but money
+  // is not covered.
+  const counter = { change: "dataTypeChanged", from: { name: "auto_counter" }, to: {} };
+  assert.equal(gradeRoundTrip(modified(counter), loss).status, "fail");
+
+  // A change entry covers only its own element type.
+  const onFact = gradeRoundTrip({
+    deltas: [{ kind: "modified", elementType: "fact_type", name: "F", changes: [aliases] }],
+  }, loss);
+  assert.equal(onFact.status, "fail");
+
+  // A modified delta with no `changes` to read cannot be graded against a
+  // change entry; reading the absence as "nothing changed" would pass it.
+  const blind = gradeRoundTrip({
+    deltas: [{ kind: "modified", elementType: "object_type", name: "Amount" }],
+  }, loss);
+  assert.equal(blind.status, "could_not_answer");
+
+  // Both ends are matched: money read back as anything but decimal is a
+  // regression, not the declared loss (PR #582 review).
+  const moneyToBool = {
+    change: "dataTypeChanged",
+    from: { name: "money" },
+    to: { name: "boolean" },
+  };
+  assert.equal(gradeRoundTrip(modified(moneyToBool), loss).status, "fail");
+
+  // The refusal is limited to deltas a change entry would judge. A delta a
+  // whole-delta entry covers, or one no change entry names, is graded as
+  // before, with or without `changes` (PR #582 review).
+  const legacy = { kind: "modified", elementType: "population", name: "p" };
+  assert.equal(
+    gradeRoundTrip({ deltas: [legacy] }, {
+      allowed: [...loss.allowed, { elementType: "population", kind: "*" }],
+    }).status,
+    "pass",
+  );
+  const unnamed = gradeRoundTrip({ deltas: [legacy] }, loss);
+  assert.equal(unnamed.status, "fail");
+  assert.match(unnamed.detail, /modified population p/);
+});
+
 test("gradeSplit: an object type in no domain is S1; a warned drop is refused; clean is pass", () => {
   assert.equal(gradeSplit(["A", "B"], { x: ["A"] }, "").severity, "S1");
   assert.equal(

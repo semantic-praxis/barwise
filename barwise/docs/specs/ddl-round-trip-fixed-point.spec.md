@@ -1,9 +1,9 @@
 # A DDL export reads back as the model that wrote it
 
-Status: Accepted -- workstreams 1 and 2 implemented; 3 to 5 not yet
+Status: Accepted -- workstreams 1 to 3 implemented; 4 and 5 not yet
 
 Created: 2026-09-27
-Last-updated: 2026-09-27
+Last-updated: 2026-09-28
 Tracking: barwise-dnm (workstreams 2 to 4), barwise-kgh (workstream 1),
 barwise-1077 (workstream 5); out of scope, tracked separately:
 barwise-fly
@@ -71,7 +71,7 @@ when the file itself says what they were.
   modified delta is inside the loss set when every one of its changes is
   covered by an entry. The DDL loss set declares what DDL cannot carry
   and barwise does not annotate: aliases, source context, notes, and a
-  data type DDL has no name for (`money`).
+  data type DDL has no name for (`money`, `other`).
 - **R4. Barwise reads its own annotations.** The annotated export writes
   one machine-readable comment per table and per column, naming the
   element it came from: the entity type and its reference mode; the fact
@@ -140,6 +140,50 @@ Out of scope:
    kernels and the examples, not by a comment.
 5. **Relationships keyed on foreign keys** (formats, R5; barwise-1077).
 
+### Workstream 3 in detail
+
+Measured on main at 4982b06c (after workstreams 1 and 2), the 12
+kernels' modified deltas carry these change kinds: `definition` on 678
+object types and 24 fact types, `readings` and `roleName` on 355 fact
+types, constraint changes on 199, `sourceContext` 41, `aliases` 28,
+`referenceMode` 18, and `dataTypeChanged` 25.
+
+- **One serializer for both surfaces.** The CLI's `diff --format json`
+  and the MCP `diff_models` tool build the same delta object in two
+  places. Adding `changes` to one would make them disagree, so the
+  per-delta shape moves into `@barwise/core/diff` as `deltaToJson`, and
+  both call it. `changes` is already plain data by construction
+  (`changeDescription.ts`: copies, never model instances).
+- **A loss-set entry's grammar.** `{elementType, kind}` as today, plus
+  an optional `change` naming a `ChangeDescription` kind. Any other key
+  on the entry is matched against the change's own fields as a subset,
+  so `{"change": "dataTypeChanged", "from": {"name": "money"}, "to":
+  {"name": "decimal"}}` covers a money column coming back as decimal and
+  nothing else. Both ends are named: with only `from`, money read back
+  as any type at all would have passed (PR #582 review). An entry
+  without `change` covers the whole delta, as before.
+- **A modified delta is inside the loss set when every one of its
+  changes is covered.** Coverage is per change, not per delta: one
+  declared change riding with an undeclared one leaves the delta outside,
+  and the failure names the undeclared kind.
+- **A diff without `changes` cannot be graded against a change entry.**
+  The grader reports `could_not_answer` rather than reading the missing
+  field as "no changes", which would pass every modified delta. It does
+  so only for a delta a change entry would judge; one a whole-delta
+  entry covers, or one no change entry names, is graded as before.
+- **What the DDL loss set gains.** `aliases`, `sourceContext` and `note`
+  on object and fact types, and `dataTypeChanged` from `money` to
+  `decimal` and from `other` to `text`. Definitions are not declared: the export writes them, so they
+  are workstream 4's to read back, and until then they are findings.
+- **What is left out, and why.** `auto_counter` returns as `integer`,
+  and a decimal with a scale but no precision returns with neither.
+  Both have DDL spellings (an identity column, `DECIMAL(p, s)`), so they
+  are export defects, not DDL limits, and are filed rather than
+  declared (barwise-hgr and barwise-e5n).
+- **After this workstream the `model-roundtrip:ddl` rows still fail.**
+  Every kernel still has definitions, readings and role names outside
+  the loss set. What changes is that the row names them.
+
 Workstreams 1 and 2 ship together, because both are small defects in
 what the two halves write and read. The rest are each their own PR. The
 trial gate runs at the end of each one.
@@ -186,5 +230,15 @@ declaring the loss, and the value role as canonical (barwise-fly).
   - Value-constraint losses went from 104 to 0.
   - Object types removed went from 124 to 8.
   - The total is 1,901 deltas, because each value type that now comes
-    back reports its definition instead. Those are declared loss, and
-    workstream 3 is what lets the grader see that.
+    back reports its definition instead. Workstream 3 found that these
+    are not declared loss after all: the export writes definitions, so
+    reading them back is workstream 4.
+- **Workstream 3.** The trial's twelve `model-roundtrip:ddl` rows still
+  fail, as expected: 1,784 deltas outside the loss set and 103 inside,
+  the same 103 as before. Every object type whose aliases, source
+  context or money type are now declared also lost its definition, so
+  no delta moved inside yet; the change entries start counting once
+  workstream 4 reads definitions back. What changed is the row: it names
+  the undeclared kinds (`modified object_type Provider (referenceMode,
+  definition)`) where it used to name only the element. The trial gate
+  is unchanged: 1074 steps, 0 new, 0 stale, 172 open.

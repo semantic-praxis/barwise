@@ -29,6 +29,7 @@ import { detectSynonymCandidates } from "./synonyms.js";
 
 export {
   deltaLabel,
+  deltaToJson,
   ELEMENT_TYPES,
   elementLabel,
   elementName,
@@ -37,6 +38,7 @@ export {
 export type {
   BreakingLevel,
   DefinitionDelta,
+  DeltaJson,
   DeltaKind,
   ElementRef,
   FactTypeDelta,

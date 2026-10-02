@@ -57,6 +57,30 @@ describe("barwise diff", () => {
     expect(Array.isArray(parsed.deltas)).toBe(true);
   });
 
+  it("emits each modified delta's changes as data beside its sentences", async () => {
+    // The trial's round-trip grader reads `changes` to tell a change the
+    // format declares lost from one it does not
+    // (ddl-round-trip-fixed-point.spec.md, R3).
+    const base = `${fixtures}/simple.orm.yaml`;
+    const incoming = join(testOutput, "diff-changed-definition.orm.yaml");
+    mkdirSync(testOutput, { recursive: true });
+    writeFileSync(
+      incoming,
+      readFileSync(base, "utf-8").replace("A person who places orders.", "A buyer."),
+    );
+    const result = await runCli(["diff", base, incoming, "--format", "json"]);
+    rmSync(incoming);
+    expect(result.exitCode).toBe(0);
+    const customer = JSON.parse(result.stdout).deltas.find(
+      (d: { name: string; }) => d.name === "Customer",
+    );
+    expect(customer.kind).toBe("modified");
+    expect(customer.changes).toEqual([
+      { change: "definition", from: "A person who places orders.", to: "A buyer." },
+    ]);
+    expect(customer.changeDescriptions).toHaveLength(1);
+  });
+
   it("suppresses synonym candidates in text output with --no-synonyms", async () => {
     const result = await runCli([
       "diff",

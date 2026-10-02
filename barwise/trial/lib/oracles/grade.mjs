@@ -348,12 +348,49 @@ export function gradeRoundTrip(diff, lossSet) {
     };
   }
   const deltas = diff.deltas.filter((d) => d.kind !== "unchanged");
-  const allowed = (d) =>
-    (lossSet?.allowed ?? []).some((a) =>
-      (a.elementType === "*" || a.elementType === d.elementType)
-      && (a.kind === "*" || a.kind === d.kind)
+  const entries = lossSet?.allowed ?? [];
+  const matchesDelta = (a, d) =>
+    (a.elementType === "*" || a.elementType === d.elementType)
+    && (a.kind === "*" || a.kind === d.kind);
+  // An entry naming a `change` covers one change of a modified delta, and
+  // does so only if its remaining keys are a subset of that change's own
+  // fields: `{change: "dataTypeChanged", from: {name: "money"}}` covers a
+  // money column read back as decimal and no other type change
+  // (ddl-round-trip-fixed-point.spec.md, workstream 3).
+  const changeEntries = entries.filter((a) => a.change !== undefined);
+  const wholeEntries = entries.filter((a) => a.change === undefined);
+  // Reading a missing `changes` as "no changes" would put a modified delta
+  // inside the loss set vacuously. Only a delta a change entry would have to
+  // judge makes the diff ungradable: one a whole-delta entry covers, or one
+  // no change entry names, is graded as before (PR #582 review).
+  const unreadable = deltas.filter((d) =>
+    d.kind === "modified"
+    && !Array.isArray(d.changes)
+    && !wholeEntries.some((a) => matchesDelta(a, d))
+    && changeEntries.some((a) => matchesDelta(a, d))
+  );
+  if (unreadable.length > 0) {
+    return {
+      status: "could_not_answer",
+      detail: `the loss set names change kinds, but ${unreadable.length} modified delta(s) it `
+        + `would judge carry no \`changes\` (first: ${unreadable[0].elementType} ${
+          unreadable[0].name
+        })`,
+    };
+  }
+  const covers = (a, c) =>
+    a.change === c.change
+    && Object.entries(a).every(([k, v]) =>
+      k === "elementType" || k === "kind" || k === "change" || isSubset(v, c[k])
     );
-  const outside = deltas.filter((d) => !allowed(d));
+  const uncovered = (d) =>
+    d.kind === "modified" && Array.isArray(d.changes) && d.changes.length > 0
+      ? d.changes.filter((c) => !changeEntries.some((a) => matchesDelta(a, d) && covers(a, c)))
+      : [d];
+  const outside = deltas
+    .filter((d) => !wholeEntries.some((a) => matchesDelta(a, d)))
+    .map((d) => ({ d, missed: uncovered(d) }))
+    .filter(({ missed }) => missed.length > 0);
   if (outside.length === 0) {
     return {
       status: "pass",
@@ -361,13 +398,26 @@ export function gradeRoundTrip(diff, lossSet) {
       evidence: { inside: deltas.length },
     };
   }
-  const sample = outside.slice(0, 8).map((d) => `${d.kind} ${d.elementType} ${d.name}`);
+  const sample = outside.slice(0, 8).map(({ d, missed }) =>
+    d.kind === "modified" && missed[0] !== d
+      ? `modified ${d.elementType} ${d.name} (${
+        [...new Set(missed.map((c) => c.change))].join(", ")
+      })`
+      : `${d.kind} ${d.elementType} ${d.name}`
+  );
   return {
     status: "fail",
     severity: "S1",
     detail: `${outside.length} delta(s) outside the declared loss set: ${sample.join("; ")}`,
     evidence: { outside: outside.length, inside: deltas.length - outside.length, sample },
   };
+}
+
+/** Whether `want` is `got`, or a plain object whose every key matches `got`'s, recursively. */
+function isSubset(want, got) {
+  if (want === null || typeof want !== "object") return want === got;
+  if (got === null || typeof got !== "object") return false;
+  return Object.entries(want).every(([k, v]) => isSubset(v, got[k]));
 }
 
 /**

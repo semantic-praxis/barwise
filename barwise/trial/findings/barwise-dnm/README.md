@@ -10,8 +10,9 @@ barwise diff examples/transcripts/clinic-appointments.orm.yaml /tmp/b.orm.yaml
 ```
 
 Expected: the re-imported model differs from the original only by the
-loss set in `trial/loss-sets/ddl.json` (definitions, populations,
-subtypes, objectification).
+loss set in `trial/loss-sets/ddl.json`: standalone definitions,
+populations, subtypes, objectification, and, per change, an element's
+aliases, source context and notes and a `money` or `other` data type.
 
 Observed (1.7.0) on a 57-object-type trial kernel: the annotated export
 re-imports with 24 entity types and zero fact types (the comments
