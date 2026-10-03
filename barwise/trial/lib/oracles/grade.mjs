@@ -378,10 +378,16 @@ export function gradeRoundTrip(diff, lossSet) {
         })`,
     };
   }
+  // `unchanged` names fields that must be equal on both ends, which a
+  // subset match cannot say: the declared loss of a defaulted precision must
+  // not also cover a scale that changed (PR #586 review).
   const covers = (a, c) =>
     a.change === c.change
     && Object.entries(a).every(([k, v]) =>
-      k === "elementType" || k === "kind" || k === "change" || isSubset(v, c[k])
+      k === "elementType" || k === "kind" || k === "change"
+      || (k === "unchanged"
+        ? v.every((f) => JSON.stringify(c.from?.[f]) === JSON.stringify(c.to?.[f]))
+        : isSubset(v, c[k]))
     );
   const uncovered = (d) =>
     d.kind === "modified" && Array.isArray(d.changes) && d.changes.length > 0
@@ -413,9 +419,16 @@ export function gradeRoundTrip(diff, lossSet) {
   };
 }
 
-/** Whether `want` is `got`, or a plain object whose every key matches `got`'s, recursively. */
+/**
+ * Whether `want` is `got`, or a plain object whose every key matches `got`'s, recursively.
+ * A `null` in `want` means the field is absent, which JSON cannot say any other
+ * way: `from: {name: "decimal", length: null}` is a decimal with no declared
+ * precision, so the entry does not also cover a declared precision that changed
+ * (ddl-type-round-trip.spec.md, R7).
+ */
 function isSubset(want, got) {
-  if (want === null || typeof want !== "object") return want === got;
+  if (want === null) return got === undefined || got === null;
+  if (typeof want !== "object") return want === got;
   if (got === null || typeof got !== "object") return false;
   return Object.entries(want).every(([k, v]) => isSubset(v, got[k]));
 }

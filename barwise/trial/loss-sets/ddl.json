@@ -1,5 +1,5 @@
 {
-  "$comment": "What a round trip through the DDL exporter and importer may drop. Populations are not carried; subtypes and objectification flatten into tables; standalone definitions have no table to live on. Of an object type or fact type, DDL has nowhere to write aliases, source context or notes, and barwise does not annotate them. A money or other data type has no DDL name, so it is written as DECIMAL or TEXT and reads back as decimal or text; the entries name both ends, so a regression to any other type stays a finding. A delta outside this list is a finding, and so is a modified delta with one change outside it. An entry with a `change` covers one change of a modified delta; its remaining keys must match that change's fields (docs/specs/ddl-round-trip-fixed-point.spec.md, workstream 3). Shrink this list in the same PR that teaches the importer a construct.",
+  "$comment": "What a round trip through the DDL exporter and importer may drop. Populations are not carried; subtypes and objectification flatten into tables; standalone definitions have no table to live on. Of an object type or fact type, DDL has nowhere to write aliases, source context or notes, and barwise does not annotate them. A money or other data type has no DDL name, so it is written as DECIMAL or TEXT and reads back as decimal or text; the entries name both ends, so a regression to any other type stays a finding. SQL cannot state a decimal's scale without a precision, so a decimal with no precision is written DECIMAL(38,s) and reads back with precision 38; a null in an entry means the field is absent, and `unchanged` names fields that must be equal on both ends, so a declared precision or a scale that changed stays a finding (docs/specs/ddl-type-round-trip.spec.md). A delta outside this list is a finding, and so is a modified delta with one change outside it. An entry with a `change` covers one change of a modified delta; its remaining keys must match that change's fields (docs/specs/ddl-round-trip-fixed-point.spec.md, workstream 3). Shrink this list in the same PR that teaches the importer a construct.",
   "allowed": [
     {
       "elementType": "definition",
@@ -58,6 +58,22 @@
       "to": {
         "name": "text"
       }
+    },
+    {
+      "elementType": "object_type",
+      "kind": "modified",
+      "change": "dataTypeChanged",
+      "from": {
+        "name": "decimal",
+        "length": null
+      },
+      "to": {
+        "name": "decimal",
+        "length": 38
+      },
+      "unchanged": [
+        "scale"
+      ]
     }
   ]
 }

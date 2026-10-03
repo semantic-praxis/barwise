@@ -550,11 +550,12 @@ export class RelationalMapper {
     // key and a false "not declared" annotation (PR #567 review).
     const ownIdx = subtypeTable.columns.findIndex((c) => c.name === ownKey[0]);
     const firstPkCol = supertypeTable.columns.find((c) => c.name === firstSupertypeCol);
+    // Its own identity goes too: the column now takes the supertype's
+    // value, so a subtype keyed on an auto_counter must not generate one
+    // (PR #586 review).
     if (ownIdx !== -1) {
-      subtypeTable.columns[ownIdx] = {
-        ...subtypeTable.columns[ownIdx]!,
-        ...copiedKeyType(firstPkCol),
-      };
+      const { identity: _ownIdentity, ...own } = subtypeTable.columns[ownIdx]!;
+      subtypeTable.columns[ownIdx] = { ...own, ...copiedKeyType(firstPkCol) };
     }
 
     const sharedCols = [ownKey[0]!];
@@ -824,6 +825,17 @@ function conceptualTypeToSql(dataType: DataTypeDef | undefined): string {
       if (dataType.length) {
         return `DECIMAL(${dataType.length})`;
       }
+      // SQL cannot state a scale without a precision. 38 is the widest
+      // precision Snowflake, SQL Server, BigQuery and Postgres all accept,
+      // so a value that fit the model fits the column; bare DECIMAL lost
+      // the scale (barwise-e5n, ddl-type-round-trip.spec.md D2). A scale
+      // above 38 takes itself as the precision, because no engine accepts
+      // a scale larger than the precision: DECIMAL(38,39) is invalid
+      // everywhere, DECIMAL(39,39) wherever such a scale exists at all
+      // (PR #586 review).
+      if (dataType.scale !== undefined) {
+        return `DECIMAL(${Math.max(38, dataType.scale)},${dataType.scale})`;
+      }
       return "DECIMAL";
     case "money":
       return dataType.length
@@ -914,7 +926,7 @@ function referenceModePkType(
 }
 
 /** A column's SQL type, whether it was declared or a fallback, and which fallback. */
-type SqlType = Pick<Column, "dataType" | "dataTypeDefaulted" | "defaultedByStrategy">;
+type SqlType = Pick<Column, "dataType" | "dataTypeDefaulted" | "defaultedByStrategy" | "identity">;
 
 /**
  * A primary key's SQL type. A declared type wins; an undeclared one takes
@@ -938,7 +950,11 @@ function keyTypeOf(
 
 /** The SQL type of a declared data type; defaulted when none is declared. */
 function sqlTypeOf(dataType: DataTypeDef | undefined): SqlType {
-  return { dataType: conceptualTypeToSql(dataType), dataTypeDefaulted: dataType === undefined };
+  return {
+    dataType: conceptualTypeToSql(dataType),
+    dataTypeDefaulted: dataType === undefined,
+    ...(dataType?.name === "auto_counter" ? { identity: true } : {}),
+  };
 }
 
 /**
