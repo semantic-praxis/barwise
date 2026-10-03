@@ -1,8 +1,9 @@
-# Tiered PR review: Copilot on every non-trivial PR, and learning from what it finds
+# Tiered PR review: Copilot on every non-trivial, non-Dependabot PR, and learning from what it finds
 
 Status: WS1, WS2 and WS3 IMPLEMENTED. **WS4 WITHDRAWN** by the owner's
 decision of 2026-09-23 (Open decision 6, resolved): Copilot reviews every
-non-trivial pull request, nothing blocks on the review, and when Copilot
+non-trivial pull request except Dependabot's (amendment of 2026-10-01),
+nothing blocks on the review, and when Copilot
 cannot review -- an exhausted quota -- work carries on without it. See
 "The decision of 2026-09-23". WS5 is unbuilt. **WS6 is new** (barwise-1050):
 classify what the reviews find by failure mode and prevent the most
@@ -18,7 +19,7 @@ merges high-risk, 70% of the last 40 -- stands as a description; with no
 gate reading the tier, it is no longer a budget anything fails against.
 
 Created: 2026-09-17
-Last-updated: 2026-10-01
+Last-updated: 2026-10-03
 Tracking: barwise-1036 (WS1, the Copilot review workflow); barwise-1037 (WS2,
 the tier table and its completeness gate); barwise-1038 (WS3, the
 classifier); barwise-1041 (WS4, the blocking gate -- withdrawn); barwise-1040
@@ -31,8 +32,8 @@ state). Extends `docs/specs/pr-skills.spec.md`, which wrote the review
 down, and applies `docs/specs/gate-refusal-contract.spec.md`, which is
 the reason the gate here has three results instead of two.
 
-In one sentence: every non-trivial pull request has a Copilot review
-requested -- a refusal, when the quota is out, is carried on past --
+In one sentence: every non-trivial pull request not opened by Dependabot
+has a Copilot review requested -- a refusal, when the quota is out, is carried on past --
 nothing blocks on it, and what the reviews keep finding is classified so
 the most common failure can be prevented before review instead of fixed
 after it.
