@@ -12,7 +12,11 @@
  *   into a reference);
  * - this entity does not already play it, since a second fact type
  *   "<Entity> has <Name>" would collide with the first and
- *   `OrmModel.addFactType` throws;
+ *   `OrmModel.addFactType` throws. A caller that names the fact type
+ *   itself passes `namedFactType`, and then a second role is fine: a
+ *   barwise DDL annotation says Listing plays Timestamp twice, as its
+ *   opening and its closing time (ddl-round-trip-fixed-point.spec.md,
+ *   workstream 4);
  * - a key shares only an identical declared type (a missing type is not
  *   a match), and an ordinary column shares unless it declares a type
  *   the holder does not have -- otherwise the column would export as the
@@ -46,11 +50,12 @@ export function claimValueTypeName(
   dataType: DataTypeDef | undefined,
   role: "key" | "attribute",
   valueConstraint?: ValueConstraintDef,
+  options?: { readonly namedFactType?: boolean; },
 ): ValueTypeClaim {
   const holder = model.getObjectTypeByName(candidate);
   if (!holder) return { kind: "create", name: candidate };
 
-  const alreadyPlayed = model
+  const alreadyPlayed = !options?.namedFactType && model
     .factTypesForObjectType(holder.id)
     .some((ft) => ft.roles.some((r) => r.playerId === entityId));
   const typesAgree = role === "key"

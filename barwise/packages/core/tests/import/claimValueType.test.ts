@@ -44,6 +44,21 @@ describe("claimValueTypeName", () => {
       .toEqual({ kind: "share", valueType: name });
   });
 
+  it("shares a value type this entity already plays only when the caller names the fact type", () => {
+    // A guessed second "Customer has Name" would collide with the first; a
+    // named one -- a barwise DDL annotation -- does not
+    // (ddl-round-trip-fixed-point.spec.md, workstream 4).
+    const { model, customer, name } = setup();
+    const text50 = { name: "text" as const, length: 50 };
+    expect(claimValueTypeName(model, customer.id, "Customer", "Name", text50, "attribute"))
+      .toEqual({ kind: "create", name: "CustomerName", displaced: name });
+    expect(
+      claimValueTypeName(model, customer.id, "Customer", "Name", text50, "attribute", undefined, {
+        namedFactType: true,
+      }),
+    ).toEqual({ kind: "share", valueType: name });
+  });
+
   it("does not share when the declared type differs", () => {
     const { model, order, name } = setup();
     expect(

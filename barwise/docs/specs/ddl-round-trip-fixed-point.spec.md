@@ -3,7 +3,7 @@
 Status: Accepted -- workstreams 1 to 3 implemented; 4 and 5 not yet
 
 Created: 2026-09-27
-Last-updated: 2026-09-28
+Last-updated: 2026-10-03
 Tracking: barwise-dnm (workstreams 2 to 4), barwise-kgh (workstream 1),
 barwise-1077 (workstream 5); out of scope, tracked separately:
 barwise-fly
@@ -78,8 +78,9 @@ when the file itself says what they were.
   type, its readings and role names; the value type. The importer reads
   them when present and names what it builds from them. Without them
   (`--no-annotate`, or another tool's DDL), it guesses from column names
-  as it does today. The existing `-- Definition:` line is read back as the
-  definition. The annotation text says nothing about dbt.
+  as it does today. Definitions are read back from the machine-readable
+  line; the existing `-- Definition:` line stays for the reader
+  ("Workstream 4 in detail"). The annotation text says nothing about dbt.
 - **R5. A table keyed on its foreign keys is a relationship.** A table
   whose primary key is two or more foreign-key columns, and whose other
   columns are value columns, imports as the many-to-many or n-ary fact
@@ -183,6 +184,58 @@ types, constraint changes on 199, `sourceContext` 41, `aliases` 28,
 - **After this workstream the `model-roundtrip:ddl` rows still fail.**
   Every kernel still has definitions, readings and role names outside
   the loss set. What changes is that the row names them.
+
+### Workstream 4 in detail
+
+Measured on main at 77150e44 (after workstream 3 and barwise-hgr/e5n),
+the annotated export of the 12 kernels reads back with 678 object type
+definitions, 24 fact type definitions, 341 fact types renamed (each an
+added and a removed delta), 355 changed readings, 336 changed role
+names and 18 changed reference modes. Each one is a guess the importer
+makes from a column name, about a model the file already names.
+
+- **One machine-readable line per entity table and per column.** The
+  line is `-- barwise:v1 ` followed by one JSON object. JSON because a
+  definition is free text: it may hold a colon, a quote or a newline,
+  and `JSON.stringify` escapes all three onto one line. The `v1` makes
+  a later change of shape detectable rather than misread.
+- **Each line says where it belongs.** A table line names its `table`;
+  a column line names its `table` and `column`. The importer indexes
+  them by those names and does not care where in the file they sit, so
+  a reordered file still reads.
+- **What a table line carries:** the `entity` name, its
+  `referenceMode`, and its `definition`. Only an entity's table gets
+  one; an n-ary or many-to-many table imports as an entity until
+  workstream 5, and gets its line there.
+- **What a column line carries:** the column's binary fact type -- its
+  `factType` name, `readings`, `definition`, and `roles` as
+  `{name, player}` in the fact type's order -- plus `rowRole`, the
+  index of the role the table's own entity plays, and, when the other
+  player is a value type, its `definition`. The exporter finds the fact
+  type through the column's `sourceRoleId`. A column whose role is not
+  in a binary (a unary's boolean, a subtype's key) gets no line, and
+  neither does a role spread over several columns (a composite foreign
+  key), which the importer reads one column at a time.
+- **The importer uses a line only while it still describes the file.**
+  A column line is used when its column exists, its row role's player
+  is the entity being built, and its other player is the value type it
+  names or the entity of the table the foreign key references. A table
+  line is used when its entity name is free. Otherwise the importer
+  guesses from the column as it does today and warns that the
+  annotation no longer matches (Risks, "R4 makes a comment format
+  load-bearing").
+- **What the line does not carry.** Constraints come from the DDL
+  (`PRIMARY KEY`, `NOT NULL`, `UNIQUE`, `CHECK`), which already states
+  them; carrying them twice would let the two disagree. Aliases, source
+  context and notes stay declared loss, as workstream 3 left them. The
+  preferred-identifier mark is barwise-fly's.
+- **The `-- Definition:` line stays, for the reader.** The JSON line is
+  what the importer reads, so the human line is not parsed: two
+  carriers for one definition would have to agree, and only one of them
+  can hold a newline.
+- **One module owns the format.** `formats/src/ddl/barwiseAnnotation.ts`
+  renders and reads the line, the export and import both call it, and a
+  round-trip test over the 12 kernels and the examples pins it.
 
 Workstreams 1 and 2 ship together, because both are small defects in
 what the two halves write and read. The rest are each their own PR. The

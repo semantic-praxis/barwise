@@ -36,6 +36,12 @@ import {
 } from "@barwise/core";
 import { parseSqlDataType } from "@barwise/core/sql";
 import {
+  type ColumnAnnotation,
+  columnKey,
+  type ReadAnnotations,
+  readAnnotations,
+} from "./barwiseAnnotation.js";
+import {
   blankComments,
   findCreateTables,
   IDENT,
@@ -112,6 +118,27 @@ export class DdlImportFormat implements ImportFormat {
 
     // Build the ORM model
     const model = new OrmModel({ name: modelName });
+    // What a barwise export says each table and column came from. A file
+    // without them -- another tool's DDL, or --no-annotate -- is read by
+    // guessing names from columns, as before (ddl-round-trip-fixed-point
+    // spec, workstream 4).
+    const annotations = readAnnotations(input, warnings);
+    // A line whose table or column is gone -- renamed or dropped by hand --
+    // describes nothing in the file; say so rather than drop it unread.
+    const present = new Set(tables.flatMap((t) => [
+      tableKey(t.name),
+      ...t.columns.map((c) => columnKey(t.name, c.name)),
+    ]));
+    for (const [key, a] of [...annotations.tables, ...annotations.columns]) {
+      if (!present.has(key)) {
+        warnings.push(
+          `The annotation for ${
+            a.kind === "table" ? `table "${a.table}"` : `column "${a.table}.${a.column}"`
+          } `
+            + `matches nothing in the file; ignored.`,
+        );
+      }
+    }
 
     // Step 1: Create entity types for all tables
     // Keyed by the table's unqualified name in lower case: a foreign key
@@ -123,7 +150,17 @@ export class DdlImportFormat implements ImportFormat {
     // while the warning said it was not imported (PR #577 review).
     const accepted: ParsedTable[] = [];
     for (const table of tables) {
-      const entityName = toPascalCase(table.name);
+      const annotation = annotations.tables.get(tableKey(table.name));
+      let entityName = toPascalCase(table.name);
+      if (annotation && model.getObjectTypeByName(annotation.entity)) {
+        warnings.push(
+          `Table "${table.name}": its annotation names entity "${annotation.entity}", which another `
+            + `table already took; the entity is named from the table instead.`,
+        );
+      } else if (annotation) {
+        entityName = annotation.entity;
+      }
+      const annotated = annotation?.entity === entityName ? annotation : undefined;
       if (entityMap.has(tableKey(table.name)) || model.getObjectTypeByName(entityName)) {
         warnings.push(
           `Table "${table.name}": another table already imports as "${entityName}" `
@@ -131,12 +168,15 @@ export class DdlImportFormat implements ImportFormat {
         );
         continue;
       }
-      const referenceMode = this.inferReferenceMode(table, warnings);
+      const referenceMode = annotated && table.primaryKey.length === 1
+        ? annotated.referenceMode
+        : this.inferReferenceMode(table, warnings);
 
       const entityType = model.addObjectType({
         name: entityName,
         kind: "entity",
         referenceMode,
+        ...(annotated?.definition ? { definition: annotated.definition } : {}),
       });
       entityMap.set(tableKey(table.name), entityType.id);
       accepted.push(table);
@@ -147,7 +187,7 @@ export class DdlImportFormat implements ImportFormat {
     // column that shares it, as the dbt importer does.
     for (const table of accepted) {
       const entity = model.getObjectType(entityMap.get(tableKey(table.name)) ?? "");
-      if (entity) this.createKeyIdentifier(model, entity, table, warnings);
+      if (entity) this.createKeyIdentifier(model, entity, table, annotations, warnings);
     }
 
     // Step 3: Create value types and fact types for the other columns
@@ -186,7 +226,8 @@ export class DdlImportFormat implements ImportFormat {
               entityType,
               referencedEntityId,
               column,
-              fk,
+              table,
+              annotations,
               warnings,
             );
           }
@@ -197,6 +238,7 @@ export class DdlImportFormat implements ImportFormat {
             entityType,
             column,
             table,
+            annotations,
             warnings,
           );
         }
@@ -522,6 +564,7 @@ export class DdlImportFormat implements ImportFormat {
     model: OrmModel,
     entity: ObjectType,
     table: ParsedTable,
+    annotations: ReadAnnotations,
     warnings: string[],
   ): void {
     if (table.primaryKey.length !== 1) return;
@@ -546,7 +589,24 @@ export class DdlImportFormat implements ImportFormat {
       );
     }
 
-    const identifier = this.claimValueType(model, entity, column, "key", table, warnings);
+    const annotation = this.columnAnnotation(
+      model,
+      annotations,
+      table,
+      column,
+      entity,
+      undefined,
+      warnings,
+    );
+    const identifier = this.claimValueType(
+      model,
+      entity,
+      column,
+      "key",
+      table,
+      warnings,
+      annotation,
+    );
     // Minted, never built from names (importer-role-ids.spec.md).
     const entityRoleId = generateId();
     const valueRoleId = generateId();
@@ -555,6 +615,19 @@ export class DdlImportFormat implements ImportFormat {
       { type: "internal_uniqueness", roleIds: [entityRoleId] },
       { type: "mandatory", roleId: entityRoleId },
     ];
+    if (annotation) {
+      model.addFactType(
+        annotatedFactType(
+          annotation,
+          entity.id,
+          identifier.id,
+          entityRoleId,
+          valueRoleId,
+          constraints,
+        ),
+      );
+      return;
+    }
     model.addFactType({
       name: `${entity.name} has ${identifier.name}`,
       roles: [
@@ -578,9 +651,12 @@ export class DdlImportFormat implements ImportFormat {
     role: "key" | "attribute",
     table: ParsedTable,
     warnings: string[],
+    annotation?: ColumnAnnotation,
   ): ObjectType {
     const dataType = columnDataType(column);
-    const candidate = toPascalCase(column.name);
+    const candidate = annotation
+      ? annotation.roles[1 - annotation.rowRole]!.player
+      : toPascalCase(column.name);
     // The constraint is part of the sharing decision: a constrained column
     // may not share an unconstrained value type, or one with another
     // constraint (PR #580 review). A refusal names the value type below.
@@ -592,6 +668,7 @@ export class DdlImportFormat implements ImportFormat {
       dataType,
       role,
       column.valueConstraint,
+      { namedFactType: annotation !== undefined },
     );
     if (claim.kind === "share") return claim.valueType;
     if (claim.displaced) {
@@ -606,6 +683,7 @@ export class DdlImportFormat implements ImportFormat {
       kind: "value",
       dataType,
       ...(column.valueConstraint ? { valueConstraint: column.valueConstraint } : {}),
+      ...(annotation?.valueDefinition ? { definition: annotation.valueDefinition } : {}),
     });
   }
 
@@ -617,11 +695,38 @@ export class DdlImportFormat implements ImportFormat {
     entityType: { readonly id: string; readonly name: string; },
     referencedEntityId: string,
     column: ParsedColumn,
-    fk: ParsedForeignKey,
+    table: ParsedTable,
+    annotations: ReadAnnotations,
     warnings: string[],
   ): void {
     const referencedEntity = model.getObjectType(referencedEntityId);
     if (!referencedEntity) return;
+
+    const annotation = this.columnAnnotation(
+      model,
+      annotations,
+      table,
+      column,
+      entityType,
+      referencedEntity.name,
+      warnings,
+    );
+    if (annotation) {
+      const rowRoleId = generateId();
+      const constraints: Constraint[] = [{ type: "internal_uniqueness", roleIds: [rowRoleId] }];
+      if (!column.nullable) constraints.push({ type: "mandatory", roleId: rowRoleId });
+      model.addFactType(
+        annotatedFactType(
+          annotation,
+          entityType.id,
+          referencedEntity.id,
+          rowRoleId,
+          generateId(),
+          constraints,
+        ),
+      );
+      return;
+    }
 
     // Infer a reading pattern from the column name
     const verb = this.inferVerbFromColumnName(column.name, referencedEntity.name);
@@ -687,9 +792,19 @@ export class DdlImportFormat implements ImportFormat {
     entityType: ObjectType,
     column: ParsedColumn,
     table: ParsedTable,
+    annotations: ReadAnnotations,
     warnings: string[],
   ): void {
     try {
+      const annotation = this.columnAnnotation(
+        model,
+        annotations,
+        table,
+        column,
+        entityType,
+        undefined,
+        warnings,
+      );
       const valueType = this.claimValueType(
         model,
         entityType,
@@ -697,6 +812,7 @@ export class DdlImportFormat implements ImportFormat {
         "attribute",
         table,
         warnings,
+        annotation,
       );
       // Minted, not built from names; see createForeignKeyFactType.
       const entityRoleId = generateId();
@@ -715,6 +831,19 @@ export class DdlImportFormat implements ImportFormat {
         constraints.push({ type: "internal_uniqueness", roleIds: [valueRoleId] });
       }
 
+      if (annotation) {
+        model.addFactType(
+          annotatedFactType(
+            annotation,
+            entityType.id,
+            valueType.id,
+            entityRoleId,
+            valueRoleId,
+            constraints,
+          ),
+        );
+        return;
+      }
       model.addFactType({
         name: `${entityType.name} has ${valueType.name}`,
         roles: [
@@ -731,6 +860,43 @@ export class DdlImportFormat implements ImportFormat {
         }`,
       );
     }
+  }
+
+  /**
+   * A column's annotation, while it still describes the file: the table's
+   * entity plays its row role, the other role is played by `other` when
+   * the caller knows it (a foreign key's referenced entity), and no fact
+   * type has its name yet. A hand edit can leave an annotation stale, and
+   * a stale one is reported and set aside rather than trusted (ddl-round-
+   * trip-fixed-point.spec.md, "R4 makes a comment format load-bearing").
+   */
+  private columnAnnotation(
+    model: OrmModel,
+    annotations: ReadAnnotations,
+    table: ParsedTable,
+    column: ParsedColumn,
+    rowEntity: { readonly name: string; },
+    other: string | undefined,
+    warnings: string[],
+  ): ColumnAnnotation | undefined {
+    const annotation = annotations.columns.get(columnKey(table.name, column.name));
+    if (!annotation) return undefined;
+    const otherPlayer = annotation.roles[1 - annotation.rowRole]!.player;
+    const reason = annotation.roles[annotation.rowRole]!.player !== rowEntity.name
+      ? `its row is played by "${
+        annotation.roles[annotation.rowRole]!.player
+      }", not "${rowEntity.name}"`
+      : other !== undefined && otherPlayer !== other
+      ? `it references "${otherPlayer}", not "${other}"`
+      : model.getFactTypeByName(annotation.factType)
+      ? `a fact type named "${annotation.factType}" already exists`
+      : undefined;
+    if (reason === undefined) return annotation;
+    warnings.push(
+      `Table "${table.name}", column "${column.name}": the annotation no longer matches (${reason}); `
+        + `names are guessed from the column instead.`,
+    );
+    return undefined;
   }
 
   /**
@@ -841,6 +1007,32 @@ function skipDefaultExpression(text: string): string {
     else if (depth === 0 && AFTER_DEFAULT.test(text.slice(i))) return text.slice(i).trim();
   }
   return "";
+}
+
+/**
+ * A binary fact type as its annotation names it: its name, readings,
+ * definition and role names, with the roles in the annotation's order.
+ * The players and the constraints come from the DDL, through the caller.
+ */
+function annotatedFactType(
+  annotation: ColumnAnnotation,
+  rowPlayerId: string,
+  otherPlayerId: string,
+  rowRoleId: string,
+  otherRoleId: string,
+  constraints: Constraint[],
+) {
+  const role = (i: 0 | 1) =>
+    i === annotation.rowRole
+      ? { id: rowRoleId, name: annotation.roles[i].name, playerId: rowPlayerId }
+      : { id: otherRoleId, name: annotation.roles[i].name, playerId: otherPlayerId };
+  return {
+    name: annotation.factType,
+    roles: [role(0), role(1)],
+    readings: [...annotation.readings],
+    constraints,
+    ...(annotation.definition ? { definition: annotation.definition } : {}),
+  };
 }
 
 /**
