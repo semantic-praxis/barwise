@@ -824,6 +824,13 @@ function conceptualTypeToSql(dataType: DataTypeDef | undefined): string {
       if (dataType.length) {
         return `DECIMAL(${dataType.length})`;
       }
+      // SQL cannot state a scale without a precision. 38 is the widest
+      // precision Snowflake, SQL Server, BigQuery and Postgres all accept,
+      // so a value that fit the model fits the column; bare DECIMAL lost
+      // the scale (barwise-e5n, ddl-type-round-trip.spec.md D2).
+      if (dataType.scale !== undefined) {
+        return `DECIMAL(38,${dataType.scale})`;
+      }
       return "DECIMAL";
     case "money":
       return dataType.length
@@ -914,7 +921,7 @@ function referenceModePkType(
 }
 
 /** A column's SQL type, whether it was declared or a fallback, and which fallback. */
-type SqlType = Pick<Column, "dataType" | "dataTypeDefaulted" | "defaultedByStrategy">;
+type SqlType = Pick<Column, "dataType" | "dataTypeDefaulted" | "defaultedByStrategy" | "identity">;
 
 /**
  * A primary key's SQL type. A declared type wins; an undeclared one takes
@@ -938,7 +945,11 @@ function keyTypeOf(
 
 /** The SQL type of a declared data type; defaulted when none is declared. */
 function sqlTypeOf(dataType: DataTypeDef | undefined): SqlType {
-  return { dataType: conceptualTypeToSql(dataType), dataTypeDefaulted: dataType === undefined };
+  return {
+    dataType: conceptualTypeToSql(dataType),
+    dataTypeDefaulted: dataType === undefined,
+    ...(dataType?.name === "auto_counter" ? { identity: true } : {}),
+  };
 }
 
 /**

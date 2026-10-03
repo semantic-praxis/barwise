@@ -29,6 +29,14 @@ export interface Column {
    */
   readonly defaultedByStrategy?: PreferredIdentifierStrategy;
   readonly nullable: boolean;
+  /**
+   * True for a column whose value type is auto_counter: the DDL renderer
+   * writes it as an identity column. It is not part of `dataType`, which
+   * stays `INTEGER`, so a foreign key copying the key's type does not
+   * copy the identity, and the dbt, Avro and OpenAPI renderers see a
+   * plain integer (ddl-type-round-trip.spec.md).
+   */
+  readonly identity?: boolean;
   /** The role id this column was derived from (traceability). */
   readonly sourceRoleId?: string;
   /** Default value (from the value type's default), rendered as SQL DEFAULT. */

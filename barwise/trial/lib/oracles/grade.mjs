@@ -413,9 +413,16 @@ export function gradeRoundTrip(diff, lossSet) {
   };
 }
 
-/** Whether `want` is `got`, or a plain object whose every key matches `got`'s, recursively. */
+/**
+ * Whether `want` is `got`, or a plain object whose every key matches `got`'s, recursively.
+ * A `null` in `want` means the field is absent, which JSON cannot say any other
+ * way: `from: {name: "decimal", length: null}` is a decimal with no declared
+ * precision, so the entry does not also cover a declared precision that changed
+ * (ddl-type-round-trip.spec.md, R7).
+ */
 function isSubset(want, got) {
-  if (want === null || typeof want !== "object") return want === got;
+  if (want === null) return got === undefined || got === null;
+  if (typeof want !== "object") return want === got;
   if (got === null || typeof got !== "object") return false;
   return Object.entries(want).every(([k, v]) => isSubset(v, got[k]));
 }

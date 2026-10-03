@@ -74,6 +74,8 @@ interface ParsedColumn {
   readonly references?: { readonly table: string; readonly column: string; };
   /** An inline CHECK the value-predicate grammar reads. */
   readonly valueConstraint?: ValueConstraintDef;
+  /** An identity clause: the column's value is generated, so it is an auto_counter. */
+  readonly identity: boolean;
 }
 
 /**
@@ -411,7 +413,14 @@ export class DdlImportFormat implements ImportFormat {
     let unique = false;
     let references: ParsedColumn["references"];
     let valueConstraint: ValueConstraintDef | undefined;
+    let identity = false;
     while (rest) {
+      const generated = IDENTITY_CLAUSE.exec(rest);
+      if (generated) {
+        identity = true;
+        rest = rest.slice(generated[0].length).trim();
+        continue;
+      }
       if (/^DEFAULT\b/i.test(rest)) {
         rest = skipDefaultExpression(rest.slice("DEFAULT".length));
         continue;
@@ -453,6 +462,7 @@ export class DdlImportFormat implements ImportFormat {
       unique,
       ...(references ? { references } : {}),
       ...(valueConstraint ? { valueConstraint } : {}),
+      identity,
     };
   }
 
@@ -758,9 +768,12 @@ export class DdlImportFormat implements ImportFormat {
  */
 const CLAUSE_KEYWORD =
   "(?:NOT|NULL|PRIMARY|UNIQUE|DEFAULT|REFERENCES|CHECK|CONSTRAINT|COLLATE|GENERATED|AUTO_INCREMENT|AUTOINCREMENT)\\b";
+// IDENTITY ends a type only after its first word: `IDENTITY` alone is a
+// type name some engines use, and the shared mapping reads it as
+// auto_counter; `INTEGER IDENTITY(1,1)` is an INTEGER with a clause.
 const TYPE_PATTERN = new RegExp(
   `^(?!${CLAUSE_KEYWORD})[a-z_]\\w*(?:\\s*\\(\\s*\\d+(?:\\s*,\\s*\\d+)?\\s*\\))?`
-    + `(?:\\s+(?!${CLAUSE_KEYWORD})[a-z_]\\w*(?:\\s*\\(\\s*\\d+(?:\\s*,\\s*\\d+)?\\s*\\))?)*`,
+    + `(?:\\s+(?!${CLAUSE_KEYWORD}|IDENTITY\\b)[a-z_]\\w*(?:\\s*\\(\\s*\\d+(?:\\s*,\\s*\\d+)?\\s*\\))?)*`,
   "i",
 );
 
@@ -783,6 +796,19 @@ const FOREIGN_KEY = new RegExp(
  * what is left. `DEFAULT` is handled by `skipDefaultExpression`, because
  * its expression has no fixed shape.
  */
+/**
+ * A column's identity clause, in each dialect's spelling: SQL:2003
+ * `GENERATED {ALWAYS | BY DEFAULT} AS IDENTITY [(options)]` (what barwise
+ * exports), MySQL `AUTO_INCREMENT`, Snowflake and SQLite
+ * `AUTOINCREMENT [(start, step) | START n INCREMENT n]`, and Redshift and
+ * SQL Server `IDENTITY [(seed, step)]`. Each used to be reported as "not
+ * imported" and ended clause parsing, so a following NOT NULL was lost and
+ * an auto_counter read back as integer (barwise-hgr). `GENERATED ALWAYS AS
+ * (expr)` is a computed column, not an identity, and does not match.
+ */
+const IDENTITY_CLAUSE =
+  /^(?:GENERATED\s+(?:ALWAYS|BY\s+DEFAULT(?:\s+ON\s+NULL)?)\s+AS\s+IDENTITY(?:\s*\([^()]*\))?|AUTO_INCREMENT\b|AUTOINCREMENT(?:\s*\(\s*\d+\s*,\s*\d+\s*\)|\s+START\s+\d+\s+INCREMENT\s+\d+)?|IDENTITY(?:\s*\(\s*\d+\s*,\s*\d+\s*\))?)(?![\w(])/i;
+
 const COLUMN_CLAUSES: readonly RegExp[] = [
   /^NOT\s+NULL\b/i,
   /^NULL\b/i,
@@ -823,6 +849,7 @@ function skipDefaultExpression(text: string): string {
  * recognize (barwise-865).
  */
 function columnDataType(column: ParsedColumn): DataTypeDef {
+  if (column.identity) return { name: "auto_counter" };
   return parseSqlDataType(column.dataType) ?? { name: "other" };
 }
 
