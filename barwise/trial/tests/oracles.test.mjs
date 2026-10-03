@@ -198,6 +198,16 @@ test("gradeRoundTrip: a modified delta is inside only when each of its changes i
     to: { name: "decimal", length: 38, scale: 3 },
   };
   assert.equal(gradeRoundTrip(modified(widened), precision).status, "fail");
+  // `unchanged` holds a field equal on both ends: the precision is the
+  // declared loss, a changed scale is not (PR #586 review).
+  precision.allowed[0].unchanged = ["scale"];
+  assert.equal(gradeRoundTrip(modified(defaulted), precision).status, "pass");
+  const rescaled = {
+    change: "dataTypeChanged",
+    from: { name: "decimal", scale: 3 },
+    to: { name: "decimal", length: 38, scale: 4 },
+  };
+  assert.equal(gradeRoundTrip(modified(rescaled), precision).status, "fail");
 
   // The refusal is limited to deltas a change entry would judge. A delta a
   // whole-delta entry covers, or one no change entry names, is graded as

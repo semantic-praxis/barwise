@@ -1095,30 +1095,36 @@ describe("RelationalMapper", () => {
     it("writes a scale-only decimal with the default precision 38", () => {
       // SQL cannot state a scale without a precision; bare DECIMAL lost
       // the scale (barwise-e5n, ddl-type-round-trip.spec.md R6).
-      const model = new OrmModel({ name: "Test" });
-      const product = model.addObjectType({
-        name: "Product",
-        kind: "entity",
-        referenceMode: "product_id",
-      });
-      const dose = model.addObjectType({
-        name: "DoseAmount",
-        kind: "value",
-        dataType: { name: "decimal", scale: 3 },
-      });
-      model.addFactType({
-        name: "Product has DoseAmount",
-        roles: [
-          { id: "r1", name: "has", playerId: product.id },
-          { id: "r2", name: "is of", playerId: dose.id },
-        ],
-        readings: ["{0} has {1}"],
-        constraints: [{ type: "internal_uniqueness", roleIds: ["r1"] }],
-      });
+      const doseColumn = (scale: number) => {
+        const model = new OrmModel({ name: "Test" });
+        const product = model.addObjectType({
+          name: "Product",
+          kind: "entity",
+          referenceMode: "product_id",
+        });
+        const dose = model.addObjectType({
+          name: "DoseAmount",
+          kind: "value",
+          dataType: { name: "decimal", scale },
+        });
+        model.addFactType({
+          name: "Product has DoseAmount",
+          roles: [
+            { id: "r1", name: "has", playerId: product.id },
+            { id: "r2", name: "is of", playerId: dose.id },
+          ],
+          readings: ["{0} has {1}"],
+          constraints: [{ type: "internal_uniqueness", roleIds: ["r1"] }],
+        });
+        const table = mapper.map(model).tables.find((t) => t.name === "product")!;
+        return table.columns.find((c) => c.name === "dose_amount")!.dataType;
+      };
 
-      const schema = mapper.map(model);
-      const table = schema.tables.find((t) => t.name === "product")!;
-      expect(table.columns.find((c) => c.name === "dose_amount")!.dataType).toBe("DECIMAL(38,3)");
+      expect(doseColumn(3)).toBe("DECIMAL(38,3)");
+      // A scale above 38 takes itself as the precision: DECIMAL(38,39)
+      // states a scale larger than its precision, which no engine accepts
+      // (PR #586 review).
+      expect(doseColumn(39)).toBe("DECIMAL(39,39)");
     });
 
     it("maps float to FLOAT and 'other' to TEXT", () => {

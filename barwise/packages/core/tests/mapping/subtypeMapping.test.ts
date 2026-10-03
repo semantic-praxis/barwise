@@ -47,6 +47,37 @@ describe("subtype relational mapping", () => {
       expect(employeeTable.columns[0]!.name).toBe("employee_id");
     });
 
+    it("does not keep the subtype's own identity on the shared key", () => {
+      // The shared key takes the supertype's value, so an auto_counter
+      // subtype key must not generate one -- nor render UUID GENERATED ...
+      // AS IDENTITY after copying a UUID supertype key (PR #586 review).
+      const model = new ModelBuilder("Test")
+        .withEntityType("Person", { referenceMode: "person_id" })
+        .withValueType("PersonId", { dataType: { name: "uuid" } })
+        .withBinaryFactType("Person has PersonId", {
+          role1: { player: "Person", name: "has" },
+          role2: { player: "PersonId", name: "identifies" },
+          uniqueness: "role1",
+          mandatory: "role1",
+        })
+        .withEntityType("Employee", { referenceMode: "employee_id" })
+        .withValueType("EmployeeId", { dataType: { name: "auto_counter" } })
+        .withBinaryFactType("Employee has EmployeeId", {
+          role1: { player: "Employee", name: "has" },
+          role2: { player: "EmployeeId", name: "identifies" },
+          uniqueness: "role1",
+          mandatory: "role1",
+        })
+        .withSubtypeFact("Employee", "Person")
+        .build();
+
+      const schema = mapper.map(model);
+      const key = schema.tables.find((t) => t.name === "employee")!.columns[0]!;
+      expect(key).toMatchObject({ name: "employee_id", dataType: "UUID" });
+      expect(key.identity).toBeUndefined();
+      expect(renderDdl(schema)).not.toContain("UUID GENERATED");
+    });
+
     it("still creates tables for both entity types", () => {
       const model = new ModelBuilder("Test")
         .withEntityType("Person", { referenceMode: "person_id" })

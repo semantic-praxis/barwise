@@ -378,10 +378,16 @@ export function gradeRoundTrip(diff, lossSet) {
         })`,
     };
   }
+  // `unchanged` names fields that must be equal on both ends, which a
+  // subset match cannot say: the declared loss of a defaulted precision must
+  // not also cover a scale that changed (PR #586 review).
   const covers = (a, c) =>
     a.change === c.change
     && Object.entries(a).every(([k, v]) =>
-      k === "elementType" || k === "kind" || k === "change" || isSubset(v, c[k])
+      k === "elementType" || k === "kind" || k === "change"
+      || (k === "unchanged"
+        ? v.every((f) => JSON.stringify(c.from?.[f]) === JSON.stringify(c.to?.[f]))
+        : isSubset(v, c[k]))
     );
   const uncovered = (d) =>
     d.kind === "modified" && Array.isArray(d.changes) && d.changes.length > 0

@@ -72,12 +72,18 @@ is a separate `Column` field, rendered only by the DDL renderer.
 - **R5.** A `GENERATED ALWAYS AS (expr)` computed column is not an
   identity and keeps its current "not imported" warning.
 - **R6.** When a decimal data type has a scale and no length, the
-  mapper shall write `DECIMAL(38,s)`.
+  mapper shall write `DECIMAL(38,s)`, or `DECIMAL(s,s)` when s is above
+  38, since no engine accepts a scale larger than the precision.
 - **R7.** The DDL loss set shall declare exactly one new loss: a
   `dataTypeChanged` from a decimal with no length to a decimal of
   length 38. The grader's subset match shall read `null` in a loss-set
   entry as "this field is absent", so the entry cannot also cover a
-  decimal whose declared precision changed to 38.
+  decimal whose declared precision changed to 38, and an entry's
+  `unchanged` list shall name fields that must be equal on both ends,
+  so it cannot cover a scale that changed either.
+- **R8.** When a subtype's key becomes the shared key referencing its
+  supertype, the mapper shall drop the subtype's own identity: the
+  column takes the supertype's value.
 
 ## Inventory
 
@@ -134,3 +140,10 @@ import round trip for both types, and the grader's `null` match.
 - **`IDENTITY` as a first type word is still a type.** The shared type
   mapping reads a column typed `IDENTITY` as auto_counter, so the
   importer treats `IDENTITY` as a clause only after the type's first word.
+- **Review of PR #586 found three gaps, all fixed in it.** A subtype
+  whose own key was auto_counter kept its identity after the key became
+  the shared foreign key to its supertype, because `settleSubtypeKey`
+  spreads the copied type over the existing column (R8). The precision
+  entry did not constrain scale, so a changed scale graded as the
+  declared loss (`unchanged` in R7). A scale above 38 rendered as
+  `DECIMAL(38,39)` (R6).
