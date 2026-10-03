@@ -1,6 +1,7 @@
 name: Copilot review
 
-# Requests one Copilot code review on every NON-TRIVIAL pull request.
+# Requests one Copilot code review on every NON-TRIVIAL pull request,
+# except one opened by Dependabot (see DEPENDABOT below).
 #
 # WS1 of barwise/docs/specs/tiered-pr-review.spec.md (barwise-1036). This
 # REQUESTS a review, and nothing blocks a merge on it: the owner decided on
