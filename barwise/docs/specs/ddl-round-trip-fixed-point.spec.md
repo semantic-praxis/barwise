@@ -1,6 +1,6 @@
 # A DDL export reads back as the model that wrote it
 
-Status: Accepted -- workstreams 1 to 3 implemented; 4 and 5 not yet
+Status: Accepted -- workstreams 1 to 4 implemented; 5 not yet
 
 Created: 2026-09-27
 Last-updated: 2026-10-03
@@ -295,3 +295,24 @@ declaring the loss, and the value role as canonical (barwise-fly).
   the undeclared kinds (`modified object_type Provider (referenceMode,
   definition)`) where it used to name only the element. The trial gate
   is unchanged: 1074 steps, 0 new, 0 stale, 172 open.
+- **Workstream 4.** Over the 12 kernels the annotated round trip went
+  from 1,869 deltas to 649. Readings, role names and fact-type
+  definitions no longer differ, and the 341 renamed fact types come back
+  under their own names. The trial's twelve `model-roundtrip:ddl` rows
+  still fail, now with 459 deltas outside the loss set (from 1,784) and
+  190 inside (from 103). What is left is out of this workstream's reach:
+  constraint differences (barwise-fly, and fact types now matched by name
+  report theirs as modified), n-ary and many-to-many tables and the value
+  types and definitions on them (workstream 5), subtypes and
+  objectification (declared loss), and entities whose key is composite.
+  The trial gate is unchanged: 1074 steps, 0 new, 0 stale, 172 open.
+  - **An entity may play one value type twice.** The corpus test found
+    Listing's opening and closing `Timestamp` coming back as
+    `ListingTimestamp`: core's `claimValueTypeName` refuses a second role
+    for one entity, because a second guessed "<Entity> has <Name>" would
+    collide with the first. An annotated fact type has its own name, so
+    the importer passes `namedFactType` and the refusal is lifted for it
+    only; the dbt importer is unchanged.
+  - **A line whose table or column is gone is reported.** The first
+    version ignored such a line silently, which is the case a hand rename
+    produces. Now it is named in the warnings.
