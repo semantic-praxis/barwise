@@ -494,7 +494,7 @@ flowchart TD
         RISK["scripts/pr-risk.mjs\ntier (informational), and trivial or not"]
     end
 
-    subgraph OnPR["On every non-trivial pull request (WS1)"]
+    subgraph OnPR["On every non-trivial, non-Dependabot pull request (WS1)"]
         WF["copilot-review.yml\nopened, reopened, ready_for_review, synchronize"]
         BOT["copilot-pull-request-reviewer bot"]
         OUTCOME["a review: findings fixed on the PR\nor a refusal (quota): carried on past,\nrequested again on the next push"]
@@ -564,7 +564,8 @@ earliest, and a check beats a line of prose that someone must remember.
 
 ## Workstreams (each independently shippable)
 
-**WS1 -- Copilot reviews every NON-TRIVIAL pull request.
+**WS1 -- Copilot reviews every NON-TRIVIAL pull request, except one
+opened by Dependabot (amendment of 2026-10-01).
 (IMPLEMENTED 2026-09-23; request path unverified until first run.)**
 
 _This paragraph used to say the precondition was not established._ It
@@ -758,7 +759,8 @@ the first.
 Acceptance, unchanged in substance: a non-trivial pull request opened
 after this lands carries a Copilot review, observed, with the request
 visible in the workflow log -- and a tracker-only one carries none, with
-the skip visible in its log.
+the skip visible in its log. Since the amendment of 2026-10-01 a
+Dependabot pull request also carries none, with its skip in the log.
 
 **WS2 -- The tier table and its completeness gate. (IMPLEMENTED
 2026-09-18.)** `barwise/review-tiers.json`, `scripts/lib/review-tiers.mjs`,
