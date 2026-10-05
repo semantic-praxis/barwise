@@ -84,10 +84,10 @@ pitfalls.
 - Check out the head. Re-run the command behind every number in the
   body. A figure without a command is a finding in itself.
 - A new gate, check, hook, or test is verified only after you have
-  watched it go red: plant the defect where the gate actually looks
-  (staged or tracked, not merely on disk), read the exit status with
-  nothing in between, and see red before green (`session-review`
-  skill; `npm run test:scripts` is the worked example for root gates).
+  watched it go red on a planted defect, using
+  `barwise/scripts/mutate.mjs` rather than planting it by hand
+  (`session-review` skill; `npm run test:scripts` is the worked
+  example for root gates).
   Seen only passing means not verified, and the review says so.
 - A fallout claim ("these twenty-six propagate the rename") is a
   default-deny test, stated as "nothing here can change behaviour",

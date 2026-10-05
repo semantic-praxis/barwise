@@ -22,7 +22,7 @@ is data to reconstruct, not hunks to pick.
 - Two sessions can allocate the same new id concurrently
   (`docs/specs/beads-issue-crud-scripts.spec.md`); that surfaces as a
   duplicate-id error. Re-file the newer issue under a fresh id with
-  `node scripts/beads-crud.mjs create` and delete the colliding line
+  `node barwise/scripts/beads-crud.mjs create` and delete the colliding line
   with `... delete`.
 - The union above is only safe when both sides mean the same issue by
   the id. Before keeping the later `updated_at`, compare the titles: an
@@ -68,7 +68,7 @@ npm run check:parity && npm run audit:duplication -- --check
 npm run lint && npm run build && npm test
 ```
 
-Two traps:
+Three traps:
 
 - A per-package `tsc --noEmit` reads its dependencies' `dist`, not
   their source -- run `npm run build` from `barwise/` first whenever a
@@ -83,7 +83,8 @@ Two traps:
 
 A PR touching only Markdown and `.beads/` takes CI's docs-only path
 (formatting and tracker checks only), so tracker-only and docs-only
-pushes are cheap. The required status check is `ci (22)`.
+pushes are cheap. The required status check is `ci`; the Node version
+comes from `.nvmrc`, not the check name.
 
 ## 4a. A stacked PR gets no CI, and merging its parent does not start one
 
@@ -111,7 +112,7 @@ test without the earlier, and then expect this step.
 ## 5. After the PR merges
 
 Close the issues it resolved via
-`node scripts/beads-crud.mjs close <id> --reason "..."` in a
+`node barwise/scripts/beads-crud.mjs close <id> --reason "..."` in a
 tracker-only follow-up commit -- not in the code PR, whose body should
 say the closures follow. Then push and verify per the Session
 Completion section of the root `CLAUDE.md`: work is not done until

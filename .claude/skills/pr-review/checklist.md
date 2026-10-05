@@ -214,12 +214,9 @@ now holds, guards, or learns that they did not have to.
 - **A general mechanism is reused, not forked for the special case.**
   A new helper written for its one call site beside a general one it
   could have been, or a general mechanism grown a special-case branch.
-  `roleGraph.ts` states the rule for one walk ("reuse the traversal,
-  don't fork it", ADR-0001) and `joinConstraintRules.ts:148-151`
-  validates a role path with its own `getRoleById` walk anyway;
-  `RoleHop` is referenced in no file outside `roleGraph.ts`.
-  Authority: `model/roleGraph.ts` header; Ousterhout ch. 6,
-  general-purpose modules are deeper.
+  The role-graph walk lives once, in `model/graph.ts`; a second walk
+  over roles elsewhere is the defect this item looks for.
+  Authority: Ousterhout ch. 6, general-purpose modules are deeper.
 - **A class of errors is handled once, at the level that can act, and
   never swallowed.** A `catch` per call site aggregates upward into
   one handler; a `catch` that drops the error or returns a default

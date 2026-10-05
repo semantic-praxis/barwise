@@ -12,7 +12,7 @@ was built while commits have touched the source it names (barwise-910). -->
 
 Created: <YYYY-MM-DD>
 Last-updated: <YYYY-MM-DD>
-Tracking: REPO_REVIEW-<YYYY-MM-DD>.md finding #<n> (or: feature/issue link)
+Tracking: barwise-<id> (or: REPO_REVIEW-<YYYY-MM-DD>.md finding #<n>)
 
 ## Principle
 

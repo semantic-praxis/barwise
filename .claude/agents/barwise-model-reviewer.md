@@ -33,11 +33,12 @@ never the raw `review_model` output. Report:
 
 - A one-line overall assessment.
 - Counts: validation errors, validation warnings, review suggestions.
-- The top 5-10 findings, ranked by severity and deduplicated, each as a
-  single line: severity, the element involved, and the recommended fix.
+- The findings that matter most, ranked by severity and deduplicated,
+  each as a single line: severity, the element involved, and the
+  recommended fix.
 - The premortem: the one to three ways the model is most likely wrong
   even though it validates, flagged as such.
 - Counts of remaining lower-priority findings by category.
 
-Keep the summary under ~300 words. If the caller wants the full review,
-they can run `review_model` directly.
+Keep the summary to what the caller needs to decide the next fix. If
+the caller wants the full review, they can run `review_model` directly.

@@ -45,5 +45,5 @@ never the full model YAML. Report:
   framings to resolve (e.g. is X an entity type or a value type?), not
   just warnings.
 
-Keep the summary under ~200 words. If the caller needs detail, they can
-open the written file themselves.
+Keep the summary to the items above. If the caller needs detail, they
+can open the written file themselves.

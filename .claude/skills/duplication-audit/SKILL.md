@@ -57,9 +57,8 @@ call sites can reach, unless that couples packages.
 **2. When the copy must stay a copy, register it or test it in the
 same commit.** Cross-package parallelism that orthogonality demands
 (the `SqlglotBridge` pair, the surface `idGenerator`s) is legitimate
--- with an entry in `parity.manifest.json` (once
-`docs/specs/duplication-drift-guards.spec.md` W2 lands) or a drift
-test alongside. Never a comment: "Must match X" is the author knowing
+-- with an entry in `parity.manifest.json` (checked by
+`npm run check:parity`) or a drift test alongside. Never a comment: "Must match X" is the author knowing
 the invariant and writing it where nothing can enforce it.
 
 **3. A membership annotation is not a completeness check.**
@@ -88,8 +87,8 @@ code instead of restating it. Counts weld prose to the current state
 **6. When you fix one copy, grep for its siblings before you ship.**
 Every diverged pair in the audit drifted because an edit landed on
 one copy. Search for the duplicated string, the function name, and
-the decision's distinctive literals; the audit doc's class C table is
-the known-siblings index until the manifest exists.
+the decision's distinctive literals; `parity.manifest.json` indexes
+the registered siblings.
 
 ## Audit method (finding the ones already in)
 
