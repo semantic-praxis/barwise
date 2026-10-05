@@ -76,7 +76,7 @@ Lint is run from the repo root: `npm run lint`.
   core's `renderDbt` -- the rendering capability stays in core; this
   package owns only the descriptor.
 - Format registration uses `registerDbtFormats()` called at tool
-  startup, alongside `registerBuiltinFormats()` and
+  startup, alongside `registerStandardFormats()` and
   `registerCodeFormats()`.
 
 ## Dependencies

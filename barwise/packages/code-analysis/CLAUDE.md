@@ -27,21 +27,27 @@ src/
     LspJsonRpc.ts            JSON-RPC 2.0 over stdio transport
     servers/
       typescript.ts           TS server defaults
-      java.ts                 JDT LS defaults (Phase 4)
-      kotlin.ts               kotlin-language-server defaults (Phase 4)
+      java.ts                 JDT LS defaults
+      kotlin.ts               kotlin-language-server defaults
   context/
     ContextAssembler.ts       LSP results + source -> CodeContext
     TypeCollector.ts          Collect type definitions
     ValidationCollector.ts    Collect validation functions
     StateTransitionCollector.ts  Collect state machines
-    AnnotationCollector.ts    Bean Validation/JPA annotations (Phase 4)
+    AnnotationCollector.ts    Bean Validation/JPA annotations
   formats/
     TypeScriptImportFormat.ts  ImportFormat for TypeScript
-    JavaImportFormat.ts        ImportFormat for Java (Phase 4)
-    KotlinImportFormat.ts      ImportFormat for Kotlin (Phase 4)
+    JavaImportFormat.ts        ImportFormat for Java
+    KotlinImportFormat.ts      ImportFormat for Kotlin
     registration.ts            registerCodeFormats()
   prompt/
-    CodeExtractionPrompt.ts    LLM prompt for code analysis (Phase 4)
+    CodeExtractionPrompt.ts    LLM prompt for code analysis
+  repo/
+    RepoManager.ts             Clone a repository for analysis
+    RepoProfiler.ts            Profile a repository (analyze_repository)
+    LanguageDetector.ts        Detect source languages
+    BuildSystemDetector.ts     Detect build systems
+    detectors/                 Framework detectors
 tests/
   lsp/                        LSP infrastructure tests
   context/                    Collector tests

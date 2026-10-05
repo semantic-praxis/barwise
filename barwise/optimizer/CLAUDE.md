@@ -7,12 +7,8 @@ anything, never imported by shipped code.
 Its tests **do** run in CI, on changes under `optimizer/` or
 `packages/cli/` -- the second because the metric tests shell out to the
 real `barwise prompt score`, so a CLI change can break them without
-touching a Python file. That is new: the lane ran in no CI at all until
-barwise-900, and the guard its spec named -- "executed by hand" -- had
-already failed, with the loader round trip red for weeks before anyone
-noticed. Nothing else about the dependency rule changes; the lane is
-still outside Turborepo and still depends on the workspace only as a
-subprocess.
+touching a Python file (barwise-900). The lane is outside Turborepo and
+depends on the workspace only as a subprocess.
 
 Design and grounding: `docs/specs/dspy-optimizer.spec.md`.
 Its parent: `docs/specs/prompt-optimization-harness.spec.md` (workstream 3).
@@ -44,6 +40,8 @@ barwise_optimizer/
   metric.py               candidate -> score, plus the rule tallies behind it
   compile.py              optimizer under an explicit budget; writes the run report
   export.py               compiled program -> candidate .prompt.yaml + delta report
+  verdict.py              the gate decision (beats/ties/loses/unmeasurable)
+  budget.py               CallBudget: the enforced --max-calls ceiling
 tests/                    all offline: no API key, no network
 ```
 
@@ -75,9 +73,9 @@ OPTIMIZER=bootstrap SEED_FROM=default TARGET=anthropic/claude-haiku-4-5 \
 
 It refuses rather than guesses, and every refusal is free: no key, a dirty
 tree (the candidate's provenance names a commit), a missing proposer for
-`mipro`/`gepa`. The `pytest` step is there because nothing else catches a
-red test in this lane (barwise-900) and the minute before spending money
-is when hand-running pays.
+`mipro`/`gepa`. The `pytest` step is there because CI runs this suite only
+on changes under `optimizer/` or `packages/cli/`, and the minute before
+spending money is when a local run pays.
 
 **Rebuild the CLI after pulling.** The seam runs
 `packages/cli/dist/index.js` -- built output, not sources -- so a branch
@@ -246,15 +244,14 @@ through. `BARWISE_CLI` overrides what gets run.
   live in the uv-managed venv, not in the ambient interpreter -- and that
   error reads exactly like "this machine cannot run the suite", which is
   how it was once written into a commit message as a fact. `uv sync
-  --extra dev` then `uv run pytest -q` is the whole story, and
-  `../compile-runner.sh` does both as preflight.
+  --frozen --extra dev` then `uv run --frozen --extra dev pytest -q` is
+  the whole story, and `../compile-runner.sh` does both as preflight.
 - Everything runs offline.
-- **Run it before you spend money, because nothing else will.** This
-  lane is outside Turborepo and CI by design, so a red test here is
-  reported by no one. The loader round trip below sat red from the day
-  the haiku45-2 variant shipped until it was noticed by accident weeks
-  later; the spec's whole guard is the clause "executed by hand"
-  (barwise-900 weighs what should replace it).
+- **Run it before you spend money.** CI runs this suite only when
+  `optimizer/` or `packages/cli/` changes, so a change to anything else
+  the seam depends on (a rebuilt `dist`, the eval suite) is caught only
+  by running it yourself. The loader round trip once sat red for weeks
+  before CI covered it (barwise-900).
 - `DummyLM` drives the program end to end -- signature rendering, the
   call, parsing, the metric -- with no key and no network.
 - The metric tests run the **real** `barwise prompt score` subprocess

@@ -30,6 +30,9 @@ src/
   run/         runSuite: cases x repeat through an LlmClient with the
                active prompt artifact
   history/     JSONL score history (append/read; caller supplies dates)
+  stats/       dispersion: per-case SD and suite standard error
+  provenance/  promptHash over the rendered system prompt
+  record/      recorded-payload naming, rescoring and comparison
   index.ts     Public API barrel
 
 evals/         The packaged seed suite: suite.yaml (weights + declared

@@ -113,8 +113,10 @@ bundle time.
      integration. Runs in the extension host process with full access
      to Copilot language models. `ToolRegistration.ts` wraps each
      `execute*()` function from `@barwise/mcp` in a
-     `LanguageModelTool<T>`. The `import_transcript` tool uses
-     `CopilotLlmClient` directly so no API key is needed.
+     `LanguageModelTool<T>`. The `import_transcript` and `review_model`
+     tools resolve their client from `barwise.llmProvider`: Copilot by
+     default (no API key), Anthropic with the key from
+     `ExtensionContext.secrets` when configured.
   2. **MCP stdio server** (`registerMcpServerDefinitionProvider`) --
      spawns `dist/mcp/index.js` as a child process for external MCP
      clients that discover servers through VS Code.
