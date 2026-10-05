@@ -2,11 +2,11 @@
 
 Tracking: barwise-tj3
 
-**Status at the commit that added this file.** The project-file hunks
-P1-P32 in the diff below were applied in that commit, except P14,
-which is a flag. One site was added during application:
-`session-review/SKILL.md:89` spelled `node scripts/mutate.mjs` with
-the same defect as P27 and got the same fix. Open items:
+**Status when this file was added.** The project-file hunks P1-P32 in
+the diff below were applied in the two commits just before it, except
+P14, which is a flag. P27 covers five sites: four spell
+`node scripts/beads-crud.mjs` and one, `session-review/SKILL.md:89`,
+spells `node scripts/mutate.mjs`. Open items:
 
 - F1 and F2 (the `bd` block in `AGENTS.md`): barwise-a49.
 - P14 (the release bump committed to `main`): barwise-8e4.
