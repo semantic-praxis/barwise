@@ -340,8 +340,15 @@ jobs:
       # after every local gate passed (PR #422). The lock is asserted
       # `--locked` by the sqlglot step above; `uv run` syncs the dev extra
       # itself.
+      #
+      # It also carries the docs-only guard, because it needs the build
+      # that guard skips. Without it a Markdown-only change under
+      # `barwise/optimizer/` set both `docs_only` and `optimizer`, skipped
+      # `npm run build`, and ran this suite against a missing
+      # `packages/cli/dist`: 18 failed, 6 errors, "No barwise CLI found"
+      # (PR #590).
       - name: Optimizer lane (Python)
-        if: steps.changes.outputs.optimizer == 'true'
+        if: steps.changes.outputs.optimizer == 'true' && steps.changes.outputs.docs_only != 'true'
         run: npm run test:optimizer
 
       # The rubric ratchet: every eval check that survives the mutation
