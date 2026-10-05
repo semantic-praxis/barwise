@@ -1,8 +1,9 @@
-# Tiered PR review: Copilot on every non-trivial PR, and learning from what it finds
+# Tiered PR review: Copilot on every non-trivial, non-Dependabot PR, and learning from what it finds
 
 Status: WS1, WS2 and WS3 IMPLEMENTED. **WS4 WITHDRAWN** by the owner's
 decision of 2026-09-23 (Open decision 6, resolved): Copilot reviews every
-non-trivial pull request, nothing blocks on the review, and when Copilot
+non-trivial pull request except Dependabot's (amendment of 2026-10-01),
+nothing blocks on the review, and when Copilot
 cannot review -- an exhausted quota -- work carries on without it. See
 "The decision of 2026-09-23". WS5 is unbuilt. **WS6 is new** (barwise-1050):
 classify what the reviews find by failure mode and prevent the most
@@ -18,7 +19,7 @@ merges high-risk, 70% of the last 40 -- stands as a description; with no
 gate reading the tier, it is no longer a budget anything fails against.
 
 Created: 2026-09-17
-Last-updated: 2026-10-01
+Last-updated: 2026-10-03
 Tracking: barwise-1036 (WS1, the Copilot review workflow); barwise-1037 (WS2,
 the tier table and its completeness gate); barwise-1038 (WS3, the
 classifier); barwise-1041 (WS4, the blocking gate -- withdrawn); barwise-1040
@@ -31,8 +32,8 @@ state). Extends `docs/specs/pr-skills.spec.md`, which wrote the review
 down, and applies `docs/specs/gate-refusal-contract.spec.md`, which is
 the reason the gate here has three results instead of two.
 
-In one sentence: every non-trivial pull request has a Copilot review
-requested -- a refusal, when the quota is out, is carried on past --
+In one sentence: every non-trivial pull request not opened by Dependabot
+has a Copilot review requested -- a refusal, when the quota is out, is carried on past --
 nothing blocks on it, and what the reviews keep finding is classified so
 the most common failure can be prevented before review instead of fixed
 after it.
@@ -493,7 +494,7 @@ flowchart TD
         RISK["scripts/pr-risk.mjs\ntier (informational), and trivial or not"]
     end
 
-    subgraph OnPR["On every non-trivial pull request (WS1)"]
+    subgraph OnPR["On every non-trivial, non-Dependabot pull request (WS1)"]
         WF["copilot-review.yml\nopened, reopened, ready_for_review, synchronize"]
         BOT["copilot-pull-request-reviewer bot"]
         OUTCOME["a review: findings fixed on the PR\nor a refusal (quota): carried on past,\nrequested again on the next push"]
@@ -563,7 +564,8 @@ earliest, and a check beats a line of prose that someone must remember.
 
 ## Workstreams (each independently shippable)
 
-**WS1 -- Copilot reviews every NON-TRIVIAL pull request.
+**WS1 -- Copilot reviews every NON-TRIVIAL pull request, except one
+opened by Dependabot (amendment of 2026-10-01).
 (IMPLEMENTED 2026-09-23; request path unverified until first run.)**
 
 _This paragraph used to say the precondition was not established._ It
@@ -757,7 +759,8 @@ the first.
 Acceptance, unchanged in substance: a non-trivial pull request opened
 after this lands carries a Copilot review, observed, with the request
 visible in the workflow log -- and a tracker-only one carries none, with
-the skip visible in its log.
+the skip visible in its log. Since the amendment of 2026-10-01 a
+Dependabot pull request also carries none, with its skip in the log.
 
 **WS2 -- The tier table and its completeness gate. (IMPLEMENTED
 2026-09-18.)** `barwise/review-tiers.json`, `scripts/lib/review-tiers.mjs`,

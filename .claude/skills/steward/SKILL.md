@@ -156,7 +156,8 @@ usefully run.
 
 ## 7. A Copilot refusal is not a review, and nothing waits on it
 
-A Copilot review is requested on every non-trivial pull request, and nothing blocks on
+A Copilot review is requested on every non-trivial pull request except
+Dependabot's (Copilot drops a request on those), and nothing blocks on
 that review (`docs/specs/tiered-pr-review.spec.md`, "The decision of
 2026-09-23"). When its quota is exhausted it posts a refusal AS a review
 -- "Copilot was unable to review this pull request because the user who
