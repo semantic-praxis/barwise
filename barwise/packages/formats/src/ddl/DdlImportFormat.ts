@@ -589,23 +589,14 @@ export class DdlImportFormat implements ImportFormat {
       );
     }
 
-    const annotation = this.columnAnnotation(
-      model,
-      annotations,
-      table,
-      column,
-      entity,
-      undefined,
-      warnings,
-    );
-    const identifier = this.claimValueType(
+    const { valueType: identifier, annotation } = this.claimValueType(
       model,
       entity,
       column,
       "key",
       table,
       warnings,
-      annotation,
+      this.columnAnnotation(model, annotations, table, column, entity, undefined, warnings),
     );
     // Minted, never built from names (importer-role-ids.spec.md).
     const entityRoleId = generateId();
@@ -643,6 +634,12 @@ export class DdlImportFormat implements ImportFormat {
    * The value type a column plays, shared or created under core's
    * `claimValueTypeName` -- the rule the dbt importer uses, so a schema's
    * value types do not depend on which importer read it.
+   *
+   * Returns the annotation the caller may still use. An annotation whose
+   * value type name is held by something it cannot share is stale: the
+   * claim would create a fallback name while the annotated fact type still
+   * named the original, so the annotation is set aside and the column
+   * claimed as an unannotated one (PR #589 review).
    */
   private claimValueType(
     model: OrmModel,
@@ -652,7 +649,7 @@ export class DdlImportFormat implements ImportFormat {
     table: ParsedTable,
     warnings: string[],
     annotation?: ColumnAnnotation,
-  ): ObjectType {
+  ): { valueType: ObjectType; annotation?: ColumnAnnotation; } {
     const dataType = columnDataType(column);
     const candidate = annotation
       ? annotation.roles[1 - annotation.rowRole]!.player
@@ -670,7 +667,15 @@ export class DdlImportFormat implements ImportFormat {
       column.valueConstraint,
       { namedFactType: annotation !== undefined },
     );
-    if (claim.kind === "share") return claim.valueType;
+    if (claim.kind === "share") return { valueType: claim.valueType, annotation };
+    if (annotation && claim.displaced) {
+      warnings.push(
+        `Table "${table.name}", column "${column.name}": the annotation no longer matches `
+          + `("${candidate}" is held by ${claim.displaced.kind} type "${claim.displaced.name}", which it cannot share); `
+          + `names are guessed from the column instead.`,
+      );
+      return this.claimValueType(model, entity, column, role, table, warnings);
+    }
     if (claim.displaced) {
       warnings.push(
         `Table "${table.name}", column "${column.name}" (${column.dataType}): the name "${candidate}" is `
@@ -678,13 +683,14 @@ export class DdlImportFormat implements ImportFormat {
           + `created value type "${claim.name}" instead.`,
       );
     }
-    return model.addObjectType({
+    const valueType = model.addObjectType({
       name: claim.name,
       kind: "value",
       dataType,
       ...(column.valueConstraint ? { valueConstraint: column.valueConstraint } : {}),
       ...(annotation?.valueDefinition ? { definition: annotation.valueDefinition } : {}),
     });
+    return { valueType, annotation };
   }
 
   /**
@@ -796,23 +802,14 @@ export class DdlImportFormat implements ImportFormat {
     warnings: string[],
   ): void {
     try {
-      const annotation = this.columnAnnotation(
-        model,
-        annotations,
-        table,
-        column,
-        entityType,
-        undefined,
-        warnings,
-      );
-      const valueType = this.claimValueType(
+      const { valueType, annotation } = this.claimValueType(
         model,
         entityType,
         column,
         "attribute",
         table,
         warnings,
-        annotation,
+        this.columnAnnotation(model, annotations, table, column, entityType, undefined, warnings),
       );
       // Minted, not built from names; see createForeignKeyFactType.
       const entityRoleId = generateId();

@@ -13,10 +13,12 @@
  * test over the trial kernels and the examples pins it.
  */
 
-import type { OrmModel } from "@barwise/core";
+import { type OrmModel, validateReadingTemplate } from "@barwise/core";
 import type { RelationalSchema, Table } from "@barwise/core/mapping";
 
 const PREFIX = "-- barwise:v1 ";
+/** Any version's line, so a version this reader does not know is named, not taken for plain DDL. */
+const ANY_VERSION = /^-- barwise:v(\d+) /;
 
 /** An entity table: the entity it came from. */
 export interface TableAnnotation {
@@ -121,9 +123,11 @@ export function injectBarwiseAnnotations(
   const result: string[] = [];
   let columns: Map<string, ColumnAnnotation> | undefined;
   for (const line of ddl.split("\n")) {
-    const create = /^CREATE TABLE "?(.+?)"? \($/.exec(line);
+    const create = CREATE_LINE.exec(line);
     if (create) {
-      const table = schema.tables.find((t) => t.name === create[1]);
+      // A quoted name doubles its quotes; the schema holds it undoubled.
+      const name = create[1] ?? create[2]!.replace(/""/g, '"');
+      const table = schema.tables.find((t) => t.name === name);
       const annotated = table ? annotateTable(model, table) : undefined;
       if (annotated?.table) result.push(renderAnnotation(annotated.table));
       columns = annotated?.columns;
@@ -138,6 +142,9 @@ export function injectBarwiseAnnotations(
   }
   return result.join("\n");
 }
+
+/** A table's first line in the DDL renderer: a plain or a quoted name. */
+const CREATE_LINE = /^CREATE TABLE (?:([a-z_][a-z0-9_]*)|"((?:[^"]|"")+)") \($/;
 
 /** A column line of the DDL renderer: two spaces, then a plain or a quoted name. */
 const COLUMN_LINE = /^ {2}(?:([a-z_][a-z0-9_]*)|"((?:[^"]|"")+)") /;
@@ -166,7 +173,16 @@ export function readAnnotations(input: string, warnings: string[]): ReadAnnotati
   const columns = new Map<string, ColumnAnnotation>();
   for (const raw of input.split("\n")) {
     const line = raw.trim();
-    if (!line.startsWith(PREFIX)) continue;
+    const version = ANY_VERSION.exec(line);
+    if (!version) continue;
+    if (!line.startsWith(PREFIX)) {
+      warnings.push(
+        `Annotation version v${version[1]} is not one this importer reads (v1); "${
+          line.slice(0, 60)
+        }" ignored.`,
+      );
+      continue;
+    }
     let value: unknown;
     try {
       value = JSON.parse(line.slice(PREFIX.length));
@@ -189,9 +205,19 @@ function optionalString(v: unknown): boolean {
   return v === undefined || typeof v === "string";
 }
 
+/**
+ * A name the model will accept. The JSON shape alone let an empty name or
+ * a reading without `{1}` through, and the model's constructor then threw
+ * and aborted the whole import over one hand-edited comment (PR #589
+ * review); such a line is now unreadable, so its column is guessed.
+ */
+function isName(v: unknown): v is string {
+  return typeof v === "string" && v.trim().length > 0;
+}
+
 function isTableAnnotation(v: unknown): v is TableAnnotation {
-  return isRecord(v) && v["kind"] === "table" && typeof v["table"] === "string"
-    && typeof v["entity"] === "string" && typeof v["referenceMode"] === "string"
+  return isRecord(v) && v["kind"] === "table" && isName(v["table"])
+    && isName(v["entity"]) && isName(v["referenceMode"])
     && optionalString(v["definition"]);
 }
 
@@ -199,14 +225,11 @@ function isColumnAnnotation(v: unknown): v is ColumnAnnotation {
   if (!isRecord(v) || v["kind"] !== "column") return false;
   const roles = v["roles"];
   const readings = v["readings"];
-  return typeof v["table"] === "string" && typeof v["column"] === "string"
-    && typeof v["factType"] === "string"
+  return isName(v["table"]) && isName(v["column"]) && isName(v["factType"])
     && Array.isArray(readings) && readings.length > 0
-    && readings.every((r) => typeof r === "string")
+    && readings.every((r) => typeof r === "string" && validateReadingTemplate(r, 2).length === 0)
     && Array.isArray(roles) && roles.length === 2
-    && roles.every((r) =>
-      isRecord(r) && typeof r["name"] === "string" && typeof r["player"] === "string"
-    )
+    && roles.every((r) => isRecord(r) && isName(r["name"]) && isName(r["player"]))
     && (v["rowRole"] === 0 || v["rowRole"] === 1)
     && optionalString(v["definition"]) && optionalString(v["valueDefinition"]);
 }

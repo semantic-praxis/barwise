@@ -82,6 +82,49 @@ describe("the annotation line", () => {
     expect(warnings[0]).toMatch(/is not JSON/);
     expect(warnings[1]).toMatch(/unknown shape/);
   });
+
+  it("names a version it does not read, rather than taking the line for plain DDL", () => {
+    // PR #589 review: a v2 line missed the v1 prefix and was skipped in silence.
+    const warnings: string[] = [];
+    const read = readAnnotations('-- barwise:v2 {"kind":"table"}', warnings);
+    expect(read.tables.size).toBe(0);
+    expect(warnings).toEqual([
+      `Annotation version v2 is not one this importer reads (v1); "-- barwise:v2 {"kind":"table"}" ignored.`,
+    ]);
+  });
+
+  it("refuses a line the model could not build: an empty name, or a reading missing a role", () => {
+    // PR #589 review: these passed the shape check, and the fact type's
+    // constructor then threw and aborted the whole import.
+    const base: ColumnAnnotation = {
+      kind: "column",
+      table: "t",
+      column: "c",
+      factType: "T has C",
+      readings: ["{0} has {1}"],
+      roles: [{ name: "has", player: "T" }, { name: "is of", player: "C" }],
+      rowRole: 0,
+    };
+    for (
+      const bad of [
+        { ...base, factType: "" },
+        { ...base, readings: ["{0} has"] },
+        { ...base, roles: [{ name: "", player: "T" }, base.roles[1]] },
+      ]
+    ) {
+      const warnings: string[] = [];
+      expect(readAnnotations(renderAnnotation(bad as ColumnAnnotation), warnings).columns.size)
+        .toBe(0);
+      expect(warnings).toHaveLength(1);
+    }
+    // And end to end: the import finishes and guesses for the column.
+    const { model, warnings } = new DdlImportFormat().parse(`
+      CREATE TABLE t (t_id INT PRIMARY KEY,
+        ${renderAnnotation({ ...base, readings: ["{0} has"] } as ColumnAnnotation)}
+        c VARCHAR(9));`);
+    expect(warnings.some((w) => /unknown shape/.test(w))).toBe(true);
+    expect(model.getFactTypeByName("T has C")).toBeDefined();
+  });
 });
 
 describe("the importer reads the export's annotations", () => {
@@ -224,6 +267,61 @@ model:
       + `names are guessed from the column instead.`,
     ]);
     expect(model.getFactTypeByName("A belongs to B")).toBeUndefined();
+  });
+});
+
+describe("what the annotations do not trust", () => {
+  it("annotates a table whose quoted name doubles a quote", () => {
+    // PR #589 review: the exporter looked the table up by its quoted
+    // spelling, so a name with a double quote got no annotations at all.
+    const model = new OrmYamlSerializer().deserialize(`
+orm_version: "1.0"
+model:
+  name: Q
+  object_types:
+    - { id: ot-a, name: 'Say"Hi', kind: entity, reference_mode: code }
+    - { id: ot-code, name: Code, kind: value, data_type: { name: text, length: 9 } }
+  fact_types:
+    - id: ft-code
+      name: Say"Hi has Code
+      roles:
+        - { id: r1, player: ot-a, role_name: has }
+        - { id: r2, player: ot-code, role_name: identifies }
+      readings: ["{0} has {1}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r1] }
+        - { type: internal_uniqueness, roles: [r2], is_preferred: true }
+        - { type: mandatory, role: r1 }
+`);
+    const text = new DdlExportFormat().export(model).text;
+    const read = readAnnotations(text, []);
+    expect([...read.tables.values()].map((t) => t.entity)).toEqual(['Say"Hi']);
+    expect(read.columns.size).toBe(1);
+  });
+
+  it("sets aside an annotation whose value type name an entity holds", () => {
+    // PR #589 review: the claim fell back to "TCode" while the fact type
+    // kept the annotation's name and readings for "Code".
+    const line = renderAnnotation({
+      kind: "column",
+      table: "t",
+      column: "code",
+      factType: "T has Code",
+      readings: ["{0} has {1}"],
+      roles: [{ name: "has", player: "T" }, { name: "is of", player: "Code" }],
+      rowRole: 0,
+    });
+    const { model, warnings } = new DdlImportFormat().parse(`
+      CREATE TABLE code (code_id INT PRIMARY KEY);
+      CREATE TABLE t (t_id INT PRIMARY KEY,
+        ${line}
+        code VARCHAR(9));`);
+    expect(warnings).toContain(
+      `Table "t", column "code": the annotation no longer matches ("Code" is held by entity type "Code", `
+        + `which it cannot share); names are guessed from the column instead.`,
+    );
+    expect(model.getFactTypeByName("T has Code")).toBeUndefined();
+    expect(model.getFactTypeByName("T has TCode")).toBeDefined();
   });
 });
 
