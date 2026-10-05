@@ -37,7 +37,7 @@ the green meant nothing:
   and two readings came back `0`;
 - `python3 -m pytest` failing was concluded as "this container cannot
   run the suite" and written into a commit message as fact, when the
-  deps lived in the uv venv and `uv run --frozen pytest` gave 95 passed.
+  deps lived in the uv venv and `uv run --frozen --extra dev pytest` gave 95 passed.
 
 So: put the defect where the gate actually looks (staged or tracked, not
 merely on disk), read the status with nothing in between, and establish

@@ -593,7 +593,7 @@ issue status, then push and verify:
 
 ```bash
 git pull --rebase
-bd dolt push   # only where bd is installed; issues.jsonl travels with git push
+if command -v bd >/dev/null; then bd dolt push; fi  # issues.jsonl travels with git push either way
 git push
 git status  # must show "up to date with origin"
 ```

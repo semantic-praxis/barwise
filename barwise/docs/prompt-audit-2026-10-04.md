@@ -17,6 +17,16 @@ spells `node scripts/mutate.mjs`. Open items:
 The user-level skills (the U findings) are outside this repository
 and were not edited.
 
+Three hunks were revised in review on PR #590, and the diff below
+shows the revised text:
+
+- P16: a trailing comment does not stop the shell running a missing
+  `bd`, so the line now tests for the command first.
+- P26: `mutate.mjs` writes only the working tree, so the original
+  staged-or-tracked instruction is kept and the helper is scoped to
+  gates that read the working tree.
+- P30: `pytest` comes from the `dev` extra, so the command names it.
+
 ## Assumptions
 
 - **Scope.** The Claude Code configuration that loads in this project:
@@ -218,7 +228,7 @@ One finding per hunk. Context lines are approximate where long lines are elided;
 @@ -594,4 +594,4 @@
  git pull --rebase
 -bd dolt push
-+bd dolt push   # only where bd is installed; issues.jsonl travels with git push
++if command -v bd >/dev/null; then bd dolt push; fi  # issues.jsonl travels with git push either way
  git push
  git status  # must show "up to date with origin"
 ```
@@ -445,15 +455,17 @@ One finding per hunk. Context lines are approximate where long lines are elided;
 # P26
 --- a/.claude/skills/pr-review/SKILL.md
 +++ b/.claude/skills/pr-review/SKILL.md
-@@ -86,6 +86,4 @@
+@@ -86,6 +86,9 @@
  - A new gate, check, hook, or test is verified only after you have
--  watched it go red: plant the defect where the gate actually looks
--  (staged or tracked, not merely on disk), read the exit status with
+   watched it go red: plant the defect where the gate actually looks
+   (staged or tracked, not merely on disk), read the exit status with
 -  nothing in between, and see red before green (`session-review`
 -  skill; `npm run test:scripts` is the worked example for root gates).
-+  watched it go red on a planted defect, via `barwise/scripts/mutate.mjs`
-+  rather than by hand (`session-review` skill; `npm run test:scripts`
-+  pins this for root gates).
++  nothing in between, and see red before green. For a gate that reads
++  the working tree, `barwise/scripts/mutate.mjs` does all three; it
++  never touches the index, so a gate that reads staged content needs
++  the defect staged by hand (`session-review` skill; `npm run
++  test:scripts` is the worked example for root gates).
    Seen only passing means not verified, and the review says so.
 ```
 
@@ -531,7 +543,7 @@ One finding per hunk. Context lines are approximate where long lines are elided;
 +++ b/.claude/skills/assertion-audit/SKILL.md
 @@ -40 +40 @@
 -  deps lived in the uv venv and `uv run pytest` gave 95 passed.
-+  deps lived in the uv venv and `uv run --frozen pytest` gave 95 passed.
++  deps lived in the uv venv and `uv run --frozen --extra dev pytest` gave 95 passed.
 ```
 
 ```diff
