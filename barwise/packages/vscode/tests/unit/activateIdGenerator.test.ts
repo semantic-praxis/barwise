@@ -52,5 +52,11 @@ describe("activate", () => {
     const { activate } = await import("../../src/client/extension.js");
     activate(inert.make() as Parameters<typeof activate>[0]);
     expect(generateId()).toMatch(V7_SHAPE);
-  }, 20_000); // importing the whole extension graph took 2.3s cold
+  }, 60_000);
+  // Importing the whole extension graph is the slow part, and its time
+  // depends on what else the machine is running (barwise-nhh). Measured
+  // 2026-10-07 on 4 CPUs: 3.7s alone; 13.2s and 15.7s in the full
+  // turbo test and test:coverage runs; three runs past the old 20s limit
+  // in the pre-commit and pre-push hooks, worst case unknown. 60s is three
+  // times the old limit, and still fails fast on a real hang.
 });
