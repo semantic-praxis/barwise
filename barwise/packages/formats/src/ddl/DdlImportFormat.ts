@@ -193,13 +193,18 @@ export class DdlImportFormat implements ImportFormat {
         );
         continue;
       }
-      const keyedOnForeignKeys = foreignKeysOfKey(table) !== undefined;
-      const referenceMode = annotated && (table.primaryKey.length === 1 || keyedOnForeignKeys)
+      // A table objectifies a relationship when its key is its foreign keys,
+      // or when its line says so: an objectified fact type keyed on a value
+      // role as well (C01's Admission, on patient and time) has a key with
+      // a plain column in it, and is still the relationship (barwise-c65).
+      const objectifies = foreignKeysOfKey(table) !== undefined
+        || annotated?.objectifies !== undefined;
+      const referenceMode = annotated && (table.primaryKey.length === 1 || objectifies)
         ? annotated.referenceMode
-        : keyedOnForeignKeys
+        : objectifies
         ? `${table.name}_id`
         : this.inferReferenceMode(table);
-      if (keyedOnForeignKeys) objectifying.push(table);
+      if (objectifies) objectifying.push(table);
 
       const entityType = model.addObjectType({
         name: entityName,

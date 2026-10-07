@@ -575,7 +575,10 @@ describe("RelationalMapper", () => {
   });
 
   describe("objectified fact type mapping", () => {
-    it("absorbs a mixed entity/value-role fact type's entity roles as a composite PK", () => {
+    // barwise-c65: the value role used to get no column, and the key was
+    // the entity roles whatever the uniqueness said. The test that stood
+    // here asserted both as correct.
+    const marriageModel = (uniqueOver?: string[]) => {
       const model = new OrmModel({ name: "Test" });
       const person = model.addObjectType({
         name: "Person",
@@ -598,19 +601,36 @@ describe("RelationalMapper", () => {
         roles: [
           { id: "r1", name: "marries in", playerId: person.id },
           { id: "r2", name: "hosts", playerId: country.id },
-          // A value-type role: skipped when absorbing FK columns.
           { id: "r3", name: "as", playerId: role.id },
         ],
         readings: ["{0} marries in {1} as {2}"],
+        ...(uniqueOver
+          ? { constraints: [{ type: "internal_uniqueness" as const, roleIds: uniqueOver }] }
+          : {}),
       });
       model.addObjectifiedFactType({ factTypeId: ft.id, objectTypeId: marriage.id });
+      return mapper.map(model).tables.find((t) => t.name === "marriage")!;
+    };
 
-      const schema = mapper.map(model);
-      const marriageTable = schema.tables.find((t) => t.name === "marriage")!;
-      expect(marriageTable.primaryKey.columnNames).toEqual(["person_id", "country_code"]);
-      expect(marriageTable.foreignKeys).toHaveLength(2);
-      // The value-type role contributes no column.
-      expect(marriageTable.columns.some((c) => c.sourceRoleId === "r3")).toBe(false);
+    it("absorbs every role of a mixed fact type, the value role as a column of its own", () => {
+      const table = marriageModel(["r1", "r2"]);
+      expect(table.columns.find((c) => c.sourceRoleId === "r3")).toMatchObject({
+        name: "role",
+        nullable: false,
+      });
+      expect(table.foreignKeys).toHaveLength(2);
+      expect(table.primaryKey.columnNames).toEqual(["person_id", "country_code"]);
+    });
+
+    it("keys the absorbing table on the fact type's uniqueness, value role included", () => {
+      // Unique on person and role: the entity roles alone would be the
+      // wrong key, as C01's Admission was (patient and facility, where the
+      // model says patient and time).
+      expect(marriageModel(["r1", "r3"]).primaryKey.columnNames).toEqual(["person_id", "role"]);
+    });
+
+    it("keys it on every role when the fact type declares no uniqueness", () => {
+      expect(marriageModel().primaryKey.columnNames).toEqual(["person_id", "country_code", "role"]);
     });
 
     it("leaves the entity's original PK when the underlying fact type has no entity roles", () => {
