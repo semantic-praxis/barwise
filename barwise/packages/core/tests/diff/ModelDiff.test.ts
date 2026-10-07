@@ -1552,7 +1552,7 @@ describe("a constraint over roles of other fact types", () => {
   // barwise-b7z: a role outside the host fact type was keyed by its raw
   // id, so two models differing only in role ids reported every external
   // uniqueness as removed and added.
-  const model = (unique: "number" | "name", buildingRole = 1) => {
+  const model = (unique: "number" | "name", buildingRole = 1, other = "Room is in Building") => {
     const m = new ModelBuilder("Rooms")
       .withEntityType("Room", { referenceMode: "room_id" })
       .withEntityType("Building", { referenceMode: "building_id" })
@@ -1574,7 +1574,7 @@ describe("a constraint over roles of other fact types", () => {
     const host = m.getFactTypeByName(
       unique === "number" ? "Room has RoomNumber" : "Room has RoomName",
     )!;
-    const building = m.getFactTypeByName("Room is in Building")!;
+    const building = m.getFactTypeByName(other)!;
     host.addConstraint({
       type: "external_uniqueness",
       roleIds: [host.roles[1]!.id, building.roles[buildingRole]!.id],
@@ -1602,6 +1602,33 @@ describe("a constraint over roles of other fact types", () => {
   it("is reported when it names a different role of the other fact type", () => {
     expect(constraintChanges(model("number"), model("number", 0)).map((c) => c.change).sort())
       .toEqual(["constraintsAdded", "constraintsRemoved"]);
+  });
+
+  it("is reported when it names the same position of a different fact type", () => {
+    // The fact type's name is part of the key, not only the position.
+    expect(
+      constraintChanges(model("number"), model("number", 1, "Room has RoomName")).map((c) =>
+        c.change
+      ).sort(),
+    )
+      .toEqual(["constraintsAdded", "constraintsRemoved"]);
+  });
+
+  it("keys a role id two fact types hold by its raw id, as graphOf refuses it", () => {
+    // Ambiguous: naming either holder could match a constraint that names
+    // the other. With the raw id, regenerated ids read as a change, which
+    // is the conservative answer.
+    const ambiguous = (m: OrmModel) => {
+      const yaml = new OrmYamlSerializer();
+      const text = yaml.serialize(m);
+      const id = m.getFactTypeByName("Room is in Building")!.roles[1]!.id;
+      const other = m.getFactTypeByName("Room has RoomName")!.roles[1]!.id;
+      return yaml.deserialize(text.split(other).join(id));
+    };
+    const a = ambiguous(model("number"));
+    expect(constraintChanges(a, ambiguous(withNewRoleIds(model("number")))).length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("that moved to another host still reads as removed from one and added to the other", () => {

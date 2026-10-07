@@ -288,7 +288,8 @@ type RoleKeys = (id: string) => string;
  * Key a constraint's roles: a role of the host fact type by its position,
  * a role of another fact type by that fact type's name and its position
  * there -- the diff matches fact types by name, so that names the same
- * role in both models. Only a role no fact type holds keeps its raw id.
+ * role in both models. A role no fact type holds, or more than one does,
+ * keeps its raw id.
  * The cross-fact-type case used to keep the raw id too, so every external
  * uniqueness read as removed and added after an import minted new role
  * ids (barwise-b7z, diff-cross-fact-type-role-keys.spec.md).
@@ -298,8 +299,14 @@ function roleKeys(roles: readonly Role[], model: OrmModel): RoleKeys {
   return (id) => {
     const own = host.get(id);
     if (own !== undefined) return own;
-    const home = model.factTypes.find((ft) => ft.getRoleById(id));
-    return home ? `${home.name}#${home.roles.findIndex((r) => r.id === id)}` : id;
+    // An id two fact types hold is ambiguous, as `graphOf` treats it; like
+    // a dangling id it keeps the raw id rather than naming either holder.
+    // `graphOf` itself cannot serve here: it refuses the whole model on
+    // any unresolved reference, and the diff must still key fragments.
+    const homes = model.factTypes.filter((ft) => ft.getRoleById(id));
+    if (homes.length !== 1) return id;
+    const home = homes[0]!;
+    return `${home.name}#${home.roles.findIndex((r) => r.id === id)}`;
   };
 }
 

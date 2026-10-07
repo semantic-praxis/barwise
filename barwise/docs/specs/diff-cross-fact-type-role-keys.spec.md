@@ -3,7 +3,7 @@
 Status: Implemented -- the one workstream landed with this spec
 Created: 2026-10-07
 Last-updated: 2026-10-07
-Tracking: barwise-b7z (join constraints: barwise-q8x); found by `ddl-round-trip-fixed-point.spec.md`,
+Tracking: barwise-b7z (join constraints: barwise-q8x; host independence: barwise-iuj); found by `ddl-round-trip-fixed-point.spec.md`,
 workstream 6
 
 In one sentence: the diff keys a constraint's roles by position only
@@ -140,7 +140,9 @@ constraints.
   move is reported nowhere is dropped when the old host is accepted as
   modified for another reason and the new host is unchanged. Reporting
   the move as a removal and an addition keeps merge correct. Revisit if
-  host moves turn out to be common outside the DDL import.
+  host moves turn out to be common outside the DDL import. Tracked as
+  barwise-iuj, with a third option: have the DDL import host each
+  constraint where the original did.
 
 ## Risks and testing
 
@@ -174,3 +176,9 @@ constraints.
 - **The draft's unit test assumed two builds differ in role ids.** The
   test `ModelBuilder` mints deterministic ids, so the test rewrites
   them through a YAML round trip instead.
+- **A role id two fact types hold** was keyed by whichever came first in
+  the draft. `graphOf` treats such an id as ambiguous, so the diff now
+  does too and keeps the raw id. The review asked to reuse `graphOf`
+  itself; it refuses the whole model on any unresolved reference, and
+  the diff must still key fragments and dangling ids, so only its
+  policy is shared, with a test.
