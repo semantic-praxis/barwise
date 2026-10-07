@@ -1,6 +1,6 @@
 # A DDL export reads back as the model that wrote it
 
-Status: Accepted -- workstreams 1 to 4 implemented; 5 not yet
+Status: Accepted -- workstreams 1 to 5 implemented; barwise-1077's plain-column keys are the next PR
 
 Created: 2026-09-27
 Last-updated: 2026-10-03
@@ -82,10 +82,12 @@ when the file itself says what they were.
   line; the existing `-- Definition:` line stays for the reader
   ("Workstream 4 in detail"). The annotation text says nothing about dbt.
 - **R5. A table keyed on its foreign keys is a relationship.** A table
-  whose primary key is two or more foreign-key columns, and whose other
-  columns are value columns, imports as the many-to-many or n-ary fact
-  type it maps from, not as an entity with an invented key
-  (barwise-1077).
+  barwise exported from a fact type reads back as that fact type, from
+  its annotation. A table without one, whose primary key is two or more
+  foreign-key columns, imports as an objectified relationship over the
+  referenced entities, the table's other columns its attributes, not as
+  an entity with an invented key (barwise-1077; the shape decided with
+  the requester on 2026-10-07, "Workstream 5 in detail").
 
 ## Scope
 
@@ -237,6 +239,52 @@ makes from a column name, about a model the file already names.
   renders and reads the line, the export and import both call it, and a
   round-trip test over the 12 kernels and the examples pins it.
 
+### Workstream 5 in detail
+
+Measured on main at bb526f5e, the 12 kernels export 50 tables keyed only
+on foreign-key columns (37 binary many-to-many or one-to-one, 13 n-ary),
+two more keyed partly on a value column or on one foreign key, and 15
+entity tables of objectified fact types keyed on their foreign keys.
+Every one imports today as an entity with an invented `<table>_id` key.
+
+- **A fact-type table gets a table line.** `{"kind": "factTable"}` with
+  the fact type's `factType`, `readings`, `definition`, and `roles` as
+  `{name, player, columns}` in the fact type's order. `columns` names
+  the table's columns for that role -- one for a value role, one per key
+  column of the referenced entity for an entity role -- found through
+  each column's `sourceRoleId`. A value role also carries its value
+  type's `valueDefinition`. A table whose fact type has a role with no
+  column gets no line.
+- **An objectifying entity's table line names what it objectifies.** The
+  entity line gains `objectifies`, the same shape as a fact-type table's.
+  The C01 `admission` table has no column for `AdmissionDateTime`, so
+  its fact type cannot be named from the table and gets no
+  `objectifies`; that is an export defect, filed rather than worked
+  around (barwise-c65).
+- **The importer builds what the line names.** A fact-type table becomes
+  its fact type, not an entity. An objectifying table becomes its entity,
+  the fact type, and the objectification. The roles' players come from
+  the DDL: an entity role's columns must be a foreign key to the table
+  of the named entity, and a value role's column is claimed as that
+  value type. Uniqueness comes from the DDL too: the primary key is a
+  uniqueness over the roles whose columns it spans, and each `UNIQUE`
+  over the roles whose columns it lists. A line that does not match the
+  table is set aside with a warning, as in workstream 4.
+- **Without a line, a table keyed on two or more foreign keys is an
+  objectified relationship** (decided with the requester on 2026-10-07).
+  The table's name is the entity; the fact type has one role per
+  foreign key in the key, with a uniqueness spanning them; every other
+  column is the entity's attribute, as for any table. Names are guessed:
+  the fact type is "<A> and <B> <table words>", read "{0} and {1} have
+  <table words>". This is also the shape barwise exports an objectified
+  fact type in, so an unannotated export of one reads back as one. The
+  alternative -- one n-ary fact type with the value columns as roles --
+  matched an n-ary export better, but read worse for an ordinary link
+  table; with annotations, an n-ary export reads back exactly anyway.
+- **What is left for the next PR.** A key or `UNIQUE` over plain
+  columns needs an external uniqueness constraint, a different
+  mechanism; it closes barwise-1077 in a PR of its own.
+
 Workstreams 1 and 2 ship together, because both are small defects in
 what the two halves write and read. The rest are each their own PR. The
 trial gate runs at the end of each one.
@@ -316,3 +364,23 @@ declaring the loss, and the value role as canonical (barwise-fly).
   - **A line whose table or column is gone is reported.** The first
     version ignored such a line silently, which is the case a hand rename
     produces. Now it is named in the warnings.
+- **Workstream 5.** Over the 12 kernels the annotated round trip went
+  from 649 deltas to 528: fact types removed from 77 to 11, object types
+  added from 58 to 3. Every fact-type table now reads back as its fact
+  type, under its own name, readings and roles. What is left of the
+  relationships is two filed defects:
+  - **barwise-c65.** Six objectified fact types (C01 Admission, C04
+    OrderLine, C07 OrderItem, C08 IntervalReading, C09 ProtocolAmendment,
+    C12 BenefitIssuance) lose their value role in the export, so the
+    table cannot name them and the import guesses the relationship.
+  - **barwise-4gr.** Five binaries whose role is a composite foreign key
+    get no column line (workstream 4 skips them), and still import under
+    guessed names.
+  - **A pre-existing parse defect surfaced in the corpus test.** The
+    column list of a `PRIMARY KEY` or `FOREIGN KEY` was read with a lazy
+    `(.*?)`, so a quoted name with a parenthesis in it --
+    `"(ambiguous)"` in the pii-redaction example -- cut the list short and
+    the key was lost. The list is now read quote-aware.
+  - **A stale fact-type line falls back all the way.** The first version
+    made the table an entity but skipped the keyed-on-foreign-keys rule,
+    so it lost its key; a test caught it.

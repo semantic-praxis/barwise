@@ -209,3 +209,83 @@ model:
     });
   });
 });
+
+describe("a table keyed on its foreign keys is an objectified relationship", () => {
+  // Without an annotation (ddl-round-trip-fixed-point.spec.md, workstream 5;
+  // the shape decided with the requester on 2026-10-07). It used to import
+  // as an entity keyed on an invented `enrollment_id`, its key columns lost
+  // (barwise-1077).
+  const schema = `
+    CREATE TABLE student (student_id INT PRIMARY KEY);
+    CREATE TABLE course (course_id INT PRIMARY KEY);
+    CREATE TABLE enrollment (
+      student_id INT NOT NULL REFERENCES student (student_id),
+      course_id INT NOT NULL REFERENCES course (course_id),
+      grade VARCHAR(2),
+      PRIMARY KEY (student_id, course_id)
+    );`;
+
+  it("the table is the entity, its key the relationship, its other columns attributes", () => {
+    const { model, warnings } = ddl.parse(schema);
+    expect(warnings).toEqual([]);
+    const ft = model.getFactTypeByName("Student and Course enrollment");
+    expect(ft?.readings.map((r) => r.template)).toEqual(["{0} and {1} have enrollment"]);
+    expect(ft?.roles.map((r) => model.getObjectType(r.playerId)?.name)).toEqual([
+      "Student",
+      "Course",
+    ]);
+    expect(ft?.constraints.map((c) => [c.type, "roleIds" in c ? c.roleIds.length : 0])).toEqual([
+      ["internal_uniqueness", 2],
+    ]);
+    const enrollment = model.getObjectTypeByName("Enrollment");
+    expect(model.objectifiedFactTypes).toEqual([
+      expect.objectContaining({ factTypeId: ft?.id, objectTypeId: enrollment?.id }),
+    ]);
+    expect(model.getFactTypeByName("Enrollment has Grade")).toBeDefined();
+    // The key columns are roles of the relationship, not attributes.
+    expect(model.getObjectTypeByName("StudentId")).toBeDefined(); // student's own key
+    expect(
+      model.factTypes.filter((f) => f.roles.some((r) => r.playerId === enrollment?.id)).map((f) =>
+        f.name
+      ),
+    )
+      .toEqual(["Enrollment has Grade"]);
+  });
+
+  it("three foreign keys name three roles", () => {
+    const { model } = ddl.parse(`
+      CREATE TABLE a (a_id INT PRIMARY KEY);
+      CREATE TABLE b (b_id INT PRIMARY KEY);
+      CREATE TABLE c (c_id INT PRIMARY KEY);
+      CREATE TABLE booking (a_id INT REFERENCES a (a_id), b_id INT REFERENCES b (b_id),
+        c_id INT REFERENCES c (c_id), PRIMARY KEY (a_id, b_id, c_id));`);
+    expect(model.getFactTypeByName("A, B and C booking")?.readings.map((r) => r.template))
+      .toEqual(["{0}, {1} and {2} have booking"]);
+  });
+
+  it("a key with a plain column is left for the external-uniqueness fix, as before", () => {
+    const { warnings } = ddl.parse(`
+      CREATE TABLE student (student_id INT PRIMARY KEY);
+      CREATE TABLE enrollment (student_id INT REFERENCES student (student_id), term VARCHAR(6),
+        PRIMARY KEY (student_id, term));`);
+    expect(
+      warnings.some((w) => /composite PRIMARY KEY \(student_id, term\) was not imported/.test(w)),
+    )
+      .toBe(true);
+  });
+
+  it("reads a key over a quoted name with parentheses in it", () => {
+    // The column list was read up to the first `)`, inside the quotes.
+    const { model, warnings } = ddl.parse(`
+      CREATE TABLE scan (scan_version TEXT PRIMARY KEY);
+      CREATE TABLE finding ("(ambiguous)" TEXT PRIMARY KEY);
+      CREATE TABLE scan_found (
+        scan_version TEXT NOT NULL,
+        "(ambiguous)" TEXT NOT NULL,
+        PRIMARY KEY (scan_version, "(ambiguous)"),
+        FOREIGN KEY (scan_version) REFERENCES scan (scan_version),
+        FOREIGN KEY ("(ambiguous)") REFERENCES finding ("(ambiguous)"));`);
+    expect(warnings).toEqual([]);
+    expect(model.getFactTypeByName("Scan and Finding scan found")).toBeDefined();
+  });
+});
