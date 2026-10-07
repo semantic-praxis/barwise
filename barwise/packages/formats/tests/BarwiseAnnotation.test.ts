@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   type ColumnAnnotation,
   readAnnotations,
+  type Relationship,
   renderAnnotation,
   type TableAnnotation,
 } from "../src/ddl/barwiseAnnotation.js";
@@ -325,17 +326,111 @@ model:
   });
 });
 
+describe("a fact-type table's line", () => {
+  const ddl = new DdlImportFormat();
+  const line = (players: [string, string]) =>
+    renderAnnotation({
+      kind: "factTable",
+      table: "membership",
+      factType: "Person belongs to Club",
+      readings: ["{0} belongs to {1}"],
+      roles: [
+        { name: "belongs to", player: players[0], columns: ["person_id"] },
+        { name: "has member", player: players[1], columns: ["club_id"] },
+      ],
+    });
+  const schema = (annotation: string) => `
+    CREATE TABLE person (person_id INT PRIMARY KEY);
+    CREATE TABLE club (club_id INT PRIMARY KEY);
+    ${annotation}
+    CREATE TABLE membership (person_id INT REFERENCES person (person_id),
+      club_id INT REFERENCES club (club_id), PRIMARY KEY (person_id, club_id));`;
+
+  it("makes the table its fact type, not an entity", () => {
+    const { model, warnings } = ddl.parse(schema(line(["Person", "Club"])));
+    expect(warnings).toEqual([]);
+    expect(model.getObjectTypeByName("Membership")).toBeUndefined();
+    const ft = model.getFactTypeByName("Person belongs to Club");
+    expect(ft?.roles.map((r) => r.name)).toEqual(["belongs to", "has member"]);
+    expect(model.objectifiedFactTypes).toEqual([]);
+  });
+
+  it("is set aside when its players no longer match the foreign keys, and says so", () => {
+    const { model, warnings } = ddl.parse(schema(line(["Person", "Society"])));
+    expect(warnings).toContain(
+      `Table "membership": the annotation no longer matches (role "has member" references "Club", `
+        + `not "Society"); it is imported as an entity.`,
+    );
+    expect(model.getFactTypeByName("Person belongs to Club")).toBeUndefined();
+    // As an entity, it is then keyed on its foreign keys: a guessed relationship.
+    expect(model.getFactTypeByName("Person and Club membership")).toBeDefined();
+  });
+
+  it("is set aside when two roles name one value type over columns that now differ", () => {
+    // Each claim alone would create "Score"; together the second would
+    // silently fall back to another name, so the dry run checks the pair.
+    const annotation = renderAnnotation({
+      kind: "factTable",
+      table: "bout",
+      factType: "Person scored Score against Score",
+      readings: ["{0} scored {1} against {2}"],
+      roles: [
+        { name: "scored", player: "Person", columns: ["person_id"] },
+        { name: "for", player: "Score", columns: ["ours"] },
+        { name: "against", player: "Score", columns: ["theirs"] },
+      ],
+    });
+    const text = (theirs: string) => `
+      CREATE TABLE person (person_id INT PRIMARY KEY);
+      ${annotation}
+      CREATE TABLE bout (person_id INT REFERENCES person (person_id), ours INT, theirs ${theirs},
+        PRIMARY KEY (person_id, ours, theirs));`;
+    expect(ddl.parse(text("INT")).warnings).toEqual([]);
+    const { model, warnings } = ddl.parse(text("VARCHAR(10)"));
+    expect(warnings).toContain(
+      `Table "bout": the annotation no longer matches (two roles name "Score" over columns of `
+        + `different types or values); it is imported as an entity.`,
+    );
+    expect(model.getFactTypeByName("Person scored Score against Score")).toBeUndefined();
+  });
+});
+
 describe("over the trial kernels and the examples", () => {
   it("every annotated element reads back as it was written", () => {
     let checked = 0;
     for (const { name, model: original } of corpus()) {
       const text = new DdlExportFormat().export(original).text;
       const { columns, tables } = readAnnotations(text, []);
-      const { model } = new DdlImportFormat().parse(text);
+      const { model, warnings } = new DdlImportFormat().parse(text);
+      // No line the export wrote is stale against the file it wrote.
+      expect(warnings.filter((w) => /no longer matches|matches nothing/.test(w)), name).toEqual([]);
+      const relationshipBack = (r: Relationship, label: string) => {
+        const ft = model.getFactTypeByName(r.factType);
+        expect(ft, `${name}: ${label} ${r.factType}`).toBeDefined();
+        expect(ft?.readings.map((x) => x.template), `${name}: ${r.factType}`).toEqual(r.readings);
+        expect(ft?.roles.map((x) => [x.name, model.getObjectType(x.playerId)?.name]))
+          .toEqual(r.roles.map((x) => [x.name, x.player]));
+        expect(ft?.definition, `${name}: ${r.factType}`).toBe(r.definition);
+        return ft;
+      };
       for (const a of tables.values()) {
+        if (a.kind === "factTable") {
+          relationshipBack(a, "fact-type table");
+          checked++;
+          continue;
+        }
         const entity = model.getObjectTypeByName(a.entity);
         expect(entity, `${name}: entity ${a.entity}`).toBeDefined();
         expect(entity?.definition, `${name}: ${a.entity}`).toBe(a.definition);
+        if (a.objectifies) {
+          const ft = relationshipBack(a.objectifies, "objectified");
+          expect(
+            model.objectifiedFactTypes.some((o) =>
+              o.factTypeId === ft?.id && o.objectTypeId === entity?.id
+            ),
+            `${name}: ${a.entity} objectifies ${a.objectifies.factType}`,
+          ).toBe(true);
+        }
         checked++;
       }
       for (const a of columns.values()) {

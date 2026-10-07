@@ -14,6 +14,7 @@
  */
 
 import { type OrmModel, validateReadingTemplate } from "@barwise/core";
+import type { FactType } from "@barwise/core";
 import type { RelationalSchema, Table } from "@barwise/core/mapping";
 
 const PREFIX = "-- barwise:v1 ";
@@ -27,6 +28,31 @@ export interface TableAnnotation {
   readonly entity: string;
   readonly referenceMode: string;
   readonly definition?: string;
+  /** The fact type this entity objectifies, when its roles are columns of the table. */
+  readonly objectifies?: Relationship;
+}
+
+/** A role of a table-wide fact type: its player and the table's columns for it. */
+export interface RelationshipRole {
+  readonly name: string;
+  readonly player: string;
+  /** One for a value role; one per key column of the referenced entity for an entity role. */
+  readonly columns: readonly string[];
+  readonly valueDefinition?: string;
+}
+
+/** A fact type spread over a whole table (ddl-round-trip-fixed-point.spec.md, workstream 5). */
+export interface Relationship {
+  readonly factType: string;
+  readonly readings: readonly string[];
+  readonly definition?: string;
+  readonly roles: readonly RelationshipRole[];
+}
+
+/** A table that is a fact type: a many-to-many, a one-to-one kept apart, an n-ary. */
+export interface FactTableAnnotation extends Relationship {
+  readonly kind: "factTable";
+  readonly table: string;
 }
 
 /** A role of a column's fact type, in the fact type's order. */
@@ -50,28 +76,67 @@ export interface ColumnAnnotation {
   readonly valueDefinition?: string;
 }
 
-export type Annotation = TableAnnotation | ColumnAnnotation;
+export type Annotation = TableAnnotation | FactTableAnnotation | ColumnAnnotation;
 
 /** One annotation as its comment line. */
 export function renderAnnotation(annotation: Annotation): string {
   return PREFIX + JSON.stringify(annotation);
 }
 
-/** The table and column annotations for an entity table, keyed as `readAnnotations` keys them. */
+/**
+ * A fact type as the table's columns carry it, found through each column's
+ * `sourceRoleId`. Undefined when a role has no column: a fact type that
+ * cannot be read back from the table is not named on it.
+ */
+function relationshipOf(model: OrmModel, ft: FactType, table: Table): Relationship | undefined {
+  const roles: RelationshipRole[] = [];
+  for (const role of ft.roles) {
+    const player = model.getObjectType(role.playerId);
+    const columns = table.columns.filter((c) => c.sourceRoleId === role.id).map((c) => c.name);
+    if (!player || columns.length === 0) return undefined;
+    roles.push({
+      name: role.name,
+      player: player.name,
+      columns,
+      ...(player.kind === "value" && player.definition
+        ? { valueDefinition: player.definition }
+        : {}),
+    });
+  }
+  return {
+    factType: ft.name,
+    readings: ft.readings.map((r) => r.template),
+    ...(ft.definition ? { definition: ft.definition } : {}),
+    roles,
+  };
+}
+
+/** The table and column annotations for a table, keyed as `readAnnotations` keys them. */
 export function annotateTable(
   model: OrmModel,
   table: Table,
-): { table?: TableAnnotation; columns: Map<string, ColumnAnnotation>; } {
+): { table?: TableAnnotation | FactTableAnnotation; columns: Map<string, ColumnAnnotation>; } {
   const columns = new Map<string, ColumnAnnotation>();
+  const source = model.factTypes.find((f) => f.id === table.sourceElementId);
+  if (source) {
+    const relationship = relationshipOf(model, source, table);
+    return relationship
+      ? { table: { kind: "factTable", table: table.name, ...relationship }, columns }
+      : { columns };
+  }
   const entity = model.getObjectType(table.sourceElementId);
   if (!entity || entity.kind !== "entity") return { columns };
 
+  const objectified = model.objectifiedFactTypes.find((o) => o.objectTypeId === entity.id);
+  const objectifiedFt = objectified ? model.getFactType(objectified.factTypeId) : undefined;
+  const objectifies = objectifiedFt ? relationshipOf(model, objectifiedFt, table) : undefined;
   const tableAnnotation: TableAnnotation = {
     kind: "table",
     table: table.name,
     entity: entity.name,
     referenceMode: entity.referenceMode,
     ...(entity.definition ? { definition: entity.definition } : {}),
+    ...(objectifies ? { objectifies } : {}),
   };
 
   // A role spread over several columns (a composite foreign key) is read
@@ -152,7 +217,7 @@ const COLUMN_LINE = /^ {2}(?:([a-z_][a-z0-9_]*)|"((?:[^"]|"")+)") /;
 /** What `readAnnotations` found. */
 export interface ReadAnnotations {
   /** By table name, lower case. */
-  readonly tables: ReadonlyMap<string, TableAnnotation>;
+  readonly tables: ReadonlyMap<string, TableAnnotation | FactTableAnnotation>;
   /** By `table.column`, lower case. */
   readonly columns: ReadonlyMap<string, ColumnAnnotation>;
 }
@@ -169,7 +234,7 @@ export function columnKey(table: string, column: string): string {
  * barwise did not write.
  */
 export function readAnnotations(input: string, warnings: string[]): ReadAnnotations {
-  const tables = new Map<string, TableAnnotation>();
+  const tables = new Map<string, TableAnnotation | FactTableAnnotation>();
   const columns = new Map<string, ColumnAnnotation>();
   for (const raw of input.split("\n")) {
     const line = raw.trim();
@@ -190,8 +255,9 @@ export function readAnnotations(input: string, warnings: string[]): ReadAnnotati
       warnings.push(`Annotation "${line.slice(0, 80)}" is not JSON; ignored.`);
       continue;
     }
-    if (isTableAnnotation(value)) tables.set(value.table.toLowerCase(), value);
-    else if (isColumnAnnotation(value)) columns.set(columnKey(value.table, value.column), value);
+    if (isTableAnnotation(value) || isFactTableAnnotation(value)) {
+      tables.set(value.table.toLowerCase(), value);
+    } else if (isColumnAnnotation(value)) columns.set(columnKey(value.table, value.column), value);
     else warnings.push(`Annotation "${line.slice(0, 80)}" has an unknown shape; ignored.`);
   }
   return { tables, columns };
@@ -218,7 +284,29 @@ function isName(v: unknown): v is string {
 function isTableAnnotation(v: unknown): v is TableAnnotation {
   return isRecord(v) && v["kind"] === "table" && isName(v["table"])
     && isName(v["entity"]) && isName(v["referenceMode"])
-    && optionalString(v["definition"]);
+    && optionalString(v["definition"])
+    && (v["objectifies"] === undefined || isRelationship(v["objectifies"]));
+}
+
+function isFactTableAnnotation(v: unknown): v is FactTableAnnotation {
+  return isRecord(v) && v["kind"] === "factTable" && isName(v["table"]) && isRelationship(v);
+}
+
+function isRelationship(v: unknown): v is Relationship {
+  if (!isRecord(v)) return false;
+  const roles = v["roles"];
+  const readings = v["readings"];
+  if (!Array.isArray(roles) || roles.length < 2) return false;
+  return isName(v["factType"]) && optionalString(v["definition"])
+    && Array.isArray(readings) && readings.length > 0
+    && readings.every((r) =>
+      typeof r === "string" && validateReadingTemplate(r, roles.length).length === 0
+    )
+    && roles.every((r) =>
+      isRecord(r) && isName(r["name"]) && isName(r["player"])
+      && optionalString(r["valueDefinition"])
+      && Array.isArray(r["columns"]) && r["columns"].length > 0 && r["columns"].every(isName)
+    );
 }
 
 function isColumnAnnotation(v: unknown): v is ColumnAnnotation {
