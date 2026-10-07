@@ -331,14 +331,18 @@ function roleKeys(
   holders: RoleHolders,
   otherHolders: RoleHolders,
 ): RoleKeys {
-  const host = new Map(roles.map((r, i) => [r.id, String(i)]));
+  // Each kind of key carries its own tag, and the free text in it is
+  // JSON-quoted, so a raw id can never read as a resolved one: a dangling
+  // id spelled "Room is in Building#1" once matched that fact type's role.
+  const host = new Map(roles.map((r, i) => [r.id, `h${i}`]));
+  const raw = (id: string) => `r${JSON.stringify(id)}`;
   return (id) => {
     const homes = holders.get(id) ?? otherHolders.get(id) ?? [];
-    if (homes.length !== 1) return id;
+    if (homes.length !== 1) return raw(id);
     const own = host.get(id);
     if (own !== undefined) return own;
     const home = homes[0]!;
-    return `${home.name}#${home.roles.findIndex((r) => r.id === id)}`;
+    return `f${JSON.stringify([home.name, home.roles.findIndex((r) => r.id === id)])}`;
   };
 }
 

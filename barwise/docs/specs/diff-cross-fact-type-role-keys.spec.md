@@ -46,7 +46,7 @@ In scope:
   in (an ambiguous one, host included), the diff shall key it by its
   raw id.
 - When a constraint names only roles of its host, none of them
-  ambiguous, its key shall be unchanged, so no existing delta changes
+  ambiguous, it shall compare as before, so no existing delta changes
   for such a constraint.
 
 Out of scope:
@@ -61,13 +61,14 @@ Out of scope:
 
 ## Inventory
 
-| Module                               | Current state                                               | Verdict                                                                     |
-| ------------------------------------ | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `core/src/diff/elementDiff.ts`       | `resolveRole(id, idxMap)` returns the raw id off the host   | changes: falls back to `<fact type name>#<index>` through the model         |
-| `core/src/diff/elementDiff.ts`       | `diffConstraints(a, b, rolesA, rolesB)`                     | changes: receives each side's model, which `diffFactType` already holds     |
-| `core/src/diff/ModelMerge.ts`        | takes an accepted modified fact type's constraints verbatim | untouched: fewer false "modified" fact types can only mean fewer such takes |
-| `core/src/diff/changeDescription.ts` | `constraintsAdded` / `constraintsRemoved` carry constraints | untouched: the shapes stay; only which constraints land in them changes     |
-| `core/tests/diff/ModelDiff.test.ts`  | no cross-fact-type constraint case                          | gains: an external uniqueness over regenerated role ids reads as unchanged  |
+| Module                               | Before                                                      | After                                                                              |
+| ------------------------------------ | ----------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `core/src/diff/elementDiff.ts`       | `resolveRole` returns the raw id for a role off the host    | `roleKeys` keys every role through a holder index, with tagged key kinds           |
+| `core/src/diff/elementDiff.ts`       | `diffConstraints(a, b, rolesA, rolesB)`                     | also receives both sides' holder indexes; `roleHolders(model)` builds one          |
+| `core/src/diff/ModelDiff.ts`         | calls `diffFactType` per matched fact type                  | builds each model's holder index once and passes both to every `diffFactType` call |
+| `core/src/diff/ModelMerge.ts`        | takes an accepted modified fact type's constraints verbatim | untouched: it reads deltas, not keys                                               |
+| `core/src/diff/changeDescription.ts` | `constraintsAdded` / `constraintsRemoved` carry constraints | untouched: the shapes stay; only which constraints land in them changes            |
+| `core/tests/diff/ModelDiff.test.ts`  | no cross-fact-type constraint case                          | gains eight cases, one per rule below                                              |
 
 `ModelMerge.ts` reads deltas, not keys. A fact type whose only
 difference was a false constraint change now reads as unchanged, so a
@@ -77,25 +78,37 @@ whole. That is what an unchanged fact type should do.
 ## Target architecture
 
 ```ts
-// elementDiff.ts -- the only file that changes.
-function resolveRole(
-  id: string,
-  idxMap: Map<string, number>,
-  model: OrmModel,
-): string {
-  const idx = idxMap.get(id);
-  if (idx !== undefined) return String(idx);
-  // A role of another fact type: its position there, named by that fact
-  // type, which the diff matches by name as well.
-  const home = model.factTypes.find((ft) => ft.getRoleById(id));
-  return home ? `${home.name}#${home.roles.findIndex((r) => r.id === id)}` : id;
+// elementDiff.ts. ModelDiff.ts builds both indexes once per diff and
+// passes them to every diffFactType call.
+export function roleHolders(model: OrmModel): RoleHolders; // role id -> fact types holding it
+
+function roleKeys(
+  roles: readonly Role[],
+  holders: RoleHolders,
+  otherHolders: RoleHolders,
+) {
+  const host = new Map(roles.map((r, i) => [r.id, `h${i}`]));
+  const raw = (id: string) => `r${JSON.stringify(id)}`;
+  return (id: string): string => {
+    // The constraint's own model first, then the other model of the diff,
+    // as playerName and factTypeName resolve for lenient fragments.
+    const homes = holders.get(id) ?? otherHolders.get(id) ?? [];
+    if (homes.length !== 1) return raw(id); // dangling, or ambiguous as graphOf treats it
+    const own = host.get(id);
+    if (own !== undefined) return own;
+    const home = homes[0]!;
+    return `f${
+      JSON.stringify([home.name, home.roles.findIndex((r) => r.id === id)])
+    }`;
+  };
 }
 ```
 
 The fact-type name is the right anchor because it is what `diffModels`
 already matches fact types by: two fact types with the same name are
 the same fact type to the diff, so their roles at the same position are
-the same roles.
+the same roles. The three key kinds carry tags (`h`, `f`, `r`) and
+JSON-quote their free text, so no raw id can spell a resolved key.
 
 ## Alternatives considered
 
@@ -113,13 +126,16 @@ the same roles.
 
 ### 1. Key foreign roles by fact type and position
 
-`resolveRole` gains the fallback above; `diffConstraints` and
-`constraintKey` thread the model through; `diffFactType` passes
-`existingModel` and `incomingModel`. One test in `ModelDiff.test.ts`
-builds a model with an external uniqueness spanning two fact types,
-regenerates every role id, and asserts no delta; a second moves one
-role to another position and asserts the change is reported; a third
-pins the host-move behaviour the open decision below keeps.
+`roleKeys` replaces `roleIndexMap` and the raw-id fallback, as above;
+`diffConstraints` and `constraintKey` take its resolver;
+`diffFactType` receives the holder indexes `diffModels` builds once.
+`ModelDiff.test.ts` gains one case per rule: regenerated role ids
+(unchanged); a different role of the same foreign fact type, and the
+same position of a different one (both reported); an id two fact types
+hold, foreign and host (raw id); a lenient fragment in both directions
+(unchanged); a dangling id spelled like a resolved key (reported); and
+a host move (still reported, per the open decision). Each guard was
+checked by removing it and watching its case fail.
 
 Acceptance: when two models differ only in role ids, the diff shall
 report no constraint change for any constraint type except the join
@@ -127,11 +143,17 @@ constraints.
 
 ## API and migration impact
 
-- No public export changes. `resolveRole`, `constraintKey` and
-  `diffConstraints` are module-private.
+- No change to the package's public exports. `roleHolders` and
+  `RoleHolders` are exported from `elementDiff.ts` for `ModelDiff.ts`
+  only; `roleKeys`, `constraintKey` and `diffConstraints` stay
+  module-private.
 - Downstream: the CLI's `diff`, the MCP `diff_models` tool, merge and
-  the trial grader all call `diffModels`; each sees fewer deltas, never
-  more. The trial gate's `model-roundtrip:*` rows report lower counts;
+  the trial grader all call `diffModels`. The change removes false
+  positives -- the same roles under new ids -- and can expose true
+  differences the raw-id key hid: two models that reuse one role id in
+  differently named fact types used to compare equal, and now report a
+  change. Over the kernels the net is fewer deltas, 535 to 520. The
+  trial gate's `model-roundtrip:*` rows report lower counts;
   no row's status should change, since each still has other deltas.
 
 ## Open decisions (for review)
@@ -196,3 +218,9 @@ constraints.
   other model, the rule `playerName` and `factTypeName` follow. The
   holder index is built once per diff (`roleHolders`), since every
   role a constraint names now consults it.
+- **The third review found a collision and an overclaim.** The raw-id
+  fallback and the resolved key shared one string space, so a dangling
+  id spelled `Room is in Building#1` matched that fact type's role; the
+  key kinds are now tagged and quoted, with a test. And the draft's
+  "fewer deltas, never more" was false in principle: keying by name can
+  separate constraints the raw id had matched by accident.

@@ -1552,7 +1552,12 @@ describe("a constraint over roles of other fact types", () => {
   // barwise-b7z: a role outside the host fact type was keyed by its raw
   // id, so two models differing only in role ids reported every external
   // uniqueness as removed and added.
-  const model = (unique: "number" | "name", buildingRole = 1, other = "Room is in Building") => {
+  const model = (
+    unique: "number" | "name",
+    buildingRole = 1,
+    other = "Room is in Building",
+    dangling?: string,
+  ) => {
     const m = new ModelBuilder("Rooms")
       .withEntityType("Room", { referenceMode: "room_id" })
       .withEntityType("Building", { referenceMode: "building_id" })
@@ -1577,7 +1582,7 @@ describe("a constraint over roles of other fact types", () => {
     const building = m.getFactTypeByName(other)!;
     host.addConstraint({
       type: "external_uniqueness",
-      roleIds: [host.roles[1]!.id, building.roles[buildingRole]!.id],
+      roleIds: [host.roles[1]!.id, dangling ?? building.roles[buildingRole]!.id],
     });
     return m;
   };
@@ -1675,6 +1680,18 @@ describe("a constraint over roles of other fact types", () => {
     fragment.addFactType(hostConfig, { skipPlayerValidation: true });
     expect(constraintChanges(full, fragment)).toEqual([]);
     expect(constraintChanges(fragment, full)).toEqual([]);
+  });
+
+  it("does not match a dangling id spelled like the key of a resolved role", () => {
+    // Raw, host and foreign keys are tagged apart; untagged, this id read
+    // as position 1 of "Room is in Building".
+    expect(
+      constraintChanges(
+        model("number"),
+        model("number", 1, "Room is in Building", "Room is in Building#1"),
+      )
+        .map((c) => c.change).sort(),
+    ).toEqual(["constraintsAdded", "constraintsRemoved"]);
   });
 
   it("that moved to another host still reads as removed from one and added to the other", () => {
