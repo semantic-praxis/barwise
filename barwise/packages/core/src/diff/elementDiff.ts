@@ -196,8 +196,9 @@ export function diffFactType(
     changes.push({ change: "readings", from: readingsA, to: readingsB });
   }
 
-  // Constraints -- pass both role arrays and models so constraintKey can
-  // resolve role IDs to positions (stable across LLM re-extractions).
+  // Constraints -- pass both role arrays and both models' role-holder
+  // indexes, so constraintKey can resolve role IDs to positions (stable
+  // across LLM re-extractions and imports).
   const constraintDiff = diffConstraints(
     a.constraints,
     b.constraints,
