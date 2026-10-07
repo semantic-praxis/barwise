@@ -37,12 +37,17 @@ the root `CLAUDE.md` names.
 In scope:
 
 - When a constraint names a role outside its host fact type, the diff
-  shall key that role by the name of the fact type that holds it, in
-  the same model, and its position there.
-- When a role id resolves to no fact type in its model (a dangling
-  reference), the diff shall key it by its raw id, as today.
-- When a constraint names only roles of its host, its key shall be
-  unchanged, so no existing delta changes for such a constraint.
+  shall key that role by the name of the fact type that holds it and
+  its position there, resolving against the constraint's own model
+  and then the other model of the diff, as the diff already resolves
+  players and fact types for lenient fragments.
+- When a role id resolves to no fact type in either model (a dangling
+  reference), or to more than one fact type in the model it resolves
+  in (an ambiguous one, host included), the diff shall key it by its
+  raw id.
+- When a constraint names only roles of its host, none of them
+  ambiguous, its key shall be unchanged, so no existing delta changes
+  for such a constraint.
 
 Out of scope:
 
@@ -182,3 +187,12 @@ constraints.
   itself; it refuses the whole model on any unresolved reference, and
   the diff must still key fragments and dangling ids, so only its
   policy is shared, with a test.
+- **The second review found two gaps in that rule, both fixed with a
+  test each.** A duplicated id that the host also holds took the host's
+  position before the ambiguity check ran; the check now comes first.
+  And each side resolved against its own model only, so a lenient
+  fragment naming a role the full model alone defines keyed it by raw
+  id on one side and by name on the other. It now falls back to the
+  other model, the rule `playerName` and `factTypeName` follow. The
+  holder index is built once per diff (`roleHolders`), since every
+  role a constraint names now consults it.

@@ -24,6 +24,7 @@ import {
   factTypeName,
   instancesKey,
   playerName,
+  roleHolders,
 } from "./elementDiff.js";
 import { detectSynonymCandidates } from "./synonyms.js";
 
@@ -112,6 +113,7 @@ export function diffModels(
   }
 
   // --- Fact types ---
+  const holders = { existing: roleHolders(existing), incoming: roleHolders(incoming) };
   const existingFts = new Map(existing.factTypes.map((ft) => [ft.name, ft]));
   const incomingFts = new Map(incoming.factTypes.map((ft) => [ft.name, ft]));
 
@@ -128,7 +130,7 @@ export function diffModels(
         breakingLevel: classifyBreakingLevel("removed", [], "fact_type"),
       });
     } else {
-      const changes = diffFactType(ft, match, existing, incoming);
+      const changes = diffFactType(ft, match, existing, incoming, holders);
       const kind: DeltaKind = changes.length > 0 ? "modified" : "unchanged";
       deltas.push({
         kind,

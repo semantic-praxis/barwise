@@ -1631,6 +1631,52 @@ describe("a constraint over roles of other fact types", () => {
     );
   });
 
+  it("keys a host role id another fact type also holds by its raw id", () => {
+    // The host's own position is no safer an answer than either holder.
+    const ambiguousHost = (m: OrmModel) => {
+      const yaml = new OrmYamlSerializer();
+      const id = m.getFactTypeByName("Room has RoomNumber")!.roles[1]!.id;
+      const other = m.getFactTypeByName("Room has RoomName")!.roles[1]!.id;
+      return yaml.deserialize(yaml.serialize(m).split(other).join(id));
+    };
+    const a = ambiguousHost(model("number"));
+    expect(constraintChanges(a, ambiguousHost(withNewRoleIds(model("number")))).length)
+      .toBeGreaterThan(0);
+  });
+
+  it("resolves a role a lenient fragment does not define against the other model, both ways", () => {
+    // The fragment holds the host fact type only; the Building role its
+    // constraint names is defined in the full model alone.
+    const full = new OrmModel({ name: "M" });
+    full.addObjectType({ id: "ot-room", name: "Room", kind: "entity", referenceMode: "nr" });
+    full.addObjectType({ id: "ot-bld", name: "Building", kind: "entity", referenceMode: "code" });
+    full.addObjectType({ id: "ot-num", name: "RoomNumber", kind: "value" });
+    const hostConfig = {
+      id: "ft-num",
+      name: "Room has RoomNumber",
+      roles: [
+        { id: "r-room", name: "has", playerId: "ot-room" },
+        { id: "r-num", name: "is of", playerId: "ot-num" },
+      ],
+      readings: ["{0} has {1}"],
+      constraints: [{ type: "external_uniqueness" as const, roleIds: ["r-num", "r-bld"] }],
+    };
+    full.addFactType(hostConfig);
+    full.addFactType({
+      id: "ft-bld",
+      name: "Room is in Building",
+      roles: [
+        { id: "r-in", name: "is in", playerId: "ot-room" },
+        { id: "r-bld", name: "houses", playerId: "ot-bld" },
+      ],
+      readings: ["{0} is in {1}"],
+    });
+    const fragment = new OrmModel({ name: "M" });
+    fragment.addFactType(hostConfig, { skipPlayerValidation: true });
+    expect(constraintChanges(full, fragment)).toEqual([]);
+    expect(constraintChanges(fragment, full)).toEqual([]);
+  });
+
   it("that moved to another host still reads as removed from one and added to the other", () => {
     // Not host-independent, on purpose: merge rebuilds fact types from
     // deltas, so a move reported nowhere could be dropped (see the spec's

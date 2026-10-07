@@ -164,6 +164,10 @@ export function diffFactType(
   b: FactType,
   existingModel: OrmModel,
   incomingModel: OrmModel,
+  holders: { readonly existing: RoleHolders; readonly incoming: RoleHolders; } = {
+    existing: roleHolders(existingModel),
+    incoming: roleHolders(incomingModel),
+  },
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 
@@ -199,8 +203,8 @@ export function diffFactType(
     b.constraints,
     a.roles,
     b.roles,
-    existingModel,
-    incomingModel,
+    holders.existing,
+    holders.incoming,
   );
   changes.push(...constraintDiff);
 
@@ -285,26 +289,54 @@ function derivationKey(d: DerivationRule | undefined): string {
 type RoleKeys = (id: string) => string;
 
 /**
+ * Every fact type that holds each role id, in one model. Built once per
+ * diff: `roleKeys` consults it for every role a constraint names, and a
+ * scan of the model per role made the diff quadratic in its size.
+ */
+export type RoleHolders = ReadonlyMap<string, readonly FactType[]>;
+
+export function roleHolders(model: OrmModel): RoleHolders {
+  const holders = new Map<string, FactType[]>();
+  for (const ft of model.factTypes) {
+    for (const role of ft.roles) {
+      const list = holders.get(role.id);
+      if (list) list.push(ft);
+      else holders.set(role.id, [ft]);
+    }
+  }
+  return holders;
+}
+
+/**
  * Key a constraint's roles: a role of the host fact type by its position,
  * a role of another fact type by that fact type's name and its position
  * there -- the diff matches fact types by name, so that names the same
- * role in both models. A role no fact type holds, or more than one does,
- * keeps its raw id.
- * The cross-fact-type case used to keep the raw id too, so every external
- * uniqueness read as removed and added after an import minted new role
- * ids (barwise-b7z, diff-cross-fact-type-role-keys.spec.md).
+ * role in both models. The cross-fact-type case used to keep the raw id,
+ * so every external uniqueness read as removed and added after an import
+ * minted new role ids (barwise-b7z, diff-cross-fact-type-role-keys.spec.md).
+ *
+ * A role resolves against the model its constraint came from, then the
+ * other model of the diff, as `playerName` and `factTypeName` do: a
+ * lenient fragment can name a role only the full model defines, and
+ * keying it by raw id on one side alone would report a false change.
+ *
+ * An id more than one fact type holds is ambiguous, as `graphOf` treats
+ * it, host included; like an id neither model holds, it keeps its raw id
+ * rather than naming one holder. `graphOf` itself cannot serve here: it
+ * refuses the whole model on any unresolved reference, and the diff must
+ * still key fragments.
  */
-function roleKeys(roles: readonly Role[], model: OrmModel): RoleKeys {
+function roleKeys(
+  roles: readonly Role[],
+  holders: RoleHolders,
+  otherHolders: RoleHolders,
+): RoleKeys {
   const host = new Map(roles.map((r, i) => [r.id, String(i)]));
   return (id) => {
+    const homes = holders.get(id) ?? otherHolders.get(id) ?? [];
+    if (homes.length !== 1) return id;
     const own = host.get(id);
     if (own !== undefined) return own;
-    // An id two fact types hold is ambiguous, as `graphOf` treats it; like
-    // a dangling id it keeps the raw id rather than naming either holder.
-    // `graphOf` itself cannot serve here: it refuses the whole model on
-    // any unresolved reference, and the diff must still key fragments.
-    const homes = model.factTypes.filter((ft) => ft.getRoleById(id));
-    if (homes.length !== 1) return id;
     const home = homes[0]!;
     return `${home.name}#${home.roles.findIndex((r) => r.id === id)}`;
   };
@@ -411,13 +443,13 @@ function diffConstraints(
   b: readonly Constraint[],
   rolesA: readonly Role[],
   rolesB: readonly Role[],
-  modelA: OrmModel,
-  modelB: OrmModel,
+  holdersA: RoleHolders,
+  holdersB: RoleHolders,
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 
-  const idxMapA = roleKeys(rolesA, modelA);
-  const idxMapB = roleKeys(rolesB, modelB);
+  const idxMapA = roleKeys(rolesA, holdersA, holdersB);
+  const idxMapB = roleKeys(rolesB, holdersB, holdersA);
 
   const keysA = new Set(a.map((c) => constraintKey(c, idxMapA)));
   const keysB = new Set(b.map((c) => constraintKey(c, idxMapB)));
