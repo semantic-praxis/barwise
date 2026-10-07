@@ -962,6 +962,7 @@ export class DdlImportFormat implements ImportFormat {
     }
     const used = new Set<string>();
     const plan: ({ kind: "entity"; id: string; } | { kind: "value"; column: ParsedColumn; })[] = [];
+    const plannedValues = new Map<string, ParsedColumn>();
     for (const role of relationship.roles) {
       const missing = role.columns.find((c) => !table.columns.some((col) => col.name === c));
       if (missing) return `it names column "${missing}", which the table does not have`;
@@ -987,10 +988,19 @@ export class DdlImportFormat implements ImportFormat {
       ) {
         return `role "${role.name}" is neither one foreign key nor one plain column`;
       }
+      // Two roles played by one value type claim it once: the model does
+      // not hold the first claim yet, so the second is checked against the
+      // first column here. Stricter than the sharing rule (value order
+      // counts), which only costs a stale warning on a hand edit.
+      const earlier = plannedValues.get(role.player);
+      if (earlier && !sameColumnValues(earlier, column)) {
+        return `two roles name "${role.player}" over columns of different types or values`;
+      }
       const claim = this.claimRoleValueType(model, objectifier, role.player, column);
       if (claim.kind === "create" && claim.displaced) {
         return `"${role.player}" is held by ${claim.displaced.kind} type "${claim.displaced.name}"`;
       }
+      plannedValues.set(role.player, column);
       plan.push({ kind: "value", column });
     }
     // A uniqueness falls on whole roles, or ORM has no way to say it here.
@@ -1307,6 +1317,12 @@ function annotatedFactType(
  * import's explicit policy for a type the shared mapping does not
  * recognize (barwise-865).
  */
+/** Whether two columns would make the same value type: data type and value constraint alike. */
+function sameColumnValues(a: ParsedColumn, b: ParsedColumn): boolean {
+  return JSON.stringify(columnDataType(a)) === JSON.stringify(columnDataType(b))
+    && JSON.stringify(a.valueConstraint ?? null) === JSON.stringify(b.valueConstraint ?? null);
+}
+
 function columnDataType(column: ParsedColumn): DataTypeDef {
   if (column.identity) return { name: "auto_counter" };
   return parseSqlDataType(column.dataType) ?? { name: "other" };

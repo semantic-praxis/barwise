@@ -365,6 +365,34 @@ describe("a fact-type table's line", () => {
     // As an entity, it is then keyed on its foreign keys: a guessed relationship.
     expect(model.getFactTypeByName("Person and Club membership")).toBeDefined();
   });
+
+  it("is set aside when two roles name one value type over columns that now differ", () => {
+    // Each claim alone would create "Score"; together the second would
+    // silently fall back to another name, so the dry run checks the pair.
+    const annotation = renderAnnotation({
+      kind: "factTable",
+      table: "bout",
+      factType: "Person scored Score against Score",
+      readings: ["{0} scored {1} against {2}"],
+      roles: [
+        { name: "scored", player: "Person", columns: ["person_id"] },
+        { name: "for", player: "Score", columns: ["ours"] },
+        { name: "against", player: "Score", columns: ["theirs"] },
+      ],
+    });
+    const text = (theirs: string) => `
+      CREATE TABLE person (person_id INT PRIMARY KEY);
+      ${annotation}
+      CREATE TABLE bout (person_id INT REFERENCES person (person_id), ours INT, theirs ${theirs},
+        PRIMARY KEY (person_id, ours, theirs));`;
+    expect(ddl.parse(text("INT")).warnings).toEqual([]);
+    const { model, warnings } = ddl.parse(text("VARCHAR(10)"));
+    expect(warnings).toContain(
+      `Table "bout": the annotation no longer matches (two roles name "Score" over columns of `
+        + `different types or values); it is imported as an entity.`,
+    );
+    expect(model.getFactTypeByName("Person scored Score against Score")).toBeUndefined();
+  });
 });
 
 describe("over the trial kernels and the examples", () => {

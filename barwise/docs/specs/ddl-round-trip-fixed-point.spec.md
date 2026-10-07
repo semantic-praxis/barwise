@@ -3,7 +3,7 @@
 Status: Accepted -- workstreams 1 to 5 implemented; barwise-1077's plain-column keys are the next PR
 
 Created: 2026-09-27
-Last-updated: 2026-10-03
+Last-updated: 2026-10-07
 Tracking: barwise-dnm (workstreams 2 to 4), barwise-kgh (workstream 1),
 barwise-1077 (workstream 5); out of scope, tracked separately:
 barwise-fly
