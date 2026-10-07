@@ -23,6 +23,7 @@ import {
 import { collectExportAnnotations, type ExportAnnotation } from "@barwise/core/annotation";
 import { generateDdlLineage } from "@barwise/core/lineage";
 import { RelationalMapper, renderDdl, renderPopulationAsSql } from "@barwise/core/mapping";
+import { injectBarwiseAnnotations } from "./barwiseAnnotation.js";
 import {
   type ConstraintRouting,
   routeConstraints,
@@ -83,6 +84,10 @@ export class DdlExportFormat implements ExportFormatAdapter {
     if (annotate) {
       ddlText = this.addConstraintAnnotations(ddlText, model, schema);
       ddlText = injectAnnotationComments(ddlText, annotations);
+      // Last, so each line sits directly above what it names. The importer
+      // reads these instead of guessing names from columns
+      // (ddl-round-trip-fixed-point.spec.md, workstream 4).
+      ddlText = injectBarwiseAnnotations(ddlText, model, schema);
     }
 
     // Append population INSERT statements if requested.

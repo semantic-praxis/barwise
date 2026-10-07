@@ -2,8 +2,11 @@
 -- Source: Patient (04eaeae4-50c4-40ab-909b-b05f5215daee)
 -- Definition: A person who books appointments at the clinic, identified by a medical record number assigned at registration.
 -- NOTE(barwise): Definition available from ORM model: "A person who books appointments at the clinic, identified by a medical record..."
+-- barwise:v1 {"kind":"table","table":"patient","entity":"Patient","referenceMode":"medical_record_number","definition":"A person who books appointments at the clinic, identified by a medical record number assigned at registration."}
 CREATE TABLE patient (
+  -- barwise:v1 {"kind":"column","table":"patient","column":"medical_record_number","factType":"Patient has MedicalRecordNumber","readings":["{0} has {1}","{1} identifies {0}"],"roles":[{"name":"has","player":"Patient"},{"name":"identifies","player":"MedicalRecordNumber"}],"rowRole":0,"valueDefinition":"The unique identifier assigned to a patient at registration."}
   medical_record_number VARCHAR(20) NOT NULL,
+  -- barwise:v1 {"kind":"column","table":"patient","column":"provider_id","factType":"Patient has primary Doctor","readings":["{0} has {1} as primary doctor","{1} is primary doctor of {0}"],"roles":[{"name":"has primary","player":"Patient"},{"name":"is primary doctor of","player":"Doctor"}],"rowRole":0}
   provider_id VARCHAR(20) NOT NULL,
   PRIMARY KEY (medical_record_number),
   FOREIGN KEY (provider_id) REFERENCES doctor (provider_id)
@@ -13,9 +16,12 @@ CREATE TABLE patient (
 -- Source: Doctor (0f321168-50ce-4b6f-accd-2a56cf810a2c)
 -- Definition: A medical provider at the clinic, identified by a state-issued provider ID.
 -- NOTE(barwise): Definition available from ORM model: "A medical provider at the clinic, identified by a state-issued provider ID."
+-- barwise:v1 {"kind":"table","table":"doctor","entity":"Doctor","referenceMode":"provider_id","definition":"A medical provider at the clinic, identified by a state-issued provider ID."}
 CREATE TABLE doctor (
+  -- barwise:v1 {"kind":"column","table":"doctor","column":"provider_id","factType":"Doctor has ProviderId","readings":["{0} has {1}","{1} identifies {0}"],"roles":[{"name":"has","player":"Doctor"},{"name":"identifies","player":"ProviderId"}],"rowRole":0,"valueDefinition":"A unique identifier for a doctor issued by the state medical board."}
   provider_id VARCHAR(20) NOT NULL,
   -- NOTE(barwise): Value constraint available: ['cardiology', 'dermatology', 'family medicine', 'orthopedics', 'pediatrics']. Consider adding an accepted_values test.
+  -- barwise:v1 {"kind":"column","table":"doctor","column":"specialty","factType":"Doctor has Specialty","readings":["{0} has {1}","{1} is specialty of {0}"],"roles":[{"name":"has","player":"Doctor"},{"name":"is of","player":"Specialty"}],"rowRole":0,"valueDefinition":"The medical specialty of a doctor."}
   specialty VARCHAR(30) NOT NULL,
   PRIMARY KEY (provider_id),
   CHECK (specialty IN ('cardiology', 'dermatology', 'family medicine', 'orthopedics', 'pediatrics'))
@@ -26,11 +32,16 @@ CREATE TABLE doctor (
 -- Source: Appointment (283bb11c-11a1-4564-aaa5-3393ffc81d94)
 -- Definition: A scheduled visit between a patient and a doctor, identified by a unique confirmation number.
 -- NOTE(barwise): Definition available from ORM model: "A scheduled visit between a patient and a doctor, identified by a unique conf..."
+-- barwise:v1 {"kind":"table","table":"appointment","entity":"Appointment","referenceMode":"confirmation_number","definition":"A scheduled visit between a patient and a doctor, identified by a unique confirmation number."}
 CREATE TABLE appointment (
+  -- barwise:v1 {"kind":"column","table":"appointment","column":"confirmation_number","factType":"Appointment has ConfirmationNumber","readings":["{0} has {1}","{1} identifies {0}"],"roles":[{"name":"has","player":"Appointment"},{"name":"identifies","player":"ConfirmationNumber"}],"rowRole":0,"valueDefinition":"A unique confirmation number assigned to an appointment when it's created."}
   confirmation_number VARCHAR(20) NOT NULL,
+  -- barwise:v1 {"kind":"column","table":"appointment","column":"visit_reason","factType":"Appointment has VisitReason","readings":["{0} has {1}","{1} is reason for {0}"],"roles":[{"name":"has","player":"Appointment"},{"name":"is for","player":"VisitReason"}],"rowRole":0,"valueDefinition":"Free-text description of the reason for the patient's visit."}
   visit_reason VARCHAR(500),
   -- NOTE(barwise): Value constraint available: ['scheduled', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show']. Consider adding an accepted_values test.
+  -- barwise:v1 {"kind":"column","table":"appointment","column":"appointment_status","factType":"Appointment has AppointmentStatus","readings":["{0} has {1}","{1} is status of {0}"],"roles":[{"name":"has","player":"Appointment"},{"name":"is of","player":"AppointmentStatus"}],"rowRole":0,"valueDefinition":"The current status of an appointment."}
   appointment_status VARCHAR(20) NOT NULL,
+  -- barwise:v1 {"kind":"column","table":"appointment","column":"follow_up_note","factType":"Appointment has FollowUpNote","readings":["{0} has {1}","{1} is for {0}"],"roles":[{"name":"has","player":"Appointment"},{"name":"is for","player":"FollowUpNote"}],"rowRole":0,"valueDefinition":"Free-text note added to a completed appointment regarding follow-up care."}
   follow_up_note VARCHAR(500),
   PRIMARY KEY (confirmation_number),
   CHECK (appointment_status IN ('scheduled', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show'))
@@ -40,7 +51,9 @@ CREATE TABLE appointment (
 -- Source: ExamRoom (14837c15-141e-41fb-8774-4a118124e8f1)
 -- Definition: A physical examination room in the clinic, identified by a room number.
 -- NOTE(barwise): Definition available from ORM model: "A physical examination room in the clinic, identified by a room number."
+-- barwise:v1 {"kind":"table","table":"exam_room","entity":"ExamRoom","referenceMode":"room_number","definition":"A physical examination room in the clinic, identified by a room number."}
 CREATE TABLE exam_room (
+  -- barwise:v1 {"kind":"column","table":"exam_room","column":"room_number","factType":"ExamRoom has RoomNumber","readings":["{0} has {1}","{1} identifies {0}"],"roles":[{"name":"has","player":"ExamRoom"},{"name":"identifies","player":"RoomNumber"}],"rowRole":0,"valueDefinition":"The number identifying an exam room."}
   room_number VARCHAR(10) NOT NULL,
   PRIMARY KEY (room_number)
 );

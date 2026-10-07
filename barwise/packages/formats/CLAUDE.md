@@ -36,6 +36,9 @@ src/
                                  (native / informational / absent)
   ddl/constraintRouting.ts       Routes model constraints to UNIQUE/CHECK
                                  clauses or the ConstraintSpec spillway
+  ddl/barwiseAnnotation.ts       The `-- barwise:v1 {json}` line the DDL
+                                 export writes and the DDL import reads:
+                                 the one owner of that format
   openapi/OpenApiImportFormat.ts OpenAPI 3.x -> ORM
   openapi/OpenApiExportFormat.ts ORM -> OpenAPI JSON (wraps renderOpenApi)
   avro/AvroExportFormat.ts       ORM -> Avro schema (wraps renderAvro)

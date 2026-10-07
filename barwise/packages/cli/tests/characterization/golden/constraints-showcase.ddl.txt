@@ -3,15 +3,18 @@
 -- Table: person
 -- Source: Person (ot-person)
 -- TODO(barwise): No model description. Add a definition to the entity type.
+-- barwise:v1 {"kind":"table","table":"person","entity":"Person","referenceMode":"person_id"}
 CREATE TABLE person (
   -- TODO(barwise): No column description. Add a definition to the value type.
   -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
   person_id TEXT NOT NULL,
   -- TODO(barwise): No column description. Add a definition to the value type.
   -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
+  -- barwise:v1 {"kind":"column","table":"person","column":"vin","factType":"Person drives Car","readings":["{0} drives {1}","{1} is driven by {0}"],"roles":[{"name":"drives","player":"Person"},{"name":"is driven by","player":"Car"}],"rowRole":0}
   vin TEXT,
   -- TODO(barwise): No column description. Add a definition to the value type.
   -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
+  -- barwise:v1 {"kind":"column","table":"person","column":"bus_number","factType":"Person rides Bus","readings":["{0} rides {1}","{1} is ridden by {0}"],"roles":[{"name":"rides","player":"Person"},{"name":"is ridden by","player":"Bus"}],"rowRole":0}
   bus_number TEXT,
   PRIMARY KEY (person_id),
   FOREIGN KEY (vin) REFERENCES car (vin),
@@ -21,6 +24,7 @@ CREATE TABLE person (
 -- Table: car
 -- Source: Car (ot-car)
 -- TODO(barwise): No model description. Add a definition to the entity type.
+-- barwise:v1 {"kind":"table","table":"car","entity":"Car","referenceMode":"vin"}
 CREATE TABLE car (
   -- TODO(barwise): No column description. Add a definition to the value type.
   -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
@@ -31,6 +35,7 @@ CREATE TABLE car (
 -- Table: bus
 -- Source: Bus (ot-bus)
 -- TODO(barwise): No model description. Add a definition to the entity type.
+-- barwise:v1 {"kind":"table","table":"bus","entity":"Bus","referenceMode":"bus_number"}
 CREATE TABLE bus (
   -- TODO(barwise): No column description. Add a definition to the value type.
   -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
@@ -41,12 +46,14 @@ CREATE TABLE bus (
 -- Table: ticket
 -- Source: Ticket (ot-ticket)
 -- TODO(barwise): No model description. Add a definition to the entity type.
+-- barwise:v1 {"kind":"table","table":"ticket","entity":"Ticket","referenceMode":"ticket_id"}
 CREATE TABLE ticket (
   -- TODO(barwise): No column description. Add a definition to the value type.
   -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
   ticket_id TEXT NOT NULL,
   -- TODO(barwise): No column description. Add a definition to the value type.
   -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
+  -- barwise:v1 {"kind":"column","table":"ticket","column":"person_id","factType":"Person purchases Ticket","readings":["{0} purchases {1}","{1} is purchased by {0}"],"roles":[{"name":"purchases","player":"Person"},{"name":"is purchased by","player":"Ticket"}],"rowRole":1}
   person_id TEXT NOT NULL,
   PRIMARY KEY (ticket_id),
   FOREIGN KEY (person_id) REFERENCES person (person_id)
