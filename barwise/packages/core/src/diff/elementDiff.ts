@@ -192,13 +192,15 @@ export function diffFactType(
     changes.push({ change: "readings", from: readingsA, to: readingsB });
   }
 
-  // Constraints -- pass both role arrays so constraintKey can resolve
-  // role IDs to positional indices (stable across LLM re-extractions).
+  // Constraints -- pass both role arrays and models so constraintKey can
+  // resolve role IDs to positions (stable across LLM re-extractions).
   const constraintDiff = diffConstraints(
     a.constraints,
     b.constraints,
     a.roles,
     b.roles,
+    existingModel,
+    incomingModel,
   );
   changes.push(...constraintDiff);
 
@@ -279,36 +281,41 @@ function derivationKey(d: DerivationRule | undefined): string {
   return `${d.kind}|${d.storage ?? "derive_on_request"}|${d.expression}|${d.isFormal ? "f" : ""}`;
 }
 
-/**
- * Build a role-id-to-index lookup from a roles array.
- */
-function roleIndexMap(roles: readonly Role[]): Map<string, number> {
-  const m = new Map<string, number>();
-  for (let i = 0; i < roles.length; i++) {
-    m.set(roles[i]!.id, i);
-  }
-  return m;
-}
+/** A role id's stable key within one model. */
+type RoleKeys = (id: string) => string;
 
 /**
- * Resolve a role ID to its positional index using the lookup.
- * Falls back to the raw ID for cross-fact-type constraints whose role
- * IDs don't belong to this fact type.
+ * Key a constraint's roles: a role of the host fact type by its position,
+ * a role of another fact type by that fact type's name and its position
+ * there -- the diff matches fact types by name, so that names the same
+ * role in both models. Only a role no fact type holds keeps its raw id.
+ * The cross-fact-type case used to keep the raw id too, so every external
+ * uniqueness read as removed and added after an import minted new role
+ * ids (barwise-b7z, diff-cross-fact-type-role-keys.spec.md).
  */
-function resolveRole(id: string, idxMap: Map<string, number>): string {
-  const idx = idxMap.get(id);
-  return idx !== undefined ? String(idx) : id;
+function roleKeys(roles: readonly Role[], model: OrmModel): RoleKeys {
+  const host = new Map(roles.map((r, i) => [r.id, String(i)]));
+  return (id) => {
+    const own = host.get(id);
+    if (own !== undefined) return own;
+    const home = model.factTypes.find((ft) => ft.getRoleById(id));
+    return home ? `${home.name}#${home.roles.findIndex((r) => r.id === id)}` : id;
+  };
+}
+
+function resolveRole(id: string, keys: RoleKeys): string {
+  return keys(id);
 }
 
 /**
  * Produce a stable, comparable string key for a constraint, normalized
- * so that role IDs are replaced with positional indices within the
- * parent fact type. This eliminates false-positive diffs caused by
- * fresh UUIDs from LLM re-extractions.
+ * so that role IDs are replaced with positions (see `roleKeys`). This
+ * eliminates false-positive diffs caused by fresh UUIDs from LLM
+ * re-extractions and imports.
  */
 function constraintKey(
   c: Constraint,
-  idxMap: Map<string, number>,
+  idxMap: RoleKeys,
 ): string {
   const base = constraintTypeKey(c, idxMap);
   // Modality is part of a constraint's identity: alethic vs deontic is a
@@ -319,7 +326,7 @@ function constraintKey(
 
 function constraintTypeKey(
   c: Constraint,
-  idxMap: Map<string, number>,
+  idxMap: RoleKeys,
 ): string {
   switch (c.type) {
     case "internal_uniqueness": {
@@ -397,11 +404,13 @@ function diffConstraints(
   b: readonly Constraint[],
   rolesA: readonly Role[],
   rolesB: readonly Role[],
+  modelA: OrmModel,
+  modelB: OrmModel,
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 
-  const idxMapA = roleIndexMap(rolesA);
-  const idxMapB = roleIndexMap(rolesB);
+  const idxMapA = roleKeys(rolesA, modelA);
+  const idxMapB = roleKeys(rolesB, modelB);
 
   const keysA = new Set(a.map((c) => constraintKey(c, idxMapA)));
   const keysB = new Set(b.map((c) => constraintKey(c, idxMapB)));

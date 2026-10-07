@@ -13,6 +13,7 @@
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
+import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 function baseModel() {
@@ -1544,5 +1545,70 @@ describe("diffModels", () => {
       (d) => d.kind === "modified" && d.elementType === "fact_type" && d.name?.includes("citizen"),
     );
     expect(delta).toBeDefined();
+  });
+});
+
+describe("a constraint over roles of other fact types", () => {
+  // barwise-b7z: a role outside the host fact type was keyed by its raw
+  // id, so two models differing only in role ids reported every external
+  // uniqueness as removed and added.
+  const model = (unique: "number" | "name", buildingRole = 1) => {
+    const m = new ModelBuilder("Rooms")
+      .withEntityType("Room", { referenceMode: "room_id" })
+      .withEntityType("Building", { referenceMode: "building_id" })
+      .withValueType("RoomNumber")
+      .withValueType("RoomName")
+      .withBinaryFactType("Room has RoomNumber", {
+        role1: { player: "Room", name: "has" },
+        role2: { player: "RoomNumber", name: "is of" },
+      })
+      .withBinaryFactType("Room has RoomName", {
+        role1: { player: "Room", name: "has" },
+        role2: { player: "RoomName", name: "is of" },
+      })
+      .withBinaryFactType("Room is in Building", {
+        role1: { player: "Room", name: "is in" },
+        role2: { player: "Building", name: "houses" },
+      })
+      .build();
+    const host = m.getFactTypeByName(
+      unique === "number" ? "Room has RoomNumber" : "Room has RoomName",
+    )!;
+    const building = m.getFactTypeByName("Room is in Building")!;
+    host.addConstraint({
+      type: "external_uniqueness",
+      roleIds: [host.roles[1]!.id, building.roles[buildingRole]!.id],
+    });
+    return m;
+  };
+  // The same model with every role id replaced, as an import mints them.
+  const withNewRoleIds = (m: OrmModel) => {
+    const yaml = new OrmYamlSerializer();
+    return yaml.deserialize(yaml.serialize(m).replace(/::role(\d)/g, "::minted-$1"));
+  };
+  const constraintChanges = (a: OrmModel, b: OrmModel) =>
+    diffModels(a, b).deltas.flatMap((d) =>
+      d.changes.filter((c) => c.change === "constraintsAdded" || c.change === "constraintsRemoved")
+    );
+
+  it("is unchanged when only the role ids differ", () => {
+    const a = model("number");
+    const b = withNewRoleIds(a);
+    expect(a.getFactTypeByName("Room is in Building")!.roles[1]!.id)
+      .not.toBe(b.getFactTypeByName("Room is in Building")!.roles[1]!.id);
+    expect(constraintChanges(a, b)).toEqual([]);
+  });
+
+  it("is reported when it names a different role of the other fact type", () => {
+    expect(constraintChanges(model("number"), model("number", 0)).map((c) => c.change).sort())
+      .toEqual(["constraintsAdded", "constraintsRemoved"]);
+  });
+
+  it("that moved to another host still reads as removed from one and added to the other", () => {
+    // Not host-independent, on purpose: merge rebuilds fact types from
+    // deltas, so a move reported nowhere could be dropped (see the spec's
+    // open decision).
+    expect(constraintChanges(model("number"), model("name")).map((c) => c.change).sort())
+      .toEqual(["constraintsAdded", "constraintsRemoved"]);
   });
 });
