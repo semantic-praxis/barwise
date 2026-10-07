@@ -217,6 +217,12 @@
       "caught_by": "not-a-correction",
       "note": "The spec's Status line, which says two things the draft had wrong are recorded below and points at them. It records no correction of its own -- both are detected separately, as this spec's other two rows -- so giving it a verdict would count one finding twice. The detector over-matched on the pointer, which is what an over-inclusive detector is built to do."
     },
+    "diff-cross-fact-type-role-keys::135e39c5be37": {
+      "spec": "diff-cross-fact-type-role-keys.spec.md",
+      "excerpt": "- measured over the 12 kernels' ddl round trip: 535 deltas to 520. of the 23 external uniquenesses, 15 now read as unchanged. the other 8 are real differences t",
+      "caught_by": "execution",
+      "note": "Both corrections were caught by running something: the kernel round-trip measurement showed the planned formats corpus assertion could not hold (7 host moves and 1 lost deontic modality are real differences), and the first run of the unit test showed the test ModelBuilder mints deterministic role ids."
+    },
     "edge-release-currency::e8bf22909434": {
       "spec": "edge-release-currency.spec.md",
       "excerpt": "stated carefully, because the earlier reading was wrong in this spec's first draft: createdat desc alone does not explain the whole historical ordering (before ",
