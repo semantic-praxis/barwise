@@ -40,6 +40,7 @@ import {
   columnKey,
   type ReadAnnotations,
   readAnnotations,
+  type Relationship,
 } from "./barwiseAnnotation.js";
 import {
   blankComments,
@@ -133,7 +134,7 @@ export class DdlImportFormat implements ImportFormat {
       if (!present.has(key)) {
         warnings.push(
           `The annotation for ${
-            a.kind === "table" ? `table "${a.table}"` : `column "${a.table}.${a.column}"`
+            a.kind === "column" ? `column "${a.table}.${a.column}"` : `table "${a.table}"`
           } `
             + `matches nothing in the file; ignored.`,
         );
@@ -149,8 +150,19 @@ export class DdlImportFormat implements ImportFormat {
     // so looking it up by key merged its key and columns into that entity
     // while the warning said it was not imported (PR #577 review).
     const accepted: ParsedTable[] = [];
+    // A table barwise exported from a fact type is that fact type, not an
+    // entity; it is built once every entity exists (step 1b).
+    const factTables: ParsedTable[] = [];
+    // A table keyed on two or more foreign keys is an objectified
+    // relationship (ddl-round-trip-fixed-point.spec.md, workstream 5).
+    const objectifying: ParsedTable[] = [];
     for (const table of tables) {
-      const annotation = annotations.tables.get(tableKey(table.name));
+      const found = annotations.tables.get(tableKey(table.name));
+      if (found?.kind === "factTable") {
+        factTables.push(table);
+        continue;
+      }
+      const annotation = found;
       let entityName = toPascalCase(table.name);
       if (annotation && model.getObjectTypeByName(annotation.entity)) {
         warnings.push(
@@ -168,9 +180,13 @@ export class DdlImportFormat implements ImportFormat {
         );
         continue;
       }
-      const referenceMode = annotated && table.primaryKey.length === 1
+      const keyedOnForeignKeys = foreignKeysOfKey(table) !== undefined;
+      const referenceMode = annotated && (table.primaryKey.length === 1 || keyedOnForeignKeys)
         ? annotated.referenceMode
+        : keyedOnForeignKeys
+        ? `${table.name}_id`
         : this.inferReferenceMode(table, warnings);
+      if (keyedOnForeignKeys) objectifying.push(table);
 
       const entityType = model.addObjectType({
         name: entityName,
@@ -180,6 +196,68 @@ export class DdlImportFormat implements ImportFormat {
       });
       entityMap.set(tableKey(table.name), entityType.id);
       accepted.push(table);
+    }
+
+    // Step 1b: tables that are relationships. A fact-type table whose line
+    // no longer matches becomes an entity after all, as it would have been
+    // without the line.
+    const consumed = new Map<string, Set<string>>(); // table key -> columns a relationship took
+    for (const table of factTables) {
+      const annotation = annotations.tables.get(tableKey(table.name));
+      const built = annotation?.kind === "factTable"
+        ? this.buildRelationship(model, table, annotation, entityMap, undefined)
+        : "it is not a fact-type line";
+      if (typeof built !== "string") {
+        consumed.set(tableKey(table.name), built);
+        continue;
+      }
+      warnings.push(
+        `Table "${table.name}": the annotation no longer matches (${built}); it is imported as an entity.`,
+      );
+      // From here it is read as if it had no line at all, keyed-on-foreign-
+      // keys rule included.
+      const keyedOnForeignKeys = foreignKeysOfKey(table) !== undefined;
+      const entityType = model.addObjectType({
+        name: toPascalCase(table.name),
+        kind: "entity",
+        referenceMode: keyedOnForeignKeys
+          ? `${table.name}_id`
+          : this.inferReferenceMode(table, warnings),
+      });
+      entityMap.set(tableKey(table.name), entityType.id);
+      accepted.push(table);
+      if (keyedOnForeignKeys) objectifying.push(table);
+    }
+    for (const table of objectifying) {
+      const entity = model.getObjectType(entityMap.get(tableKey(table.name)) ?? "");
+      if (!entity || entity.kind !== "entity") continue;
+      const annotation = annotations.tables.get(tableKey(table.name));
+      const declared = annotation?.kind === "table" && annotation.entity === entity.name
+        ? annotation.objectifies
+        : undefined;
+      let built = declared
+        ? this.buildRelationship(model, table, declared, entityMap, entity)
+        : undefined;
+      if (typeof built === "string") {
+        warnings.push(
+          `Table "${table.name}": the annotation of what it objectifies no longer matches (${built}); `
+            + `names are guessed from the table instead.`,
+        );
+      }
+      if (built === undefined || typeof built === "string") {
+        const guessed = this.guessedRelationship(model, table, entityMap);
+        built = guessed
+          ? this.buildRelationship(model, table, guessed, entityMap, entity)
+          : "a referenced table is not an entity";
+      }
+      if (typeof built === "string") {
+        warnings.push(
+          `Table "${table.name}": composite PRIMARY KEY (${table.primaryKey.join(", ")}) was not `
+            + `imported (${built}); the entity uses "${entity.referenceMode}" (barwise-1077).`,
+        );
+        continue;
+      }
+      consumed.set(tableKey(table.name), built);
     }
 
     // Step 2: Give each single-column key a typed identifier. Before the
@@ -198,8 +276,9 @@ export class DdlImportFormat implements ImportFormat {
       const entityType = model.getObjectType(entityId);
       if (!entityType) continue;
 
+      const taken = consumed.get(tableKey(table.name));
       for (const cols of table.uniqueConstraints) {
-        if (cols.length > 1) {
+        if (cols.length > 1 && !cols.every((c) => taken?.has(c))) {
           warnings.push(
             `Table "${table.name}": UNIQUE (${
               cols.join(", ")
@@ -209,8 +288,9 @@ export class DdlImportFormat implements ImportFormat {
       }
 
       for (const column of table.columns) {
-        // Key columns are the entity's identifier (step 2)
-        if (table.primaryKey.includes(column.name)) {
+        // Key columns are the entity's identifier (step 2), or a role of
+        // the relationship it objectifies (step 1b).
+        if (table.primaryKey.includes(column.name) || taken?.has(column.name)) {
           continue;
         }
 
@@ -512,7 +592,7 @@ export class DdlImportFormat implements ImportFormat {
    * Parse column names from a constraint like "PRIMARY KEY (col1, col2)".
    */
   private parseConstraintColumns(constraint: string): string[] {
-    const match = /\((.*?)\)/i.exec(constraint);
+    const match = new RegExp(`\\(${COLUMN_LIST}\\)`).exec(constraint);
     if (!match) return [];
 
     return identifierList(match[1]!);
@@ -860,6 +940,182 @@ export class DdlImportFormat implements ImportFormat {
   }
 
   /**
+   * A relationship over a whole table: an annotated fact-type table, what
+   * an objectifying table's line says it objectifies, or the shape guessed
+   * for a table keyed on its foreign keys. The players and the uniqueness
+   * come from the DDL: an entity role's columns must be exactly one of the
+   * table's foreign keys, to the table of the named entity; a value role is
+   * one column that is no foreign key; the primary key and each `UNIQUE`
+   * become a uniqueness over the roles whose columns they span. Returns the
+   * columns it took, or why it built nothing -- decided before anything is
+   * built, so a refusal leaves the model as it was.
+   */
+  private buildRelationship(
+    model: OrmModel,
+    table: ParsedTable,
+    relationship: Relationship,
+    entityMap: ReadonlyMap<string, string>,
+    objectifier: ObjectType | undefined,
+  ): Set<string> | string {
+    if (model.getFactTypeByName(relationship.factType)) {
+      return `a fact type named "${relationship.factType}" already exists`;
+    }
+    const used = new Set<string>();
+    const plan: ({ kind: "entity"; id: string; } | { kind: "value"; column: ParsedColumn; })[] = [];
+    const plannedValues = new Map<string, ParsedColumn>();
+    for (const role of relationship.roles) {
+      const missing = role.columns.find((c) => !table.columns.some((col) => col.name === c));
+      if (missing) return `it names column "${missing}", which the table does not have`;
+      if (role.columns.some((c) => used.has(c))) return "two roles name one column";
+      role.columns.forEach((c) => used.add(c));
+      const fk = table.foreignKeys.find((f) =>
+        f.columns.length === role.columns.length && f.columns.every((c) => role.columns.includes(c))
+      );
+      if (fk) {
+        const player = model.getObjectType(entityMap.get(tableKey(fk.referencedTable)) ?? "");
+        if (!player || player.name !== role.player) {
+          return `role "${role.name}" references "${
+            player?.name ?? fk.referencedTable
+          }", not "${role.player}"`;
+        }
+        plan.push({ kind: "entity", id: player.id });
+        continue;
+      }
+      const column = table.columns.find((c) => c.name === role.columns[0]);
+      if (
+        role.columns.length !== 1 || !column
+        || table.foreignKeys.some((f) => f.columns.includes(column.name))
+      ) {
+        return `role "${role.name}" is neither one foreign key nor one plain column`;
+      }
+      // Two roles played by one value type claim it once: the model does
+      // not hold the first claim yet, so the second is checked against the
+      // first column here. Stricter than the sharing rule (value order
+      // counts), which only costs a stale warning on a hand edit.
+      const earlier = plannedValues.get(role.player);
+      if (earlier && !sameColumnValues(earlier, column)) {
+        return `two roles name "${role.player}" over columns of different types or values`;
+      }
+      const claim = this.claimRoleValueType(model, objectifier, role.player, column);
+      if (claim.kind === "create" && claim.displaced) {
+        return `"${role.player}" is held by ${claim.displaced.kind} type "${claim.displaced.name}"`;
+      }
+      plannedValues.set(role.player, column);
+      plan.push({ kind: "value", column });
+    }
+    // A uniqueness falls on whole roles, or ORM has no way to say it here.
+    const rolesOver = (cols: readonly string[]): number[] | undefined => {
+      const idx = relationship.roles.flatMap((r, i) =>
+        r.columns.every((c) => cols.includes(c)) ? [i] : []
+      );
+      const covered = idx.flatMap((i) => relationship.roles[i]!.columns);
+      return covered.length === cols.length && cols.every((c) => covered.includes(c))
+        ? idx
+        : undefined;
+    };
+    const keyRoles = table.primaryKey.length > 0 ? rolesOver(table.primaryKey) : undefined;
+    if (table.primaryKey.length > 0 && !keyRoles) {
+      return "its primary key does not fall on whole roles";
+    }
+
+    const roleIds = relationship.roles.map(() => generateId());
+    const constraints: Constraint[] = [];
+    const uniqueOver = (idx: number[] | undefined) => {
+      if (!idx) return;
+      const over = idx.map((i) => roleIds[i]!);
+      const key = [...over].sort().join();
+      const seen = constraints.some((c) =>
+        c.type === "internal_uniqueness" && [...c.roleIds].sort().join() === key
+      );
+      if (!seen) constraints.push({ type: "internal_uniqueness", roleIds: over });
+    };
+    uniqueOver(keyRoles);
+    for (const cols of table.uniqueConstraints) uniqueOver(rolesOver(cols));
+
+    const roles = relationship.roles.map((role, i) => {
+      const step = plan[i]!;
+      let playerId: string;
+      if (step.kind === "entity") {
+        playerId = step.id;
+      } else {
+        const claim = this.claimRoleValueType(model, objectifier, role.player, step.column);
+        playerId = claim.kind === "share"
+          ? claim.valueType.id
+          : model.addObjectType({
+            name: claim.name,
+            kind: "value",
+            dataType: columnDataType(step.column),
+            ...(step.column.valueConstraint
+              ? { valueConstraint: step.column.valueConstraint }
+              : {}),
+            ...(role.valueDefinition ? { definition: role.valueDefinition } : {}),
+          }).id;
+      }
+      return { id: roleIds[i]!, name: role.name, playerId };
+    });
+    const factType = model.addFactType({
+      name: relationship.factType,
+      roles,
+      readings: [...relationship.readings],
+      constraints,
+      ...(relationship.definition ? { definition: relationship.definition } : {}),
+    });
+    if (objectifier) {
+      model.addObjectifiedFactType({ factTypeId: factType.id, objectTypeId: objectifier.id });
+    }
+    return used;
+  }
+
+  /** The sharing rule for a value role of a relationship, which names its own fact type. */
+  private claimRoleValueType(
+    model: OrmModel,
+    objectifier: ObjectType | undefined,
+    name: string,
+    column: ParsedColumn,
+  ) {
+    return claimValueTypeName(
+      model,
+      objectifier?.id ?? "",
+      objectifier?.name ?? "",
+      name,
+      columnDataType(column),
+      "attribute",
+      column.valueConstraint,
+      { namedFactType: true },
+    );
+  }
+
+  /**
+   * The relationship a table keyed on its foreign keys is taken to be when
+   * nothing names it (decided with the requester, 2026-10-07): one role
+   * per foreign key in the key, named from the table -- "Student and
+   * Course enrollment", read "{0} and {1} have enrollment". Undefined
+   * when a referenced table imported as no entity.
+   */
+  private guessedRelationship(
+    model: OrmModel,
+    table: ParsedTable,
+    entityMap: ReadonlyMap<string, string>,
+  ): Relationship | undefined {
+    const fks = foreignKeysOfKey(table);
+    if (!fks) return undefined;
+    const players = fks.map((fk) =>
+      model.getObjectType(entityMap.get(tableKey(fk.referencedTable)) ?? "")
+    );
+    if (players.some((p) => !p)) return undefined;
+    const words = table.name.replace(/_/g, " ").toLowerCase();
+    const list = (items: string[]) =>
+      items.length === 2
+        ? items.join(" and ")
+        : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+    return {
+      factType: `${list(players.map((p) => p!.name))} ${words}`,
+      readings: [`${list(fks.map((_, i) => `{${i}}`))} have ${words}`],
+      roles: fks.map((fk, i) => ({ name: "is in", player: players[i]!.name, columns: fk.columns })),
+    };
+  }
+
+  /**
    * A column's annotation, while it still describes the file: the table's
    * entity plays its row role, the other role is played by `other` when
    * the caller knows it (a foreign key's referenced entity), and no fact
@@ -949,8 +1205,14 @@ function tableKey(name: string): string {
 const CONSTRAINT_NAME = new RegExp(`^CONSTRAINT\\s+${IDENT}\\s+`, "i");
 const INDEX_OR_CHECK = new RegExp(`^(CHECK\\s*\\(|(INDEX|KEY)\\s+${IDENT}\\s*\\()`, "i");
 const COLUMN_NAME = new RegExp(`^(${IDENT})\\s+`);
+/**
+ * What is inside a column list's parentheses, a quoted name included: a
+ * lazy `(.*?)` stopped at the first `)`, so a key over `"(ambiguous)"`
+ * read as `"(ambiguous` and the key was lost.
+ */
+const COLUMN_LIST = `((?:"[^"]*"|[^)"])*)`;
 const FOREIGN_KEY = new RegExp(
-  `FOREIGN\\s+KEY\\s*\\((.*?)\\)\\s*REFERENCES\\s+(${QUALIFIED})\\s*\\((.*?)\\)`,
+  `FOREIGN\\s+KEY\\s*\\(${COLUMN_LIST}\\)\\s*REFERENCES\\s+(${QUALIFIED})\\s*\\(${COLUMN_LIST}\\)`,
   "i",
 );
 
@@ -1007,6 +1269,24 @@ function skipDefaultExpression(text: string): string {
 }
 
 /**
+ * The foreign keys a table's primary key is made of, when it is made of
+ * two or more and nothing else: the shape of a relationship's table. A
+ * key that is one foreign key identifies an entity by a relationship
+ * (barwise-1078), and a key with a plain column is barwise-1077's other
+ * half, an external uniqueness.
+ */
+function foreignKeysOfKey(table: ParsedTable): ParsedForeignKey[] | undefined {
+  const key = table.primaryKey;
+  if (key.length < 2) return undefined;
+  const fks = table.foreignKeys.filter((f) => f.columns.every((c) => key.includes(c)));
+  const covered = fks.flatMap((f) => f.columns);
+  if (fks.length < 2 || covered.length !== key.length || !key.every((c) => covered.includes(c))) {
+    return undefined;
+  }
+  return [...fks];
+}
+
+/**
  * A binary fact type as its annotation names it: its name, readings,
  * definition and role names, with the roles in the annotation's order.
  * The players and the constraints come from the DDL, through the caller.
@@ -1037,6 +1317,12 @@ function annotatedFactType(
  * import's explicit policy for a type the shared mapping does not
  * recognize (barwise-865).
  */
+/** Whether two columns would make the same value type: data type and value constraint alike. */
+function sameColumnValues(a: ParsedColumn, b: ParsedColumn): boolean {
+  return JSON.stringify(columnDataType(a)) === JSON.stringify(columnDataType(b))
+    && JSON.stringify(a.valueConstraint ?? null) === JSON.stringify(b.valueConstraint ?? null);
+}
+
 function columnDataType(column: ParsedColumn): DataTypeDef {
   if (column.identity) return { name: "auto_counter" };
   return parseSqlDataType(column.dataType) ?? { name: "other" };

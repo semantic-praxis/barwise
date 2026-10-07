@@ -193,6 +193,12 @@
       "caught_by": "execution",
       "note": "The first round-trip test called renderDdl directly and failed on a missing UNIQUE (email): UNIQUE comes from DdlExportFormat's constraint routing. Running the test caught it; the test now goes through DdlExportFormat."
     },
+    "ddl-round-trip-fixed-point::4a9dce598539": {
+      "spec": "ddl-round-trip-fixed-point.spec.md",
+      "excerpt": "- workstreams 1 and 2 (barwise-kgh, part of barwise-dnm). three more defects in the same path surfaced once n-ary value roles had columns. - the export annotati",
+      "caught_by": "execution",
+      "note": "Each defect in these notes was caught by running something: the n-ary export defects once the columns existed (workstreams 1 and 2), the trial corpus measurement (workstreams 3 and 4), and the corpus round-trip test, which found the quote-unaware key-list parse and the stale fact-type fallback that skipped the keyed-on-foreign-keys rule (workstream 5)."
+    },
     "diagram-layout-laws::6cdf956a0090": {
       "spec": "diagram-layout-laws.spec.md",
       "excerpt": "the draft gave a different first reason and it was wrong. it said reuse would require either reaching into another package's tests/, \"which depcruise exists to ",
