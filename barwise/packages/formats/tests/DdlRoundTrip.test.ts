@@ -263,15 +263,46 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
       .toEqual(["{0}, {1} and {2} have booking"]);
   });
 
-  it("a key with a plain column is left for the external-uniqueness fix, as before", () => {
-    const { warnings } = ddl.parse(`
+  it("a key with a plain column is no relationship: an external uniqueness over its columns", () => {
+    const { model, warnings } = ddl.parse(`
       CREATE TABLE student (student_id INT PRIMARY KEY);
       CREATE TABLE enrollment (student_id INT REFERENCES student (student_id), term VARCHAR(6),
         PRIMARY KEY (student_id, term));`);
+    expect(model.objectifiedFactTypes).toEqual([]);
     expect(
-      warnings.some((w) => /composite PRIMARY KEY \(student_id, term\) was not imported/.test(w)),
-    )
-      .toBe(true);
+      warnings.some((w) =>
+        /composite PRIMARY KEY \(student_id, term\) is imported as an external uniqueness/.test(w)
+      ),
+    ).toBe(true);
+    const external = model.factTypes.flatMap((f) => f.constraints)
+      .filter((c) => c.type === "external_uniqueness");
+    expect(external).toHaveLength(1);
+  });
+
+  it("a UNIQUE over a relationship column and an attribute spans the relationship's role", () => {
+    // C03's policy_period: the policy number is unique within a term, and
+    // the term is a role of the relationship the period objectifies, not a
+    // binary of the period. It was dropped with a warning.
+    const { model, warnings } = ddl.parse(`
+      CREATE TABLE policy (policy_id INT PRIMARY KEY);
+      CREATE TABLE term (term_number INT PRIMARY KEY);
+      CREATE TABLE policy_period (
+        policy_id INT NOT NULL REFERENCES policy (policy_id),
+        term_number INT NOT NULL REFERENCES term (term_number),
+        policy_number VARCHAR(20) NOT NULL,
+        PRIMARY KEY (policy_id, term_number),
+        UNIQUE (policy_number, term_number));`);
+    expect(warnings).toEqual([]);
+    const where = new Map(
+      model.factTypes.flatMap((f) => f.roles.map((r, i) => [r.id, `${f.name}#${i}`] as const)),
+    );
+    const external = model.factTypes.flatMap((f) => f.constraints)
+      .filter((c) => c.type === "external_uniqueness")
+      .map((c) => c.roleIds.map((id) => where.get(id)));
+    expect(external).toEqual([[
+      "PolicyPeriod has PolicyNumber#1",
+      "Policy and Term policy period#1",
+    ]]);
   });
 
   it("reads a key over a quoted name with parentheses in it", () => {

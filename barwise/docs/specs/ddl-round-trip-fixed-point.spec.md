@@ -1,6 +1,6 @@
 # A DDL export reads back as the model that wrote it
 
-Status: Accepted -- workstreams 1 to 5 implemented; barwise-1077's plain-column keys are the next PR
+Status: Accepted -- workstreams 1 to 6 implemented
 
 Created: 2026-09-27
 Last-updated: 2026-10-07
@@ -285,6 +285,37 @@ Every one imports today as an entity with an invented `<table>_id` key.
   columns needs an external uniqueness constraint, a different
   mechanism; it closes barwise-1077 in a PR of its own.
 
+### Workstream 6: keys and UNIQUE over plain columns (barwise-1077)
+
+Workstream 5 left the half of barwise-1077 that has no relationship in
+it: a `UNIQUE` over several columns, and a primary key with a plain
+column in it. Both import today as a warning and nothing else. In ORM,
+"this combination of an entity's attributes is unique" is an external
+uniqueness over the attributes' fact types, and that is what the export
+writes a multi-column `UNIQUE` from (`constraintRouting.ts`): 23 of
+them across the 12 kernels.
+
+- **R6.** When an entity table has a `UNIQUE` over two or more columns,
+  each of which imported as a binary of that entity, the importer shall
+  add an external uniqueness over the binaries' other roles, stored on
+  the first column's fact type as the kernels store it.
+- **R7.** When an entity table's primary key spans two or more columns
+  and is not keyed on foreign keys alone (workstream 5), the key columns
+  shall import as mandatory attributes of the entity with an external
+  uniqueness over them, instead of being dropped. The entity keeps the
+  invented `<table>_id` reference mode, and the warning says so: the
+  metamodel has no preferred external uniqueness, so nothing can name
+  the combination as the entity's identifier, and an export of the
+  result adds the `<table>_id` column back. That gap is its own issue
+  (barwise-ezn); no data is lost meanwhile.
+- **A column of the relationship the table objectifies** stands for
+  that relationship's role: C03's `UNIQUE (policy_number, term_number)`
+  is an external uniqueness over PolicyNumber's role and the Term role
+  of "Policy is in force for Term", as the kernel has it. The columns of
+  a composite foreign key all stand for their one role.
+- **A `UNIQUE` or key over a column that imported as nothing** (a
+  column of a table that failed to import) keeps today's warning.
+
 Workstreams 1 and 2 ship together, because both are small defects in
 what the two halves write and read. The rest are each their own PR. The
 trial gate runs at the end of each one.
@@ -384,3 +415,22 @@ declaring the loss, and the value role as canonical (barwise-fly).
   - **A stale fact-type line falls back all the way.** The first version
     made the table an entity but skipped the keyed-on-foreign-keys rule,
     so it lost its key; a test caught it.
+- **Workstream 6.** All 23 external uniquenesses in the kernels now read
+  back over the same roles, from none: a corpus test in
+  `BarwiseAnnotation.test.ts` pins it, keyed by role position among
+  each fact type's players, since the import mints new role ids and an
+  identifier's fact type and value type can be spelled its own way.
+  - **The kernel delta count rose, 528 to 535, while fidelity improved.**
+    Core's diff resolves a role outside the host fact type by its raw id,
+    so every external uniqueness reads as removed and added after any
+    import, and the import may host one on a different fact type than
+    the original (C03). Before this workstream they read only as
+    removed. That is a defect in the instrument, filed as barwise-b7z,
+    not a loss; the corpus test above is the measurement that holds.
+  - **The first version missed C03's policy period,** whose `UNIQUE`
+    spans a relationship column and an attribute; step 3b looked only
+    at binaries. The relationship builder now returns each column with
+    the role it plays.
+  - **No preferred external uniqueness.** A composite key over plain
+    columns still identifies its entity by an invented `<table>_id`,
+    and the warning names barwise-ezn.
