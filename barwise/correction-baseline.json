@@ -463,6 +463,18 @@
       "caught_by": "execution",
       "note": "Reading the universe and judging by absence turned out to be different properties; found in implementation."
     },
+    "objectification-absorption::2b1552de004e": {
+      "spec": "objectification-absorption.spec.md",
+      "excerpt": "the key rule was wrong for objectifications with no value role too, in the other direction. c05's \"material is produced at plant in batch\" is unique on the batc",
+      "caught_by": "execution",
+      "note": "Caught by execution: a scan of every kernel and example for objectified fact types keyed on fewer than all roles found the entity-only cases (C05, C06, C09, the auction example) whose key also changed, which the first draft of the spec left out."
+    },
+    "objectification-absorption::7f11e874e0ec": {
+      "spec": "objectification-absorption.spec.md",
+      "excerpt": "addrolecolumns takes the loop out of createassociativetable, adds an optional sourceconstraintid the objectified foreign keys carry, and settleobjectifiedkey ca",
+      "caught_by": "execution",
+      "note": "Caught by execution: fixing the mapper failed the test that asserted the value role gets no column (it pinned the defect), and the formats corpus test found the import half, a declared objectifies line never consulted when the key had a plain column."
+    },
     "offline-eval-rehearsal::e87d9654e1c2": {
       "spec": "offline-eval-rehearsal.spec.md",
       "excerpt": "the sharpest of the seven is worth naming here. resolving the variant and then not passing it to runsuite leaves the using artifact version line intact and send",
