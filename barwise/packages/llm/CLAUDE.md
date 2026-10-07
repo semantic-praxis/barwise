@@ -281,8 +281,9 @@ npx tsc --noEmit            # type-check only
   No real API calls in the standard test suite.
 - `tests/Pipeline.integration.test.ts` tests the full extraction
   pipeline with recorded fixtures.
-- Live LLM tests (requiring API keys) belong in `tests/live/` and are
-  excluded from CI. Run them manually during prompt engineering.
+- Live LLM runs (requiring API keys) go through `barwise prompt eval`
+  (the promptlab lane), not through this package's test suite, which
+  has no excluded live directory.
 
 ## Dependencies
 

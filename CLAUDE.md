@@ -182,7 +182,8 @@ The one thing outside that graph is `barwise/optimizer/`: the DSPy
 prompt-optimization lane. It is Python, it is dev-time only, and it
 depends on the workspace **as a subprocess** (`barwise prompt schema`,
 `barwise prompt score`) rather than by import. Turborepo does not know
-it exists and CI does not run it. Nothing there may become a runtime
+it exists; CI runs its offline suite (`npm run test:optimizer`) when
+`optimizer/` or `packages/cli/` changes. Nothing there may become a runtime
 dependency -- if a capability built in that lane turns out to be needed
 at run time, it moves into `@barwise/llm` as TypeScript. That is the
 determinism rule applied one layer further out than `core`.
@@ -370,9 +371,9 @@ skill (`.claude/skills/release/`).
 
 ## Conventions (Monorepo-Wide)
 
-- ALWAYS create a spec file before beginning development. There should
-  be a documented and reviewed plan to ensure the quality of work is
-  high. Use the `spec-writer` skill for the house spec format, the
+- Create a spec file before beginning development, so there is a
+  documented and reviewed plan that keeps the quality of work high.
+  Use the `spec-writer` skill for the house spec format, the
   design-principle framing, and the pre-flight checklist; specs live
   in `barwise/docs/specs/`.
 - Doc naming and dating (stable kebab names for specs, dated filenames
@@ -592,7 +593,7 @@ issue status, then push and verify:
 
 ```bash
 git pull --rebase
-bd dolt push
+if command -v bd >/dev/null; then bd dolt push; fi  # issues.jsonl travels with git push either way
 git push
 git status  # must show "up to date with origin"
 ```

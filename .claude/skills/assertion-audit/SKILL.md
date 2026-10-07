@@ -37,7 +37,7 @@ the green meant nothing:
   and two readings came back `0`;
 - `python3 -m pytest` failing was concluded as "this container cannot
   run the suite" and written into a commit message as fact, when the
-  deps lived in the uv venv and `uv run pytest` gave 95 passed.
+  deps lived in the uv venv and `uv run --frozen --extra dev pytest` gave 95 passed.
 
 So: put the defect where the gate actually looks (staged or tracked, not
 merely on disk), read the status with nothing in between, and establish
@@ -82,8 +82,8 @@ caught by exactly one test").
 `toEqual`; adding or removing an MCP tool means updating that list in
 the same commit. The CLI gets this for free only because every command
 has a test file driving it through `runCli` -- keep that invariant when
-adding a command. VS Code's `ToolRegistration` has no pin yet (known
-gap; see the 2026-08-25 audit's watch items).
+adding a command. VS Code's `ToolRegistration` is pinned the same way
+in `vscode/tests/unit/toolRegistration.test.ts`.
 
 **5. Two shapes that must not drift need one test that holds them
 together.** When a producer and consumer live in different packages
@@ -105,9 +105,10 @@ own rule.
 
 ## Audit method (finding the ones already in)
 
-Run over a clean checkout of main. Deliverable is a dated findings doc
-under `barwise/docs/` (see `test-suite-assertion-audit-2026-08-25.md`
-for the format): method, findings with file:line evidence, and
+Run over a clean checkout of main. The deliverable is a script and a
+ratchet (see the end of this section); a dated findings doc under
+`barwise/docs/` (format: `test-suite-assertion-audit-2026-08-25.md`)
+accompanies it: method, findings with file:line evidence, and
 negative results -- what was checked and cleared matters as much,
 because it says what the pass covered.
 

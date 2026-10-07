@@ -61,8 +61,8 @@ gh release create v1.3.0 --title "v1.3.0" --generate-notes
 ```
 
 `--generate-notes` builds the changelog from merged PRs since the last
-tag. (Remote sessions have no `gh` CLI; use the GitHub MCP release
-tools instead.) The `release.yml` workflow then builds and attaches
+tag. Check that `gh` is on PATH first; the GitHub MCP tools can read
+releases but not create one. The `release.yml` workflow then builds and attaches
 the artifacts: the VS Code extension (`.vsix`), the standalone CLI
 bundle (`barwise-cli-<ver>.cjs`), the MCP server bundle
 (`barwise-mcp-<ver>.cjs`), and a `SHA256SUMS` file. The same workflow

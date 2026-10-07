@@ -43,8 +43,9 @@ The files the steps below reference -- `sensemaking.md`, `editing.md`,
 `llm-tics.md`, `template.spec.md` -- ship in this skill's directory,
 alongside this file.
 
-1. **Ground it, then frame it.** Read `barwise/docs/ARCHITECTURE.md`,
-   the relevant package `CLAUDE.md`, and the source the spec covers (a
+1. **Ground it, then frame it.** Read the root and relevant package
+   `CLAUDE.md` (current structure; `barwise/docs/ARCHITECTURE.md` is
+   the historical design rationale), and the source the spec covers (a
    REPO_REVIEW finding, the code to change). Verify claims against the
    code; do not design from assumptions. For anything non-trivial, work
    `sensemaking.md`: anchor the design in verified facts, hold two or
@@ -187,8 +188,9 @@ reverse.
   entry, or a drift test) in the same workstream that introduces it.
   A "must match" comment is not a check
   (`docs/specs/duplication-drift-guards.spec.md`).
-- **REPO_REVIEW link**: reference the finding the spec resolves, and
-  update its checkbox/status line when the spec lands.
+- **Tracking link**: `Tracking:` names the beads issue the spec
+  resolves (or the REPO_REVIEW finding, when it came from one, and
+  update that finding's status line when the spec lands).
 
 ### Formatting gate (dprint)
 

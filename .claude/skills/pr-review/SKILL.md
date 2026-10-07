@@ -86,8 +86,11 @@ pitfalls.
 - A new gate, check, hook, or test is verified only after you have
   watched it go red: plant the defect where the gate actually looks
   (staged or tracked, not merely on disk), read the exit status with
-  nothing in between, and see red before green (`session-review`
-  skill; `npm run test:scripts` is the worked example for root gates).
+  nothing in between, and see red before green. For a gate that reads
+  the working tree, `barwise/scripts/mutate.mjs` does all three; it
+  never touches the index, so a gate that reads staged content needs
+  the defect staged by hand (`session-review` skill; `npm run
+  test:scripts` is the worked example for root gates).
   Seen only passing means not verified, and the review says so.
 - A fallout claim ("these twenty-six propagate the rename") is a
   default-deny test, stated as "nothing here can change behaviour",

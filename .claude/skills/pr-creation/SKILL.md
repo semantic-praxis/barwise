@@ -36,7 +36,7 @@ least once:
   partial claim decays unwatched (barwise-912). Record what the spec
   did not anticipate in its implementation notes.
 - **The tracking issue exists and this PR does not close it.** File
-  it with `node scripts/beads-crud.mjs create` if missing. Closure is
+  it with `node barwise/scripts/beads-crud.mjs create` if missing. Closure is
   a tracker-only follow-up after merge (`steward`, section 5); the
   body says so. Follow-ups found on the way become issues, never
   TODO comments.

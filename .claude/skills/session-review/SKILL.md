@@ -17,7 +17,7 @@ resolution is not a review entry, it is a wish.
 ## Step 0: read the ledger before writing anything
 
 ```sh
-node scripts/beads-crud.mjs list --label process
+node barwise/scripts/beads-crud.mjs list --label process
 ```
 
 Do this FIRST, every time. Session reviews live in PR bodies, which
@@ -86,7 +86,7 @@ script refuses instead of proceeding when the anchor is absent or
 ambiguous, when the replacement is a no-op, when the command wrote to
 its own input, and when the restored bytes do not hash-match:
 
-    node scripts/mutate.mjs --file <path> --old <text> --new <text> \
+    node barwise/scripts/mutate.mjs --file <path> --old <text> --new <text> \
       -- <the command that should fail>
 
 It exits 0 when the mutation was CAUGHT, so `mutate ... && echo verified`

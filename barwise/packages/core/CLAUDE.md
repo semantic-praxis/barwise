@@ -63,8 +63,7 @@ npx stryker run --mutate 'src/mapping/RelationalMapper.ts'   # one file
 npm ci                                             # from barwise/, to restore
 ```
 
-**Not `npx --yes @stryker-mutator/core@9 ... stryker run`**, which is
-what this file used to say and what nobody had run. It fails: Stryker's
+**Not `npx --yes @stryker-mutator/core@9 ... stryker run`.** It fails: Stryker's
 tsconfig preprocessor does a bare `import("typescript")`, and from an
 npx cache directory that resolves to nothing --
 `ERR_MODULE_NOT_FOUND: Cannot find package 'typescript'`, after
@@ -154,10 +153,8 @@ it, so knip sees an unused file where there is a live edge.
 
 ## Downstream Dependents
 
-- `@barwise/diagram` -- imports model types to convert to graph layout
-- `@barwise/llm` -- imports model types and serializers to produce draft models
-- `barwise-vscode` -- imports everything (model, validation, verbalization,
-  serialization, mapping)
+Every other package in the monorepo depends on this one; the root
+CLAUDE.md dependency graph is the authoritative list.
 
 Changes to exported types or behavior in this package can break all
 downstream packages. Run the full monorepo build (`npm run build` from
