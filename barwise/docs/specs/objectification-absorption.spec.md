@@ -106,9 +106,9 @@ old column rule. The formats corpus test already checks that every
 `objectifies` line reads back as its relationship, which is what caught
 the import half.
 
-Acceptance: when an entity objectifies a fact type, its table has a
-column for every role and a key equal to the fact type's chosen
-uniqueness; the DDL round trip of each kernel reads every such entity
+Acceptance: when an entity objectifies a fact type with at least one
+entity role, its table has a column for every role and a key equal to
+the fact type's chosen uniqueness; the DDL round trip of each kernel reads every such entity
 back as objectifying its own fact type.
 
 ## API and migration impact
@@ -122,6 +122,21 @@ back as objectifying its own fact type.
 ## Implementation notes
 
 - **Measured over the 12 kernels' DDL round trip:** 520 deltas to 491,
+  counted as the total `deltas` length of `barwise diff --format json`
+  between each `trial/customers/<kernel>/kernel.orm.yaml` and its
+  round trip, from `barwise/` after `npm run build` and the CLI bundle:
+
+  ```sh
+  out=$(mktemp -d)
+  for c in trial/customers/C*/; do n=$(basename $c)
+    node packages/cli/dist/index.js export $c/kernel.orm.yaml --format ddl --output $out/$n.sql
+    node packages/cli/dist/index.js import model $out/$n.sql --format ddl --output $out/$n.back.orm.yaml
+    node packages/cli/dist/index.js diff $c/kernel.orm.yaml $out/$n.back.orm.yaml --format json > $out/$n.diff.json
+  done
+  node -e 'const fs=require("fs"),d=process.argv[1];let n=0;for(const f of fs.readdirSync(d).filter(f=>f.endsWith(".diff.json")))n+=JSON.parse(fs.readFileSync(d+"/"+f)).deltas.length;console.log(n)' $out
+  ```
+
+  The 520 is the same count on main before this change (after #597),
   and all six objectifying entities read back as objectifying their own
   fact type. Before, four came back objectifying a guessed relationship
   (C01, C04, C07, C12) and two not objectifying at all (C08 and C09,

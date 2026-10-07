@@ -17,8 +17,11 @@
  * 8. Subtype facts with identification: subtype table's PK is a FK to the
  *    supertype table (shared PK pattern).
  * 9. Objectified fact types: the objectified entity's table absorbs the
- *    underlying fact type's roles as FK columns, and its PK becomes
- *    the composite of those columns.
+ *    underlying fact type's roles -- an entity role as FK columns, a value
+ *    role as a column of its own -- and its PK becomes the columns of the
+ *    fact type's preferred (else first) internal uniqueness, else of every
+ *    role: the key an associative table for it would have. A fact type
+ *    with no entity role is not absorbed; the entity keeps its own key.
  */
 
 import type { FactType } from "../model/FactType.js";
@@ -444,9 +447,6 @@ export class RelationalMapper {
   }
 
   /**
-   * Create an associative (join) table for a fact type.
-   */
-  /**
    * A whole fact type as columns of one table: each entity role a foreign
    * key to its player's table, each value role a column of its own.
    * Returns the columns each role maps to, for keying the table on the
@@ -507,6 +507,9 @@ export class RelationalMapper {
     return roleColumns;
   }
 
+  /**
+   * Create an associative (join) table for a fact type.
+   */
   private createAssociativeTable(
     ft: FactType,
     model: OrmModel,
