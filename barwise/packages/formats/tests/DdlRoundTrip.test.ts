@@ -263,15 +263,104 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
       .toEqual(["{0}, {1} and {2} have booking"]);
   });
 
-  it("a key with a plain column is left for the external-uniqueness fix, as before", () => {
-    const { warnings } = ddl.parse(`
+  it("a key with a plain column is no relationship: an external uniqueness over its columns", () => {
+    const { model, warnings } = ddl.parse(`
       CREATE TABLE student (student_id INT PRIMARY KEY);
       CREATE TABLE enrollment (student_id INT REFERENCES student (student_id), term VARCHAR(6),
         PRIMARY KEY (student_id, term));`);
+    expect(model.objectifiedFactTypes).toEqual([]);
     expect(
-      warnings.some((w) => /composite PRIMARY KEY \(student_id, term\) was not imported/.test(w)),
-    )
-      .toBe(true);
+      warnings.some((w) =>
+        /composite PRIMARY KEY \(student_id, term\) is imported as an external uniqueness/.test(w)
+      ),
+    ).toBe(true);
+    const external = model.factTypes.flatMap((f) => f.constraints)
+      .filter((c) => c.type === "external_uniqueness");
+    expect(external).toHaveLength(1);
+  });
+
+  it("a UNIQUE over a relationship column and an attribute spans the relationship's role", () => {
+    // C03's policy_period: the policy number is unique within a term, and
+    // the term is a role of the relationship the period objectifies, not a
+    // binary of the period. It was dropped with a warning.
+    const { model, warnings } = ddl.parse(`
+      CREATE TABLE policy (policy_id INT PRIMARY KEY);
+      CREATE TABLE term (term_number INT PRIMARY KEY);
+      CREATE TABLE policy_period (
+        policy_id INT NOT NULL REFERENCES policy (policy_id),
+        term_number INT NOT NULL REFERENCES term (term_number),
+        policy_number VARCHAR(20) NOT NULL,
+        PRIMARY KEY (policy_id, term_number),
+        UNIQUE (policy_number, term_number));`);
+    expect(warnings).toEqual([]);
+    const where = new Map(
+      model.factTypes.flatMap((f) => f.roles.map((r, i) => [r.id, `${f.name}#${i}`] as const)),
+    );
+    const external = model.factTypes.flatMap((f) => f.constraints)
+      .filter((c) => c.type === "external_uniqueness")
+      .map((c) => c.roleIds.map((id) => where.get(id)));
+    expect(external).toEqual([[
+      "PolicyPeriod has PolicyNumber#1",
+      "Policy and Term policy period#1",
+    ]]);
+  });
+
+  describe("a UNIQUE over part of a composite foreign key is refused, not widened", () => {
+    // Uniqueness over parent_a alone is weaker than over the Parent role,
+    // which both columns stand for; ORM cannot state the former here.
+    const schema = (unique: string) => `
+      CREATE TABLE parent (parent_a INT, parent_b INT, PRIMARY KEY (parent_a, parent_b));
+      CREATE TABLE child (child_id INT PRIMARY KEY);
+      CREATE TABLE link (
+        parent_a INT NOT NULL, parent_b INT NOT NULL, child_id INT NOT NULL, code INT,
+        PRIMARY KEY (parent_a, parent_b, child_id),
+        FOREIGN KEY (parent_a, parent_b) REFERENCES parent (parent_a, parent_b),
+        FOREIGN KEY (child_id) REFERENCES child (child_id),
+        ${unique});`;
+    // Parent's own composite key is an external uniqueness too; only the
+    // ones over a role of Link's relationship or of Link's attributes count.
+    const externals = (model: OrmModel) => {
+      const link = model.getObjectTypeByName("Link")?.id;
+      const ofLink = new Set(
+        model.factTypes
+          .filter((f) =>
+            f.name === "Parent and Child link" || f.roles.some((r) => r.playerId === link)
+          )
+          .flatMap((f) => f.roles.map((r) => r.id)),
+      );
+      return model.factTypes.flatMap((f) => f.constraints)
+        .filter((c) => c.type === "external_uniqueness" && c.roleIds.some((id) => ofLink.has(id)));
+    };
+    const linkWarnings = (warnings: string[]) =>
+      warnings.filter((w) => w.startsWith(`Table "link"`));
+
+    it("with an attribute beside it", () => {
+      const { model, warnings } = ddl.parse(schema("UNIQUE (parent_a, code)"));
+      expect(model.getFactTypeByName("Parent and Child link")).toBeDefined();
+      expect(externals(model)).toEqual([]);
+      expect(warnings).toContain(
+        `Table "link": UNIQUE (parent_a, code) covers only part of the composite foreign key `
+          + `(parent_a, parent_b), and was not imported (barwise-1077).`,
+      );
+    });
+
+    it("wholly inside the relationship", () => {
+      const { model, warnings } = ddl.parse(schema("UNIQUE (parent_a, child_id)"));
+      const ft = model.getFactTypeByName("Parent and Child link");
+      expect(ft?.constraints.filter((c) => c.type === "internal_uniqueness")).toHaveLength(1);
+      expect(warnings).toContain(
+        `Table "link": UNIQUE (parent_a, child_id) covers only part of the composite foreign key `
+          + `(parent_a, parent_b), and was not imported (barwise-1077).`,
+      );
+    });
+
+    it("but a UNIQUE over the whole role and an attribute is imported", () => {
+      const { model, warnings } = ddl.parse(schema("UNIQUE (parent_a, parent_b, code)"));
+      expect(linkWarnings(warnings)).toEqual([]);
+      expect(externals(model)).toHaveLength(1);
+      // The Parent role once, for both of its columns, and Code's role.
+      expect((externals(model)[0] as { roleIds: string[]; }).roleIds).toHaveLength(2);
+    });
   });
 
   it("reads a key over a quoted name with parentheses in it", () => {

@@ -114,17 +114,41 @@ describe("a single-column key becomes a typed identifier (R4)", () => {
     );
   });
 
-  it("warns on a composite key instead of dropping it silently", () => {
-    const { warnings } = importer.parse(`
+  it("imports a composite key over plain columns as mandatory attributes and an external uniqueness", () => {
+    // It used to warn and drop both columns (barwise-1077). The entity still
+    // gets an invented key, because an external uniqueness cannot yet be
+    // its preferred identifier, and the warning says so (barwise-ezn;
+    // ddl-round-trip-fixed-point.spec.md, R7).
+    const { model, warnings } = importer.parse(`
       CREATE TABLE enrollment (
         student_id INTEGER NOT NULL,
         course_id INTEGER NOT NULL,
         PRIMARY KEY (student_id, course_id)
       );
     `);
-    expect(warnings.join("\n")).toMatch(
-      /composite PRIMARY KEY \(student_id, course_id\).*barwise-1077/,
-    );
+    const student = factType(model, "Enrollment has StudentId");
+    expect(constraintsByPlayer(model, student)).toEqual([
+      "external_uniqueness",
+      "mandatory:Enrollment",
+      "unique:Enrollment",
+    ]);
+    expect(constraintsByPlayer(model, factType(model, "Enrollment has CourseId"))).toEqual([
+      "mandatory:Enrollment",
+      "unique:Enrollment",
+    ]);
+    const external = student.constraints.find((c) => c.type === "external_uniqueness");
+    expect(
+      external && "roleIds" in external
+        ? external.roleIds.map((id) =>
+          model.factTypes.flatMap((f) => f.roles).find((r) => r.id === id)?.playerId
+        ).map((id) => model.getObjectType(id!)?.name)
+        : [],
+    ).toEqual(["StudentId", "CourseId"]);
+    expect(warnings).toEqual([
+      `Table "enrollment": composite PRIMARY KEY (student_id, course_id) is imported as an external `
+      + `uniqueness over its columns; the entity is identified by "enrollment_id", since an external `
+      + `uniqueness cannot yet be preferred (barwise-ezn).`,
+    ]);
   });
 });
 
@@ -207,14 +231,21 @@ describe("column types: several words, length and scale, trailing clauses (R2, R
     ]);
   });
 
-  it("warns that a multi-column UNIQUE is not imported, rather than making each column unique", () => {
+  it("imports a multi-column UNIQUE as an external uniqueness, not as each column unique", () => {
+    // It used to warn and import nothing (barwise-1077; ddl-round-trip-
+    // fixed-point.spec.md, R6). The export writes this UNIQUE from exactly
+    // this external uniqueness.
     const result = importer.parse(`
       CREATE TABLE v (id INT PRIMARY KEY, a INT, b INT, UNIQUE (a, b));
     `);
     expect(constraintsByPlayer(result.model, factType(result.model, "V has A"))).toEqual([
+      "external_uniqueness",
       "unique:V",
     ]);
-    expect(result.warnings.join("\n")).toMatch(/UNIQUE \(a, b\) spans several columns/);
+    expect(constraintsByPlayer(result.model, factType(result.model, "V has B"))).toEqual([
+      "unique:V",
+    ]);
+    expect(result.warnings).toEqual([]);
   });
 
   it("does not mistake a column named key or index for a table constraint", () => {

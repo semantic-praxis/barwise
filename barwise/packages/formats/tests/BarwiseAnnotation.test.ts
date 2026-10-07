@@ -452,4 +452,31 @@ describe("over the trial kernels and the examples", () => {
     // The corpus must exercise the format, not pass by being empty.
     expect(checked).toBeGreaterThan(500);
   });
+
+  it("every external uniqueness reads back over the same roles", () => {
+    // Keyed by role position among the fact type's players: the import
+    // mints new role ids, a fact type's name and a value type's spelling ("Model_id")
+    // can be its own, and the fact type that hosts the constraint is arbitrary.
+    const keys = (m: OrmModel) => {
+      const players = (f: OrmModel["factTypes"][number]) =>
+        f.roles.map((r) => m.getObjectType(r.playerId)?.name.replace(/_/g, "").toLowerCase()).join(
+          "/",
+        );
+      const where = new Map(
+        m.factTypes.flatMap((f) => f.roles.map((r, i) => [r.id, `${players(f)}#${i}`] as const)),
+      );
+      return m.factTypes.flatMap((f) => f.constraints)
+        .flatMap((c) => c.type === "external_uniqueness" ? [c.roleIds] : [])
+        .map((ids) => ids.map((id) => where.get(id) ?? id).sort().join(" + "))
+        .sort();
+    };
+    let checked = 0;
+    for (const { name, model: original } of corpus()) {
+      const text = new DdlExportFormat().export(original).text;
+      const expected = keys(original);
+      expect(keys(new DdlImportFormat().parse(text).model), name).toEqual(expected);
+      checked += expected.length;
+    }
+    expect(checked).toBeGreaterThan(20);
+  });
 });
