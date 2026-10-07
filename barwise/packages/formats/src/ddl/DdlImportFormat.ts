@@ -106,6 +106,8 @@ interface ParsedForeignKey {
 interface Binary {
   readonly factType: FactType;
   readonly farRoleId: string;
+  /** Every column that stands for the role, when it is more than this one. */
+  readonly roleColumns?: readonly string[];
 }
 
 export class DdlImportFormat implements ImportFormat {
@@ -345,31 +347,46 @@ export class DdlImportFormat implements ImportFormat {
       // column's fact type as the kernels store it -- the shape the export
       // writes a multi-column UNIQUE from (ddl-round-trip-fixed-point
       // spec, workstream 6).
-      const external = (cols: readonly string[]): boolean => {
-        // A column of the relationship the table objectifies stands for that
-        // relationship's role; the columns of a composite foreign key all
-        // stand for one role.
+      // A column of the relationship the table objectifies stands for that
+      // relationship's role; the columns of a composite foreign key all
+      // stand for one role, so a combination naming only some of them
+      // constrains less than the role and is refused rather than widened.
+      const unexpressible = (cols: readonly string[]): string | undefined => {
         const parts = cols.map((c) => taken?.get(c) ?? binaries.get(columnKey(table.name, c)));
-        if (parts.some((p) => p === undefined)) return false;
+        if (parts.some((p) => p === undefined)) {
+          return "spans a column that imported as no fact type of the table's entity";
+        }
+        const partial = parts.find((p) => p!.roleColumns?.some((c) => !cols.includes(c)));
+        return partial
+          ? `covers only part of the composite foreign key (${partial.roleColumns!.join(", ")})`
+          : undefined;
+      };
+      const external = (cols: readonly string[]): string | undefined => {
+        const reason = unexpressible(cols);
+        if (reason) return reason;
+        const parts = cols.map((c) => (taken?.get(c) ?? binaries.get(columnKey(table.name, c)))!);
         parts[0]!.factType.addConstraint({
           type: "external_uniqueness",
-          roleIds: [...new Set(parts.map((p) => p!.farRoleId))],
+          roleIds: [...new Set(parts.map((p) => p.farRoleId))],
         });
-        return true;
+        return undefined;
       };
       for (const cols of table.uniqueConstraints) {
-        if (cols.length < 2 || cols.every((c) => taken?.has(c))) continue;
-        if (!external(cols)) {
+        if (cols.length < 2) continue;
+        // Wholly inside the relationship: step 1b made it an internal
+        // uniqueness when it falls on whole roles, and dropped it otherwise.
+        const reason = cols.every((c) => taken?.has(c)) ? unexpressible(cols) : external(cols);
+        if (reason) {
           warnings.push(
-            `Table "${table.name}": UNIQUE (${cols.join(", ")}) spans a column that imported as no `
-              + `fact type of the table's entity, and was not imported (barwise-1077).`,
+            `Table "${table.name}": UNIQUE (${cols.join(", ")}) ${reason}, and was not imported `
+              + `(barwise-1077).`,
           );
         }
       }
       if (compositeKey) {
         const key = table.primaryKey.join(", ");
         warnings.push(
-          external(table.primaryKey)
+          external(table.primaryKey) === undefined
             ? `Table "${table.name}": composite PRIMARY KEY (${key}) is imported as an external `
               + `uniqueness over its columns; the entity is identified by "${
                 entityType.kind === "entity" ? entityType.referenceMode : ""
@@ -1119,7 +1136,11 @@ export class DdlImportFormat implements ImportFormat {
     }
     return new Map(
       relationship.roles.flatMap((role, i) =>
-        role.columns.map((c): [string, Binary] => [c, { factType, farRoleId: roleIds[i]! }])
+        role.columns.map((c): [string, Binary] => [c, {
+          factType,
+          farRoleId: roleIds[i]!,
+          ...(role.columns.length > 1 ? { roleColumns: role.columns } : {}),
+        }])
       ),
     );
   }

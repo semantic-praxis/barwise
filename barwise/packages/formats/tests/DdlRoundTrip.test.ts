@@ -305,6 +305,64 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
     ]]);
   });
 
+  describe("a UNIQUE over part of a composite foreign key is refused, not widened", () => {
+    // Uniqueness over parent_a alone is weaker than over the Parent role,
+    // which both columns stand for; ORM cannot state the former here.
+    const schema = (unique: string) => `
+      CREATE TABLE parent (parent_a INT, parent_b INT, PRIMARY KEY (parent_a, parent_b));
+      CREATE TABLE child (child_id INT PRIMARY KEY);
+      CREATE TABLE link (
+        parent_a INT NOT NULL, parent_b INT NOT NULL, child_id INT NOT NULL, code INT,
+        PRIMARY KEY (parent_a, parent_b, child_id),
+        FOREIGN KEY (parent_a, parent_b) REFERENCES parent (parent_a, parent_b),
+        FOREIGN KEY (child_id) REFERENCES child (child_id),
+        ${unique});`;
+    // Parent's own composite key is an external uniqueness too; only the
+    // ones over a role of Link's relationship or of Link's attributes count.
+    const externals = (model: OrmModel) => {
+      const link = model.getObjectTypeByName("Link")?.id;
+      const ofLink = new Set(
+        model.factTypes
+          .filter((f) =>
+            f.name === "Parent and Child link" || f.roles.some((r) => r.playerId === link)
+          )
+          .flatMap((f) => f.roles.map((r) => r.id)),
+      );
+      return model.factTypes.flatMap((f) => f.constraints)
+        .filter((c) => c.type === "external_uniqueness" && c.roleIds.some((id) => ofLink.has(id)));
+    };
+    const linkWarnings = (warnings: string[]) =>
+      warnings.filter((w) => w.startsWith(`Table "link"`));
+
+    it("with an attribute beside it", () => {
+      const { model, warnings } = ddl.parse(schema("UNIQUE (parent_a, code)"));
+      expect(model.getFactTypeByName("Parent and Child link")).toBeDefined();
+      expect(externals(model)).toEqual([]);
+      expect(warnings).toContain(
+        `Table "link": UNIQUE (parent_a, code) covers only part of the composite foreign key `
+          + `(parent_a, parent_b), and was not imported (barwise-1077).`,
+      );
+    });
+
+    it("wholly inside the relationship", () => {
+      const { model, warnings } = ddl.parse(schema("UNIQUE (parent_a, child_id)"));
+      const ft = model.getFactTypeByName("Parent and Child link");
+      expect(ft?.constraints.filter((c) => c.type === "internal_uniqueness")).toHaveLength(1);
+      expect(warnings).toContain(
+        `Table "link": UNIQUE (parent_a, child_id) covers only part of the composite foreign key `
+          + `(parent_a, parent_b), and was not imported (barwise-1077).`,
+      );
+    });
+
+    it("but a UNIQUE over the whole role and an attribute is imported", () => {
+      const { model, warnings } = ddl.parse(schema("UNIQUE (parent_a, parent_b, code)"));
+      expect(linkWarnings(warnings)).toEqual([]);
+      expect(externals(model)).toHaveLength(1);
+      // The Parent role once, for both of its columns, and Code's role.
+      expect((externals(model)[0] as { roleIds: string[]; }).roleIds).toHaveLength(2);
+    });
+  });
+
   it("reads a key over a quoted name with parentheses in it", () => {
     // The column list was read up to the first `)`, inside the quotes.
     const { model, warnings } = ddl.parse(`
