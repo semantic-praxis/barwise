@@ -1,0 +1,226 @@
+# A constraint's diff key names every role by position, not only its host's
+
+Status: Implemented -- the one workstream landed with this spec
+Created: 2026-10-07
+Last-updated: 2026-10-07
+Tracking: barwise-b7z (join constraints: barwise-q8x; host independence: barwise-iuj); found by `ddl-round-trip-fixed-point.spec.md`,
+workstream 6
+
+In one sentence: the diff keys a constraint's roles by position only
+when they belong to the fact type that hosts it, and by raw id
+otherwise, so after any import that mints new role ids every external
+uniqueness -- and every exclusion, subset or equality that spans fact
+types -- reads as removed and added though it names the same roles.
+
+## Principle
+
+**Determinism in core, applied to what "the same" means.** `diffModels`
+is a pure function, and its constraint key exists so that two models
+that say the same thing produce no delta: `constraintKey`'s own comment
+says it replaces role ids with positions "to eliminate false-positive
+diffs caused by fresh UUIDs". It does that for half the roles a
+constraint can name. `resolveRole` falls back to the raw id for a role
+outside the host fact type, and the comment on it calls that the
+handling for cross-fact-type constraints -- which is the case the key
+fails on, not a case it handles.
+
+The cost is measured. Over the 12 trial kernels, a DDL round trip
+brings all 23 external uniquenesses back over the same roles
+(`BarwiseAnnotation.test.ts` pins it), and the diff reports 23 removed
+and 23 added. The kernel delta count rose from 528 to 535 in the PR
+that made the import better. An instrument that moves the wrong way
+when the thing it measures improves is the shadow-and-property failure
+the root `CLAUDE.md` names.
+
+## Scope
+
+In scope:
+
+- When a constraint names a role outside its host fact type, the diff
+  shall key that role by the name of the fact type that holds it and
+  its position there, resolving against the constraint's own model
+  and then the other model of the diff, as the diff already resolves
+  players and fact types for lenient fragments.
+- When a role id resolves to no fact type in either model (a dangling
+  reference), or to more than one fact type in the model it resolves
+  in (an ambiguous one, host included), the diff shall key it by its
+  raw id.
+- When a constraint names only roles of its host, none of them
+  ambiguous, it shall compare as before, so no existing delta changes
+  for such a constraint.
+
+Out of scope:
+
+- **Host independence.** An external uniqueness that moved from one
+  fact type to another still reads as removed from one and added to the
+  other. See Open decisions.
+- **Join constraints.** `join_subset`, `join_equality` and
+  `join_exclusion` key by their operand paths, whose steps carry role
+  ids; they fail the same way. They are rare in the corpus (none in the
+  kernels) and their key is a different function: barwise-q8x.
+
+## Inventory
+
+| Module                               | Before                                                      | After                                                                              |
+| ------------------------------------ | ----------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `core/src/diff/elementDiff.ts`       | `resolveRole` returns the raw id for a role off the host    | `roleKeys` keys every role through a holder index, with tagged key kinds           |
+| `core/src/diff/elementDiff.ts`       | `diffConstraints(a, b, rolesA, rolesB)`                     | also receives both sides' holder indexes; `roleHolders(model)` builds one          |
+| `core/src/diff/ModelDiff.ts`         | calls `diffFactType` per matched fact type                  | builds each model's holder index once and passes both to every `diffFactType` call |
+| `core/src/diff/ModelMerge.ts`        | takes an accepted modified fact type's constraints verbatim | untouched: it reads deltas, not keys                                               |
+| `core/src/diff/changeDescription.ts` | `constraintsAdded` / `constraintsRemoved` carry constraints | untouched: the shapes stay; only which constraints land in them changes            |
+| `core/tests/diff/ModelDiff.test.ts`  | no cross-fact-type constraint case                          | gains eight cases, one per rule below                                              |
+
+`ModelMerge.ts` reads deltas, not keys. A fact type whose only
+difference was a false constraint change now reads as unchanged, so a
+merge keeps the existing version instead of taking the incoming one
+whole. That is what an unchanged fact type should do.
+
+## Target architecture
+
+```ts
+// elementDiff.ts. ModelDiff.ts builds both indexes once per diff and
+// passes them to every diffFactType call.
+export function roleHolders(model: OrmModel): RoleHolders; // role id -> fact types holding it
+
+function roleKeys(
+  roles: readonly Role[],
+  holders: RoleHolders,
+  otherHolders: RoleHolders,
+) {
+  const host = new Map(roles.map((r, i) => [r.id, `h${i}`]));
+  const raw = (id: string) => `r${JSON.stringify(id)}`;
+  return (id: string): string => {
+    // The constraint's own model first, then the other model of the diff,
+    // as playerName and factTypeName resolve for lenient fragments.
+    const homes = holders.get(id) ?? otherHolders.get(id) ?? [];
+    if (homes.length !== 1) return raw(id); // dangling, or ambiguous as graphOf treats it
+    const own = host.get(id);
+    if (own !== undefined) return own;
+    const home = homes[0]!;
+    return `f${
+      JSON.stringify([home.name, home.roles.findIndex((r) => r.id === id)])
+    }`;
+  };
+}
+```
+
+The fact-type name is the right anchor because it is what `diffModels`
+already matches fact types by: two fact types with the same name are
+the same fact type to the diff, so their roles at the same position are
+the same roles. The three key kinds carry tags (`h`, `f`, `r`) and
+JSON-quote their free text, so no raw id can spell a resolved key.
+
+## Alternatives considered
+
+- **Key every role, host included, by `<name>#<index>`.** Uniform, but
+  it changes the key of every constraint in every diff, and a fact type
+  renamed between the two models would turn each of its internal
+  constraints into a removal and an addition. The host's roles keep
+  their bare index.
+- **Key a foreign role by its player's name and position.** Survives a
+  fact-type rename, but two fact types between the same players (a
+  common shape: Person was born in Country, Person lives in Country)
+  collide. The diff matches fact types by name, so the key should too.
+
+## Workstreams (each independently shippable)
+
+### 1. Key foreign roles by fact type and position
+
+`roleKeys` replaces `roleIndexMap` and the raw-id fallback, as above;
+`diffConstraints` and `constraintKey` take its resolver;
+`diffFactType` receives the holder indexes `diffModels` builds once.
+`ModelDiff.test.ts` gains one case per rule: regenerated role ids
+(unchanged); a different role of the same foreign fact type, and the
+same position of a different one (both reported); an id two fact types
+hold, foreign and host (raw id); a lenient fragment in both directions
+(unchanged); a dangling id spelled like a resolved key (reported); and
+a host move (still reported, per the open decision). Each guard was
+checked by removing it and watching its case fail.
+
+Acceptance: when two models differ only in role ids, the diff shall
+report no constraint change for any constraint type except the join
+constraints.
+
+## API and migration impact
+
+- No change to the package's public exports. `roleHolders` and
+  `RoleHolders` are exported from `elementDiff.ts` for `ModelDiff.ts`
+  only; `roleKeys`, `constraintKey` and `diffConstraints` stay
+  module-private.
+- Downstream: the CLI's `diff`, the MCP `diff_models` tool, merge and
+  the trial grader all call `diffModels`. The change removes false
+  positives -- the same roles under new ids -- and can expose true
+  differences the raw-id key hid: two models that reuse one role id in
+  differently named fact types used to compare equal, and now report a
+  change. Over the kernels the net is fewer deltas, 535 to 520. The
+  trial gate's `model-roundtrip:*` rows report lower counts;
+  no row's status should change, since each still has other deltas.
+
+## Open decisions (for review)
+
+- **Should an external uniqueness be compared independent of its host?
+  (recommended: no, not in this spec.)** ORM does not care which fact
+  type hosts an external uniqueness, and the DDL import may host one
+  differently from the original (C03's policy period). A model-wide
+  comparison would report no change for a moved constraint. The cost is
+  in merge: it rebuilds fact types from deltas, so a constraint whose
+  move is reported nowhere is dropped when the old host is accepted as
+  modified for another reason and the new host is unchanged. Reporting
+  the move as a removal and an addition keeps merge correct. Revisit if
+  host moves turn out to be common outside the DDL import. Tracked as
+  barwise-iuj, with a third option: have the DDL import host each
+  constraint where the original did.
+
+## Risks and testing
+
+- Constraints over host roles only must key exactly as before; the
+  existing `tests/diff/` suite covers them and must pass unchanged.
+- Run the full monorepo build and tests: core's diff feeds every
+  surface.
+- Run the trial gate after; its baseline should have no new and no
+  stale rows.
+
+## Non-goals
+
+- No change to how fact types or object types are matched.
+- No change to merge.
+
+## Implementation notes
+
+- **Measured over the 12 kernels' DDL round trip:** 535 deltas to 520.
+  Of the 23 external uniquenesses, 15 now read as unchanged. The other
+  8 are real differences the diff should report: 7 host moves (the DDL
+  import hosts a constraint on the first `UNIQUE` column's fact type,
+  so C02, C03, C05, C06 and C09 each move one or two) and 1 lost
+  modality (C12's deontic "Sanction is imposed on Recipient" comes back
+  alethic, since a `UNIQUE` cannot say "ought").
+- **The draft planned a formats corpus assertion** that the round trip
+  reports no external-uniqueness change. The measurement above shows
+  why it cannot hold while host moves are reported, so it was dropped;
+  `BarwiseAnnotation.test.ts` already pins that every external
+  uniqueness comes back over the same roles, and the core test pins the
+  key.
+- **The draft's unit test assumed two builds differ in role ids.** The
+  test `ModelBuilder` mints deterministic ids, so the test rewrites
+  them through a YAML round trip instead.
+- **A role id two fact types hold** was keyed by whichever came first in
+  the draft. `graphOf` treats such an id as ambiguous, so the diff now
+  does too and keeps the raw id. The review asked to reuse `graphOf`
+  itself; it refuses the whole model on any unresolved reference, and
+  the diff must still key fragments and dangling ids, so only its
+  policy is shared, with a test.
+- **The second review found two gaps in that rule, both fixed with a
+  test each.** A duplicated id that the host also holds took the host's
+  position before the ambiguity check ran; the check now comes first.
+  And each side resolved against its own model only, so a lenient
+  fragment naming a role the full model alone defines keyed it by raw
+  id on one side and by name on the other. It now falls back to the
+  other model, the rule `playerName` and `factTypeName` follow. The
+  holder index is built once per diff (`roleHolders`), since every
+  role a constraint names now consults it.
+- **The third review found a collision and an overclaim.** The raw-id
+  fallback and the resolved key shared one string space, so a dangling
+  id spelled `Room is in Building#1` matched that fact type's role; the
+  key kinds are now tagged and quoted, with a test. And the draft's
+  "fewer deltas, never more" was false in principle: keying by name can
+  separate constraints the raw id had matched by accident.

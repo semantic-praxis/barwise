@@ -164,6 +164,10 @@ export function diffFactType(
   b: FactType,
   existingModel: OrmModel,
   incomingModel: OrmModel,
+  holders: { readonly existing: RoleHolders; readonly incoming: RoleHolders; } = {
+    existing: roleHolders(existingModel),
+    incoming: roleHolders(incomingModel),
+  },
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 
@@ -192,13 +196,16 @@ export function diffFactType(
     changes.push({ change: "readings", from: readingsA, to: readingsB });
   }
 
-  // Constraints -- pass both role arrays so constraintKey can resolve
-  // role IDs to positional indices (stable across LLM re-extractions).
+  // Constraints -- pass both role arrays and both models' role-holder
+  // indexes, so constraintKey can resolve role IDs to positions (stable
+  // across LLM re-extractions and imports).
   const constraintDiff = diffConstraints(
     a.constraints,
     b.constraints,
     a.roles,
     b.roles,
+    holders.existing,
+    holders.incoming,
   );
   changes.push(...constraintDiff);
 
@@ -279,36 +286,80 @@ function derivationKey(d: DerivationRule | undefined): string {
   return `${d.kind}|${d.storage ?? "derive_on_request"}|${d.expression}|${d.isFormal ? "f" : ""}`;
 }
 
+/** A role id's stable key within one model. */
+type RoleKeys = (id: string) => string;
+
 /**
- * Build a role-id-to-index lookup from a roles array.
+ * Every fact type that holds each role id, in one model. Built once per
+ * diff: `roleKeys` consults it for every role a constraint names, and a
+ * scan of the model per role made the diff quadratic in its size.
  */
-function roleIndexMap(roles: readonly Role[]): Map<string, number> {
-  const m = new Map<string, number>();
-  for (let i = 0; i < roles.length; i++) {
-    m.set(roles[i]!.id, i);
+export type RoleHolders = ReadonlyMap<string, readonly FactType[]>;
+
+export function roleHolders(model: OrmModel): RoleHolders {
+  const holders = new Map<string, FactType[]>();
+  for (const ft of model.factTypes) {
+    for (const role of ft.roles) {
+      const list = holders.get(role.id);
+      if (list) list.push(ft);
+      else holders.set(role.id, [ft]);
+    }
   }
-  return m;
+  return holders;
 }
 
 /**
- * Resolve a role ID to its positional index using the lookup.
- * Falls back to the raw ID for cross-fact-type constraints whose role
- * IDs don't belong to this fact type.
+ * Key a constraint's roles: a role of the host fact type by its position,
+ * a role of another fact type by that fact type's name and its position
+ * there -- the diff matches fact types by name, so that names the same
+ * role in both models. The cross-fact-type case used to keep the raw id,
+ * so every external uniqueness read as removed and added after an import
+ * minted new role ids (barwise-b7z, diff-cross-fact-type-role-keys.spec.md).
+ *
+ * A role resolves against the model its constraint came from, then the
+ * other model of the diff, as `playerName` and `factTypeName` do: a
+ * lenient fragment can name a role only the full model defines, and
+ * keying it by raw id on one side alone would report a false change.
+ *
+ * An id more than one fact type holds is ambiguous, as `graphOf` treats
+ * it, host included; like an id neither model holds, it keeps its raw id
+ * rather than naming one holder. `graphOf` itself cannot serve here: it
+ * refuses the whole model on any unresolved reference, and the diff must
+ * still key fragments.
  */
-function resolveRole(id: string, idxMap: Map<string, number>): string {
-  const idx = idxMap.get(id);
-  return idx !== undefined ? String(idx) : id;
+function roleKeys(
+  roles: readonly Role[],
+  holders: RoleHolders,
+  otherHolders: RoleHolders,
+): RoleKeys {
+  // Each kind of key carries its own tag, and the free text in it is
+  // JSON-quoted, so a raw id can never read as a resolved one: a dangling
+  // id spelled "Room is in Building#1" once matched that fact type's role.
+  const host = new Map(roles.map((r, i) => [r.id, `h${i}`]));
+  const raw = (id: string) => `r${JSON.stringify(id)}`;
+  return (id) => {
+    const homes = holders.get(id) ?? otherHolders.get(id) ?? [];
+    if (homes.length !== 1) return raw(id);
+    const own = host.get(id);
+    if (own !== undefined) return own;
+    const home = homes[0]!;
+    return `f${JSON.stringify([home.name, home.roles.findIndex((r) => r.id === id)])}`;
+  };
+}
+
+function resolveRole(id: string, keys: RoleKeys): string {
+  return keys(id);
 }
 
 /**
  * Produce a stable, comparable string key for a constraint, normalized
- * so that role IDs are replaced with positional indices within the
- * parent fact type. This eliminates false-positive diffs caused by
- * fresh UUIDs from LLM re-extractions.
+ * so that role IDs are replaced with positions (see `roleKeys`). This
+ * eliminates false-positive diffs caused by fresh UUIDs from LLM
+ * re-extractions and imports.
  */
 function constraintKey(
   c: Constraint,
-  idxMap: Map<string, number>,
+  idxMap: RoleKeys,
 ): string {
   const base = constraintTypeKey(c, idxMap);
   // Modality is part of a constraint's identity: alethic vs deontic is a
@@ -319,7 +370,7 @@ function constraintKey(
 
 function constraintTypeKey(
   c: Constraint,
-  idxMap: Map<string, number>,
+  idxMap: RoleKeys,
 ): string {
   switch (c.type) {
     case "internal_uniqueness": {
@@ -397,11 +448,13 @@ function diffConstraints(
   b: readonly Constraint[],
   rolesA: readonly Role[],
   rolesB: readonly Role[],
+  holdersA: RoleHolders,
+  holdersB: RoleHolders,
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 
-  const idxMapA = roleIndexMap(rolesA);
-  const idxMapB = roleIndexMap(rolesB);
+  const idxMapA = roleKeys(rolesA, holdersA, holdersB);
+  const idxMapB = roleKeys(rolesB, holdersB, holdersA);
 
   const keysA = new Set(a.map((c) => constraintKey(c, idxMapA)));
   const keysB = new Set(b.map((c) => constraintKey(c, idxMapB)));
