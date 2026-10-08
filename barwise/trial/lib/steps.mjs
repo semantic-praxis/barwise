@@ -36,6 +36,7 @@ import {
   TRIAL_DIR,
 } from "./paths.mjs";
 import { exemptPositions } from "./personas.mjs";
+import { renameImported, skinRenames } from "./skinNames.mjs";
 
 export function loadCustomer(dir) {
   const customer = parse(readFileSync(join(dir, "customer.yaml"), "utf8"));
@@ -1059,6 +1060,25 @@ export function acceptanceCandidates({ kernel, scaled = null, imported = [], jud
   ];
 }
 
+/**
+ * The model a persona grades for one candidate. An import of a skinned
+ * DDL artifact is graded through a copy whose object types carry the
+ * kernel's names wherever the skin's naming spells them
+ * (docs/specs/trial-skin-name-mapping.spec.md, barwise-d60): the checks
+ * name kernel concepts, and the artifact never wrote those names.
+ */
+function gradedCandidate(customer, gen, label, path, kind) {
+  const art = (customer.artifacts ?? []).find((a) => a.id === label);
+  if (kind !== "ddl" || !art?.skin) return { path, mapped: 0 };
+  const skin = parse(readFileSync(join(customer.dir, art.skin), "utf8")) ?? {};
+  const imported = readModel(path);
+  const renames = skinRenames(readModel(customer.kernelPath), skin, imported);
+  if (renames.size === 0) return { path, mapped: 0 };
+  const graded = join(gen, `${label}.graded.orm.yaml`);
+  writeModel(graded, renameImported(imported, renames));
+  return { path: graded, mapped: renames.size };
+}
+
 /** Sprint 6: personas accept or reject; MCP and CLI agree; the release bundle works as shipped. */
 export async function sprint6Surfaces(customer, tier, record) {
   const budget = customer.budgets?.[tier] ?? 600_000;
@@ -1099,7 +1119,8 @@ export async function sprint6Surfaces(customer, tier, record) {
       judges: p.judges ?? [],
     });
     const checks = parse(readFileSync(exercisePath, "utf8")).checks ?? [];
-    for (const { label, path: candidate, authoring, kind } of candidates) {
+    for (const { label, path: imported, authoring, kind } of candidates) {
+      const { path: candidate, mapped } = gradedCandidate(customer, gen, label, imported, kind);
       const res = runCli([
         "gym",
         "check",
@@ -1113,7 +1134,11 @@ export async function sprint6Surfaces(customer, tier, record) {
       ], { timeoutMs: budget });
       const report = parseJson(res.stdout);
       const exempt = kind ? exemptPositions(checks, p.not_expressible, kind) : new Set();
-      const outcome = grade.gradeAcceptance(res, report, { exempt, checkCount: checks.length });
+      const graded = grade.gradeAcceptance(res, report, { exempt, checkCount: checks.length });
+      // Say so when names were mapped: the step graded a translated copy.
+      const outcome = mapped
+        ? { ...graded, detail: `${graded.detail} (${mapped} names mapped through the skin)` }
+        : graded;
       // The kernel must satisfy its own personas: a failure there is an authoring defect, not a product one.
       record({
         sprint: 6,
