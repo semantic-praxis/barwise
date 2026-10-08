@@ -125,7 +125,13 @@ describe("a composite-key table imports as the fact type it states", () => {
       players: ["Orders", "ProductVariant", "Quantity"],
       uniques: [[0, 1]],
     });
-    expect(model.factTypes.map((f) => f.name)).toContain("OrderLine has LineId");
+    // An alternate identifier: unique on its value role, while the
+    // primary key stays the preferred identification (PR #620 review).
+    const lineId = model.getFactTypeByName("OrderLine has LineId")!;
+    const valueRole = lineId.roles.find((r) => model.getObjectType(r.playerId)?.name === "LineId")!;
+    expect(lineId.constraints.some((c) =>
+      c.type === "internal_uniqueness" && c.roleIds.length === 1 && c.roleIds[0] === valueRole.id
+    )).toBe(true);
   });
 
   it("a table another table references is objectified, so the reference has a player", () => {
@@ -174,6 +180,20 @@ describe("a composite-key table imports as the fact type it states", () => {
         FOREIGN KEY (tenant_id, order_id) REFERENCES orders (tenant_id, order_id));`);
     expect(model.objectifiedFactTypes).toEqual([]);
     expect(model.factTypes.every((f) => f.roles.length >= 2)).toBe(true);
+  });
+
+  it("two foreign keys in the key that share a column keep today's reading", () => {
+    const { model, warnings } = ddl.parse(`CREATE TABLE tenant (tenant_id INT PRIMARY KEY);
+      CREATE TABLE orders (tenant_id INT, order_id INT, PRIMARY KEY (tenant_id, order_id));
+      CREATE TABLE order_flag (
+        tenant_id INT NOT NULL, order_id INT NOT NULL,
+        PRIMARY KEY (tenant_id, order_id),
+        FOREIGN KEY (tenant_id) REFERENCES tenant (tenant_id),
+        FOREIGN KEY (tenant_id, order_id) REFERENCES orders (tenant_id, order_id));`);
+    expect(model.factTypes.some((f) => / order flag$/.test(f.name))).toBe(false);
+    // Not even attempted: without the guard the rule tried two roles over
+    // one column, failed, and fell back with a warning.
+    expect(warnings.filter((w) => /reads as a fact type over its key/.test(w))).toEqual([]);
   });
 
   it("a key of values alone keeps today's reading: an entity with an external uniqueness", () => {

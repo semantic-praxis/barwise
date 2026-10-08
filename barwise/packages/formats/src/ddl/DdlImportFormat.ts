@@ -1438,6 +1438,9 @@ function compositeReading(table: ParsedTable, referenced: boolean): CompositeRea
   const keyFks = table.foreignKeys.filter((f) => f.columns.every(inKey));
   if (keyFks.length === 0) return undefined;
   const fkColumns = new Set(keyFks.flatMap((f) => f.columns));
+  // Two foreign keys sharing a column cannot both be roles, and which one
+  // the key "is" is not the DDL's to say (PR #620 review).
+  if (fkColumns.size !== keyFks.reduce((n, f) => n + f.columns.length, 0)) return undefined;
   const keyRoles = [
     ...keyFks.map((f) => [...f.columns]),
     ...key.filter((c) => !fkColumns.has(c)).map((c) => [c]),

@@ -26,6 +26,8 @@ function composite(model: OrmModel) {
         players: f.roles.map((r) => name(r.playerId)),
         uniques: f.constraints.filter((c) => c.type === "internal_uniqueness")
           .map((c) => c.roleIds.map((id) => index.get(id)).sort()),
+        mandatory: f.constraints.filter((c) => c.type === "mandatory")
+          .map((c) => index.get(c.roleId)).sort(),
       };
     }).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
     objectified: model.objectifiedFactTypes.map((o) => name(o.objectTypeId)).sort(),
