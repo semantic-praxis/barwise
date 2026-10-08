@@ -81,9 +81,13 @@ referenced.
    unique by itself, and no other table references the table, the
    importer shall add it as a further role, the
    uniqueness still over the key's roles only.
-3. When any other column remains beside the key, when another table
-   references the table, or when the fact type would be a binary over
-   one foreign key and one value, the importer shall objectify the fact
+3. Otherwise -- when a column remains beside the key that requirement 2
+   does not take (more than one remains, or the one is nullable or
+   unique by itself, or another table references the table), when
+   another table references the table, or when the fact type would be a
+   binary over one foreign key and one value; requirement 3 is the
+   fallback, so no table meets both it and requirement 2 (PR #620
+   review) -- the importer shall objectify the fact
    type by an entity named after the table and import each remaining
    column as that entity's: a plain column as an attribute, a column of
    a remaining foreign key as a relationship the entity plays with the

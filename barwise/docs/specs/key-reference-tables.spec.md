@@ -107,7 +107,9 @@ round-trips: the mapper writes exactly this shape for a subtype.
 
 ## Requirements
 
-1. When an unannotated table has a shared-key foreign key -- one whose
+1. When an unannotated table has exactly one shared-key foreign key
+   meeting both conditions below (requirement 2 covers two or more; PR
+   #620 review) -- a shared-key foreign key being one whose
    source columns are exactly the table's primary key, a single column,
    and whose referenced columns are exactly another table's complete
    primary key (PR #620 review: not a composite foreign key that merely
@@ -115,7 +117,15 @@ round-trips: the mapper writes exactly this shape for a subtype.
    column) -- and the table's name ends in the referenced
    table's head noun, and the table repeats none of the referenced
    table's non-key columns, both as defined under "Matching" below, the DDL importer shall import the table's entity as a subtype
-   of the referenced table's entity, identified through it.
+   of the referenced table's entity, identified through it. The
+   subtype's own key column then imports as no preferred identifier:
+   today's importer gives every entity table a preferred key-value
+   fact first (`DdlImportFormat.ts`, the key step), and keeping it
+   beside an identifying subtype fact gives the entity two identity
+   sources, which `completenessWarnings.ts` reports as conflicting
+   identification (PR #620 review). The same holds for a subtype fact
+   with `providesIdentification` imported from an annotation
+   (requirement 4a).
    **Matching** (PR #620 review). A name's head noun is its last
    `_`-separated word after removing quoting, compared without regard
    to case. The child's head noun matches the parent's when the two are
@@ -221,7 +231,8 @@ round-trip test that a caught subtype re-exports unchanged; the
 identifying and a non-identifying subtype -- `employee-hierarchy`
 carries both -- a subtype whose supertype has a two-column key, an
 entity with two supertypes, a subtype fact with `isExclusive`,
-`isExhaustive` and a `definingRule` set, and a two-parent control for requirement 2 (both parents qualify, neither
+`isExhaustive` and a `definingRule` set, and an assertion on each imported subtype that the model reports no
+conflicting-identification diagnostic, a two-parent control for requirement 2 (both parents qualify, neither
 imported), an annotation whose columns no longer form the foreign key
 (dropped with a warning, the table read by requirements 1-3), an
 objectified entity whose identifying subtype fact is exported as a

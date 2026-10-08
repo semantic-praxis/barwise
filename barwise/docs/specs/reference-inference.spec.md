@@ -47,7 +47,12 @@ length and scale (so `VARCHAR(10)` would miss `VARCHAR(12)`), maps an
 unknown type to `other` (so two unknown types would match), and maps an
 identity key to `auto_counter` (so `site_id INT IDENTITY` would never
 match the `INT` that refers to it): the referring column of a
-generated key is a plain integer. A column
+generated key is a plain integer. For the same reason `auto_counter`
+compares equal to `integer`: PostgreSQL's `SERIAL` stays in the
+declared type and parses to `auto_counter`, unlike `INT IDENTITY`
+(PR #620 review). `BIGSERIAL` and `SMALLSERIAL` parse to nothing
+today, so a key declared with them infers nothing until core's type
+mapping learns them. A column
 that would match two tables infers nothing and is reported. Each inference is a warning naming the
 column and the table, so it can be checked by eye.
 
@@ -71,9 +76,10 @@ something it did not (PR #620 review). The refusal has its own test.
    spec leaves unchanged; PR #620 review.)
 2. When it is given, for a column `X` of table `T` that is not in `T`'s
    primary key and has no declared foreign key, the importer shall read
-   a reference to table `U` when `X` matches `U`'s single key column by
-   one of the three forms above, `U` is not `T`, and the declared types
-   match; and shall warn once per inferred reference, naming the column
+   a reference to table `U` when `U` is the only table such that `X`
+   matches `U`'s single key column by one of the three forms above,
+   `U` is not `T`, and the declared types match (two or more such
+   tables are requirement 3's; PR #620 review); and shall warn once per inferred reference, naming the column
    and the table.
 3. When a column matches two or more tables, the importer shall infer
    nothing for it and shall warn naming the candidates.
@@ -96,7 +102,8 @@ for each matching form; one per ending pair (`categories` to
 in both directions) and an irregular plural (`people` does not match
 `person`); an equivalent type spelling (`INT` against
 `INTEGER`), a length difference (`VARCHAR(10)` against `VARCHAR(12)`,
-inferred), an identity key (`INT IDENTITY` against `INT`, inferred), an
+inferred), an identity key (`INT IDENTITY` against `INT`, inferred), a `SERIAL`
+key against `INTEGER` (inferred), a `BIGSERIAL` key (not inferred), an
 unrecognised type on either side (not inferred), a type mismatch, a
 self-table match, a composite-key target `U` whose first key column's
 name and type match `X` (no inference: `U` has no single key column),
