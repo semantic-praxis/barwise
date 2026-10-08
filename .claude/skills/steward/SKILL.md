@@ -77,9 +77,10 @@ Three traps:
   affected tests; on failure it restores the staged state, discarding
   fixes it applied -- re-stage and commit again rather than assuming
   the fixes stuck.
-- The pre-push hook runs the full `ci:local` gate list, so the command
-  above is a subset of what the push will check anyway. Budget ~30s
-  warm, ~3min when sources changed.
+- The pre-push hook runs `ci:local`, which runs the gates CI will run
+  for this change and lists the ones it skips, so the command above is
+  a subset of what the push will check anyway. Budget ~30s warm, ~3min
+  when sources changed.
 
 A PR touching only Markdown and `.beads/` takes CI's docs-only path
 (formatting and tracker checks only), so tracker-only and docs-only

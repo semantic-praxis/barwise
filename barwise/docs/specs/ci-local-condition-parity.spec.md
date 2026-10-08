@@ -1,8 +1,8 @@
 # `ci:local` should run the gates CI runs, not every gate CI has
 
-Status: Draft -- no workstream implemented
+Status: Implemented -- workstreams 1 and 2 (see Implementation notes)
 Created: 2026-09-07
-Last-updated: 2026-09-07
+Last-updated: 2026-10-08
 Tracking: barwise-954 (this spec); barwise-950 (no git hooks in a remote
 container, so the local tier is chosen by hand rather than by the
 pre-commit/pre-push split)
@@ -259,3 +259,47 @@ trust from this draft.
   once it does.
 - No git-hook installation. barwise-950 owns that, and it is a decision
   about shared environment setup rather than a script change.
+
+## Implementation notes (2026-10-08)
+
+Both workstreams shipped together. The open decisions were taken as
+recommended: conditions apply by default and `--all` forces every gate;
+with no merge-base against `origin/main` the runner runs every gate and
+says why, and never fetches; the skip list is printed in the summary.
+
+- **WS1.** `scripts/lib/changed-class.mjs` owns `classify`, and `ci.yml`'s
+  detect step is one line that runs it. It was checked against the last
+  40 merges to main, running the old shell and the new module over the
+  same `git diff <first-parent> <merge>`: 40 of 40 agree (16 docs-only, 13
+  optimizer, 11 neither). It reads paths with `-z`, so a path git would
+  quote reaches the regexes as itself; the shell saw the quoted form.
+  None of the 40 had such a path.
+- **WS2.** `lib/ci-gates.mjs` gains `ciSteps()`, returning each gate with
+  its `if:`, and `shouldRun()`. `ciGates()` is now derived from
+  `ciSteps()`, so `fault-matrix.mjs` reads the same list it always did
+  (35 gates, unchanged). The counts the draft gave were from a 28-gate
+  `ci.yml`; on today's 35: a `.beads/`-only change runs 12 and skips 23, a
+  `.ts` change runs 34 (all but `test:optimizer`), and a `packages/cli/`
+  change runs 35. The tests derive these from the live workflow rather
+  than pinning the numbers.
+
+What the draft did not anticipate:
+
+- **A compound condition.** `test:optimizer` gained
+  `optimizer == 'true' && docs_only != 'true'` in PR #590, after this
+  spec was written, because a Markdown-only change under
+  `barwise/optimizer/` skipped the build and still ran the lane.
+  `shouldRun` therefore reads `&&` joins of the recognised atoms; `||`
+  and anything else stay unknown and run.
+- **`ls-files --others` is cwd-scoped.** The first version listed
+  untracked files from `barwise/`, so an untracked file at the repo root
+  or under `.github/` was invisible -- the direction that can skip a gate
+  CI runs. The end-to-end test caught it; the `:/` pathspec fixes it.
+- **The tests went in a new file**, `scripts/tests/ci-conditions.test.mjs`
+  (11 tests), not `gates.test.mjs`. The existing `ci-local` sandbox in
+  `gates.test.mjs` gained `changed-class.mjs` in its copy list, and one
+  assertion followed the summary line from "Running 2 gates" to
+  "Running 2 of 2 gates".
+- **Verified red.** Four guards were planted with `scripts/mutate.mjs`
+  and each was CAUGHT: the `:/` pathspec, the before-`run:` ordering, the
+  fail-open rule for an unknown condition, and the empty-diff guard.

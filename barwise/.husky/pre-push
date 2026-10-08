@@ -31,7 +31,7 @@ fi
 
 cd barwise || exit 1
 
-echo "pre-push: running the full CI gate list (npm run ci:local)."
+echo "pre-push: running the gates CI runs for this change (npm run ci:local)."
 echo "  ~30s warm, ~3min when sources changed."
 if ! npm run ci:local; then
   echo >&2
