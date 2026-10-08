@@ -28,6 +28,12 @@ personas:
     wants: Accounts, tariffs and billing cycles tie to service agreements with the right keys.
     acceptance: personas/billing-analyst.gym.yaml
     judges: [cis-ddl]
+    not_expressible:
+      - artifact_kind: ddl
+        check: { sentence: "It is obligatory that each Meter was estimated in at least 1 and at most 3 BillingCycle." }
+        reason: >-
+          DDL has no deontic modality: a constraint is enforced or it is not, so
+          an obligation that a row may break cannot be written. (barwise-1077)
 artifacts:
   - id: cim-owl
     generator: owl

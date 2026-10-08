@@ -35,6 +35,12 @@ personas:
     wants: Awards tie to a student, a fund and an aid year, and the FERPA release rule is visibly deontic.
     acceptance: personas/financial-aid-director.gym.yaml
     judges: [sis-ddl]
+    not_expressible:
+      - artifact_kind: ddl
+        check: { sentence: "It is obligatory that each DirectoryInformationRelease is authorized by at least one Employee." }
+        reason: >-
+          DDL has no deontic modality: a constraint is enforced or it is not, so
+          an obligation that a row may break cannot be written. (barwise-1077)
 artifacts:
   - id: sis-ddl
     generator: ddl

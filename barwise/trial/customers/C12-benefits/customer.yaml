@@ -23,6 +23,22 @@ personas:
       constraint on the right fact type, at the grain the statute uses.
     acceptance: personas/policy-analyst.gym.yaml
     judges: [mainframe-ddl, modern-ddl]
+    not_expressible:
+      - artifact_kind: ddl
+        check: { sentence: "It is obligatory that each Determination cites at least one StatuteReference." }
+        reason: >-
+          DDL has no deontic modality: a constraint is enforced or it is not, so
+          an obligation that a row may break cannot be written. (barwise-1077)
+      - artifact_kind: ddl
+        check: { sentence: "It is obligatory that each Determination relies on at least one VerificationDocument." }
+        reason: >-
+          DDL has no deontic modality: a constraint is enforced or it is not, so
+          an obligation that a row may break cannot be written. (barwise-1077)
+      - artifact_kind: ddl
+        check: { sentence: "It is obligatory that each Applicant applies for at least one Program." }
+        reason: >-
+          DDL has no deontic modality: a constraint is enforced or it is not, so
+          an obligation that a row may break cannot be written. (barwise-1077)
   - id: mainframe-dba
     name: Len Prakash
     role: Database administrator, DB2 for z/OS
@@ -40,6 +56,21 @@ personas:
       platform can build against.
     acceptance: personas/modernization-architect.gym.yaml
     judges: [mainframe-ddl, modern-ddl]
+    not_expressible:
+      - artifact_kind: ddl
+        check: { factType: "Determination supersedes Determination", constraint: "ring" }
+        reason: >-
+          DDL cannot state a ring constraint: a foreign key may reference its own
+          table, but nothing in a CREATE TABLE forbids a chain of rows that
+          returns to where it started; only a trigger or the application can.
+          (barwise-1077)
+      - artifact_kind: ddl
+        check: { sentence: "No Determination supersedes that same Determination, directly or through a chain of such relationships." }
+        reason: >-
+          DDL cannot state a ring constraint: a foreign key may reference its own
+          table, but nothing in a CREATE TABLE forbids a chain of rows that
+          returns to where it started; only a trigger or the application can.
+          (barwise-1077)
   - id: hearing-officer
     name: Beverly Chen
     role: Hearing officer, appeals unit
@@ -48,6 +79,17 @@ personas:
       assignment and sanction rules the hearing turns on.
     acceptance: personas/hearing-officer.gym.yaml
     judges: [mainframe-ddl, modern-ddl]
+    not_expressible:
+      - artifact_kind: ddl
+        check: { sentence: "It is obligatory that each Appeal is heard by at least one HearingOfficer." }
+        reason: >-
+          DDL has no deontic modality: a constraint is enforced or it is not, so
+          an obligation that a row may break cannot be written. (barwise-1077)
+      - artifact_kind: ddl
+        check: { sentence: "It is obligatory that The combination of Recipient and Program is unique across fact types." }
+        reason: >-
+          DDL has no deontic modality: a constraint is enforced or it is not, so
+          an obligation that a row may break cannot be written. (barwise-1077)
 artifacts:
   - id: mainframe-ddl
     generator: ddl

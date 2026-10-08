@@ -16,6 +16,14 @@ personas:
     wants: Material, plant and storage location keep their composite keys, and the BOM cannot contain itself.
     acceptance: personas/master-data-lead.gym.yaml
     judges: [erp-ddl]
+    not_expressible:
+      - artifact_kind: ddl
+        check: { factType: "Material is component of Material", constraint: "ring" }
+        reason: >-
+          DDL cannot state a ring constraint: a foreign key may reference its own
+          table, but nothing in a CREATE TABLE forbids a chain of rows that
+          returns to where it started; only a trigger or the application can.
+          (barwise-1077)
   - id: mes-engineer
     name: Rafael Ortega
     role: Manufacturing execution engineer

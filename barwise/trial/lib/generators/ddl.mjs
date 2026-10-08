@@ -262,6 +262,13 @@ export function generateDdl(doc, skin, { factor = 1, seed = 1, artifactId = "ddl
           }PRIMARY KEY (${pkCols.map(q).join(", ")})`,
         );
       }
+      // A skin whose schemas leave multi-column uniqueness to the application
+      // says so with `no_unique_constraints`.
+      if (!idioms.no_unique_constraints) {
+        for (const u of t.uniques ?? []) {
+          constraints.push(`  UNIQUE (${u.map((c) => q(ident(c, false))).join(", ")})`);
+        }
+      }
       if (!idioms.no_foreign_keys) {
         for (const fk of fks) {
           constraints.push(
