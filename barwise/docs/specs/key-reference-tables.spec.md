@@ -1,6 +1,6 @@
 # A primary key that is also a foreign key imports its reference
 
-Status: Draft -- no workstream implemented
+Status: Partially implemented -- workstreams 1 and 3 landed; workstream 2 (the annotation) not yet
 Created: 2026-10-08
 Last-updated: 2026-10-08
 Tracking: barwise-1078
@@ -282,3 +282,26 @@ check; any C01 row the newly visible references change).
 Out of scope: the one-to-one reading (above, barwise-3pc); a composite key
 that is also a set of foreign keys (composite-key-tables.spec.md); the
 dbt importer, whose relationships test has no key-is-reference form.
+
+## Implementation notes
+
+Workstreams 1 and 3, measured over the regenerated small tier,
+2026-10-08.
+
+- **The rule moved exactly the two rows the spec named.** C10's
+  ir-analyst and C09's biostatistician subtype checks pass; the trial
+  gate reported them stale and nothing new (1074 steps, 0 new, 2 stale),
+  then 155 open in baseline after removing them.
+- **The extension tables are now evidence, and agree with the
+  prediction.** With the generator writing their `FOREIGN KEY` over the
+  base's whole key, all 42 reach the importer as key-is-reference tables,
+  fail the head noun (`PAT_2` ends in `2`), and keep today's reading. No
+  trial row moved because of them. Their reference is still not imported,
+  which is barwise-3pc's.
+- **Every condition is load-bearing in the tests.** Removing the
+  repeated-column check, the one-foreign-key-on-the-key check or the
+  head-noun check each fails at least one test in
+  `formats/tests/keyReferenceTables.test.ts`.
+- **The shared number rule landed here first**, as
+  `formats/src/ddl/nameMatching.ts`, with its own tests; reference
+  inference imports it.
