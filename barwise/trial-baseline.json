@@ -147,13 +147,6 @@
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
     },
-    "C02/small/6/acceptance:bank-data-architect:regmart-ddl": {
-      "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
-      "detail": "2 of 7 persona checks fail: The model has no fact type connecting \"Transaction\" and \"GeneralLedgerAccount\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Party holds DepositAccount\"), so it cannot rule out: Rules out: two facts of Party holds DepositAccount"
-    },
     "C02/small/6/release-bundle:gym-list": {
       "severity": "S3",
       "class": "bundle-gym-catalog",
@@ -262,8 +255,8 @@
     "C03/small/6/acceptance:policy-admin-dba:pc-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
+      "issue": "barwise-d60",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
       "detail": "9 of 10 persona checks fail: The model has no object type named \"Policy\".; The model has no object type named \"PolicyPeriod\".; The model has no object type named \"Term\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"PolicyPeriod has PolicyPeriodId\"), so it "
     },
     "C03/small/6/release-bundle:gym-list": {
@@ -378,13 +371,6 @@
       "note": "Edit distance to acceptance on a dbt project. Nothing is declared not_expressible for dbt: a singular test is SQL, so even a ring constraint can be stated (PR #575 review). What remains are checks the round trip does not carry: rings, multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn).",
       "detail": "3 of 6 persona checks fail: The model has no object type named \"Seller\".; The model has no fact type connecting \"Order\" and \"Buyer\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Order includes ProductVariant in Quantity\"), so it cannot rule out: Rules out:"
     },
-    "C04/small/6/acceptance:catalog-steward:snowflake-ddl": {
-      "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
-      "detail": "3 of 5 persona checks fail: The model has no object type named \"HazmatProduct\".; The model has no object type named \"Listing\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Product bundles Product\"), so it cannot rule out: Rules out: a acyclic ring violatio"
-    },
     "C04/small/6/release-bundle:gym-list": {
       "severity": "S3",
       "class": "bundle-gym-catalog",
@@ -472,8 +458,8 @@
     "C05/small/6/acceptance:master-data-lead:erp-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
+      "issue": "barwise-d60",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
       "detail": "5 of 6 persona checks fail: The model has no object type named \"Material\".; The model has no object type named \"Plant\".; The model has no object type named \"MaterialPlantData\".; The model has no fact type connecting \"Material\" and \"Plant\"."
     },
     "C05/small/6/release-bundle:gym-list": {
@@ -567,13 +553,6 @@
       "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
       "detail": "rename Conveyance -> Vehicle reported as a removal plus an addition with no synonym candidate"
     },
-    "C06/small/6/acceptance:tms-dba:tms-ddl": {
-      "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
-      "detail": "2 of 6 persona checks fail: The model has no fact type connecting \"Shipment\" and \"Container\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Shipment travels Leg on Vehicle\"), so it cannot rule out: Rules out: two facts of Shipment travels Leg on Vehicle tha"
-    },
     "C06/small/6/release-bundle:gym-list": {
       "severity": "S3",
       "class": "bundle-gym-catalog",
@@ -654,8 +633,8 @@
     "C07/small/6/acceptance:network-inventory-architect:bq-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
+      "issue": "barwise-d60",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
       "detail": "4 of 10 persona checks fail: The model has no fact type connecting \"NetworkDevice\" and \"Site\".; Your model still allows what it should forbid: Rules out: a NetworkDevice that exists but never plays \"NetworkDevice is installed at Site\" -- e.g. NetworkDevice#1 appears in NetworkDevice has ManagementIp"
     },
     "C07/small/6/release-bundle:gym-list": {
@@ -742,18 +721,11 @@
       "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
       "detail": "rename ServiceLocation -> Premise reported as a removal plus an addition with no synonym candidate"
     },
-    "C08/small/6/acceptance:c08-billing-analyst:cis-ddl": {
-      "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
-      "detail": "5 of 8 persona checks fail: The model has no object type named \"ServiceAgreement\".; The model has no fact type connecting \"ServiceAgreement\" and \"Tariff\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"ServiceAgreement is billed under Tariff\"), so it cannot "
-    },
     "C08/small/6/acceptance:c08-metering-data-engineer:cis-ddl": {
       "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
+      "class": "acceptance-all-role-table",
+      "issue": "barwise-2z1",
+      "note": "Edit distance to acceptance on a DDL table whose every column is a role of one fact type: without a barwise line the import reads it as an entity with attributes, or as a relationship over its foreign keys alone, so the three-role fact type the persona checks for is not there (barwise-2z1). C09's biostatistician also fails a subtype check, which is barwise-1078.",
       "detail": "6 of 8 persona checks fail: The model has no object type named \"IntervalMeter\".; The model has no fact type connecting \"Meter\" and \"IntervalTimestamp\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Meter records ReadingValue at IntervalTimestamp\"), so it ca"
     },
     "C08/small/6/release-bundle:gym-list": {
@@ -842,9 +814,9 @@
     },
     "C09/small/6/acceptance:biostatistician:sdtm-ddl": {
       "severity": "S5",
-      "class": "acceptance-edit-distance-ddl",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by the DDL importer: the persona checks fail partly on composite keys and multi-column uniqueness the importer replaces with an invented key (barwise-1077). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
+      "class": "acceptance-all-role-table",
+      "issue": "barwise-2z1",
+      "note": "Edit distance to acceptance on a DDL table whose every column is a role of one fact type: without a barwise line the import reads it as an entity with attributes, or as a relationship over its foreign keys alone, so the three-role fact type the persona checks for is not there (barwise-2z1). C09's biostatistician also fails a subtype check, which is barwise-1078.",
       "detail": "2 of 10 persona checks fail: The model does not verbalize as \"RandomizedSubject is a subtype of EnrolledSubject.\". Check the fact type, its reading, and its constraints.; The model does not verbalize as \"For each Subject and Treatment combination, at most one Dose applies.\". Check the fact type, its"
     },
     "C09/small/6/acceptance:clinical-data-manager:legacy-norma": {
@@ -854,26 +826,12 @@
       "note": "barwise-nm4: the NORMA importer drops every internal uniqueness constraint that no fact references, while keeping the mandatory ones, so the imported model allows what the source forbids. Exit 0, confidence high, no warning. A consequence row; closes with that importer issue.",
       "detail": "4 of 10 persona checks fail: Your model still allows what it should forbid: Rules out: two facts of Subject has UniqueSubjectId that agree on Subject -- e.g. {Subject=Subject#1, UniqueSubjectId=UniqueSubjectId#1}; {Subject=Subject#1, UniqueSubjectId=UniqueSubjectId#2}; The model does not verbalize a"
     },
-    "C09/small/6/acceptance:clinical-data-manager:sdtm-ddl": {
-      "severity": "S5",
-      "class": "acceptance-edit-distance-ddl",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by the DDL importer: the persona checks fail partly on composite keys and multi-column uniqueness the importer replaces with an invented key (barwise-1077). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
-      "detail": "3 of 10 persona checks fail: The model does not verbalize as \"The combination of Study, Site and SubjectNumber is unique across fact types.\". Check the fact type, its reading, and its constraints.; The model does not verbalize as \"The combination of Subject and VisitNumber is unique across fact type"
-    },
     "C09/small/6/acceptance:pharmacovigilance-lead:legacy-norma": {
       "severity": "S5",
       "class": "acceptance-edit-distance-norma",
       "issue": "barwise-nm4",
       "note": "barwise-nm4: the NORMA importer drops every internal uniqueness constraint that no fact references, while keeping the mandatory ones, so the imported model allows what the source forbids. Exit 0, confidence high, no warning. A consequence row; closes with that importer issue.",
       "detail": "3 of 10 persona checks fail: The model does not verbalize as \"It is obligatory that each SeriousAdverseEvent was reported at at least one SaeReportDateTime.\". Check the fact type, its reading, and its constraints.; Your model still allows what it should forbid: Rules out: a acyclic ring violation am"
-    },
-    "C09/small/6/acceptance:pharmacovigilance-lead:sdtm-ddl": {
-      "severity": "S5",
-      "class": "acceptance-edit-distance-ddl",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by the DDL importer: the persona checks fail partly on composite keys and multi-column uniqueness the importer replaces with an invented key (barwise-1077). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
-      "detail": "4 of 10 persona checks fail: The model does not verbalize as \"It is obligatory that each SeriousAdverseEvent was reported at at least one SaeReportDateTime.\". Check the fact type, its reading, and its constraints.; Your model still allows what it should forbid: Rules out: a acyclic ring violation am"
     },
     "C09/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -962,29 +920,29 @@
     "C10/small/6/acceptance:financial-aid-director:sis-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
+      "issue": "barwise-d60",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
       "detail": "6 of 9 persona checks fail: The model has no object type named \"FinancialAidAward\".; The model has no fact type connecting \"FinancialAidAward\" and \"Student\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"FinancialAidAward is awarded to Student\"), so it cann"
     },
     "C10/small/6/acceptance:ir-analyst:sis-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
+      "issue": "barwise-d60",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
       "detail": "7 of 9 persona checks fail: The model has no object type named \"Grade\".; The model has no object type named \"GraduateStudent\".; The model does not verbalize as \"GraduateStudent is a subtype of Student.\". Check the fact type, its reading, and its constraints.; The model does not verbalize as \"Enrollm"
     },
     "C10/small/6/acceptance:registrar-data-steward:sis-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
+      "issue": "barwise-d60",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
       "detail": "8 of 9 persona checks fail: The model has no object type named \"Term\".; The model has no object type named \"Enrollment\".; The model has no fact type connecting \"Student\" and \"CourseSection\".; The model has no fact type connecting \"Course\" and \"Course\"."
     },
     "C10/small/6/acceptance:sis-dba:sis-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
+      "issue": "barwise-d60",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
       "detail": "8 of 9 persona checks fail: The model has no object type named \"Person\".; The model has no fact type connecting \"Person\" and \"Pidm\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Person has Pidm\"), so it cannot rule out: Rules out: two facts of Person has P"
     },
     "C10/small/6/release-bundle:gym-list": {
@@ -1172,29 +1130,29 @@
     "C12/small/6/acceptance:hearing-officer:modern-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
+      "issue": "barwise-d60",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
       "detail": "9 of 10 persona checks fail: The model has no object type named \"Appeal\".; The model has no object type named \"HearingOfficer\".; The model has no fact type connecting \"Appeal\" and \"Determination\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Appeal contest"
     },
     "C12/small/6/acceptance:mainframe-dba:modern-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
+      "issue": "barwise-d60",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
       "detail": "8 of 10 persona checks fail: The model has no object type named \"Client\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Client has ClientNumber\"), so it cannot rule out: Rules out: two facts of Client has ClientNumber that agree on Client -- e.g. {Client=Cl"
     },
     "C12/small/6/acceptance:modernization-architect:modern-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
+      "issue": "barwise-d60",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
       "detail": "9 of 10 persona checks fail: The model has no object type named \"Applicant\".; The model has no object type named \"Recipient\".; The model has no object type named \"Household\".; The model has no fact type connecting \"Client\" and \"Household\"."
     },
     "C12/small/6/acceptance:policy-analyst:modern-ddl": {
       "severity": "S5",
       "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
+      "issue": "barwise-d60",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
       "detail": "8 of 9 persona checks fail: The model has no object type named \"Determination\".; The model has no object type named \"CertificationPeriod\".; The model does not verbalize as \"Each combination of Case, Program and CertificationPeriod is unique in Case is determined for Program in CertificationPeriod.\"."
     },
     "C12/small/6/release-bundle:gym-list": {

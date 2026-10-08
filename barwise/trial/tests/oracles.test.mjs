@@ -433,7 +433,10 @@ test("classify: each acceptance row on a DDL file reaches its importer's class, 
     importer,
     detail: "2 of 10 persona checks fail",
   });
-  assert.equal(classify(row("ddl"), classes)?.id, "acceptance-edit-distance-ddl");
+  // The DDL importer's acceptance class went with barwise-1077's fix, its
+  // rows passing or moved to a named cause; a new DDL-importer row must
+  // stay unclassified, keeping the gate red, not borrow the SQL class.
+  assert.notEqual(classify(row("ddl"), classes)?.id, "acceptance-edit-distance-sql");
   assert.equal(classify(row("sql"), classes)?.id, "acceptance-edit-distance-sql");
 });
 

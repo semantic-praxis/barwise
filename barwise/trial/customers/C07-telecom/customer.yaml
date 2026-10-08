@@ -41,6 +41,21 @@ personas:
       cannot loop.
     acceptance: personas/network-inventory-architect.gym.yaml
     judges: [bq-ddl]
+    not_expressible:
+      - artifact_kind: ddl
+        check: { factType: "Service depends on Service", constraint: "ring" }
+        reason: >-
+          DDL cannot state a ring constraint: a foreign key may reference its own
+          table, but nothing in a CREATE TABLE forbids a chain of rows that
+          returns to where it started; only a trigger or the application can.
+          (barwise-1077)
+      - artifact_kind: ddl
+        check: { sentence: "No Service depends on that same Service, directly or through a chain of such relationships." }
+        reason: >-
+          DDL cannot state a ring constraint: a foreign key may reference its own
+          table, but nothing in a CREATE TABLE forbids a chain of rows that
+          returns to where it started; only a trigger or the application can.
+          (barwise-1077)
   - id: integration-engineer
     name: Aisha Rahman
     role: Integration engineer, order management and porting gateway

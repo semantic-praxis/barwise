@@ -62,6 +62,7 @@ export function relationalView(doc) {
       pk: [],
       fks: [],
       checks: [],
+      uniques: [],
     });
   }
   const supertypeOf = new Map();
@@ -146,6 +147,7 @@ export function relationalView(doc) {
       pk: [],
       fks: [],
       checks: [],
+      uniques: [],
     };
     roles.forEach((r, i) => {
       const p = players[i];
@@ -161,8 +163,18 @@ export function relationalView(doc) {
         };
       t.columns.push(col);
       if (p.kind === "entity") t.fks.push({ column: name, ref: tables.get(p.id) });
-      t.pk.push(name);
     });
+    // Keyed on the fact type's preferred (else first) uniqueness, else on
+    // every role. It was every role whatever the kernel said, so C06's
+    // "Shipment travels Leg on Vehicle", unique on shipment and leg, was
+    // written with a key that allows two vehicles for one leg, and the
+    // acceptance check for that rule graded an artifact that never stated
+    // it (barwise-1077 triage).
+    const chosen = uniq.find((u) => u.is_preferred) ?? uniq[0];
+    const keyed = chosen
+      ? roles.flatMap((r, i) => ((chosen.roles ?? []).includes(r.id) ? [t.columns[i].name] : []))
+      : [];
+    t.pk.push(...(keyed.length ? keyed : t.columns.map((c) => c.name)));
     tables.set(ft.id, t);
   }
   // Every entity table needs a key; a subtype inherits its supertype's.
@@ -190,6 +202,30 @@ export function relationalView(doc) {
         t.columns.unshift(col);
         t.pk.push(col.name);
       }
+    }
+  }
+  // A combination of an entity's attributes that is unique -- an external
+  // uniqueness whose roles all became columns of one table -- is that
+  // table's UNIQUE clause. The generator used to write none, so an
+  // acceptance check for "the combination of Study, Site and SubjectNumber
+  // is unique" graded an artifact that never stated it (barwise-1077).
+  const columnOfRole = new Map();
+  for (const t of tables.values()) {
+    t.columns.forEach((col, i) => {
+      const ft = t.entity ? col.factType : t.factType;
+      if (!ft) return;
+      const roles = t.entity ? (ft.roles ?? []) : [ft.roles?.[i]].filter(Boolean);
+      for (const r of roles) columnOfRole.set(r.id, { table: t, column: col.name });
+    });
+  }
+  for (const ft of factTypes(doc)) {
+    for (const c of ft.constraints ?? []) {
+      // A deontic uniqueness is an obligation a row may break: an enforced
+      // UNIQUE would reject what the model allows (PR #601 review).
+      if (c.type !== "external_uniqueness" || c.modality === "deontic") continue;
+      const at = (c.roles ?? []).map((id) => columnOfRole.get(id));
+      if (at.length < 2 || at.some((x) => !x) || at.some((x) => x.table !== at[0].table)) continue;
+      at[0].table.uniques.push(at.map((x) => x.column));
     }
   }
   return [...tables.values()];

@@ -20,6 +20,12 @@ personas:
       The composite subject key and the visit number survive the model so the SDTM merges still work at lock.
     acceptance: personas/clinical-data-manager.gym.yaml
     judges: [legacy-norma, sdtm-ddl]
+    not_expressible:
+      - artifact_kind: ddl
+        check: { sentence: "It is obligatory that each AdverseEvent is coded to at least one MeddraPreferredTermCode." }
+        reason: >-
+          DDL has no deontic modality: a constraint is enforced or it is not, so
+          an obligation that a row may break cannot be written. (barwise-1077)
   - id: biostatistician
     name: Tomas Reyes
     role: Biostatistician, statistical analysis plan
@@ -34,6 +40,26 @@ personas:
       Serious events are their own kind, the 24-hour reporting obligation is stated as an obligation, and follow-up chains cannot loop.
     acceptance: personas/pharmacovigilance-lead.gym.yaml
     judges: [legacy-norma, sdtm-ddl]
+    not_expressible:
+      - artifact_kind: ddl
+        check: { sentence: "It is obligatory that each SeriousAdverseEvent was reported at at least one SaeReportDateTime." }
+        reason: >-
+          DDL has no deontic modality: a constraint is enforced or it is not, so
+          an obligation that a row may break cannot be written. (barwise-1077)
+      - artifact_kind: ddl
+        check: { factType: "AdverseEvent is follow-up of AdverseEvent", constraint: "ring" }
+        reason: >-
+          DDL cannot state a ring constraint: a foreign key may reference its own
+          table, but nothing in a CREATE TABLE forbids a chain of rows that
+          returns to where it started; only a trigger or the application can.
+          (barwise-1077)
+      - artifact_kind: ddl
+        check: { sentence: "No AdverseEvent is follow-up of that same AdverseEvent, directly or through a chain of such relationships." }
+        reason: >-
+          DDL cannot state a ring constraint: a foreign key may reference its own
+          table, but nothing in a CREATE TABLE forbids a chain of rows that
+          returns to where it started; only a trigger or the application can.
+          (barwise-1077)
 artifacts:
   - id: legacy-norma
     generator: norma

@@ -36,3 +36,48 @@ test("a statement that declares no table is not expected as an entity", () => {
   assert.equal(types.length, 2);
   assert.ok(types.every((t) => t.importable === false));
 });
+
+test("a combination the kernel says is unique is the table's UNIQUE clause", () => {
+  // barwise-1077's acceptance checks graded artifacts that never stated
+  // the combination, so no importer could have passed them.
+  const doc = load("C09-pharma/kernel.orm.yaml");
+  const skin = load("C09-pharma/skins/sdtm-ansi.yaml");
+  const { text } = generateDdl(doc, skin);
+  assert.match(text, /UNIQUE \("STUDY_ID", "SITE_ID", "SUBJECT_NUMBER"\)/);
+  assert.match(text, /UNIQUE \("SUBJECT_ID", "VISIT_NUMBER"\)/);
+  // A skin whose schemas leave it to the application says so.
+  const none = generateDdl(doc, {
+    ...skin,
+    idioms: { ...skin.idioms, no_unique_constraints: true },
+  });
+  assert.doesNotMatch(none.text, /^\s+UNIQUE \(/m);
+});
+
+test("a table for a fact type of three or more roles is keyed on its uniqueness", () => {
+  // Keyed on every role, it allowed two vehicles for one shipment leg, and
+  // the persona check for that rule graded an artifact that never said so.
+  const { text } = generateDdl(
+    load("C06-logistics/kernel.orm.yaml"),
+    load("C06-logistics/skins/postgres-tms.yaml"),
+  );
+  const table = /CREATE TABLE[^;]*shipment_travels_leg_on_vehicle[^;]*/i.exec(text)?.[0] ?? "";
+  assert.match(table, /PRIMARY KEY \(shipment_id, leg_id\)/);
+});
+
+test("no UNIQUE where the dialect has none or the rule is deontic", () => {
+  // BigQuery has no UNIQUE constraint; C07's subscriber combination would
+  // be an invalid clause there.
+  const bq = generateDdl(
+    load("C07-telecom/kernel.orm.yaml"),
+    load("C07-telecom/skins/bigquery-dwh.yaml"),
+  );
+  assert.doesNotMatch(bq.text, /^\s+UNIQUE \(/m);
+  // C12's Recipient-and-Program uniqueness is an obligation, not a rule
+  // the database may enforce; its alethic combinations still are.
+  const { text } = generateDdl(
+    load("C12-benefits/kernel.orm.yaml"),
+    load("C12-benefits/skins/postgres-modern.yaml"),
+  );
+  assert.doesNotMatch(text, /UNIQUE \(rcpt_id, prgm_id\)/);
+  assert.match(text, /UNIQUE \(case_nbr, ofc_id\)/);
+});
