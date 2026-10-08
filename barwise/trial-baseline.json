@@ -240,9 +240,9 @@
     },
     "C03/small/6/acceptance:actuarial-analyst:claims-dbt": {
       "severity": "S5",
-      "class": "acceptance-edit-distance-dbt",
-      "issue": "barwise-nkn",
-      "note": "Edit distance to acceptance on a dbt project. Nothing is declared not_expressible for dbt: a singular test is SQL, so even a ring constraint can be stated (PR #575 review). What remains are checks the round trip does not carry: rings, multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn).",
+      "class": "acceptance-dbt-composite-reference",
+      "issue": "barwise-tjg",
+      "note": "Edit distance to acceptance on C03's claims dbt project. The coverage model references PolicyPeriod, now keyed on two columns, through two relationships tests; the dbt importer reads them as two references, so the composite-key rule sees two columns beside the key and objectifies instead of reading the ternary 'Coverage applies to Risk under PolicyPeriod' (barwise-tjg).",
       "detail": "1 of 9 persona checks fail: The model does not verbalize as \"For each Coverage and Risk combination, at most one PolicyPeriod applies.\". Check the fact type, its reading, and its constraints."
     },
     "C03/small/6/acceptance:claims-data-steward:claims-dbt": {
@@ -450,9 +450,9 @@
     },
     "C05/small/6/acceptance:master-data-lead:erp-ddl": {
       "severity": "S5",
-      "class": "acceptance-all-role-table",
-      "issue": "barwise-2z1",
-      "note": "Edit distance to acceptance on a DDL table whose every column is a role of one fact type: without a barwise line the import reads it as an entity with attributes, or as a relationship over its foreign keys alone, so the three-role fact type the persona checks for is not there (barwise-2z1). C05's \"Material is produced at Plant in Batch\", keyed on its batch alone, imports as an entity, so no fact type connects Material and Plant. C09's biostatistician also fails a subtype check, which is barwise-1078.",
+      "class": "acceptance-key-through-entity",
+      "issue": "barwise-3pc",
+      "note": "Edit distance to acceptance on C05's SAP DDL. MAT_IS_PRODUCED_AT_WERK_IN_CHA is WorkOrder's table, keyed on CHARG_ID alone (the kernel's uniqueness over the batch role), which is a key that is also a foreign key: an entity identified through another entity, which core cannot express (barwise-3pc). The import keeps the key and drops the reference, so no fact type connects Material and Plant. Was barwise-2z1 until composite-key-tables.spec.md, which covers keys of two or more roles.",
       "detail": "1 of 6 persona checks fail: The model has no fact type connecting \"Material\" and \"Plant\". (26 names mapped through the skin)"
     },
     "C05/small/6/release-bundle:gym-list": {
@@ -714,13 +714,6 @@
       "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
       "detail": "rename ServiceLocation -> Premise reported as a removal plus an addition with no synonym candidate"
     },
-    "C08/small/6/acceptance:c08-metering-data-engineer:cis-ddl": {
-      "severity": "S5",
-      "class": "acceptance-all-role-table",
-      "issue": "barwise-2z1",
-      "note": "Edit distance to acceptance on a DDL table whose every column is a role of one fact type: without a barwise line the import reads it as an entity with attributes, or as a relationship over its foreign keys alone, so the three-role fact type the persona checks for is not there (barwise-2z1). C09's biostatistician also fails a subtype check, which is barwise-1078.",
-      "detail": "6 of 8 persona checks fail: The model has no object type named \"IntervalMeter\".; The model has no fact type connecting \"Meter\" and \"IntervalTimestamp\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Meter records ReadingValue at IntervalTimestamp\"), so it ca"
-    },
     "C08/small/6/release-bundle:gym-list": {
       "severity": "S3",
       "class": "bundle-gym-catalog",
@@ -807,9 +800,9 @@
     },
     "C09/small/6/acceptance:biostatistician:sdtm-ddl": {
       "severity": "S5",
-      "class": "acceptance-all-role-table",
-      "issue": "barwise-2z1",
-      "note": "Edit distance to acceptance on a DDL table whose every column is a role of one fact type: without a barwise line the import reads it as an entity with attributes, or as a relationship over its foreign keys alone, so the three-role fact type the persona checks for is not there (barwise-2z1). C09's biostatistician also fails a subtype check, which is barwise-1078.",
+      "class": "acceptance-subtype-key-reference",
+      "issue": "barwise-1078",
+      "note": "Edit distance to acceptance on C10's Banner DDL, graded with its names mapped through the skin (barwise-d60) and generated with one table per objectification (barwise-rlv). What remains is GRADUATE_SGBSTDN, keyed on SGBSTDN_ID referencing SGBSTDN: the import keeps the key and not the reference, so \"GraduateStudent is a subtype of Student.\" has nothing to verbalize (barwise-1078). C09's biostatistician fails the same way on \"RandomizedSubject is a subtype of EnrolledSubject.\"; its Dose check is declared not_expressible for ddl, since a DDL table does not say which column beside its key is a role of the objectified fact and which an attribute (composite-key-tables.spec.md, decision 1).",
       "detail": "2 of 10 persona checks fail: The model does not verbalize as \"RandomizedSubject is a subtype of EnrolledSubject.\". Check the fact type, its reading, and its constraints.; The model does not verbalize as \"For each Subject and Treatment combination, at most one Dose applies.\". Check the fact type, its"
     },
     "C09/small/6/acceptance:clinical-data-manager:legacy-norma": {

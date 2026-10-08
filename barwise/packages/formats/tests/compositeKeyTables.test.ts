@@ -120,9 +120,11 @@ describe("a composite-key table imports as the fact type it states", () => {
         PRIMARY KEY (order_id, item_id));`;
     const model = roundTrips(sql);
     expect(shape(model).objectified).toEqual(["OrderItem"]);
-    expect(shape(model).factTypes.some((f) =>
-      f.players.includes("OrderItem") && f.players.includes("Supplier")
-    )).toBe(true);
+    expect(
+      shape(model).factTypes.some((f) =>
+        f.players.includes("OrderItem") && f.players.includes("Supplier")
+      ),
+    ).toBe(true);
   });
 
   it("a column unique by itself identifies the objectifier and is never the extra role", () => {
@@ -146,9 +148,11 @@ describe("a composite-key table imports as the fact type it states", () => {
     // primary key stays the preferred identification (PR #620 review).
     const lineId = model.getFactTypeByName("OrderLine has LineId")!;
     const valueRole = lineId.roles.find((r) => model.getObjectType(r.playerId)?.name === "LineId")!;
-    expect(lineId.constraints.some((c) =>
-      c.type === "internal_uniqueness" && c.roleIds.length === 1 && c.roleIds[0] === valueRole.id
-    )).toBe(true);
+    expect(
+      lineId.constraints.some((c) =>
+        c.type === "internal_uniqueness" && c.roleIds.length === 1 && c.roleIds[0] === valueRole.id
+      ),
+    ).toBe(true);
   });
 
   it("a table another table references is objectified, so the reference has a player", () => {

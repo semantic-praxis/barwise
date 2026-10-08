@@ -17,7 +17,8 @@ import { hasTest } from "./constraints.js";
 import type { CompositeInfo, DbtMapperContext } from "./context.js";
 import { toPascalCase } from "./naming.js";
 
-const KEY_TEST = "dbt_utils.unique_combination_of_columns";
+/** The model-level dbt test whose columns name a composite key. */
+export const KEY_TEST = "dbt_utils.unique_combination_of_columns";
 
 /**
  * The columns a model-level combination test names, when it names two or

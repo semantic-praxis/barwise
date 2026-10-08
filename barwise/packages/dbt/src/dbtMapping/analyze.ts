@@ -2,7 +2,7 @@
  * Analysis phase: identify PKs, FKs, and custom tests across models.
  */
 
-import { compositeKeyOf } from "./compositeKeys.js";
+import { compositeKeyOf, KEY_TEST } from "./compositeKeys.js";
 import { findRelationshipTest, hasTest } from "./constraints.js";
 import { type DbtMapperContext, type RelationshipInfo } from "./context.js";
 
@@ -69,7 +69,7 @@ export function analyzeModels(ctx: DbtMapperContext): void {
     for (const test of m.modelTests) {
       if (
         test.type === "custom"
-        && !(keyTest && test.name === "dbt_utils.unique_combination_of_columns")
+        && !(keyTest && test.name === KEY_TEST)
       ) {
         ctx.report.warning(
           "macro",

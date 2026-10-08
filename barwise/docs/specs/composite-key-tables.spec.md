@@ -1,6 +1,6 @@
 # A table keyed on several columns imports as the fact type it states
 
-Status: Draft -- no workstream implemented
+Status: Implemented -- both workstreams landed together
 Created: 2026-10-08
 Last-updated: 2026-10-08
 Tracking: barwise-2z1 (DDL); barwise-nkn, its composite-key part (dbt)
@@ -201,3 +201,40 @@ column, which no table imports today (barwise-u0e).
    test needs both sides, and either side alone would land a rule the
    other contradicts.
 2. Trial run and reclassification, riding the same PR.
+
+## Implementation notes
+
+Measured over the regenerated small tier, 2026-10-08.
+
+- **The grader had the old reading built in.** The first run reported
+  five new S1 rows: imports "silently dropping" 1 to 4 tables each. Every
+  one was a many-to-many or n-ary table the generator's manifest records
+  as `kind: fact`, which the importer now reads as the fact type it is.
+  The import grader looked for an object type per table, so the correct
+  reading scored as a drop. It now also accepts a fact type named after
+  the table (`trial/lib/oracles/grade.mjs`, with a test).
+- **What moved.** C08's metering row passes (barwise-2z1's original
+  case). The three dbt imports REFUSED since barwise-rlv import again.
+  C04's analytics-engineer gains the ternary "Order includes
+  ProductVariant in Quantity"; C11's data-platform-lead gains the
+  FunnelStep ring fact type, leaving only the ring constraint itself.
+- **What did not, and why.** C05's master-data lead is keyed on one
+  foreign key, which is the key-is-reference shape (barwise-3pc). C09's
+  biostatistician fails its subtype check (barwise-1078); its Dose check
+  is declared not_expressible for ddl, because `EXPOSURE` carries both
+  `DOSE_ID` and `EXPOSURE_START_DATE` beside its key and no DDL says
+  which is the fact's role -- decision 1's cost, met in the trial. C03's
+  actuarial analyst references a two-column-keyed PolicyPeriod through
+  two dbt relationships tests, read as two references: a new issue,
+  barwise-tjg, the dbt sibling of barwise-f2n.
+- **Review changed the rule five times before any code ran.** NOT NULL
+  for the extra column, objectifying the foreign-key-and-value binary,
+  the single composite foreign key, overlapping foreign keys and the dbt
+  `not_null` key columns all came from the six review rounds of PR #620;
+  each has a test, and the overlap guard's test was shown to fail
+  without it.
+- **The drift test was too weak at first.** Mutating the dbt side's
+  NOT NULL condition left it green: no case had a nullable extra column.
+  It gained one, and the same mutation now fails it.
+- **One PR, not two.** The plan put each importer in its own PR; the
+  drift test needs both, so they landed together.
