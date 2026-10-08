@@ -74,8 +74,12 @@ referenced.
 3. When any other column remains beside the key, when another table
    references the table, or when the fact type would be a binary over
    one foreign key and one value, the importer shall objectify the fact
-   type by an entity named after the table and import the remaining
-   columns as that entity's attributes. A remaining column unique by
+   type by an entity named after the table and import each remaining
+   column as that entity's: a plain column as an attribute, a column of
+   a remaining foreign key as a relationship the entity plays with the
+   referenced entity, as the importer reads any entity's foreign key
+   today (PR #620 review: `supplier_id` beside an order line's key is a
+   relationship, not a value). A remaining column unique by
    itself shall be an attribute whose value role is unique -- an
    alternate identifier; the objectified fact type's key, which is the
    table's primary key, remains the entity's preferred identification.

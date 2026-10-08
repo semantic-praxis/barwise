@@ -72,16 +72,16 @@ with an annotation, which is read first and is unaffected.
 
 ## Options
 
-| Option                                                                                                             | Subtype checks                       | Extension tables, copies             | Cost                                                   |
-| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------ | ------------------------------------ | ------------------------------------------------------ |
-| A. always a subtype                                                                                                | pass                                 | wrong: `PAT_2` becomes a kind of PAT | simplest; asserts "is a" the DDL never said            |
-| B. never a subtype: today's reading, the reference dropped with a warning; subtype checks declared not_expressible | out of reach                         | right                                | no inference; known information loss until barwise-3pc |
-| C. the two-condition rule, today's reading otherwise (recommended)                                                 | pass except C10's three coded tables | right                                | a naming heuristic, reported per table                 |
+| Option                                                                                                             | Subtype checks                       | Extension tables, copies                                                                                                                                                                                       | Cost                                                   |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| A. always a subtype                                                                                                | pass                                 | wrong: `PAT_2` becomes a kind of PAT                                                                                                                                                                           | simplest; asserts "is a" the DDL never said            |
+| B. never a subtype: today's reading, the reference dropped with a warning; subtype checks declared not_expressible | out of reach                         | right                                                                                                                                                                                                          | no inference; known information loss until barwise-3pc |
+| C. the two-condition rule, today's reading otherwise (recommended)                                                 | pass except C10's three coded tables | right for the trial's 42 and for copies; wrong for a vertical partition named with its parent's noun (the documented false positive), which by hand can only be undone with the relationship until barwise-3pc | a naming heuristic, reported per table                 |
 
 Recommended: **C**, with every inferred subtype named in a warning
 ("imported as a subtype of ENC: its name ends in ENC's head noun and it
 repeats none of ENC's columns"), so the inference is visible and
-reversible by hand. B is the fallback if review judges any naming
+reversible by hand, except the documented false positive above, which loses the relationship when undone until barwise-3pc. B is the fallback if review judges any naming
 inference out of bounds, on the reason that a subtype and a one-to-one
 extension have one relational shape. A subtype read this way
 round-trips: the mapper writes exactly this shape for a subtype.
@@ -123,7 +123,7 @@ imported, the reference is not, and the warning says so.
 
 In scope: `DdlImportFormat`'s handling of a single-column key that is
 also a foreign key; tests for a caught subtype, a coded-name miss, an
-extension table, `user_profiles`, the `LEGACY_ORDER` control and the `ARCHIVED_ORDER` control, and a
+extension table, `user_profiles`, the `LEGACY_ORDER` control, the `ARCHIVED_ORDER` control, and a same-noun child that repeats exactly one of a multi-column parent's non-key columns, which must keep today's reading (PR #620 review: it separates "no repeated column" from "not every column repeated"), and a
 round-trip test that a caught subtype re-exports unchanged; the trial
 rows it moves (C10 ir-analyst; the C09 biostatistician subtype check).
 

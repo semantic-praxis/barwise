@@ -36,8 +36,11 @@ the other number by exactly these endings and no others: `ies` and
 `y`, `es` and nothing, `s` and nothing -- so `categories` matches
 `category`, `statuses` matches `status`, and an irregular plural such
 as `people` matches only itself, PR #620 review), `U` is not
-`T`, and the declared types match; a column that would match two tables
-infers nothing and is reported. Each inference is a warning naming the
+`T`, and the declared types match -- compared as the conceptual type the
+importer already derives for a column (`columnDataType`: `INT` and
+`INTEGER` are one type, a length or precision is ignored), with no
+inference when either side's type is unknown (PR #620 review). A column
+that would match two tables infers nothing and is reported. Each inference is a warning naming the
 column and the table, so it can be checked by eye.
 
 A column in `T`'s primary key is never inferred (PR #620 review): an
@@ -77,8 +80,11 @@ something it did not (PR #620 review). The refusal has its own test.
 In scope: requirements 1-6 in the DDL importer, with `SqlImportFormat`
 threading the option through its file and directory flows (today it
 passes `DdlImportFormat.parse` only `{ modelName }` in both); unit tests
-for each matching form, a type mismatch, a self-table match, the
-ambiguous case, the key-column case and the flag absent; CLI tests that
+for each matching form, an equivalent type spelling (`INT` against
+`INTEGER`), a type mismatch, a self-table match, the ambiguous case, the
+key-column case, a column with a declared foreign key whose name suggests
+another table (the declared reference wins, with no inference warning),
+and the flag absent; CLI tests that
 observe an inferred relationship through all three paths of requirement
 6 and the refusal of requirement 5 (PR #620 review); the CLI docs; and
 the capability-matrix row for the flag, marked as a deliberate CLI-only
