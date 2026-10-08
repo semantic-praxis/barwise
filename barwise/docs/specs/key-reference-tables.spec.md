@@ -43,7 +43,7 @@ The rule has two conditions. **The table's name ends in the referenced
 table's head noun** (its last word, singular and plural alike), and
 **it repeats none of that table's non-key columns.** The head noun alone
 has a false positive the trial cannot show: a prefix-qualified copy --
-`LEGACY_ORDER`, `ARCHIVED_ORDER` keyed on `ORDER`'s key -- ends in the
+`LEGACY_ORDER` keyed on `ORDER`'s key -- ends in the
 parent's noun and is not a kind of it (PR #620 review). A copy repeats
 its parent's columns and a subtype adds its own, so the second condition
 separates them. Measured over the three customers with this shape, no
@@ -85,7 +85,7 @@ supertype. Measured on `examples/output/employee-hierarchy.orm.yaml`:
 exported as annotated DDL and imported again, both subtype facts are
 gone -- Manager's shared key (identifying) warns as barwise-1078, and
 Employee's `person_id` column (non-identifying) imports as an ordinary
-relationship. So the annotation gains an explicit `supertype`, which
+relationship. So the annotation gains an explicit `supertypes` list, which
 the export writes and the import reads before any naming rule:
 explicit where barwise wrote the DDL, inferred only where it did not.
 
@@ -134,20 +134,33 @@ round-trips: the mapper writes exactly this shape for a subtype.
    read it exactly as before this spec (for a shared-key foreign key:
    the key imported, the reference not, and the existing warning).
 4. The DDL export shall write, on the table annotation of every entity
-   that is a subtype, an optional `supertype` naming the supertype
-   entity and the column that references its table. When a table's
-   annotation carries `supertype`, the importer shall import the
-   subtype fact from it -- identifying when that column is the table's
-   shared key, not identifying otherwise, the column then imported as
-   the subtype link rather than as a relationship -- and shall not
-   apply requirements 1-3 to that table. When an annotated table has
-   no `supertype` (an export from before this spec, or an entity that
-   is no subtype), requirements 1-3 apply to it as to an unannotated
+   that is a subtype, an optional `supertypes` list with one entry per
+   subtype fact, each naming the supertype entity and the columns that
+   reference its table -- a list of columns, since a supertype keyed on
+   several columns is referenced through all of them, and a list of
+   entries, since an entity may have more than one supertype (PR #620
+   review). When a table's annotation carries `supertypes`, the
+   importer shall import each subtype fact from its entry --
+   identifying when its columns are exactly the table's primary key,
+   not identifying otherwise, the columns then imported as the subtype
+   link rather than as a relationship -- and shall not apply
+   requirements 1-3 to that table. When an annotated table has no
+   `supertypes` (an export from before this spec, or an entity that is
+   no subtype), requirements 1-3 apply to it as to an unannotated
    table.
-5. A subtype imported by requirement 1 or 4 and exported again, with
-   and without annotations, shall give the same subtype facts, and an
-   identifying subtype shall re-export as one column that is both key
-   and foreign key.
+5. Round trips (PR #620 review: the first wording asked an unannotated
+   export to keep what only the annotation can carry):
+   - A subtype imported by requirement 4, exported with annotations and
+     imported again, shall give the same subtype facts. Without
+     annotations nothing promises it survives: the names of
+     `employee` and `person` say nothing of a subtype, which is the
+     loss requirement 4 exists to prevent.
+   - A subtype imported by requirement 1, exported with or without
+     annotations and imported again, shall give the same subtype facts,
+     and shall re-export as one column that is both key and foreign
+     key. Without annotations this holds because the import named both
+     entities after the tables whose names met the rule, and the export
+     names the tables after the entities.
 
 ## The one-to-one reading is a follow-up (resolved: deferred)
 
@@ -178,10 +191,11 @@ same-noun name that would otherwise qualify -- a composite foreign key
 one-column foreign key to the parent's alternate UNIQUE column rather
 than its primary key -- both keeping today's reading; and a
 round-trip test that a caught subtype re-exports unchanged; the
-`supertype` field in `barwiseAnnotation.ts` (writer and reader) and
+`supertypes` field in `barwiseAnnotation.ts` (writer and reader) and
 `DdlExportFormat`, with round-trip tests, annotated and not, over an
 identifying and a non-identifying subtype -- `employee-hierarchy`
-carries both -- and a test that an annotation's `supertype` wins over
+carries both -- a subtype whose supertype has a two-column key, an
+entity with two supertypes, and a test that an annotation's `supertypes` wins over
 a table name that fails the naming rule. The trial
 generator writing the extension tables' `FOREIGN KEY`, which its
 manifest already records (`trial/lib/generators/ddl.mjs`), with a
