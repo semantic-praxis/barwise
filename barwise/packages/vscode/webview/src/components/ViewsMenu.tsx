@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 /**
  * Top-bar dropdown for named diagram views.
  *

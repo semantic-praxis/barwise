@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 /**
  * Thin context strip below the top bar.
  *

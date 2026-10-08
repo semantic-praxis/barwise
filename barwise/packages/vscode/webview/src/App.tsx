@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 /**
  * Root of the diagram webview application.
  *

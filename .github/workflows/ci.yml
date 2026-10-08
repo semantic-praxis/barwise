@@ -283,6 +283,18 @@ jobs:
       - run: npm run build
         if: steps.changes.outputs.docs_only != 'true'
 
+      # The vscode package's own type-checks. Every other package builds
+      # with tsc, so its build is its type-check; this one builds with
+      # esbuild, which strips types unchecked, so both tsconfigs had gone
+      # red on main with nothing to say so (barwise-iii). After build,
+      # because tsc reads the dependencies' dist. Two steps so a failure
+      # names the tsconfig (docs/specs/vscode-typecheck-in-ci.spec.md).
+      - run: npm run --workspace=barwise-vscode check
+        if: steps.changes.outputs.docs_only != 'true'
+
+      - run: npm run --workspace=barwise-vscode check:webview
+        if: steps.changes.outputs.docs_only != 'true'
+
       # The optimizer lane, which until now ran in no CI at all. Its own
       # spec called the guard "the Python lane has its own pytest run,
       # executed by hand" -- and a hand-run guard is run when someone

@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 /**
  * The non-diagram tab panels (modernization Phase 3): thin views over
  * host-computed content. Verbalization renders the FORML sentences,

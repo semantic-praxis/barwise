@@ -52,6 +52,13 @@
       ],
       "note": "Genuinely still a draft; the commits below are unrelated work on modules the spec happens to name. 8a62161 is model-lint's four workstreams touching populationValidation.ts; 8175c7c moved mcp output-size guidance, touching verbalize.ts. Neither implements anything here -- no rival-frame or premortem code exists in any package's src. The spec's own Tracking line says it files bd issues per workstream WHEN IT LANDS, so nothing has landed to report. Remove this row when the first workstream ships and the Status says so."
     },
+    "instruction-reference-check.spec.md": {
+      "status": "Draft -- no workstream implemented",
+      "commits": [
+        "da360d7e"
+      ],
+      "note": "Genuinely still a draft. da360d7e (barwise-iii) adds the two vscode type-check steps to ci.yml, which this spec names only as the file its own WS1 step will go in; nothing of the instruction-reference gate exists yet. Remove this row when WS1 ships and the Status says so."
+    },
     "model-issues-tab.spec.md": {
       "status": "Draft -- no workstream implemented",
       "commits": [
@@ -62,6 +69,8 @@
     "mutation-ratchet.spec.md": {
       "status": "Draft -- no workstream implemented. All five open decisions\nresolved 2026-09-10; the workstreams below reflect them.",
       "commits": [
+        "e735c9e4",
+        "0a09d2da",
         "6f49c110",
         "7f8e467d",
         "d2d838fa",

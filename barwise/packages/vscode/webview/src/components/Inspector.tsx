@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 /**
  * Right inspector pane: contextual detail for the selected element.
  *

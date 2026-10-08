@@ -1,7 +1,9 @@
 import {
   type Constraint,
+  type EntityType,
   type FactType,
   isDisjunctiveMandatory,
+  isEntityType,
   isEquality,
   isExclusion,
   isExclusiveOr,
@@ -13,10 +15,11 @@ import {
   isScopedView,
   isSubset,
   isValueConstraint,
-  type ObjectType,
+  isValueType,
   type OrmModel,
   OrmYamlSerializer,
   type SubtypeFact,
+  type ValueType,
 } from "@barwise/core";
 import * as vscode from "vscode";
 
@@ -148,7 +151,7 @@ function buildTree(model: OrmModel): ModelTreeItem[] {
   const categories: ModelTreeItem[] = [];
 
   // Entity types
-  const entities = model.objectTypes.filter((ot) => ot.kind === "entity");
+  const entities = model.objectTypes.filter(isEntityType);
   if (entities.length > 0) {
     categories.push({
       kind: "category",
@@ -159,7 +162,7 @@ function buildTree(model: OrmModel): ModelTreeItem[] {
   }
 
   // Value types
-  const values = model.objectTypes.filter((ot) => ot.kind === "value");
+  const values = model.objectTypes.filter(isValueType);
   if (values.length > 0) {
     categories.push({
       kind: "category",
@@ -215,17 +218,16 @@ function buildTree(model: OrmModel): ModelTreeItem[] {
   return categories;
 }
 
-function entityItem(ot: ObjectType): ModelTreeItem {
-  const refMode = ot.referenceMode ? ` (.${ot.referenceMode})` : "";
+function entityItem(ot: EntityType): ModelTreeItem {
   return {
     kind: "entity_type",
     label: ot.name,
-    description: refMode || undefined,
+    description: ` (.${ot.referenceMode})`,
     id: ot.id,
   };
 }
 
-function valueItem(ot: ObjectType): ModelTreeItem {
+function valueItem(ot: ValueType): ModelTreeItem {
   const dt = ot.dataType ? ot.dataType.name : undefined;
   return {
     kind: "value_type",

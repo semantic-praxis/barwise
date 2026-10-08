@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 /**
  * Left pane: self-contained model tree over the serialized model
  * summary (modernization Phase 2). Deliberately overlaps the native

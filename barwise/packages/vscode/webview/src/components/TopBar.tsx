@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 /** Top bar: model name, view tabs, the Views menu, and the palette. */
 import { ViewsMenu } from "./ViewsMenu";
 
