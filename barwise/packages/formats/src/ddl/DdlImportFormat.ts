@@ -95,6 +95,8 @@ interface ParsedForeignKey {
   readonly columns: readonly string[];
   readonly referencedTable: string;
   readonly referencedColumns: readonly string[];
+  /** Added by `--infer-references`, not declared in the DDL. */
+  readonly inferred?: true;
 }
 
 /**
@@ -504,6 +506,24 @@ export class DdlImportFormat implements ImportFormat {
               model,
               entityType,
               referencedEntityId,
+              read,
+              table,
+              annotations,
+              warnings,
+            );
+          } else if (fk.inferred) {
+            // Inference predicts which tables become entities; when it
+            // predicted wrong (two table names that read as one entity, say)
+            // the guess is withdrawn and the column kept, never dropped
+            // (PR #628 review).
+            warnings.push(
+              `Table "${table.name}": the reference inferred for column "${column.name}" has no `
+                + `entity to point at ("${fk.referencedTable}" imported as none); it is kept as a `
+                + `column instead.`,
+            );
+            binary = this.createColumnFactType(
+              model,
+              entityType,
               read,
               table,
               annotations,
@@ -1830,6 +1850,7 @@ function inferReferences(
         columns: [column.name],
         referencedTable: target.name,
         referencedColumns: [target.primaryKey[0]!],
+        inferred: true,
       });
       warnings.push(
         `Table "${table.name}": column "${column.name}" is read as a reference to `

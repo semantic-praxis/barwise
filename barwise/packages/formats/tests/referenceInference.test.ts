@@ -171,6 +171,19 @@ describe("a column named after a table's key, with its type", () => {
       expect(model.factTypes.some((f) => /^NetworkDevice has \w*SiteId$/.test(f.name))).toBe(true);
     });
 
+    it("a guess whose target imports as no entity is withdrawn, and the column kept", () => {
+      // site and _site both read as Site, so the second imports as none;
+      // inference chose it by type, and the column used to be dropped.
+      const { model, warnings } = infer(`CREATE TABLE site (site_id UUID PRIMARY KEY);
+        CREATE TABLE _site (site_id INT PRIMARY KEY);
+        ${device("site_id")}`);
+      expect(related(model, "NetworkDevice", "Site")).toBe(false);
+      expect(model.factTypes.some((f) => /^NetworkDevice has \w*SiteId$/.test(f.name))).toBe(true);
+      expect(warnings.some((w) => /inferred for column "site_id" has no entity/.test(w))).toBe(
+        true,
+      );
+    });
+
     it("not a table its annotation makes a fact table, which has no entity", () => {
       // Inferred, the column lost even its value fact: step 3 found no
       // entity for the reference.
