@@ -6,8 +6,8 @@
  * separate child process.
  *
  * Each tool wraps the corresponding execute function from @barwise/mcp,
- * except import_transcript and review_model which use CopilotLlmClient
- * directly. The tools are table-driven: a `register` call per tool pairs
+ * except import_transcript and review_model, which call @barwise/llm with
+ * the client resolveLlmClient picks. The tools are table-driven: a `register` call per tool pairs
  * its name with a `run` closure and an invocation message, built into a
  * single generic `LanguageModelTool` adapter.
  */
@@ -169,8 +169,9 @@ function resolveSourceParam(source: string | undefined): SourceInput {
 }
 
 /**
- * Resolve the LLM client for the Copilot-backed tools: prefer Copilot
- * (no API key needed), fall back to Anthropic if the user configured it.
+ * Resolve the LLM client for the two LLM-backed tools from
+ * barwise.llmProvider: Copilot by default (no API key needed), Anthropic
+ * when the setting says so.
  *
  * The key comes from `ExtensionContext.secrets`, never from a settings
  * string -- a settings value can be written to `.vscode/settings.json` and
@@ -193,13 +194,14 @@ async function resolveLlmClient(secrets: vscode.SecretStorage): Promise<LlmClien
 }
 
 // ---------------------------------------------------------------------------
-// Bespoke tool bodies (the two Copilot-backed tools and export's options)
+// Bespoke tool bodies (the two LLM-backed tools and export's options)
 // ---------------------------------------------------------------------------
 
 /**
- * import_transcript: uses CopilotLlmClient so the user's Copilot
- * subscription handles the LLM call without any API key. Provides the
- * open model's types as context when an .orm.yaml file is focused.
+ * import_transcript: the LLM client comes from resolveLlmClient, so it
+ * follows barwise.llmProvider -- Copilot by default (no API key), or
+ * Anthropic with the key from SecretStorage. Provides the open model's
+ * types as context when an .orm.yaml file is focused.
  */
 async function runImportTranscript(
   input: ImportTranscriptInput,
@@ -250,7 +252,7 @@ function runExportModel(input: ExportModelInput): vscode.LanguageModelToolResult
   return toToolResult(result);
 }
 
-/** review_model: Copilot-backed review, formatted as Markdown. */
+/** review_model: LLM review via resolveLlmClient, formatted as Markdown. */
 async function runReviewModel(
   input: ReviewModelInput,
   secrets: vscode.SecretStorage,

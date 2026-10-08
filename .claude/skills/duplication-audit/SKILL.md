@@ -167,6 +167,7 @@ Operational rules, learned in the first sweep:
   (`mcp/src/workspace/projectLoader.ts` header) are the codebase
   working as designed; the finding, if any, is only a missing check.
 - Fix only what is small and unambiguous in the sweep itself; file
-  the rest (beads, `bd`) with evidence. Reconciling a diverged pair
-  is a behavioral change -- it needs its own change, with a decision
+  the rest as beads issues (`beads-crud.mjs create`) with evidence.
+  Reconciling a diverged pair is a behavioral change -- it needs its
+  own change, with a decision
   about which copy is right.

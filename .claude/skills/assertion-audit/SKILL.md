@@ -188,6 +188,6 @@ where every open finding carries a `tracked:<issue>` verdict, and make
 that no longer reproduces, so fixing one forces its row out. Then wire
 it into CI. `scripts/audit-rubric.mjs` is the worked example.
 
-Fix only what is small and unambiguous; file the rest (beads, `bd`)
-with the evidence attached. Record caught mutations in the findings
-doc so the next audit does not re-run them.
+Fix only what is small and unambiguous; file the rest as beads issues
+(`beads-crud.mjs create`) with the evidence attached. Record caught
+mutations in the findings doc so the next audit does not re-run them.
