@@ -30,12 +30,18 @@ server and VS Code extension) before anyone saves a file with it.
 
 ### NORMA export and import follow view scope
 
-- Exporting to NORMA now draws exactly what each saved view shows: the
-  view's object types, plus every fact type whose players are all in the
-  view. Previously the export drew one shape for each saved position, so
-  fact types were usually missing and a view with no saved positions came
-  out empty. Shapes with no saved position are placed automatically below
-  the positioned ones.
-- Importing a NORMA file keeps each diagram's scope: the object types a
-  NORMA diagram shows become that view's `elements`. A NORMA diagram that
-  shows every object type imports as a full view.
+- Exporting to NORMA now draws the object types and fact types each saved
+  view shows: the view's object types, plus every fact type whose players
+  are all in the view. Previously the export drew one shape for each saved
+  position, so fact types were usually missing and a view with no saved
+  positions came out empty. Shapes with no saved position are placed
+  automatically below the positioned ones. Subtype links are still not
+  exported, so a view that shows them in VS Code has no subtype connectors
+  in NORMA.
+- Importing a NORMA file keeps each diagram's object types: the object
+  types a NORMA diagram shows become that view's `elements`, and the view
+  then shows every fact type whose players are all in it. Two cases do not
+  round-trip. A NORMA diagram that shows every object type imports as a
+  full view, even if it leaves out some fact types, so exporting it again
+  draws all of them. An empty NORMA diagram is skipped on import, so an
+  exported empty view does not come back.
