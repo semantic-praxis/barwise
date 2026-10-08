@@ -72,11 +72,11 @@ with an annotation, which is read first and is unaffected.
 
 ## Options
 
-| Option                                                             | Subtype checks                       | Extension tables, copies             | Cost                                        |
-| ------------------------------------------------------------------ | ------------------------------------ | ------------------------------------ | ------------------------------------------- |
-| A. always a subtype                                                | pass                                 | wrong: `PAT_2` becomes a kind of PAT | simplest; asserts "is a" the DDL never said |
-| B. never a subtype; declare subtype checks not_expressible         | out of reach                         | right                                | no inference at all                         |
-| C. the two-condition rule, today's reading otherwise (recommended) | pass except C10's three coded tables | right                                | a naming heuristic, reported per table      |
+| Option                                                                                                             | Subtype checks                       | Extension tables, copies             | Cost                                                   |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------ | ------------------------------------ | ------------------------------------------------------ |
+| A. always a subtype                                                                                                | pass                                 | wrong: `PAT_2` becomes a kind of PAT | simplest; asserts "is a" the DDL never said            |
+| B. never a subtype: today's reading, the reference dropped with a warning; subtype checks declared not_expressible | out of reach                         | right                                | no inference; known information loss until barwise-3pc |
+| C. the two-condition rule, today's reading otherwise (recommended)                                                 | pass except C10's three coded tables | right                                | a naming heuristic, reported per table                 |
 
 Recommended: **C**, with every inferred subtype named in a warning
 ("imported as a subtype of ENC: its name ends in ENC's head noun and it
@@ -85,6 +85,24 @@ reversible by hand. B is the fallback if review judges any naming
 inference out of bounds, on the reason that a subtype and a one-to-one
 extension have one relational shape. A subtype read this way
 round-trips: the mapper writes exactly this shape for a subtype.
+
+## Requirements
+
+1. When an unannotated table's primary key is one column that is also a
+   foreign key to another table, the table's name ends in the referenced
+   table's head noun (the last `_`-separated word, singular and plural
+   alike), and the table repeats none of the referenced table's non-key
+   columns, the DDL importer shall import the table's entity as a subtype
+   of the referenced table's entity, identified through it.
+2. When it does, the importer shall add a warning naming the table, the
+   supertype and both conditions.
+3. When such a table meets either condition but not both, the importer
+   shall read it as before this spec: the key imported, the reference
+   not, and the existing warning.
+4. When a table carries a barwise annotation, the importer shall read
+   the annotation and ignore this rule.
+5. A subtype imported by requirement 1 and exported again shall
+   re-export as one column that is both key and foreign key.
 
 ## The one-to-one reading is a follow-up (resolved: deferred)
 

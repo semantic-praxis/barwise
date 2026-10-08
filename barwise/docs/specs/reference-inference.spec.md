@@ -47,17 +47,51 @@ command is `import sql`: `import model` serves every text importer,
 and `--format openapi --infer-references` would otherwise appear to do
 something it did not (PR #620 review). The refusal has its own test.
 
+## Requirements
+
+1. When `--infer-references` is absent, the DDL and SQL importers shall
+   infer no reference, whatever the column names.
+2. When it is given, for a column `X` of table `T` that is not in `T`'s
+   primary key and has no declared foreign key, the importer shall read
+   a reference to table `U` when `X` matches `U`'s single key column by
+   one of the three forms above, `U` is not `T`, and the declared types
+   match; and shall warn once per inferred reference, naming the column
+   and the table.
+3. When a column matches two or more tables, the importer shall infer
+   nothing for it and shall warn naming the candidates.
+4. When a matching column is in `T`'s primary key, the importer shall
+   infer nothing for it and shall warn that it is a candidate.
+5. When the flag is given to `import model` with a format other than
+   `ddl`, the command shall exit non-zero with a message naming the
+   formats that accept it.
+6. The flag shall reach the DDL importer through `import model --format
+   ddl`, through `import sql` on a file, and through `import sql` on a
+   directory.
+
 ## Scope
 
-In scope: the flag on the DDL and SQL importers (the SQL importer reads
-CREATE TABLE through the DDL importer since barwise-jjd, and today
-passes it only `{ modelName }` in both its file and directory flows, so
-the option must be threaded through both), tests for each matching
-form, the ambiguous case and the key-column case, CLI tests that observe
-an inferred relationship through `import model --format ddl` and
-through `import sql` on a file and on a directory (PR #620 review), a trial per-artifact
-`import_flags` so C07's BigQuery artifact can pass it, and the CLI docs.
+In scope: requirements 1-6 in the DDL importer, with `SqlImportFormat`
+threading the option through its file and directory flows (today it
+passes `DdlImportFormat.parse` only `{ modelName }` in both); unit tests
+for each matching form, a type mismatch, a self-table match, the
+ambiguous case, the key-column case and the flag absent; CLI tests that
+observe an inferred relationship through all three paths of requirement
+6 and the refusal of requirement 5 (PR #620 review); the CLI docs; and
+the capability-matrix row for the flag, marked as a deliberate CLI-only
+divergence, in the same commit as the flag (CLAUDE.md, capability
+matrix).
 
-Out of scope: MCP and VS Code (the capability matrix records the
-divergence as deliberate until there is a use for it there); dbt, whose
-relationships tests already state references.
+Out of scope: MCP and VS Code, until there is a use for the flag there;
+dbt, whose relationships tests already state references.
+
+## Workstreams
+
+1. **The flag and the inference** (formats, cli): requirements 1-6, the
+   tests above, the docs and the matrix row.
+2. **The trial passes it** (trial): a per-artifact `import_flags` list in
+   `customer.yaml`, validated against the flags the importer accepts and
+   appended by `importCommand` in `trial/lib/steps.mjs` (today it builds
+   the arguments from importer, path and dialect alone); a trial test
+   that an artifact's flags reach the command line; C07's BigQuery
+   artifact given `--infer-references`; then a trial run and the C07 row
+   reclassified. It depends on workstream 1.
