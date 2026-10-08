@@ -97,6 +97,18 @@ test("gradeImport: a fact table comes back as its fact type, an entity table doe
     summary(["Doctor"], ["Doctor and Doctor patient"]),
   );
   assert.equal(entityAsFact.status, "fail");
+  // The dbt manifest carries the kind too (PR #621 review): a fact model
+  // passes as its fact type, an entity model does not.
+  const dbt = (kind) => ({
+    generator: "dbt",
+    models: [{ name: "stg_course_is_prerequisite_of_course", kind, keyless: false }],
+  });
+  const ring = summary([], ["Course and Course course is prerequisite of course"]);
+  assert.equal(gradeImport(ok, dbt("fact"), "import", { ...ring, objectTypes: 1 }).status, "pass");
+  assert.equal(
+    gradeImport(ok, dbt("entity"), "import", { ...ring, objectTypes: 1 }).status,
+    "fail",
+  );
 });
 
 test("gradeImport: an empty model with exit 0 is S3, a crash is S2, a hang is S2", () => {

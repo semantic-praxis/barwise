@@ -159,7 +159,9 @@ function expectedNames(manifest) {
       }
       break;
     case "dbt":
-      for (const m of manifest.models) if (!m.keyless) raws.push(m.name.replace(/^stg_/, ""));
+      for (const m of manifest.models) {
+        if (!m.keyless) raws.push({ raw: m.name.replace(/^stg_/, ""), kind: m.kind });
+      }
       break;
     case "code":
       for (const c of manifest.classes) raws.push(c.name);

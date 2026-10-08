@@ -2,7 +2,7 @@
  * Analysis phase: identify PKs, FKs, and custom tests across models.
  */
 
-import { candidateKeysOf, compositeKeyOf, KEY_TEST } from "./compositeKeys.js";
+import { candidateKeysOf, combinationOf, compositeKeyOf, KEY_TEST } from "./compositeKeys.js";
 import { findRelationshipTest, hasTest } from "./constraints.js";
 import { type DbtMapperContext, type RelationshipInfo } from "./context.js";
 
@@ -67,14 +67,15 @@ export function analyzeModels(ctx: DbtMapperContext): void {
       }
     }
 
-    // Report model-level custom tests.
-    // The combination test that names a composite key is read, not
-    // reviewed (compositeKeys.ts).
-    const keyTest = compositeKeyOf(m) !== undefined;
+    // Report model-level custom tests. The one combination test read as
+    // the model's key is read, not reviewed (compositeKeys.ts); any other,
+    // including a second combination or one beside a single-column key,
+    // still is (PR #621 review).
+    const consumed = pkCol ? undefined : compositeKeyOf(m)?.join("\0");
     for (const test of m.modelTests) {
       if (
         test.type === "custom"
-        && !(keyTest && test.name === KEY_TEST)
+        && (consumed === undefined || combinationOf(test)?.join("\0") !== consumed)
       ) {
         ctx.report.warning(
           "macro",

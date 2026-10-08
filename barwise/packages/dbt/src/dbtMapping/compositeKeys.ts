@@ -11,31 +11,41 @@
  */
 
 import { type Constraint, generateId } from "@barwise/core";
-import type { DbtModel } from "../DbtSchemaTypes.js";
+import type { DbtModel, DbtTest } from "../DbtSchemaTypes.js";
 import { claimValueType, resolveColumnType } from "./columnTypes.js";
-import { hasTest } from "./constraints.js";
+import { findRelationshipTest, hasTest } from "./constraints.js";
 import type { CompositeInfo, DbtMapperContext } from "./context.js";
 import { toPascalCase } from "./naming.js";
 
 /** The model-level dbt test whose columns name a composite key. */
 export const KEY_TEST = "dbt_utils.unique_combination_of_columns";
 
+/** The columns a model-level combination test names, or undefined for any other test. */
+export function combinationOf(test: DbtModel["modelTests"][number]): string[] | undefined {
+  if (test.type !== "custom" || test.name !== KEY_TEST) return undefined;
+  const cols = test.config["combination_of_columns"];
+  return Array.isArray(cols) ? cols.map(String) : undefined;
+}
+
 /**
- * Every combination a model-level combination test names that could be
- * the model's key: two or more columns, each `not_null`. The test proves
- * the combination unique but not present, and a key with a null in it
- * identifies nothing (PR #620 review); a SQL primary key and the
- * single-column rule both demand it.
+ * Every combination a model-level combination test names that this rule
+ * reads as a key (composite-key-tables.spec.md, requirement 5): two or
+ * more columns, each `not_null`, at least one a `relationships` column.
+ * The test proves the combination unique but not present, and a key with
+ * a null in it identifies nothing (PR #620 review); a key of values alone
+ * is not this rule's. One predicate, so the analysis that suppresses the
+ * "no identifier" gap and the mapping that builds the fact type cannot
+ * disagree about a model (PR #621 review).
  */
 export function candidateKeysOf(m: DbtModel): string[][] {
   const keys: string[][] = [];
   for (const test of m.modelTests) {
-    if (test.type !== "custom" || test.name !== KEY_TEST) continue;
-    const cols = test.config["combination_of_columns"];
-    if (!Array.isArray(cols) || cols.length < 2) continue;
-    const names = cols.map(String);
+    const names = combinationOf(test);
+    if (!names || names.length < 2) continue;
     const columns = names.map((n) => m.columns.find((c) => c.name === n));
-    if (columns.every((c) => c !== undefined && hasTest(c, "not_null"))) keys.push(names);
+    if (!columns.every((c) => c !== undefined && hasTest(c, "not_null"))) continue;
+    if (!columns.some((c) => findRelationshipTest(c!) !== undefined)) continue;
+    keys.push(names);
   }
   return keys;
 }
@@ -113,6 +123,9 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
     const entityName = toPascalCase(m.name);
     const rels = ctx.relMap.get(m.name) ?? [];
     const roles: { id: string; name: string; playerId: string; }[] = [];
+    // An accepted_values test on a value role is its value constraint, as
+    // buildConstraints reads it on any other column (PR #621 review).
+    const valueConstraints: Constraint[] = [];
     for (const [colName] of info.roles) {
       const col = m.columns.find((c) => c.name === colName)!;
       const rel = rels.find((r) => r.columnName === colName);
@@ -139,7 +152,27 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
             ...(resolved.dataType ? { dataType: resolved.dataType } : {}),
           }).id;
       }
-      roles.push({ id: generateId(), name: "is in", playerId });
+      const roleId = generateId();
+      roles.push({ id: roleId, name: "is in", playerId });
+      const accepted = rel
+        ? undefined
+        : col.tests.find((t): t is Extract<DbtTest, { type: "accepted_values"; }> =>
+          t.type === "accepted_values"
+        );
+      if (accepted && accepted.values.length > 0) {
+        valueConstraints.push({
+          type: "value_constraint",
+          roleId,
+          values: accepted.values as string[],
+        });
+      } else if (accepted) {
+        ctx.report.warning(
+          "constraint",
+          m.name,
+          `accepted_values test on column "${colName}" has an empty values list -- no value constraint generated. Check the dbt schema YAML.`,
+          colName,
+        );
+      }
     }
     if (roles.length !== info.roles.length) continue;
 
@@ -153,7 +186,10 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
       [c],
       i,
     ) => (info.key.includes(c!) ? [roles[i]!.id] : []));
-    const constraints: Constraint[] = [{ type: "internal_uniqueness", roleIds: keyRoleIds }];
+    const constraints: Constraint[] = [
+      { type: "internal_uniqueness", roleIds: keyRoleIds },
+      ...valueConstraints,
+    ];
     const factType = ctx.model.addFactType({
       name: `${list(players)} ${words}`,
       roles,

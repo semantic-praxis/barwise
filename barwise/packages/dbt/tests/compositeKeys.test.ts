@@ -96,4 +96,71 @@ describe("a composite-key dbt model", () => {
     expect(text).not.toContain("Composite key (");
     expect(text).toContain("(course_id, crn), (crn, course_id)) and none is marked preferred");
   });
+
+  it("a combination of values alone is no key, and the model is still reported as having none", () => {
+    // The gap was suppressed by a check that did not ask for a relationships
+    // column, while the mapping skipped the model for lacking one (PR #621
+    // review).
+    const { report } = importDbtProject([`
+models:
+  - name: exchange_rate
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [currency, rate_date]
+    columns:
+      - name: currency
+        data_tests: [not_null]
+      - name: rate_date
+        data_tests: [not_null]
+`]);
+    const text = JSON.stringify(report);
+    expect(text).toContain("Cannot determine primary identifier");
+    expect(text).not.toContain("Composite key (");
+  });
+
+  it("warns on every combination test except the one read as the key", () => {
+    // A second, nullable combination is not the key, so it is reviewed.
+    const extra = yaml.replace(
+      "          combination_of_columns: [course_id, crn]\n",
+      "          combination_of_columns: [course_id, crn]\n"
+        + "      - dbt_utils.unique_combination_of_columns:\n"
+        + "          combination_of_columns: [crn, room]\n",
+    ).replace(
+      "      - name: crn\n        data_tests:\n          - not_null\n          - relationships: { to: \"ref('section')\", field: crn }\n",
+      "      - name: crn\n        data_tests:\n          - not_null\n          - relationships: { to: \"ref('section')\", field: crn }\n      - name: room\n",
+    );
+    expect(extra).toContain("- name: room");
+    const { report } = importDbtProject([extra]);
+    const text = JSON.stringify(report);
+    expect(text).toContain("Composite key (course_id, crn)");
+    expect(text.match(/Model-level custom test \\"dbt_utils\.unique_combination_of_columns\\"/g))
+      .toHaveLength(1);
+  });
+
+  it("keeps an accepted_values test on a value role as its value constraint", () => {
+    const { model } = importDbtProject([`
+models:
+  - name: meter
+    columns:
+      - name: meter_id
+        data_tests: [unique, not_null]
+  - name: meter_reading
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [meter_id, channel]
+    columns:
+      - name: meter_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('meter')", field: meter_id }
+      - name: channel
+        data_tests:
+          - not_null
+          - accepted_values: { values: [A, B] }
+`]);
+    const values = model.factTypes.flatMap((f) => f.constraints)
+      .filter((c) => c.type === "value_constraint");
+    expect(values).toHaveLength(1);
+    expect(values[0]).toMatchObject({ values: ["A", "B"] });
+  });
 });

@@ -12,9 +12,17 @@ import { DdlImportFormat } from "../src/ddl/DdlImportFormat.js";
 
 const ddl = new DdlImportFormat();
 
-/** What a reader of the model sees: object types, fact types with players, objectifications, uniquenesses. */
+/**
+ * What a reader of the model sees: object types, fact types with players,
+ * objectifications, internal uniquenesses, and external uniquenesses by
+ * the players of their roles (requirement 6 asks for all uniquenesses;
+ * PR #621 review).
+ */
 function shape(model: OrmModel) {
   const name = (id: string) => model.getObjectType(id)?.name ?? "?";
+  const playerOf = new Map(
+    model.factTypes.flatMap((f) => f.roles.map((r) => [r.id, name(r.playerId)])),
+  );
   return {
     entities: model.objectTypes.filter((o) => o.kind === "entity").map((o) => o.name).sort(),
     factTypes: model.factTypes.map((f) => {
@@ -26,6 +34,10 @@ function shape(model: OrmModel) {
       };
     }).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
     objectified: model.objectifiedFactTypes.map((o) => name(o.objectTypeId)).sort(),
+    externalUniques: model.factTypes.flatMap((f) => f.constraints)
+      .filter((c) => c.type === "external_uniqueness")
+      .map((c) => c.roleIds.map((id) => playerOf.get(id) ?? "?").sort().join(","))
+      .sort(),
   };
 }
 
@@ -239,6 +251,26 @@ describe("a composite-key table imports as the fact type it states", () => {
     expect(model.factTypes.some((f) => / order flag$/.test(f.name))).toBe(false);
     // Not even attempted: without the guard the rule tried two roles over
     // one column, failed, and fell back with a warning.
+    expect(warnings.filter((w) => /reads as a fact type over its key/.test(w))).toEqual([]);
+  });
+
+  it("a foreign key lying partly inside the key keeps today's reading, beside one wholly inside", () => {
+    // (order_id) is wholly inside the key; (warehouse_id, bin_id) has
+    // bin_id inside and warehouse_id outside (PR #621 review). This pins the
+    // outcome, not compositeReading's guard alone: with the guard removed,
+    // buildRelationship still refuses a role that is part of a wider foreign
+    // key and the table falls back silently to the same model. Checked by
+    // mutation; the guard spares the attempt and states requirement 4.
+    const { model, warnings } = ddl.parse(`CREATE TABLE orders (order_id INT PRIMARY KEY);
+      CREATE TABLE bin (warehouse_id INT, bin_id INT, PRIMARY KEY (warehouse_id, bin_id));
+      CREATE TABLE pick (
+        order_id INT NOT NULL REFERENCES orders (order_id),
+        bin_id INT NOT NULL,
+        warehouse_id INT NOT NULL,
+        PRIMARY KEY (order_id, bin_id),
+        FOREIGN KEY (warehouse_id, bin_id) REFERENCES bin (warehouse_id, bin_id));`);
+    expect(model.objectifiedFactTypes).toEqual([]);
+    expect(model.factTypes.some((f) => / pick$/.test(f.name))).toBe(false);
     expect(warnings.filter((w) => /reads as a fact type over its key/.test(w))).toEqual([]);
   });
 

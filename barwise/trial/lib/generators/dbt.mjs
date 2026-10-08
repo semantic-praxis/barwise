@@ -113,6 +113,11 @@ export function generateDbt(doc, skin, dir, { factor = 1, artifactId = "dbt" } =
       staging.models.push(model);
       manifest.models.push({
         name: stg,
+        // Whether the model holds an entity's rows or a fact type's, as the
+        // DDL manifest records it: a composite-key fact model may import as
+        // the fact type it states, which the grader accepts only for a fact
+        // model (PR #621 review).
+        kind: t.entity ? "entity" : "fact",
         source: t.entity ?? t.factType.name,
         keyless: !!dropKey,
         module: m + 1,
