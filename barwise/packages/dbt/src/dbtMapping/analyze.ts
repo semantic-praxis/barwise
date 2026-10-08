@@ -70,12 +70,14 @@ export function analyzeModels(ctx: DbtMapperContext): void {
     // Report model-level custom tests. The one combination test read as
     // the model's key is read, not reviewed (compositeKeys.ts); any other,
     // including a second combination or one beside a single-column key,
-    // still is (PR #621 review).
-    const consumed = pkCol ? undefined : compositeKeyOf(m)?.join("\0");
+    // still is (PR #621 review). Compared as column sets: the same key
+    // stated again in another order is read too (candidateKeysOf).
+    const asSet = (cols: string[] | undefined) => cols && [...cols].sort().join("\0");
+    const consumed = pkCol ? undefined : asSet(compositeKeyOf(m));
     for (const test of m.modelTests) {
       if (
         test.type === "custom"
-        && (consumed === undefined || combinationOf(test)?.join("\0") !== consumed)
+        && (consumed === undefined || asSet(combinationOf(test)) !== consumed)
       ) {
         ctx.report.warning(
           "macro",

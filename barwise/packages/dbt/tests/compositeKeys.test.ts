@@ -112,7 +112,12 @@ describe("a composite-key dbt model", () => {
     const { model, report } = importDbtProject([twice]);
     expect(model.objectifiedFactTypes.map((o) => model.getObjectType(o.objectTypeId)?.name))
       .toEqual(["Offering"]);
-    expect(JSON.stringify(report)).toContain("Composite key (course_id, crn)");
+    const text = JSON.stringify(report);
+    expect(text).toContain("Composite key (course_id, crn)");
+    // Neither statement of the key is left for manual review.
+    expect(text).not.toMatch(
+      /Model-level custom test \\"dbt_utils\.unique_combination_of_columns\\"/,
+    );
   });
 
   it("a combination of values alone is no key, and the model is still reported as having none", () => {
