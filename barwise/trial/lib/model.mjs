@@ -48,8 +48,14 @@ export function valueTypes(doc) {
  * A relational view of the kernel: one table per entity, one column per
  * binary fact type whose first role is played by the entity and whose
  * other player is a value type (an attribute) or an entity (a foreign
- * key). Ternaries and many-to-many binaries become their own tables.
+ * key). Ternaries and many-to-many binaries become their own tables, and
+ * an objectified fact type becomes its entity's table, keyed on the fact
+ * type's uniqueness (trial-generator-objectification.spec.md).
  * This is the generator's ground truth: what an importer should give back.
+ *
+ * Each column records the roles it holds (`roles`), so an external
+ * uniqueness can find its columns, and the role name it is renamed by
+ * (`role`) when another column of its table has the same name.
  */
 export function relationalView(doc) {
   const ids = byId(doc);
@@ -67,12 +73,97 @@ export function relationalView(doc) {
   }
   const supertypeOf = new Map();
   for (const sf of doc.model?.subtype_facts ?? []) supertypeOf.set(sf.subtype, sf.supertype);
+  const ftById = new Map(factTypes(doc).map((ft) => [ft.id, ft]));
+  const objectifier = new Map();
+  for (const o of doc.model?.objectified_fact_types ?? []) {
+    if (ftById.has(o.fact_type) && tables.has(o.object_type)) {
+      objectifier.set(o.fact_type, o.object_type);
+    }
+  }
+  const uniquenesses = (ft) =>
+    (ft.constraints ?? []).filter((c) => c.type === "internal_uniqueness");
+
+  // The columns that reference an entity's table. A table keyed on more
+  // than one column -- an objectification, settled first -- is referenced
+  // by one column per key column, each naming the column it references;
+  // any other table by one column, whose referenced column the generators
+  // read from the table's key once every key is settled.
+  const referenceColumns = (ref, base, extra) =>
+    ref.settled && ref.pk.length > 1
+      ? ref.pk.map((k) => ({ name: `${base}_${k}`, ref, refColumn: k, ...extra }))
+      : [{ name: `${base}_id`, ref, ...extra }];
+
+  // Two columns of one table may not share a name: every self-reference
+  // and every pair of roles with one player used to write the same column
+  // twice (barwise-rlv). A column from a role is renamed after that role;
+  // one already in the key keeps its name, since another table may have
+  // been built against it.
+  const renamed = (col, n) => `${columnName(col.role)}_${n}`;
+  const renameClash = (t, name) => {
+    const clash = t.columns.find((c) => c.name === name);
+    if (!clash?.role || clash.renamedByRole || t.pk.includes(name)) return;
+    clash.name = renamed(clash, name);
+    clash.renamedByRole = true;
+    for (const fk of t.fks) fk.columns = fk.columns.map((c) => (c === name ? clash.name : c));
+  };
+  const addColumns = (t, cols) => {
+    for (const col of cols) {
+      const clash = t.columns.find((c) => c.name === col.name);
+      renameClash(t, col.name);
+      if (clash && col.role) {
+        col.name = renamed(col, col.name);
+        col.renamedByRole = true;
+      }
+      t.columns.push(col);
+    }
+    const fkCols = cols.filter((c) => c.ref);
+    if (fkCols.length) t.fks.push({ columns: fkCols.map((c) => c.name), ref: fkCols[0].ref });
+    return cols.map((c) => c.name);
+  };
+
+  // An objectification first, its players' objectifications before it
+  // (C04's Fulfillment objectifies a fact type OrderLine plays in), since
+  // its key decides how every other table references it.
+  const settle = (ftId, visiting = new Set()) => {
+    const t = tables.get(objectifier.get(ftId));
+    if (t.settled || visiting.has(ftId)) return;
+    visiting.add(ftId);
+    const ft = ftById.get(ftId);
+    const roles = ft.roles ?? [];
+    for (const r of roles) {
+      for (const [other, entityId] of objectifier) {
+        if (entityId === r.player) settle(other, visiting);
+      }
+    }
+    const players = roles.map((r) => ids.get(r.player));
+    const repeated = (p) => players.filter((q) => q === p).length > 1;
+    const roleColumns = new Map();
+    roles.forEach((r, i) => {
+      const p = players[i];
+      if (!p) return;
+      const extra = { factType: ft, roles: [r.id], role: r.role_name, nullable: false };
+      const base = repeated(p)
+        ? `${columnName(r.role_name)}_${columnName(p.name)}`
+        : columnName(p.name);
+      const cols = p.kind === "entity"
+        ? referenceColumns(tables.get(p.id), base, extra)
+        : [{ name: base, valueType: p, check: p.value_constraint?.values ?? null, ...extra }];
+      roleColumns.set(r.id, addColumns(t, cols));
+    });
+    const chosen = uniquenesses(ft).find((u) => u.is_preferred) ?? uniquenesses(ft)[0];
+    const keyed = (chosen?.roles ?? []).flatMap((id) => roleColumns.get(id) ?? []);
+    t.pk.push(...(keyed.length ? keyed : [...roleColumns.values()].flat()));
+    t.objectifies = ft;
+    t.settled = true;
+  };
+  for (const ftId of objectifier.keys()) settle(ftId);
 
   for (const ft of factTypes(doc)) {
+    if (objectifier.has(ft.id)) continue;
     const roles = ft.roles ?? [];
     const players = roles.map((r) => ids.get(r.player));
     if (players.some((p) => !p)) continue;
-    const uniq = (ft.constraints ?? []).filter((c) => c.type === "internal_uniqueness");
+    const uniq = uniquenesses(ft);
     const mandatoryRoles = new Set(
       (ft.constraints ?? []).filter((c) => c.type === "mandatory").map((c) => c.role),
     );
@@ -82,63 +173,82 @@ export function relationalView(doc) {
       const single0 = uniq.some((u) => u.roles?.length === 1 && u.roles[0] === r0.id);
       const single1 = uniq.some((u) => u.roles?.length === 1 && u.roles[0] === r1.id);
       const preferred = uniq.find((u) => u.is_preferred);
+      const both = [r0.id, r1.id];
       if (p0.kind === "entity" && p1.kind === "value" && single0) {
         const t = tables.get(p0.id);
         const col = {
           name: columnName(p1.name),
           valueType: p1,
           factType: ft,
+          roles: both,
+          role: r0.role_name,
           nullable: !mandatoryRoles.has(r0.id),
           check: p1.value_constraint?.values ?? null,
         };
-        t.columns.push(col);
+        addColumns(t, [col]);
         if (
           preferred
           || p1.name.replace(/[^a-z]/gi, "").toLowerCase()
             === (p0.reference_mode ?? "").replace(/[^a-z]/gi, "").toLowerCase()
         ) {
-          t.pk.push(col.name);
+          // An objectification is keyed on its roles; its own identifier
+          // is still an identifier, so it is unique.
+          if (t.objectifies) t.uniques.push([col.name]);
+          else t.pk.push(col.name);
         }
         continue;
       }
+      // A reference to the table's own entity is named after its role
+      // wherever it lands: `determination_case_id` inside Determination's
+      // own table would read as its key.
+      const self = p0.id === p1.id;
       if (p0.kind === "entity" && p1.kind === "entity" && single0) {
-        const t = tables.get(p0.id);
-        const col = {
-          name: `${columnName(p1.name)}_id`,
-          ref: tables.get(p1.id),
-          factType: ft,
-          nullable: !mandatoryRoles.has(r0.id),
-        };
-        t.columns.push(col);
-        t.fks.push({ column: col.name, ref: tables.get(p1.id) });
+        addColumns(
+          tables.get(p0.id),
+          referenceColumns(
+            tables.get(p1.id),
+            self ? `${columnName(r0.role_name)}_${columnName(p1.name)}` : columnName(p1.name),
+            {
+              factType: ft,
+              roles: both,
+              role: r0.role_name,
+              nullable: !mandatoryRoles.has(r0.id),
+            },
+          ),
+        );
         continue;
       }
       if (p1.kind === "entity" && p0.kind === "entity" && single1) {
-        const t = tables.get(p1.id);
-        const col = {
-          name: `${columnName(p0.name)}_id`,
-          ref: tables.get(p0.id),
-          factType: ft,
-          nullable: !mandatoryRoles.has(r1.id),
-        };
-        t.columns.push(col);
-        t.fks.push({ column: col.name, ref: tables.get(p0.id) });
+        addColumns(
+          tables.get(p1.id),
+          referenceColumns(
+            tables.get(p0.id),
+            self ? `${columnName(r1.role_name)}_${columnName(p0.name)}` : columnName(p0.name),
+            {
+              factType: ft,
+              roles: both,
+              role: r1.role_name,
+              nullable: !mandatoryRoles.has(r1.id),
+            },
+          ),
+        );
         continue;
       }
       if (p0.kind === "value" && p1.kind === "entity" && single1) {
-        const t = tables.get(p1.id);
-        const col = {
+        addColumns(tables.get(p1.id), [{
           name: columnName(p0.name),
           valueType: p0,
           factType: ft,
+          roles: both,
+          role: r1.role_name,
           nullable: !mandatoryRoles.has(r1.id),
           check: p0.value_constraint?.values ?? null,
-        };
-        t.columns.push(col);
+        }]);
         continue;
       }
     }
-    // Many-to-many or n-ary: its own table with one column per role.
+    // Many-to-many or n-ary: its own table with one column per role (more
+    // than one for a role whose player is keyed on several).
     const t = {
       id: ft.id,
       entity: null,
@@ -149,20 +259,19 @@ export function relationalView(doc) {
       checks: [],
       uniques: [],
     };
-    roles.forEach((r, i) => {
+    const repeated = (p) => players.filter((q) => q === p).length > 1;
+    const roleColumns = roles.map((r, i) => {
       const p = players[i];
-      const name = p.kind === "entity" ? `${columnName(p.name)}_id` : columnName(p.name);
-      const col = p.kind === "entity"
-        ? { name, ref: tables.get(p.id), factType: ft, nullable: false }
-        : {
-          name,
-          valueType: p,
-          factType: ft,
-          nullable: false,
-          check: p.value_constraint?.values ?? null,
-        };
-      t.columns.push(col);
-      if (p.kind === "entity") t.fks.push({ column: name, ref: tables.get(p.id) });
+      const extra = { factType: ft, roles: [r.id], role: r.role_name, nullable: false };
+      const base = repeated(p)
+        ? `${columnName(r.role_name)}_${columnName(p.name)}`
+        : columnName(p.name);
+      return addColumns(
+        t,
+        p.kind === "entity"
+          ? referenceColumns(tables.get(p.id), base, extra)
+          : [{ name: base, valueType: p, check: p.value_constraint?.values ?? null, ...extra }],
+      );
     });
     // Keyed on the fact type's preferred (else first) uniqueness, else on
     // every role. It was every role whatever the kernel said, so C06's
@@ -172,9 +281,9 @@ export function relationalView(doc) {
     // it (barwise-1077 triage).
     const chosen = uniq.find((u) => u.is_preferred) ?? uniq[0];
     const keyed = chosen
-      ? roles.flatMap((r, i) => ((chosen.roles ?? []).includes(r.id) ? [t.columns[i].name] : []))
+      ? roles.flatMap((r, i) => ((chosen.roles ?? []).includes(r.id) ? roleColumns[i] : []))
       : [];
-    t.pk.push(...(keyed.length ? keyed : t.columns.map((c) => c.name)));
+    t.pk.push(...(keyed.length ? keyed : roleColumns.flat()));
     tables.set(ft.id, t);
   }
   // Every entity table needs a key; a subtype inherits its supertype's.
@@ -189,8 +298,9 @@ export function relationalView(doc) {
           nullable: false,
           inherited: true,
         };
+        renameClash(t, col.name);
         t.columns.unshift(col);
-        t.fks.push({ column: col.name, ref: supTable });
+        t.fks.push({ columns: [col.name], ref: supTable });
         t.pk.push(col.name);
       } else {
         const col = {
@@ -209,23 +319,24 @@ export function relationalView(doc) {
   // table's UNIQUE clause. The generator used to write none, so an
   // acceptance check for "the combination of Study, Site and SubjectNumber
   // is unique" graded an artifact that never stated it (barwise-1077).
-  const columnOfRole = new Map();
+  const columnsOfRole = new Map();
   for (const t of tables.values()) {
-    t.columns.forEach((col, i) => {
-      const ft = t.entity ? col.factType : t.factType;
-      if (!ft) return;
-      const roles = t.entity ? (ft.roles ?? []) : [ft.roles?.[i]].filter(Boolean);
-      for (const r of roles) columnOfRole.set(r.id, { table: t, column: col.name });
-    });
+    for (const col of t.columns) {
+      for (const r of col.roles ?? []) {
+        const at = columnsOfRole.get(r) ?? { table: t, columns: [] };
+        at.columns.push(col.name);
+        columnsOfRole.set(r, at);
+      }
+    }
   }
   for (const ft of factTypes(doc)) {
     for (const c of ft.constraints ?? []) {
       // A deontic uniqueness is an obligation a row may break: an enforced
       // UNIQUE would reject what the model allows (PR #601 review).
       if (c.type !== "external_uniqueness" || c.modality === "deontic") continue;
-      const at = (c.roles ?? []).map((id) => columnOfRole.get(id));
+      const at = (c.roles ?? []).map((id) => columnsOfRole.get(id));
       if (at.length < 2 || at.some((x) => !x) || at.some((x) => x.table !== at[0].table)) continue;
-      at[0].table.uniques.push(at.map((x) => x.column));
+      at[0].table.uniques.push(at.flatMap((x) => x.columns));
     }
   }
   return [...tables.values()];

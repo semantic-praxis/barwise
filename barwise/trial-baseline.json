@@ -252,13 +252,6 @@
       "note": "Edit distance to acceptance on a dbt project. Nothing is declared not_expressible for dbt: a singular test is SQL, so even a ring constraint can be stated (PR #575 review). What remains are checks the round trip does not carry: rings, multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn).",
       "detail": "2 of 10 persona checks fail: The model does not verbalize as \"It is obligatory that each Reserve is approved by at least one Adjuster.\". Check the fact type, its reading, and its constraints.; The model has no fact type connecting \"Subrogation\" and \"Contact\"."
     },
-    "C03/small/6/acceptance:policy-admin-dba:pc-ddl": {
-      "severity": "S5",
-      "class": "acceptance-skin-generator-objectification",
-      "issue": "barwise-rlv",
-      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's ir-analyst also fails a subtype check, which is barwise-1078.",
-      "detail": "1 of 10 persona checks fail: The model does not verbalize as \"The combination of PolicyNumber and Term is unique across fact types.\". Check the fact type, its reading, and its constraints. (20 names mapped through the skin)"
-    },
     "C03/small/6/release-bundle:gym-list": {
       "severity": "S3",
       "class": "bundle-gym-catalog",
@@ -919,24 +912,10 @@
     },
     "C10/small/6/acceptance:ir-analyst:sis-ddl": {
       "severity": "S5",
-      "class": "acceptance-skin-generator-objectification",
-      "issue": "barwise-rlv",
-      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's ir-analyst also fails a subtype check, which is barwise-1078.",
-      "detail": "2 of 9 persona checks fail: The model does not verbalize as \"GraduateStudent is a subtype of Student.\". Check the fact type, its reading, and its constraints.; The model does not verbalize as \"Enrollment is where Student enrolls in CourseSection for Term.\". Check the fact type, its reading, and its "
-    },
-    "C10/small/6/acceptance:registrar-data-steward:sis-ddl": {
-      "severity": "S5",
-      "class": "acceptance-skin-generator-objectification",
-      "issue": "barwise-rlv",
-      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's ir-analyst also fails a subtype check, which is barwise-1078.",
-      "detail": "2 of 9 persona checks fail: The model has no fact type connecting \"Course\" and \"Course\".; The model does not verbalize as \"Each combination of Student, CourseSection and Term is unique in Student enrolls in CourseSection for Term.\". Check the fact type, its reading, and its constraints. (27 names ma"
-    },
-    "C10/small/6/acceptance:sis-dba:sis-ddl": {
-      "severity": "S5",
-      "class": "acceptance-skin-generator-objectification",
-      "issue": "barwise-rlv",
-      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's sis-dba fails because the file creates SPRIDEN twice, once for Person and once as a skin extra table, so the grader maps neither (PR #611 review). C10's ir-analyst also fails a subtype check, which is barwise-1078.",
-      "detail": "4 of 9 persona checks fail: The model has no object type named \"Person\".; The model has no fact type connecting \"Person\" and \"Pidm\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Person has Pidm\"), so it cannot rule out: Rules out: two facts of Person has P"
+      "class": "acceptance-subtype-key-reference",
+      "issue": "barwise-1078",
+      "note": "Edit distance to acceptance on C10's Banner DDL, graded with its names mapped through the skin (barwise-d60) and generated with one table per objectification (barwise-rlv). What remains is GRADUATE_SGBSTDN, keyed on SGBSTDN_ID referencing SGBSTDN: the import keeps the key and not the reference, so \"GraduateStudent is a subtype of Student.\" has nothing to verbalize (barwise-1078).",
+      "detail": "1 of 9 persona checks fail: The model does not verbalize as \"GraduateStudent is a subtype of Student.\". Check the fact type, its reading, and its constraints. (27 names mapped through the skin)"
     },
     "C10/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -1119,20 +1098,6 @@
       "issue": "barwise-s4x",
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
-    },
-    "C12/small/6/acceptance:modernization-architect:modern-ddl": {
-      "severity": "S5",
-      "class": "acceptance-skin-generator-objectification",
-      "issue": "barwise-rlv",
-      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's ir-analyst also fails a subtype check, which is barwise-1078.",
-      "detail": "1 of 10 persona checks fail: The model does not verbalize as \"Determination is where Case is determined for Program in CertificationPeriod.\". Check the fact type, its reading, and its constraints. (55 names mapped through the skin)"
-    },
-    "C12/small/6/acceptance:policy-analyst:modern-ddl": {
-      "severity": "S5",
-      "class": "acceptance-skin-generator-objectification",
-      "issue": "barwise-rlv",
-      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's ir-analyst also fails a subtype check, which is barwise-1078.",
-      "detail": "1 of 9 persona checks fail: The model does not verbalize as \"Each combination of Case, Program and CertificationPeriod is unique in Case is determined for Program in CertificationPeriod.\". Check the fact type, its reading, and its constraints. (55 names mapped through the skin)"
     },
     "C12/small/6/release-bundle:gym-list": {
       "severity": "S3",

@@ -74,15 +74,18 @@ export function generateDbt(doc, skin, dir, { factor = 1, artifactId = "dbt" } =
       const dropKey = keyless < (skin.models_without_keys ?? 0) && t.entity;
       const cols = t.columns.map((c) => {
         const tests = [];
+        // A column of a composite key is not unique by itself; a test that
+        // said so would state a constraint the model does not have.
         const isPk = t.pk.includes(c.name);
-        if (isPk && !dropKey) tests.push("unique", "not_null");
+        if (isPk && t.pk.length === 1 && !dropKey) tests.push("unique", "not_null");
+        else if (isPk) tests.push("not_null");
         else if (!c.nullable) tests.push("not_null");
         if (c.check) tests.push({ accepted_values: { values: c.check.slice(0, 20).map(String) } });
         if (c.ref) {
           tests.push({
             relationships: {
               to: `ref('stg_${tableName(c.ref)}${sfx}')`,
-              field: c.ref.pk[0] ?? "id",
+              field: c.refColumn ?? c.ref.pk[0] ?? "id",
             },
           });
         }
@@ -94,11 +97,20 @@ export function generateDbt(doc, skin, dir, { factor = 1, artifactId = "dbt" } =
         keyless++;
         manifest.keyless.push(stg);
       }
-      staging.models.push({
+      const model = {
         name: stg,
         description: t.entity ? `Staging for ${t.entity}` : `Staging for ${t.factType.name}`,
         columns: cols,
-      });
+      };
+      // A key of several columns is one model-level test, the way a dbt
+      // project states it; per-column unique tests said each column was a
+      // key by itself, which the kernel never did (barwise-rlv).
+      if (t.pk.length > 1 && !dropKey) {
+        model.tests = [{
+          "dbt_utils.unique_combination_of_columns": { combination_of_columns: t.pk },
+        }];
+      }
+      staging.models.push(model);
       manifest.models.push({
         name: stg,
         source: t.entity ?? t.factType.name,
@@ -111,7 +123,11 @@ export function generateDbt(doc, skin, dir, { factor = 1, artifactId = "dbt" } =
           : `{{ ${mac}(this) }}`
       ).join("\n    ");
       const sql = [
-        `{{ config(materialized='incremental', unique_key='${t.pk[0] ?? columns[0]}') }}`,
+        `{{ config(materialized='incremental', unique_key=${
+          t.pk.length > 1
+            ? `[${t.pk.map((c) => `'${c}'`).join(", ")}]`
+            : `'${t.pk[0] ?? columns[0]}'`
+        }) }}`,
         ``,
         `with src as (`,
         `    select`,

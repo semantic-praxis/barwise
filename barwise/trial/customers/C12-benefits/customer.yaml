@@ -25,6 +25,14 @@ personas:
     judges: [mainframe-ddl, modern-ddl]
     not_expressible:
       - artifact_kind: ddl
+        check: { sentence: "Each combination of Case, Program and CertificationPeriod is unique in Case is determined for Program in CertificationPeriod." }
+        reason: >-
+          DDL states table and column names, never a predicate reading: a
+          vendor's table for this fact is named after its entity or its
+          dictionary code, so the import can only call the relationship
+          "{0}, {1} and {2} have <table>". No schema states the reading this
+          sentence is worded around. (barwise-rlv)
+      - artifact_kind: ddl
         check: { sentence: "It is obligatory that each Determination cites at least one StatuteReference." }
         reason: >-
           DDL has no deontic modality: a constraint is enforced or it is not, so
@@ -57,6 +65,14 @@ personas:
     acceptance: personas/modernization-architect.gym.yaml
     judges: [mainframe-ddl, modern-ddl]
     not_expressible:
+      - artifact_kind: ddl
+        check: { sentence: "Determination is where Case is determined for Program in CertificationPeriod." }
+        reason: >-
+          DDL states table and column names, never a predicate reading: a
+          vendor's table for this fact is named after its entity or its
+          dictionary code, so the import can only call the relationship
+          "{0}, {1} and {2} have <table>". No schema states the reading this
+          sentence is worded around. (barwise-rlv)
       - artifact_kind: ddl
         check: { factType: "Determination supersedes Determination", constraint: "ring" }
         reason: >-

@@ -17,6 +17,15 @@ personas:
     wants: Enrollment is an objectified fact, terms are not semesters, and the prerequisite chain cannot loop.
     acceptance: personas/registrar-data-steward.gym.yaml
     judges: [sis-ddl]
+    not_expressible:
+      - artifact_kind: ddl
+        check: { sentence: "Each combination of Student, CourseSection and Term is unique in Student enrolls in CourseSection for Term." }
+        reason: >-
+          DDL states table and column names, never a predicate reading: a
+          vendor's table for this fact is named after its entity or its
+          dictionary code, so the import can only call the relationship
+          "{0}, {1} and {2} have <table>". No schema states the reading this
+          sentence is worded around. (barwise-rlv)
   - id: sis-dba
     name: Derek Okonkwo
     role: SIS database administrator
@@ -29,6 +38,15 @@ personas:
     wants: Student, section and term line up so a headcount by campus and term is a path query, not a guess.
     acceptance: personas/ir-analyst.gym.yaml
     judges: [sis-ddl]
+    not_expressible:
+      - artifact_kind: ddl
+        check: { sentence: "Enrollment is where Student enrolls in CourseSection for Term." }
+        reason: >-
+          DDL states table and column names, never a predicate reading: a
+          vendor's table for this fact is named after its entity or its
+          dictionary code, so the import can only call the relationship
+          "{0}, {1} and {2} have <table>". No schema states the reading this
+          sentence is worded around. (barwise-rlv)
   - id: financial-aid-director
     name: Marcus Bell
     role: Financial-aid director
