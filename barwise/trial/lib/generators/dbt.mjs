@@ -97,11 +97,20 @@ export function generateDbt(doc, skin, dir, { factor = 1, artifactId = "dbt" } =
         keyless++;
         manifest.keyless.push(stg);
       }
-      staging.models.push({
+      const model = {
         name: stg,
         description: t.entity ? `Staging for ${t.entity}` : `Staging for ${t.factType.name}`,
         columns: cols,
-      });
+      };
+      // A key of several columns is one model-level test, the way a dbt
+      // project states it; per-column unique tests said each column was a
+      // key by itself, which the kernel never did (barwise-rlv).
+      if (t.pk.length > 1 && !dropKey) {
+        model.tests = [{
+          "dbt_utils.unique_combination_of_columns": { combination_of_columns: t.pk },
+        }];
+      }
+      staging.models.push(model);
       manifest.models.push({
         name: stg,
         source: t.entity ?? t.factType.name,
@@ -114,7 +123,11 @@ export function generateDbt(doc, skin, dir, { factor = 1, artifactId = "dbt" } =
           : `{{ ${mac}(this) }}`
       ).join("\n    ");
       const sql = [
-        `{{ config(materialized='incremental', unique_key='${t.pk[0] ?? columns[0]}') }}`,
+        `{{ config(materialized='incremental', unique_key=${
+          t.pk.length > 1
+            ? `[${t.pk.map((c) => `'${c}'`).join(", ")}]`
+            : `'${t.pk[0] ?? columns[0]}'`
+        }) }}`,
         ``,
         `with src as (`,
         `    select`,

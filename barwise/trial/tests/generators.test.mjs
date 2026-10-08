@@ -7,11 +7,13 @@
  * are not tables at all.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
+import { generateDbt } from "../lib/generators/dbt.mjs";
 import { generateDdl } from "../lib/generators/ddl.mjs";
 
 const customers = join(dirname(fileURLToPath(import.meta.url)), "../customers");
@@ -246,4 +248,21 @@ test("a skin's extra table that has a generated table's name is refused", () => 
       }),
     /extra table leg has the name of a generated table/,
   );
+});
+
+test("dbt states a key of several columns as one model test, not as unique columns", () => {
+  const dir = mkdtempSync(join(tmpdir(), "dbt-composite-"));
+  generateDbt(objectificationKernel(), { adapter: "postgres" }, dir);
+  const schema = parse(readFileSync(join(dir, "models/staging/schema.yml"), "utf8"));
+  const period = schema.models.find((m) => m.name === "stg_policy_period");
+  assert.deepEqual(period.tests, [
+    {
+      "dbt_utils.unique_combination_of_columns": {
+        combination_of_columns: ["policy_id", "term_id"],
+      },
+    },
+  ]);
+  for (const c of period.columns.filter((c) => ["policy_id", "term_id"].includes(c.name))) {
+    assert.ok(!c.tests.includes("unique"), c.name);
+  }
 });

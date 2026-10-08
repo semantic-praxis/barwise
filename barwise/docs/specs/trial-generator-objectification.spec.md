@@ -1,6 +1,6 @@
 # The trial's DDL generator states what the kernel states: one table per objectification, one name per column
 
-Status: Draft -- no workstream implemented
+Status: Implemented -- the one workstream landed with this spec
 Created: 2026-10-08
 Last-updated: 2026-10-08
 Tracking: barwise-rlv (decided by the requester on 2026-10-08: key the
@@ -80,11 +80,17 @@ is the role the entity plays ("Leg departs from Port" gives
 self-references are 12 of the 14 tables, and the other two are a
 different cause with the same symptom.
 
-`generateDdl` then refuses (throws) when an emitted table still declares
-a column twice, after the skin's casing, abbreviation and truncation,
-since C12's 8-character truncation can make two distinct names one. A
-generator that cannot write a valid table says so rather than writing an
-invalid one.
+A self-reference is named after its role even with no clash:
+`determination_case_id` inside Determination's own table would read as
+its key.
+
+The skin's naming can still make two names one after this: C12 cuts
+every identifier to 8 characters, so the three
+`supersedes_determination_*` columns all become `SUPERSED`.
+`generateDdl` numbers the tail (`SUPERSED`, `SUPERSE2`, `SUPERSE3`),
+as a mainframe schema tool does, and settles every table's identifiers
+before writing any, so a foreign key in another table names the same
+columns.
 
 ## How are colliding extra tables handled? (resolved: refused, and C10's replaced)
 
@@ -126,8 +132,11 @@ In scope:
   (dbt).
 - When two columns of one table would share a name, the one from a
   role shall be named after that role.
-- When an emitted table declares a column twice, or a skin's extra
-  table has a generated table's name, `generateDdl` shall throw.
+- When the skin's naming makes two column identifiers of one table
+  alike, `generateDdl` shall number them apart within the identifier
+  limit.
+- When a skin's extra table has a generated table's name,
+  `generateDdl` shall throw.
 - C10's skin shall carry extra tables that collide with nothing.
 - The four checks above shall be declared `not_expressible` for `ddl`.
 
@@ -150,11 +159,39 @@ would reclassify rows twice.
 Tests in `trial/tests/generators.test.mjs`: an objectification becomes
 one table keyed on its roles with the own identifier `UNIQUE`; a
 reference to it is a composite foreign key; a self-reference and a
-two-role player are named after their roles; a duplicate column after
-truncation throws; a colliding extra table throws.
+two-role player are named after their roles; names truncation makes
+alike are numbered apart and references follow; a colliding extra table
+throws; dbt states a key of several columns as one model test.
 
 Acceptance: over the regenerated small tier, no generated table declares
 a column twice and no file creates a table twice; the six barwise-rlv
 rows pass or fail only on a cause that is not the generator's, and each
 is reclassified to that cause; barwise-rlv's class and findings
 directory are removed.
+
+## Implementation notes
+
+Measured over the regenerated small tier, 2026-10-08.
+
+- **Five of the six barwise-rlv rows pass**: C03 policy-admin-dba, C10
+  registrar-data-steward and sis-dba, C12 modernization-architect and
+  policy-analyst. C10's ir-analyst fails one check, "GraduateStudent is a
+  subtype of Student.", which is barwise-1078 (a primary key that is also
+  a foreign key) and is reclassified there. No other step newly fails.
+- **The truncation refusal fired before the numbering existed.** The
+  first version threw when an emitted table declared a column twice, on
+  the reasoning that a generator should refuse what it cannot write
+  validly. C12's generation threw at once, on `SUPERSED`. A real
+  mainframe tool does not refuse; it numbers, so the generator does too,
+  and the throw went: numbering leaves no case for it to catch.
+- **dbt had the same defect one layer over, and fixing it exposed an
+  importer gap.** The dbt generator built from the same view and tested
+  every column of a composite key as `unique` by itself, a constraint
+  the kernel never states. Removing that and writing the key as one
+  `dbt_utils.unique_combination_of_columns` test, as a dbt project does,
+  turned three dbt imports (C03, C04, C11) from PASS to REFUSED: the dbt
+  importer identifies a model's key only from a column with both
+  `unique` and `not_null`, so a composite-key model is skipped and named
+  on stderr. The earlier passes rested on the false per-column tests,
+  which made the importer take the first key column as the whole key.
+  That is the composite-key gap barwise-nkn already tracks.
