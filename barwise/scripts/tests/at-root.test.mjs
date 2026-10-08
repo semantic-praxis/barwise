@@ -14,6 +14,8 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -51,5 +53,42 @@ test("a real script runs in barwise/ and reports the same result from every cwd"
   const results = CWDS.map((cwd) => run(cwd, "check:root-scripts"));
   for (const [i, r] of results.entries()) {
     assert.equal(r.status, 0, `cwd ${CWDS[i]}: ${r.stdout}\n${r.stderr}`);
+  }
+});
+
+test("a caller's leading -- is dropped, so both spellings reach the script identically", () => {
+  // at-root adds its own `--`, and a caller who also typed one used to
+  // pass a literal `--` through: audit-corrections then read it as its
+  // mode, ran in survey mode, wrote nothing and exited 0 (barwise-2lz).
+  // A sandbox copy of the wrapper beside a stub package.json whose script
+  // prints its argv shows exactly what the script receives.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-at-root-"));
+  try {
+    mkdirSync(join(dir, "scripts"));
+    copyFileSync(AT_ROOT, join(dir, "scripts", "at-root.mjs"));
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({
+        name: "at-root-probe",
+        private: true,
+        scripts: { argv: "node argv.mjs" },
+      }),
+    );
+    writeFileSync(join(dir, "argv.mjs"), "console.log(JSON.stringify(process.argv.slice(2)));\n");
+    const wrapper = join(dir, "scripts", "at-root.mjs");
+    const argvOf = (...args) => {
+      const r = spawnSync(process.execPath, [wrapper, "argv", ...args], {
+        cwd: dir,
+        encoding: "utf8",
+      });
+      assert.equal(r.status, 0, r.stderr);
+      return JSON.parse(r.stdout.trim().split("\n").at(-1));
+    };
+    assert.deepEqual(argvOf("--write"), ["--write"]);
+    assert.deepEqual(argvOf("--", "--write"), ["--write"]);
+    assert.deepEqual(argvOf("--", "--write", "--", "x"), ["--write", "--", "x"]);
+    assert.deepEqual(argvOf(), []);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });

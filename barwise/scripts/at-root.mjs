@@ -26,7 +26,16 @@ import { fileURLToPath } from "node:url";
 
 const BARWISE = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-const [script, ...args] = process.argv.slice(2);
+// One leading `--` from the caller is dropped, because this file adds its
+// own. Callers copy the npm spelling (`npm run x -- --write`), and without
+// this the script received a literal `--` first: `audit-corrections` reads
+// its mode positionally, fell through to survey mode, wrote nothing and
+// exited 0, and `check:beads` reported "no such file: --" (barwise-2lz).
+// Fixing it here rather than in each script covers every script at once,
+// including ones not written yet. The cost is that a script cannot receive
+// a literal leading `--` through this wrapper; none takes one.
+const [script, ...rawArgs] = process.argv.slice(2);
+const args = rawArgs[0] === "--" ? rawArgs.slice(1) : rawArgs;
 if (!script || script === "--help" || script === "-h") {
   process.stderr.write(
     "usage: node barwise/scripts/at-root.mjs <npm-script> [args...]\n"
