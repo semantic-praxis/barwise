@@ -61,7 +61,12 @@ gh release create v1.3.0 --title "v1.3.0" --generate-notes
 ```
 
 `--generate-notes` builds the changelog from merged PRs since the last
-tag. Check that `gh` is on PATH first; the GitHub MCP tools can read
+tag. A PR list does not tell a user what to do about a breaking change,
+so changes that need explanation are written ahead of time in
+`barwise/docs/release-notes/unreleased.md`. If that file exists, rename
+it to `<version>.md` in the bump commit and add
+`--notes-file barwise/docs/release-notes/<version>.md`; gh combines it
+with the generated changelog. Check that `gh` is on PATH first; the GitHub MCP tools can read
 releases but not create one. The `release.yml` workflow then builds and attaches
 the artifacts: the VS Code extension (`.vsix`), the standalone CLI
 bundle (`barwise-cli-<ver>.cjs`), the MCP server bundle
