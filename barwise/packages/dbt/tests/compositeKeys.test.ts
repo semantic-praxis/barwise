@@ -224,4 +224,64 @@ models:
       "The register a reading comes from.",
     );
   });
+
+  it("skips a composite that references a skipped composite, leaving no orphan entity", () => {
+    // offering references course, which has no key; waitlist_slot references
+    // offering. Checked one level deep, waitlist_slot was admitted because
+    // offering had a valid combination, though offering itself was then
+    // skipped (PR #621 review).
+    const { model, report } = importDbtProject([`
+models:
+  - name: course
+    columns:
+      - name: course_id
+        data_tests: [not_null]
+  - name: section
+    columns:
+      - name: crn
+        data_tests: [unique, not_null]
+  - name: offering
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [course_id, crn]
+    columns:
+      - name: course_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('course')", field: course_id }
+      - name: crn
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('section')", field: crn }
+  - name: waitlist_slot
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [course_id, slot]
+    columns:
+      - name: course_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('offering')", field: course_id }
+      - name: slot
+        data_tests: [not_null]
+      - name: note
+`]);
+    const names = model.objectTypes.map((o) => o.name);
+    expect(names).not.toContain("Offering");
+    expect(names).not.toContain("WaitlistSlot");
+    expect(JSON.stringify(report)).toContain(
+      `references model \\"offering\\", which has no identifiable key`,
+    );
+  });
+
+  it("does not read a combination that repeats a column as a key", () => {
+    const repeated = yaml.replace(
+      "combination_of_columns: [course_id, crn]",
+      "combination_of_columns: [course_id, course_id]",
+    );
+    expect(repeated).not.toEqual(yaml);
+    const { model, report } = importDbtProject([repeated]);
+    expect(model.objectifiedFactTypes).toEqual([]);
+    expect(JSON.stringify(report)).not.toContain("Composite key (");
+  });
 });

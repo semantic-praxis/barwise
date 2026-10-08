@@ -1,6 +1,6 @@
 # A table keyed on several columns imports as the fact type it states
 
-Status: Implemented -- both workstreams landed together
+Status: Implemented -- both workstreams landed together; requirement 6 holds for every shape but one, which waits on barwise-f2n (implementation notes)
 Created: 2026-10-08
 Last-updated: 2026-10-08
 Tracking: barwise-2z1 (DDL); barwise-nkn, its composite-key part (dbt)
@@ -248,5 +248,14 @@ Measured over the regenerated small tier, 2026-10-08.
   on the dbt side, which must leave out `not_null` or make the column
   the key; the two sides described different schemas. The DDL side is
   now nullable too.
+- **Requirement 6 has one exception, and it is not this rule's.** A
+  composite-key table that another table references through a composite
+  foreign key is objectified as specified, but that referencing table
+  imports its composite foreign key as one reference per column, and each
+  export adds another (barwise-f2n). So that shape's test
+  (`compositeKeyTables.test.ts`, "a table another table references")
+  asserts the import and does not round-trip; every other shape in the
+  table round-trips with and without annotations. The test goes back to
+  `roundTrips` when barwise-f2n lands (PR #621 review).
 - **One PR, not two.** The plan put each importer in its own PR; the
   drift test needs both, so they landed together.

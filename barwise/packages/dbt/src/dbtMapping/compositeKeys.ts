@@ -46,7 +46,8 @@ export function candidateKeysOf(m: DbtModel): string[][] {
   const keys: string[][] = [];
   for (const test of m.modelTests) {
     const names = combinationOf(test);
-    if (!names || names.length < 2) continue;
+    // Repeated names are one column, not a combination (PR #621 review).
+    if (!names || names.length < 2 || new Set(names).size !== names.length) continue;
     const columns = names.map((n) => m.columns.find((c) => c.name === n));
     if (!columns.every((c) => c !== undefined && hasTest(c, "not_null"))) continue;
     if (!columns.some((c) => findRelationshipTest(c!) !== undefined)) continue;
@@ -81,6 +82,12 @@ export function analyzeComposites(ctx: DbtMapperContext): void {
   const referenced = new Set(
     [...ctx.relMap.values()].flatMap((rels) => rels.map((r) => r.targetModelName)),
   );
+  const pending = new Map<string, {
+    m: DbtModel;
+    key: string[];
+    roles: string[][];
+    objectified: boolean;
+  }>();
   for (const m of ctx.doc.models) {
     if (ctx.pkMap.has(m.name)) continue;
     const key = compositeKeyOf(m);
@@ -98,35 +105,49 @@ export function analyzeComposites(ctx: DbtMapperContext): void {
     const roles = (extra ? [...key, extra] : key).map((c) => [c]);
     const valueBinary = roles.length === 2 && roles.filter((r) => relCols.has(r[0]!)).length === 1;
     const remaining = others.length - (extra ? 1 : 0);
-    // Every reference among the roles must reach a model with a key of its
-    // own, a single column or a combination this rule reads. Otherwise the
-    // fact type cannot be built, and admitting the model would create its
-    // objectifier anyway: an entity with an invented key and nothing to
-    // objectify (PR #621 review). It is reported and skipped instead, as
-    // any model with no identifiable key is.
-    const rels = ctx.relMap.get(m.name) ?? [];
-    const unreachable = roles.flat().map((c) => rels.find((r) => r.columnName === c))
-      .find((rel) => {
-        if (!rel) return false;
-        const target = ctx.doc.models.find((t) => t.name === rel.targetModelName);
-        return !target || !(ctx.pkMap.has(target.name) || compositeKeyOf(target) !== undefined);
-      });
-    if (unreachable) {
+    pending.set(m.name, {
+      m,
+      key,
+      roles,
+      objectified: referenced.has(m.name) || remaining > 0 || valueBinary,
+    });
+  }
+
+  // Every reference among a model's roles must reach a model with a key:
+  // a single column, or a composite that is itself admitted. Otherwise the
+  // fact type cannot be built, and admitting the model would create its
+  // objectifier anyway: an entity with an invented key and nothing to
+  // objectify (PR #621 review). Settled to a fixed point, since dropping
+  // one composite can strand another that references it; models that
+  // reference each other in a cycle all stay.
+  const unreachable = (name: string) => {
+    const { roles } = pending.get(name)!;
+    const rels = ctx.relMap.get(name) ?? [];
+    return roles.flat().map((c) => rels.find((r) => r.columnName === c)).find((rel) =>
+      rel !== undefined && !ctx.pkMap.has(rel.targetModelName) && !pending.has(rel.targetModelName)
+    );
+  };
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const name of [...pending.keys()]) {
+      const rel = unreachable(name);
+      if (!rel) continue;
+      const { key } = pending.get(name)!;
+      pending.delete(name);
+      changed = true;
       ctx.report.gap(
         "identifier",
-        m.name,
+        name,
         `Composite key (${
           key.join(", ")
-        }): column "${unreachable.columnName}" references model "${unreachable.targetModelName}", which has no identifiable key, so the fact type cannot be built and the model is skipped.`,
-        unreachable.columnName,
+        }): column "${rel.columnName}" references model "${rel.targetModelName}", which has no identifiable key, so the fact type cannot be built and the model is skipped.`,
+        rel.columnName,
       );
-      continue;
     }
-    const info: CompositeInfo = {
-      roles,
-      key,
-      objectified: referenced.has(m.name) || remaining > 0 || valueBinary,
-    };
+  }
+
+  for (const { m, key, roles, objectified } of pending.values()) {
+    const info: CompositeInfo = { roles, key, objectified };
     ctx.compositeMap.set(m.name, info);
     ctx.report.info(
       "identifier",
