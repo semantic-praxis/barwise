@@ -76,13 +76,23 @@ test("gradeImport: a fact table comes back as its fact type, an entity table doe
       { name: "COURSE_IS_PREREQUISITE_OF_COURSE", kind: "fact", importable: true },
     ],
   };
-  const summary = (names, factTypeNames) => ({ objectTypes: names.length, names, factTypeNames });
+  // A fact type as the importers write it: its name and its readings.
+  const summary = (names, facts) => ({
+    objectTypes: names.length,
+    names,
+    factTypeNames: facts.map((f) => f.name),
+    factTypeReadings: facts.flatMap((f) => f.readings),
+  });
+  const prereq = {
+    name: "Course and Course course is prerequisite of course",
+    readings: ["{0} and {1} have course is prerequisite of course"],
+  };
   assert.equal(
     gradeImport(
       ok,
       m,
       "import",
-      summary(["Patient"], ["Course and Course course is prerequisite of course"]),
+      summary(["Patient"], [prereq]),
     )
       .status,
     "pass",
@@ -94,7 +104,10 @@ test("gradeImport: a fact table comes back as its fact type, an entity table doe
       tables: [{ name: "patient", kind: "entity", importable: true }],
     },
     "import",
-    summary(["Doctor"], ["Doctor and Doctor patient"]),
+    summary(["Doctor"], [{
+      name: "Doctor and Doctor patient",
+      readings: ["{0} and {1} have patient"],
+    }]),
   );
   assert.equal(entityAsFact.status, "fail");
   // The dbt manifest carries the kind too (PR #621 review): a fact model
@@ -103,18 +116,44 @@ test("gradeImport: a fact table comes back as its fact type, an entity table doe
     generator: "dbt",
     models: [{ name: "stg_course_is_prerequisite_of_course", kind, keyless: false }],
   });
-  // A fact type whose name only ends in the table's letters is not it:
-  // "Customer places Preorder" is not the fact table "order".
+  // A fact type whose name only ends in the table's word is not it:
+  // "Customer places Preorder", nor "Customer places Order", is the fact
+  // table ORDER; only the importers' "{0} and {1} have order" is.
   const order = { generator: "ddl", tables: [{ name: "ORDER", kind: "fact", importable: true }] };
   assert.equal(
-    gradeImport(ok, order, "import", summary(["Customer"], ["Customer places Preorder"])).status,
+    gradeImport(
+      ok,
+      order,
+      "import",
+      summary(["Customer"], [{ name: "Customer places Preorder", readings: ["{0} places {1}"] }]),
+    ).status,
     "fail",
   );
   assert.equal(
-    gradeImport(ok, order, "import", summary(["Customer"], ["Customer and Product order"])).status,
+    gradeImport(
+      ok,
+      order,
+      "import",
+      summary(["Customer"], [{ name: "Customer places Order", readings: ["{0} places {1}"] }]),
+    ).status,
+    "fail",
+  );
+  assert.equal(
+    gradeImport(
+      ok,
+      order,
+      "import",
+      summary(["Customer"], [{
+        name: "Customer and Product order",
+        readings: ["{0} and {1} have order"],
+      }]),
+    ).status,
     "pass",
   );
-  const ring = summary([], ["Course and Course course is prerequisite of course"]);
+  const ring = summary([], [{
+    ...prereq,
+    readings: ["{0} and {1} have stg course is prerequisite of course"],
+  }]);
   assert.equal(gradeImport(ok, dbt("fact"), "import", { ...ring, objectTypes: 1 }).status, "pass");
   assert.equal(
     gradeImport(ok, dbt("entity"), "import", { ...ring, objectTypes: 1 }).status,

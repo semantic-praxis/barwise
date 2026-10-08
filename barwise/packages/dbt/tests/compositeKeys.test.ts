@@ -308,4 +308,32 @@ models:
 `]);
     expect(JSON.stringify(report)).toMatch(/Column \\"readAt\\" will export as/);
   });
+
+  it("skips a composite whose roles reference the model itself", () => {
+    // It would be identified through its own objectifier: core rejects that
+    // as an identification cycle (PR #621 review).
+    const { model, report } = importDbtProject([`
+models:
+  - name: course
+    columns:
+      - name: course_id
+        data_tests: [unique, not_null]
+  - name: offering
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [course_id, prior_course_id]
+    columns:
+      - name: course_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('course')", field: course_id }
+      - name: prior_course_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('offering')", field: course_id }
+      - name: room
+`]);
+    expect(model.objectTypes.map((o) => o.name)).not.toContain("Offering");
+    expect(JSON.stringify(report)).toContain("so it would be identified through itself");
+  });
 });

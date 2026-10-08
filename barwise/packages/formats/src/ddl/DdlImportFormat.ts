@@ -181,6 +181,48 @@ export class DdlImportFormat implements ImportFormat {
     // same unqualified name is skipped with the duplicate warning rather
     // than colliding with the first one's fact type later (PR #621 review).
     const plainKeys = new Set<string>();
+    // Every unannotated table's composite reading, decided before any is
+    // used, so a reading whose key roles reach back to its own table --
+    // directly, or through other composite readings -- can be declined
+    // first: it would identify the table's objectifier through itself,
+    // which core rejects as an identification cycle (PR #621 review). A
+    // declined table keeps today's reading, as requirement 4 keeps any.
+    const composite = new Map<string, CompositeReading>();
+    for (const table of tables) {
+      if (annotations.tables.get(tableKey(table.name)) !== undefined) continue;
+      const r = compositeReading(table, referenced.has(tableKey(table.name)));
+      if (r) composite.set(tableKey(table.name), r);
+    }
+    const compositeTargets = (key: string): string[] => {
+      const table = tables.find((t) => tableKey(t.name) === key)!;
+      return composite.get(key)!.roles.flatMap((cols) => {
+        const fk = table.foreignKeys.find((f) =>
+          f.columns.length === cols.length && f.columns.every((c) => cols.includes(c))
+        );
+        const target = fk && tableKey(fk.referencedTable);
+        return target && composite.has(target) ? [target] : [];
+      });
+    };
+    const cyclic = [...composite.keys()].filter((start) => {
+      const seen = new Set<string>();
+      const stack = compositeTargets(start);
+      while (stack.length > 0) {
+        const next = stack.pop()!;
+        if (next === start) return true;
+        if (seen.has(next)) continue;
+        seen.add(next);
+        stack.push(...compositeTargets(next));
+      }
+      return false;
+    });
+    for (const key of cyclic) {
+      composite.delete(key);
+      warnings.push(
+        `Table "${tables.find((t) => tableKey(t.name) === key)!.name}": its composite key `
+          + `references this table again, directly or through other composite keys, so it is `
+          + `not read as a fact type; it would be identified through itself.`,
+      );
+    }
     for (const table of tables) {
       const found = annotations.tables.get(tableKey(table.name));
       if (found?.kind === "factTable") {
@@ -198,9 +240,7 @@ export class DdlImportFormat implements ImportFormat {
         entityName = annotation.entity;
       }
       const annotated = annotation?.entity === entityName ? annotation : undefined;
-      const reading = annotation === undefined
-        ? compositeReading(table, referenced.has(tableKey(table.name)))
-        : undefined;
+      const reading = annotation === undefined ? composite.get(tableKey(table.name)) : undefined;
       if (
         plainKeys.has(tableKey(table.name))
         || (reading && !reading.objectified && entityMap.has(tableKey(table.name)))

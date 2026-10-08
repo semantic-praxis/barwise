@@ -106,14 +106,20 @@ export function gradeImport(result, manifest, expect, modelSummary) {
   // words>" (composite-key-tables.spec.md), or, as it used to, as an
   // entity objectifying it. Either names the table; only an object type
   // used to count, so the correct reading was graded as a silent drop.
-  // Compared as whole words, not normalised strings: endsWith over "order"
-  // matched "Customer places Preorder" (PR #621 review), the same false
-  // positive the object-type comparison below guards against.
-  const factWords = (modelSummary?.factTypeNames ?? []).map(words);
-  const endsWithWords = (f, t) =>
-    t.length > 0 && f.length >= t.length && t.every((w, i) => f[f.length - t.length + i] === w);
+  // Matched by the reading both importers give such a fact type,
+  // "{0} and {1} have <table words>", with the table's words exactly: a
+  // name that merely ends in them ("Customer places Order" for a table
+  // ORDER) is another fact, and suffix matching on names could not tell
+  // the two apart (PR #621 review). A dbt model's staging prefix, which
+  // expectedNames strips, is stripped from the reading too.
+  const tableFacts = (modelSummary?.factTypeReadings ?? []).flatMap((r) => {
+    const m = /^\{\d+\}(?:,? (?:and )?\{\d+\})+ have (.+)$/.exec(r);
+    if (!m) return [];
+    const w = words(m[1]);
+    return [(w[0] === "stg" ? w.slice(1) : w).join("")];
+  });
   const missing = expected.filter((n) =>
-    !(n.kind === "fact" && factWords.some((f) => endsWithWords(f, words(n.raw))))
+    !(n.kind === "fact" && tableFacts.includes(words(n.raw).join("")))
     && !got.has(n.norm)
     && !gotRaw.some((g) =>
       prefixStripped(g).has(n.norm) || prefixStripped(n.raw).has(norm(g)) && norm(g).length > 3

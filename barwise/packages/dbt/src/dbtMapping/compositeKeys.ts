@@ -118,8 +118,7 @@ export function analyzeComposites(ctx: DbtMapperContext): void {
   // fact type cannot be built, and admitting the model would create its
   // objectifier anyway: an entity with an invented key and nothing to
   // objectify (PR #621 review). Settled to a fixed point, since dropping
-  // one composite can strand another that references it; models that
-  // reference each other in a cycle all stay.
+  // one composite can strand another that references it.
   const unreachable = (name: string) => {
     const { roles } = pending.get(name)!;
     const rels = ctx.relMap.get(name) ?? [];
@@ -127,6 +126,44 @@ export function analyzeComposites(ctx: DbtMapperContext): void {
       rel !== undefined && !ctx.pkMap.has(rel.targetModelName) && !pending.has(rel.targetModelName)
     );
   };
+  // A composite whose roles reach back to itself, directly or through
+  // other composites, would be identified through its own objectifier:
+  // core rejects that model as an identification cycle (PR #621 review).
+  // Every member of such a cycle is reported and skipped first; the fixed
+  // point below then drops whatever depended on them.
+  const targets = (name: string) => {
+    const { roles } = pending.get(name)!;
+    const rels = ctx.relMap.get(name) ?? [];
+    return roles.flat().flatMap((c) => {
+      const rel = rels.find((r) => r.columnName === c);
+      return rel && pending.has(rel.targetModelName) ? [rel.targetModelName] : [];
+    });
+  };
+  const reachesItself = (start: string) => {
+    const seen = new Set<string>();
+    const stack = targets(start);
+    while (stack.length > 0) {
+      const next = stack.pop()!;
+      if (next === start) return true;
+      if (seen.has(next)) continue;
+      seen.add(next);
+      stack.push(...targets(next));
+    }
+    return false;
+  };
+  const cyclic = [...pending.keys()].filter(reachesItself);
+  for (const name of cyclic) {
+    const { key } = pending.get(name)!;
+    ctx.report.gap(
+      "identifier",
+      name,
+      `Composite key (${
+        key.join(", ")
+      }): its roles reference this model again, directly or through other composite keys, so it would be identified through itself; the model is skipped.`,
+    );
+  }
+  for (const name of cyclic) pending.delete(name);
+
   for (let changed = true; changed;) {
     changed = false;
     for (const name of [...pending.keys()]) {

@@ -9,8 +9,10 @@ In one sentence: when a table or dbt model is keyed on more than one
 column, the key is eligible under requirement 1 (at least one foreign
 key wholly inside it, none partly inside it, none sharing a column) and
 nothing annotates it, both importers read it as one fact type
-over its key columns plus, when exactly one other column remains and it
-is NOT NULL and not itself unique, that column, keyed on the key; any
+over its key columns plus, when exactly one other column remains that is
+not unique by itself (a column unique by itself is an alternate
+identifier and is not counted) and it is NOT NULL, that column, keyed on
+the key; any
 other shape makes the fact type over the key objectified by an entity
 named after the table, which carries the remaining columns as
 attributes.
@@ -77,13 +79,17 @@ referenced.
    inside it share no column, the DDL importer shall import one fact
    type whose roles are each such foreign key and each other key column,
    unique over the key's roles.
-2. When exactly one column remains beside the key, NOT NULL and not
-   unique by itself, and no other table references the table, the
-   importer shall add it as a further role, the
-   uniqueness still over the key's roles only.
+2. When, among the columns beside the key that are not unique by
+   themselves, exactly one remains, it is NOT NULL, and no other table
+   references the table, the importer shall add it as a further role,
+   the uniqueness still over the key's roles only. A column unique by
+   itself is not counted here: it is an alternate identifier under
+   requirement 3, so `quantity` beside C04's `line_id UNIQUE` still
+   widens the fact type (PR #621 review).
 3. Otherwise -- when a column remains beside the key that requirement 2
-   does not take (more than one remains, or the one is nullable or
-   unique by itself, or another table references the table), when
+   does not take (two or more columns that are not unique by themselves
+   remain, or the one is nullable, or a column unique by itself remains,
+   or another table references the table), when
    another table references the table, or when the fact type would be a
    binary over one foreign key and one value; requirement 3 is the
    fallback, so no table meets both it and requirement 2 (PR #620

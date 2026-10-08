@@ -5,7 +5,7 @@
  * export's annotations and without them -- so a shape the relational
  * mapper cannot write fails here rather than in a user's round trip.
  */
-import type { OrmModel } from "@barwise/core";
+import { type OrmModel, ValidationEngine } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { DdlExportFormat } from "../src/ddl/DdlExportFormat.js";
 import { DdlImportFormat } from "../src/ddl/DdlImportFormat.js";
@@ -256,6 +256,32 @@ describe("a composite-key table imports as the fact type it states", () => {
     const fact = model.factTypes.find((f) => / meter reading$/.test(f.name))!;
     expect(fact.roles).toHaveLength(3);
     expect(new Set(fact.roles.map((r) => r.playerId)).size).toBe(3);
+  });
+
+  it("a composite key that reaches back to its own table keeps today's reading", () => {
+    // A key of one foreign key and one value, where the foreign key
+    // references order_line itself through its alternate key: the reading
+    // would identify OrderLine through itself, which core rejects as an
+    // identification cycle (PR #621 review). Before this rule a key with a
+    // value in it was an entity, which is what it stays. (A key made only
+    // of foreign keys, one of them back to the table, was objectified by
+    // the older rule already, cycle and all, and is unchanged here.)
+    const { model, warnings } = ddl.parse(`CREATE TABLE order_line (
+        parent_line_id INT NOT NULL REFERENCES order_line (line_id),
+        seq INT NOT NULL,
+        line_id INT NOT NULL UNIQUE,
+        note VARCHAR(80),
+        PRIMARY KEY (parent_line_id, seq));`);
+    expect(model.objectifiedFactTypes).toEqual([]);
+    expect(
+      warnings.some((w) => /"order_line": its composite key references this table again/.test(w)),
+    )
+      .toBe(true);
+    expect(
+      new ValidationEngine().validate(model).filter((d) =>
+        d.ruleId === "structural/identification-cycle"
+      ),
+    ).toEqual([]);
   });
 
   it("a key that is one composite foreign key is not this rule: it is one role, not several", () => {

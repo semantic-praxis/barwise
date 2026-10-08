@@ -54,9 +54,17 @@ function modelSummaryOf(path) {
       factTypes: factTypes(doc).length,
       names: objectTypes(doc).map((o) => o.name),
       factTypeNames: factTypes(doc).map((f) => f.name),
+      factTypeReadings: factTypes(doc).flatMap((f) => (f.readings ?? []).map(String)),
     };
   } catch (e) {
-    return { objectTypes: 0, factTypes: 0, names: [], factTypeNames: [], unreadable: e.message };
+    return {
+      objectTypes: 0,
+      factTypes: 0,
+      names: [],
+      factTypeNames: [],
+      factTypeReadings: [],
+      unreadable: e.message,
+    };
   }
 }
 
