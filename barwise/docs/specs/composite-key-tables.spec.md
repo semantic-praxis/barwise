@@ -118,7 +118,9 @@ referenced.
    which is preferred, so the importer shall read none of them as the
    key, keep today's reading, and report the model naming each
    combination (PR #620 review). A DDL table has one PRIMARY KEY, so the
-   case is dbt's alone.
+   case is dbt's alone. A combination test read as the key shall not
+   also be reported as a model-level custom test needing manual review;
+   one that is not read as the key still is (PR #620 review).
 6. For each shape in the table above, a DDL import exported and imported
    again, with and without the export's annotations, shall give the same
    object types, fact types, role players, uniquenesses and
@@ -175,7 +177,8 @@ importer per row dbt can state (not the composite-foreign-key row:
 dbt's `relationships` test is per column, so it cannot say several
 columns form one reference -- barwise-tjg); a dbt test that a
 model with two qualifying combination tests keeps today's reading and
-is reported; the
+is reported; a dbt report assertion that the consumed combination test
+draws no manual-review warning; the
 drift test in `@barwise/cli`, the one package that depends on both --
 the two packages keep their own code, and the drift test is what fails
 when they diverge, as CLAUDE.md requires of must-agree copies (PR #620

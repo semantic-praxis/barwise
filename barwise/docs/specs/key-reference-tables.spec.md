@@ -177,13 +177,17 @@ round-trips: the mapper writes exactly this shape for a subtype.
    #620 review). The entry's columns locate the link and are checked
    against the DDL: they must be a declared foreign key, in full, to the
    table of the named supertype. An entry that fails the check is
-   dropped with a warning naming it, and the table is read by
-   requirements 1-3 -- an annotation is used only while it describes
-   the DDL (ddl-round-trip-fixed-point.spec.md). Columns of an entry
-   that passes are the subtype link, not a relationship. Requirements
-   1-3 do not apply to a table whose annotation carries `supertypes`,
-   empty or not: an empty list says barwise wrote the table and it is
-   no subtype, so the naming rule must not invent one.
+   dropped with a warning naming it -- that entry alone; the others
+   are read as usual (PR #620 review) -- since an annotation is used
+   only while it describes the DDL (ddl-round-trip-fixed-point.spec.md).
+   Columns of an entry that passes are the subtype link, not a
+   relationship. Requirements 1-3 do not apply to a table whose
+   annotation carries `supertypes`, with one exception: when the list
+   was non-empty and every entry was dropped, the annotation no longer
+   says anything about the table's parents, and requirements 1-3 apply
+   as to an unannotated table. An empty list as written says barwise
+   wrote the table and it is no subtype, so the naming rule must not
+   invent one.
    4b. When a table's annotation has no `supertypes` (an export from
    before this spec), requirements 1-3 apply to it as to an
    unannotated table.
@@ -241,13 +245,18 @@ foreign key and one other foreign key; today's reading), a two-parent
 control for requirement 2 (both parents qualify, neither
 imported), an annotation whose columns no longer form the foreign key
 (dropped with a warning, the table read by requirements 1-3), an
+annotation with one valid and one stale entry (the stale one dropped,
+the valid one imported, requirements 1-3 not applied), an
 objectified entity whose identifying subtype fact is exported as a
 non-key foreign key (re-imported with `providesIdentification` true),
 an empty `supertypes` on a same-noun vertical partition (no subtype
 invented), and a test that an annotation's `supertypes` wins over
 a table name that fails the naming rule. The trial
-generator writing the extension tables' `FOREIGN KEY`, which its
-manifest already records (`trial/lib/generators/ddl.mjs`), with a
+generator writing the extension tables' `FOREIGN KEY` over the parent's
+complete key -- today it copies only the first key column, so C01's
+two-column Admission key would not be a shared-key reference, and the
+manifest records the same partial key (PR #620 review); the generator
+and the manifest both copy every key column -- (`trial/lib/generators/ddl.mjs`), with a
 generator test that each extension table's DDL carries it -- without
 it the extension-table rows above are unmeasured; then a trial run, the
 extension tables' result recorded in this spec's implementation notes,

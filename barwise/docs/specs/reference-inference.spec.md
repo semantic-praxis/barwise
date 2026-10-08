@@ -87,8 +87,13 @@ something it did not (PR #620 review). The refusal has its own test.
    candidates. A table that matches by name but not by type is no
    candidate: `site_id INT` beside `sites.site_id INT` and
    `legacy_sites.site_id UUID` infers `sites` (PR #620 review).
-4. When a matching column is in `T`'s primary key, the importer shall
-   infer nothing for it and shall warn that it is a candidate.
+4. When a column in `T`'s primary key with no declared foreign key
+   meets the other criteria of requirement 2 for one or more tables,
+   the importer shall infer nothing for it and shall warn that it is a
+   candidate, naming every such table. A column with a declared foreign
+   key is never a candidate, key column or not, and draws no inference
+   warning (PR #620 review). Requirements 2 and 3 cover only columns
+   outside the primary key.
 5. When the flag is given to `import model` with a format other than
    `ddl`, the command shall exit non-zero with a message naming the
    formats that accept it.
