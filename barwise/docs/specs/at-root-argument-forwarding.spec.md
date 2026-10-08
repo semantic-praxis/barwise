@@ -1,6 +1,6 @@
 # at-root.mjs forwards arguments the same way whichever spelling the caller uses
 
-Status: Implemented -- workstream 1 (PR #613)
+Status: Implemented -- workstream 1 (PR #613; this spec followed in a later PR)
 
 Created: 2026-10-08
 Last-updated: 2026-10-08
