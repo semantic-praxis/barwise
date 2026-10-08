@@ -163,4 +163,65 @@ models:
     expect(values).toHaveLength(1);
     expect(values[0]).toMatchObject({ values: ["A", "B"] });
   });
+
+  it("is skipped and reported, with no entity, when a role references a model with no key", () => {
+    // The objectifier used to be created before the fact type was known to
+    // be buildable, leaving an entity with an invented key (PR #621 review).
+    const { model, report } = importDbtProject([`
+models:
+  - name: course
+    columns:
+      - name: course_id
+        data_tests: [not_null]
+  - name: section
+    columns:
+      - name: crn
+        data_tests: [unique, not_null]
+  - name: offering
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [course_id, crn]
+    columns:
+      - name: course_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('course')", field: course_id }
+      - name: crn
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('section')", field: crn }
+      - name: room
+        data_tests: [not_null]
+      - name: seats
+`]);
+    expect(model.objectTypes.some((o) => o.name === "Offering")).toBe(false);
+    expect(JSON.stringify(report)).toContain(
+      `column \\"course_id\\" references model \\"course\\", which has no identifiable key`,
+    );
+  });
+
+  it("describes a value role's value type as any column's", () => {
+    const { model } = importDbtProject([`
+models:
+  - name: meter
+    columns:
+      - name: meter_id
+        data_tests: [unique, not_null]
+  - name: meter_reading
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [meter_id, channel]
+    columns:
+      - name: meter_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('meter')", field: meter_id }
+      - name: channel
+        description: The register a reading comes from.
+        data_tests: [not_null]
+`]);
+    expect(model.getObjectTypeByName("Channel")?.definition).toBe(
+      "The register a reading comes from.",
+    );
+  });
 });

@@ -103,6 +103,17 @@ test("gradeImport: a fact table comes back as its fact type, an entity table doe
     generator: "dbt",
     models: [{ name: "stg_course_is_prerequisite_of_course", kind, keyless: false }],
   });
+  // A fact type whose name only ends in the table's letters is not it:
+  // "Customer places Preorder" is not the fact table "order".
+  const order = { generator: "ddl", tables: [{ name: "ORDER", kind: "fact", importable: true }] };
+  assert.equal(
+    gradeImport(ok, order, "import", summary(["Customer"], ["Customer places Preorder"])).status,
+    "fail",
+  );
+  assert.equal(
+    gradeImport(ok, order, "import", summary(["Customer"], ["Customer and Product order"])).status,
+    "pass",
+  );
   const ring = summary([], ["Course and Course course is prerequisite of course"]);
   assert.equal(gradeImport(ok, dbt("fact"), "import", { ...ring, objectTypes: 1 }).status, "pass");
   assert.equal(

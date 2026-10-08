@@ -67,6 +67,23 @@ const keyed = (name: string, key: string[], columns: string) =>
 
 const cases: { name: string; ddl: string; dbt: string; }[] = [
   {
+    // The first shape of the spec: nothing beside the key, nothing
+    // referencing it, so an unobjectified many-to-many (PR #621 review).
+    name: "nothing beside the key, nothing referencing it",
+    ddl: `CREATE TABLE course (course_id INT PRIMARY KEY);
+      CREATE TABLE course_prerequisite (
+        course_id INT NOT NULL REFERENCES course (course_id),
+        requires_course_id INT NOT NULL REFERENCES course (course_id),
+        PRIMARY KEY (course_id, requires_course_id));`,
+    dbt: `models:\n${dbtModel("course", "course_id", "")}${
+      keyed(
+        "course_prerequisite",
+        ["course_id", "requires_course_id"],
+        ref("course_id", "course", "course_id") + ref("requires_course_id", "course", "course_id"),
+      )
+    }`,
+  },
+  {
     name: "one NOT NULL column beside the key",
     ddl: `CREATE TABLE coverage (coverage_id INT PRIMARY KEY);
       CREATE TABLE risk (risk_id INT PRIMARY KEY);

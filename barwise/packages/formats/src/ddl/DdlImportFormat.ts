@@ -177,6 +177,10 @@ export class DdlImportFormat implements ImportFormat {
     const referenced = new Set(
       tables.flatMap((t) => t.foreignKeys.map((fk) => tableKey(fk.referencedTable))),
     );
+    // Every table key a plain fact table took, so a second table with the
+    // same unqualified name is skipped with the duplicate warning rather
+    // than colliding with the first one's fact type later (PR #621 review).
+    const plainKeys = new Set<string>();
     for (const table of tables) {
       const found = annotations.tables.get(tableKey(table.name));
       if (found?.kind === "factTable") {
@@ -197,8 +201,19 @@ export class DdlImportFormat implements ImportFormat {
       const reading = annotation === undefined
         ? compositeReading(table, referenced.has(tableKey(table.name)))
         : undefined;
+      if (
+        plainKeys.has(tableKey(table.name))
+        || (reading && !reading.objectified && entityMap.has(tableKey(table.name)))
+      ) {
+        warnings.push(
+          `Table "${table.name}": another table already imports as "${entityName}" `
+            + `(two schemas can declare one name); not imported.`,
+        );
+        continue;
+      }
       if (reading) readings.set(table, reading);
       if (reading && !reading.objectified) {
+        plainKeys.add(tableKey(table.name));
         plainFactTables.push(table);
         continue;
       }

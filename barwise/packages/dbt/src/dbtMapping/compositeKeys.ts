@@ -12,7 +12,12 @@
 
 import { type Constraint, generateId } from "@barwise/core";
 import type { DbtModel, DbtTest } from "../DbtSchemaTypes.js";
-import { claimValueType, resolveColumnType } from "./columnTypes.js";
+import {
+  claimValueType,
+  reportColumnType,
+  resolveColumnDescription,
+  resolveColumnType,
+} from "./columnTypes.js";
 import { findRelationshipTest, hasTest } from "./constraints.js";
 import type { CompositeInfo, DbtMapperContext } from "./context.js";
 import { toPascalCase } from "./naming.js";
@@ -93,6 +98,30 @@ export function analyzeComposites(ctx: DbtMapperContext): void {
     const roles = (extra ? [...key, extra] : key).map((c) => [c]);
     const valueBinary = roles.length === 2 && roles.filter((r) => relCols.has(r[0]!)).length === 1;
     const remaining = others.length - (extra ? 1 : 0);
+    // Every reference among the roles must reach a model with a key of its
+    // own, a single column or a combination this rule reads. Otherwise the
+    // fact type cannot be built, and admitting the model would create its
+    // objectifier anyway: an entity with an invented key and nothing to
+    // objectify (PR #621 review). It is reported and skipped instead, as
+    // any model with no identifiable key is.
+    const rels = ctx.relMap.get(m.name) ?? [];
+    const unreachable = roles.flat().map((c) => rels.find((r) => r.columnName === c))
+      .find((rel) => {
+        if (!rel) return false;
+        const target = ctx.doc.models.find((t) => t.name === rel.targetModelName);
+        return !target || !(ctx.pkMap.has(target.name) || compositeKeyOf(target) !== undefined);
+      });
+    if (unreachable) {
+      ctx.report.gap(
+        "identifier",
+        m.name,
+        `Composite key (${
+          key.join(", ")
+        }): column "${unreachable.columnName}" references model "${unreachable.targetModelName}", which has no identifiable key, so the fact type cannot be built and the model is skipped.`,
+        unreachable.columnName,
+      );
+      continue;
+    }
     const info: CompositeInfo = {
       roles,
       key,
@@ -149,8 +178,12 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
           : ctx.model.addObjectType({
             name: claim.name,
             kind: "value",
+            // Described as the ordinary value-column path describes it
+            // (valueTypes.ts; PR #621 review).
+            definition: resolveColumnDescription(ctx, m.name, col),
             ...(resolved.dataType ? { dataType: resolved.dataType } : {}),
           }).id;
+        if (claim.kind !== "share") reportColumnType(ctx, m.name, col, resolved);
       }
       const roleId = generateId();
       roles.push({ id: roleId, name: "is in", playerId });

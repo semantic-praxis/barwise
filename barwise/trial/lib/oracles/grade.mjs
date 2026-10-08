@@ -106,9 +106,14 @@ export function gradeImport(result, manifest, expect, modelSummary) {
   // words>" (composite-key-tables.spec.md), or, as it used to, as an
   // entity objectifying it. Either names the table; only an object type
   // used to count, so the correct reading was graded as a silent drop.
-  const factNames = (modelSummary?.factTypeNames ?? []).map(norm);
+  // Compared as whole words, not normalised strings: endsWith over "order"
+  // matched "Customer places Preorder" (PR #621 review), the same false
+  // positive the object-type comparison below guards against.
+  const factWords = (modelSummary?.factTypeNames ?? []).map(words);
+  const endsWithWords = (f, t) =>
+    t.length > 0 && f.length >= t.length && t.every((w, i) => f[f.length - t.length + i] === w);
   const missing = expected.filter((n) =>
-    !(n.kind === "fact" && factNames.some((f) => f.endsWith(n.norm)))
+    !(n.kind === "fact" && factWords.some((f) => endsWithWords(f, words(n.raw))))
     && !got.has(n.norm)
     && !gotRaw.some((g) =>
       prefixStripped(g).has(n.norm) || prefixStripped(n.raw).has(norm(g)) && norm(g).length > 3
@@ -143,6 +148,12 @@ export function gradeImport(result, manifest, expect, modelSummary) {
       } of them are not mentioned on stderr (${Math.round(share * 100)}% silently dropped)`,
     evidence,
   };
+}
+
+/** A name's words, lower case: `COURSE_IS_PREREQUISITE_OF_COURSE`, `CourseIsPrerequisite` and "course is prerequisite" agree. */
+function words(name) {
+  return String(name).replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/)
+    .filter(Boolean);
 }
 
 function expectedNames(manifest) {

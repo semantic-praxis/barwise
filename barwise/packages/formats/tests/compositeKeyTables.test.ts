@@ -72,6 +72,23 @@ describe("a composite-key table imports as the fact type it states", () => {
     roundTrips(sql);
   });
 
+  it("a second schema's table of the same name is skipped with the duplicate warning", () => {
+    // Without the reservation the second plain fact table collided with the
+    // first one's fact type later and became a spurious entity (PR #621 review).
+    const prerequisite = (schema: string) =>
+      `CREATE TABLE ${schema}.course_prerequisite (
+        course_id INT NOT NULL REFERENCES course (course_id),
+        requires_course_id INT NOT NULL REFERENCES course (course_id),
+        PRIMARY KEY (course_id, requires_course_id));`;
+    const { model, warnings } = ddl.parse(`CREATE TABLE course (course_id INT PRIMARY KEY);
+      ${prerequisite("a")} ${prerequisite("b")}`);
+    expect(model.objectTypes.filter((o) => o.kind === "entity").map((o) => o.name)).toEqual([
+      "Course",
+    ]);
+    expect(model.factTypes.filter((f) => / course prerequisite$/.test(f.name))).toHaveLength(1);
+    expect(warnings.filter((w) => /two schemas can declare one name/.test(w))).toHaveLength(1);
+  });
+
   it("one NOT NULL column beside the key: a fact type over the key and it, unique on the key", () => {
     // C03's "For each Coverage and Risk combination, at most one
     // PolicyPeriod applies" needs the ternary.
