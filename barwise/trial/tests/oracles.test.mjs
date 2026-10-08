@@ -150,6 +150,23 @@ test("gradeImport: a fact table comes back as its fact type, an entity table doe
     ).status,
     "pass",
   );
+  // Only dbt strips a staging prefix; a DDL table may be named STG_ORDER.
+  const stgOrder = {
+    generator: "ddl",
+    tables: [{ name: "STG_ORDER", kind: "fact", importable: true }],
+  };
+  assert.equal(
+    gradeImport(
+      ok,
+      stgOrder,
+      "import",
+      summary(["Customer", "Product"], [{
+        name: "Customer and Product stg order",
+        readings: ["{0} and {1} have stg order"],
+      }]),
+    ).status,
+    "pass",
+  );
   const ring = summary([], [{
     ...prereq,
     readings: ["{0} and {1} have stg course is prerequisite of course"],

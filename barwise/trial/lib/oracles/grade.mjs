@@ -110,13 +110,16 @@ export function gradeImport(result, manifest, expect, modelSummary) {
   // "{0} and {1} have <table words>", with the table's words exactly: a
   // name that merely ends in them ("Customer places Order" for a table
   // ORDER) is another fact, and suffix matching on names could not tell
-  // the two apart (PR #621 review). A dbt model's staging prefix, which
-  // expectedNames strips, is stripped from the reading too.
+  // the two apart (PR #621 review). For dbt only, the staging prefix that
+  // expectedNames strips from model names is stripped from the reading
+  // too; a DDL table may well be named STG_ORDER (PR #621 review).
   const tableFacts = (modelSummary?.factTypeReadings ?? []).flatMap((r) => {
     const m = /^\{\d+\}(?:,? (?:and )?\{\d+\})+ have (.+)$/.exec(r);
     if (!m) return [];
     const w = words(m[1]);
-    return [(w[0] === "stg" ? w.slice(1) : w).join("")];
+    return manifest.generator === "dbt" && w[0] === "stg"
+      ? [w.join(""), w.slice(1).join("")]
+      : [w.join("")];
   });
   const missing = expected.filter((n) =>
     !(n.kind === "fact" && tableFacts.includes(words(n.raw).join("")))

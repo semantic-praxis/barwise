@@ -187,14 +187,22 @@ export class DdlImportFormat implements ImportFormat {
     // first: it would identify the table's objectifier through itself,
     // which core rejects as an identification cycle (PR #621 review). A
     // declined table keeps today's reading, as requirement 4 keeps any.
-    const composite = new Map<string, CompositeReading>();
+    // Keyed by unqualified name, like the entity map, so only the first
+    // table of a name is read here: a later one from another schema is
+    // the duplicate the loop below skips, and must not overwrite the first
+    // one's reading (PR #621 review).
+    const firstOfKey = new Map<string, ParsedTable>();
     for (const table of tables) {
-      if (annotations.tables.get(tableKey(table.name)) !== undefined) continue;
-      const r = compositeReading(table, referenced.has(tableKey(table.name)));
-      if (r) composite.set(tableKey(table.name), r);
+      if (!firstOfKey.has(tableKey(table.name))) firstOfKey.set(tableKey(table.name), table);
+    }
+    const composite = new Map<string, CompositeReading>();
+    for (const [key, table] of firstOfKey) {
+      if (annotations.tables.get(key) !== undefined) continue;
+      const r = compositeReading(table, referenced.has(key));
+      if (r) composite.set(key, r);
     }
     const compositeTargets = (key: string): string[] => {
-      const table = tables.find((t) => tableKey(t.name) === key)!;
+      const table = firstOfKey.get(key)!;
       return composite.get(key)!.roles.flatMap((cols) => {
         const fk = table.foreignKeys.find((f) =>
           f.columns.length === cols.length && f.columns.every((c) => cols.includes(c))
@@ -218,7 +226,7 @@ export class DdlImportFormat implements ImportFormat {
     for (const key of cyclic) {
       composite.delete(key);
       warnings.push(
-        `Table "${tables.find((t) => tableKey(t.name) === key)!.name}": its composite key `
+        `Table "${firstOfKey.get(key)!.name}": its composite key `
           + `references this table again, directly or through other composite keys, so it is `
           + `not read as a fact type; it would be identified through itself.`,
       );
@@ -240,7 +248,9 @@ export class DdlImportFormat implements ImportFormat {
         entityName = annotation.entity;
       }
       const annotated = annotation?.entity === entityName ? annotation : undefined;
-      const reading = annotation === undefined ? composite.get(tableKey(table.name)) : undefined;
+      const reading = annotation === undefined && firstOfKey.get(tableKey(table.name)) === table
+        ? composite.get(tableKey(table.name))
+        : undefined;
       if (
         plainKeys.has(tableKey(table.name))
         || (reading && !reading.objectified && entityMap.has(tableKey(table.name)))

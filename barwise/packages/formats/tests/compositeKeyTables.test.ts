@@ -89,6 +89,28 @@ describe("a composite-key table imports as the fact type it states", () => {
     expect(warnings.filter((w) => /two schemas can declare one name/.test(w))).toHaveLength(1);
   });
 
+  it("the first schema's table of a name is read by its own shape, not the second's", () => {
+    // a.link is an all-FK many-to-many; b.link has a column beside its key.
+    // Keyed by unqualified name, the second table's reading overwrote the
+    // first's before the duplicate guard ran (PR #621 review).
+    const { model, warnings } = ddl.parse(`CREATE TABLE course (course_id INT PRIMARY KEY);
+      CREATE TABLE a.link (
+        course_id INT NOT NULL REFERENCES course (course_id),
+        requires_course_id INT NOT NULL REFERENCES course (course_id),
+        PRIMARY KEY (course_id, requires_course_id));
+      CREATE TABLE b.link (
+        course_id INT NOT NULL REFERENCES course (course_id),
+        requires_course_id INT NOT NULL REFERENCES course (course_id),
+        note VARCHAR(40), weight INT,
+        PRIMARY KEY (course_id, requires_course_id));`);
+    expect(model.objectifiedFactTypes).toEqual([]);
+    expect(shape(model).factTypes).toContainEqual({
+      players: ["Course", "Course"],
+      uniques: [[0, 1]],
+    });
+    expect(warnings.filter((w) => /two schemas can declare one name/.test(w))).toHaveLength(1);
+  });
+
   it("one NOT NULL column beside the key: a fact type over the key and it, unique on the key", () => {
     // C03's "For each Coverage and Risk combination, at most one
     // PolicyPeriod applies" needs the ternary.
