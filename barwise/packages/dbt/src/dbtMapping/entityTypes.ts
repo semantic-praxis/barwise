@@ -8,10 +8,13 @@ import { inferModelDescription, toPascalCase } from "./naming.js";
 export function createEntityTypes(ctx: DbtMapperContext): void {
   for (const m of ctx.doc.models) {
     const pk = ctx.pkMap.get(m.name);
-    if (!pk) continue; // Skip models without identifiable PK.
+    const composite = ctx.compositeMap.get(m.name);
+    // A model with no identifiable key is skipped; a composite-key model
+    // needs an entity only to objectify its fact type.
+    if (!pk && !composite?.objectified) continue;
 
     const entityName = toPascalCase(m.name);
-    const refMode = pk.columnName;
+    const refMode = pk?.columnName ?? `${m.name}_id`;
 
     // Resolve description.
     const description = m.description ?? inferModelDescription(m.name);

@@ -25,6 +25,7 @@
 import type { OrmModel } from "@barwise/core";
 import type { DbtImportReport } from "./DbtImportReport.js";
 import { analyzeModels } from "./dbtMapping/analyze.js";
+import { analyzeComposites, createCompositeFactTypes } from "./dbtMapping/compositeKeys.js";
 import { createContext } from "./dbtMapping/context.js";
 import { createEntityTypes } from "./dbtMapping/entityTypes.js";
 import { reportColumnRenames } from "./dbtMapping/exportedColumns.js";
@@ -63,9 +64,11 @@ export function mapDbtToOrm(doc: DbtProjectDocument): DbtMapResult {
   const ctx = createContext(doc);
   indexSourceDataTypes(ctx);
   analyzeModels(ctx);
+  analyzeComposites(ctx);
   createEntityTypes(ctx);
   createIdentifierTypes(ctx);
   createValueTypes(ctx);
+  createCompositeFactTypes(ctx);
   createFactTypes(ctx);
   reportColumnRenames(ctx);
   return { model: ctx.model, report: ctx.report.build() };

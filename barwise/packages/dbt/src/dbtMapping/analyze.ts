@@ -2,6 +2,7 @@
  * Analysis phase: identify PKs, FKs, and custom tests across models.
  */
 
+import { compositeKeyOf } from "./compositeKeys.js";
 import { findRelationshipTest, hasTest } from "./constraints.js";
 import { type DbtMapperContext, type RelationshipInfo } from "./context.js";
 
@@ -23,7 +24,7 @@ export function analyzeModels(ctx: DbtMapperContext): void {
         `Primary identifier "${pkCol.name}" detected from unique + not_null tests.`,
         pkCol.name,
       );
-    } else {
+    } else if (!compositeKeyOf(m)) {
       ctx.report.gap(
         "identifier",
         m.name,
@@ -62,8 +63,14 @@ export function analyzeModels(ctx: DbtMapperContext): void {
     }
 
     // Report model-level custom tests.
+    // The combination test that names a composite key is read, not
+    // reviewed (compositeKeys.ts).
+    const keyTest = compositeKeyOf(m) !== undefined;
     for (const test of m.modelTests) {
-      if (test.type === "custom") {
+      if (
+        test.type === "custom"
+        && !(keyTest && test.name === "dbt_utils.unique_combination_of_columns")
+      ) {
         ctx.report.warning(
           "macro",
           m.name,

@@ -10,6 +10,7 @@ import {
   resolveColumnDescription,
   resolveColumnType,
 } from "./columnTypes.js";
+import { compositeRoleColumns } from "./compositeKeys.js";
 import type { DbtMapperContext } from "./context.js";
 import { toPascalCase } from "./naming.js";
 
@@ -21,12 +22,15 @@ export function createValueTypes(ctx: DbtMapperContext): void {
     const pk = ctx.pkMap.get(m.name);
     const rels = ctx.relMap.get(m.name) ?? [];
     const relColNames = new Set(rels.map((r) => r.columnName));
+    const roleCols = compositeRoleColumns(ctx, m.name);
     const entityName = toPascalCase(m.name);
 
     for (const col of m.columns) {
       // Skip PK column (identifierTypes.ts) and FK columns (factTypes.ts).
       if (col.name === pk?.columnName) continue;
       if (relColNames.has(col.name)) continue;
+      // A role of the fact type a composite key reads as (compositeKeys.ts).
+      if (roleCols.has(col.name)) continue;
 
       const resolved = resolveColumnType(ctx, col);
       const claim = claimValueType(ctx, entityName, entityId, col, resolved, "attribute");

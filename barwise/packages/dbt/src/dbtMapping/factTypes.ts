@@ -3,6 +3,7 @@
  */
 
 import { type Constraint, generateId } from "@barwise/core";
+import { compositeRoleColumns } from "./compositeKeys.js";
 import { buildConstraints, hasTest } from "./constraints.js";
 import type { DbtMapperContext } from "./context.js";
 import { toPascalCase } from "./naming.js";
@@ -13,13 +14,17 @@ export function createFactTypes(ctx: DbtMapperContext): void {
     if (!entityId) continue;
 
     const pk = ctx.pkMap.get(m.name);
-    const rels = ctx.relMap.get(m.name) ?? [];
+    // A role of the fact type a composite key reads as is that fact type's
+    // (compositeKeys.ts), not an attribute or a reference of the entity.
+    const roleCols = compositeRoleColumns(ctx, m.name);
+    const rels = (ctx.relMap.get(m.name) ?? []).filter((r) => !roleCols.has(r.columnName));
     const relColNames = new Set(rels.map((r) => r.columnName));
 
     // Create fact types for value columns.
     for (const col of m.columns) {
       if (col.name === pk?.columnName) continue;
       if (relColNames.has(col.name)) continue;
+      if (roleCols.has(col.name)) continue;
 
       const vtId = ctx.valueTypeIdMap.get(`${m.name}::${col.name}`);
       if (!vtId) continue;
