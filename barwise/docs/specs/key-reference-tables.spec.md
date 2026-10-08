@@ -35,7 +35,7 @@ to do with a fact the schema does not give.
 | `MED_ORDER`, `LAB_ORDER` (C01)                      | `ORDER`            | subtypes of Order                    | ORDER / ORDER                     | subtype, right       |
 | `SGBSTDN`, `PEBEMPL` (C10)                          | `SPRIDEN`          | Student, Employee subtypes of Person | SGBSTDN, PEBEMPL / SPRIDEN        | not a subtype, miss  |
 | `SIBINST` (C10)                                     | `PEBEMPL`          | Faculty subtype of Employee          | SIBINST / PEBEMPL                 | not a subtype, miss  |
-| 42 extension tables, `PAT_2` to `LAB_ORDER_3` (C01) | their base table   | the same entity, more columns        | 2 or 3 / the base's               | not a subtype, right |
+| 42 extension tables, `PAT_2` to `LAB_ORDER_3` (C01) | their base table\* | the same entity, more columns        | 2 or 3 / the base's               | not measured\*       |
 | `user_profiles` (barwise-1078's own example)        | `users`            | a one-to-one extension               | PROFILES / USERS                  | not a subtype, right |
 | `LEGACY_ORDER`, a copy of `ORDER` (test control)    | `ORDER`            | not a subtype                        | ORDER / ORDER                     | not a subtype, right |
 
@@ -47,11 +47,18 @@ has a false positive the trial cannot show: a prefix-qualified copy --
 parent's noun and is not a kind of it (PR #620 review). A copy repeats
 its parent's columns and a subtype adds its own, so the second condition
 separates them. Measured over the three customers with this shape, no
-real subtype repeats a parent column (11 of 11), the 42 extension
-tables fail the head noun before the second condition is reached, and
-the control fails the second. The three misses are C10's vendor
-dictionary codes, where no name carries the noun; they keep today's
-reading.
+real subtype repeats a parent column (11 of 11), and the control fails
+the second condition. The three misses are C10's vendor dictionary
+codes, where no name carries the noun; they keep today's reading.
+
+\*The extension tables are not evidence yet (PR #620 review). The trial
+generator writes them with a primary key and no `FOREIGN KEY`
+(`trial/lib/generators/ddl.mjs`, the `extension_tables` idiom); only its
+manifest records the reference. So no import has ever seen them as this
+shape, and an earlier draft's "42 extension tables rejected" was read
+off their names, not measured. By name they would fail the head noun --
+`PAT_2` ends in `2` -- but that is a prediction until the generator
+emits the reference and the trial is re-run, which is in scope below.
 
 **What neither condition can tell apart** (PR #620 review): a table
 keyed on its parent that holds rows for only some parents, with facts of
@@ -72,11 +79,11 @@ with an annotation, which is read first and is unaffected.
 
 ## Options
 
-| Option                                                                                                             | Subtype checks                       | Extension tables, copies                                                                                                                                                                                       | Cost                                                   |
-| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| A. always a subtype                                                                                                | pass                                 | wrong: `PAT_2` becomes a kind of PAT                                                                                                                                                                           | simplest; asserts "is a" the DDL never said            |
-| B. never a subtype: today's reading, the reference dropped with a warning; subtype checks declared not_expressible | out of reach                         | right                                                                                                                                                                                                          | no inference; known information loss until barwise-3pc |
-| C. the two-condition rule, today's reading otherwise (recommended)                                                 | pass except C10's three coded tables | right for the trial's 42 and for copies; wrong for a vertical partition named with its parent's noun (the documented false positive), which by hand can only be undone with the relationship until barwise-3pc | a naming heuristic, reported per table                 |
+| Option                                                                                                             | Subtype checks                       | Extension tables, copies                                                                                                                                                                                                                 | Cost                                                   |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| A. always a subtype                                                                                                | pass                                 | wrong: `PAT_2` becomes a kind of PAT                                                                                                                                                                                                     | simplest; asserts "is a" the DDL never said            |
+| B. never a subtype: today's reading, the reference dropped with a warning; subtype checks declared not_expressible | out of reach                         | right                                                                                                                                                                                                                                    | no inference; known information loss until barwise-3pc |
+| C. the two-condition rule, today's reading otherwise (recommended)                                                 | pass except C10's three coded tables | right for copies, and by name for the trial's 42 (to be measured); wrong for a vertical partition named with its parent's noun (the documented false positive), which by hand can only be undone with the relationship until barwise-3pc | a naming heuristic, reported per table                 |
 
 Recommended: **C**, with every inferred subtype named in a warning
 ("imported as a subtype of ENC: its name ends in ENC's head noun and it
@@ -88,17 +95,23 @@ round-trips: the mapper writes exactly this shape for a subtype.
 
 ## Requirements
 
-1. When an unannotated table's primary key is one column that is also a
-   foreign key to another table, the table's name ends in the referenced
+1. When an unannotated table has a shared-key foreign key -- one whose
+   source columns are exactly the table's primary key, a single column,
+   and whose referenced columns are exactly another table's complete
+   primary key (PR #620 review: not a composite foreign key that merely
+   contains the key column, and not a reference to an alternate UNIQUE
+   column) -- and the table's name ends in the referenced
    table's head noun (the last `_`-separated word, singular and plural
    alike), and the table repeats none of the referenced table's non-key
    columns, the DDL importer shall import the table's entity as a subtype
    of the referenced table's entity, identified through it.
 2. When it does, the importer shall add a warning naming the table, the
    supertype and both conditions.
-3. When such a table does not meet both conditions, the importer shall
-   read it as before this spec: the key imported, the reference
-   not, and the existing warning.
+3. When a table with a shared-key foreign key does not meet both
+   naming and column conditions, or its key column's foreign key is not
+   a shared-key foreign key, the importer shall
+   read it exactly as before this spec (for a shared-key foreign key:
+   the key imported, the reference not, and the existing warning).
 4. When a table carries a barwise annotation, the importer shall read
    the annotation and ignore this rule.
 5. A subtype imported by requirement 1 and exported again shall
@@ -123,9 +136,20 @@ imported, the reference is not, and the warning says so.
 
 In scope: `DdlImportFormat`'s handling of a single-column key that is
 also a foreign key; tests for a caught subtype, a coded-name miss, an
-extension table, `user_profiles`, the `LEGACY_ORDER` control, the `ARCHIVED_ORDER` control, and a same-noun child that repeats exactly one of a multi-column parent's non-key columns, which must keep today's reading (PR #620 review: it separates "no repeated column" from "not every column repeated"), and a
-round-trip test that a caught subtype re-exports unchanged; the trial
-rows it moves (C10 ir-analyst; the C09 biostatistician subtype check).
+extension table, `user_profiles`, the `LEGACY_ORDER` control, the `ARCHIVED_ORDER` control, and a same-noun child that repeats exactly one of a multi-column parent's non-key columns, which must keep today's reading (PR #620 review: it separates "no repeated column" from "not every column repeated"); two
+exclusion tests for requirement 1's shared-key definition, each with a
+same-noun name that would otherwise qualify -- a composite foreign key
+`(tenant_id, order_id)` that contains the single key column, and a
+one-column foreign key to the parent's alternate UNIQUE column rather
+than its primary key -- both keeping today's reading; and a
+round-trip test that a caught subtype re-exports unchanged. The trial
+generator writing the extension tables' `FOREIGN KEY`, which its
+manifest already records (`trial/lib/generators/ddl.mjs`), with a
+generator test that each extension table's DDL carries it -- without
+it the extension-table rows above are unmeasured; then a trial run, the
+extension tables' result recorded in this spec's implementation notes,
+and the rows it moves (C10 ir-analyst; the C09 biostatistician subtype
+check; any C01 row the newly visible references change).
 
 Out of scope: the one-to-one reading (above, barwise-3pc); a composite key
 that is also a set of foreign keys (composite-key-tables.spec.md); the

@@ -36,10 +36,16 @@ the other number by exactly these endings and no others: `ies` and
 `y`, `es` and nothing, `s` and nothing -- so `categories` matches
 `category`, `statuses` matches `status`, and an irregular plural such
 as `people` matches only itself, PR #620 review), `U` is not
-`T`, and the declared types match -- compared as the conceptual type the
-importer already derives for a column (`columnDataType`: `INT` and
-`INTEGER` are one type, a length or precision is ignored), with no
-inference when either side's type is unknown (PR #620 review). A column
+`T`, and the declared types match -- compared by the conceptual type
+name alone, `parseSqlDataType(column.dataType)?.name` (`INT` and
+`INTEGER` are one type; a length, precision or scale is ignored), with
+no inference when either side's name is undefined, an unrecognised type
+(PR #620 review). Not the importer's `columnDataType`, which keeps the
+length and scale (so `VARCHAR(10)` would miss `VARCHAR(12)`), maps an
+unknown type to `other` (so two unknown types would match), and maps an
+identity key to `auto_counter` (so `site_id INT IDENTITY` would never
+match the `INT` that refers to it): the referring column of a
+generated key is a plain integer. A column
 that would match two tables infers nothing and is reported. Each inference is a warning naming the
 column and the table, so it can be checked by eye.
 
@@ -57,7 +63,10 @@ something it did not (PR #620 review). The refusal has its own test.
 ## Requirements
 
 1. When `--infer-references` is absent, the DDL and SQL importers shall
-   infer no reference, whatever the column names.
+   infer no reference from a column's name, whatever the names. (This
+   covers name-based inference only: `import sql` already mines JOIN
+   conditions into relationships, a separate source of evidence this
+   spec leaves unchanged; PR #620 review.)
 2. When it is given, for a column `X` of table `T` that is not in `T`'s
    primary key and has no declared foreign key, the importer shall read
    a reference to table `U` when `X` matches `U`'s single key column by
@@ -81,7 +90,10 @@ In scope: requirements 1-6 in the DDL importer, with `SqlImportFormat`
 threading the option through its file and directory flows (today it
 passes `DdlImportFormat.parse` only `{ modelName }` in both); unit tests
 for each matching form, an equivalent type spelling (`INT` against
-`INTEGER`), a type mismatch, a self-table match, the ambiguous case, the
+`INTEGER`), a length difference (`VARCHAR(10)` against `VARCHAR(12)`,
+inferred), an identity key (`INT IDENTITY` against `INT`, inferred), an
+unrecognised type on either side (not inferred), a type mismatch, a
+self-table match, the ambiguous case, the
 key-column case, a column with a declared foreign key whose name suggests
 another table (the declared reference wins, with no inference warning),
 and the flag absent; CLI tests that
@@ -99,9 +111,13 @@ dbt, whose relationships tests already state references.
 1. **The flag and the inference** (formats, cli): requirements 1-6, the
    tests above, the docs and the matrix row.
 2. **The trial passes it** (trial): a per-artifact `import_flags` list in
-   `customer.yaml`, validated against the flags the importer accepts and
-   appended by `importCommand` in `trial/lib/steps.mjs` (today it builds
-   the arguments from importer, path and dialect alone); a trial test
-   that an artifact's flags reach the command line; C07's BigQuery
+   `customer.yaml`, appended as given by `importCommand` in
+   `trial/lib/steps.mjs` (today it builds the arguments from importer,
+   path and dialect alone). The CLI stays the one validator of its own
+   flags: the trial keeps no allow-list, which would be a second copy of
+   the command's options that drifts, and an unknown or misplaced flag
+   fails the import step with the CLI's own message (PR #620 review). A
+   trial test that an artifact's flags reach the command line, and one
+   that a flag the CLI refuses fails the step; C07's BigQuery
    artifact given `--infer-references`; then a trial run and the C07 row
    reclassified. It depends on workstream 1.

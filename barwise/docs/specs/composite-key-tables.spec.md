@@ -6,7 +6,9 @@ Last-updated: 2026-10-08
 Tracking: barwise-2z1 (DDL); barwise-nkn, its composite-key part (dbt)
 
 In one sentence: when a table or dbt model is keyed on more than one
-column and nothing annotates it, both importers read it as one fact type
+column, the key is eligible under requirement 1 (at least one foreign
+key wholly inside it, none partly inside it, none sharing a column) and
+nothing annotates it, both importers read it as one fact type
 over its key columns plus, when exactly one other column remains and it
 is NOT NULL and not itself unique, that column, keyed on the key; any
 other shape makes the fact type over the key objectified by an entity
@@ -38,7 +40,7 @@ on K. The importer's only real choice is the grouping:
 | exactly one column beside K, NOT NULL, not unique by itself       | one fact type over K and it, unique on K                                                      | C03 `Coverage applies to Risk under PolicyPeriod`; C08 `Meter records ReadingValue at IntervalTimestamp` |
 | exactly one column beside K, nullable                             | the fact type over K, objectified, the column an optional attribute                           | `coverage_applies` with a nullable `policy_period_id`                                                    |
 | more than one column beside K, or another table references it     | the fact type over K, objectified by an entity named after the table, the rest its attributes | C10 Enrollment, C12 Determination                                                                        |
-| a column unique by itself beside K                                | objectified; that column the entity's identifier, never a role                                | C04 OrderLine and its `line_id`                                                                          |
+| a column unique by itself beside K                                | objectified; that column an alternate identifier, never a role                                | C04 OrderLine and its `line_id`                                                                          |
 | K is one foreign key and one value, nothing beside it             | the binary over them, objectified                                                             | `meter_reading_time (meter_id, read_at)`                                                                 |
 | K is one composite foreign key                                    | not this rule: one role is the key-is-reference shape                                         | `order_note (tenant_id, order_id)`                                                                       |
 | K has no foreign key                                              | not this rule: today's entity with an external uniqueness                                     | `exchange_rate (currency, rate_date)`                                                                    |
@@ -79,10 +81,16 @@ referenced.
    a remaining foreign key as a relationship the entity plays with the
    referenced entity, as the importer reads any entity's foreign key
    today (PR #620 review: `supplier_id` beside an order line's key is a
-   relationship, not a value). A remaining column unique by
+   relationship, not a value). A remaining plain column unique by
    itself shall be an attribute whose value role is unique -- an
    alternate identifier; the objectified fact type's key, which is the
    table's primary key, remains the entity's preferred identification.
+   A remaining foreign-key column that is also unique by itself is read
+   as any entity's foreign key is read today, a many-to-one: the DDL
+   importer drops a single-column UNIQUE on a foreign-key column on
+   every table, not only here, so the one-to-one it states is its own
+   change with its own round-trip question (barwise-u0e; PR #620
+   review).
 4. When the key is one composite foreign key, contains no foreign key,
    has a foreign key lying partly inside it, or has two foreign keys
    inside it that share a column (PR #620 review: `FOREIGN KEY
@@ -153,7 +161,8 @@ Out of scope: barwise-nkn's other parts (deontic `severity: warn`, rings
 as singular tests, Order-Buyer, Seller), which are separate causes; an
 annotated table, whose barwise line already says what it is; a
 composite foreign key outside the key, which imports as one reference
-per column (barwise-f2n).
+per column (barwise-f2n); a single-column UNIQUE on a foreign-key
+column, which no table imports today (barwise-u0e).
 
 ## Workstreams
 
