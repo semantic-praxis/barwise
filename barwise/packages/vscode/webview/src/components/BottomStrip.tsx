@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 /** Bottom strip: model statistics and the backing file name. */
 import type { PositionedGraph } from "@barwise/diagram";
 import type { DiagramMeta } from "../../../src/diagram/protocol";

@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 /**
  * Cmd/Ctrl+K command overlay: a filtered, keyboard-driven list of the
  * diagram's verbs. Commands are supplied by the App, already bound to
