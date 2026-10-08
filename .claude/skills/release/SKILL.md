@@ -11,7 +11,8 @@ accumulate on main; a release is an intentional act, not automatic.
 
 1. **Develop** -- merge PRs to main. CI runs build + test + lint.
 2. **Decide to release** -- when a meaningful set of changes has landed.
-3. **Bump versions** -- update package.json files and tag (below).
+3. **Bump versions** -- update package.json files in a PR, then tag its
+   merge commit (below).
 4. **Create a GitHub release** -- triggers the artifact build workflow.
 
 To review what changed since the last release:
@@ -22,18 +23,41 @@ git log --oneline v1.2.0..HEAD
 
 ## Bump versions and tag
 
+The bump is a pull request like any other change, and the tag goes on
+the merge commit once it lands. AGENTS.md forbids committing to main,
+and v1.7.0 was cut this way (PR #279, tagged on its merge commit); this
+section used to push the bump and the tag straight to main, which is
+the one path that skips CI on the commit being released (barwise-8e4).
+
 All commands run from `barwise/`. The `--no-workspaces-update` flag
 prevents npm from resolving workspace dependencies against the public
 registry (these packages are not published). Use `patch` for bug fixes
 and small improvements, `minor` for new features or format support:
 
 ```bash
+git fetch origin main   # a stale origin/main would bump from a version already shipped
+git checkout -b release-bump origin/main
 npm version patch --workspaces --include-workspace-root \
   --no-git-tag-version --no-workspaces-update
 VER=$(node -p "require('./package.json').version")
+# before committing: the three gotchas below, and the release-notes
+# rename under "Create a GitHub release"
 git add -A && git commit -m "bump to $VER"
-git tag -a "v$VER" -m "v$VER: brief description"
-git push origin main --tags
+git push -u origin release-bump   # open the PR; merge it once CI is green
+```
+
+After the PR merges, tag the merge commit, not the branch commit. This
+block stands alone: it reads the version from the commit it tags rather
+than from `VER` above, which is empty in a fresh shell and would make the
+tag a bare `v`.
+
+```bash
+git fetch origin main
+SHA=$(git rev-parse origin/main)   # or the bump PR's merge SHA, if something merged after it
+git log -1 "$SHA"                  # confirm it is the bump's merge commit
+VER=$(git show "$SHA:barwise/package.json" | node -p "JSON.parse(require('fs').readFileSync(0)).version")
+git tag -a "v$VER" -m "v$VER: brief description" "$SHA"
+git push origin "v$VER"
 ```
 
 Three gotchas, each of which fails CI if skipped:
