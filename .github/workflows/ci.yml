@@ -46,27 +46,13 @@ jobs:
       - name: Detect docs-only pull request
         id: changes
         if: github.event_name == 'pull_request'
-        run: |
-          base='${{ github.event.pull_request.base.sha }}'
-          changed="$(git diff --name-only "$base" HEAD)"
-          echo "Changed files:"
-          echo "$changed"
-          if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qvE '\.md$|^\.beads/'; then
-            echo "docs_only=true" >> "$GITHUB_OUTPUT"
-            echo "Docs/tracker-only change -- skipping build, test, and lint steps."
-          else
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
-          fi
-          # The optimizer lane costs 3.5 minutes and changes rarely, so it
-          # runs only when it is touched -- or when the CLI it shells out
-          # to changes, since its metric tests run the real
-          # `barwise prompt score` and a CLI change can break them without
-          # touching a Python file.
-          if printf '%s\n' "$changed" | grep -qE '^barwise/optimizer/|^barwise/packages/cli/'; then
-            echo "optimizer=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "optimizer=false" >> "$GITHUB_OUTPUT"
-          fi
+        # The two predicates -- docs_only, and optimizer (the 3.5-minute
+        # optimizer lane runs only when it or the CLI it shells out to is
+        # touched) -- live in scripts/lib/changed-class.mjs, which
+        # `ci:local` imports, so the local runner skips exactly what this
+        # job skips (barwise-954). This step runs before setup-node, on the
+        # runner's own Node, which is why that file imports builtins only.
+        run: node scripts/lib/changed-class.mjs '${{ github.event.pull_request.base.sha }}' >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v7
         with:

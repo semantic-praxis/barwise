@@ -1,48 +1,10 @@
 {
   "$comment": "Specs whose Status claims no implementation while commits have landed on the source files they name. Each row needs a note saying why the header is still right, or what it should say instead. Ratcheted by `npm run audit:specs -- --check` (scripts/audit-spec-status.mjs).",
   "specs": {
-    "ci-local-condition-parity.spec.md": {
-      "status": "Draft -- no workstream implemented",
-      "commits": [
-        "ec1af289",
-        "cd883e1f",
-        "01b99b2e",
-        "45fdfc50",
-        "3d3c4f7f",
-        "ecdeb34a",
-        "aa31d1b9",
-        "da786723",
-        "94f6cfd9",
-        "658e1f6f",
-        "02800a0d",
-        "e07f6ec6",
-        "2e958d4a",
-        "3617d2f2",
-        "3f372373",
-        "e49773e7",
-        "962b75bc",
-        "bc93f06b",
-        "b17cc52a",
-        "9b763902",
-        "33ea339c",
-        "6b99a9d3",
-        "b6324fd1",
-        "ec9ae742",
-        "4211c56d",
-        "ddffb970",
-        "90c096e1",
-        "58122dc1",
-        "222dfdf4",
-        "18dfcd38",
-        "36daafd8",
-        "3ca3c0b4",
-        "0ab14956"
-      ],
-      "note": "Genuinely unimplemented, and the header is right: this spec's deliverable is teaching ci-local.mjs to read the `if:` conditions on ci.yml's steps and skip the gates CI would skip, and it still reads none -- the gate list is derived exactly as before and all 28 run. The commit below is barwise-960 giving the same script a lock, a run-scoped coverage directory, and full failure logs; it changes how a run is isolated and reported, not which gates it selects. This is the proxy false positive the gate's own header describes: two findings on one script. Remove this row when the condition filter ships and the Status says so."
-    },
     "conformance-property.spec.md": {
       "status": "Accepted (all decisions resolved 2026-08-25; both workstreams\nopen -- design only, no implementation in this PR)",
       "commits": [
+        "545fc8d1",
         "788b02d5",
         "6657985f",
         "3e8a981b",
@@ -100,6 +62,12 @@
     "mutation-ratchet.spec.md": {
       "status": "Draft -- no workstream implemented. All five open decisions\nresolved 2026-09-10; the workstreams below reflect them.",
       "commits": [
+        "6f49c110",
+        "7f8e467d",
+        "d2d838fa",
+        "bb9b4660",
+        "c32d2e21",
+        "305266e6",
         "592dac69",
         "d7aa6efb",
         "6037f88c",
