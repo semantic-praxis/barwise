@@ -463,6 +463,18 @@
       "caught_by": "not-a-correction",
       "note": "Non-goals section distinguishing this from a coverage tool."
     },
+    "norma-export-view-scope::bf44a5e42542": {
+      "spec": "norma-export-view-scope.spec.md",
+      "excerpt": "- d1: import norma shapes as elements. (resolved: yes, in this change.) the draft deferred it. self-review showed that deferring it is a regression: the importe",
+      "caught_by": "reasoning",
+      "note": "The code-review self-review found the NORMA round-trip regression (partial diagrams re-exporting as full ones) by reading the diff, before any test ran."
+    },
+    "norma-export-view-scope::fe0a01b8216f": {
+      "spec": "norma-export-view-scope.spec.md",
+      "excerpt": "composability and dry: \"which elements belong to a saved view\" is one decision, and the vs code diagram panel and the norma exporter each made it their own way.",
+      "caught_by": "not-a-correction",
+      "note": "Principle paragraph describing the pre-existing exporter defect, not a correction of an earlier draft."
+    },
     "norma-round-trip-completion::21acf518b766": {
       "spec": "norma-round-trip-completion.spec.md",
       "excerpt": "status: complete -- all four workstreams implemented 2026-08-07. ws1-ws3: exclusive-or coupled-pair round-trip with one-sided-coupler tolerance; value-compariso",

@@ -11,7 +11,13 @@
  * Persistence (reading/writing the `.orm.yaml`) and the async stale-render
  * guard stay in the host adapter; this class only assembles the data.
  */
-import { type DiagramLayout, isScopedView, type OrmModel } from "@barwise/core";
+import {
+  containedRelations,
+  type DiagramLayout,
+  isScopedView,
+  type OrmModel,
+  viewMembership,
+} from "@barwise/core";
 import { generateDiagram } from "../DiagramGenerator.js";
 import { computeNeighborhood } from "../graph/NeighborhoodFilter.js";
 import type { PositionedFactTypeNode, PositionedGraph } from "../layout/LayoutTypes.js";
@@ -224,7 +230,7 @@ export class DiagramSession {
 
     this.ghostObjectTypeIds.delete(entityId);
     this.activeViewFilter.objectTypeIds.add(entityId);
-    this.expandFilterFromObjectTypes(this.activeViewFilter);
+    this.includeFullyContainedRelations(this.activeViewFilter);
     return ot.id;
   }
 
@@ -299,17 +305,8 @@ export class DiagramSession {
     if (!layout) return;
 
     if (isScopedView(layout)) {
-      const objectTypeIds = new Set<string>();
-      for (const id of layout.elements) {
-        if (this.model.getObjectType(id)) objectTypeIds.add(id);
-      }
-      const filter: ViewFilter = {
-        objectTypeIds,
-        factTypeIds: new Set<string>(),
-        subtypeFactIds: new Set<string>(),
-      };
-      this.includeFullyContainedRelations(filter);
-      this.activeViewFilter = filter;
+      // The same membership the NORMA exporter draws (core's viewMembership).
+      this.activeViewFilter = viewMembership(this.model, layout);
       this.activeViewName = viewName;
     } else {
       this.activeViewFilter = undefined;
@@ -338,21 +335,9 @@ export class DiagramSession {
 
   /** Add fact/subtype relations whose every player is already included. */
   private includeFullyContainedRelations(filter: ViewFilter): void {
-    for (const ft of this.model.factTypes) {
-      if (ft.roles.every((r) => filter.objectTypeIds.has(r.playerId))) {
-        filter.factTypeIds.add(ft.id);
-      }
-    }
-    for (const sf of this.model.subtypeFacts) {
-      if (filter.objectTypeIds.has(sf.subtypeId) && filter.objectTypeIds.has(sf.supertypeId)) {
-        filter.subtypeFactIds.add(sf.id);
-      }
-    }
-  }
-
-  /** addGhostToView's expansion: same as named-view containment. */
-  private expandFilterFromObjectTypes(filter: ViewFilter): void {
-    this.includeFullyContainedRelations(filter);
+    const contained = containedRelations(this.model, filter.objectTypeIds);
+    for (const id of contained.factTypeIds) filter.factTypeIds.add(id);
+    for (const id of contained.subtypeFactIds) filter.subtypeFactIds.add(id);
   }
 
   private computeGhostRenderIds(): readonly string[] {

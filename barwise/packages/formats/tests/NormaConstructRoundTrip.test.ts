@@ -673,11 +673,23 @@ describe("NORMA diagram geometry round-trip (WS2)", () => {
     // there: a position must land on the element it was saved for.
     const id = (name: string) =>
       (back.getObjectTypeByName(name) ?? back.getFactTypeByName(name))!.id;
-    expect(layout!.positions).toEqual({
+    // Saved positions come back exactly.
+    expect(layout!.positions).toMatchObject({
       [id("Customer")]: { x: 192, y: 96 },
       [id("Order")]: { x: 480, y: 96 },
       [id("Customer places Order")]: { x: 336, y: 96 },
     });
+    // "Main" is a show-all view, so every fact type is drawn -- the two
+    // unaries had no saved position and were placed, not dropped.
+    expect(Object.keys(layout!.positions).sort()).toEqual(
+      [
+        id("Customer"),
+        id("Order"),
+        id("Customer places Order"),
+        id("Customer is preferred"),
+        id("Customer is active"),
+      ].sort(),
+    );
   });
 
   it("emits no diagram section for a model with no saved layout", () => {

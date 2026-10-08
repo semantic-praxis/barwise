@@ -19,18 +19,22 @@
  * We do not embed or redistribute any NORMA source code or XSD schemas.
  * These mappings are derived from publicly documented format information.
  */
-import type {
-  CardinalityConstraint,
-  ConceptualDataTypeName,
-  Constraint,
-  FactType,
-  JoinOperand,
-  ObjectType,
-  OrmModel,
-  Role,
-  ValueComparisonOperator,
-  ValueRange,
-  ValueType,
+import {
+  absorbedReferenceModes,
+  type CardinalityConstraint,
+  type ConceptualDataTypeName,
+  type Constraint,
+  type DiagramLayout,
+  type FactType,
+  type JoinOperand,
+  type ObjectType,
+  type OrmModel,
+  pureObjectifyingEntityIds,
+  type Role,
+  type ValueComparisonOperator,
+  type ValueRange,
+  type ValueType,
+  viewMembership,
 } from "@barwise/core";
 import { asNormaId, derivedNormaId, type NormaId, toNormaId } from "./normaId.js";
 import type {
@@ -786,24 +790,131 @@ function estimateShapeSize(
   return { width: Math.max(0.6, 0.15 + name.length * 0.055), height: 0.25 };
 }
 
+/** Horizontal gap, in pixels, between shapes in the row of unpositioned object types. */
+const PLACEMENT_GAP_X_PX = 60;
+/** Gap between the lowest positioned shape and that row. */
+const PLACEMENT_GAP_Y_PX = 150;
+/** How far a generated shape moves down when its box would overlap a placed one. */
+const PLACEMENT_NUDGE_PX = 40;
+/** Clearance, in pixels, kept around every placed box. */
+const PLACEMENT_MARGIN_PX = 10;
+
+type Center = { x: number; y: number; };
+/** A shape's box in barwise pixels: center and half-extents. */
+type Box = Center & { hw: number; hh: number; };
+
+/** Half-extents, in pixels, of an element's estimated shape. */
+function halfExtents(element: ObjectType | FactType): { hw: number; hh: number; } {
+  const isFact = "roles" in element;
+  const size = estimateShapeSize(
+    isFact ? "fact_type" : "object_type",
+    element.name,
+    isFact ? (element as FactType).roles.length : 0,
+  );
+  return { hw: (size.width * PX_PER_INCH) / 2, hh: (size.height * PX_PER_INCH) / 2 };
+}
+
 /**
- * Emit one ORMDiagram per saved layout. A saved position is the element's
- * center in pixels; NORMA AbsoluteBounds carries the top-left in inches,
- * so the estimated size recenters the box. Elements without a stored
- * position get no shape (NORMA renders them off-diagram, matching the
- * saved view's element subset).
+ * Centers, in barwise pixels, for the shapes a diagram draws: the saved
+ * position where there is one, otherwise a deterministic placement (see
+ * `docs/specs/norma-export-view-scope.spec.md`). Object types without a
+ * position go in a row below everything positioned, in model order, each
+ * box starting a fixed gap after the previous one ends; a fact type
+ * without one sits at the mean of its players' centers. A generated box
+ * that would overlap a placed one (a unary on its player, two fact types
+ * over the same pair, a midpoint inside a wide box) moves down until clear;
+ * saved centers never move.
+ */
+function placeShapes(
+  layout: DiagramLayout,
+  objectTypes: readonly ObjectType[],
+  factTypes: readonly FactType[],
+): Map<string, Center> {
+  const centers = new Map<string, Center>();
+  const placed: Box[] = [];
+  const overlaps = (b: Box) =>
+    placed.some((p) =>
+      Math.abs(p.x - b.x) < p.hw + b.hw + PLACEMENT_MARGIN_PX
+      && Math.abs(p.y - b.y) < p.hh + b.hh + PLACEMENT_MARGIN_PX
+    );
+  const place = (element: ObjectType | FactType, c: Center) => {
+    let box: Box = { ...c, ...halfExtents(element) };
+    while (overlaps(box)) box = { ...box, y: box.y + PLACEMENT_NUDGE_PX };
+    centers.set(element.id, { x: box.x, y: box.y });
+    placed.push(box);
+  };
+
+  let minX = Infinity;
+  let maxY = -Infinity;
+  for (const element of [...objectTypes, ...factTypes]) {
+    const pos = layout.positions[element.id];
+    if (!pos) continue;
+    centers.set(element.id, { x: pos.x, y: pos.y });
+    placed.push({ x: pos.x, y: pos.y, ...halfExtents(element) });
+    minX = Math.min(minX, pos.x);
+    maxY = Math.max(maxY, pos.y);
+  }
+
+  const rowY = placed.length > 0 ? maxY + PLACEMENT_GAP_Y_PX : 100;
+  let left = placed.length > 0 ? minX : 100;
+  let first = true;
+  for (const ot of objectTypes) {
+    if (centers.has(ot.id)) continue;
+    const { hw } = halfExtents(ot);
+    // The first box is centered on the row's start; each later one starts
+    // one gap after the previous box ends.
+    const x = first ? left : left + hw;
+    place(ot, { x, y: rowY });
+    left = x + hw + PLACEMENT_GAP_X_PX;
+    first = false;
+  }
+
+  for (const ft of factTypes) {
+    if (centers.has(ft.id)) continue;
+    const players = ft.roles.map((r) => centers.get(r.playerId)!);
+    place(ft, {
+      x: players.reduce((sum, c) => sum + c.x, 0) / players.length,
+      y: players.reduce((sum, c) => sum + c.y, 0) / players.length,
+    });
+  }
+  return centers;
+}
+
+/**
+ * Emit one ORMDiagram per saved layout, drawing what the diagram panel
+ * draws for that view: core's `viewMembership`, minus what the panel folds
+ * away -- an entity that only objectifies a fact type (drawn as that fact
+ * type) and a reference-mode value type with its identifying fact type
+ * (drawn as the entity's "(.ref_mode)" label). A saved position is the
+ * element's center in pixels; NORMA AbsoluteBounds carries the top-left in
+ * inches, so the estimated size recenters the box. Subtype links are not
+ * emitted: NORMA draws them as connectors, which neither side persists.
  */
 function writeDiagrams(model: OrmModel): NormaDiagram[] {
+  const absorbed = absorbedReferenceModes(model);
+  const pure = pureObjectifyingEntityIds(model);
   return model.diagramLayouts.map((layout, di) => {
-    const shapes: NormaShape[] = [];
-    for (const [id, pos] of Object.entries(layout.positions)) {
-      const ot = model.getObjectType(id);
-      const ft = ot ? undefined : model.getFactType(id);
-      const element = ot ?? ft;
-      if (!element) continue;
-      const kind = ot ? "object_type" as const : "fact_type" as const;
-      const size = estimateShapeSize(kind, element.name, ft ? ft.roles.length : 0);
-      shapes.push({
+    const members = viewMembership(model, layout);
+    const objectTypes = model.objectTypes.filter((ot) =>
+      members.objectTypeIds.has(ot.id) && !pure.has(ot.id) && !absorbed.valueTypeIds.has(ot.id)
+    );
+    // A fact type is drawn only when every player is: placement centers it
+    // between them, so the check is here rather than assumed.
+    const drawn = new Set(objectTypes.map((ot) => ot.id));
+    const factTypes = model.factTypes.filter((ft) =>
+      members.factTypeIds.has(ft.id)
+      && !absorbed.factTypeIds.has(ft.id)
+      && ft.roles.every((r) => drawn.has(r.playerId))
+    );
+    const centers = placeShapes(layout, objectTypes, factTypes);
+    const shape = (
+      element: ObjectType | FactType,
+      kind: "object_type" | "fact_type",
+      arity: number,
+    ): NormaShape => {
+      const pos = centers.get(element.id)!;
+      const size = estimateShapeSize(kind, element.name, arity);
+      return {
         id: derivedNormaId(toNormaId(element.id), `_shape${di}`),
         kind,
         subjectRef: toNormaId(element.id),
@@ -811,8 +922,12 @@ function writeDiagrams(model: OrmModel): NormaDiagram[] {
         y: pos.y / PX_PER_INCH - size.height / 2,
         width: size.width,
         height: size.height,
-      });
-    }
+      };
+    };
+    const shapes = [
+      ...objectTypes.map((ot) => shape(ot, "object_type", 0)),
+      ...factTypes.map((ft) => shape(ft, "fact_type", ft.roles.length)),
+    ];
     const slug = layout.name.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
     return {
       id: toNormaId(`diagram_${slug || String(di)}`),
