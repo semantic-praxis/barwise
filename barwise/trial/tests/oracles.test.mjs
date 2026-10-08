@@ -64,6 +64,120 @@ test("gradeImport: a silently dropped table is S1, a named skip is a refusal, a 
   assert.equal(full.status, "pass");
 });
 
+test("gradeImport: a fact table comes back as its fact type, an entity table does not", () => {
+  // A many-to-many table now imports as the fact type it states
+  // (composite-key-tables.spec.md); graded only against object types it
+  // read as silently dropped. An entity's table still needs its entity.
+  const m = {
+    generator: "ddl",
+    dialect: "postgres",
+    tables: [
+      { name: "patient", kind: "entity", importable: true },
+      { name: "COURSE_IS_PREREQUISITE_OF_COURSE", kind: "fact", importable: true },
+    ],
+  };
+  // A fact type as the importers write it: its name and its readings.
+  const summary = (names, facts) => ({
+    objectTypes: names.length,
+    names,
+    factTypeNames: facts.map((f) => f.name),
+    factTypeReadings: facts.flatMap((f) => f.readings),
+  });
+  const prereq = {
+    name: "Course and Course course is prerequisite of course",
+    readings: ["{0} and {1} have course is prerequisite of course"],
+  };
+  assert.equal(
+    gradeImport(
+      ok,
+      m,
+      "import",
+      summary(["Patient"], [prereq]),
+    )
+      .status,
+    "pass",
+  );
+  const entityAsFact = gradeImport(
+    ok,
+    {
+      ...m,
+      tables: [{ name: "patient", kind: "entity", importable: true }],
+    },
+    "import",
+    summary(["Doctor"], [{
+      name: "Doctor and Doctor patient",
+      readings: ["{0} and {1} have patient"],
+    }]),
+  );
+  assert.equal(entityAsFact.status, "fail");
+  // The dbt manifest carries the kind too (PR #621 review): a fact model
+  // passes as its fact type, an entity model does not.
+  const dbt = (kind) => ({
+    generator: "dbt",
+    models: [{ name: "stg_course_is_prerequisite_of_course", kind, keyless: false }],
+  });
+  // A fact type whose name only ends in the table's word is not it:
+  // "Customer places Preorder", nor "Customer places Order", is the fact
+  // table ORDER; only the importers' "{0} and {1} have order" is.
+  const order = { generator: "ddl", tables: [{ name: "ORDER", kind: "fact", importable: true }] };
+  assert.equal(
+    gradeImport(
+      ok,
+      order,
+      "import",
+      summary(["Customer"], [{ name: "Customer places Preorder", readings: ["{0} places {1}"] }]),
+    ).status,
+    "fail",
+  );
+  assert.equal(
+    gradeImport(
+      ok,
+      order,
+      "import",
+      summary(["Customer"], [{ name: "Customer places Order", readings: ["{0} places {1}"] }]),
+    ).status,
+    "fail",
+  );
+  assert.equal(
+    gradeImport(
+      ok,
+      order,
+      "import",
+      summary(["Customer"], [{
+        name: "Customer and Product order",
+        readings: ["{0} and {1} have order"],
+      }]),
+    ).status,
+    "pass",
+  );
+  // Only dbt strips a staging prefix; a DDL table may be named STG_ORDER.
+  const stgOrder = {
+    generator: "ddl",
+    tables: [{ name: "STG_ORDER", kind: "fact", importable: true }],
+  };
+  assert.equal(
+    gradeImport(
+      ok,
+      stgOrder,
+      "import",
+      summary(["Customer", "Product"], [{
+        name: "Customer and Product stg order",
+        readings: ["{0} and {1} have stg order"],
+      }]),
+    ).status,
+    "pass",
+  );
+  const ring = summary([], [{
+    ...prereq,
+    readings: ["{0} and {1} have stg course is prerequisite of course"],
+  }]);
+  assert.equal(gradeImport(ok, dbt("fact"), "import", { ...ring, objectTypes: 1 }).status, "pass");
+  assert.equal(
+    gradeImport(ok, dbt("entity"), "import", { ...ring, objectTypes: 1 }).status,
+    "fail",
+  );
+});
+
 test("gradeImport: an empty model with exit 0 is S3, a crash is S2, a hang is S2", () => {
   assert.equal(gradeImport(ok, manifest, "import", { objectTypes: 0, names: [] }).severity, "S3");
   assert.equal(

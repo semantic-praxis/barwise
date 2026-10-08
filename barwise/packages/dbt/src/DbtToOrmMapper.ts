@@ -25,6 +25,7 @@
 import type { OrmModel } from "@barwise/core";
 import type { DbtImportReport } from "./DbtImportReport.js";
 import { analyzeModels } from "./dbtMapping/analyze.js";
+import { analyzeComposites, createCompositeFactTypes } from "./dbtMapping/compositeKeys.js";
 import { createContext } from "./dbtMapping/context.js";
 import { createEntityTypes } from "./dbtMapping/entityTypes.js";
 import { reportColumnRenames } from "./dbtMapping/exportedColumns.js";
@@ -63,7 +64,12 @@ export function mapDbtToOrm(doc: DbtProjectDocument): DbtMapResult {
   const ctx = createContext(doc);
   indexSourceDataTypes(ctx);
   analyzeModels(ctx);
+  analyzeComposites(ctx);
   createEntityTypes(ctx);
+  // Composite roles claim their value types before identifiers and
+  // ordinary columns, as the DDL importer does, so a name both want goes
+  // to the same column in either format (PR #621 review).
+  createCompositeFactTypes(ctx);
   createIdentifierTypes(ctx);
   createValueTypes(ctx);
   createFactTypes(ctx);

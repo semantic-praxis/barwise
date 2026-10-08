@@ -23,6 +23,14 @@ export interface RelationshipInfo {
   readonly targetField: string;
 }
 
+/** A model keyed by a combination of columns, read as the fact type it states. */
+export interface CompositeInfo {
+  /** One column per role: the key's columns, then the extra column if any. */
+  readonly roles: readonly (readonly string[])[];
+  readonly key: readonly string[];
+  readonly objectified: boolean;
+}
+
 /** Mutable state shared across the dbt-to-ORM mapping phases. */
 export interface DbtMapperContext {
   readonly doc: DbtProjectDocument;
@@ -32,6 +40,8 @@ export interface DbtMapperContext {
   readonly pkMap: Map<string, PkInfo>;
   /** model name -> relationship columns. */
   readonly relMap: Map<string, RelationshipInfo[]>;
+  /** model name -> its composite-key reading (composite-key-tables.spec.md). */
+  readonly compositeMap: Map<string, CompositeInfo>;
   /** model name -> entity type id in OrmModel. */
   readonly entityIdMap: Map<string, string>;
   /** "modelName::columnName" -> value type id. */
@@ -56,6 +66,7 @@ export function createContext(doc: DbtProjectDocument): DbtMapperContext {
     model: new OrmModel({ name: "dbt Import" }),
     pkMap: new Map<string, PkInfo>(),
     relMap: new Map<string, RelationshipInfo[]>(),
+    compositeMap: new Map<string, CompositeInfo>(),
     entityIdMap: new Map<string, string>(),
     valueTypeIdMap: new Map<string, string>(),
     columnRoleIdMap: new Map<string, string>(),

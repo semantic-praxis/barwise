@@ -1,0 +1,47 @@
+version: 2
+models:
+  - name: policy
+    columns:
+      - name: policy_id
+        data_tests: [unique, not_null]
+  - name: term
+    columns:
+      - name: term_id
+        data_tests: [unique, not_null]
+  - name: coverage
+    columns:
+      - name: coverage_id
+        data_tests: [unique, not_null]
+  - name: policy_period
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [policy_id, term_id]
+    columns:
+      - name: policy_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('policy')", field: policy_id }
+      - name: term_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('term')", field: term_id }
+      - name: status
+  - name: coverage_applies
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [coverage_id, risk_code]
+    columns:
+      - name: coverage_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('coverage')", field: coverage_id }
+      - name: risk_code
+        data_tests: [not_null]
+      - name: policy_period_policy_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('policy_period')", field: policy_id }
+      - name: policy_period_term_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('policy_period')", field: term_id }

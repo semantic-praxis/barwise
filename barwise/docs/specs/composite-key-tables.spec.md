@@ -1,6 +1,6 @@
 # A table keyed on several columns imports as the fact type it states
 
-Status: Draft -- no workstream implemented
+Status: Implemented -- both workstreams landed together; requirement 6 holds for every shape but one, which waits on barwise-f2n (implementation notes)
 Created: 2026-10-08
 Last-updated: 2026-10-08
 Tracking: barwise-2z1 (DDL); barwise-nkn, its composite-key part (dbt)
@@ -9,8 +9,10 @@ In one sentence: when a table or dbt model is keyed on more than one
 column, the key is eligible under requirement 1 (at least one foreign
 key wholly inside it, none partly inside it, none sharing a column) and
 nothing annotates it, both importers read it as one fact type
-over its key columns plus, when exactly one other column remains and it
-is NOT NULL and not itself unique, that column, keyed on the key; any
+over its key columns plus, when exactly one other column remains that is
+not unique by itself (a column unique by itself is an alternate
+identifier and is not counted) and it is NOT NULL, that column, keyed on
+the key; any
 other shape makes the fact type over the key objectified by an entity
 named after the table, which carries the remaining columns as
 attributes.
@@ -28,7 +30,7 @@ imports as nothing at all: three trial imports skip two models each
 (barwise-nkn, noted on 2026-10-08). The same schema shape should mean
 the same model whichever file it arrives in.
 
-## What a composite-key table states (recommended; the open decisions below)
+## What a composite-key table states (the resolved decisions below)
 
 ORM normalisation fixes most of it. A table keyed on columns K with
 further columns A1..Am states, for each Ai, a fact over K and Ai unique
@@ -76,14 +78,21 @@ referenced.
    least one foreign key wholly inside it, and the foreign keys wholly
    inside it share no column, the DDL importer shall import one fact
    type whose roles are each such foreign key and each other key column,
-   unique over the key's roles.
-2. When exactly one column remains beside the key, NOT NULL and not
-   unique by itself, and no other table references the table, the
-   importer shall add it as a further role, the
-   uniqueness still over the key's roles only.
+   in the primary key's column order (a foreign key at its first key
+   column), unique over the key's roles. The dbt importer orders roles by
+   the combination test's column list, so both read a key the same way
+   (PR #621 review).
+2. When, among the columns beside the key that are not unique by
+   themselves, exactly one remains, it is NOT NULL, and no other table
+   references the table, the importer shall add it as a further role,
+   the uniqueness still over the key's roles only. A column unique by
+   itself is not counted here: it is an alternate identifier under
+   requirement 3, so `quantity` beside C04's `line_id UNIQUE` still
+   widens the fact type (PR #621 review).
 3. Otherwise -- when a column remains beside the key that requirement 2
-   does not take (more than one remains, or the one is nullable or
-   unique by itself, or another table references the table), when
+   does not take (two or more columns that are not unique by themselves
+   remain, or the one is nullable, or a column unique by itself remains,
+   or another table references the table), when
    another table references the table, or when the fact type would be a
    binary over one foreign key and one value; requirement 3 is the
    fallback, so no table meets both it and requirement 2 (PR #620
@@ -107,8 +116,13 @@ referenced.
    has a foreign key lying partly inside it, or has two foreign keys
    inside it that share a column (PR #620 review: `FOREIGN KEY
    (tenant_id)` beside `FOREIGN KEY (tenant_id, order_id)`), the
-   importer shall read the table as it did before this spec. This
-   requirement takes precedence over requirements 1-3.
+   importer shall read the table as it did before this spec. So shall
+   it when a foreign key inside the key references the table itself, or
+   reaches it again through other tables this rule reads: the fact
+   type's objectifier would be identified through itself, which core
+   rejects as an identification cycle (PR #621 review). The importer
+   warns that it declined the reading. This requirement takes precedence
+   over requirements 1-3.
 5. When a dbt model has no column with both `unique` and `not_null` and
    a model-level `dbt_utils.unique_combination_of_columns` names two or
    more columns, each `not_null`, at least one a `relationships` column,
@@ -118,13 +132,19 @@ referenced.
    which is preferred, so the importer shall read none of them as the
    key, keep today's reading, and report the model naming each
    combination (PR #620 review). A DDL table has one PRIMARY KEY, so the
-   case is dbt's alone. A combination test read as the key shall not
+   case is dbt's alone. Two tests naming the same columns in another
+   order are one key stated twice, not two candidates (PR #621 review).
+   A combination test read as the key shall not
    also be reported as a model-level custom test needing manual review;
    one that is not read as the key still is (PR #620 review).
-6. For each shape in the table above, a DDL import exported and imported
-   again, with and without the export's annotations, shall give the same
-   object types, fact types, role players, uniquenesses and
-   objectifications.
+6. For each shape in the table above that this rule reads, a DDL import
+   exported and imported again, with and without the export's
+   annotations, shall give the same object types, fact types, role
+   players, uniquenesses and objectifications. The two rows marked "not
+   this rule" keep today's reading by requirement 4, and today's round
+   trip with it: a key that is one composite foreign key is barwise-3pc's
+   and a key of values alone is barwise-ezn's, and neither round-trips on
+   main before this spec either (measured; PR #621 review).
 7. For each shape both formats can state, the cli drift test shall
    import it as DDL and as the equivalent dbt project and shall fail when
    the two disagree on role players, internal and external uniquenesses
@@ -135,9 +155,13 @@ referenced.
    pass) -- or on what is objectified. Fact type names and readings are
    not compared, since the two importers word them differently.
 
-## Open decisions
+## Resolved decisions
 
-1. **The single-extra-column rule.** Recommended: as above.
+Each was open when the spec merged (#620) and is settled by the
+implementation in #621; the alternative is kept so a later reader can
+see what was weighed.
+
+1. **The single-extra-column rule.** Decided: as above.
    Alternative: always objectify, never widen the fact type by one
    column. That keeps the functional dependency -- uniqueness over the
    objectified Coverage-Risk pair plus a mandatory functional
@@ -150,14 +174,14 @@ referenced.
    PolicyPeriod coverage applies to risk under policy period"). Checks
    worded around the kernel's reading stay out of reach and are
    declared `not_expressible` (as barwise-rlv did for ddl).
-3. **dbt key source.** Recommended: a model-level
+3. **dbt key source.** Decided: a model-level
    `dbt_utils.unique_combination_of_columns` over `not_null` columns names
    the key; the test alone proves uniqueness and not presence, so a key
    with a nullable column is no key (PR #620 review). A model with a
    single `unique` + `not_null` column keeps today's reading: that column
    is a dbt model's key by convention, so where DDL can say a single
    `UNIQUE` sits beside a composite primary key, dbt cannot.
-4. **A column unique by itself beside the key.** Recommended: an
+4. **A column unique by itself beside the key.** Decided: an
    alternate identifier of the objectifying entity (a unique attribute),
    never a role; the primary key stays the preferred identification, as
    the DDL says. The trade-off (PR
@@ -201,3 +225,62 @@ column, which no table imports today (barwise-u0e).
    test needs both sides, and either side alone would land a rule the
    other contradicts.
 2. Trial run and reclassification, riding the same PR.
+
+## Implementation notes
+
+Measured over the regenerated small tier, 2026-10-08.
+
+- **The grader had the old reading built in.** The first run reported
+  five new S1 rows: imports "silently dropping" 1 to 4 tables each. Every
+  one was a many-to-many or n-ary table the generator's manifest records
+  as `kind: fact`, which the importer now reads as the fact type it is.
+  The import grader looked for an object type per table, so the correct
+  reading scored as a drop. It now also accepts a fact type named after
+  the table (`trial/lib/oracles/grade.mjs`, with a test).
+- **What moved.** C08's metering row passes (barwise-2z1's original
+  case). The three dbt imports REFUSED since barwise-rlv import again.
+  C04's analytics-engineer gains the ternary "Order includes
+  ProductVariant in Quantity"; C11's data-platform-lead gains the
+  FunnelStep ring fact type, leaving only the ring constraint itself.
+- **What did not, and why.** C05's master-data lead is keyed on one
+  foreign key, which is the key-is-reference shape (barwise-3pc). C09's
+  biostatistician fails its subtype check (barwise-1078); its Dose check
+  is declared not_expressible for ddl, because `EXPOSURE` carries both
+  `DOSE_ID` and `EXPOSURE_START_DATE` beside its key and no DDL says
+  which is the fact's role -- decision 1's cost, met in the trial. C03's
+  actuarial analyst references a two-column-keyed PolicyPeriod through
+  two dbt relationships tests, read as two references: a new issue,
+  barwise-tjg, the dbt sibling of barwise-f2n.
+- **Review changed the rule five times before any code ran.** NOT NULL
+  for the extra column, objectifying the foreign-key-and-value binary,
+  the single composite foreign key, overlapping foreign keys and the dbt
+  `not_null` key columns all came from the review rounds of PR #620;
+  each has a test, and the overlap guard's test was shown to fail
+  without it.
+- **The drift test was too weak at first.** Mutating the dbt side's
+  NOT NULL condition left it green: no case had a nullable extra column.
+  It gained one, and the same mutation now fails it.
+- **Later rounds changed it three more times, after the code existed.**
+  A referenced table never takes the extra role, since it must be
+  objectified and a fact type unique over only some of its roles is not
+  one to objectify; a dbt model with two qualifying combination tests
+  has no key; and the drift test compares every fact type the
+  objectifier plays in. Each has a test shown to fail without its
+  change. A full offline trial run after them moved no baseline row.
+- **The wider drift test found a fixture error, not a code one.** The
+  LineId case declared `line_id` NOT NULL on the DDL side and nullable
+  on the dbt side, which must leave out `not_null` or make the column
+  the key; the two sides described different schemas. The DDL side is
+  now nullable too.
+- **Requirement 6 has one exception, and it is not this rule's.** A
+  composite-key table that another table references through a composite
+  foreign key is objectified as specified, but that referencing table
+  imports its composite foreign key as one reference per column, and each
+  export adds another (barwise-f2n). So that shape's test
+  (`compositeKeyTables.test.ts`, "a table another table references")
+  asserts the import and does not round-trip; every other shape this rule
+  reads round-trips with and without annotations. The two shapes the rule
+  declines are outside requirement 6 (see its text). The test goes back to
+  `roundTrips` when barwise-f2n lands (PR #621 review).
+- **One PR, not two.** The plan put each importer in its own PR; the
+  drift test needs both, so they landed together.

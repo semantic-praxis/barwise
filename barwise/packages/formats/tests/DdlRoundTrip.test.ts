@@ -263,20 +263,24 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
       .toEqual(["{0}, {1} and {2} have booking"]);
   });
 
-  it("a key with a plain column is no relationship: an external uniqueness over its columns", () => {
+  it("a key of a foreign key and a plain column is an objectified binary, not an external uniqueness", () => {
+    // It used to import as an entity with an invented key and an external
+    // uniqueness (barwise-2z1). Unobjectified, a binary over an entity and
+    // a value is one the relational mapper writes into the entity's table,
+    // so it could not export back (composite-key-tables.spec.md).
     const { model, warnings } = ddl.parse(`
       CREATE TABLE student (student_id INT PRIMARY KEY);
       CREATE TABLE enrollment (student_id INT REFERENCES student (student_id), term VARCHAR(6),
         PRIMARY KEY (student_id, term));`);
-    expect(model.objectifiedFactTypes).toEqual([]);
+    expect(warnings).toEqual([]);
+    const ft = model.getFactTypeByName("Student and Term enrollment")!;
+    expect(ft.roles.map((r) => model.getObjectType(r.playerId)?.name)).toEqual(["Student", "Term"]);
+    expect(model.objectifiedFactTypes.map((o) => model.getObjectType(o.objectTypeId)?.name))
+      .toEqual(["Enrollment"]);
     expect(
-      warnings.some((w) =>
-        /composite PRIMARY KEY \(student_id, term\) is imported as an external uniqueness/.test(w)
-      ),
-    ).toBe(true);
-    const external = model.factTypes.flatMap((f) => f.constraints)
-      .filter((c) => c.type === "external_uniqueness");
-    expect(external).toHaveLength(1);
+      model.factTypes.flatMap((f) => f.constraints).filter((c) => c.type === "external_uniqueness"),
+    )
+      .toEqual([]);
   });
 
   it("a UNIQUE over a relationship column and an attribute spans the relationship's role", () => {
@@ -290,6 +294,7 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
         policy_id INT NOT NULL REFERENCES policy (policy_id),
         term_number INT NOT NULL REFERENCES term (term_number),
         policy_number VARCHAR(20) NOT NULL,
+        effective_date DATE NOT NULL,
         PRIMARY KEY (policy_id, term_number),
         UNIQUE (policy_number, term_number));`);
     expect(warnings).toEqual([]);

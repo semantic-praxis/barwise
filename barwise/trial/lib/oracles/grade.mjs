@@ -101,8 +101,29 @@ export function gradeImport(result, manifest, expect, modelSummary) {
   // `dbo.User` and `stg_user` satisfy `User`, `SuperUser` does not. The
   // first version compared normalised strings with endsWith, so a model
   // holding only SuperUser passed an import that dropped User.
+  // A table the manifest records as a fact type (a many-to-many, an
+  // n-ary) may come back as that fact type, named "<players> <table
+  // words>" (composite-key-tables.spec.md), or, as it used to, as an
+  // entity objectifying it. Either names the table; only an object type
+  // used to count, so the correct reading was graded as a silent drop.
+  // Matched by the reading both importers give such a fact type,
+  // "{0} and {1} have <table words>", with the table's words exactly: a
+  // name that merely ends in them ("Customer places Order" for a table
+  // ORDER) is another fact, and suffix matching on names could not tell
+  // the two apart (PR #621 review). For dbt only, the staging prefix that
+  // expectedNames strips from model names is stripped from the reading
+  // too; a DDL table may well be named STG_ORDER (PR #621 review).
+  const tableFacts = (modelSummary?.factTypeReadings ?? []).flatMap((r) => {
+    const m = /^\{\d+\}(?:,? (?:and )?\{\d+\})+ have (.+)$/.exec(r);
+    if (!m) return [];
+    const w = words(m[1]);
+    return manifest.generator === "dbt" && w[0] === "stg"
+      ? [w.join(""), w.slice(1).join("")]
+      : [w.join("")];
+  });
   const missing = expected.filter((n) =>
-    !got.has(n.norm)
+    !(n.kind === "fact" && tableFacts.includes(words(n.raw).join("")))
+    && !got.has(n.norm)
     && !gotRaw.some((g) =>
       prefixStripped(g).has(n.norm) || prefixStripped(n.raw).has(norm(g)) && norm(g).length > 3
     )
@@ -138,11 +159,19 @@ export function gradeImport(result, manifest, expect, modelSummary) {
   };
 }
 
+/** A name's words, lower case: `COURSE_IS_PREREQUISITE_OF_COURSE`, `CourseIsPrerequisite` and "course is prerequisite" agree. */
+function words(name) {
+  return String(name).replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
 function expectedNames(manifest) {
   const raws = [];
   switch (manifest.generator) {
     case "ddl":
-      for (const t of manifest.tables) if (t.importable && t.kind !== "lookup") raws.push(t.name);
+      for (const t of manifest.tables) {
+        if (t.importable && t.kind !== "lookup") raws.push({ raw: t.name, kind: t.kind });
+      }
       break;
     case "openapi":
       for (const s of manifest.schemas) {
@@ -150,7 +179,9 @@ function expectedNames(manifest) {
       }
       break;
     case "dbt":
-      for (const m of manifest.models) if (!m.keyless) raws.push(m.name.replace(/^stg_/, ""));
+      for (const m of manifest.models) {
+        if (!m.keyless) raws.push({ raw: m.name.replace(/^stg_/, ""), kind: m.kind });
+      }
       break;
     case "code":
       for (const c of manifest.classes) raws.push(c.name);
@@ -161,7 +192,11 @@ function expectedNames(manifest) {
     default:
       break;
   }
-  return raws.map((raw) => ({ raw, norm: norm(raw) }));
+  return raws.map((r) =>
+    typeof r === "string"
+      ? { raw: r, norm: norm(r) }
+      : { raw: r.raw, kind: r.kind, norm: norm(r.raw) }
+  );
 }
 
 /**

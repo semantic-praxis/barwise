@@ -33,6 +33,18 @@ personas:
       Randomized, enrolled and exposed subjects stay distinct so the analysis populations derive without guessing.
     acceptance: personas/biostatistician.gym.yaml
     judges: [legacy-norma, sdtm-ddl]
+    not_expressible:
+      - artifact_kind: ddl
+        check: { sentence: "For each Subject and Treatment combination, at most one Dose applies." }
+        reason: >-
+          The kernel's Exposure objectifies "Subject receives Dose of Treatment"
+          and has an ExposureStartDate; its table is keyed on subject and
+          treatment with DOSE_ID and EXPOSURE_START_DATE beside the key, and no
+          DDL construct says which of the two is a role of the fact and which
+          an attribute of the entity. The importer keeps the dependency (at
+          most one dose per subject and treatment) as an attribute, not the
+          ternary this sentence verbalizes (composite-key-tables.spec.md,
+          decision 1).
   - id: pharmacovigilance-lead
     name: Anneke Voss
     role: Pharmacovigilance lead, safety reporting

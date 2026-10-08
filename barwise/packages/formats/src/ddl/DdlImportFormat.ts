@@ -169,6 +169,68 @@ export class DdlImportFormat implements ImportFormat {
     // A table keyed on two or more foreign keys is an objectified
     // relationship (ddl-round-trip-fixed-point.spec.md, workstream 5).
     const objectifying: ParsedTable[] = [];
+    // An unannotated table keyed on several columns reads as the fact type
+    // it states (composite-key-tables.spec.md); one that needs no
+    // objectifier is built once every entity exists (step 1c).
+    const readings = new Map<ParsedTable, CompositeReading>();
+    const plainFactTables: ParsedTable[] = [];
+    const referenced = new Set(
+      tables.flatMap((t) => t.foreignKeys.map((fk) => tableKey(fk.referencedTable))),
+    );
+    // Every table key a plain fact table took, so a second table with the
+    // same unqualified name is skipped with the duplicate warning rather
+    // than colliding with the first one's fact type later (PR #621 review).
+    const plainKeys = new Set<string>();
+    // Every unannotated table's composite reading, decided before any is
+    // used, so a reading whose key roles reach back to its own table --
+    // directly, or through other composite readings -- can be declined
+    // first: it would identify the table's objectifier through itself,
+    // which core rejects as an identification cycle (PR #621 review). A
+    // declined table keeps today's reading, as requirement 4 keeps any.
+    // Keyed by unqualified name, like the entity map, so only the first
+    // table of a name is read here: a later one from another schema is
+    // the duplicate the loop below skips, and must not overwrite the first
+    // one's reading (PR #621 review).
+    const firstOfKey = new Map<string, ParsedTable>();
+    for (const table of tables) {
+      if (!firstOfKey.has(tableKey(table.name))) firstOfKey.set(tableKey(table.name), table);
+    }
+    const composite = new Map<string, CompositeReading>();
+    for (const [key, table] of firstOfKey) {
+      if (annotations.tables.get(key) !== undefined) continue;
+      const r = compositeReading(table, referenced.has(key));
+      if (r) composite.set(key, r);
+    }
+    const compositeTargets = (key: string): string[] => {
+      const table = firstOfKey.get(key)!;
+      return composite.get(key)!.roles.flatMap((cols) => {
+        const fk = table.foreignKeys.find((f) =>
+          f.columns.length === cols.length && f.columns.every((c) => cols.includes(c))
+        );
+        const target = fk && tableKey(fk.referencedTable);
+        return target && composite.has(target) ? [target] : [];
+      });
+    };
+    const cyclic = [...composite.keys()].filter((start) => {
+      const seen = new Set<string>();
+      const stack = compositeTargets(start);
+      while (stack.length > 0) {
+        const next = stack.pop()!;
+        if (next === start) return true;
+        if (seen.has(next)) continue;
+        seen.add(next);
+        stack.push(...compositeTargets(next));
+      }
+      return false;
+    });
+    for (const key of cyclic) {
+      composite.delete(key);
+      warnings.push(
+        `Table "${firstOfKey.get(key)!.name}": its composite key `
+          + `references this table again, directly or through other composite keys, so it is `
+          + `not read as a fact type; it would be identified through itself.`,
+      );
+    }
     for (const table of tables) {
       const found = annotations.tables.get(tableKey(table.name));
       if (found?.kind === "factTable") {
@@ -186,6 +248,25 @@ export class DdlImportFormat implements ImportFormat {
         entityName = annotation.entity;
       }
       const annotated = annotation?.entity === entityName ? annotation : undefined;
+      const reading = annotation === undefined && firstOfKey.get(tableKey(table.name)) === table
+        ? composite.get(tableKey(table.name))
+        : undefined;
+      if (
+        plainKeys.has(tableKey(table.name))
+        || (reading && !reading.objectified && entityMap.has(tableKey(table.name)))
+      ) {
+        warnings.push(
+          `Table "${table.name}": another table already imports as "${entityName}" `
+            + `(two schemas can declare one name); not imported.`,
+        );
+        continue;
+      }
+      if (reading) readings.set(table, reading);
+      if (reading && !reading.objectified) {
+        plainKeys.add(tableKey(table.name));
+        plainFactTables.push(table);
+        continue;
+      }
       if (entityMap.has(tableKey(table.name)) || model.getObjectTypeByName(entityName)) {
         warnings.push(
           `Table "${table.name}": another table already imports as "${entityName}" `
@@ -197,7 +278,11 @@ export class DdlImportFormat implements ImportFormat {
       // or when its line says so: an objectified fact type keyed on a value
       // role as well (C01's Admission, on patient and time) has a key with
       // a plain column in it, and is still the relationship (barwise-c65).
-      const objectifies = foreignKeysOfKey(table) !== undefined
+      // The older rule (a key made of two or more whole foreign keys) still
+      // applies when the composite reading declines a table: requirement 4
+      // keeps that table as it was read before (PR #621 review).
+      const objectifies = reading !== undefined
+        || foreignKeysOfKey(table) !== undefined
         || annotated?.objectifies !== undefined;
       const referenceMode = annotated && (table.primaryKey.length === 1 || objectifies)
         ? annotated.referenceMode
@@ -264,15 +349,44 @@ export class DdlImportFormat implements ImportFormat {
         );
       }
       if (built === undefined || typeof built === "string") {
-        const guessed = this.guessedRelationship(model, table, entityMap);
+        const guessed = this.guessedRelationship(model, table, entityMap, readings.get(table));
         built = guessed
-          ? this.buildRelationship(model, table, guessed, entityMap, entity)
+          ? this.buildRelationship(model, table, guessed, entityMap, entity, true)
           : "a referenced table is not an entity";
       }
       // A relationship that could not be built leaves the key to step 3,
       // which imports it as an external uniqueness.
       if (typeof built === "string") continue;
       consumed.set(tableKey(table.name), built);
+    }
+
+    // Step 1c: tables that read as a fact type no table references and
+    // nothing else needs to hold (composite-key-tables.spec.md). One whose
+    // relationship cannot be built -- a referenced table imported as no
+    // entity -- is an entity after all, read as it was before.
+    for (const table of plainFactTables) {
+      const guessed = this.guessedRelationship(model, table, entityMap, readings.get(table));
+      const built = guessed
+        ? this.buildRelationship(model, table, guessed, entityMap, undefined, true)
+        : "a referenced table is not an entity";
+      if (typeof built !== "string") {
+        consumed.set(tableKey(table.name), built);
+        continue;
+      }
+      warnings.push(
+        `Table "${table.name}": it reads as a fact type over its key, but ${built}; it is `
+          + `imported as an entity.`,
+      );
+      const keyedOnForeignKeys = foreignKeysOfKey(table) !== undefined;
+      const entityType = model.addObjectType({
+        name: toPascalCase(table.name),
+        kind: "entity",
+        referenceMode: keyedOnForeignKeys
+          ? `${table.name}_id`
+          : this.inferReferenceMode(table),
+      });
+      entityMap.set(tableKey(table.name), entityType.id);
+      accepted.push(table);
     }
 
     // Each column's binary, by `table.column`: what step 3b's external
@@ -1032,6 +1146,7 @@ export class DdlImportFormat implements ImportFormat {
     relationship: Relationship,
     entityMap: ReadonlyMap<string, string>,
     objectifier: ObjectType | undefined,
+    guessed = false,
   ): Map<string, Binary> | string {
     if (model.getFactTypeByName(relationship.factType)) {
       return `a fact type named "${relationship.factType}" already exists`;
@@ -1069,11 +1184,18 @@ export class DdlImportFormat implements ImportFormat {
       // first column here. Stricter than the sharing rule (value order
       // counts), which only costs a stale warning on a hand edit.
       const earlier = plannedValues.get(role.player);
-      if (earlier && !sameColumnValues(earlier, column)) {
+      // A guessed name is only the column's, so two columns that name one
+      // value type with different types each get their own, as dbt gives
+      // them (PR #621 review); an annotation that does so no longer matches.
+      if (earlier && !sameColumnValues(earlier, column) && !guessed) {
         return `two roles name "${role.player}" over columns of different types or values`;
       }
-      const claim = this.claimRoleValueType(model, objectifier, role.player, column);
-      if (claim.kind === "create" && claim.displaced) {
+      const claim = this.claimRoleValueType(model, objectifier, role.player, column, table);
+      // An annotation names the player, so a name another type holds means
+      // the line no longer describes the model. A guessed name is only the
+      // column's, and takes the renamed value type any column would, as the
+      // dbt importer does for the same table (PR #621 review).
+      if (claim.kind === "create" && claim.displaced && !guessed) {
         return `"${role.player}" is held by ${claim.displaced.kind} type "${claim.displaced.name}"`;
       }
       plannedValues.set(role.player, column);
@@ -1114,7 +1236,7 @@ export class DdlImportFormat implements ImportFormat {
       if (step.kind === "entity") {
         playerId = step.id;
       } else {
-        const claim = this.claimRoleValueType(model, objectifier, role.player, step.column);
+        const claim = this.claimRoleValueType(model, objectifier, role.player, step.column, table);
         playerId = claim.kind === "share"
           ? claim.valueType.id
           : model.addObjectType({
@@ -1150,17 +1272,23 @@ export class DdlImportFormat implements ImportFormat {
     );
   }
 
-  /** The sharing rule for a value role of a relationship, which names its own fact type. */
+  /**
+   * The sharing rule for a value role of a relationship, which names its
+   * own fact type. A name another type holds is prefixed with the
+   * objectifier's name, or the table's when nothing objectifies it, which
+   * is the name the dbt importer gives the same role (PR #621 review).
+   */
   private claimRoleValueType(
     model: OrmModel,
     objectifier: ObjectType | undefined,
     name: string,
     column: ParsedColumn,
+    table: ParsedTable,
   ) {
     return claimValueTypeName(
       model,
       objectifier?.id ?? "",
-      objectifier?.name ?? "",
+      objectifier?.name ?? toPascalCase(table.name),
       name,
       columnDataType(column),
       "attribute",
@@ -1170,32 +1298,45 @@ export class DdlImportFormat implements ImportFormat {
   }
 
   /**
-   * The relationship a table keyed on its foreign keys is taken to be when
-   * nothing names it (decided with the requester, 2026-10-07): one role
-   * per foreign key in the key, named from the table -- "Student and
-   * Course enrollment", read "{0} and {1} have enrollment". Undefined
-   * when a referenced table imported as no entity.
+   * The relationship a table is taken to be when nothing names it: a table
+   * keyed on its foreign keys (decided with the requester, 2026-10-07), or
+   * any composite-key table the reading in `compositeReading` covers. One
+   * role per foreign key or plain column the reading names, each foreign
+   * key's role played by its table's entity and each plain column's by a
+   * value type named after it; the fact type is named from the table --
+   * "Student and Course enrollment", read "{0} and {1} have enrollment".
+   * Undefined when a referenced table imported as no entity.
    */
   private guessedRelationship(
     model: OrmModel,
     table: ParsedTable,
     entityMap: ReadonlyMap<string, string>,
+    reading?: CompositeReading,
   ): Relationship | undefined {
-    const fks = foreignKeysOfKey(table);
-    if (!fks) return undefined;
-    const players = fks.map((fk) =>
-      model.getObjectType(entityMap.get(tableKey(fk.referencedTable)) ?? "")
-    );
-    if (players.some((p) => !p)) return undefined;
+    const groups = reading?.roles ?? foreignKeysOfKey(table)?.map((fk) => [...fk.columns]);
+    if (!groups) return undefined;
+    const roles: { name: string; player: string; columns: string[]; }[] = [];
+    for (const columns of groups) {
+      const fk = table.foreignKeys.find((f) =>
+        f.columns.length === columns.length && f.columns.every((c) => columns.includes(c))
+      );
+      if (fk) {
+        const player = model.getObjectType(entityMap.get(tableKey(fk.referencedTable)) ?? "");
+        if (!player) return undefined;
+        roles.push({ name: "is in", player: player.name, columns });
+      } else {
+        roles.push({ name: "is in", player: toPascalCase(columns[0]!), columns });
+      }
+    }
     const words = table.name.replace(/_/g, " ").toLowerCase();
     const list = (items: string[]) =>
       items.length === 2
         ? items.join(" and ")
         : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
     return {
-      factType: `${list(players.map((p) => p!.name))} ${words}`,
-      readings: [`${list(fks.map((_, i) => `{${i}}`))} have ${words}`],
-      roles: fks.map((fk, i) => ({ name: "is in", player: players[i]!.name, columns: fk.columns })),
+      factType: `${list(roles.map((r) => r.player))} ${words}`,
+      readings: [`${list(roles.map((_, i) => `{${i}}`))} have ${words}`],
+      roles,
     };
   }
 
@@ -1350,6 +1491,72 @@ function skipDefaultExpression(text: string): string {
     else if (depth === 0 && AFTER_DEFAULT.test(text.slice(i))) return text.slice(i).trim();
   }
   return "";
+}
+
+/**
+ * How an unannotated table keyed on several columns reads
+ * (composite-key-tables.spec.md): the roles of the fact type it states --
+ * each foreign key inside the key, each plain key column, and the one
+ * other column when exactly one remains that is NOT NULL and not itself
+ * unique, unless another table references this one -- and whether that fact type needs an entity to objectify it.
+ * It does when other columns remain for the entity to hold, when another
+ * table references this one, or when the fact type would be a binary over
+ * one foreign key and one value, which the relational mapper writes into
+ * the entity's table and so could not export back. Undefined for a key
+ * without a foreign key in it, or with a foreign key only partly inside.
+ */
+interface CompositeReading {
+  readonly roles: readonly string[][];
+  readonly objectified: boolean;
+}
+
+function compositeReading(table: ParsedTable, referenced: boolean): CompositeReading | undefined {
+  const key = table.primaryKey;
+  if (key.length < 2) return undefined;
+  const inKey = (c: string) => key.includes(c);
+  if (table.foreignKeys.some((f) => f.columns.some(inKey) && !f.columns.every(inKey))) {
+    return undefined;
+  }
+  const keyFks = table.foreignKeys.filter((f) => f.columns.every(inKey));
+  if (keyFks.length === 0) return undefined;
+  const fkColumns = new Set(keyFks.flatMap((f) => f.columns));
+  // Two foreign keys sharing a column cannot both be roles, and which one
+  // the key "is" is not the DDL's to say (PR #620 review).
+  if (fkColumns.size !== keyFks.reduce((n, f) => n + f.columns.length, 0)) return undefined;
+  // Roles follow the primary key's column order, each foreign key placed at
+  // its first key column, so the fact type agrees with dbt's reading of the
+  // same combination (PR #621 review).
+  const keyRoles: string[][] = [];
+  for (const c of key) {
+    const fk = keyFks.find((f) => f.columns.includes(c));
+    if (!fk) keyRoles.push([c]);
+    else if (key.find((k) => fk.columns.includes(k)) === c) keyRoles.push([...fk.columns]);
+  }
+  // A key that is one composite foreign key is one role: the key-is-
+  // reference shape (key-reference-tables.spec.md), not a relationship
+  // over several (PR #620 review).
+  if (keyRoles.length < 2) return undefined;
+  // A column unique by itself identifies the objectifying entity; it is
+  // never a role, and it needs that entity to exist (C04's line_id).
+  const uniqueAlone = (c: string) =>
+    table.uniqueConstraints.some((u) => u.length === 1 && u[0] === c);
+  const others = table.columns.filter((c) => !inKey(c.name));
+  const candidates = others.filter((c) => !uniqueAlone(c.name));
+  const lone = candidates.length === 1 ? candidates[0]! : undefined;
+  const loneFk = lone && table.foreignKeys.find((f) => f.columns.includes(lone.name));
+  // A nullable extra column cannot widen the fact: a row without it still
+  // states the key's combination (PR #620 review). Nor can one beside a
+  // key another table references: that fact type must be objectified, and
+  // one unique over only some of its roles is not one to objectify.
+  const extra = !referenced && lone && !lone.nullable
+      && (!loneFk || loneFk.columns.length === 1)
+    ? [lone.name]
+    : undefined;
+  const roles = extra ? [...keyRoles, extra] : keyRoles;
+  const valueBinary = roles.length === 2
+    && roles.filter((r) => table.foreignKeys.some((f) => f.columns.includes(r[0]!))).length === 1;
+  const remaining = others.length - (extra ? 1 : 0);
+  return { roles, objectified: referenced || remaining > 0 || valueBinary };
 }
 
 /**

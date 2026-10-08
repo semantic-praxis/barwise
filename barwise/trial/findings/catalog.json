@@ -123,18 +123,18 @@
       "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi)."
     },
     {
-      "id": "acceptance-all-role-table",
-      "issue": "barwise-2z1",
+      "id": "acceptance-key-through-entity",
+      "issue": "barwise-3pc",
       "severity": "S5",
-      "step": "^acceptance:(c08-metering-data-engineer:cis-ddl|biostatistician:sdtm-ddl|master-data-lead:erp-ddl)$",
-      "note": "Edit distance to acceptance on a DDL table whose every column is a role of one fact type: without a barwise line the import reads it as an entity with attributes, or as a relationship over its foreign keys alone, so the three-role fact type the persona checks for is not there (barwise-2z1). C05's \"Material is produced at Plant in Batch\", keyed on its batch alone, imports as an entity, so no fact type connects Material and Plant. C09's biostatistician also fails a subtype check, which is barwise-1078."
+      "step": "^acceptance:master-data-lead:erp-ddl$",
+      "note": "Edit distance to acceptance on C05's SAP DDL. MAT_IS_PRODUCED_AT_WERK_IN_CHA is WorkOrder's table, keyed on CHARG_ID alone (the kernel's uniqueness over the batch role), which is a key that is also a foreign key: an entity identified through another entity, which core cannot express (barwise-3pc). The import keeps the key and drops the reference, so no fact type connects Material and Plant. Was barwise-2z1 until composite-key-tables.spec.md, which covers keys of two or more roles."
     },
     {
       "id": "acceptance-subtype-key-reference",
       "issue": "barwise-1078",
       "severity": "S5",
-      "step": "^acceptance:ir-analyst:sis-ddl$",
-      "note": "Edit distance to acceptance on C10's Banner DDL, graded with its names mapped through the skin (barwise-d60) and generated with one table per objectification (barwise-rlv). What remains is GRADUATE_SGBSTDN, keyed on SGBSTDN_ID referencing SGBSTDN: the import keeps the key and not the reference, so \"GraduateStudent is a subtype of Student.\" has nothing to verbalize (barwise-1078)."
+      "step": "^acceptance:(ir-analyst:sis-ddl|biostatistician:sdtm-ddl)$",
+      "note": "Edit distance to acceptance on C10's Banner DDL, graded with its names mapped through the skin (barwise-d60) and generated with one table per objectification (barwise-rlv). What remains is GRADUATE_SGBSTDN, keyed on SGBSTDN_ID referencing SGBSTDN: the import keeps the key and not the reference, so \"GraduateStudent is a subtype of Student.\" has nothing to verbalize (barwise-1078). C09's biostatistician fails the same way on \"RandomizedSubject is a subtype of EnrolledSubject.\"; its Dose check is declared not_expressible for ddl, since a DDL table does not say which column beside its key is a role of the objectified fact and which an attribute (composite-key-tables.spec.md, decision 1)."
     },
     {
       "id": "acceptance-no-foreign-keys",
@@ -142,6 +142,13 @@
       "severity": "S5",
       "step": "^acceptance:network-inventory-architect:bq-ddl$",
       "note": "Edit distance to acceptance on C07's BigQuery DDL, graded with its names mapped through the skin (barwise-d60). The skin writes no FOREIGN KEY, so NETWORK_DEVICE.SITE_ID imports as an attribute and no fact type connects NetworkDevice and Site; whether the import should infer a reference from a key-named column is barwise-c5f."
+    },
+    {
+      "id": "acceptance-dbt-composite-reference",
+      "issue": "barwise-tjg",
+      "severity": "S5",
+      "step": "^acceptance:actuarial-analyst:claims-dbt$",
+      "note": "Edit distance to acceptance on C03's claims dbt project. The coverage model references PolicyPeriod, now keyed on two columns, through two relationships tests; the dbt importer reads them as two references, so the composite-key rule sees two columns beside the key and objectifies instead of reading the ternary 'Coverage applies to Risk under PolicyPeriod' (barwise-tjg)."
     },
     {
       "id": "acceptance-edit-distance-dbt",
