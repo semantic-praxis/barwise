@@ -1134,7 +1134,10 @@ export class DdlImportFormat implements ImportFormat {
       // first column here. Stricter than the sharing rule (value order
       // counts), which only costs a stale warning on a hand edit.
       const earlier = plannedValues.get(role.player);
-      if (earlier && !sameColumnValues(earlier, column)) {
+      // A guessed name is only the column's, so two columns that name one
+      // value type with different types each get their own, as dbt gives
+      // them (PR #621 review); an annotation that does so no longer matches.
+      if (earlier && !sameColumnValues(earlier, column) && !guessed) {
         return `two roles name "${role.player}" over columns of different types or values`;
       }
       const claim = this.claimRoleValueType(model, objectifier, role.player, column, table);

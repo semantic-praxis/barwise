@@ -121,10 +121,14 @@ referenced.
    case is dbt's alone. A combination test read as the key shall not
    also be reported as a model-level custom test needing manual review;
    one that is not read as the key still is (PR #620 review).
-6. For each shape in the table above, a DDL import exported and imported
-   again, with and without the export's annotations, shall give the same
-   object types, fact types, role players, uniquenesses and
-   objectifications.
+6. For each shape in the table above that this rule reads, a DDL import
+   exported and imported again, with and without the export's
+   annotations, shall give the same object types, fact types, role
+   players, uniquenesses and objectifications. The two rows marked "not
+   this rule" keep today's reading by requirement 4, and today's round
+   trip with it: a key that is one composite foreign key is barwise-3pc's
+   and a key of values alone is barwise-ezn's, and neither round-trips on
+   main before this spec either (measured; PR #621 review).
 7. For each shape both formats can state, the cli drift test shall
    import it as DDL and as the equivalent dbt project and shall fail when
    the two disagree on role players, internal and external uniquenesses
@@ -254,8 +258,9 @@ Measured over the regenerated small tier, 2026-10-08.
   imports its composite foreign key as one reference per column, and each
   export adds another (barwise-f2n). So that shape's test
   (`compositeKeyTables.test.ts`, "a table another table references")
-  asserts the import and does not round-trip; every other shape in the
-  table round-trips with and without annotations. The test goes back to
+  asserts the import and does not round-trip; every other shape this rule
+  reads round-trips with and without annotations. The two shapes the rule
+  declines are outside requirement 6 (see its text). The test goes back to
   `roundTrips` when barwise-f2n lands (PR #621 review).
 - **One PR, not two.** The plan put each importer in its own PR; the
   drift test needs both, so they landed together.

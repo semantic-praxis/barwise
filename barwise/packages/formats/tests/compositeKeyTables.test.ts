@@ -243,10 +243,27 @@ describe("a composite-key table imports as the fact type it states", () => {
     });
   });
 
+  it("two plain columns that name one value type with different types each get their own", () => {
+    // channel and channel_ both guess "Channel"; the DDL side refused the
+    // reading for the type difference while dbt disambiguated (PR #621 review).
+    const { model, warnings } = ddl.parse(`CREATE TABLE meter (meter_id INT PRIMARY KEY);
+      CREATE TABLE meter_reading (
+        meter_id INT NOT NULL REFERENCES meter (meter_id),
+        channel VARCHAR(4) NOT NULL,
+        channel_ INT NOT NULL,
+        PRIMARY KEY (meter_id, channel, channel_));`);
+    expect(warnings.filter((w) => /reads as a fact type over its key/.test(w))).toEqual([]);
+    const fact = model.factTypes.find((f) => / meter reading$/.test(f.name))!;
+    expect(fact.roles).toHaveLength(3);
+    expect(new Set(fact.roles.map((r) => r.playerId)).size).toBe(3);
+  });
+
   it("a key that is one composite foreign key is not this rule: it is one role, not several", () => {
     // (tenant_id, order_id) is one reference to orders; read as a fact type
     // it would have one role (PR #620 review). It is the key-is-reference
-    // shape (key-reference-tables.spec.md).
+    // shape (key-reference-tables.spec.md). Not round-tripped: it keeps
+    // today's reading, which does not round-trip on main either (barwise-3pc;
+    // requirement 6 covers only the shapes this rule reads).
     const { model } = ddl.parse(`CREATE TABLE orders (tenant_id INT, order_id INT,
         PRIMARY KEY (tenant_id, order_id));
       CREATE TABLE order_note (
@@ -309,6 +326,8 @@ describe("a composite-key table imports as the fact type it states", () => {
   });
 
   it("a key of values alone keeps today's reading: an entity with an external uniqueness", () => {
+    // Not round-tripped: today's reading does not round-trip on main either,
+    // since an external uniqueness cannot yet be preferred (barwise-ezn).
     const { model } = ddl.parse(`CREATE TABLE exchange_rate (
       currency VARCHAR(3) NOT NULL, rate_date DATE NOT NULL, rate DECIMAL(12,6) NOT NULL,
       PRIMARY KEY (currency, rate_date));`);
