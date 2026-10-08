@@ -87,17 +87,18 @@ spelling, and each is reclassified to that cause.
 
 Measured over the regenerated small tier, 2026-10-08.
 
-- **Four of the 11 rows pass**: C10's sis-dba and financial-aid-director,
-  and C12's mainframe-dba and hearing-officer. C12's 8-character
-  truncation mapped 55 names and C10's dictionary 27, so the forward
-  mapping holds where inversion could not have.
-- **The other seven fail on structure, and none on a spelling.** That
+- **Three of the 11 rows pass**: C10's financial-aid-director, and
+  C12's mainframe-dba and hearing-officer. C12's 8-character truncation
+  mapped 55 names, so the forward mapping holds where inversion could
+  not have. C10's sis-dba passed too, until review found the reason was
+  false (below).
+- **The other eight fail on structure, and none on a spelling.** That
   was the acceptance criterion, but which structure was not what the
   scope predicted: only C07's row is a relationship the artifact
-  never states. Five are defects in the trial's own generator, and one
+  never states. Six are defects in the trial's own generator, and one
   is an importer limit that already had an issue:
-  - barwise-rlv (C03 policy-admin-dba; C10 ir-analyst and
-    registrar-data-steward; C12 modernization-architect and
+  - barwise-rlv (C03 policy-admin-dba; C10 ir-analyst,
+    registrar-data-steward and sis-dba; C12 modernization-architect and
     policy-analyst). `relationalView` writes an objectified fact type as
     two unlinked tables, and names a self-reference column after its
     player, so a ring table repeats one column. C03's "PolicyNumber and
@@ -111,6 +112,15 @@ Measured over the regenerated small tier, 2026-10-08.
   - barwise-c5f (C07 network-inventory-architect). The BigQuery skin
     writes no foreign key; whether the import should infer one from a
     key-named column is a new decision.
+- **A name the artifact declares twice is never mapped.** Not in the
+  scope, and found in review (PR #611). C10's skin adds vendor tables
+  named SPRIDEN, SFRSTCR and STVTERM, and its dictionary gives the
+  generated Person, Enrollment and Term tables the same names, so the
+  file creates each twice. The import keeps the first and drops the
+  second, and the grader mapped SPRIDEN to Person: C10's sis-dba passed
+  over a schema no database would load. `gradedCandidate` now reads the
+  artifact's manifest and leaves those names alone, which is why sis-dba
+  is under barwise-rlv; the collision itself is rlv's to fix.
 - **The SQL importer's catch-all acceptance class is gone.** It matched
   every non-kernel `-ddl` acceptance step, so it would have taken any
   new row on its cause without anyone looking. Each replacement class

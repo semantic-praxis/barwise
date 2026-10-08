@@ -35,7 +35,8 @@ Observed (2026-10-08):
 
 The trial rows classified here are graded with their names mapped
 through the skin (barwise-d60), so what fails is structure the artifact
-does not state: C03 policy-admin-dba, C10 ir-analyst and
-registrar-data-steward, C12 modernization-architect and policy-analyst.
+does not state: C03 policy-admin-dba, C10 ir-analyst,
+registrar-data-steward and sis-dba (whose Person is one of the
+colliding names), C12 modernization-architect and policy-analyst.
 C10's ir-analyst also fails "GraduateStudent is a subtype of Student",
 which is barwise-1078 (a primary key that is also a foreign key).

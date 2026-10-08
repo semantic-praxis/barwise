@@ -931,6 +931,13 @@
       "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's ir-analyst also fails a subtype check, which is barwise-1078.",
       "detail": "2 of 9 persona checks fail: The model has no fact type connecting \"Course\" and \"Course\".; The model does not verbalize as \"Each combination of Student, CourseSection and Term is unique in Student enrolls in CourseSection for Term.\". Check the fact type, its reading, and its constraints. (27 names ma"
     },
+    "C10/small/6/acceptance:sis-dba:sis-ddl": {
+      "severity": "S5",
+      "class": "acceptance-skin-generator-objectification",
+      "issue": "barwise-rlv",
+      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's sis-dba fails because the file creates SPRIDEN twice, once for Person and once as a skin extra table, so the grader maps neither (PR #611 review). C10's ir-analyst also fails a subtype check, which is barwise-1078.",
+      "detail": "4 of 9 persona checks fail: The model has no object type named \"Person\".; The model has no fact type connecting \"Person\" and \"Pidm\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Person has Pidm\"), so it cannot rule out: Rules out: two facts of Person has P"
+    },
     "C10/small/6/release-bundle:gym-list": {
       "severity": "S3",
       "class": "bundle-gym-catalog",

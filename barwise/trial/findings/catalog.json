@@ -133,8 +133,8 @@
       "id": "acceptance-skin-generator-objectification",
       "issue": "barwise-rlv",
       "severity": "S5",
-      "step": "^acceptance:(policy-admin-dba:pc-ddl|ir-analyst:sis-ddl|registrar-data-steward:sis-ddl|modernization-architect:modern-ddl|policy-analyst:modern-ddl)$",
-      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's ir-analyst also fails a subtype check, which is barwise-1078."
+      "step": "^acceptance:(policy-admin-dba:pc-ddl|ir-analyst:sis-ddl|registrar-data-steward:sis-ddl|sis-dba:sis-ddl|modernization-architect:modern-ddl|policy-analyst:modern-ddl)$",
+      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's sis-dba fails because the file creates SPRIDEN twice, once for Person and once as a skin extra table, so the grader maps neither (PR #611 review). C10's ir-analyst also fails a subtype check, which is barwise-1078."
     },
     {
       "id": "acceptance-no-foreign-keys",
