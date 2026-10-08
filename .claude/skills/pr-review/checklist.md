@@ -16,7 +16,11 @@ output specification for the PR body (spec:
   what this PR ships. `audit:specs --check` guards only the claim of
   no implementation (barwise-912). Authority: `spec-writer` skill.
 - A tracking issue exists; the PR does not close it, and says the
-  closure follows after merge. Authority: `steward` skill, section 5.
+  closure follows after merge. `check:tracker-closes` fails a diff that
+  closes any issue while changing files outside `.beads/`; it cannot
+  tell which issue is the PR's own, so a tracker-only PR that closes the
+  wrong issue is still the reviewer's to catch. Authority: `steward`
+  skill, section 5.
 - Every number in the body has the command that produced it, and
   re-running the command gives that number. Authority:
   `pr-creation`, section 4.3.

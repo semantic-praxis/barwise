@@ -23,6 +23,7 @@
     "check:lockfile": "node scripts/check-lockfile-agrees.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:shell": "node scripts/check-shell.mjs",
+    "check:tracker-closes": "node scripts/check-tracker-closes.mjs",
     "check:python-uv": "node scripts/check-python-uv.mjs",
     "check:root-scripts": "node scripts/regen-root-package.mjs --check",
     "check:book-citations": "node scripts/check-book-citations.mjs",

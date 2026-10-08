@@ -24,6 +24,7 @@
     "check:lockfile": "npm --prefix barwise run check:lockfile --",
     "check:secrets": "npm --prefix barwise run check:secrets --",
     "check:shell": "npm --prefix barwise run check:shell --",
+    "check:tracker-closes": "npm --prefix barwise run check:tracker-closes --",
     "check:python-uv": "npm --prefix barwise run check:python-uv --",
     "check:root-scripts": "npm --prefix barwise run check:root-scripts --",
     "check:book-citations": "npm --prefix barwise run check:book-citations --",

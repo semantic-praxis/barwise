@@ -123,6 +123,19 @@ jobs:
       - name: Validate beads tracker
         run: npm run check:beads -- --strict
 
+      # A pull request that closes an issue changes nothing but the tracker
+      # (steward skill, section 5). Written down twice and enforced nowhere,
+      # it was broken three times in one session and caught only by a
+      # reviewer bot (barwise-i61). No docs-only guard: a spec plus a close
+      # is exactly the shape it exists to stop. Pull requests only, since a
+      # push to main has no base to compare against; ci-local runs it
+      # against `git merge-base origin/main HEAD` instead
+      # (docs/specs/tracker-only-closes.spec.md).
+      - run: npm run check:tracker-closes
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+
       # Fast, source-only static gates next (none need the build), so a lint
       # or architecture violation fails in seconds rather than after the
       # build and test suite.
