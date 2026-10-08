@@ -391,6 +391,12 @@
       "caught_by": "execution",
       "note": "Rescoring the committed 20260828-1647 round moved 13 of 115 payloads, all one legitimate ORM shape."
     },
+    "key-reference-tables::ecfcf44f880e": {
+      "spec": "key-reference-tables.spec.md",
+      "excerpt": "1. when an unannotated table's key column carries exactly one foreign key, that foreign key is a shared-key foreign key and it meets both conditions below (two ",
+      "caught_by": "not-a-correction",
+      "note": "The detector matched \"every entry was dropped\" in requirement 4a, which states the fallback when an annotation's stale supertypes entries are all discarded on import. It describes importer behaviour, not a correction to the draft (PR #620)."
+    },
     "keyless-model-access::95734f42d91c": {
       "spec": "keyless-model-access.spec.md",
       "excerpt": "the draft said to check sampling, and that was wrong -- it is sampling.tools. reading clientcapabilities showed tool use is a separate capability nested under s",
