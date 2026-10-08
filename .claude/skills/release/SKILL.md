@@ -35,6 +35,7 @@ registry (these packages are not published). Use `patch` for bug fixes
 and small improvements, `minor` for new features or format support:
 
 ```bash
+git fetch origin main   # a stale origin/main would bump from a version already shipped
 git checkout -b release-bump origin/main
 npm version patch --workspaces --include-workspace-root \
   --no-git-tag-version --no-workspaces-update
@@ -45,17 +46,19 @@ git add -A && git commit -m "bump to $VER"
 git push -u origin release-bump   # open the PR; merge it once CI is green
 ```
 
-After the PR merges, tag the merge commit, not the branch commit:
+After the PR merges, tag the merge commit, not the branch commit. This
+block stands alone: it reads the version from the commit it tags rather
+than from `VER` above, which is empty in a fresh shell and would make the
+tag a bare `v`.
 
 ```bash
 git fetch origin main
-git tag -a "v$VER" -m "v$VER: brief description" origin/main
+SHA=$(git rev-parse origin/main)   # or the bump PR's merge SHA, if something merged after it
+git log -1 "$SHA"                  # confirm it is the bump's merge commit
+VER=$(git show "$SHA:barwise/package.json" | node -p "JSON.parse(require('fs').readFileSync(0)).version")
+git tag -a "v$VER" -m "v$VER: brief description" "$SHA"
 git push origin "v$VER"
 ```
-
-Check that `origin/main` is the bump's merge commit before tagging
-(`git log -1 origin/main`); if something else merged first, tag the
-bump's merge commit by its SHA instead.
 
 Three gotchas, each of which fails CI if skipped:
 
