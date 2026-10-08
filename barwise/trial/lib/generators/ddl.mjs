@@ -349,24 +349,43 @@ export function generateDdl(doc, skin, { factor = 1, seed = 1, artifactId = "ddl
         fks: idioms.no_foreign_keys ? [] : fks,
         importable: true,
       });
+      // An extension table holds more columns of its base table's rows: keyed
+      // on the base's whole key, each key column typed as the base types it,
+      // and a FOREIGN KEY over all of them. It used to copy only the first
+      // key column and write no FOREIGN KEY, recording one in the manifest
+      // alone, so no import ever saw the reference the trial claimed
+      // (key-reference-tables.spec.md, PR #620 review).
       if (idioms.extension_tables && t.entity && pkCols.length) {
+        const keyTypes = t.pk.map((k) => columnType(t.columns.find((c) => c.name === k)));
         for (const n of [2, 3]) {
           const ext = ident(`${tableName(t)}${suffix}_${n}`, true);
-          const extCols = [`  ${q(pkCols[0])} ${types.id} NOT NULL`];
+          const extCols = pkCols.map((k, i) => `  ${q(k)} ${keyTypes[i]} NOT NULL`);
+          const extNames = [...pkCols];
           for (let i = 0; i < 4; i++) {
-            extCols.push(`  ${q(ident(`${tableName(t)}_x${n}_${i}`, false))} ${types.text} NULL`);
+            const cname = ident(`${tableName(t)}_x${n}_${i}`, false);
+            extNames.push(cname);
+            extCols.push(`  ${q(cname)} ${types.text} NULL`);
+          }
+          const keyList = pkCols.map(q).join(", ");
+          const extConstraints = [`  PRIMARY KEY (${keyList})`];
+          if (!idioms.no_foreign_keys) {
+            extConstraints.push(
+              `  FOREIGN KEY (${keyList}) REFERENCES ${schema}${q(name)} (${keyList})`,
+            );
           }
           const sql2 = `CREATE TABLE ${schema}${q(ext)} (\n${
-            extCols.join(",\n")
-          },\n  PRIMARY KEY (${q(pkCols[0])})\n)`;
+            [...extCols, ...extConstraints].join(",\n")
+          }\n)`;
           emit(sql2, {
             name: ext,
             kind: "extension",
             source: t.entity,
             module: m + 1,
-            columns: [pkCols[0]],
-            pk: [pkCols[0]],
-            fks: [{ column: pkCols[0], ref: name, refColumn: pkCols[0] }],
+            columns: extNames,
+            pk: [...pkCols],
+            fks: idioms.no_foreign_keys
+              ? []
+              : [{ columns: [...pkCols], ref: name, refColumns: [...pkCols] }],
             importable: true,
           });
         }

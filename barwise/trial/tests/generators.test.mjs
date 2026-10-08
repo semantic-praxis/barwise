@@ -212,6 +212,35 @@ test("a reference to an objectification is a composite foreign key", () => {
   );
 });
 
+test("an extension table carries its base table's whole key and a FOREIGN KEY over it", () => {
+  // It once copied the first key column and wrote no FOREIGN KEY, recording
+  // one in the manifest alone, so no import saw the reference
+  // (key-reference-tables.spec.md, PR #620 review). policy_period is keyed
+  // on two columns, which the first-column copy got wrong.
+  const { text, manifest } = generateDdl(objectificationKernel(), {
+    ...ansi,
+    idioms: { extension_tables: true },
+  });
+  const ext = tableSql(text, "policy_period_2");
+  assert.match(ext, /PRIMARY KEY \(policy_id, term_id\)/);
+  assert.match(
+    ext,
+    /FOREIGN KEY \(policy_id, term_id\) REFERENCES policy_period \(policy_id, term_id\)/,
+  );
+  const row = manifest.tables.find((t) => t.name === "policy_period_2");
+  assert.deepEqual(row.fks, [{
+    columns: ["policy_id", "term_id"],
+    ref: "policy_period",
+    refColumns: ["policy_id", "term_id"],
+  }]);
+  // A skin that writes no foreign keys writes none here either.
+  const bare = generateDdl(objectificationKernel(), {
+    ...ansi,
+    idioms: { extension_tables: true, no_foreign_keys: true },
+  });
+  assert.doesNotMatch(tableSql(bare.text, "policy_period_2"), /FOREIGN KEY/);
+});
+
 test("a self-reference and two roles with one player are named after their roles", () => {
   const { text } = generateDdl(objectificationKernel(), ansi);
   assert.match(tableSql(text, "policy_period"), /supersedes_policy_period_policy_id/);
