@@ -74,8 +74,20 @@ than designed away: until barwise-3pc gives the importer a one-to-one
 reading to fall back on, a user who knows the table is a partition can
 only remove the subtype by hand, which also removes the relationship.
 The tests carry `ARCHIVED_ORDER` as a control that pins this behaviour,
-with a comment naming the limit. barwise's own DDL export writes this shape only for subtypes,
-with an annotation, which is read first and is unaffected.
+with a comment naming the limit.
+
+**barwise's own export loses its subtypes today, annotated or not** (PR
+#620 review). An earlier draft said the export's annotation is read
+first and so is unaffected. It is not: the table annotation
+(`barwiseAnnotation.ts`, `TableAnnotation`) records the entity,
+reference mode, definition and objectification, and nothing about a
+supertype. Measured on `examples/output/employee-hierarchy.orm.yaml`:
+exported as annotated DDL and imported again, both subtype facts are
+gone -- Manager's shared key (identifying) warns as barwise-1078, and
+Employee's `person_id` column (non-identifying) imports as an ordinary
+relationship. So the annotation gains an explicit `supertype`, which
+the export writes and the import reads before any naming rule:
+explicit where barwise wrote the DDL, inferred only where it did not.
 
 ## Options
 
@@ -121,10 +133,21 @@ round-trips: the mapper writes exactly this shape for a subtype.
    a shared-key foreign key, the importer shall
    read it exactly as before this spec (for a shared-key foreign key:
    the key imported, the reference not, and the existing warning).
-4. When a table carries a barwise annotation, the importer shall read
-   the annotation and ignore this rule.
-5. A subtype imported by requirement 1 and exported again shall
-   re-export as one column that is both key and foreign key.
+4. The DDL export shall write, on the table annotation of every entity
+   that is a subtype, an optional `supertype` naming the supertype
+   entity and the column that references its table. When a table's
+   annotation carries `supertype`, the importer shall import the
+   subtype fact from it -- identifying when that column is the table's
+   shared key, not identifying otherwise, the column then imported as
+   the subtype link rather than as a relationship -- and shall not
+   apply requirements 1-3 to that table. When an annotated table has
+   no `supertype` (an export from before this spec, or an entity that
+   is no subtype), requirements 1-3 apply to it as to an unannotated
+   table.
+5. A subtype imported by requirement 1 or 4 and exported again, with
+   and without annotations, shall give the same subtype facts, and an
+   identifying subtype shall re-export as one column that is both key
+   and foreign key.
 
 ## The one-to-one reading is a follow-up (resolved: deferred)
 
@@ -154,7 +177,12 @@ same-noun name that would otherwise qualify -- a composite foreign key
 `(tenant_id, order_id)` that contains the single key column, and a
 one-column foreign key to the parent's alternate UNIQUE column rather
 than its primary key -- both keeping today's reading; and a
-round-trip test that a caught subtype re-exports unchanged. The trial
+round-trip test that a caught subtype re-exports unchanged; the
+`supertype` field in `barwiseAnnotation.ts` (writer and reader) and
+`DdlExportFormat`, with round-trip tests, annotated and not, over an
+identifying and a non-identifying subtype -- `employee-hierarchy`
+carries both -- and a test that an annotation's `supertype` wins over
+a table name that fails the naming rule. The trial
 generator writing the extension tables' `FOREIGN KEY`, which its
 manifest already records (`trial/lib/generators/ddl.mjs`), with a
 generator test that each extension table's DDL carries it -- without

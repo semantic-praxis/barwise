@@ -89,7 +89,10 @@ something it did not (PR #620 review). The refusal has its own test.
 In scope: requirements 1-6 in the DDL importer, with `SqlImportFormat`
 threading the option through its file and directory flows (today it
 passes `DdlImportFormat.parse` only `{ modelName }` in both); unit tests
-for each matching form, an equivalent type spelling (`INT` against
+for each matching form; one per ending pair (`categories` to
+`category`, `statuses` to `status`, `subjects` to `subject`, each
+in both directions) and an irregular plural (`people` does not match
+`person`); an equivalent type spelling (`INT` against
 `INTEGER`), a length difference (`VARCHAR(10)` against `VARCHAR(12)`,
 inferred), an identity key (`INT IDENTITY` against `INT`, inferred), an
 unrecognised type on either side (not inferred), a type mismatch, a

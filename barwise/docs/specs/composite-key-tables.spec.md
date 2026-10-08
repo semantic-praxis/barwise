@@ -51,6 +51,13 @@ combination, so a fact over the key and that column would either lose
 the row or invent a value. A nullable extra column forces
 objectification and becomes an optional attribute.
 
+A table another table references never takes the extra role (PR #620
+review: requirements 2 and 3 both matched it). It must be objectified,
+and a fact type unique over only some of its roles is not one to
+objectify: its objectifier would be identified by the key while the
+extra role hung off the fact. So the fact type stays over the key, and
+the column is the objectifier's attribute or relationship.
+
 **Every shape the rule produces must be one the relational mapper
 exports back** (PR #620 review). The mapper writes an n-ary fact type
 or a many-to-many between entities as its own table, and an objectified
@@ -71,7 +78,8 @@ referenced.
    type whose roles are each such foreign key and each other key column,
    unique over the key's roles.
 2. When exactly one column remains beside the key, NOT NULL and not
-   unique by itself, the importer shall add it as a further role, the
+   unique by itself, and no other table references the table, the
+   importer shall add it as a further role, the
    uniqueness still over the key's roles only.
 3. When any other column remains beside the key, when another table
    references the table, or when the fact type would be a binary over
@@ -154,7 +162,10 @@ referenced.
 ## Scope
 
 In scope: requirements 1-7, in `DdlImportFormat` (formats) and the dbt
-mapping (dbt); a test per row of the table above in each package; a dbt test that a
+mapping (dbt); a test per row of the table above in the DDL importer, and in the dbt
+importer per row dbt can state (not the composite-foreign-key row:
+dbt's `relationships` test is per column, so it cannot say several
+columns form one reference -- barwise-tjg); a dbt test that a
 model with two qualifying combination tests keeps today's reading and
 is reported; the
 drift test in `@barwise/cli`, the one package that depends on both --
