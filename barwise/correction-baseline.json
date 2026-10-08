@@ -415,6 +415,18 @@
       "caught_by": "execution",
       "note": "Measured directly: the env var was dropped under strict env mode, so the run looked isolated and was not."
     },
+    "lockfile-gate-stale-install::2ee389253e74": {
+      "spec": "lockfile-gate-stale-install.spec.md",
+      "excerpt": "status: implemented 2026-10-08 (single change). one deviation from the draft: the comparison skips every entry outside nodemodules, not only the root (see scope",
+      "caught_by": "execution",
+      "note": "Status line recording the deviation. A surviving mutant (removing the root-entry skip failed no test) showed the skip was untested; working out why it matters widened it to every entry outside node_modules."
+    },
+    "lockfile-gate-stale-install::d2c3e66f5232": {
+      "spec": "lockfile-gate-stale-install.spec.md",
+      "excerpt": "- before running npm ls, the gate shall compare each entry in package-lock.json's packages map with the installed package at that path, reading the installed pa",
+      "caught_by": "execution",
+      "note": "Scope block with two corrections. The root-only skip widened to every entry outside node_modules after a surviving mutant showed it untested (execution). The packages-map refusal, the npm-link skip and the neutral refusal wording came from the code-review self-review reading the diff (reasoning)."
+    },
     "model-graph-and-id-spaces::1ca8e3cb770b": {
       "spec": "model-graph-and-id-spaces.spec.md",
       "excerpt": "its premise is false for most of its cases, and that is now measured rather than suspected (barwise-979). the draft below said \"once the graph is total, that pr",
