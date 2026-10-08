@@ -2,6 +2,7 @@ import { getImporter, listImporters, OrmYamlSerializer } from "@barwise/core";
 import type { Command } from "commander";
 import { basename, extname } from "node:path";
 import { readFile, writeOutput } from "../../workspace/io.js";
+import { INFER_REFERENCES_HELP } from "./shared.js";
 
 export function addModelSubcommand(importCmd: Command): void {
   // Format-based import (DDL, OpenAPI -- text-based formats)
@@ -19,7 +20,7 @@ export function addModelSubcommand(importCmd: Command): void {
     .option("--name <name>", "Model name (defaults to filename)")
     .option(
       "--infer-references",
-      "Read a column named after another table's key, with its type, as a reference to it (each one is reported)",
+      INFER_REFERENCES_HELP,
     )
     .action(
       async (

@@ -4,6 +4,7 @@ import type { Command } from "commander";
 import { statSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
 import { readFile, writeOutput } from "../../workspace/io.js";
+import { INFER_REFERENCES_HELP } from "./shared.js";
 
 export function addSqlSubcommand(importCmd: Command): void {
   // SQL file/directory import
@@ -19,7 +20,7 @@ export function addSqlSubcommand(importCmd: Command): void {
     )
     .option(
       "--infer-references",
-      "Read a column named after another table's key, with its type, as a reference to it (each one is reported)",
+      INFER_REFERENCES_HELP,
     )
     .action(
       async (
