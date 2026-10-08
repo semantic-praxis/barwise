@@ -96,8 +96,8 @@ round-trips: the mapper writes exactly this shape for a subtype.
    of the referenced table's entity, identified through it.
 2. When it does, the importer shall add a warning naming the table, the
    supertype and both conditions.
-3. When such a table meets either condition but not both, the importer
-   shall read it as before this spec: the key imported, the reference
+3. When such a table does not meet both conditions, the importer shall
+   read it as before this spec: the key imported, the reference
    not, and the existing warning.
 4. When a table carries a barwise annotation, the importer shall read
    the annotation and ignore this rule.

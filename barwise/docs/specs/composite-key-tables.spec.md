@@ -63,10 +63,11 @@ referenced.
 
 ## Requirements
 
-1. When an unannotated table's primary key has two or more roles and at
-   least one foreign key wholly inside it, the DDL importer shall import
-   one fact type whose roles are each such foreign key and each other key
-   column, unique over the key's roles.
+1. When an unannotated table's primary key has two or more roles, at
+   least one foreign key wholly inside it, and the foreign keys wholly
+   inside it share no column, the DDL importer shall import one fact
+   type whose roles are each such foreign key and each other key column,
+   unique over the key's roles.
 2. When exactly one column remains beside the key, NOT NULL and not
    unique by itself, the importer shall add it as a further role, the
    uniqueness still over the key's roles only.
@@ -74,10 +75,16 @@ referenced.
    references the table, or when the fact type would be a binary over
    one foreign key and one value, the importer shall objectify the fact
    type by an entity named after the table and import the remaining
-   columns as that entity's attributes.
-4. When the key is one composite foreign key, or contains no foreign
-   key, or a foreign key lies partly inside it, the importer shall read
-   the table as it did before this spec.
+   columns as that entity's attributes. A remaining column unique by
+   itself shall be an attribute whose value role is unique -- an
+   alternate identifier; the objectified fact type's key, which is the
+   table's primary key, remains the entity's preferred identification.
+4. When the key is one composite foreign key, contains no foreign key,
+   has a foreign key lying partly inside it, or has two foreign keys
+   inside it that share a column (PR #620 review: `FOREIGN KEY
+   (tenant_id)` beside `FOREIGN KEY (tenant_id, order_id)`), the
+   importer shall read the table as it did before this spec. This
+   requirement takes precedence over requirements 1-3.
 5. When a dbt model has no column with both `unique` and `not_null` and
    a model-level `dbt_utils.unique_combination_of_columns` names two or
    more columns, each `not_null`, at least one a `relationships` column,
@@ -89,7 +96,8 @@ referenced.
    objectifications.
 7. For each shape both formats can state, the cli drift test shall
    import it as DDL and as the equivalent dbt project and shall fail when
-   the two disagree on the fact types the rule builds or on what is
+   the two disagree, for the fact types the rule builds, on role players,
+   internal uniquenesses or mandatory constraints, or on what is
    objectified.
 
 ## Open decisions
@@ -114,8 +122,10 @@ referenced.
    single `unique` + `not_null` column keeps today's reading: that column
    is a dbt model's key by convention, so where DDL can say a single
    `UNIQUE` sits beside a composite primary key, dbt cannot.
-4. **A column unique by itself beside the key.** Recommended: the
-   objectifying entity's identifier, never a role. The trade-off (PR
+4. **A column unique by itself beside the key.** Recommended: an
+   alternate identifier of the objectifying entity (a unique attribute),
+   never a role; the primary key stays the preferred identification, as
+   the DDL says. The trade-off (PR
    #620 review): the DDL importer reads a single-column UNIQUE elsewhere
    as a role with a uniqueness (`DdlImportFormat.ts`, header), and a
    unique column could be the extra role of a fact type that happens to

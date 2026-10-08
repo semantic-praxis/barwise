@@ -31,7 +31,11 @@ relationships into a model that no one stated.
 
 The rule under B: a column `X` in table `T` references table `U` when
 `X` equals `U`'s single key column name, or `<U>_<key>`, or `<U>_id`
-(case- and separator-insensitive, `U` singular or plural), `U` is not
+(case- and separator-insensitive; `U` matches in its own form or in
+the other number by exactly these endings and no others: `ies` and
+`y`, `es` and nothing, `s` and nothing -- so `categories` matches
+`category`, `statuses` matches `status`, and an irregular plural such
+as `people` matches only itself, PR #620 review), `U` is not
 `T`, and the declared types match; a column that would match two tables
 infers nothing and is reported. Each inference is a warning naming the
 column and the table, so it can be checked by eye.
