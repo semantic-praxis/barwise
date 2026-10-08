@@ -275,6 +275,20 @@ for (const f of [...failed, ...refused]) {
   console.error(`\nfull output: ${f.log}`);
 }
 
+/**
+ * The gates this run did not run, on EVERY exit path -- a pass, a failure
+ * and a refusal alike. A runner that silently does less than it used to is
+ * how a fast path becomes a hole; these lines are the evidence that it did
+ * the right less, and `--all` is how to do more. Printed only on success at
+ * first, so a docs-only run with one failing gate did not say what it had
+ * skipped (Copilot, PR #602).
+ */
+function reportSkipped(write) {
+  if (skipped.length === 0) return;
+  write(`${skipped.length} skipped for this change, as CI skips them (--all runs them):`);
+  for (const s of skipped) write(`  npm ${s.args}   [if: ${s.condition}]`);
+}
+
 // Exit 1 only for a real finding. Refusals alone exit 2, so a caller can tell
 // "this tree has a problem" from "this container cannot check everything" --
 // and neither prints that all gates passed, because they did not.
@@ -283,6 +297,7 @@ if (failed.length > 0) {
   if (refused.length > 0) {
     console.error(`${refused.length} could not answer: ${refused.map((r) => r.gate).join(", ")}`);
   }
+  reportSkipped(console.error);
   console.error(`Logs: ${LOG_DIR}`);
   process.exit(1);
 }
@@ -292,15 +307,10 @@ if (refused.length > 0) {
   );
   console.error(`  ${refused.map((r) => r.gate).join("\n  ")}`);
   console.error(`Install what they name, or accept that much is unchecked.`);
+  reportSkipped(console.error);
   console.error(`Logs: ${LOG_DIR}`);
   process.exit(2);
 }
 rmSync(RUN_DIR, { recursive: true, force: true });
 console.log(`\nAll ${list.length} gates passed.`);
-// The skip list is printed on success too. A runner that silently does less
-// than it used to is how a fast path becomes a hole; these lines are the
-// evidence that it did the right less, and `--all` is how to do more.
-if (skipped.length > 0) {
-  console.log(`${skipped.length} skipped for this change, as CI skips them (--all runs them):`);
-  for (const s of skipped) console.log(`  npm ${s.args}   [if: ${s.condition}]`);
-}
+reportSkipped(console.log);

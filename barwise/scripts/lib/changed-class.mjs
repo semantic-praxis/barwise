@@ -46,9 +46,18 @@ export function classify(paths) {
   };
 }
 
-/** NUL-separated so a path git would quote reaches the regexes as itself. */
-function gitPaths(args, cwd) {
-  const out = execFileSync("git", [...args, "-z"], { cwd, encoding: "utf8" });
+/**
+ * NUL-separated so a path git would quote reaches the regexes as itself.
+ *
+ * `-z` goes straight after the subcommand, never at the end: once an
+ * argument list contains `--`, git reads everything after it as a pathspec,
+ * so a trailing `-z` became a path to match and the output fell back to
+ * newlines. Two untracked files then arrived as ONE string, and one that
+ * began `.beads/` classified an untracked `.ts` beside it as docs-only --
+ * the direction that skips gates CI runs (Copilot, PR #602).
+ */
+function gitPaths([subcommand, ...rest], cwd) {
+  const out = execFileSync("git", [subcommand, "-z", ...rest], { cwd, encoding: "utf8" });
   return out.split("\0").filter(Boolean);
 }
 

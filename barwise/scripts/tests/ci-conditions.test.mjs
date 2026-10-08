@@ -189,6 +189,22 @@ test("ci:local --list: an uncommitted source edit is not docs-only", () => {
   }
 });
 
+test("ci:local --list: an untracked source file beside an untracked .beads/ file is not docs-only", () => {
+  // Two untracked files, one docs-shaped and listed first. With `-z` after
+  // `--` git read it as a pathspec and returned one newline-joined string,
+  // which `^\.beads\/` matched -- so the .ts beside it vanished (PR #602).
+  const { dir, git } = sandbox();
+  try {
+    git("update-ref", "refs/remotes/origin/main", "HEAD");
+    mkdirSync(join(dir, ".beads"));
+    writeFileSync(join(dir, ".beads", "a.jsonl"), "{}\n");
+    writeFileSync(join(dir, "x.ts"), "export {};\n");
+    assert.equal(list(dir).run, expected(CODE));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("ci:local --list: a CLI change runs every gate", () => {
   const { dir, git } = sandbox();
   try {
@@ -196,6 +212,59 @@ test("ci:local --list: a CLI change runs every gate", () => {
     mkdirSync(join(dir, "barwise", "packages", "cli"), { recursive: true });
     writeFileSync(join(dir, "barwise", "packages", "cli", "x.ts"), "export {};\n");
     assert.equal(list(dir).run, steps.length);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("ci:local names the gates it skipped even when a gate it ran failed", () => {
+  // The skip list was printed only on the success path, so the run most
+  // worth reading -- a red one -- did not say what it had not checked
+  // (Copilot, PR #602). A real run, not --list: the failure path is the
+  // thing under test.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-cilocal-fail-"));
+  const git = (...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
+  try {
+    mkdirSync(join(dir, "barwise", "scripts", "lib"), { recursive: true });
+    mkdirSync(join(dir, ".github", "workflows"), { recursive: true });
+    for (const f of ["ci-local.mjs", "lib/ci-gates.mjs", "lib/changed-class.mjs"]) {
+      cpSync(join(SCRIPTS, f), join(dir, "barwise", "scripts", f));
+    }
+    writeFileSync(
+      join(dir, ".github", "workflows", "ci.yml"),
+      [
+        "jobs:",
+        "  ci:",
+        "    steps:",
+        "      - run: npm run boom",
+        "      - run: npm run heavy",
+        "        if: steps.changes.outputs.docs_only != 'true'",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(
+      join(dir, "barwise", "package.json"),
+      JSON.stringify({
+        name: "fake",
+        private: true,
+        scripts: { boom: 'node -e "process.exitCode = 1"', heavy: 'node -e ""' },
+      }),
+    );
+    git("init", "-q", "-b", "main");
+    git("-c", "user.email=t@t", "-c", "user.name=t", "add", "-A");
+    git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "base");
+    git("update-ref", "refs/remotes/origin/main", "HEAD");
+    mkdirSync(join(dir, ".beads"));
+    writeFileSync(join(dir, ".beads", "issues.jsonl"), "{}\n");
+
+    const r = spawnSync(process.execPath, [join(dir, "barwise", "scripts", "ci-local.mjs")], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 1, `${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /1 of 1 gates failed/);
+    assert.match(r.stderr, /1 skipped for this change/);
+    assert.match(r.stderr, /npm run heavy/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

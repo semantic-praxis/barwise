@@ -78,9 +78,10 @@ Three traps:
   fixes it applied -- re-stage and commit again rather than assuming
   the fixes stuck.
 - The pre-push hook runs `ci:local`, which runs the gates CI will run
-  for this change and lists the ones it skips, so the command above is
-  a subset of what the push will check anyway. Budget ~30s warm, ~3min
-  when sources changed.
+  for this change and lists the ones it skips. For a source change the
+  command above is a subset of what the push will check anyway; for a
+  Markdown or `.beads/`-only change the push skips build, lint and
+  tests, as CI does. Budget ~30s warm, ~3min when sources changed.
 
 A PR touching only Markdown and `.beads/` takes CI's docs-only path
 (formatting and tracker checks only), so tracker-only and docs-only

@@ -1,4 +1,4 @@
-# The whole CI gate list, run at the event that actually causes a red
+# The CI gates CI selects for this change, run at the event that actually causes a red
 # build. Two red pushes in one session came from gates that were simply
 # not run -- `fmt:check`, then `knip` -- and a third came from running
 # only the two gates I happened to be thinking about. `ci:local` derives
