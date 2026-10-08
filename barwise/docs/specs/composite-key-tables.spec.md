@@ -230,11 +230,23 @@ Measured over the regenerated small tier, 2026-10-08.
 - **Review changed the rule five times before any code ran.** NOT NULL
   for the extra column, objectifying the foreign-key-and-value binary,
   the single composite foreign key, overlapping foreign keys and the dbt
-  `not_null` key columns all came from the six review rounds of PR #620;
+  `not_null` key columns all came from the review rounds of PR #620;
   each has a test, and the overlap guard's test was shown to fail
   without it.
 - **The drift test was too weak at first.** Mutating the dbt side's
   NOT NULL condition left it green: no case had a nullable extra column.
   It gained one, and the same mutation now fails it.
+- **Later rounds changed it three more times, after the code existed.**
+  A referenced table never takes the extra role, since it must be
+  objectified and a fact type unique over only some of its roles is not
+  one to objectify; a dbt model with two qualifying combination tests
+  has no key; and the drift test compares every fact type the
+  objectifier plays in. Each has a test shown to fail without its
+  change. A full offline trial run after them moved no baseline row.
+- **The wider drift test found a fixture error, not a code one.** The
+  LineId case declared `line_id` NOT NULL on the DDL side and nullable
+  on the dbt side, which must leave out `not_null` or make the column
+  the key; the two sides described different schemas. The DDL side is
+  now nullable too.
 - **One PR, not two.** The plan put each importer in its own PR; the
   drift test needs both, so they landed together.
