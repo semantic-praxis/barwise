@@ -66,3 +66,29 @@ importer defect the per-row triage turns up; each is filed instead.
 - **Declare the naming failures `not_expressible`.** Wrong for the same
   reason, and AUTHORING.md forbids using the declaration for anything
   but a format limit.
+
+## Implementation notes
+
+- **Six of the 19 rows now pass** on the regenerated small tier (C02
+  regmart, C04 snowflake, C06 tms, C08 billing, C09 clinical data
+  manager, C09 pharmacovigilance lead) and are removed from the
+  baseline. The gate reads `0 new, 0 stale, 166 open -> PASS`.
+- **Eleven point at barwise-d60**, through the existing
+  `acceptance-edit-distance-sql` class, re-pointed: every failing check
+  left in them is a renamed concept or an unstated relationship.
+- **Two point at barwise-2z1, filed here** through a new
+  `acceptance-all-role-table` class. The per-row triage found an
+  importer gap the first draft did not: a table whose every column is a
+  role (C08's meter readings, C09's doses) imports as an entity or as a
+  relationship over its foreign keys alone, never as the three-role
+  fact type. `trial/findings/barwise-2z1/` reproduces it.
+- **A second generator gap surfaced after the first fix:** a table for a
+  fact type of three or more roles was keyed on all of them, whatever
+  its uniqueness said, which hid C06's "for each Shipment and Leg at
+  most one Vehicle" from the artifact. It is keyed on the uniqueness
+  now.
+- **Copilot's review found two cases the generator must not write:**
+  BigQuery has no `UNIQUE` constraint, and a deontic uniqueness (C12's
+  Recipient and Program) is an obligation a row may break.
+- **The `acceptance-edit-distance-ddl` class is removed**: its rows
+  either pass or moved to `acceptance-all-role-table`.

@@ -123,11 +123,18 @@
       "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi)."
     },
     {
+      "id": "acceptance-all-role-table",
+      "issue": "barwise-2z1",
+      "severity": "S5",
+      "step": "^acceptance:(c08-metering-data-engineer:cis-ddl|biostatistician:sdtm-ddl)$",
+      "note": "Edit distance to acceptance on a DDL table whose every column is a role of one fact type: without a barwise line the import reads it as an entity with attributes, or as a relationship over its foreign keys alone, so the three-role fact type the persona checks for is not there (barwise-2z1). C09's biostatistician also fails a subtype check, which is barwise-1078."
+    },
+    {
       "id": "acceptance-edit-distance-sql",
-      "issue": "barwise-1077",
+      "issue": "barwise-d60",
       "severity": "S5",
       "step": "^acceptance:.*:(?!kernel).*-ddl$",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql, which since barwise-jjd reads CREATE TABLE through the DDL importer -- so the residual is acceptance-edit-distance-ddl's: composite keys and multi-column uniqueness replaced with an invented key (barwise-1077), and relationships an artifact without FOREIGN KEY clauses never states (C07's BigQuery skin). Checks DDL cannot express keep a row open after the fix; reclassify it then.",
+      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
       "importer": "sql"
     },
     {
@@ -164,14 +171,6 @@
       "step": "^acceptance:",
       "importer": "openapi",
       "note": "Edit distance to acceptance on an OpenAPI artifact. Checks OpenAPI cannot state (rings, deontic rules, composite and value-side uniqueness, n-ary uniqueness) are declared not_expressible on the personas (barwise-1079). What remains is the importer ignoring discriminator subtypes (barwise-nul)."
-    },
-    {
-      "id": "acceptance-edit-distance-ddl",
-      "issue": "barwise-1077",
-      "severity": "S5",
-      "step": "^acceptance:",
-      "importer": "ddl",
-      "note": "Edit distance to acceptance on a DDL artifact read by the DDL importer: the persona checks fail partly on composite keys and multi-column uniqueness the importer replaces with an invented key (barwise-1077). Checks DDL cannot express keep a row open after the fix; reclassify it then."
     }
   ]
 }
