@@ -1,4 +1,10 @@
-import { type OrmModel, referenceModeOf, type RingType } from "@barwise/core";
+import {
+  absorbedReferenceModes,
+  type OrmModel,
+  pureObjectifyingEntityIds,
+  referenceModeOf,
+  type RingType,
+} from "@barwise/core";
 import type {
   ConstraintEdge,
   ConstraintKind,
@@ -96,56 +102,11 @@ export function modelToGraph(
   const constraintEdges: ConstraintEdge[] = [];
   const subtypeEdges: SubtypeEdge[] = [];
 
-  // Identify absorbed reference mode patterns: when an entity type has a
-  // reference mode, its identifying value type and identifying fact type
-  // are shown as "EntityName (.ref_mode)" on the entity node, not as
-  // separate nodes and edges on the diagram.
-  const absorbedValueTypeIds = new Set<string>();
-  const absorbedFactTypeIds = new Set<string>();
-
-  for (const ot of model.objectTypes) {
-    if (ot.kind !== "entity" || !ot.referenceMode) continue;
-
-    // Find fact types with is_preferred uniqueness connecting this entity
-    // to a value type.
-    for (const ft of model.factTypes) {
-      if (ft.arity !== 2) continue;
-
-      const hasPreferred = ft.constraints.some(
-        (c) => c.type === "internal_uniqueness" && c.isPreferred,
-      );
-      if (!hasPreferred) continue;
-
-      // Check if this fact type connects our entity to a value type.
-      const role0Player = model.getObjectType(ft.roles[0]!.playerId);
-      const role1Player = model.getObjectType(ft.roles[1]!.playerId);
-      if (!role0Player || !role1Player) continue;
-
-      let valueTypeId: string | undefined;
-      if (role0Player.id === ot.id && role1Player.kind === "value") {
-        valueTypeId = role1Player.id;
-      } else if (role1Player.id === ot.id && role0Player.kind === "value") {
-        valueTypeId = role0Player.id;
-      }
-
-      if (valueTypeId) {
-        absorbedValueTypeIds.add(valueTypeId);
-        absorbedFactTypeIds.add(ft.id);
-      }
-    }
-  }
-
-  // An identifying value type that also plays an ordinary role stays a
-  // node: hiding it would leave that role's edge pointing at nothing. The
-  // dbt importer writes this shape whenever a non-key column shares a key
-  // column's name. The identifying fact type is still folded into the
-  // entity's "(.ref_mode)" label either way.
-  for (const vtId of [...absorbedValueTypeIds]) {
-    const playsOtherRole = model
-      .factTypesForObjectType(vtId)
-      .some((ft) => !absorbedFactTypeIds.has(ft.id));
-    if (playsOtherRole) absorbedValueTypeIds.delete(vtId);
-  }
+  // Reference-mode patterns folded into the entity's "(.ref_mode)" label.
+  // The rule lives in core, shared with the NORMA exporter.
+  const absorbed = absorbedReferenceModes(model);
+  const absorbedValueTypeIds = absorbed.valueTypeIds;
+  const absorbedFactTypeIds = absorbed.factTypeIds;
 
   // Build a lookup from fact type id to objectified entity name, and
   // collect objectified entity IDs that don't play roles in any other
@@ -153,24 +114,12 @@ export function modelToGraph(
   // fact type node (with the rounded-rectangle envelope) so rendering
   // them as separate entity nodes produces disconnected "island" nodes.
   const objectifiedMap = new Map<string, string>();
-  const objectifiedEntityIds = new Set<string>();
   for (const oft of model.objectifiedFactTypes) {
     const entityType = model.getObjectType(oft.objectTypeId);
-    if (entityType) {
-      objectifiedMap.set(oft.factTypeId, entityType.name);
-      objectifiedEntityIds.add(oft.objectTypeId);
-    }
+    if (entityType) objectifiedMap.set(oft.factTypeId, entityType.name);
   }
-
-  // Remove objectified entities that also play roles in other fact
-  // types -- they need to stay as visible nodes with edges.
-  for (const ft of model.factTypes) {
-    for (const role of ft.roles) {
-      if (objectifiedEntityIds.has(role.playerId)) {
-        objectifiedEntityIds.delete(role.playerId);
-      }
-    }
-  }
+  // Shared with the NORMA exporter (core), so both hide the same entities.
+  const objectifiedEntityIds = pureObjectifyingEntityIds(model);
 
   // Create object type nodes (skip absorbed value types, pure
   // objectified entities, and filtered-out types).
