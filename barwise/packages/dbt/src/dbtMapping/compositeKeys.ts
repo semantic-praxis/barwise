@@ -56,7 +56,8 @@ export function compositeKeyOf(m: DbtModel): string[] | undefined {
  * Phase 1a: decide each composite-key model's reading. A `relationships`
  * column is a foreign key; dbt states one per column, so each is a role.
  * The roles are the key's columns plus, when exactly one other column
- * remains that is `not_null` and not `unique` by itself, that column. The
+ * remains that is `not_null` and not `unique` by itself, and no other model
+ * references this one, that column. The
  * fact type is objectified when other columns remain, when another model
  * references this one, or when it would be a binary over one reference and
  * one value, which the relational mapper writes into the entity's table.
@@ -74,7 +75,11 @@ export function analyzeComposites(ctx: DbtMapperContext): void {
     const others = m.columns.filter((c) => !key.includes(c.name));
     const candidates = others.filter((c) => !hasTest(c, "unique"));
     const lone = candidates.length === 1 ? candidates[0]! : undefined;
-    const extra = lone && hasTest(lone, "not_null") ? lone.name : undefined;
+    // A referenced model must be objectified, and a fact type unique over
+    // only some of its roles is not one to objectify (PR #620 review).
+    const extra = !referenced.has(m.name) && lone && hasTest(lone, "not_null")
+      ? lone.name
+      : undefined;
     const roles = (extra ? [...key, extra] : key).map((c) => [c]);
     const valueBinary = roles.length === 2 && roles.filter((r) => relCols.has(r[0]!)).length === 1;
     const remaining = others.length - (extra ? 1 : 0);

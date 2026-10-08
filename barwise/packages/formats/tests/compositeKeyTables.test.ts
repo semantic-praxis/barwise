@@ -175,6 +175,31 @@ describe("a composite-key table imports as the fact type it states", () => {
     expect(shape(model).objectified).toEqual(["Offering"]);
   });
 
+  it("a referenced table's one NOT NULL column stays an attribute, not a role", () => {
+    // Objectified because waitlist references it, so the fact type stays
+    // over the key: one unique over only some of its roles is not one to
+    // objectify (PR #620 review).
+    const sql = `CREATE TABLE course (course_id INT PRIMARY KEY);
+      CREATE TABLE section (crn INT PRIMARY KEY);
+      CREATE TABLE offering (
+        course_id INT NOT NULL REFERENCES course (course_id),
+        crn INT NOT NULL REFERENCES section (crn),
+        room_code VARCHAR(8) NOT NULL,
+        PRIMARY KEY (course_id, crn));
+      CREATE TABLE waitlist (
+        waitlist_id INT PRIMARY KEY,
+        offering_course_id INT NOT NULL,
+        offering_crn INT NOT NULL,
+        FOREIGN KEY (offering_course_id, offering_crn) REFERENCES offering (course_id, crn));`;
+    const { model } = ddl.parse(sql);
+    expect(shape(model).objectified).toEqual(["Offering"]);
+    expect(shape(model).factTypes).toContainEqual({
+      players: ["Course", "Section"],
+      uniques: [[0, 1]],
+    });
+    expect(model.factTypes.map((f) => f.name)).toContain("Offering has RoomCode");
+  });
+
   it("a key of one foreign key and one value is objectified, since the mapper could not write the binary", () => {
     const sql = `CREATE TABLE meter (meter_id INT PRIMARY KEY);
       CREATE TABLE meter_reading_time (

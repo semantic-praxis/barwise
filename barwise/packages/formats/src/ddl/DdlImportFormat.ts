@@ -1416,7 +1416,7 @@ function skipDefaultExpression(text: string): string {
  * (composite-key-tables.spec.md): the roles of the fact type it states --
  * each foreign key inside the key, each plain key column, and the one
  * other column when exactly one remains that is NOT NULL and not itself
- * unique -- and whether that fact type needs an entity to objectify it.
+ * unique, unless another table references this one -- and whether that fact type needs an entity to objectify it.
  * It does when other columns remain for the entity to hold, when another
  * table references this one, or when the fact type would be a binary over
  * one foreign key and one value, which the relational mapper writes into
@@ -1458,8 +1458,11 @@ function compositeReading(table: ParsedTable, referenced: boolean): CompositeRea
   const lone = candidates.length === 1 ? candidates[0]! : undefined;
   const loneFk = lone && table.foreignKeys.find((f) => f.columns.includes(lone.name));
   // A nullable extra column cannot widen the fact: a row without it still
-  // states the key's combination (PR #620 review).
-  const extra = lone && !lone.nullable && (!loneFk || loneFk.columns.length === 1)
+  // states the key's combination (PR #620 review). Nor can one beside a
+  // key another table references: that fact type must be objectified, and
+  // one unique over only some of its roles is not one to objectify.
+  const extra = !referenced && lone && !lone.nullable
+      && (!loneFk || loneFk.columns.length === 1)
     ? [lone.name]
     : undefined;
   const roles = extra ? [...keyRoles, extra] : keyRoles;

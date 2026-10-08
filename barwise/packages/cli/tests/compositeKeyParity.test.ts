@@ -94,6 +94,29 @@ const cases: { name: string; ddl: string; dbt: string; }[] = [
     }`,
   },
   {
+    // Referenced, so objectified; the NOT NULL column stays an attribute
+    // rather than widening a fact type that is then objectified with a
+    // uniqueness over only some of its roles (PR #620 review).
+    name: "one NOT NULL column beside a key another table references",
+    ddl: `CREATE TABLE course (course_id INT PRIMARY KEY);
+      CREATE TABLE section (crn INT PRIMARY KEY);
+      CREATE TABLE offering (
+        course_id INT NOT NULL REFERENCES course (course_id),
+        crn INT NOT NULL REFERENCES section (crn),
+        room_code VARCHAR(8) NOT NULL,
+        PRIMARY KEY (course_id, crn));
+      CREATE TABLE waitlist (
+        waitlist_id INT PRIMARY KEY,
+        course_id INT NOT NULL REFERENCES offering (course_id));`,
+    dbt: `models:\n${dbtModel("course", "course_id", "")}${dbtModel("section", "crn", "")}${
+      keyed(
+        "offering",
+        ["course_id", "crn"],
+        ref("course_id", "course", "course_id") + ref("crn", "section", "crn") + plain("room_code"),
+      )
+    }${dbtModel("waitlist", "waitlist_id", ref("course_id", "offering", "course_id"))}`,
+  },
+  {
     name: "several columns beside the key",
     ddl: `CREATE TABLE student (student_id INT PRIMARY KEY);
       CREATE TABLE section (crn INT PRIMARY KEY);
