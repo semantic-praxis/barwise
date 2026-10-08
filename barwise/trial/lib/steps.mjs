@@ -53,9 +53,10 @@ function modelSummaryOf(path) {
       objectTypes: objectTypes(doc).length,
       factTypes: factTypes(doc).length,
       names: objectTypes(doc).map((o) => o.name),
+      factTypeNames: factTypes(doc).map((f) => f.name),
     };
   } catch (e) {
-    return { objectTypes: 0, factTypes: 0, names: [], unreadable: e.message };
+    return { objectTypes: 0, factTypes: 0, names: [], factTypeNames: [], unreadable: e.message };
   }
 }
 

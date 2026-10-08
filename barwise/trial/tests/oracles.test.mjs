@@ -64,6 +64,41 @@ test("gradeImport: a silently dropped table is S1, a named skip is a refusal, a 
   assert.equal(full.status, "pass");
 });
 
+test("gradeImport: a fact table comes back as its fact type, an entity table does not", () => {
+  // A many-to-many table now imports as the fact type it states
+  // (composite-key-tables.spec.md); graded only against object types it
+  // read as silently dropped. An entity's table still needs its entity.
+  const m = {
+    generator: "ddl",
+    dialect: "postgres",
+    tables: [
+      { name: "patient", kind: "entity", importable: true },
+      { name: "COURSE_IS_PREREQUISITE_OF_COURSE", kind: "fact", importable: true },
+    ],
+  };
+  const summary = (names, factTypeNames) => ({ objectTypes: names.length, names, factTypeNames });
+  assert.equal(
+    gradeImport(
+      ok,
+      m,
+      "import",
+      summary(["Patient"], ["Course and Course course is prerequisite of course"]),
+    )
+      .status,
+    "pass",
+  );
+  const entityAsFact = gradeImport(
+    ok,
+    {
+      ...m,
+      tables: [{ name: "patient", kind: "entity", importable: true }],
+    },
+    "import",
+    summary(["Doctor"], ["Doctor and Doctor patient"]),
+  );
+  assert.equal(entityAsFact.status, "fail");
+});
+
 test("gradeImport: an empty model with exit 0 is S3, a crash is S2, a hang is S2", () => {
   assert.equal(gradeImport(ok, manifest, "import", { objectTypes: 0, names: [] }).severity, "S3");
   assert.equal(
