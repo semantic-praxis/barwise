@@ -237,6 +237,7 @@ it is qualified by `barwise.enableMcpServer`, which defaults on.
 | prompt-artifact override (`--artifacts`)              | yes | no  | no      | deliberate: candidates are measured, not sent                 |
 | multi-sample import (`--samples`)                     | yes | yes | no      | deliberate: an editor wants one quick pass                    |
 | thinking-budget override (`--thinking-budget`)        | yes | no  | no      | deliberate: an experiment dimension, recorded per history row |
+| reference inference (`--infer-references`)            | yes | no  | no      | deliberate: a warehouse-import option, no use elsewhere yet   |
 
 Every remaining gap is marked deliberate, which is the point: an
 unmarked gap is a bug.

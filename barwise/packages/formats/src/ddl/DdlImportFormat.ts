@@ -44,7 +44,7 @@ import {
   type Relationship,
   type SupertypeLink,
 } from "./barwiseAnnotation.js";
-import { headNoun, sameUpToNumber } from "./nameMatching.js";
+import { bareName, headNoun, sameUpToNumber } from "./nameMatching.js";
 import {
   blankComments,
   findCreateTables,
@@ -121,7 +121,13 @@ export class DdlImportFormat implements ImportFormat {
     const modelName = options?.modelName ?? "Imported Model";
 
     // Parse all CREATE TABLE statements
-    const tables = this.parseCreateTables(input, warnings);
+    const parsed = this.parseCreateTables(input, warnings);
+    // Off unless asked: the flag is the user declaring that the schema
+    // names its references after the keys they hold
+    // (reference-inference.spec.md).
+    const tables = options?.["inferReferences"] === true
+      ? inferReferences(parsed, warnings)
+      : parsed;
 
     if (tables.length === 0) {
       warnings.push("No CREATE TABLE statements found in input");
@@ -1738,6 +1744,80 @@ function subtypeReading(
   if (qualifying.length >= 2) return { candidates: qualifying.map((p) => p.name) };
   if (onKey.length === 1 && qualifying.length === 1) return { parent: qualifying[0]! };
   return undefined;
+}
+
+/**
+ * `--infer-references` (reference-inference.spec.md): a column with no
+ * declared foreign key reads as a reference to the one table it names,
+ * as `<key>`, `<table>_<key>` or `<table>_id` -- case and separators
+ * ignored, the table in either number by the shared rule -- when that
+ * table is not its own, has a single key column, and the declared types
+ * have the same conceptual name. Each inference is added as a foreign
+ * key, so the rest of the importer reads it as it reads a declared one,
+ * and each is warned so it can be checked by eye. Two or more candidates
+ * infer nothing. A key column is never inferred, only reported: a guessed
+ * reference there would feed the subtype rule a second guess.
+ */
+function inferReferences(tables: readonly ParsedTable[], warnings: string[]): ParsedTable[] {
+  const squash = (n: string) => bareName(n).replace(/_/g, "");
+  // The conceptual type name, a generated key compared as the integer
+  // that refers to it; undefined (unrecognised) never matches.
+  const typeOf = (c: ParsedColumn) => {
+    const name = parseSqlDataType(c.dataType)?.name;
+    return name === "auto_counter" ? "integer" : name;
+  };
+  const named = (column: string, target: ParsedTable): boolean => {
+    const key = squash(target.primaryKey[0]!);
+    const x = squash(column);
+    const table = squash(target.name);
+    if (x === key) return true;
+    for (const suffix of [key, "id"]) {
+      if (x.length > suffix.length && x.endsWith(suffix)) {
+        if (sameUpToNumber(x.slice(0, -suffix.length), table)) return true;
+      }
+    }
+    return false;
+  };
+  return tables.map((table) => {
+    const added: ParsedForeignKey[] = [];
+    for (const column of table.columns) {
+      if (table.foreignKeys.some((f) => f.columns.includes(column.name))) continue;
+      const type = typeOf(column);
+      const candidates = tables.filter((u) => {
+        if (u === table || u.primaryKey.length !== 1) return false;
+        if (!named(column.name, u)) return false;
+        const key = u.columns.find((c) => c.name === u.primaryKey[0]);
+        return type !== undefined && key !== undefined && typeOf(key) === type;
+      });
+      if (candidates.length === 0) continue;
+      const list = candidates.map((u) => `"${u.name}"`).join(", ");
+      if (table.primaryKey.includes(column.name)) {
+        warnings.push(
+          `Table "${table.name}": key column "${column.name}" is named like a reference to ${list}; `
+            + `a key column is never inferred (--infer-references).`,
+        );
+        continue;
+      }
+      if (candidates.length > 1) {
+        warnings.push(
+          `Table "${table.name}": column "${column.name}" could reference ${list}; none is `
+            + `inferred (--infer-references).`,
+        );
+        continue;
+      }
+      const target = candidates[0]!;
+      added.push({
+        columns: [column.name],
+        referencedTable: target.name,
+        referencedColumns: [target.primaryKey[0]!],
+      });
+      warnings.push(
+        `Table "${table.name}": column "${column.name}" is read as a reference to `
+          + `"${target.name}" by its name (--infer-references); check it.`,
+      );
+    }
+    return added.length > 0 ? { ...table, foreignKeys: [...table.foreignKeys, ...added] } : table;
+  });
 }
 
 /** Whether `from` already reaches `to` through supertypes: a subtype fact to `to` would close a cycle. */

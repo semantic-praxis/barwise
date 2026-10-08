@@ -17,6 +17,10 @@ export function addSqlSubcommand(importCmd: Command): void {
       "--dialect <dialect>",
       `SQL dialect (${SQL_DIALECTS.join(", ")})`,
     )
+    .option(
+      "--infer-references",
+      "Read a column named after another table's key, with its type, as a reference to it (each one is reported)",
+    )
     .action(
       async (
         source: string,
@@ -24,6 +28,7 @@ export function addSqlSubcommand(importCmd: Command): void {
           output?: string;
           name?: string;
           dialect?: string;
+          inferReferences?: boolean;
         },
       ) => {
         try {
@@ -43,6 +48,7 @@ export function addSqlSubcommand(importCmd: Command): void {
           if (opts.dialect) {
             importOpts["dialect"] = opts.dialect;
           }
+          if (opts.inferReferences) importOpts["inferReferences"] = true;
 
           process.stderr.write(
             `Importing ORM model from SQL: ${resolvedSource}\n`,

@@ -83,6 +83,10 @@ artifacts:
     skin: skins/bigquery-dwh.yaml
     importer: sql
     dialect: bigquery
+    # The skin writes no FOREIGN KEY, as BigQuery warehouses usually do not;
+    # the flag declares that its columns name the keys they hold
+    # (reference-inference.spec.md, barwise-c5f).
+    import_flags: [--infer-references]
     expect: import
     tiers: { small: 1, medium: 8, enterprise: 30 }
   - id: tmf-openapi
