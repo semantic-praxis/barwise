@@ -42,6 +42,7 @@ import {
   type ReadAnnotations,
   readAnnotations,
   type Relationship,
+  type SupertypeLink,
 } from "./barwiseAnnotation.js";
 import { headNoun, sameUpToNumber } from "./nameMatching.js";
 import {
@@ -402,8 +403,29 @@ export class DdlImportFormat implements ImportFormat {
     // identifier of its own: keeping both gives the entity two identity
     // sources (key-reference-tables.spec.md, requirements 1-3).
     const byKey = new Map(tables.map((t) => [tableKey(t.name), t]));
+    // table key -> the columns a declared subtype link took, which step 3
+    // must not read as a relationship as well.
+    const subtypeLinks = new Map<string, Set<string>>();
     for (const table of accepted) {
       const entity = model.getObjectType(entityMap.get(tableKey(table.name)) ?? "");
+      const found = annotations.tables.get(tableKey(table.name));
+      const declared = entity && found?.kind === "table" && found.entity === entity.name
+        ? found.supertypes
+        : undefined;
+      // A table line that carries supertypes says what this table's parents
+      // are, empty or not; the naming rule does not second-guess it. Only a
+      // list whose every entry no longer matches the DDL falls back to the
+      // rule (requirements 4a, 4b).
+      if (entity && declared) {
+        const kept = this.importSupertypes(model, entity, table, declared, entityMap, warnings);
+        if (kept.size > 0 || declared.length === 0) {
+          subtypeLinks.set(tableKey(table.name), kept.columns);
+          if (kept.identifiedByKey) continue;
+          const binary = this.createKeyIdentifier(model, entity, table, annotations, warnings);
+          if (binary) binaries.set(columnKey(table.name, table.primaryKey[0]!), binary);
+          continue;
+        }
+      }
       const sub = entity ? subtypeReading(table, byKey) : undefined;
       if (sub && "candidates" in sub) {
         warnings.push(
@@ -459,6 +481,9 @@ export class DdlImportFormat implements ImportFormat {
         if (inKey && !compositeKey) continue;
         // A table-level PRIMARY KEY makes its columns NOT NULL.
         const read = inKey ? { ...column, nullable: false } : column;
+
+        // A declared subtype link is the subtype fact, not a relationship.
+        if (subtypeLinks.get(tableKey(table.name))?.has(column.name.toLowerCase())) continue;
 
         // Check if this column is a foreign key
         const fk = table.foreignKeys.find((fk) => fk.columns.includes(column.name));
@@ -844,6 +869,60 @@ export class DdlImportFormat implements ImportFormat {
     }
     // Composite key or no key: use default
     return `${table.name}_id`;
+  }
+
+  /**
+   * Import the subtype facts a table line declares, each only while the
+   * DDL still says it: its columns must be a declared foreign key, in
+   * full, to the named supertype's table, as an annotation is used only
+   * while it describes the file (ddl-round-trip-fixed-point.spec.md). An
+   * entry that fails is dropped alone, with a warning. Each fact is
+   * imported with its stored fields, never re-derived from the columns
+   * (key-reference-tables.spec.md, requirement 4a).
+   */
+  private importSupertypes(
+    model: OrmModel,
+    entity: ObjectType,
+    table: ParsedTable,
+    declared: readonly SupertypeLink[],
+    entityMap: ReadonlyMap<string, string>,
+    warnings: string[],
+  ): { size: number; columns: Set<string>; identifiedByKey: boolean; } {
+    const columns = new Set<string>();
+    let size = 0;
+    let identifiedByKey = false;
+    const lower = (cs: readonly string[]) => cs.map((c) => c.toLowerCase()).sort().join(",");
+    for (const link of declared) {
+      const supertype = model.getObjectTypeByName(link.entity);
+      const fk = supertype && table.foreignKeys.find((f) =>
+        lower(f.columns) === lower(link.columns)
+        && entityMap.get(tableKey(f.referencedTable)) === supertype.id
+      );
+      if (!supertype || !fk || reaches(model, supertype.id, entity.id)) {
+        warnings.push(
+          `Table "${table.name}": its annotation says it is a subtype of "${link.entity}" through `
+            + `(${
+              link.columns.join(", ")
+            }), which is no longer a foreign key to that entity's table; `
+            + `that subtype is not imported.`,
+        );
+        continue;
+      }
+      model.addSubtypeFact({
+        subtypeId: entity.id,
+        supertypeId: supertype.id,
+        providesIdentification: link.providesIdentification,
+        isExclusive: link.isExclusive,
+        isExhaustive: link.isExhaustive,
+        ...(link.definingRule ? { definingRule: link.definingRule } : {}),
+      });
+      size++;
+      for (const c of link.columns) columns.add(c.toLowerCase());
+      if (link.providesIdentification && lower(link.columns) === lower(table.primaryKey)) {
+        identifiedByKey = true;
+      }
+    }
+    return { size, columns, identifiedByKey };
   }
 
   /**

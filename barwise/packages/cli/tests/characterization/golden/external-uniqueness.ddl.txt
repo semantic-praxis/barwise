@@ -1,7 +1,7 @@
 -- Table: room
 -- Source: Room (ot-room)
 -- TODO(barwise): No model description. Add a definition to the entity type.
--- barwise:v1 {"kind":"table","table":"room","entity":"Room","referenceMode":"room_id"}
+-- barwise:v1 {"kind":"table","table":"room","entity":"Room","referenceMode":"room_id","supertypes":[]}
 CREATE TABLE room (
   -- TODO(barwise): No column description. Add a definition to the value type.
   -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
@@ -22,7 +22,7 @@ CREATE TABLE room (
 -- Table: building
 -- Source: Building (ot-building)
 -- TODO(barwise): No model description. Add a definition to the entity type.
--- barwise:v1 {"kind":"table","table":"building","entity":"Building","referenceMode":"building_code"}
+-- barwise:v1 {"kind":"table","table":"building","entity":"Building","referenceMode":"building_code","supertypes":[]}
 CREATE TABLE building (
   -- TODO(barwise): No column description. Add a definition to the value type.
   -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
