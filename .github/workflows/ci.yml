@@ -136,6 +136,14 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
 
+      # Every path and `node <path>` an instruction file cites resolves to a
+      # tracked file. The 2026-10-04 prompt audit found 26 stale references
+      # by hand (barwise-52b); this is the mechanical half of that sweep.
+      # No docs-only guard: instruction files are Markdown, so a gate that
+      # skipped docs-only changes would skip exactly the changes it is for
+      # (docs/specs/instruction-reference-check.spec.md).
+      - run: npm run check:instruction-refs
+
       # Fast, source-only static gates next (none need the build), so a lint
       # or architecture violation fails in seconds rather than after the
       # build and test suite.

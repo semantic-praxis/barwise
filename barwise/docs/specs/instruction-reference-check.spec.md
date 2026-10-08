@@ -1,6 +1,7 @@
 # A gate that resolves the paths, scripts and check names instruction files cite
 
-Status: Draft -- no workstream implemented
+Status: Implemented -- workstream 1 (see Implementation notes); workstream 2
+not started
 
 Created: 2026-10-08
 Last-updated: 2026-10-08
@@ -270,6 +271,36 @@ this lands.
   `.claude/**/*.md`, which includes agents and skill support files such
   as `pr-review/checklist.md`. Recommend exactly that set for now; living
   specs are a candidate for a later filter change (see Out of scope).
+
+## Implementation notes (2026-10-08)
+
+Workstream 1 shipped as `barwise/scripts/check-instruction-refs.mjs`,
+the `check:instruction-refs` npm script and a `ci.yml` step with no
+`if:`. The open decisions were taken as recommended. Three deviations
+from the text above:
+
+- **Unrooted tokens also resolve from the repo root.** The rules table
+  says own directory, then a unique suffix. The prototype the numbers
+  came from also accepted a token that is itself a tracked path, and
+  without that step a skill citing `CLAUDE.md` is "ambiguous" against
+  the 13 package `CLAUDE.md` files: the first port of the gate reported
+  21 such findings on a corpus the prototype passed. Order is now own
+  directory, repo root, unique suffix. A sandbox test pins it.
+- **The allowlist is a JSON file**, `barwise/scripts/instruction-refs-allowlist.json`,
+  rather than a constant in the script, so each sandbox test can supply
+  its own rows; inline, every sandbox run would fail on ten stale rows.
+- **Ten allowlist rows, not nine plus a choice.** Of the four ambiguous
+  pr-review sites, three were qualified to the file meant
+  (`validation/rules/structural.ts`, `cli/src/commands/merge.ts`,
+  `core/tests/helpers/ModelBuilder.ts`), and the two dead paths gained
+  their `src/`. `verbalize.ts` in `pr-review/SKILL.md` names both
+  surfaces' files on purpose, so it is the tenth row.
+
+On main after the fixes the gate reads 34 instruction files and passes
+with all ten rows matched, from the repo root, `barwise/` and a
+package directory. Eight sandbox tests cover a passing and a failing
+case for each branch; six mutations of the resolver, one per branch,
+are each caught.
 
 ## Risks and testing
 

@@ -4220,3 +4220,158 @@ test("check-tracker-closes refuses with no base rather than reporting clean", ()
     rmSync(r.dir, { recursive: true, force: true });
   }
 });
+
+/**
+ * check-instruction-refs: every path and `node <path>` an instruction file
+ * cites resolves (docs/specs/instruction-reference-check.spec.md, WS1).
+ *
+ * The real corpus exercises only some branches -- its one relative file
+ * reference resolves, so it never shows that branch failing -- so each
+ * branch gets a passing and a failing case in a sandbox repository with
+ * its own allowlist.
+ */
+function refsRepo({ allow = [], files = {} } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-refs-"));
+  const g = (...args) =>
+    execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  g("init", "-q");
+  mkdirSync(join(dir, "scripts", "lib"), { recursive: true });
+  for (const f of ["check-instruction-refs.mjs", join("lib", "tracked.mjs")]) {
+    writeFileSync(join(dir, "scripts", f), readFileSync(join(SCRIPTS, f)));
+  }
+  writeFileSync(
+    join(dir, "scripts", "instruction-refs-allowlist.json"),
+    JSON.stringify({ rows: allow }),
+  );
+  const base = {
+    "barwise/docs/guide.md": "# guide\n",
+    "barwise/scripts/tool.mjs": "",
+    "barwise/pkg/build.mjs": "",
+    "barwise/pkg/src/unique.ts": "",
+    "barwise/pkg/src/twin.ts": "",
+    "barwise/other/src/twin.ts": "",
+    ".claude/skills/s/notes.md": "# notes\n",
+    "CLAUDE.md": "See `barwise/docs/guide.md` and run `node barwise/scripts/tool.mjs`.\n",
+    "barwise/pkg/CLAUDE.md":
+      "Run `node build.mjs`; the entry is `unique.ts`; ours is `src/twin.ts`.\n",
+    // `CLAUDE.md` exists at the root and in barwise/pkg/: the root one wins.
+    ".claude/skills/s/SKILL.md": "Read `./notes.md`, then `CLAUDE.md`.\n",
+  };
+  for (const [f, body] of Object.entries({ ...base, ...files })) {
+    if (body === null) continue;
+    mkdirSync(dirname(join(dir, f)), { recursive: true });
+    writeFileSync(join(dir, f), body);
+  }
+  g("add", "-A");
+  const run = (cwd = dir) =>
+    spawnSync(process.execPath, [join(dir, "scripts", "check-instruction-refs.mjs")], {
+      cwd,
+      encoding: "utf8",
+    });
+  return { dir, run };
+}
+
+test("check-instruction-refs passes every live branch, from the root and from a package", () => {
+  const r = refsRepo();
+  try {
+    const top = r.run();
+    assert.equal(top.status, 0, top.stdout + top.stderr);
+    assert.match(top.stdout, /4 instruction file\(s\)/); // notes.md is under .claude/ too
+    const sub = r.run(join(r.dir, "barwise", "pkg"));
+    assert.equal(sub.status, 0, sub.stderr);
+    assert.equal(sub.stdout, top.stdout);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+for (
+  const [name, files, expected] of [
+    [
+      "a dead rooted path",
+      { "CLAUDE.md": "See `barwise/docs/gone.md`.\n" },
+      /barwise\/docs\/gone\.md` -- no tracked file/,
+    ],
+    [
+      "a dead relative path",
+      { ".claude/skills/s/SKILL.md": "Read `../no-such.md`.\n" },
+      /does not resolve from \.claude\/skills\/s\//,
+    ],
+    [
+      "a dead unrooted name",
+      { "barwise/pkg/CLAUDE.md": "See `missing.ts`.\n" },
+      /missing\.ts` -- no tracked path/,
+    ],
+    [
+      "an ambiguous name",
+      { "CLAUDE.md": "See `src/twin.ts`.\n" },
+      /ambiguous, 2 tracked paths end with it: .*pkg\/src\/twin\.ts.*other\/src\/twin\.ts|ambiguous, 2 tracked paths end with it: .*other\/src\/twin\.ts.*pkg\/src\/twin\.ts/,
+    ],
+    [
+      "a dead node command",
+      { "CLAUDE.md": "Run `node scripts/beads-crud.mjs`.\n" },
+      /node scripts\/beads-crud\.mjs` -- resolves neither/,
+    ],
+  ]
+) {
+  test(`check-instruction-refs fails ${name}`, () => {
+    const r = refsRepo({ files });
+    try {
+      const out = r.run();
+      assert.equal(out.status, 1, out.stdout + out.stderr);
+      assert.match(out.stderr, expected);
+    } finally {
+      rmSync(r.dir, { recursive: true, force: true });
+    }
+  });
+}
+
+test("check-instruction-refs fails an ignored untracked path unless allowlisted, and a stale row", () => {
+  // `git check-ignore` cannot tell a build output from a typo under dist/.
+  const files = {
+    ".gitignore": "dist/\n",
+    "dist/out.js": "",
+    "CLAUDE.md": "Built to `barwise/dist/out.js`.\n",
+  };
+  let r = refsRepo({ files });
+  try {
+    assert.equal(r.run().status, 1);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+  const row = { file: "CLAUDE.md", token: "barwise/dist/out.js", why: "a build output" };
+  r = refsRepo({ files, allow: [row] });
+  try {
+    assert.equal(r.run().status, 0);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+  r = refsRepo({ allow: [row] });
+  try {
+    const out = r.run();
+    assert.equal(out.status, 1);
+    assert.match(out.stderr, /ALLOWLIST: CLAUDE\.md `barwise\/dist\/out\.js` matches nothing/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-instruction-refs refuses an empty listing rather than reporting OK", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-refs-empty-"));
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    mkdirSync(join(dir, "scripts", "lib"), { recursive: true });
+    for (const f of ["check-instruction-refs.mjs", join("lib", "tracked.mjs")]) {
+      writeFileSync(join(dir, "scripts", f), readFileSync(join(SCRIPTS, f)));
+    }
+    writeFileSync(join(dir, "scripts", "instruction-refs-allowlist.json"), '{"rows":[]}');
+    const out = spawnSync(process.execPath, [join(dir, "scripts", "check-instruction-refs.mjs")], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.doesNotMatch(out.stdout, /OK/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
