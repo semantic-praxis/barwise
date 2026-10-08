@@ -101,10 +101,19 @@ round-trips: the mapper writes exactly this shape for a subtype.
    primary key (PR #620 review: not a composite foreign key that merely
    contains the key column, and not a reference to an alternate UNIQUE
    column) -- and the table's name ends in the referenced
-   table's head noun (the last `_`-separated word, singular and plural
-   alike), and the table repeats none of the referenced table's non-key
-   columns, the DDL importer shall import the table's entity as a subtype
+   table's head noun, and the table repeats none of the referenced
+   table's non-key columns, both as defined under "Matching" below, the DDL importer shall import the table's entity as a subtype
    of the referenced table's entity, identified through it.
+   **Matching** (PR #620 review). A name's head noun is its last
+   `_`-separated word after removing quoting, compared without regard
+   to case. The child's head noun matches the parent's when the two are
+   equal or differ by exactly one of these endings and no others, the
+   ones reference-inference.spec.md uses: `ies` and `y`, `es` and
+   nothing, `s` and nothing -- so `ENROLLED_SUBJECTS` matches
+   `SUBJECT`, `enrolled_subject` matches `SUBJECT`, and an irregular
+   plural matches only itself. A child column repeats a parent column
+   when their names are equal without regard to case; the key column,
+   which both tables share by definition, is not counted.
 2. When it does, the importer shall add a warning naming the table, the
    supertype and both conditions.
 3. When a table with a shared-key foreign key does not meet both
@@ -134,7 +143,10 @@ imported, the reference is not, and the warning says so.
 
 ## Scope
 
-In scope: `DdlImportFormat`'s handling of a single-column key that is
+In scope: matching controls for a plural child of a singular parent
+(`ENROLLED_SUBJECTS` to `SUBJECT`, caught), a case difference
+(`enrolled_subject` to `SUBJECT`, caught) and a non-ending difference
+(`SUBJECTIVE` to `SUBJECT`, not caught); `DdlImportFormat`'s handling of a single-column key that is
 also a foreign key; tests for a caught subtype, a coded-name miss, an
 extension table, `user_profiles`, the `LEGACY_ORDER` control, the `ARCHIVED_ORDER` control, and a same-noun child that repeats exactly one of a multi-column parent's non-key columns, which must keep today's reading (PR #620 review: it separates "no repeated column" from "not every column repeated"); two
 exclusion tests for requirement 1's shared-key definition, each with a

@@ -101,7 +101,12 @@ referenced.
    a model-level `dbt_utils.unique_combination_of_columns` names two or
    more columns, each `not_null`, at least one a `relationships` column,
    the dbt importer shall read it by requirements 1-3, each
-   `relationships` column a foreign-key role.
+   `relationships` column a foreign-key role. When two or more such
+   tests qualify, the model has two candidate keys and nothing says
+   which is preferred, so the importer shall read none of them as the
+   key, keep today's reading, and report the model naming each
+   combination (PR #620 review). A DDL table has one PRIMARY KEY, so the
+   case is dbt's alone.
 6. For each shape in the table above, a DDL import exported and imported
    again, with and without the export's annotations, shall give the same
    object types, fact types, role players, uniquenesses and
@@ -149,7 +154,9 @@ referenced.
 ## Scope
 
 In scope: requirements 1-7, in `DdlImportFormat` (formats) and the dbt
-mapping (dbt); a test per row of the table above in each package; the
+mapping (dbt); a test per row of the table above in each package; a dbt test that a
+model with two qualifying combination tests keeps today's reading and
+is reported; the
 drift test in `@barwise/cli`, the one package that depends on both --
 the two packages keep their own code, and the drift test is what fails
 when they diverge, as CLAUDE.md requires of must-agree copies (PR #620
