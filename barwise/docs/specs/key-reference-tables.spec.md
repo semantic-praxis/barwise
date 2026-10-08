@@ -1,6 +1,6 @@
 # A primary key that is also a foreign key imports its reference
 
-Status: Partially implemented -- workstreams 1 and 3 landed; workstream 2 (the annotation) not yet
+Status: Implemented -- all three workstreams landed
 Created: 2026-10-08
 Last-updated: 2026-10-08
 Tracking: barwise-1078
@@ -285,8 +285,7 @@ dbt importer, whose relationships test has no key-is-reference form.
 
 ## Implementation notes
 
-Workstreams 1 and 3, measured over the regenerated small tier,
-2026-10-08.
+Measured over the regenerated small tier, 2026-10-08.
 
 - **The rule moved exactly the two rows the spec named.** C10's
   ir-analyst and C09's biostatistician subtype checks pass; the trial
@@ -305,3 +304,13 @@ Workstreams 1 and 3, measured over the regenerated small tier,
 - **The shared number rule landed here first**, as
   `formats/src/ddl/nameMatching.ts`, with its own tests; reference
   inference imports it.
+- **The annotation (workstream 2) moved no trial row.** The trial's DDL
+  comes from its own generator, not barwise's export, so only the
+  round-trip steps could see it, and none changed status (0 new, 0
+  stale). Its evidence is the unit tests: `employee-hierarchy` keeps both
+  subtype facts through an annotated round trip, where before it lost
+  both, and four mutations of the reader (no reader, a derived
+  identification flag, no foreign-key check, an empty list read as
+  absent) each fail a test.
+- **Every table line now carries `supertypes`, empty when there is
+  none.** Three CLI golden DDL files changed by exactly that field.
