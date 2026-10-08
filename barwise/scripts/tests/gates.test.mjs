@@ -4246,12 +4246,15 @@ function refsRepo({ allow = [], files = {} } = {}) {
   const base = {
     "barwise/docs/guide.md": "# guide\n",
     "barwise/scripts/tool.mjs": "",
+    "barwise/scripts/legacy.cjs": "",
     "barwise/pkg/build.mjs": "",
     "barwise/pkg/src/unique.ts": "",
     "barwise/pkg/src/twin.ts": "",
     "barwise/other/src/twin.ts": "",
     ".claude/skills/s/notes.md": "# notes\n",
-    "CLAUDE.md": "See `barwise/docs/guide.md` and run `node barwise/scripts/tool.mjs`.\n",
+    "CLAUDE.md": "See `barwise/docs/guide.md`; run `node barwise/scripts/tool.mjs`, "
+      + "`node barwise/scripts/legacy.cjs` and "
+      + '`node "$(git rev-parse --show-toplevel)/barwise/scripts/tool.mjs" x`.\n',
     "barwise/pkg/CLAUDE.md":
       "Run `node build.mjs`; the entry is `unique.ts`; ours is `src/twin.ts`.\n",
     // `CLAUDE.md` exists at the root and in barwise/pkg/: the root one wins.
@@ -4312,6 +4315,16 @@ for (
       { "CLAUDE.md": "Run `node scripts/beads-crud.mjs`.\n" },
       /node scripts\/beads-crud\.mjs` -- resolves neither/,
     ],
+    [
+      "a dead .cjs node command",
+      { "CLAUDE.md": "Run `node barwise/scripts/gone.cjs`.\n" },
+      /node barwise\/scripts\/gone\.cjs` -- resolves neither/,
+    ],
+    [
+      "a dead canonical node command",
+      { "CLAUDE.md": 'Run `node "$(git rev-parse --show-toplevel)/barwise/scripts/gone.mjs"`.\n' },
+      /show-toplevel\)\/barwise\/scripts\/gone\.mjs` -- resolves neither from the repo root/,
+    ],
   ]
 ) {
   test(`check-instruction-refs fails ${name}`, () => {
@@ -4328,9 +4341,11 @@ for (
 
 test("check-instruction-refs fails an ignored untracked path unless allowlisted, and a stale row", () => {
   // `git check-ignore` cannot tell a build output from a typo under dist/.
+  // The cited file exists on disk and git ignores it: exactly the state a
+  // check-ignore rule would wave through (Copilot on #626).
   const files = {
     ".gitignore": "dist/\n",
-    "dist/out.js": "",
+    "barwise/dist/out.js": "",
     "CLAUDE.md": "Built to `barwise/dist/out.js`.\n",
   };
   let r = refsRepo({ files });
@@ -4351,6 +4366,27 @@ test("check-instruction-refs fails an ignored untracked path unless allowlisted,
     const out = r.run();
     assert.equal(out.status, 1);
     assert.match(out.stderr, /ALLOWLIST: CLAUDE\.md `barwise\/dist\/out\.js` matches nothing/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-instruction-refs refuses a listing with no instruction file rather than reporting OK", () => {
+  // Tracked files exist, so trackedFiles() returns; it is the gate's own
+  // filter that comes back empty (Copilot on #626).
+  const r = refsRepo({
+    files: {
+      "CLAUDE.md": null,
+      "barwise/pkg/CLAUDE.md": null,
+      ".claude/skills/s/SKILL.md": null,
+      ".claude/skills/s/notes.md": null,
+    },
+  });
+  try {
+    const out = r.run();
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /none of them an instruction file/);
+    assert.doesNotMatch(out.stdout, /OK/);
   } finally {
     rmSync(r.dir, { recursive: true, force: true });
   }

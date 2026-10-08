@@ -75,6 +75,17 @@ for (const f of all) {
 }
 const list = [...entries];
 const files = all.filter(isInstructionFile);
+// trackedFiles() refuses an empty listing; this refuses an empty FILTER.
+// A repository always has CLAUDE.md, so zero instruction files means the
+// filter or the listing went wrong, and "OK -- 0 files" would be a pass
+// over nothing (Copilot on #626).
+if (files.length === 0) {
+  console.error(
+    `check-instruction-refs: ${all.length} tracked file(s), none of them an instruction file.`,
+  );
+  console.error("Could not answer; refusing rather than reporting a clean scan of nothing.");
+  process.exit(2);
+}
 
 const findings = [];
 const allowHits = new Set();
@@ -115,10 +126,19 @@ for (const file of files) {
         }
       }
     }
-    for (const m of text.matchAll(/\bnode\s+(?:--test\s+)?"?([\w./()-]+\.m?js)/g)) {
-      const p = m[1];
-      if (!entries.has(normalize(p)) && !entries.has(normalize(join(own, p)))) {
-        report(file, i + 1, `node ${p}`, `resolves neither from the repo root nor from ${own}/`);
+    // `node <path>` for .js/.mjs/.cjs, including the repository's canonical
+    // `node "$(git rev-parse --show-toplevel)/<path>"` (root CLAUDE.md),
+    // which names a root-relative path and resolves from the root only.
+    for (
+      const m of text.matchAll(
+        /\bnode\s+(?:--test\s+)?"?(\$\(git rev-parse --show-toplevel\)\/)?([\w./-]+\.[cm]?js)\b/g,
+      )
+    ) {
+      const [, fromTop, p] = m;
+      const ok = entries.has(normalize(p)) || (!fromTop && entries.has(normalize(join(own, p))));
+      if (!ok) {
+        const where = fromTop ? "the repo root" : `the repo root nor from ${own}/`;
+        report(file, i + 1, `node ${fromTop ?? ""}${p}`, `resolves neither from ${where}`);
       }
     }
   }

@@ -298,9 +298,18 @@ from the text above:
 
 On main after the fixes the gate reads 34 instruction files and passes
 with all ten rows matched, from the repo root, `barwise/` and a
-package directory. Eight sandbox tests cover a passing and a failing
-case for each branch; six mutations of the resolver, one per branch,
+package directory. Eleven sandbox tests cover a passing and a failing
+case for each branch; nine mutations of the resolver, one per branch,
 are each caught.
+
+After Copilot's review of the first push, three more points. The gate
+refuses with exit 2 when tracked files exist but none is an instruction
+file, the empty-filter case `lib/tracked.mjs`'s empty-listing refusal
+does not reach. `node <path>` covers `.cjs` as well as `.js` and `.mjs`,
+and the canonical `node "$(git rev-parse --show-toplevel)/<path>"` form
+from the root `CLAUDE.md`, which resolves from the repo root only. The
+ignored-file test now creates the exact path it cites, so it shows an
+existing ignored file failing, not only a missing one.
 
 ## Risks and testing
 
