@@ -2,6 +2,7 @@ import { getImporter, listImporters, OrmYamlSerializer } from "@barwise/core";
 import type { Command } from "commander";
 import { basename, extname } from "node:path";
 import { readFile, writeOutput } from "../../workspace/io.js";
+import { INFER_REFERENCES_HELP } from "./shared.js";
 
 export function addModelSubcommand(importCmd: Command): void {
   // Format-based import (DDL, OpenAPI -- text-based formats)
@@ -17,6 +18,10 @@ export function addModelSubcommand(importCmd: Command): void {
     )
     .option("--output <file>", "Write .orm.yaml to file instead of stdout")
     .option("--name <name>", "Model name (defaults to filename)")
+    .option(
+      "--infer-references",
+      INFER_REFERENCES_HELP,
+    )
     .action(
       async (
         source: string,
@@ -24,12 +29,24 @@ export function addModelSubcommand(importCmd: Command): void {
           format: string;
           output?: string;
           name?: string;
+          inferReferences?: boolean;
         },
       ) => {
         try {
           const input = readFile(source);
           if (!input.trim()) {
             process.stderr.write("Error: Source file is empty.\n");
+            process.exitCode = 1;
+            return;
+          }
+
+          // Only the DDL importer reads it; on any other format it would
+          // look as if it had done something (reference-inference.spec.md).
+          if (opts.inferReferences && opts.format !== "ddl") {
+            process.stderr.write(
+              `Error: --infer-references applies to --format ddl and to \`barwise import sql\`, `
+                + `not to --format ${opts.format}.\n`,
+            );
             process.exitCode = 1;
             return;
           }
@@ -60,7 +77,10 @@ export function addModelSubcommand(importCmd: Command): void {
             `Importing ORM model from ${opts.format}...\n`,
           );
 
-          const result = format.parse(input, { modelName });
+          const result = format.parse(input, {
+            modelName,
+            ...(opts.inferReferences ? { inferReferences: true } : {}),
+          });
 
           // Serialize to YAML
           const serializer = new OrmYamlSerializer();

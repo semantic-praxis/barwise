@@ -93,13 +93,6 @@
         "ec9ae742"
       ],
       "note": "Genuinely unimplemented, and the header is right: this spec's deliverable is `scripts/mutation-baseline.mjs --classify`, a classifier that splits surviving mutants by whether the suite is the thing that should have caught them, plus a scheduled run. That file does not exist, no package.json script or workflow mentions a ratchet, and no Stryker checker is installed -- verified, not assumed. The commit below is barwise-998 fixing four defects in `scripts/mutate.mjs`, which this spec NAMES as an input the ratchet will drive rather than as something it implements: a signal-killed child that read as CAUGHT, a throw in the restore that read as UNCAUGHT, an unpinned restore-hash branch, and a spec sentence claiming a gate that does not exist. If anything, it makes this spec's own restore discipline cheaper to meet, since a killed run now refuses instead of reporting a result. This is the proxy false positive the gate's own header describes -- a spec naming a file that unrelated work touches. Remove this row when WS1 ships and the Status says so."
-    },
-    "reference-inference.spec.md": {
-      "status": "Draft -- no workstream implemented",
-      "commits": [
-        "7d2ddae3"
-      ],
-      "note": "Genuinely unimplemented, and the header is right. The commit is the trial grader learning to accept a fact table as its fact type (composite-key-tables.spec.md); it touched trial/lib/steps.mjs, which this spec names only as where a later workstream will add per-artifact import_flags. No part of --infer-references exists yet."
     }
   }
 }

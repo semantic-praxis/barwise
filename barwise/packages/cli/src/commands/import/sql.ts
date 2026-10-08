@@ -4,6 +4,7 @@ import type { Command } from "commander";
 import { statSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
 import { readFile, writeOutput } from "../../workspace/io.js";
+import { INFER_REFERENCES_HELP } from "./shared.js";
 
 export function addSqlSubcommand(importCmd: Command): void {
   // SQL file/directory import
@@ -17,6 +18,10 @@ export function addSqlSubcommand(importCmd: Command): void {
       "--dialect <dialect>",
       `SQL dialect (${SQL_DIALECTS.join(", ")})`,
     )
+    .option(
+      "--infer-references",
+      INFER_REFERENCES_HELP,
+    )
     .action(
       async (
         source: string,
@@ -24,6 +29,7 @@ export function addSqlSubcommand(importCmd: Command): void {
           output?: string;
           name?: string;
           dialect?: string;
+          inferReferences?: boolean;
         },
       ) => {
         try {
@@ -43,6 +49,7 @@ export function addSqlSubcommand(importCmd: Command): void {
           if (opts.dialect) {
             importOpts["dialect"] = opts.dialect;
           }
+          if (opts.inferReferences) importOpts["inferReferences"] = true;
 
           process.stderr.write(
             `Importing ORM model from SQL: ${resolvedSource}\n`,

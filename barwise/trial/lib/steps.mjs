@@ -81,25 +81,35 @@ function parseJson(text) {
   }
 }
 
-const importCommand = (importer, path, dialect) => {
-  switch (importer) {
-    case "ddl":
-    case "openapi":
-    case "norma":
-      return ["import", "model", path, "--format", importer];
-    case "sql":
-      return ["import", "sql", path, ...(dialect ? ["--dialect", dialect] : [])];
-    case "dbt":
-      return ["import", "dbt", path];
-    case "typescript":
-    case "java":
-    case "kotlin":
-      return ["import", importer, path];
-    default:
-      // Formats barwise does not read: the step still runs, through the
-      // generic entry point, so the refusal is what gets graded.
-      return ["import", "model", path, "--format", importer];
-  }
+/**
+ * The CLI arguments that import one artifact. `flags` is the artifact's
+ * `import_flags` from customer.yaml, appended as given: the CLI is the one
+ * validator of its own options, so the trial keeps no allow-list to drift
+ * from it, and a flag the CLI refuses fails the step with the CLI's own
+ * message (reference-inference.spec.md, workstream 2).
+ */
+export const importCommand = (importer, path, dialect, flags = []) => {
+  const base = (() => {
+    switch (importer) {
+      case "ddl":
+      case "openapi":
+      case "norma":
+        return ["import", "model", path, "--format", importer];
+      case "sql":
+        return ["import", "sql", path, ...(dialect ? ["--dialect", dialect] : [])];
+      case "dbt":
+        return ["import", "dbt", path];
+      case "typescript":
+      case "java":
+      case "kotlin":
+        return ["import", importer, path];
+      default:
+        // Formats barwise does not read: the step still runs, through the
+        // generic entry point, so the refusal is what gets graded.
+        return ["import", "model", path, "--format", importer];
+    }
+  })();
+  return [...base, ...flags.map(String)];
 };
 
 const exporterFor = { ddl: "ddl", sql: "ddl", openapi: "openapi", dbt: "dbt", norma: "norma" };
@@ -127,7 +137,11 @@ export function sprint1Brownfield(customer, tier, record) {
     const input = join(gen, manifest.path);
     const out = join(gen, `${art.id}.imported.orm.yaml`);
     rmSync(out, { force: true });
-    const res = runCli([...importCommand(art.importer, input, art.dialect), "--output", out], {
+    const res = runCli([
+      ...importCommand(art.importer, input, art.dialect, art.import_flags ?? []),
+      "--output",
+      out,
+    ], {
       timeoutMs: budget,
       cwd: gen,
     });

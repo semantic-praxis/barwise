@@ -3,6 +3,10 @@ import { elementName, type ModelDiffResult } from "@barwise/core/diff";
 import type { CandidateFraming } from "@barwise/llm";
 
 export const serializer = new OrmYamlSerializer();
+
+/** `--infer-references` on `import model` and `import sql`: one flag, one description. */
+export const INFER_REFERENCES_HELP =
+  "Read a column named after another table's key, with its type, as a reference to it (each one is reported)";
 /**
  * Slugify a model name for use in output filenames.
  * Lowercase, remove dots, replace spaces/slashes with hyphens,
