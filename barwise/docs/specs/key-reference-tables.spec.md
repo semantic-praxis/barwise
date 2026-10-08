@@ -107,9 +107,13 @@ round-trips: the mapper writes exactly this shape for a subtype.
 
 ## Requirements
 
-1. When an unannotated table has exactly one shared-key foreign key
-   meeting both conditions below (requirement 2 covers two or more; PR
-   #620 review) -- a shared-key foreign key being one whose
+1. When an unannotated table's key column carries exactly one foreign
+   key, that foreign key is a shared-key foreign key and it meets both
+   conditions below (two or more shared-key foreign keys are requirement
+   2's; any other foreign key on the key column, shared-key or not,
+   leaves the table to requirement 3, since a subtype that drops a
+   second reference is the information loss this spec exists to end;
+   PR #620 review) -- a shared-key foreign key being one whose
    source columns are exactly the table's primary key, a single column,
    and whose referenced columns are exactly another table's complete
    primary key (PR #620 review: not a composite foreign key that merely
@@ -232,7 +236,9 @@ identifying and a non-identifying subtype -- `employee-hierarchy`
 carries both -- a subtype whose supertype has a two-column key, an
 entity with two supertypes, a subtype fact with `isExclusive`,
 `isExhaustive` and a `definingRule` set, and an assertion on each imported subtype that the model reports no
-conflicting-identification diagnostic, a two-parent control for requirement 2 (both parents qualify, neither
+conflicting-identification diagnostic, a mixed control (the key column carries one qualifying shared-key
+foreign key and one other foreign key; today's reading), a two-parent
+control for requirement 2 (both parents qualify, neither
 imported), an annotation whose columns no longer form the foreign key
 (dropped with a warning, the table read by requirements 1-3), an
 objectified entity whose identifying subtype fact is exported as a
@@ -247,6 +253,22 @@ it the extension-table rows above are unmeasured; then a trial run, the
 extension tables' result recorded in this spec's implementation notes,
 and the rows it moves (C10 ir-analyst; the C09 biostatistician subtype
 check; any C01 row the newly visible references change).
+
+## Workstreams
+
+1. **The naming rule** (formats): requirements 1-3 and the shared
+   number-matching function, if reference-inference has not landed it;
+   their tests. Independent of the others.
+2. **The annotation** (formats): requirements 4, 4a, 4b and 5 -- the
+   `supertypes` field in `barwiseAnnotation.ts`, its writer in the
+   export and reader in the import, and the round-trip tests. Shippable
+   alone; it fixes barwise's own export whatever happens to the naming
+   rule. Lands with or after 1 only in that requirement 4a's fallback
+   names requirements 1-3.
+3. **The generator and the trial** (trial): the extension tables'
+   `FOREIGN KEY`, its generator test, the trial run and the
+   reclassification. After 1, since the rows it moves are the naming
+   rule's.
 
 Out of scope: the one-to-one reading (above, barwise-3pc); a composite key
 that is also a set of foreign keys (composite-key-tables.spec.md); the

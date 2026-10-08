@@ -81,8 +81,12 @@ something it did not (PR #620 review). The refusal has its own test.
    `U` is not `T`, and the declared types match (two or more such
    tables are requirement 3's; PR #620 review); and shall warn once per inferred reference, naming the column
    and the table.
-3. When a column matches two or more tables, the importer shall infer
-   nothing for it and shall warn naming the candidates.
+3. When two or more tables meet every criterion of requirement 2 for a
+   column -- name form, a single key column, not `T`, and the type --
+   the importer shall infer nothing for it and shall warn naming the
+   candidates. A table that matches by name but not by type is no
+   candidate: `site_id INT` beside `sites.site_id INT` and
+   `legacy_sites.site_id UUID` infers `sites` (PR #620 review).
 4. When a matching column is in `T`'s primary key, the importer shall
    infer nothing for it and shall warn that it is a candidate.
 5. When the flag is given to `import model` with a format other than
@@ -107,7 +111,8 @@ key against `INTEGER` (inferred), a `BIGSERIAL` key (not inferred), an
 unrecognised type on either side (not inferred), a type mismatch, a
 self-table match, a composite-key target `U` whose first key column's
 name and type match `X` (no inference: `U` has no single key column),
-the ambiguous case, the
+the ambiguous case, a name match whose type differs beside one that
+qualifies (inferred to the one), the
 key-column case, a column with a declared foreign key whose name suggests
 another table (the declared reference wins, with no inference warning),
 and the flag absent; CLI tests that

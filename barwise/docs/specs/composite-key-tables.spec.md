@@ -179,7 +179,9 @@ is reported; the
 drift test in `@barwise/cli`, the one package that depends on both --
 the two packages keep their own code, and the drift test is what fails
 when they diverge, as CLAUDE.md requires of must-agree copies (PR #620
-review); and the trial rows the change moves (barwise-2z1's three;
+review); and the trial rows the change moves (two of barwise-2z1's three -- the third, C05's,
+is keyed on `CHARG_ID` alone, the key-is-reference shape, and moves to
+barwise-3pc (PR #620 review);
 barwise-nkn's C03 actuarial-analyst and C04 ternary check; the three
 REFUSED dbt imports).
 
