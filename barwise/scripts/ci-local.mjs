@@ -16,16 +16,28 @@
  * `audit`, `publint`, the bundles), because it too was assembled from
  * memory. Deriving the list is the only version of this that stays true.
  *
- * `--list` prints the gates without running them. A failure does not stop
- * the run: every gate reports, so one pass shows all the breakage rather
- * than the first of it.
+ * It applies ci.yml's `if:` conditions too, not just its list. A gate CI
+ * skips for this change is skipped here and named in the summary, and the
+ * change is classified by `lib/changed-class.mjs` -- the module ci.yml's
+ * own detect step runs -- over the branch's diff from
+ * `git merge-base origin/main HEAD` plus anything uncommitted. Before, this
+ * ran every gate on every change, which cost three minutes on a tracker
+ * edit and, worse, passed a docs-only diff that CI then failed: locally the
+ * build had always run, in CI it was skipped (barwise-954,
+ * `docs/specs/ci-local-condition-parity.spec.md`). The unknown case runs:
+ * an `if:` this cannot read, or a base it cannot find, runs the gate and
+ * says why. `--all` runs every gate regardless.
+ *
+ * `--list` prints each gate with the verdict this change gets, without
+ * running anything. A failure does not stop the run: every gate reports,
+ * so one pass shows all the breakage rather than the first of it.
  *
  * A run holds a lock, points coverage at a directory of its own, and
  * keeps the complete output of every failing gate on disk -- see
  * `docs/specs/local-ci-isolation.spec.md` (barwise-960) for why each of
  * those three exists.
  */
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   closeSync,
   mkdirSync,
@@ -38,7 +50,8 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ciGates } from "./lib/ci-gates.mjs";
+import { classify, committedPaths, uncommittedPaths } from "./lib/changed-class.mjs";
+import { ciSteps, shouldRun } from "./lib/ci-gates.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -133,9 +146,50 @@ function logName(gate) {
   return `${gate.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "")}.log`;
 }
 
-const list = ciGates();
+/**
+ * The change class for this run, or why there is none.
+ *
+ * The base is `git merge-base origin/main HEAD`, the local analogue of
+ * CI's `pull_request.base.sha`. It is never fetched: network I/O inside a
+ * gate runner can hang in an offline container, and a missing or stale
+ * `origin/main` is exactly the unknown case, which runs everything.
+ */
+function changeClass() {
+  if (process.argv.includes("--all")) return { cls: undefined, why: "--all" };
+  try {
+    const base = execFileSync("git", ["merge-base", "origin/main", "HEAD"], {
+      cwd: ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    const paths = [...new Set([...committedPaths(base, ROOT), ...uncommittedPaths(ROOT)])];
+    return { cls: classify(paths), base: base.slice(0, 8), files: paths.length };
+  } catch {
+    return { cls: undefined, why: "no merge-base with origin/main" };
+  }
+}
+
+const change = changeClass();
+const plan = ciSteps().map((s) => {
+  if (change.cls === undefined) return { ...s, run: true, understood: true };
+  return { ...s, ...shouldRun(s.condition, change.cls) };
+});
+const list = plan.filter((p) => p.run).map((p) => p.args);
+const skipped = plan.filter((p) => !p.run);
+const unread = plan.filter((p) => !p.understood);
+
+const classLine = change.cls === undefined
+  ? `Running every gate (${change.why}).`
+  : `Change class: docs_only=${change.cls.docsOnly} optimizer=${change.cls.optimizer} `
+    + `(${change.files} file(s) since ${change.base}, uncommitted included).`;
+
 if (process.argv.includes("--list")) {
-  for (const g of list) console.log(`npm ${g}`);
+  console.log(classLine);
+  for (const p of plan) {
+    const verdict = p.run ? (p.understood ? "run " : "run?") : "skip";
+    console.log(`  ${verdict}  npm ${p.args}${p.condition ? `   [if: ${p.condition}]` : ""}`);
+  }
+  console.log(`${list.length} run, ${skipped.length} skipped.`);
   process.exit(0);
 }
 
@@ -167,7 +221,11 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
   });
 }
 
-console.log(`Running ${list.length} gates from ci.yml, in order.\n`);
+console.log(classLine);
+for (const u of unread) {
+  console.log(`  not understood, so running: npm ${u.args}   [if: ${u.condition}]`);
+}
+console.log(`Running ${list.length} of ${plan.length} gates from ci.yml, in order.\n`);
 const failed = [];
 // A gate that exits 2 could not answer; it did not find anything. Reported
 // apart from a failure because conflating them is the defect
@@ -239,3 +297,10 @@ if (refused.length > 0) {
 }
 rmSync(RUN_DIR, { recursive: true, force: true });
 console.log(`\nAll ${list.length} gates passed.`);
+// The skip list is printed on success too. A runner that silently does less
+// than it used to is how a fast path becomes a hole; these lines are the
+// evidence that it did the right less, and `--all` is how to do more.
+if (skipped.length > 0) {
+  console.log(`${skipped.length} skipped for this change, as CI skips them (--all runs them):`);
+  for (const s of skipped) console.log(`  npm ${s.args}   [if: ${s.condition}]`);
+}

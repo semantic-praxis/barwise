@@ -1740,11 +1740,12 @@ function tempCiRepo() {
   // file. A fixture that copies only the entry point gets ERR_MODULE_
   // NOT_FOUND, which the assertions below report as "the summary must
   // name the log directory" -- true, and about nothing.
+  // `lib/changed-class.mjs` likewise: the change classification ci.yml's
+  // detect step runs, which ci-local imports to apply the same `if:`s.
   mkdirSync(join(root, "scripts", "lib"), { recursive: true });
-  writeFileSync(
-    join(root, "scripts", "lib", "ci-gates.mjs"),
-    readFileSync(join(SCRIPTS, "lib", "ci-gates.mjs")),
-  );
+  for (const lib of ["ci-gates.mjs", "changed-class.mjs"]) {
+    writeFileSync(join(root, "scripts", "lib", lib), readFileSync(join(SCRIPTS, "lib", lib)));
+  }
   return {
     dir,
     root,
@@ -1877,7 +1878,7 @@ test("a lock whose pid is gone is removed rather than obeyed, and a run releases
     writeFileSync(repo.lock, JSON.stringify({ pid: dead, started: "2026-09-08T00:00:00Z" }));
 
     const r = runCiLocal(repo);
-    assert.match(r.stdout, /Running 2 gates/, `a stale lock must not stop a run:\n${r.all}`);
+    assert.match(r.stdout, /Running 2 of 2 gates/, `a stale lock must not stop a run:\n${r.all}`);
     assert.equal(existsSync(repo.lock), false, "a finished run must release its lock");
   } finally {
     rmSync(repo.dir, { recursive: true, force: true });
