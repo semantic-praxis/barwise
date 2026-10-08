@@ -96,16 +96,20 @@ export function ciSteps(workflow = WORKFLOW) {
  *
  * Only the forms ci.yml uses are understood: a comparison of
  * `steps.changes.outputs.docs_only` or `.optimizer` with `'true'` or
- * `'false'`, and `&&` joins of those. Anything else answers `run: true`
- * with `understood: false`, because skipping a gate CI will run turns a
- * green local pass into a red push -- the failure the local runner exists
- * to prevent. The caller prints the unknown condition rather than hiding it.
+ * `'false'`, `github.event_name == 'pull_request'`, and `&&` joins of
+ * those. The event test is true locally: ci-local runs before a push, and
+ * every push from a branch is headed for a pull request, so a PR-only step
+ * is one the push will meet (check-tracker-closes, barwise-i61). Anything
+ * else answers `run: true` with `understood: false`, because skipping a
+ * gate CI will run turns a green local pass into a red push -- the failure
+ * the local runner exists to prevent. The caller prints the unknown condition rather than hiding it.
  */
 export function shouldRun(condition, cls) {
   if (condition === "") return { run: true, understood: true };
   const outputs = { docs_only: cls.docsOnly, optimizer: cls.optimizer };
   let run = true;
   for (const atom of condition.split("&&").map((s) => s.trim())) {
+    if (/^github\.event_name\s*==\s*'pull_request'$/.test(atom)) continue;
     const m = /^steps\.changes\.outputs\.(docs_only|optimizer)\s*(==|!=)\s*'(true|false)'$/.exec(
       atom,
     );

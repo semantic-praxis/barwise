@@ -4068,3 +4068,139 @@ test("check-review-tiers names the defect it refuses, for every row and allow-li
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+/**
+ * check-tracker-closes: a diff that closes an issue changes nothing but
+ * the tracker (docs/specs/tracker-only-closes.spec.md, barwise-i61).
+ *
+ * A sandbox repository, so each case is a diff built for it. The gate and
+ * the one module it imports are copied in; `BASE_SHA` stands in for the
+ * pull request's base commit, as ci.yml passes it.
+ */
+function trackerRepo() {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-closes-"));
+  const g = (...args) =>
+    execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+      .trim();
+  g("init", "-q", "-b", "main");
+  g("config", "user.email", "t@example.com");
+  g("config", "user.name", "t");
+  mkdirSync(join(dir, ".beads"));
+  mkdirSync(join(dir, "scripts", "lib"), { recursive: true });
+  for (const f of ["check-tracker-closes.mjs", join("lib", "changed-class.mjs")]) {
+    writeFileSync(join(dir, "scripts", f), readFileSync(join(SCRIPTS, f)));
+  }
+  const issues = (rows) =>
+    writeFileSync(
+      join(dir, ".beads", "issues.jsonl"),
+      rows.map(([id, status]) => JSON.stringify({ id, status })).join("\n") + "\n",
+    );
+  const commit = (msg) => {
+    g("add", "-A");
+    g("commit", "-q", "-m", msg);
+    return g("rev-parse", "HEAD");
+  };
+  issues([["a", "open"], ["b", "open"]]);
+  writeFileSync(join(dir, "src.ts"), "export const x = 1;\n");
+  const base = commit("base");
+  const run = (env = { BASE_SHA: base }) =>
+    spawnSync(process.execPath, [join(dir, "scripts", "check-tracker-closes.mjs")], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, BASE_SHA: "", ...env },
+    });
+  return { dir, g, issues, commit, base, run };
+}
+
+test("check-tracker-closes fails a close beside a code change", () => {
+  const r = trackerRepo();
+  try {
+    r.issues([["a", "closed"], ["b", "open"]]);
+    writeFileSync(join(r.dir, "src.ts"), "export const x = 2;\n");
+    r.commit("fix and close");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stderr);
+    assert.match(out.stderr, /closed: {2}a\b/);
+    assert.match(out.stderr, /src\.ts/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-tracker-closes fails a close beside a Markdown-only change", () => {
+  // #616's shape: a spec and a close in one diff, which the docs-only
+  // path must not wave through.
+  const r = trackerRepo();
+  try {
+    r.issues([["a", "closed"], ["b", "open"]]);
+    writeFileSync(join(r.dir, "x.spec.md"), "# spec\n");
+    r.commit("spec and close");
+    assert.equal(r.run().status, 1);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-tracker-closes fails an issue filed already closed beside a code change", () => {
+  // #604's shape: absent at the base, closed at the head.
+  const r = trackerRepo();
+  try {
+    r.issues([["a", "open"], ["b", "open"], ["c", "closed"]]);
+    writeFileSync(join(r.dir, "src.ts"), "export const x = 3;\n");
+    r.commit("file, fix and close");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stderr);
+    assert.match(out.stderr, /closed: {2}c\b/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-tracker-closes passes a tracker-only close and a change that closes nothing", () => {
+  const r = trackerRepo();
+  try {
+    r.issues([["a", "closed"], ["b", "open"]]);
+    const closeOnly = r.commit("close a");
+    let out = r.run();
+    assert.equal(out.status, 0, out.stderr);
+    assert.match(out.stdout, /1 close\(s\), tracker-only/);
+    writeFileSync(join(r.dir, "src.ts"), "export const x = 4;\n");
+    r.commit("code only");
+    out = r.run({ BASE_SHA: closeOnly });
+    assert.equal(out.status, 0, out.stderr);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-tracker-closes does not count a close made on main and merged in", () => {
+  // The base the gate is given is the pull request's current base, so a
+  // close that reached the branch through a merge from main is on both
+  // sides of the diff.
+  const r = trackerRepo();
+  try {
+    r.g("checkout", "-q", "-b", "feature");
+    writeFileSync(join(r.dir, "src.ts"), "export const x = 5;\n");
+    r.commit("feature work");
+    r.g("checkout", "-q", "main");
+    r.issues([["a", "open"], ["b", "closed"]]);
+    const movedBase = r.commit("close b on main");
+    r.g("checkout", "-q", "feature");
+    r.g("merge", "-q", "--no-edit", "main");
+    const out = r.run({ BASE_SHA: movedBase });
+    assert.equal(out.status, 0, out.stderr);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-tracker-closes refuses with no base rather than reporting clean", () => {
+  const r = trackerRepo();
+  try {
+    const out = r.run({ BASE_SHA: "" });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.doesNotMatch(out.stdout, /OK/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});

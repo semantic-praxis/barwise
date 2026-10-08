@@ -116,7 +116,9 @@ test without the earlier, and then expect this step.
 Close the issues it resolved via
 `node barwise/scripts/beads-crud.mjs close <id> --reason "..."` in a
 tracker-only follow-up commit -- not in the code PR, whose body should
-say the closures follow. Then push and verify per the Session
+say the closures follow. `npm run check:tracker-closes` (a CI step on every
+pull request, and part of the pre-push run) fails a diff that closes an
+issue and changes anything outside `.beads/`, docs included. Then push and verify per the Session
 Completion section of the root `CLAUDE.md`: work is not done until
 `git status` shows up to date with origin. If the merge deleted the
 branch, prune first -- see 6, because until you do that is a question

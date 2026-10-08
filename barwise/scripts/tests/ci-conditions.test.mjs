@@ -66,12 +66,17 @@ test("shouldRun reads every condition form ci.yml uses", () => {
   // The case #590 hit: a Markdown-only change under optimizer/ sets both.
   assert.equal(shouldRun(optGuard, OPT_DOCS).run, false);
   assert.deepEqual(shouldRun("", DOCS), { run: true, understood: true });
+  // A pull-request-only step runs locally, docs-only or not: every push
+  // from a branch is headed for a pull request (barwise-i61).
+  const prOnly = "github.event_name == 'pull_request'";
+  assert.deepEqual(shouldRun(prOnly, DOCS), { run: true, understood: true });
+  assert.deepEqual(shouldRun(`${prOnly} && ${docsGuard}`, DOCS), { run: false, understood: true });
 });
 
 test("shouldRun runs a gate whose condition it cannot read, and says so", () => {
   for (
     const cond of [
-      "github.event_name == 'pull_request'",
+      "github.event_name == 'push'",
       "steps.changes.outputs.docs_only != 'true' || failure()",
       "steps.changes.outputs.something_new == 'true'",
       "${{ steps.changes.outputs.docs_only != 'true' }}",

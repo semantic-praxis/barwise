@@ -15,8 +15,10 @@ output specification for the PR body (spec:
 - The spec workstream is named, and the spec's `Status` header says
   what this PR ships. `audit:specs --check` guards only the claim of
   no implementation (barwise-912). Authority: `spec-writer` skill.
-- A tracking issue exists; the PR does not close it, and says the
-  closure follows after merge. Authority: `steward` skill, section 5.
+- A tracking issue exists, and the body says the closure follows after
+  merge. That the PR closes no issue is checked by
+  `check:tracker-closes`; the rest is the reviewer's. Authority:
+  `steward` skill, section 5.
 - Every number in the body has the command that produced it, and
   re-running the command gives that number. Authority:
   `pr-creation`, section 4.3.
