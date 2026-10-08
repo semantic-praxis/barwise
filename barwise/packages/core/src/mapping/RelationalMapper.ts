@@ -17,8 +17,11 @@
  * 8. Subtype facts with identification: subtype table's PK is a FK to the
  *    supertype table (shared PK pattern).
  * 9. Objectified fact types: the objectified entity's table absorbs the
- *    underlying fact type's roles as FK columns, and its PK becomes
- *    the composite of those columns.
+ *    underlying fact type's roles -- an entity role as FK columns, a value
+ *    role as a column of its own -- and its PK becomes the columns of the
+ *    fact type's preferred (else first) internal uniqueness, else of every
+ *    role: the key an associative table for it would have. A fact type
+ *    with no entity role is not absorbed; the entity keeps its own key.
  */
 
 import type { FactType } from "../model/FactType.js";
@@ -444,19 +447,23 @@ export class RelationalMapper {
   }
 
   /**
-   * Create an associative (join) table for a fact type.
+   * A whole fact type as columns of one table: each entity role a foreign
+   * key to its player's table, each value role a column of its own.
+   * Returns the columns each role maps to, for keying the table on the
+   * fact type's uniqueness. One owner for the associative table and the
+   * objectifying entity's table, because the second copy was the one that
+   * never learned value roles: an objectified fact type lost every value
+   * role in every relational export (barwise-c65).
    */
-  private createAssociativeTable(
+  private addRoleColumns(
     ft: FactType,
     model: OrmModel,
-    entityTables: Map<string, MutableTable>,
-    associativeTables: MutableTable[],
-  ): void {
-    const columns: Column[] = [];
-    const foreignKeys: ForeignKey[] = [];
-    // The columns each role maps to, for building the key below.
+    tables: ReadonlyMap<string, MutableTable>,
+    columns: Column[],
+    foreignKeys: ForeignKey[],
+    sourceConstraintId?: string,
+  ): Map<string, string[]> {
     const roleColumns = new Map<string, string[]>();
-
     for (const role of ft.roles) {
       const player = model.getObjectType(role.playerId);
       if (!player) continue;
@@ -477,7 +484,7 @@ export class RelationalMapper {
         continue;
       }
 
-      const targetTable = entityTables.get(player.id);
+      const targetTable = tables.get(player.id);
       if (!targetTable) continue;
 
       // Disambiguate if the same entity appears in multiple roles.
@@ -494,8 +501,24 @@ export class RelationalMapper {
         columnNames: colNames,
         referencedTable: targetTable.name,
         referencedColumns: [...targetTable.primaryKey.columnNames],
+        ...(sourceConstraintId ? { sourceConstraintId } : {}),
       });
     }
+    return roleColumns;
+  }
+
+  /**
+   * Create an associative (join) table for a fact type.
+   */
+  private createAssociativeTable(
+    ft: FactType,
+    model: OrmModel,
+    entityTables: Map<string, MutableTable>,
+    associativeTables: MutableTable[],
+  ): void {
+    const columns: Column[] = [];
+    const foreignKeys: ForeignKey[] = [];
+    const roleColumns = this.addRoleColumns(ft, model, entityTables, columns, foreignKeys);
 
     const table: MutableTable = {
       name: toSnake(ft.name),
@@ -624,35 +647,27 @@ export class RelationalMapper {
     const factType = model.getFactType(oft.factTypeId);
     if (!entityTable || !factType) return;
 
-    const fkColNames: string[] = [];
-
-    for (const role of factType.roles) {
-      const player = model.getObjectType(role.playerId);
-      if (!player || player.kind !== "entity") continue;
-
-      const targetTable = tables.get(player.id);
-      if (!targetTable) continue;
-
-      // Disambiguate if the same entity appears in multiple roles.
-      const colNames = this.appendForeignKeyColumns(
-        entityTable.columns,
-        targetTable,
-        false,
-        role.id,
-        (pkColName) => `${toSnake(role.name)}_${pkColName}`,
-      );
-      fkColNames.push(...colNames);
-
-      entityTable.foreignKeys.push({
-        columnNames: colNames,
-        referencedTable: targetTable.name,
-        referencedColumns: [...targetTable.primaryKey.columnNames],
-        sourceConstraintId: factType.id,
-      });
-    }
-
-    if (fkColNames.length > 0) {
-      entityTable.primaryKey = { columnNames: fkColNames };
+    const roleColumns = this.addRoleColumns(
+      factType,
+      model,
+      tables,
+      entityTable.columns,
+      entityTable.foreignKeys,
+      factType.id,
+    );
+    // Keyed on the fact type's uniqueness, as its own table would be. It
+    // used to be keyed on its entity roles whatever the constraints said,
+    // so C01's Admission -- unique on patient and time -- was keyed on
+    // patient and facility, and C08's IntervalReading on the meter alone.
+    const absorbed = [...roleColumns.values()].flat();
+    if (absorbed.length > 0) {
+      entityTable.primaryKey = {
+        columnNames: associativeKey(
+          factType,
+          roleColumns,
+          entityTable.columns.filter((c) => absorbed.includes(c.name)),
+        ),
+      };
     }
   }
 
