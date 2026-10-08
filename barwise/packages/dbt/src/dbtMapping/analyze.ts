@@ -2,7 +2,7 @@
  * Analysis phase: identify PKs, FKs, and custom tests across models.
  */
 
-import { compositeKeyOf, KEY_TEST } from "./compositeKeys.js";
+import { candidateKeysOf, compositeKeyOf, KEY_TEST } from "./compositeKeys.js";
 import { findRelationshipTest, hasTest } from "./constraints.js";
 import { type DbtMapperContext, type RelationshipInfo } from "./context.js";
 
@@ -25,10 +25,15 @@ export function analyzeModels(ctx: DbtMapperContext): void {
         pkCol.name,
       );
     } else if (!compositeKeyOf(m)) {
+      const candidates = candidateKeysOf(m);
       ctx.report.gap(
         "identifier",
         m.name,
-        `No column with both unique and not_null tests found. Cannot determine primary identifier.`,
+        candidates.length > 1
+          ? `${candidates.length} ${KEY_TEST} tests each name a possible key (${
+            candidates.map((k) => `(${k.join(", ")})`).join(", ")
+          }) and none is marked preferred. Cannot determine primary identifier.`
+          : `No column with both unique and not_null tests found. Cannot determine primary identifier.`,
       );
     }
 

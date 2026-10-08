@@ -21,21 +21,35 @@ import { toPascalCase } from "./naming.js";
 export const KEY_TEST = "dbt_utils.unique_combination_of_columns";
 
 /**
- * The columns a model-level combination test names, when it names two or
- * more and each is `not_null`: the test proves the combination unique but
- * not present, and a key with a null in it identifies nothing (PR #620
- * review). A SQL primary key and the single-column rule both demand it.
+ * Every combination a model-level combination test names that could be
+ * the model's key: two or more columns, each `not_null`. The test proves
+ * the combination unique but not present, and a key with a null in it
+ * identifies nothing (PR #620 review); a SQL primary key and the
+ * single-column rule both demand it.
  */
-export function compositeKeyOf(m: DbtModel): string[] | undefined {
+export function candidateKeysOf(m: DbtModel): string[][] {
+  const keys: string[][] = [];
   for (const test of m.modelTests) {
     if (test.type !== "custom" || test.name !== KEY_TEST) continue;
     const cols = test.config["combination_of_columns"];
     if (!Array.isArray(cols) || cols.length < 2) continue;
     const names = cols.map(String);
     const columns = names.map((n) => m.columns.find((c) => c.name === n));
-    if (columns.every((c) => c !== undefined && hasTest(c, "not_null"))) return names;
+    if (columns.every((c) => c !== undefined && hasTest(c, "not_null"))) keys.push(names);
   }
-  return undefined;
+  return keys;
+}
+
+/**
+ * The model's composite key, when exactly one combination qualifies. Two
+ * are two candidate keys with nothing marking one preferred, which a DDL
+ * table, having one PRIMARY KEY, can never state; the model keeps today's
+ * reading and `analyzeModels` names them (composite-key-tables.spec.md,
+ * requirement 5).
+ */
+export function compositeKeyOf(m: DbtModel): string[] | undefined {
+  const keys = candidateKeysOf(m);
+  return keys.length === 1 ? keys[0] : undefined;
 }
 
 /**

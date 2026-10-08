@@ -80,4 +80,20 @@ describe("a composite-key dbt model", () => {
     expect(model.objectifiedFactTypes).toEqual([]);
     expect(JSON.stringify(report)).not.toContain("Composite key (course_id, crn)");
   });
+
+  it("is no key when two combinations qualify, and names both", () => {
+    // Two candidate keys, neither marked preferred (PR #620 review).
+    const twoKeys = yaml.replace(
+      "          combination_of_columns: [course_id, crn]\n",
+      "          combination_of_columns: [course_id, crn]\n"
+        + "      - dbt_utils.unique_combination_of_columns:\n"
+        + "          combination_of_columns: [crn, course_id]\n",
+    );
+    expect(twoKeys).not.toEqual(yaml);
+    const { model, report } = importDbtProject([twoKeys]);
+    expect(model.objectifiedFactTypes).toEqual([]);
+    const text = JSON.stringify(report);
+    expect(text).not.toContain("Composite key (");
+    expect(text).toContain("(course_id, crn), (crn, course_id)) and none is marked preferred");
+  });
 });
