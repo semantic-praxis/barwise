@@ -159,6 +159,33 @@ describe("a column named after a table's key, with its type", () => {
     });
   });
 
+  describe("targets only a table that becomes an entity (PR #628 review)", () => {
+    it("not a second schema's table of a name, which is skipped as a duplicate", () => {
+      // b.site matches by type, but it is skipped and the reference would
+      // resolve to a.site, whose key is a UUID.
+      const { model, warnings } = infer(`CREATE TABLE a.site (site_id UUID PRIMARY KEY);
+        CREATE TABLE b.site (site_id INT PRIMARY KEY);
+        ${device("site_id")}`);
+      expect(related(model, "NetworkDevice", "Site")).toBe(false);
+      expect(warnings.some((w) => /read as a reference to "site"/.test(w))).toBe(false);
+      expect(model.factTypes.some((f) => /^NetworkDevice has \w*SiteId$/.test(f.name))).toBe(true);
+    });
+
+    it("not a table its annotation makes a fact table, which has no entity", () => {
+      // Inferred, the column lost even its value fact: step 3 found no
+      // entity for the reference.
+      const { model, warnings } = infer(`CREATE TABLE person (person_id INT PRIMARY KEY);
+        CREATE TABLE club (club_id INT PRIMARY KEY);
+        -- barwise:v1 {"kind":"factTable","table":"membership","factType":"Person belongs to Club","readings":["{0} belongs to {1}"],"roles":[{"name":"member","player":"Person","columns":["person_id"]},{"name":"club","player":"Club","columns":["club_id"]}]}
+        CREATE TABLE membership (person_id INT PRIMARY KEY REFERENCES person (person_id),
+          club_id INT NOT NULL REFERENCES club (club_id));
+        CREATE TABLE ticket (ticket_id INT PRIMARY KEY, membership_id INT);`);
+      expect(model.getFactTypeByName("Person belongs to Club")).toBeDefined();
+      expect(model.getFactTypeByName("Ticket has MembershipId")).toBeDefined();
+      expect(warnings.some((w) => /reference to "membership"/.test(w))).toBe(false);
+    });
+  });
+
   it("needs a single key column: a composite key's first column is no target", () => {
     const { model } = infer(`CREATE TABLE site (site_id INT, rack INT, PRIMARY KEY (site_id, rack));
       ${device("site_id")}`);

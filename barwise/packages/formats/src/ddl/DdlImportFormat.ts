@@ -122,11 +122,17 @@ export class DdlImportFormat implements ImportFormat {
 
     // Parse all CREATE TABLE statements
     const parsed = this.parseCreateTables(input, warnings);
+    // What a barwise export says each table and column came from. A file
+    // without them -- another tool's DDL, or --no-annotate -- is read by
+    // guessing names from columns, as before (ddl-round-trip-fixed-point
+    // spec, workstream 4). Read before inference, which must not target a
+    // table the annotations make a fact table.
+    const annotations = readAnnotations(input, warnings);
     // Off unless asked: the flag is the user declaring that the schema
     // names its references after the keys they hold
     // (reference-inference.spec.md).
     const tables = options?.["inferReferences"] === true
-      ? inferReferences(parsed, warnings)
+      ? inferReferences(parsed, warnings, (t) => annotations.tables.get(tableKey(t))?.kind)
       : parsed;
 
     if (tables.length === 0) {
@@ -140,11 +146,6 @@ export class DdlImportFormat implements ImportFormat {
 
     // Build the ORM model
     const model = new OrmModel({ name: modelName });
-    // What a barwise export says each table and column came from. A file
-    // without them -- another tool's DDL, or --no-annotate -- is read by
-    // guessing names from columns, as before (ddl-round-trip-fixed-point
-    // spec, workstream 4).
-    const annotations = readAnnotations(input, warnings);
     // A line whose table or column is gone -- renamed or dropped by hand --
     // describes nothing in the file; say so rather than drop it unread.
     const present = new Set(tables.flatMap((t) => [
@@ -1758,7 +1759,21 @@ function subtypeReading(
  * infer nothing. A key column is never inferred, only reported: a guessed
  * reference there would feed the subtype rule a second guess.
  */
-function inferReferences(tables: readonly ParsedTable[], warnings: string[]): ParsedTable[] {
+function inferReferences(
+  tables: readonly ParsedTable[],
+  warnings: string[],
+  annotatedKind: (table: string) => string | undefined,
+): ParsedTable[] {
+  // Only a table that becomes an entity can be referenced: the first of
+  // its unqualified name (a later one from another schema is skipped as a
+  // duplicate, and the reference would resolve to the first, whatever its
+  // type), and not one its annotation makes a fact table, which has no
+  // entity, so the inferred reference would leave the column with no fact
+  // at all (PR #628 review).
+  const first = new Map<string, ParsedTable>();
+  for (const t of tables) if (!first.has(tableKey(t.name))) first.set(tableKey(t.name), t);
+  const isTarget = (u: ParsedTable) =>
+    first.get(tableKey(u.name)) === u && annotatedKind(u.name) !== "factTable";
   const squash = (n: string) => bareName(n).replace(/_/g, "");
   // The parser keeps each constraint's own spelling, so `site_id` and a
   // table-level `PRIMARY KEY (SITE_ID)` are one unquoted column; compared
@@ -1789,7 +1804,7 @@ function inferReferences(tables: readonly ParsedTable[], warnings: string[]): Pa
       if (table.foreignKeys.some((f) => f.columns.some((c) => same(c, column.name)))) continue;
       const type = typeOf(column);
       const candidates = tables.filter((u) => {
-        if (u === table || u.primaryKey.length !== 1) return false;
+        if (u === table || u.primaryKey.length !== 1 || !isTarget(u)) return false;
         if (!named(column.name, u)) return false;
         const key = u.columns.find((c) => same(c.name, u.primaryKey[0]!));
         return type !== undefined && key !== undefined && typeOf(key) === type;
