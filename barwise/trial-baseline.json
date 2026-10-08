@@ -254,10 +254,10 @@
     },
     "C03/small/6/acceptance:policy-admin-dba:pc-ddl": {
       "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-d60",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
-      "detail": "9 of 10 persona checks fail: The model has no object type named \"Policy\".; The model has no object type named \"PolicyPeriod\".; The model has no object type named \"Term\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"PolicyPeriod has PolicyPeriodId\"), so it "
+      "class": "acceptance-skin-generator-objectification",
+      "issue": "barwise-rlv",
+      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's ir-analyst also fails a subtype check, which is barwise-1078.",
+      "detail": "1 of 10 persona checks fail: The model does not verbalize as \"The combination of PolicyNumber and Term is unique across fact types.\". Check the fact type, its reading, and its constraints. (20 names mapped through the skin)"
     },
     "C03/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -457,10 +457,10 @@
     },
     "C05/small/6/acceptance:master-data-lead:erp-ddl": {
       "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-d60",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
-      "detail": "5 of 6 persona checks fail: The model has no object type named \"Material\".; The model has no object type named \"Plant\".; The model has no object type named \"MaterialPlantData\".; The model has no fact type connecting \"Material\" and \"Plant\"."
+      "class": "acceptance-all-role-table",
+      "issue": "barwise-2z1",
+      "note": "Edit distance to acceptance on a DDL table whose every column is a role of one fact type: without a barwise line the import reads it as an entity with attributes, or as a relationship over its foreign keys alone, so the three-role fact type the persona checks for is not there (barwise-2z1). C05's \"Material is produced at Plant in Batch\", keyed on its batch alone, imports as an entity, so no fact type connects Material and Plant. C09's biostatistician also fails a subtype check, which is barwise-1078.",
+      "detail": "1 of 6 persona checks fail: The model has no fact type connecting \"Material\" and \"Plant\". (26 names mapped through the skin)"
     },
     "C05/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -632,10 +632,10 @@
     },
     "C07/small/6/acceptance:network-inventory-architect:bq-ddl": {
       "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-d60",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
-      "detail": "4 of 10 persona checks fail: The model has no fact type connecting \"NetworkDevice\" and \"Site\".; Your model still allows what it should forbid: Rules out: a NetworkDevice that exists but never plays \"NetworkDevice is installed at Site\" -- e.g. NetworkDevice#1 appears in NetworkDevice has ManagementIp"
+      "class": "acceptance-no-foreign-keys",
+      "issue": "barwise-c5f",
+      "note": "Edit distance to acceptance on C07's BigQuery DDL, graded with its names mapped through the skin (barwise-d60). The skin writes no FOREIGN KEY, so NETWORK_DEVICE.SITE_ID imports as an attribute and no fact type connects NetworkDevice and Site; whether the import should infer a reference from a key-named column is barwise-c5f.",
+      "detail": "2 of 10 persona checks fail: The model has no fact type connecting \"NetworkDevice\" and \"Site\".; Your model still allows what it should forbid: Rules out: a NetworkDevice that exists but never plays \"NetworkDevice is installed at Site\" -- e.g. NetworkDevice#1 appears in NetworkDevice has ManagementIp"
     },
     "C07/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -917,33 +917,26 @@
       "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
       "detail": "rename Semester -> Term reported as a removal plus an addition with no synonym candidate"
     },
-    "C10/small/6/acceptance:financial-aid-director:sis-ddl": {
-      "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-d60",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
-      "detail": "6 of 9 persona checks fail: The model has no object type named \"FinancialAidAward\".; The model has no fact type connecting \"FinancialAidAward\" and \"Student\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"FinancialAidAward is awarded to Student\"), so it cann"
-    },
     "C10/small/6/acceptance:ir-analyst:sis-ddl": {
       "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-d60",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
-      "detail": "7 of 9 persona checks fail: The model has no object type named \"Grade\".; The model has no object type named \"GraduateStudent\".; The model does not verbalize as \"GraduateStudent is a subtype of Student.\". Check the fact type, its reading, and its constraints.; The model does not verbalize as \"Enrollm"
+      "class": "acceptance-skin-generator-objectification",
+      "issue": "barwise-rlv",
+      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's ir-analyst also fails a subtype check, which is barwise-1078.",
+      "detail": "2 of 9 persona checks fail: The model does not verbalize as \"GraduateStudent is a subtype of Student.\". Check the fact type, its reading, and its constraints.; The model does not verbalize as \"Enrollment is where Student enrolls in CourseSection for Term.\". Check the fact type, its reading, and its "
     },
     "C10/small/6/acceptance:registrar-data-steward:sis-ddl": {
       "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-d60",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
-      "detail": "8 of 9 persona checks fail: The model has no object type named \"Term\".; The model has no object type named \"Enrollment\".; The model has no fact type connecting \"Student\" and \"CourseSection\".; The model has no fact type connecting \"Course\" and \"Course\"."
+      "class": "acceptance-skin-generator-objectification",
+      "issue": "barwise-rlv",
+      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's ir-analyst also fails a subtype check, which is barwise-1078.",
+      "detail": "2 of 9 persona checks fail: The model has no fact type connecting \"Course\" and \"Course\".; The model does not verbalize as \"Each combination of Student, CourseSection and Term is unique in Student enrolls in CourseSection for Term.\". Check the fact type, its reading, and its constraints. (27 names ma"
     },
     "C10/small/6/acceptance:sis-dba:sis-ddl": {
       "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-d60",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
-      "detail": "8 of 9 persona checks fail: The model has no object type named \"Person\".; The model has no fact type connecting \"Person\" and \"Pidm\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Person has Pidm\"), so it cannot rule out: Rules out: two facts of Person has P"
+      "class": "acceptance-skin-generator-objectification",
+      "issue": "barwise-rlv",
+      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's sis-dba fails because the file creates SPRIDEN twice, once for Person and once as a skin extra table, so the grader maps neither (PR #611 review). C10's ir-analyst also fails a subtype check, which is barwise-1078.",
+      "detail": "4 of 9 persona checks fail: The model has no object type named \"Person\".; The model has no fact type connecting \"Person\" and \"Pidm\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Person has Pidm\"), so it cannot rule out: Rules out: two facts of Person has P"
     },
     "C10/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -1127,33 +1120,19 @@
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
     },
-    "C12/small/6/acceptance:hearing-officer:modern-ddl": {
-      "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-d60",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
-      "detail": "9 of 10 persona checks fail: The model has no object type named \"Appeal\".; The model has no object type named \"HearingOfficer\".; The model has no fact type connecting \"Appeal\" and \"Determination\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Appeal contest"
-    },
-    "C12/small/6/acceptance:mainframe-dba:modern-ddl": {
-      "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-d60",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
-      "detail": "8 of 10 persona checks fail: The model has no object type named \"Client\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Client has ClientNumber\"), so it cannot rule out: Rules out: two facts of Client has ClientNumber that agree on Client -- e.g. {Client=Cl"
-    },
     "C12/small/6/acceptance:modernization-architect:modern-ddl": {
       "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-d60",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
-      "detail": "9 of 10 persona checks fail: The model has no object type named \"Applicant\".; The model has no object type named \"Recipient\".; The model has no object type named \"Household\".; The model has no fact type connecting \"Client\" and \"Household\"."
+      "class": "acceptance-skin-generator-objectification",
+      "issue": "barwise-rlv",
+      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's ir-analyst also fails a subtype check, which is barwise-1078.",
+      "detail": "1 of 10 persona checks fail: The model does not verbalize as \"Determination is where Case is determined for Program in CertificationPeriod.\". Check the fact type, its reading, and its constraints. (55 names mapped through the skin)"
     },
     "C12/small/6/acceptance:policy-analyst:modern-ddl": {
       "severity": "S5",
-      "class": "acceptance-edit-distance-sql",
-      "issue": "barwise-d60",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
-      "detail": "8 of 9 persona checks fail: The model has no object type named \"Determination\".; The model has no object type named \"CertificationPeriod\".; The model does not verbalize as \"Each combination of Case, Program and CertificationPeriod is unique in Case is determined for Program in CertificationPeriod.\"."
+      "class": "acceptance-skin-generator-objectification",
+      "issue": "barwise-rlv",
+      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's ir-analyst also fails a subtype check, which is barwise-1078.",
+      "detail": "1 of 9 persona checks fail: The model does not verbalize as \"Each combination of Case, Program and CertificationPeriod is unique in Case is determined for Program in CertificationPeriod.\". Check the fact type, its reading, and its constraints. (55 names mapped through the skin)"
     },
     "C12/small/6/release-bundle:gym-list": {
       "severity": "S3",

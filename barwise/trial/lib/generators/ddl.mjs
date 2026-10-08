@@ -155,12 +155,29 @@ function valueSqlType(col, types) {
 }
 
 /**
+ * A skin's spelling of a table or column name: its abbreviations, case,
+ * table prefix and identifier limit, in that order. One owner for the
+ * generator, which writes these names, and the acceptance grader, which
+ * maps an import's names back through them (trial-skin-name-mapping.spec.md):
+ * a second copy that drifted would grade a name the artifact never wrote.
+ */
+export function skinNamer(skin) {
+  const naming = skin?.naming ?? {};
+  const spell = (raw, isTable) => {
+    let n = naming.abbreviate ? abbreviate(raw, naming.abbreviations) : raw;
+    n = caseName(n, isTable ? naming.table_case : naming.column_case);
+    if (isTable && naming.table_prefix) n = `${naming.table_prefix}${n}`;
+    return truncate(n, naming.max_identifier);
+  };
+  return { table: (raw) => spell(raw, true), column: (raw) => spell(raw, false) };
+}
+
+/**
  * @returns {{ text: string, manifest: object }}
  */
 export function generateDdl(doc, skin, { factor = 1, seed = 1, artifactId = "ddl" } = {}) {
   const dialect = skin.dialect ?? "ansi";
   const types = { ...(TYPE_MAPS[dialect] ?? TYPE_MAPS.ansi), ...(skin.types ?? {}) };
-  const naming = skin.naming ?? {};
   const idioms = skin.idioms ?? {};
   const [ql, qr] = QUOTES[idioms.quoting ?? "none"] ?? QUOTES.none;
   const q = (s) => `${ql}${s}${qr}`;
@@ -173,12 +190,8 @@ export function generateDdl(doc, skin, { factor = 1, seed = 1, artifactId = "ddl
   const manifest = { artifact: artifactId, generator: "ddl", dialect, factor, tables: [] };
   let stmt = 0;
 
-  const ident = (raw, isTable) => {
-    let n = naming.abbreviate ? abbreviate(raw, naming.abbreviations) : raw;
-    n = caseName(n, isTable ? naming.table_case : naming.column_case);
-    if (isTable && naming.table_prefix) n = `${naming.table_prefix}${n}`;
-    return truncate(n, naming.max_identifier);
-  };
+  const namer = skinNamer(skin);
+  const ident = (raw, isTable) => (isTable ? namer.table(raw) : namer.column(raw));
 
   const emit = (sql, meta) => {
     stmt++;

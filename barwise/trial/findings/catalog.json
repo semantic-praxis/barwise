@@ -126,16 +126,22 @@
       "id": "acceptance-all-role-table",
       "issue": "barwise-2z1",
       "severity": "S5",
-      "step": "^acceptance:(c08-metering-data-engineer:cis-ddl|biostatistician:sdtm-ddl)$",
-      "note": "Edit distance to acceptance on a DDL table whose every column is a role of one fact type: without a barwise line the import reads it as an entity with attributes, or as a relationship over its foreign keys alone, so the three-role fact type the persona checks for is not there (barwise-2z1). C09's biostatistician also fails a subtype check, which is barwise-1078."
+      "step": "^acceptance:(c08-metering-data-engineer:cis-ddl|biostatistician:sdtm-ddl|master-data-lead:erp-ddl)$",
+      "note": "Edit distance to acceptance on a DDL table whose every column is a role of one fact type: without a barwise line the import reads it as an entity with attributes, or as a relationship over its foreign keys alone, so the three-role fact type the persona checks for is not there (barwise-2z1). C05's \"Material is produced at Plant in Batch\", keyed on its batch alone, imports as an entity, so no fact type connects Material and Plant. C09's biostatistician also fails a subtype check, which is barwise-1078."
     },
     {
-      "id": "acceptance-edit-distance-sql",
-      "issue": "barwise-d60",
+      "id": "acceptance-skin-generator-objectification",
+      "issue": "barwise-rlv",
       "severity": "S5",
-      "step": "^acceptance:.*:(?!kernel).*-ddl$",
-      "note": "Edit distance to acceptance on a DDL artifact read by import sql. What remains is names: the skin renames the concept a check names (C03's pc_ prefix, C05's and C10's vendor abbreviations, C12's 8-character identifiers), or never states the relationship (C07's BigQuery skin writes no FOREIGN KEY) (barwise-d60). Deontic and ring checks are declared not_expressible for ddl, and the trial's generator now writes the UNIQUE and n-ary keys the kernel declares (barwise-1077 triage).",
-      "importer": "sql"
+      "step": "^acceptance:(policy-admin-dba:pc-ddl|ir-analyst:sis-ddl|registrar-data-steward:sis-ddl|sis-dba:sis-ddl|modernization-architect:modern-ddl|policy-analyst:modern-ddl)$",
+      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's sis-dba fails because the file creates SPRIDEN twice, once for Person and once as a skin extra table, so the grader maps neither (PR #611 review). C10's ir-analyst also fails a subtype check, which is barwise-1078."
+    },
+    {
+      "id": "acceptance-no-foreign-keys",
+      "issue": "barwise-c5f",
+      "severity": "S5",
+      "step": "^acceptance:network-inventory-architect:bq-ddl$",
+      "note": "Edit distance to acceptance on C07's BigQuery DDL, graded with its names mapped through the skin (barwise-d60). The skin writes no FOREIGN KEY, so NETWORK_DEVICE.SITE_ID imports as an attribute and no fact type connects NetworkDevice and Site; whether the import should infer a reference from a key-named column is barwise-c5f."
     },
     {
       "id": "acceptance-edit-distance-dbt",

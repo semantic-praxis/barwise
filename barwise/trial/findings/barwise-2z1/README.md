@@ -19,3 +19,8 @@ is keyed on its two foreign keys with `DOSE` outside the key, so the
 import builds a relationship over the foreign keys with Dose as an
 attribute and "For each Subject and Treatment combination, at most one
 Dose applies" has no ternary to verbalize.
+
+C05's master-data lead (since barwise-d60 maps the skin's names) fails
+the same way: `MAT_IS_PRODUCED_AT_WERK_IN_CHA` is three foreign keys
+keyed on `CHARG_ID` alone, so it imports as an entity and no fact type
+connects Material and Plant.

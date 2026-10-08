@@ -36,6 +36,7 @@ import {
   TRIAL_DIR,
 } from "./paths.mjs";
 import { exemptPositions } from "./personas.mjs";
+import { gradedCandidate } from "./skinNames.mjs";
 
 export function loadCustomer(dir) {
   const customer = parse(readFileSync(join(dir, "customer.yaml"), "utf8"));
@@ -1099,7 +1100,8 @@ export async function sprint6Surfaces(customer, tier, record) {
       judges: p.judges ?? [],
     });
     const checks = parse(readFileSync(exercisePath, "utf8")).checks ?? [];
-    for (const { label, path: candidate, authoring, kind } of candidates) {
+    for (const { label, path: imported, authoring, kind } of candidates) {
+      const { path: candidate, mapped } = gradedCandidate(customer, gen, label, imported, kind);
       const res = runCli([
         "gym",
         "check",
@@ -1113,7 +1115,11 @@ export async function sprint6Surfaces(customer, tier, record) {
       ], { timeoutMs: budget });
       const report = parseJson(res.stdout);
       const exempt = kind ? exemptPositions(checks, p.not_expressible, kind) : new Set();
-      const outcome = grade.gradeAcceptance(res, report, { exempt, checkCount: checks.length });
+      const graded = grade.gradeAcceptance(res, report, { exempt, checkCount: checks.length });
+      // Say so when names were mapped: the step graded a translated copy.
+      const outcome = mapped
+        ? { ...graded, detail: `${graded.detail} (${mapped} names mapped through the skin)` }
+        : graded;
       // The kernel must satisfy its own personas: a failure there is an authoring defect, not a product one.
       record({
         sprint: 6,
