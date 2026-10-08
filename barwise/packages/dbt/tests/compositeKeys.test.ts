@@ -218,6 +218,35 @@ models:
     );
   });
 
+  it("keeps an unobjectified model's explicit description on its fact type", () => {
+    // No entity stands for the model, so the fact type is where the
+    // description survives (PR #621 review).
+    const { model } = importDbtProject([`
+models:
+  - name: course
+    columns:
+      - name: course_id
+        data_tests: [unique, not_null]
+  - name: prerequisite
+    description: A course that must be passed before another.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [course_id, prior_course_id]
+    columns:
+      - name: course_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('course')", field: course_id }
+      - name: prior_course_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('course')", field: course_id }
+`]);
+    expect(model.objectifiedFactTypes).toEqual([]);
+    const fact = model.factTypes.find((f) => / prerequisite$/.test(f.name));
+    expect(fact?.definition).toBe("A course that must be passed before another.");
+  });
+
   it("describes a value role's value type as any column's", () => {
     const { model } = importDbtProject([`
 models:

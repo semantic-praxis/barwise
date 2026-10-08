@@ -101,7 +101,7 @@ export function gradeImport(result, manifest, expect, modelSummary) {
   // `dbo.User` and `stg_user` satisfy `User`, `SuperUser` does not. The
   // first version compared normalised strings with endsWith, so a model
   // holding only SuperUser passed an import that dropped User.
-  // A table the manifest records as a fact type's (a many-to-many, an
+  // A table the manifest records as a fact type (a many-to-many, an
   // n-ary) may come back as that fact type, named "<players> <table
   // words>" (composite-key-tables.spec.md), or, as it used to, as an
   // entity objectifying it. Either names the table; only an object type

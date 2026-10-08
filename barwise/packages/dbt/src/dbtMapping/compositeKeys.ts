@@ -293,6 +293,10 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
       roles,
       readings: [`${list(roles.map((_, i) => `{${i}}`))} have ${words}`],
       constraints,
+      // Unobjectified, the fact type is all that stands for the model, so
+      // it carries an explicit description; objectified, the entity does
+      // (PR #621 review). An inferred one is not invented for it.
+      ...(!info.objectified && m.description ? { definition: m.description } : {}),
     });
     if (info.objectified && entityId) {
       ctx.model.addObjectifiedFactType({ factTypeId: factType.id, objectTypeId: entityId });
