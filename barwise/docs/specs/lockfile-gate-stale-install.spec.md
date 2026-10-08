@@ -1,6 +1,6 @@
 # check:lockfile tells a stale install from a range problem
 
-Status: Implemented 2026-10-08 (single change). One deviation from the draft: the comparison skips every entry outside `node_modules`, not only the root (see Scope).
+Status: Implemented 2026-10-08 (single change). Three corrections from implementation and review are recorded under Corrections during implementation.
 Created: 2026-10-08
 Last-updated: 2026-10-08
 Tracking: barwise-2d4
@@ -42,46 +42,61 @@ not describe. The first row is the one barwise-2d4 reported.
 - Before running `npm ls`, the gate shall compare each entry in
   `package-lock.json`'s `packages` map with the installed package at that
   path, reading the installed `package.json`'s `version`.
-- When an installed version differs from the lockfile's version, or a
-  non-optional lockfile entry has nothing installed at its path, the gate
-  shall exit 2, list the first differences (lockfile version against
-  installed version, by path), and name `npm ci` as the remedy.
+- The gate shall also walk the installed tree (the root's and each
+  workspace's `node_modules`, scoped and nested) and treat a package
+  installed at a path the lockfile has no entry for as a difference.
+  `npm ls` judges extraneous packages by the manifests, not the lockfile,
+  so a declared package installed against a lockfile that lost its entry
+  passes it.
+- When an installed version differs from the lockfile's version, a
+  non-optional lockfile entry has nothing installed at its path, or an
+  installed package has no lockfile entry, the gate shall exit 2, list the
+  first differences by path, and name `npm ci` as the remedy.
 - The comparison shall skip entries whose path is outside `node_modules`
-  (the root and the workspaces), `link: true` entries (workspace
-  symlinks), and entries marked `optional` or `devOptional` that have
-  nothing installed. The draft skipped only the root; mutation testing
-  showed that skip was untested, and the reason it matters covers the
-  workspaces too: their entries describe source manifests, so a version
-  bump not yet followed by `npm install` would read as a stale install
-  and `npm ci` is not the remedy. On this tree, 131 of 685 entries are
-  optional platform builds absent by design; none are required and
-  missing, and no installed version differs after `npm ci`.
+  (the root and the workspaces: their manifests are source, so a version
+  bump not yet followed by `npm install` is not a stale install),
+  `link: true` entries (workspace symlinks), and entries marked
+  `optional` or `devOptional` that have nothing installed. On this tree,
+  131 of 685 entries are optional platform builds absent by design; none
+  are required and missing, no installed version differs after `npm ci`,
+  and the walk finds none of 542 installed packages missing from the
+  lockfile.
+- When an installed package is a symlink the lockfile does not mark as a
+  link (`npm link` to a local checkout), the gate shall skip it and not
+  walk into it. The developer put it there on purpose, and `npm ci` would
+  undo it; `npm ls` still checks its version against the range.
 - When `package-lock.json` is absent, the gate shall skip the comparison
   and behave as today. The gate's question is about the installed tree
   against the manifests, and the test fixtures have no lockfile.
 - When `package-lock.json` is present but has no `packages` map
   (lockfileVersion 1, or a bad merge), the gate shall exit 2 rather than
   skip the comparison, which would bring back the false green.
-- When an installed package is a symlink the lockfile does not mark as a
-  link (`npm link` to a local checkout), the gate shall skip it. The
-  developer put it there on purpose, and `npm ci` would undo it; `npm ls`
-  still checks its version against the range.
-
-The last two rules and the neutral wording of the refusal ("not installed
-from this lockfile", since an install can be newer than the lockfile as
-well as older) came from the self-review.
-
 - The range-problem message (exit 1) is unchanged, because once the
   comparison passes, a range problem is a range problem.
 
 Out of scope:
 
-- Packages installed but absent from the lockfile (extraneous). `npm ls`
-  already reports them; `npm ci` removes them. Detecting them would mean
-  walking every `node_modules` directory rather than reading the lockfile.
 - Running `npm ci` automatically. The gate reports; installing is the
   operator's call, and a hook that rewrites `node_modules` mid-push would
   surprise anyone with a linked local package.
+
+## Corrections during implementation
+
+The draft skipped only the root lockfile entry. A mutation run showed
+that skip was untested, and working out why it matters widened it to the
+workspaces: the draft would have told someone midway through a version
+bump to run `npm ci`.
+
+The draft had no packages-map refusal and no `npm link` skip, and its
+refusal said the install "predates" the lockfile, which is wrong for an
+install newer than the lockfile. The self-review found all three by
+reading the diff; the refusal now says "not installed from this
+lockfile".
+
+The reverse walk was out of scope in the draft, on the premise that
+`npm ls` reports packages missing from the lockfile. Copilot's review
+of PR #627 reproduced a declared package installed against a lockfile
+with no entry for it, which `npm ls` passes, so the premise was wrong.
 
 ## Inventory
 

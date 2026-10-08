@@ -32,7 +32,7 @@
  * repository root rather than the cwd.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 function refuse(message) {
@@ -101,6 +101,44 @@ if (existsSync(lockPath)) {
       stale.push(`${path}: lockfile ${entry.version}, installed ${installed}`);
     }
   }
+  // The other direction: a package installed where the lockfile has no
+  // entry. `npm ls` judges extraneous packages by the manifests, not the
+  // lockfile, so a declared package installed against a lockfile that lost
+  // its entry passes `npm ls` (Copilot, PR #627). Walks the root's and each
+  // workspace's node_modules, scoped and nested.
+  const visit = (pkgDir, key) => {
+    if (lstatSync(pkgDir).isSymbolicLink()) return;
+    if (!(key in lock.packages)) {
+      let version = "unknown version";
+      try {
+        version = JSON.parse(readFileSync(join(pkgDir, "package.json"), "utf8")).version;
+      } catch {
+        // A directory with no readable manifest is still not the lockfile's.
+      }
+      stale.push(`${key}: installed ${version}, not in lockfile`);
+    }
+    walk(join(pkgDir, "node_modules"), `${key}/node_modules/`);
+  };
+  const walk = (nodeModules, prefix) => {
+    if (!existsSync(nodeModules)) return;
+    for (const name of readdirSync(nodeModules)) {
+      if (name.startsWith(".")) continue;
+      if (!name.startsWith("@")) {
+        visit(join(nodeModules, name), prefix + name);
+        continue;
+      }
+      for (const scoped of readdirSync(join(nodeModules, name))) {
+        visit(join(nodeModules, name, scoped), `${prefix}${name}/${scoped}`);
+      }
+    }
+  };
+  walk(join(dir, "node_modules"), "node_modules/");
+  for (const path of Object.keys(lock.packages)) {
+    if (path !== "" && !path.includes("node_modules/")) {
+      walk(join(dir, path, "node_modules"), `${path}/node_modules/`);
+    }
+  }
+
   if (stale.length > 0) {
     const shown = stale.slice(0, 10).map((s) => `  ${s}`).join("\n");
     const more = stale.length > 10 ? `\n  ... and ${stale.length - 10} more` : "";

@@ -415,17 +415,23 @@
       "caught_by": "execution",
       "note": "Measured directly: the env var was dropped under strict env mode, so the run looked isolated and was not."
     },
-    "lockfile-gate-stale-install::2ee389253e74": {
+    "lockfile-gate-stale-install::017ba0d22acb": {
       "spec": "lockfile-gate-stale-install.spec.md",
-      "excerpt": "status: implemented 2026-10-08 (single change). one deviation from the draft: the comparison skips every entry outside nodemodules, not only the root (see scope",
+      "excerpt": "the reverse walk was out of scope in the draft, on the premise that npm ls reports packages missing from the lockfile. copilot's review of pr #627 reproduced a ",
       "caught_by": "execution",
-      "note": "Status line recording the deviation. A surviving mutant (removing the root-entry skip failed no test) showed the skip was untested; working out why it matters widened it to every entry outside node_modules."
+      "note": "Copilot review on PR #627 reproduced a declared package installed against a lockfile with no entry for it, which npm ls passes; the reverse walk moved into scope."
     },
-    "lockfile-gate-stale-install::d2c3e66f5232": {
+    "lockfile-gate-stale-install::ca2e89741669": {
       "spec": "lockfile-gate-stale-install.spec.md",
-      "excerpt": "- before running npm ls, the gate shall compare each entry in package-lock.json's packages map with the installed package at that path, reading the installed pa",
+      "excerpt": "the draft had no packages-map refusal and no npm link skip, and its refusal said the install \"predates\" the lockfile, which is wrong for an install newer than t",
+      "caught_by": "reasoning",
+      "note": "The code-review self-review found the missing packages-map refusal, the missing npm-link skip and the wrong \"predates\" wording by reading the diff."
+    },
+    "lockfile-gate-stale-install::d4397fd5a334": {
+      "spec": "lockfile-gate-stale-install.spec.md",
+      "excerpt": "the draft skipped only the root lockfile entry. a mutation run showed that skip was untested, and working out why it matters widened it to the workspaces: the d",
       "caught_by": "execution",
-      "note": "Scope block with two corrections. The root-only skip widened to every entry outside node_modules after a surviving mutant showed it untested (execution). The packages-map refusal, the npm-link skip and the neutral refusal wording came from the code-review self-review reading the diff (reasoning)."
+      "note": "A surviving mutant (removing the root-entry skip failed no test) showed the skip was untested; working out why widened it to the workspaces."
     },
     "model-graph-and-id-spaces::1ca8e3cb770b": {
       "spec": "model-graph-and-id-spaces.spec.md",

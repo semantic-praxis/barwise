@@ -403,6 +403,29 @@ test("check-lockfile-agrees refuses rather than passing an in-range install the 
   assert.doesNotMatch(r.stdout, /OK/);
 });
 
+test("check-lockfile-agrees refuses a package installed where the lockfile has no entry", () => {
+  // Copilot's reproduction on PR #627: `npm ls` judges extraneous
+  // packages by the manifests, so a declared foo@2.1.0 against a lockfile
+  // that lost its entry passed. Scoped and nested paths go through the
+  // same walk, so the fixture puts one of each beside it.
+  const r = lockfileGate("2.1.0", {}, (dir) => {
+    const put = (path, version) => {
+      mkdirSync(join(dir, path), { recursive: true });
+      writeFileSync(join(dir, path, "package.json"), JSON.stringify({ version }));
+    };
+    put("node_modules/@s/bar", "1.0.0");
+    put("node_modules/foo/node_modules/baz", "3.0.0");
+  });
+  assert.equal(r.status, 2, `expected refusal, got ${r.status}:\n${r.stdout}${r.stderr}`);
+  assert.match(r.stderr, /node_modules\/foo: installed 2\.1\.0, not in lockfile/);
+  assert.match(r.stderr, /node_modules\/@s\/bar: installed 1\.0\.0, not in lockfile/);
+  assert.match(
+    r.stderr,
+    /node_modules\/foo\/node_modules\/baz: installed 3\.0\.0, not in lockfile/,
+  );
+  assert.doesNotMatch(r.stdout, /OK/);
+});
+
 test("check-lockfile-agrees refuses when a required lockfile entry is not installed", () => {
   const r = lockfileGate("2.2.0", {
     "node_modules/foo": { version: "2.2.0" },
@@ -418,6 +441,10 @@ test("check-lockfile-agrees passes a matching install, skipping absent optional 
     "node_modules/opt": { version: "1.0.0", optional: true },
     "node_modules/devopt": { version: "1.0.0", devOptional: true },
     "node_modules/ws": { resolved: "packages/ws", link: true },
+  }, (dir) => {
+    // npm's own bookkeeping lives in dot-entries; none is a package.
+    mkdirSync(join(dir, "node_modules", ".bin"));
+    mkdirSync(join(dir, "node_modules", ".cache"));
   });
   assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
   assert.match(r.stdout, /1 installed entries satisfy their declared ranges\. OK/);
@@ -454,6 +481,13 @@ test("check-lockfile-agrees leaves a package linked on purpose alone", () => {
     writeFileSync(
       join(dir, "local-foo", "package.json"),
       JSON.stringify({ name: "foo", version: "2.5.0" }),
+    );
+    // The checkout has its own node_modules, which no lockfile here
+    // describes; the walk must not follow the link into it.
+    mkdirSync(join(dir, "local-foo", "node_modules", "dep"), { recursive: true });
+    writeFileSync(
+      join(dir, "local-foo", "node_modules", "dep", "package.json"),
+      JSON.stringify({ version: "1.0.0" }),
     );
     mkdirSync(join(dir, "node_modules"));
     symlinkSync(join(dir, "local-foo"), join(dir, "node_modules", "foo"), "dir");
