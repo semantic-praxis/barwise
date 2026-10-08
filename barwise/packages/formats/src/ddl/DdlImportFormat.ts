@@ -43,6 +43,7 @@ import {
   readAnnotations,
   type Relationship,
 } from "./barwiseAnnotation.js";
+import { headNoun, sameUpToNumber } from "./nameMatching.js";
 import {
   blankComments,
   findCreateTables,
@@ -395,9 +396,39 @@ export class DdlImportFormat implements ImportFormat {
 
     // Step 2: Give each single-column key a typed identifier. Before the
     // ordinary columns, so a key gets its plain name ahead of a non-key
-    // column that shares it, as the dbt importer does.
+    // column that shares it, as the dbt importer does. A key that is also
+    // a shared-key reference to a table whose kind the name declares is a
+    // subtype identified through its supertype instead, with no
+    // identifier of its own: keeping both gives the entity two identity
+    // sources (key-reference-tables.spec.md, requirements 1-3).
+    const byKey = new Map(tables.map((t) => [tableKey(t.name), t]));
     for (const table of accepted) {
       const entity = model.getObjectType(entityMap.get(tableKey(table.name)) ?? "");
+      const sub = entity ? subtypeReading(table, byKey) : undefined;
+      if (sub && "candidates" in sub) {
+        warnings.push(
+          `Table "${table.name}": its key references ${
+            sub.candidates.map((c) => `"${c}"`).join(", ")
+          }, and each would make it a subtype; which is not the DDL's to say, so none is imported `
+            + `(key-reference-tables.spec.md).`,
+        );
+      }
+      const parentId = sub && "parent" in sub
+        ? entityMap.get(tableKey(sub.parent.name))
+        : undefined;
+      if (entity && sub && "parent" in sub && parentId && !reaches(model, parentId, entity.id)) {
+        model.addSubtypeFact({
+          subtypeId: entity.id,
+          supertypeId: parentId,
+          providesIdentification: true,
+        });
+        warnings.push(
+          `Table "${table.name}": imported as a subtype of "${sub.parent.name}": its name ends in `
+            + `"${sub.parent.name}"'s head noun and it repeats none of its columns `
+            + `(key-reference-tables.spec.md).`,
+        );
+        continue;
+      }
       const binary = entity
         ? this.createKeyIdentifier(model, entity, table, annotations, warnings)
         : undefined;
@@ -1566,6 +1597,65 @@ function compositeReading(table: ParsedTable, referenced: boolean): CompositeRea
  * (barwise-1078), and a key with a plain column is barwise-1077's other
  * half, an external uniqueness.
  */
+/**
+ * Whether a table keyed on one column that also references another table
+ * is a subtype of it (key-reference-tables.spec.md, requirements 1-3).
+ * The key column must carry exactly one foreign key, a shared-key one:
+ * its source the table's key and its target the other table's whole
+ * single-column key. The table's name must end in the other's head noun,
+ * up to number, and it must repeat none of the other's non-key columns,
+ * which is what separates a subtype (adds columns) from a copy (repeats
+ * them). Two or more qualifying parents are reported, not chosen, since
+ * taking the first would make the model depend on constraint order. Any
+ * other foreign key on the key column leaves today's reading: a subtype
+ * that dropped the second reference would lose it.
+ */
+type SubtypeReading = { readonly parent: ParsedTable; } | {
+  readonly candidates: readonly string[];
+};
+
+function subtypeReading(
+  table: ParsedTable,
+  byKey: ReadonlyMap<string, ParsedTable>,
+): SubtypeReading | undefined {
+  if (table.primaryKey.length !== 1) return undefined;
+  const key = table.primaryKey[0]!;
+  const onKey = table.foreignKeys.filter((f) => f.columns.includes(key));
+  const qualifying = onKey.flatMap((f) => {
+    const parent = byKey.get(tableKey(f.referencedTable));
+    if (!parent || parent === table || f.columns.length !== 1) return [];
+    if (parent.primaryKey.length !== 1) return [];
+    const target = f.referencedColumns.length > 0 ? f.referencedColumns : parent.primaryKey;
+    if (target.length !== 1 || target[0]!.toLowerCase() !== parent.primaryKey[0]!.toLowerCase()) {
+      return [];
+    }
+    if (!sameUpToNumber(headNoun(table.name), headNoun(parent.name))) return [];
+    const theirs = new Set(
+      parent.columns.filter((c) => !parent.primaryKey.includes(c.name))
+        .map((c) => c.name.toLowerCase()),
+    );
+    if (table.columns.some((c) => c.name !== key && theirs.has(c.name.toLowerCase()))) return [];
+    return [parent];
+  });
+  if (qualifying.length >= 2) return { candidates: qualifying.map((p) => p.name) };
+  if (onKey.length === 1 && qualifying.length === 1) return { parent: qualifying[0]! };
+  return undefined;
+}
+
+/** Whether `from` already reaches `to` through supertypes: a subtype fact to `to` would close a cycle. */
+function reaches(model: OrmModel, from: string, to: string): boolean {
+  const seen = new Set<string>();
+  const queue = [from];
+  while (queue.length > 0) {
+    const id = queue.pop()!;
+    if (id === to) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    for (const sf of model.subtypeFacts) if (sf.subtypeId === id) queue.push(sf.supertypeId);
+  }
+  return false;
+}
+
 function foreignKeysOfKey(table: ParsedTable): ParsedForeignKey[] | undefined {
   const key = table.primaryKey;
   if (key.length < 2) return undefined;
