@@ -433,11 +433,13 @@ test("classify: each acceptance row on a DDL file reaches its importer's class, 
     importer,
     detail: "2 of 10 persona checks fail",
   });
-  // The DDL importer's acceptance class went with barwise-1077's fix, its
-  // rows passing or moved to a named cause; a new DDL-importer row must
-  // stay unclassified, keeping the gate red, not borrow the SQL class.
-  assert.notEqual(classify(row("ddl"), classes)?.id, "acceptance-edit-distance-sql");
-  assert.equal(classify(row("sql"), classes)?.id, "acceptance-edit-distance-sql");
+  // Neither importer has a catch-all acceptance class any more: the DDL
+  // importer's went with barwise-1077's fix and the SQL importer's with
+  // barwise-d60's, their rows passing or moved to a class that names its
+  // steps. A row no class names must stay unclassified, keeping the gate
+  // red, rather than borrow a cause it was never shown to have.
+  assert.equal(classify(row("ddl"), classes), null);
+  assert.equal(classify(row("sql"), classes), null);
 });
 
 test("gradeStaleness: a real staleness report passes, a clean one after a change is S1, an unreadable payload refuses", () => {

@@ -82,3 +82,37 @@ the abbreviation case (C10), the prefix case (C03), the truncation case
 Acceptance: over the regenerated small tier, the 11 barwise-d60 rows
 either pass or fail only on checks whose cause is not a skin's
 spelling, and each is reclassified to that cause.
+
+## Implementation notes
+
+Measured over the regenerated small tier, 2026-10-08.
+
+- **Four of the 11 rows pass**: C10's sis-dba and financial-aid-director,
+  and C12's mainframe-dba and hearing-officer. C12's 8-character
+  truncation mapped 55 names and C10's dictionary 27, so the forward
+  mapping holds where inversion could not have.
+- **The other seven fail on structure, and none on a spelling.** That
+  was the acceptance criterion, but which structure was not what the
+  scope predicted: only C07's row is a relationship the artifact
+  never states. Five are defects in the trial's own generator, and one
+  is an importer limit that already had an issue:
+  - barwise-rlv (C03 policy-admin-dba; C10 ir-analyst and
+    registrar-data-steward; C12 modernization-architect and
+    policy-analyst). `relationalView` writes an objectified fact type as
+    two unlinked tables, and names a self-reference column after its
+    player, so a ring table repeats one column. C03's "PolicyNumber and
+    Term" uniqueness looked like a format limit, a uniqueness across
+    two tables, until the kernel showed PolicyPeriod objectifies the
+    fact type with the Term role: written as one table, the rule is an
+    ordinary `UNIQUE`. It is classified to the generator, not declared
+    `not_expressible`.
+  - barwise-2z1 (C05 master-data-lead). "Material is produced at Plant
+    in Batch", keyed on its batch alone, imports as an entity.
+  - barwise-c5f (C07 network-inventory-architect). The BigQuery skin
+    writes no foreign key; whether the import should infer one from a
+    key-named column is a new decision.
+- **The SQL importer's catch-all acceptance class is gone.** It matched
+  every non-kernel `-ddl` acceptance step, so it would have taken any
+  new row on its cause without anyone looking. Each replacement class
+  names its steps, and `oracles.test.mjs` now asserts that an unnamed
+  DDL acceptance row stays unclassified for either importer.
