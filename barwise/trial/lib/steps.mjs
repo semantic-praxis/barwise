@@ -36,7 +36,7 @@ import {
   TRIAL_DIR,
 } from "./paths.mjs";
 import { exemptPositions } from "./personas.mjs";
-import { renameImported, skinRenames } from "./skinNames.mjs";
+import { gradedCandidate } from "./skinNames.mjs";
 
 export function loadCustomer(dir) {
   const customer = parse(readFileSync(join(dir, "customer.yaml"), "utf8"));
@@ -1058,25 +1058,6 @@ export function acceptanceCandidates({ kernel, scaled = null, imported = [], jud
       .filter(([id]) => judges.includes(id))
       .map(([id, path, kind = null]) => ({ label: id, path, authoring: false, kind })),
   ];
-}
-
-/**
- * The model a persona grades for one candidate. An import of a skinned
- * DDL artifact is graded through a copy whose object types carry the
- * kernel's names wherever the skin's naming spells them
- * (docs/specs/trial-skin-name-mapping.spec.md, barwise-d60): the checks
- * name kernel concepts, and the artifact never wrote those names.
- */
-function gradedCandidate(customer, gen, label, path, kind) {
-  const art = (customer.artifacts ?? []).find((a) => a.id === label);
-  if (kind !== "ddl" || !art?.skin) return { path, mapped: 0 };
-  const skin = parse(readFileSync(join(customer.dir, art.skin), "utf8")) ?? {};
-  const imported = readModel(path);
-  const renames = skinRenames(readModel(customer.kernelPath), skin, imported);
-  if (renames.size === 0) return { path, mapped: 0 };
-  const graded = join(gen, `${label}.graded.orm.yaml`);
-  writeModel(graded, renameImported(imported, renames));
-  return { path: graded, mapped: renames.size };
 }
 
 /** Sprint 6: personas accept or reject; MCP and CLI agree; the release bundle works as shipped. */

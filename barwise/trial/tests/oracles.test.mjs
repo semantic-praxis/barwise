@@ -423,7 +423,7 @@ test("evaluateGate: a row whose current result now fits another class fails the 
   assert.match(v.misclassified[1].why, /classifies as no class, the row says sql-class/);
 });
 
-test("classify: each acceptance row on a DDL file reaches its importer's class, whatever the catalog order", () => {
+test("classify: an acceptance row on a DDL file that no class names reaches no class, from either importer", () => {
   // First fit wins, and the SQL importer's class once matched every
   // "-ddl" acceptance step, so a DDL-importer row landed under the SQL
   // importer's issue (PR #572 review). Asserted over the real catalog.

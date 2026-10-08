@@ -26,8 +26,12 @@ Observed (2026-10-08):
 - `SCBCRSE_IS_PREREQUISITE_OF_SCB` declares `SCBCRSE_ID` twice, and
   `pc_policy_period` declares `policy_period_id` twice (its supersedes
   self-reference), so neither table says which role is which.
-- C10's skin also lists an `extra_tables` `SFRSTCR`, which collides with
-  the generated Enrollment table of the same name.
+- C10's skin lists three `extra_tables`, `SPRIDEN`, `SFRSTCR` and
+  `STVTERM`, whose names the dictionary also gives the generated Person,
+  Enrollment and Term tables, so the file creates each twice. The import
+  keeps the first and drops the second; the grader maps none of the
+  three, since the artifact does not say which one is Person (PR #611
+  review).
 
 The trial rows classified here are graded with their names mapped
 through the skin (barwise-d60), so what fails is structure the artifact

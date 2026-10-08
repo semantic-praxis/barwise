@@ -4,8 +4,12 @@
  * barwise-d60). Synthetic models, so each case shows one rule.
  */
 import assert from "node:assert/strict";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
-import { renameImported, skinRenames } from "../lib/skinNames.mjs";
+import { parse, stringify } from "yaml";
+import { gradedCandidate, renameImported, skinRenames } from "../lib/skinNames.mjs";
 
 const kernel = (...ots) => ({
   model: { object_types: ots.map(([name, kind = "entity"]) => ({ name, kind })) },
@@ -74,4 +78,73 @@ test("the renamed copy keeps the import's own name as an alias", () => {
     aliases: ["Sgbstdn"],
   });
   assert.equal(doc.model.object_types[0].name, "Sgbstdn", "the import itself is untouched");
+});
+
+test("a name the artifact declares twice maps nothing: the import kept only one of them", () => {
+  const skin = {
+    naming: { table_case: "upper", abbreviate: true, abbreviations: { Person: "SPRIDEN" } },
+  };
+  assert.deepEqual(
+    renames(kernel(["Person"]), skin, imported("Spriden")),
+    { Spriden: "Person" },
+  );
+  assert.equal(
+    skinRenames(kernel(["Person"]), skin, imported("Spriden"), { declaredTwice: ["SPRIDEN"] })
+      .size,
+    0,
+  );
+});
+
+/**
+ * A customer on disk: a kernel, a skin, an imported model and the
+ * artifact's manifest, so gradedCandidate is driven through the same
+ * files sprint6Surfaces hands it.
+ */
+function customerOnDisk({ manifestTables = ["SGBSTDN"] } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "skin-graded-"));
+  const kernelPath = join(dir, "kernel.orm.yaml");
+  writeFileSync(kernelPath, stringify(kernel(["Student"])));
+  writeFileSync(
+    join(dir, "skin.yaml"),
+    stringify({
+      naming: { table_case: "upper", abbreviate: true, abbreviations: { Student: "SGBSTDN" } },
+    }),
+  );
+  const importedPath = join(dir, "sis-ddl.imported.orm.yaml");
+  writeFileSync(importedPath, stringify(imported("Sgbstdn")));
+  writeFileSync(
+    join(dir, "sis-ddl.manifest.json"),
+    JSON.stringify({ tables: manifestTables.map((name) => ({ name })) }),
+  );
+  const customer = { dir, kernelPath, artifacts: [{ id: "sis-ddl", skin: "skin.yaml" }] };
+  return { customer, dir, importedPath };
+}
+
+test("gradedCandidate: a skinned DDL import is graded through a renamed copy beside it", () => {
+  const { customer, dir, importedPath } = customerOnDisk();
+  const got = gradedCandidate(customer, dir, "sis-ddl", importedPath, "ddl");
+  assert.deepEqual(got, { path: join(dir, "sis-ddl.graded.orm.yaml"), mapped: 1 });
+  const graded = parse(readFileSync(got.path, "utf8"));
+  assert.deepEqual(graded.model.object_types[0].name, "Student");
+  assert.equal(parse(readFileSync(importedPath, "utf8")).model.object_types[0].name, "Sgbstdn");
+});
+
+test("gradedCandidate: anything but a skinned DDL import is graded as it stands", () => {
+  const { customer, dir, importedPath } = customerOnDisk();
+  for (const [label, kind] of [["sis-ddl", "dbt"], ["kernel", "ddl"]]) {
+    assert.deepEqual(gradedCandidate(customer, dir, label, importedPath, kind), {
+      path: importedPath,
+      mapped: 0,
+    });
+  }
+});
+
+test("gradedCandidate: a table the manifest lists twice is not mapped", () => {
+  const { customer, dir, importedPath } = customerOnDisk({
+    manifestTables: ["SGBSTDN", "SGBSTDN"],
+  });
+  assert.deepEqual(gradedCandidate(customer, dir, "sis-ddl", importedPath, "ddl"), {
+    path: importedPath,
+    mapped: 0,
+  });
 });
