@@ -162,6 +162,20 @@ describe("a composite-key table imports as the fact type it states", () => {
     });
   });
 
+  it("a key that is one composite foreign key is not this rule: it is one role, not several", () => {
+    // (tenant_id, order_id) is one reference to orders; read as a fact type
+    // it would have one role (PR #620 review). It is the key-is-reference
+    // shape (key-reference-tables.spec.md).
+    const { model } = ddl.parse(`CREATE TABLE orders (tenant_id INT, order_id INT,
+        PRIMARY KEY (tenant_id, order_id));
+      CREATE TABLE order_note (
+        tenant_id INT NOT NULL, order_id INT NOT NULL, note VARCHAR(200) NOT NULL,
+        PRIMARY KEY (tenant_id, order_id),
+        FOREIGN KEY (tenant_id, order_id) REFERENCES orders (tenant_id, order_id));`);
+    expect(model.objectifiedFactTypes).toEqual([]);
+    expect(model.factTypes.every((f) => f.roles.length >= 2)).toBe(true);
+  });
+
   it("a key of values alone keeps today's reading: an entity with an external uniqueness", () => {
     const { model } = ddl.parse(`CREATE TABLE exchange_rate (
       currency VARCHAR(3) NOT NULL, rate_date DATE NOT NULL, rate DECIMAL(12,6) NOT NULL,

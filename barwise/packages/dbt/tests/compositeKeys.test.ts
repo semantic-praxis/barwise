@@ -68,4 +68,16 @@ describe("a composite-key dbt model", () => {
       ),
     ).toBe(true);
   });
+
+  it("is no key when a column of the combination may be null", () => {
+    // The combination test proves uniqueness, not presence (PR #620 review).
+    const nullable = yaml.replace(
+      "      - name: crn\n        data_tests:\n          - not_null\n          - relationships: { to: \"ref('section')\", field: crn }",
+      "      - name: crn\n        data_tests:\n          - relationships: { to: \"ref('section')\", field: crn }",
+    );
+    expect(nullable).not.toEqual(yaml);
+    const { model, report } = importDbtProject([nullable]);
+    expect(model.objectifiedFactTypes).toEqual([]);
+    expect(JSON.stringify(report)).not.toContain("Composite key (course_id, crn)");
+  });
 });

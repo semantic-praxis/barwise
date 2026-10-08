@@ -19,14 +19,20 @@ import { toPascalCase } from "./naming.js";
 
 const KEY_TEST = "dbt_utils.unique_combination_of_columns";
 
-/** The columns a model-level combination test names, when it names two or more. */
+/**
+ * The columns a model-level combination test names, when it names two or
+ * more and each is `not_null`: the test proves the combination unique but
+ * not present, and a key with a null in it identifies nothing (PR #620
+ * review). A SQL primary key and the single-column rule both demand it.
+ */
 export function compositeKeyOf(m: DbtModel): string[] | undefined {
   for (const test of m.modelTests) {
     if (test.type !== "custom" || test.name !== KEY_TEST) continue;
     const cols = test.config["combination_of_columns"];
     if (!Array.isArray(cols) || cols.length < 2) continue;
     const names = cols.map(String);
-    if (names.every((n) => m.columns.some((c) => c.name === n))) return names;
+    const columns = names.map((n) => m.columns.find((c) => c.name === n));
+    if (columns.every((c) => c !== undefined && hasTest(c, "not_null"))) return names;
   }
   return undefined;
 }

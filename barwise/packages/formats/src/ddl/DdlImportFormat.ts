@@ -1442,6 +1442,10 @@ function compositeReading(table: ParsedTable, referenced: boolean): CompositeRea
     ...keyFks.map((f) => [...f.columns]),
     ...key.filter((c) => !fkColumns.has(c)).map((c) => [c]),
   ];
+  // A key that is one composite foreign key is one role: the key-is-
+  // reference shape (key-reference-tables.spec.md), not a relationship
+  // over several (PR #620 review).
+  if (keyRoles.length < 2) return undefined;
   // A column unique by itself identifies the objectifying entity; it is
   // never a role, and it needs that entity to exist (C04's line_id).
   const uniqueAlone = (c: string) =>
