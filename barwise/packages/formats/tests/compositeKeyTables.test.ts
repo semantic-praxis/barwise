@@ -108,6 +108,23 @@ describe("a composite-key table imports as the fact type it states", () => {
     expect(model.factTypes.map((f) => f.name)).toContain("Enrollment has StatusCode");
   });
 
+  it("a remaining foreign key is a relationship of the objectifier, not an attribute", () => {
+    const sql = `CREATE TABLE orders (order_id INT PRIMARY KEY);
+      CREATE TABLE item (item_id INT PRIMARY KEY);
+      CREATE TABLE supplier (supplier_id INT PRIMARY KEY);
+      CREATE TABLE order_item (
+        order_id INT NOT NULL REFERENCES orders (order_id),
+        item_id INT NOT NULL REFERENCES item (item_id),
+        supplier_id INT NOT NULL REFERENCES supplier (supplier_id),
+        quantity INT NOT NULL,
+        PRIMARY KEY (order_id, item_id));`;
+    const model = roundTrips(sql);
+    expect(shape(model).objectified).toEqual(["OrderItem"]);
+    expect(shape(model).factTypes.some((f) =>
+      f.players.includes("OrderItem") && f.players.includes("Supplier")
+    )).toBe(true);
+  });
+
   it("a column unique by itself identifies the objectifier and is never the extra role", () => {
     // C04's OrderLine: line_id is the entity's own identifier, quantity the
     // ternary's third role.
