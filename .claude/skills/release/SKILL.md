@@ -23,23 +23,24 @@ git log --oneline v1.2.0..HEAD
 
 ## Bump versions and tag
 
-All commands run from `barwise/`. The `--no-workspaces-update` flag
-prevents npm from resolving workspace dependencies against the public
-registry (these packages are not published). Use `patch` for bug fixes
-and small improvements, `minor` for new features or format support:
-
 The bump is a pull request like any other change, and the tag goes on
 the merge commit once it lands. AGENTS.md forbids committing to main,
 and v1.7.0 was cut this way (PR #279, tagged on its merge commit); this
 section used to push the bump and the tag straight to main, which is
 the one path that skips CI on the commit being released (barwise-8e4).
 
+All commands run from `barwise/`. The `--no-workspaces-update` flag
+prevents npm from resolving workspace dependencies against the public
+registry (these packages are not published). Use `patch` for bug fixes
+and small improvements, `minor` for new features or format support:
+
 ```bash
 git checkout -b release-bump origin/main
 npm version patch --workspaces --include-workspace-root \
   --no-git-tag-version --no-workspaces-update
 VER=$(node -p "require('./package.json').version")
-# apply the three gotchas below before committing
+# before committing: the three gotchas below, and the release-notes
+# rename under "Create a GitHub release"
 git add -A && git commit -m "bump to $VER"
 git push -u origin release-bump   # open the PR; merge it once CI is green
 ```
@@ -81,7 +82,12 @@ gh release create v1.3.0 --title "v1.3.0" --generate-notes
 ```
 
 `--generate-notes` builds the changelog from merged PRs since the last
-tag. Check that `gh` is on PATH first; the GitHub MCP tools can read
+tag. A PR list does not tell a user what to do about a breaking change,
+so changes that need explanation are written ahead of time in
+`barwise/docs/release-notes/unreleased.md`. If that file exists, rename
+it to `<version>.md` in the bump commit and add
+`--notes-file barwise/docs/release-notes/<version>.md`; gh combines it
+with the generated changelog. Check that `gh` is on PATH first; the GitHub MCP tools can read
 releases but not create one. The `release.yml` workflow then builds and attaches
 the artifacts: the VS Code extension (`.vsix`), the standalone CLI
 bundle (`barwise-cli-<ver>.cjs`), the MCP server bundle
