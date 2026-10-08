@@ -23,19 +23,17 @@ part of that sweep into a gate.
 
 ## Can a reference be resolved without a declaration at every site? (resolved: yes, by four rules and a short allowlist)
 
-A survey of the 34 instruction files on main 29db88a7 settles this.
-Requiring every reference to be rooted (`barwise/...`) would have meant
+A survey of the 34 instruction files on main 2d80d6c0 settles this.
+Requiring every reference to be rooted (`barwise/...`) would mean
 rewriting about 240 references written as basenames (`ci.yml`) or
-package-relative paths (`cli/src/commands/`). Instead, four resolution
-rules, prototyped over the whole corpus, check 365 path references and
-leave 9 unresolved:
+package-relative paths (`cli/src/commands/`): a looser first pass finds 376
+path-like tokens, of which 138 are rooted. Instead, four resolution
+rules, prototyped over the whole corpus, check 363 path references and
+leave 7 unresolved:
 
 - 2 are real defects: `cli/workspace/io.ts` and
   `mcp/workspace/resolve.ts` in `pr-review/checklist.md`. Both omit
   `src/`, so a reader looking for them finds nothing at the path given.
-- 2 are a file-type name (`.orm-project.yaml`) that the prototype's
-  file-type filter missed because of the hyphen. The filter is fixed in
-  the implementation.
 - 5 are legitimate mentions of files that are not tracked: a template
   placeholder (`path/thing.ts`), a user's `.vscode/settings.json` (cited
   twice), the optimizer's runtime `report.json`, and dbt's `target/`.
