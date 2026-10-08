@@ -1,9 +1,12 @@
 # Agent Instructions
 
-This project uses **bd** (beads) for issue tracking; the generated
-Beads Integration section below is the authoritative workflow
-reference. (A hand-written copy of it used to sit here and had
-already drifted from the generated one -- barwise-873.)
+Issue tracking uses beads, through `node barwise/scripts/beads-crud.mjs`.
+The interface, its rules and the session-completion steps live once, in
+the root `CLAUDE.md` ("Beads Issue Tracker" and "Session Completion").
+A `bd init` generated block used to sit here and prescribed `bd`
+commands (`bd prime`, `bd remember`) that CLAUDE.md says not to rely
+on, so two files gave an agent opposite instructions (barwise-a49). Do
+not run `bd init` in this repository: it writes that block back.
 
 ## Git Workflow
 
@@ -15,53 +18,3 @@ open a pull request.
 Always run `gh auth switch --user gabeschenz` before using the `gh`
 command. This ensures the correct GitHub account is active for
 authentication.
-
-<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
-
-## Beads Issue Tracker
-
-This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
-
-### Quick Reference
-
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work
-bd close <id>         # Complete work
-```
-
-### Rules
-
-- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
-- Run `bd prime` for detailed command reference and session close protocol
-- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
-
-## Session Completion
-
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
-
-**MANDATORY WORKFLOW:**
-
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd dolt push
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
-
-**CRITICAL RULES:**
-
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
-
-<!-- END BEADS INTEGRATION -->
