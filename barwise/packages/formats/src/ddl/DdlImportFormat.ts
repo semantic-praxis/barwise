@@ -908,6 +908,19 @@ export class DdlImportFormat implements ImportFormat {
         );
         continue;
       }
+      // A hand-edited line can name one supertype twice; the model refuses
+      // the second fact, which would abort the whole import (PR #623 review).
+      if (
+        model.subtypeFacts.some((sf) =>
+          sf.subtypeId === entity.id && sf.supertypeId === supertype.id
+        )
+      ) {
+        warnings.push(
+          `Table "${table.name}": its annotation names "${link.entity}" as a supertype more than `
+            + `once; the repeat is ignored.`,
+        );
+        continue;
+      }
       model.addSubtypeFact({
         subtypeId: entity.id,
         supertypeId: supertype.id,
@@ -1698,8 +1711,10 @@ function subtypeReading(
   byKey: ReadonlyMap<string, ParsedTable>,
 ): SubtypeReading | undefined {
   if (table.primaryKey.length !== 1) return undefined;
-  const key = table.primaryKey[0]!;
-  const onKey = table.foreignKeys.filter((f) => f.columns.includes(key));
+  // Unquoted SQL names are case-insensitive, so `PRIMARY KEY (subject_id)`
+  // and `FOREIGN KEY (SUBJECT_ID)` name one column (PR #623 review).
+  const key = table.primaryKey[0]!.toLowerCase();
+  const onKey = table.foreignKeys.filter((f) => f.columns.some((c) => c.toLowerCase() === key));
   const qualifying = onKey.flatMap((f) => {
     const parent = byKey.get(tableKey(f.referencedTable));
     if (!parent || parent === table || f.columns.length !== 1) return [];
@@ -1709,11 +1724,15 @@ function subtypeReading(
       return [];
     }
     if (!sameUpToNumber(headNoun(table.name), headNoun(parent.name))) return [];
+    const parentKey = parent.primaryKey[0]!.toLowerCase();
     const theirs = new Set(
-      parent.columns.filter((c) => !parent.primaryKey.includes(c.name))
-        .map((c) => c.name.toLowerCase()),
+      parent.columns.map((c) => c.name.toLowerCase()).filter((c) => c !== parentKey),
     );
-    if (table.columns.some((c) => c.name !== key && theirs.has(c.name.toLowerCase()))) return [];
+    if (
+      table.columns.some((c) => c.name.toLowerCase() !== key && theirs.has(c.name.toLowerCase()))
+    ) {
+      return [];
+    }
     return [parent];
   });
   if (qualifying.length >= 2) return { candidates: qualifying.map((p) => p.name) };

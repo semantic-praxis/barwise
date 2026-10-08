@@ -192,6 +192,49 @@ CREATE TABLE enrolled_subject (subject_id INT PRIMARY KEY REFERENCES subject (su
     expect(warnings.some((w) => /subtype of "Trial"/.test(w))).toBe(true);
   });
 
+  it("a supertype named twice is imported once, with a warning, not an aborted import", () => {
+    // The model refuses a second identical subtype fact (PR #623 review).
+    const entry =
+      `{"entity":"Subject","columns":["subject_id"],"providesIdentification":true,"isExclusive":false,"isExhaustive":false}`;
+    const sql = `CREATE TABLE subject (subject_id INT PRIMARY KEY);
+-- barwise:v1 {"kind":"table","table":"enrolled_subject","entity":"EnrolledSubject","referenceMode":"subject_id","supertypes":[${entry},${entry}]}
+CREATE TABLE enrolled_subject (subject_id INT PRIMARY KEY REFERENCES subject (subject_id),
+  enrolled_on DATE NOT NULL);`;
+    const { model, warnings } = ddl.parse(sql);
+    expect(subtypes(model).map((s) => `${s.sub}<${s.sup}`)).toEqual(["EnrolledSubject<Subject"]);
+    expect(warnings.some((w) => /names "Subject" as a supertype more than once/.test(w))).toBe(
+      true,
+    );
+  });
+
+  it("a defining rule the model cannot hold makes the line unreadable", () => {
+    // Only the expression was checked, so a rule with no kind was stored
+    // and verbalized as derived (PR #623 review).
+    const line = (rule: string) =>
+      `CREATE TABLE subject (subject_id INT PRIMARY KEY);
+-- barwise:v1 {"kind":"table","table":"enrolled_subject","entity":"EnrolledSubject","referenceMode":"subject_id","supertypes":[{"entity":"Subject","columns":["subject_id"],"providesIdentification":true,"isExclusive":false,"isExhaustive":false,"definingRule":${rule}}]}
+CREATE TABLE enrolled_subject (subject_id INT PRIMARY KEY REFERENCES subject (subject_id),
+  enrolled_on DATE NOT NULL);`;
+    const good = ddl.parse(line(`{"kind":"derived","expression":"enrolled"}`));
+    expect(subtypes(good.model)[0]?.definingRule).toEqual({
+      kind: "derived",
+      expression: "enrolled",
+    });
+    for (
+      const bad of [
+        `{"expression":"enrolled"}`,
+        `{"kind":"maybe","expression":"enrolled"}`,
+        `{"kind":"derived","storage":"sometimes","expression":"enrolled"}`,
+        `{"kind":"derived","isFormal":"yes","expression":"enrolled"}`,
+      ]
+    ) {
+      const { model, warnings } = ddl.parse(line(bad));
+      expect(warnings.some((w) => /has an unknown shape; ignored/.test(w)), bad).toBe(true);
+      // The naming rule reads the table instead, with no rule.
+      expect(subtypes(model).map((s) => s.definingRule), bad).toEqual([undefined]);
+    }
+  });
+
   it("an empty list says no subtype, so the naming rule invents none", () => {
     // The same-noun vertical partition the naming rule would read as a
     // subtype, written by barwise with an explicit empty list.

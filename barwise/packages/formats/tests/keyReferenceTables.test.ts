@@ -47,6 +47,20 @@ describe("a key that is also a reference to a table its name declares a kind of"
     );
   });
 
+  it("compares column names without case, as SQL does for unquoted names", () => {
+    // The key and its foreign key in different case are one column, and so
+    // is a repeated column (PR #623 review).
+    const sql = `${subject}
+      CREATE TABLE enrolled_subject (
+        subject_id INT NOT NULL, enrolled_on DATE NOT NULL,
+        PRIMARY KEY (subject_id),
+        FOREIGN KEY (SUBJECT_ID) REFERENCES subject (subject_id));`;
+    expect(subtypes(ddl.parse(sql).model)).toEqual(["EnrolledSubject < Subject"]);
+    const copy = sql.replace("enrolled_on DATE", "BIRTH_DATE DATE");
+    expect(copy).not.toEqual(sql);
+    expect(subtypes(ddl.parse(copy).model)).toEqual([]);
+  });
+
   it("chains: a subtype of a subtype", () => {
     const sql = `${subject}
       CREATE TABLE enrolled_subject (subject_id INT PRIMARY KEY REFERENCES subject (subject_id),
