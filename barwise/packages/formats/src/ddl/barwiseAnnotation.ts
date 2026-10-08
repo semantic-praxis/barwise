@@ -14,7 +14,7 @@
  */
 
 import { type OrmModel, validateReadingTemplate } from "@barwise/core";
-import type { DerivationRule, FactType } from "@barwise/core";
+import type { DerivationKind, DerivationRule, DerivationStorage, FactType } from "@barwise/core";
 import type { RelationalSchema, Table } from "@barwise/core/mapping";
 
 const PREFIX = "-- barwise:v1 ";
@@ -334,8 +334,30 @@ function isSupertypeLink(v: unknown): v is SupertypeLink {
     && typeof v["providesIdentification"] === "boolean"
     && typeof v["isExclusive"] === "boolean"
     && typeof v["isExhaustive"] === "boolean"
-    && (v["definingRule"] === undefined
-      || isRecord(v["definingRule"]) && typeof v["definingRule"]["expression"] === "string");
+    && (v["definingRule"] === undefined || isDerivationRule(v["definingRule"]));
+}
+
+/**
+ * Keyed by core's unions, so a kind or storage added there fails to compile
+ * here rather than being read as unknown.
+ */
+const DERIVATION_KINDS: Record<DerivationKind, true> = { derived: true, semiderived: true };
+const DERIVATION_STORAGE: Record<DerivationStorage, true> = {
+  derive_on_request: true,
+  derived_and_stored: true,
+};
+
+/**
+ * A rule the model can hold. Checking the expression alone let a rule with
+ * no kind through, verbalized as derived and written back with none (PR
+ * #623 review).
+ */
+function isDerivationRule(v: unknown): v is DerivationRule {
+  return isRecord(v) && typeof v["expression"] === "string"
+    && typeof v["kind"] === "string" && Object.hasOwn(DERIVATION_KINDS, v["kind"])
+    && (v["storage"] === undefined
+      || typeof v["storage"] === "string" && Object.hasOwn(DERIVATION_STORAGE, v["storage"]))
+    && (v["isFormal"] === undefined || typeof v["isFormal"] === "boolean");
 }
 
 function isFactTableAnnotation(v: unknown): v is FactTableAnnotation {
