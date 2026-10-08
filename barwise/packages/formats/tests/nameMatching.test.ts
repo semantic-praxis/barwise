@@ -15,7 +15,9 @@ describe("name matching shared by the subtype rule and reference inference", () 
   });
 
   it("matches each ending pair in both directions", () => {
-    for (const [p, s] of [["categories", "category"], ["statuses", "status"], ["subjects", "subject"]]) {
+    for (
+      const [p, s] of [["categories", "category"], ["statuses", "status"], ["subjects", "subject"]]
+    ) {
       expect(sameUpToNumber(p!, s!)).toBe(true);
       expect(sameUpToNumber(s!, p!)).toBe(true);
     }
