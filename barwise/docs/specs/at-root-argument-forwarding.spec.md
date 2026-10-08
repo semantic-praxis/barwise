@@ -4,7 +4,8 @@ Status: Implemented -- workstream 1 (PR #613; this spec followed in a later PR)
 
 Created: 2026-10-08
 Last-updated: 2026-10-08
-Tracking: barwise-2lz (this spec); barwise-907 (why the wrapper exists)
+Tracking: barwise-a98 (this spec); barwise-2lz (the fix, shipped in #613);
+barwise-907 (why the wrapper exists)
 
 ## Principle
 
@@ -72,5 +73,5 @@ argv, and asserts that `--write` and `-- --write` both arrive as
 
 ## Non-goals
 
-- No change to how npm itself forwards arguments, and no change to any
-  script.
+- No change to how npm itself forwards arguments, and no change to the
+  npm scripts the wrapper runs; `at-root.mjs` is the only script changed.
