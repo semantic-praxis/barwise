@@ -125,7 +125,12 @@ round-trips: the mapper writes exactly this shape for a subtype.
    `SUBJECT`, `enrolled_subject` matches `SUBJECT`, and an irregular
    plural matches only itself. A child column repeats a parent column
    when their names are equal without regard to case; the key column,
-   which both tables share by definition, is not counted.
+   which both tables share by definition, is not counted. The number
+   rule is reference-inference.spec.md's, and the two must give the
+   same answer for the same names, so they share one function in
+   `packages/formats/src/ddl/` (CLAUDE.md: a must-agree copy is shared,
+   never restated): whichever spec lands first creates it, with its own
+   tests, and the second imports it (PR #620 review).
 2. When it does, the importer shall add a warning naming the table, the
    supertype and both conditions.
 3. When a table with a shared-key foreign key does not meet both
@@ -136,7 +141,10 @@ round-trips: the mapper writes exactly this shape for a subtype.
 4. The DDL export shall write, on the table annotation of every entity
    that is a subtype, an optional `supertypes` list with one entry per
    subtype fact, each naming the supertype entity and the columns that
-   reference its table -- a list of columns, since a supertype keyed on
+   reference its table, and carrying the rest of the subtype fact as
+   core stores it -- `providesIdentification`, `isExclusive`,
+   `isExhaustive` and `definingRule` (`SubtypeFact.ts`), so the
+   annotated round trip loses none of them (PR #620 review) -- a list of columns, since a supertype keyed on
    several columns is referenced through all of them, and a list of
    entries, since an entity may have more than one supertype (PR #620
    review). When a table's annotation carries `supertypes`, the
@@ -195,7 +203,8 @@ round-trip test that a caught subtype re-exports unchanged; the
 `DdlExportFormat`, with round-trip tests, annotated and not, over an
 identifying and a non-identifying subtype -- `employee-hierarchy`
 carries both -- a subtype whose supertype has a two-column key, an
-entity with two supertypes, and a test that an annotation's `supertypes` wins over
+entity with two supertypes, a subtype fact with `isExclusive`,
+`isExhaustive` and a `definingRule` set, and a test that an annotation's `supertypes` wins over
 a table name that fails the naming rule. The trial
 generator writing the extension tables' `FOREIGN KEY`, which its
 manifest already records (`trial/lib/generators/ddl.mjs`), with a

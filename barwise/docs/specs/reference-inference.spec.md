@@ -31,7 +31,9 @@ relationships into a model that no one stated.
 
 The rule under B: a column `X` in table `T` references table `U` when
 `X` equals `U`'s single key column name, or `<U>_<key>`, or `<U>_id`
-(case- and separator-insensitive; `U` matches in its own form or in
+(case- and separator-insensitive; the number rule is one function
+shared with key-reference-tables.spec.md, never a second copy, PR #620
+review; `U` matches in its own form or in
 the other number by exactly these endings and no others: `ies` and
 `y`, `es` and nothing, `s` and nothing -- so `categories` matches
 `category`, `statuses` matches `status`, and an irregular plural such
