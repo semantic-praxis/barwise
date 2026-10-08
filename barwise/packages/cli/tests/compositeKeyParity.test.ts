@@ -271,6 +271,30 @@ const cases: { name: string; ddl: string; dbt: string; }[] = [
       )
     }`,
   },
+  {
+    // A composite value role and another model's attribute share a name
+    // but not a type, so one keeps the plain name and the other is
+    // prefixed. dbt once claimed composite roles after ordinary columns and
+    // DDL before them, so they gave the plain name to different columns
+    // (PR #621 review).
+    name: "a value role whose name another model's column of another type also uses",
+    ddl: `CREATE TABLE meter (meter_id INT PRIMARY KEY);
+      CREATE TABLE device (device_id INT PRIMARY KEY, channel INT NOT NULL);
+      CREATE TABLE meter_reading (
+        meter_id INT NOT NULL REFERENCES meter (meter_id),
+        channel VARCHAR(10) NOT NULL,
+        PRIMARY KEY (meter_id, channel));`,
+    dbt: `models:\n${dbtModel("meter", "meter_id", "")}${
+      dbtModel("device", "device_id", "        data_type: int\n")
+    }      - name: channel\n        data_type: int\n        data_tests: [not_null]\n${
+      keyed(
+        "meter_reading",
+        ["meter_id", "channel"],
+        ref("meter_id", "meter", "meter_id")
+          + "      - name: channel\n        data_type: varchar(10)\n        data_tests: [not_null]\n",
+      )
+    }`,
+  },
 ];
 
 describe("the DDL and dbt importers agree on a composite-key table", () => {

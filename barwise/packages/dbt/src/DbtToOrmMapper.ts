@@ -66,9 +66,12 @@ export function mapDbtToOrm(doc: DbtProjectDocument): DbtMapResult {
   analyzeModels(ctx);
   analyzeComposites(ctx);
   createEntityTypes(ctx);
+  // Composite roles claim their value types before identifiers and
+  // ordinary columns, as the DDL importer does, so a name both want goes
+  // to the same column in either format (PR #621 review).
+  createCompositeFactTypes(ctx);
   createIdentifierTypes(ctx);
   createValueTypes(ctx);
-  createCompositeFactTypes(ctx);
   createFactTypes(ctx);
   reportColumnRenames(ctx);
   return { model: ctx.model, report: ctx.report.build() };
