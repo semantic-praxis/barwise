@@ -1,6 +1,6 @@
 # Inferring references a schema does not declare, when asked to
 
-Status: Draft -- no workstream implemented
+Status: Implemented -- both workstreams landed
 Created: 2026-10-08
 Last-updated: 2026-10-08
 Tracking: barwise-c5f
@@ -145,3 +145,26 @@ dbt, whose relationships tests already state references.
    that a flag the CLI refuses fails the step; C07's BigQuery
    artifact given `--infer-references`; then a trial run and the C07 row
    reclassified. It depends on workstream 1.
+
+## Implementation notes
+
+Measured over the regenerated small tier, 2026-10-08.
+
+- **The trial row moved.** C07's network-inventory architect over the
+  BigQuery DDL passes its eight expressible checks; its two ring checks
+  stay declared not_expressible for ddl, which inference does not change.
+  The gate reported the row stale and nothing new (1074 steps, 0 new, 1
+  stale), 154 open after removing it.
+- **One pre-pass, no second path.** Inference adds each inferred
+  reference to the parsed table as a foreign key before anything else
+  reads it, so the composite-key reading, the subtype rule and step 3 see
+  it exactly as they see a declared one. A key column is never given one,
+  which is what keeps the subtype rule from being fed a guess.
+- **The number rule is shared, not copied.** Both this spec and
+  key-reference-tables match table names up to number through
+  `formats/src/ddl/nameMatching.ts`.
+- **Every condition is load-bearing in the tests.** Removing the type
+  check, the SERIAL-as-integer mapping, the key-column exclusion, the
+  ambiguity rule, the own-table exclusion or the single-key requirement
+  each fails at least one test in `formats/tests/referenceInference.test.ts`;
+  dropping the flag from `import sql` fails the CLI path test.
