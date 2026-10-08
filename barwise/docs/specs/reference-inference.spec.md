@@ -36,11 +36,21 @@ The rule under B: a column `X` in table `T` references table `U` when
 infers nothing and is reported. Each inference is a warning naming the
 column and the table, so it can be checked by eye.
 
+A column in `T`'s primary key is never inferred (PR #620 review): an
+inferred reference there would be the key-is-reference shape of
+key-reference-tables.spec.md, and one opt-in guess would feed a second,
+the subtype heuristic. Such a column is reported as a candidate and left
+alone.
+
 ## Scope
 
 In scope: the flag on the DDL and SQL importers (the SQL importer reads
-CREATE TABLE through the DDL importer since barwise-jjd), tests for each
-matching form and for the ambiguous case, a trial per-artifact
+CREATE TABLE through the DDL importer since barwise-jjd, and today
+passes it only `{ modelName }` in both its file and directory flows, so
+the option must be threaded through both), tests for each matching
+form, the ambiguous case and the key-column case, CLI tests that observe
+an inferred relationship through `import model --format ddl` and
+through `import sql` on a file and on a directory (PR #620 review), a trial per-artifact
 `import_flags` so C07's BigQuery artifact can pass it, and the CLI docs.
 
 Out of scope: MCP and VS Code (the capability matrix records the

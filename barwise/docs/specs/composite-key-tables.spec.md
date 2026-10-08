@@ -7,9 +7,10 @@ Tracking: barwise-2z1 (DDL); barwise-nkn, its composite-key part (dbt)
 
 In one sentence: when a table or dbt model is keyed on more than one
 column and nothing annotates it, both importers read it as one fact type
-over its key columns plus, when exactly one other plain column remains,
-that column, keyed on the key; any further columns make the fact type
-objectified by an entity named after the table, which carries them as
+over its key columns plus, when exactly one other column remains and it
+is NOT NULL and not itself unique, that column, keyed on the key; any
+other shape makes the fact type over the key objectified by an entity
+named after the table, which carries the remaining columns as
 attributes.
 
 ## Principle
@@ -34,8 +35,15 @@ on K. The importer's only real choice is the grouping:
 | Columns beside the key                               | Reading                                                                                       | Trial case it fits                                                                                       |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | none                                                 | one fact type over K (a many-to-many)                                                         | C10 `Course is prerequisite of Course`                                                                   |
-| exactly one, not itself unique                       | one fact type over K and it, unique on K                                                      | C03 `Coverage applies to Risk under PolicyPeriod`; C08 `Meter records ReadingValue at IntervalTimestamp` |
+| exactly one, NOT NULL and not itself unique          | one fact type over K and it, unique on K                                                      | C03 `Coverage applies to Risk under PolicyPeriod`; C08 `Meter records ReadingValue at IntervalTimestamp` |
 | more than one, or the table is referenced by another | the fact type over K, objectified by an entity named after the table, the rest its attributes | C10 Enrollment, C12 Determination, C04 OrderLine                                                         |
+
+The extra column must be NOT NULL to widen the fact type (PR #620
+review): a row whose extra column is null still states the key's
+combination, so a fact over the key and that column would either lose
+the row or invent a value. A nullable extra column therefore forces
+objectification and becomes an optional attribute of the objectifier,
+exactly as a second extra column would.
 
 A column with its own single-column `UNIQUE` beside the key is an
 identifier of the objectifying entity, never a role (C04's `line_id`
@@ -67,8 +75,13 @@ objectified after all, since only an object type can be referenced.
 ## Scope
 
 In scope: the rule in both `DdlImportFormat` (formats) and the dbt
-mapping (dbt), a shared fixture per row of the table above in each
-package's tests, and the trial rows it moves (barwise-2z1's three;
+mapping (dbt), a fixture per row of the table above in each package's
+tests, a drift test in `@barwise/cli` (the one package that depends on
+both) that imports each fixture as DDL and as the equivalent dbt project
+and asserts the two models agree in object types, fact types, role
+players and uniqueness -- the two packages keep their own code, and the
+test is what fails when they diverge, as CLAUDE.md requires of
+must-agree copies (PR #620 review) -- and the trial rows it moves (barwise-2z1's three;
 barwise-nkn's C03 actuarial-analyst and the C04 ternary check; the three
 REFUSED dbt imports).
 
@@ -78,5 +91,8 @@ annotated table, whose barwise line already says what it is.
 
 ## Workstreams
 
-1. DDL importer (formats), with tests. 2. dbt importer, with tests.
-2. Trial run and reclassification. One PR each for 1 and 2; 3 rides 2.
+1. DDL importer (formats), with tests.
+2. dbt importer, with tests, and the cross-importer drift test.
+3. Trial run and reclassification.
+
+One PR each for 1 and 2; 3 rides 2.
