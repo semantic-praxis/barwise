@@ -275,6 +275,15 @@ for (const script of ["check-no-nul.mjs", "check-shell.mjs", "audit-corrections.
  * With the root pinned, all three runs do identical work, so they
  * refuse together or not at all. A PARTIAL refusal is therefore not an
  * environment fact; it is the defect, and it must fail here.
+ *
+ * The property is agreement, not a pass. This test once asserted exit 0
+ * from every cwd, which made it a second copy of the audit-gate CI step:
+ * an advisory published upstream failed `test:scripts` on every PR,
+ * whatever it changed, with a message about cwd that the failure had
+ * nothing to do with (barwise-um1). Whether the tree has an unaccepted
+ * advisory is that step's question. This one asks only whether the
+ * answer depends on where the gate was run, and the restored defect
+ * still fails it: the package cwd's PASS disagrees with the others.
  */
 test("audit-gate reports the same advisories from every cwd", (t) => {
   const runs = CWDS.map((cwd) => ({ cwd, ...gate("audit-gate.mjs", cwd) }));
@@ -282,9 +291,14 @@ test("audit-gate reports the same advisories from every cwd", (t) => {
     t.skip("`npm audit` could not run here (exit 2 from every cwd is refusal, not failure)");
     return;
   }
-  for (const r of runs) {
-    assert.equal(r.status, 0, `audit-gate failed in ${r.cwd}:\n${r.stdout}${r.stderr}`);
-  }
+  const statuses = new Set(runs.map((r) => r.status));
+  assert.equal(
+    statuses.size,
+    1,
+    `audit-gate's exit status depends on cwd:\n${
+      runs.map((r) => `  ${r.cwd}: exit ${r.status}\n${r.stdout}${r.stderr}`).join("\n")
+    }`,
+  );
   const outputs = new Set(runs.map((r) => r.stdout.trim()));
   assert.equal(
     outputs.size,
