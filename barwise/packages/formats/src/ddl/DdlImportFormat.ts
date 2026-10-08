@@ -1760,6 +1760,11 @@ function subtypeReading(
  */
 function inferReferences(tables: readonly ParsedTable[], warnings: string[]): ParsedTable[] {
   const squash = (n: string) => bareName(n).replace(/_/g, "");
+  // The parser keeps each constraint's own spelling, so `site_id` and a
+  // table-level `PRIMARY KEY (SITE_ID)` are one unquoted column; compared
+  // exactly, the key exclusion and the declared-reference guard were
+  // skipped (PR #628 review).
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
   // The conceptual type name, a generated key compared as the integer
   // that refers to it; undefined (unrecognised) never matches.
   const typeOf = (c: ParsedColumn) => {
@@ -1781,17 +1786,17 @@ function inferReferences(tables: readonly ParsedTable[], warnings: string[]): Pa
   return tables.map((table) => {
     const added: ParsedForeignKey[] = [];
     for (const column of table.columns) {
-      if (table.foreignKeys.some((f) => f.columns.includes(column.name))) continue;
+      if (table.foreignKeys.some((f) => f.columns.some((c) => same(c, column.name)))) continue;
       const type = typeOf(column);
       const candidates = tables.filter((u) => {
         if (u === table || u.primaryKey.length !== 1) return false;
         if (!named(column.name, u)) return false;
-        const key = u.columns.find((c) => c.name === u.primaryKey[0]);
+        const key = u.columns.find((c) => same(c.name, u.primaryKey[0]!));
         return type !== undefined && key !== undefined && typeOf(key) === type;
       });
       if (candidates.length === 0) continue;
       const list = candidates.map((u) => `"${u.name}"`).join(", ");
-      if (table.primaryKey.includes(column.name)) {
+      if (table.primaryKey.some((k) => same(k, column.name))) {
         warnings.push(
           `Table "${table.name}": key column "${column.name}" is named like a reference to ${list}; `
             + `a key column is never inferred (--infer-references).`,

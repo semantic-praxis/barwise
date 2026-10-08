@@ -128,6 +128,37 @@ describe("a column named after a table's key, with its type", () => {
     expect(warnings.some((w) => /infer-references/.test(w))).toBe(false);
   });
 
+  describe("compares column names without case, as SQL does for unquoted names", () => {
+    // A table-level constraint keeps its own spelling (PR #628 review).
+    it("a key column named in another case is still never inferred", () => {
+      const { model, warnings } = infer(`${site}
+        CREATE TABLE site_detail (site_id INT, note VARCHAR(80), PRIMARY KEY (SITE_ID));`);
+      expect(related(model, "SiteDetail", "Site")).toBe(false);
+      expect(model.subtypeFacts).toEqual([]);
+      expect(warnings.some((w) => /key column "site_id" is named like a reference/.test(w)))
+        .toBe(true);
+    });
+
+    it("a declared foreign key in another case still keeps the column", () => {
+      const { model, warnings } = infer(`${site} CREATE TABLE region (region_id INT PRIMARY KEY);
+        CREATE TABLE network_device (device_id INT PRIMARY KEY, site_id INT,
+          FOREIGN KEY (SITE_ID) REFERENCES region (region_id));`);
+      // Not asserted: the Region relationship. The importer drops a declared
+      // foreign key spelled in another case with or without inference
+      // (barwise-sl4), which is not this rule's to fix.
+      expect(related(model, "NetworkDevice", "Site")).toBe(false);
+      expect(warnings.some((w) => /infer-references/.test(w))).toBe(false);
+    });
+
+    it("a target whose key is named in another case is still a target", () => {
+      const { model } = infer(
+        `CREATE TABLE site (site_id INT, name VARCHAR(40), PRIMARY KEY (SITE_ID));
+        ${device("site_id")}`,
+      );
+      expect(related(model, "NetworkDevice", "Site")).toBe(true);
+    });
+  });
+
   it("needs a single key column: a composite key's first column is no target", () => {
     const { model } = infer(`CREATE TABLE site (site_id INT, rack INT, PRIMARY KEY (site_id, rack));
       ${device("site_id")}`);
