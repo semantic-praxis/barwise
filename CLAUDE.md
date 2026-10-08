@@ -354,9 +354,12 @@ file that asked.
 
 **The hooks split by cost, not by preference.** Pre-commit is the fast
 path: staged-file linting, a build, and the tests of packages a change
-touches. Pre-push runs `npm run ci:local`, which is the whole CI gate
-list derived from `ci.yml` -- about 30s warm and 2m40s once a source
-file changed, of which `test:coverage` alone is 109s. That belongs at
+touches. Pre-push runs `npm run ci:local`, which is the CI gate list
+derived from `ci.yml`, with ci.yml's `if:` conditions applied through
+the same change classifier CI's detect step runs
+(`scripts/lib/changed-class.mjs`): a docs-only change skips what CI
+skips, and `--all` runs everything. About 30s warm and 2m40s once a
+source file changed, of which `test:coverage` alone is 109s. That belongs at
 the push because a push is what makes CI run, and because the same list
 per commit is a hook people turn off. `git push --no-verify` is the
 escape hatch for work in progress; a red push is the thing it is worth

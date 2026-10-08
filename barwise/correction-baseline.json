@@ -61,6 +61,18 @@
       "caught_by": "not-a-correction",
       "note": "An Inventory note about what the diff does to the baseline files. The detector matched `caught it` inside prose NAMING the verdict vocabulary, which is the same over-match this spec's first row records."
     },
+    "ci-local-condition-parity::0bc9b629f788": {
+      "spec": "ci-local-condition-parity.spec.md",
+      "excerpt": "- ws1. scripts/lib/changed-class.mjs owns classify, and ci.yml's detect step is one line that runs it. it was checked against the last 40 merges to main, runnin",
+      "caught_by": "execution",
+      "note": "The 28-gate counts in the draft were re-derived by running ciSteps() over the live ci.yml (35 gates); the classifier was checked by running the old shell and the new module over the last 40 merges (40 of 40 agree)."
+    },
+    "ci-local-condition-parity::1b5481d68650": {
+      "spec": "ci-local-condition-parity.spec.md",
+      "excerpt": "- a compound condition. test:optimizer gained optimizer == 'true' && docsonly != 'true' in pr #590, after this spec was written, because a markdown-only change ",
+      "caught_by": "execution",
+      "note": "The compound condition surfaced from enumerating the if: forms in ci.yml before writing the parser; the cwd-scoped ls-files --others defect was caught by the end-to-end ci:local --list test failing (34 run where 12 were expected). Both were found by running something."
+    },
     "closed-sets-as-unions::640fb4210c1b": {
       "spec": "closed-sets-as-unions.spec.md",
       "excerpt": "making the drift testable needed one refactor the workstream did not anticipate: classifychange returned the literal \"caution\" both for a deliberate caution and",

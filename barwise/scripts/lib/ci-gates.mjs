@@ -38,17 +38,80 @@ const SKIP = [/^ci$/];
  * `docs/specs/gate-refusal-contract.spec.md` exists to remove.
  */
 export function ciGates(workflow = WORKFLOW) {
-  const yml = readFileSync(workflow, "utf8");
+  return ciSteps(workflow).map((s) => s.args);
+}
+
+/**
+ * Every `run: npm <args>` step with the `if:` that guards it, as
+ * `{ args, condition }` -- `condition` is `""` for an unguarded step.
+ *
+ * The condition is read from the WHOLE step, not the line after `run:`.
+ * `test:optimizer` writes its `if:` before its `run:`, every other guarded
+ * gate writes it after, and a scan in one direction would read the other
+ * as unguarded -- safe, but silently wrong in exactly the way a runner
+ * that only ever sees the safe direction cannot show
+ * (`docs/specs/ci-local-condition-parity.spec.md`).
+ *
+ * A step starts at a `- ` at the indent of the first item under `steps:`;
+ * deeper dashes (a `with:` list) belong to the step above them.
+ */
+export function ciSteps(workflow = WORKFLOW) {
+  const lines = readFileSync(workflow, "utf8").split("\n");
+  const blocks = [];
+  let stepIndent = -1;
+  let inSteps = false;
+  for (const line of lines) {
+    if (/^\s*steps:\s*$/.test(line)) {
+      inSteps = true;
+      continue;
+    }
+    if (!inSteps) continue;
+    const item = /^(\s*)- /.exec(line);
+    if (item && stepIndent < 0) stepIndent = item[1].length;
+    if (item && item[1].length === stepIndent) blocks.push([]);
+    if (blocks.length > 0) blocks[blocks.length - 1].push(line);
+  }
+
   const found = [];
-  for (const line of yml.split("\n")) {
-    const m = /^\s*(?:- )?run: npm (.+?)\s*$/.exec(line);
-    if (!m) continue;
-    const args = m[1];
-    if (SKIP.some((re) => re.test(args))) continue;
-    if (!found.includes(args)) found.push(args);
+  for (const block of blocks) {
+    let args;
+    let condition = "";
+    for (const line of block) {
+      const run = /^\s*(?:- )?run: npm (.+?)\s*$/.exec(line);
+      if (run) args = run[1];
+      const cond = /^\s*(?:- )?if:\s*(.+?)\s*$/.exec(line);
+      if (cond) condition = cond[1];
+    }
+    if (args === undefined || SKIP.some((re) => re.test(args))) continue;
+    if (!found.some((s) => s.args === args)) found.push({ args, condition });
   }
   if (found.length === 0) {
     throw new Error(`no 'run: npm ...' steps found in ${workflow}; has the workflow moved?`);
   }
   return found;
+}
+
+/**
+ * Whether a step's `if:` lets it run for a change of this class.
+ *
+ * Only the forms ci.yml uses are understood: a comparison of
+ * `steps.changes.outputs.docs_only` or `.optimizer` with `'true'` or
+ * `'false'`, and `&&` joins of those. Anything else answers `run: true`
+ * with `understood: false`, because skipping a gate CI will run turns a
+ * green local pass into a red push -- the failure the local runner exists
+ * to prevent. The caller prints the unknown condition rather than hiding it.
+ */
+export function shouldRun(condition, cls) {
+  if (condition === "") return { run: true, understood: true };
+  const outputs = { docs_only: cls.docsOnly, optimizer: cls.optimizer };
+  let run = true;
+  for (const atom of condition.split("&&").map((s) => s.trim())) {
+    const m = /^steps\.changes\.outputs\.(docs_only|optimizer)\s*(==|!=)\s*'(true|false)'$/.exec(
+      atom,
+    );
+    if (!m) return { run: true, understood: false };
+    const equal = String(outputs[m[1]]) === m[3];
+    if ((m[2] === "==") !== equal) run = false;
+  }
+  return { run, understood: true };
 }

@@ -1,4 +1,4 @@
-# The whole CI gate list, run at the event that actually causes a red
+# The CI gates CI selects for this change, run at the event that actually causes a red
 # build. Two red pushes in one session came from gates that were simply
 # not run -- `fmt:check`, then `knip` -- and a third came from running
 # only the two gates I happened to be thinking about. `ci:local` derives
@@ -31,7 +31,7 @@ fi
 
 cd barwise || exit 1
 
-echo "pre-push: running the full CI gate list (npm run ci:local)."
+echo "pre-push: running the gates CI runs for this change (npm run ci:local)."
 echo "  ~30s warm, ~3min when sources changed."
 if ! npm run ci:local; then
   echo >&2
