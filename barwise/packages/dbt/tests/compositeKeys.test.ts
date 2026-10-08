@@ -87,14 +87,32 @@ describe("a composite-key dbt model", () => {
       "          combination_of_columns: [course_id, crn]\n",
       "          combination_of_columns: [course_id, crn]\n"
         + "      - dbt_utils.unique_combination_of_columns:\n"
-        + "          combination_of_columns: [crn, course_id]\n",
+        + "          combination_of_columns: [crn, term]\n",
+    ).replace(
+      "  - name: waitlist\n",
+      "      - name: term\n        data_tests: [not_null]\n  - name: waitlist\n",
     );
-    expect(twoKeys).not.toEqual(yaml);
+    expect(twoKeys).toContain("- name: term");
     const { model, report } = importDbtProject([twoKeys]);
     expect(model.objectifiedFactTypes).toEqual([]);
     const text = JSON.stringify(report);
     expect(text).not.toContain("Composite key (");
-    expect(text).toContain("(course_id, crn), (crn, course_id)) and none is marked preferred");
+    expect(text).toContain("(course_id, crn), (crn, term)) and none is marked preferred");
+  });
+
+  it("reads one combination stated twice in different orders as one key", () => {
+    // The same columns reordered are not a second candidate (PR #621 review).
+    const twice = yaml.replace(
+      "          combination_of_columns: [course_id, crn]\n",
+      "          combination_of_columns: [course_id, crn]\n"
+        + "      - dbt_utils.unique_combination_of_columns:\n"
+        + "          combination_of_columns: [crn, course_id]\n",
+    );
+    expect(twice).not.toEqual(yaml);
+    const { model, report } = importDbtProject([twice]);
+    expect(model.objectifiedFactTypes.map((o) => model.getObjectType(o.objectTypeId)?.name))
+      .toEqual(["Offering"]);
+    expect(JSON.stringify(report)).toContain("Composite key (course_id, crn)");
   });
 
   it("a combination of values alone is no key, and the model is still reported as having none", () => {

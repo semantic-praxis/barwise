@@ -1523,10 +1523,15 @@ function compositeReading(table: ParsedTable, referenced: boolean): CompositeRea
   // Two foreign keys sharing a column cannot both be roles, and which one
   // the key "is" is not the DDL's to say (PR #620 review).
   if (fkColumns.size !== keyFks.reduce((n, f) => n + f.columns.length, 0)) return undefined;
-  const keyRoles = [
-    ...keyFks.map((f) => [...f.columns]),
-    ...key.filter((c) => !fkColumns.has(c)).map((c) => [c]),
-  ];
+  // Roles follow the primary key's column order, each foreign key placed at
+  // its first key column, so the fact type agrees with dbt's reading of the
+  // same combination (PR #621 review).
+  const keyRoles: string[][] = [];
+  for (const c of key) {
+    const fk = keyFks.find((f) => f.columns.includes(c));
+    if (!fk) keyRoles.push([c]);
+    else if (key.find((k) => fk.columns.includes(k)) === c) keyRoles.push([...fk.columns]);
+  }
   // A key that is one composite foreign key is one role: the key-is-
   // reference shape (key-reference-tables.spec.md), not a relationship
   // over several (PR #620 review).

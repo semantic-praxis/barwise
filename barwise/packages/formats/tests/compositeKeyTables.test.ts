@@ -295,6 +295,10 @@ describe("a composite-key table imports as the fact type it states", () => {
         note VARCHAR(80),
         PRIMARY KEY (parent_line_id, seq));`);
     expect(model.objectifiedFactTypes).toEqual([]);
+    // Kept, not dropped: the entity and its key, as an external uniqueness
+    // over the key columns (PR #621 review).
+    expect(shape(model).entities).toEqual(["OrderLine"]);
+    expect(shape(model).externalUniques).toEqual(["OrderLine,Seq"]);
     expect(
       warnings.some((w) => /"order_line": its composite key references this table again/.test(w)),
     )
@@ -320,6 +324,10 @@ describe("a composite-key table imports as the fact type it states", () => {
         FOREIGN KEY (tenant_id, order_id) REFERENCES orders (tenant_id, order_id));`);
     expect(model.objectifiedFactTypes).toEqual([]);
     expect(model.factTypes.every((f) => f.roles.length >= 2)).toBe(true);
+    // Kept as today: an entity whose key is an external uniqueness over its
+    // two references to orders, one per column (barwise-3pc; PR #621 review).
+    expect(shape(model).entities).toContain("OrderNote");
+    expect(shape(model).externalUniques).toContain("Orders,Orders");
   });
 
   it("two foreign keys in the key that share a column keep today's reading", () => {
@@ -331,6 +339,10 @@ describe("a composite-key table imports as the fact type it states", () => {
         FOREIGN KEY (tenant_id) REFERENCES tenant (tenant_id),
         FOREIGN KEY (tenant_id, order_id) REFERENCES orders (tenant_id, order_id));`);
     expect(model.factTypes.some((f) => / order flag$/.test(f.name))).toBe(false);
+    // Kept as today: the entity, keyed by an external uniqueness over its
+    // two references (PR #621 review).
+    expect(shape(model).entities).toContain("OrderFlag");
+    expect(shape(model).externalUniques).toContain("Orders,Tenant");
     // Not even attempted: without the guard the rule tried two roles over
     // one column, failed, and fell back with a warning.
     expect(warnings.filter((w) => /reads as a fact type over its key/.test(w))).toEqual([]);
@@ -353,6 +365,10 @@ describe("a composite-key table imports as the fact type it states", () => {
         FOREIGN KEY (warehouse_id, bin_id) REFERENCES bin (warehouse_id, bin_id));`);
     expect(model.objectifiedFactTypes).toEqual([]);
     expect(model.factTypes.some((f) => / pick$/.test(f.name))).toBe(false);
+    // Kept as today: the entity, keyed by an external uniqueness over the
+    // two references its key columns make (PR #621 review).
+    expect(shape(model).entities).toContain("Pick");
+    expect(shape(model).externalUniques).toContain("Bin,Orders");
     expect(warnings.filter((w) => /reads as a fact type over its key/.test(w))).toEqual([]);
   });
 

@@ -30,7 +30,7 @@ imports as nothing at all: three trial imports skip two models each
 (barwise-nkn, noted on 2026-10-08). The same schema shape should mean
 the same model whichever file it arrives in.
 
-## What a composite-key table states (recommended; the open decisions below)
+## What a composite-key table states (the resolved decisions below)
 
 ORM normalisation fixes most of it. A table keyed on columns K with
 further columns A1..Am states, for each Ai, a fact over K and Ai unique
@@ -78,7 +78,10 @@ referenced.
    least one foreign key wholly inside it, and the foreign keys wholly
    inside it share no column, the DDL importer shall import one fact
    type whose roles are each such foreign key and each other key column,
-   unique over the key's roles.
+   in the primary key's column order (a foreign key at its first key
+   column), unique over the key's roles. The dbt importer orders roles by
+   the combination test's column list, so both read a key the same way
+   (PR #621 review).
 2. When, among the columns beside the key that are not unique by
    themselves, exactly one remains, it is NOT NULL, and no other table
    references the table, the importer shall add it as a further role,
@@ -113,8 +116,13 @@ referenced.
    has a foreign key lying partly inside it, or has two foreign keys
    inside it that share a column (PR #620 review: `FOREIGN KEY
    (tenant_id)` beside `FOREIGN KEY (tenant_id, order_id)`), the
-   importer shall read the table as it did before this spec. This
-   requirement takes precedence over requirements 1-3.
+   importer shall read the table as it did before this spec. So shall
+   it when a foreign key inside the key references the table itself, or
+   reaches it again through other tables this rule reads: the fact
+   type's objectifier would be identified through itself, which core
+   rejects as an identification cycle (PR #621 review). The importer
+   warns that it declined the reading. This requirement takes precedence
+   over requirements 1-3.
 5. When a dbt model has no column with both `unique` and `not_null` and
    a model-level `dbt_utils.unique_combination_of_columns` names two or
    more columns, each `not_null`, at least one a `relationships` column,
@@ -124,7 +132,9 @@ referenced.
    which is preferred, so the importer shall read none of them as the
    key, keep today's reading, and report the model naming each
    combination (PR #620 review). A DDL table has one PRIMARY KEY, so the
-   case is dbt's alone. A combination test read as the key shall not
+   case is dbt's alone. Two tests naming the same columns in another
+   order are one key stated twice, not two candidates (PR #621 review).
+   A combination test read as the key shall not
    also be reported as a model-level custom test needing manual review;
    one that is not read as the key still is (PR #620 review).
 6. For each shape in the table above that this rule reads, a DDL import
@@ -145,9 +155,13 @@ referenced.
    pass) -- or on what is objectified. Fact type names and readings are
    not compared, since the two importers word them differently.
 
-## Open decisions
+## Resolved decisions
 
-1. **The single-extra-column rule.** Recommended: as above.
+Each was open when the spec merged (#620) and is settled by the
+implementation in #621; the alternative is kept so a later reader can
+see what was weighed.
+
+1. **The single-extra-column rule.** Decided: as above.
    Alternative: always objectify, never widen the fact type by one
    column. That keeps the functional dependency -- uniqueness over the
    objectified Coverage-Risk pair plus a mandatory functional
@@ -160,14 +174,14 @@ referenced.
    PolicyPeriod coverage applies to risk under policy period"). Checks
    worded around the kernel's reading stay out of reach and are
    declared `not_expressible` (as barwise-rlv did for ddl).
-3. **dbt key source.** Recommended: a model-level
+3. **dbt key source.** Decided: a model-level
    `dbt_utils.unique_combination_of_columns` over `not_null` columns names
    the key; the test alone proves uniqueness and not presence, so a key
    with a nullable column is no key (PR #620 review). A model with a
    single `unique` + `not_null` column keeps today's reading: that column
    is a dbt model's key by convention, so where DDL can say a single
    `UNIQUE` sits beside a composite primary key, dbt cannot.
-4. **A column unique by itself beside the key.** Recommended: an
+4. **A column unique by itself beside the key.** Decided: an
    alternate identifier of the objectifying entity (a unique attribute),
    never a role; the primary key stays the preferred identification, as
    the DDL says. The trade-off (PR

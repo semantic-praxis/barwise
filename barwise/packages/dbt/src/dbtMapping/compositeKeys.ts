@@ -51,6 +51,10 @@ export function candidateKeysOf(m: DbtModel): string[][] {
     const columns = names.map((n) => m.columns.find((c) => c.name === n));
     if (!columns.every((c) => c !== undefined && hasTest(c, "not_null"))) continue;
     if (!columns.some((c) => findRelationshipTest(c!) !== undefined)) continue;
+    // The same columns in another order are the same key stated twice, not
+    // a second candidate (PR #621 review).
+    const set = [...names].sort().join("\0");
+    if (keys.some((k) => [...k].sort().join("\0") === set)) continue;
     keys.push(names);
   }
   return keys;

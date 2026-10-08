@@ -254,6 +254,23 @@ const cases: { name: string; ddl: string; dbt: string; }[] = [
       )
     }`,
   },
+  {
+    // The DDL side once put every foreign key first, so a key naming its
+    // value column first read in a different role order (PR #621 review).
+    name: "a key naming its value column before its reference",
+    ddl: `CREATE TABLE meter (meter_id INT PRIMARY KEY);
+      CREATE TABLE meter_reading_time (
+        meter_id INT NOT NULL REFERENCES meter (meter_id),
+        read_at TIMESTAMP NOT NULL,
+        PRIMARY KEY (read_at, meter_id));`,
+    dbt: `models:\n${dbtModel("meter", "meter_id", "")}${
+      keyed(
+        "meter_reading_time",
+        ["read_at", "meter_id"],
+        ref("meter_id", "meter", "meter_id") + plain("read_at"),
+      )
+    }`,
+  },
 ];
 
 describe("the DDL and dbt importers agree on a composite-key table", () => {
