@@ -278,7 +278,7 @@ for (const script of ["check-no-nul.mjs", "check-shell.mjs", "audit-corrections.
  *
  * The property is agreement, not a pass. This test once asserted exit 0
  * from every cwd, which made it a second copy of the audit-gate CI step:
- * an advisory published upstream failed `test:scripts` on every PR,
+ * an advisory published upstream failed `test:scripts` on every non-docs PR,
  * whatever it changed, with a message about cwd that the failure had
  * nothing to do with (barwise-um1). Whether the tree has an unaccepted
  * advisory is that step's question. This one asks only whether the
