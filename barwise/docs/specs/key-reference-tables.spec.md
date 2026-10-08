@@ -51,7 +51,23 @@ real subtype repeats a parent column (11 of 11), the 42 extension
 tables fail the head noun before the second condition is reached, and
 the control fails the second. The three misses are C10's vendor
 dictionary codes, where no name carries the noun; they keep today's
-reading. barwise's own DDL export writes this shape only for subtypes,
+reading.
+
+**What neither condition can tell apart** (PR #620 review): a table
+keyed on its parent that holds rows for only some parents, with facts of
+its own -- `ARCHIVED_ORDER(order_id, archived_at)` -- reads as a subtype,
+and in ORM terms that is what it is: ArchivedOrder is an Order that has
+an ArchivedAt, a subset with its own facts. The case the DDL cannot
+separate from a subtype is a vertical partition that every parent row
+has, one table split in two; both are a key that is also a reference,
+and no constraint in a CREATE TABLE says "every parent has a row here".
+The rule reads that case as a subtype too when its name carries the
+parent's noun. This is the residual false positive, recorded here rather
+than designed away: until barwise-3pc gives the importer a one-to-one
+reading to fall back on, a user who knows the table is a partition can
+only remove the subtype by hand, which also removes the relationship.
+The tests carry `ARCHIVED_ORDER` as a control that pins this behaviour,
+with a comment naming the limit. barwise's own DDL export writes this shape only for subtypes,
 with an annotation, which is read first and is unaffected.
 
 ## Options
@@ -89,7 +105,7 @@ imported, the reference is not, and the warning says so.
 
 In scope: `DdlImportFormat`'s handling of a single-column key that is
 also a foreign key; tests for a caught subtype, a coded-name miss, an
-extension table, `user_profiles` and the `LEGACY_ORDER` control, and a
+extension table, `user_profiles`, the `LEGACY_ORDER` control and the `ARCHIVED_ORDER` control, and a
 round-trip test that a caught subtype re-exports unchanged; the trial
 rows it moves (C10 ir-analyst; the C09 biostatistician subtype check).
 
