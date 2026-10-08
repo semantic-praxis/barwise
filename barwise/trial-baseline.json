@@ -798,13 +798,6 @@
       "note": "barwise-nm4: the NORMA importer drops every internal uniqueness constraint that no fact references, while keeping the mandatory ones, so the imported model allows what the source forbids. Exit 0, confidence high, no warning. A consequence row; closes with that importer issue.",
       "detail": "2 of 10 persona checks fail: Your model still allows what it should forbid: Rules out: two facts of RandomizedSubject is assigned to Arm that agree on RandomizedSubject -- e.g. {RandomizedSubject=RandomizedSubject#1, Arm=Arm#1}; {RandomizedSubject=RandomizedSubject#1, Arm=Arm#2}; The model does not "
     },
-    "C09/small/6/acceptance:biostatistician:sdtm-ddl": {
-      "severity": "S5",
-      "class": "acceptance-subtype-key-reference",
-      "issue": "barwise-1078",
-      "note": "Edit distance to acceptance on C10's Banner DDL, graded with its names mapped through the skin (barwise-d60) and generated with one table per objectification (barwise-rlv). What remains is GRADUATE_SGBSTDN, keyed on SGBSTDN_ID referencing SGBSTDN: the import keeps the key and not the reference, so \"GraduateStudent is a subtype of Student.\" has nothing to verbalize (barwise-1078). C09's biostatistician fails the same way on \"RandomizedSubject is a subtype of EnrolledSubject.\"; its Dose check is declared not_expressible for ddl, since a DDL table does not say which column beside its key is a role of the objectified fact and which an attribute (composite-key-tables.spec.md, decision 1).",
-      "detail": "1 of 10 persona checks fail: The model does not verbalize as \"RandomizedSubject is a subtype of EnrolledSubject.\". Check the fact type, its reading, and its constraints."
-    },
     "C09/small/6/acceptance:clinical-data-manager:legacy-norma": {
       "severity": "S5",
       "class": "acceptance-edit-distance-norma",
@@ -902,13 +895,6 @@
       "issue": "barwise-rkm",
       "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
       "detail": "rename Semester -> Term reported as a removal plus an addition with no synonym candidate"
-    },
-    "C10/small/6/acceptance:ir-analyst:sis-ddl": {
-      "severity": "S5",
-      "class": "acceptance-subtype-key-reference",
-      "issue": "barwise-1078",
-      "note": "Edit distance to acceptance on C10's Banner DDL, graded with its names mapped through the skin (barwise-d60) and generated with one table per objectification (barwise-rlv). What remains is GRADUATE_SGBSTDN, keyed on SGBSTDN_ID referencing SGBSTDN: the import keeps the key and not the reference, so \"GraduateStudent is a subtype of Student.\" has nothing to verbalize (barwise-1078).",
-      "detail": "1 of 9 persona checks fail: The model does not verbalize as \"GraduateStudent is a subtype of Student.\". Check the fact type, its reading, and its constraints. (27 names mapped through the skin)"
     },
     "C10/small/6/release-bundle:gym-list": {
       "severity": "S3",

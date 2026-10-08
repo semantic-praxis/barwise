@@ -3,7 +3,7 @@
 -- Table: person
 -- Source: Person (ot-person)
 -- TODO(barwise): No model description. Add a definition to the entity type.
--- barwise:v1 {"kind":"table","table":"person","entity":"Person","referenceMode":"person_id"}
+-- barwise:v1 {"kind":"table","table":"person","entity":"Person","referenceMode":"person_id","supertypes":[]}
 CREATE TABLE person (
   -- TODO(barwise): No column description. Add a definition to the value type.
   -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
@@ -24,7 +24,7 @@ CREATE TABLE person (
 -- Table: car
 -- Source: Car (ot-car)
 -- TODO(barwise): No model description. Add a definition to the entity type.
--- barwise:v1 {"kind":"table","table":"car","entity":"Car","referenceMode":"vin"}
+-- barwise:v1 {"kind":"table","table":"car","entity":"Car","referenceMode":"vin","supertypes":[]}
 CREATE TABLE car (
   -- TODO(barwise): No column description. Add a definition to the value type.
   -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
@@ -35,7 +35,7 @@ CREATE TABLE car (
 -- Table: bus
 -- Source: Bus (ot-bus)
 -- TODO(barwise): No model description. Add a definition to the entity type.
--- barwise:v1 {"kind":"table","table":"bus","entity":"Bus","referenceMode":"bus_number"}
+-- barwise:v1 {"kind":"table","table":"bus","entity":"Bus","referenceMode":"bus_number","supertypes":[]}
 CREATE TABLE bus (
   -- TODO(barwise): No column description. Add a definition to the value type.
   -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
@@ -46,7 +46,7 @@ CREATE TABLE bus (
 -- Table: ticket
 -- Source: Ticket (ot-ticket)
 -- TODO(barwise): No model description. Add a definition to the entity type.
--- barwise:v1 {"kind":"table","table":"ticket","entity":"Ticket","referenceMode":"ticket_id"}
+-- barwise:v1 {"kind":"table","table":"ticket","entity":"Ticket","referenceMode":"ticket_id","supertypes":[]}
 CREATE TABLE ticket (
   -- TODO(barwise): No column description. Add a definition to the value type.
   -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.

@@ -14,7 +14,7 @@
  */
 
 import { type OrmModel, validateReadingTemplate } from "@barwise/core";
-import type { FactType } from "@barwise/core";
+import type { DerivationRule, FactType } from "@barwise/core";
 import type { RelationalSchema, Table } from "@barwise/core/mapping";
 
 const PREFIX = "-- barwise:v1 ";
@@ -30,6 +30,27 @@ export interface TableAnnotation {
   readonly definition?: string;
   /** The fact type this entity objectifies, when its roles are columns of the table. */
   readonly objectifies?: Relationship;
+  /**
+   * Every subtype fact this entity is the subtype of, each with the
+   * columns that reference its supertype's table and the fact's fields as
+   * core stores them. Written on every table line, empty for an entity
+   * that is no subtype, so that absence means only "written before this
+   * field existed" (key-reference-tables.spec.md, requirement 4). Fields
+   * are imported as stored, never re-derived: the mapper writes an
+   * identifying subtype fact as a non-key foreign key when an
+   * objectification identifies the same entity.
+   */
+  readonly supertypes?: readonly SupertypeLink[];
+}
+
+/** One subtype fact, as a table line carries it. */
+export interface SupertypeLink {
+  readonly entity: string;
+  readonly columns: readonly string[];
+  readonly providesIdentification: boolean;
+  readonly isExclusive: boolean;
+  readonly isExhaustive: boolean;
+  readonly definingRule?: DerivationRule;
 }
 
 /** A role of a table-wide fact type: its player and the table's columns for it. */
@@ -130,6 +151,22 @@ export function annotateTable(
   const objectified = model.objectifiedFactTypes.find((o) => o.objectTypeId === entity.id);
   const objectifiedFt = objectified ? model.getFactType(objectified.factTypeId) : undefined;
   const objectifies = objectifiedFt ? relationshipOf(model, objectifiedFt, table) : undefined;
+  // The mapper tags each subtype's foreign key with its subtype fact's id.
+  const supertypes: SupertypeLink[] = [];
+  for (const sf of model.subtypeFacts) {
+    if (sf.subtypeId !== entity.id) continue;
+    const supertype = model.getObjectType(sf.supertypeId);
+    const fk = table.foreignKeys.find((f) => f.sourceConstraintId === sf.id);
+    if (!supertype || !fk) continue;
+    supertypes.push({
+      entity: supertype.name,
+      columns: [...fk.columnNames],
+      providesIdentification: sf.providesIdentification,
+      isExclusive: sf.isExclusive,
+      isExhaustive: sf.isExhaustive,
+      ...(sf.definingRule ? { definingRule: sf.definingRule } : {}),
+    });
+  }
   const tableAnnotation: TableAnnotation = {
     kind: "table",
     table: table.name,
@@ -137,6 +174,7 @@ export function annotateTable(
     referenceMode: entity.referenceMode,
     ...(entity.definition ? { definition: entity.definition } : {}),
     ...(objectifies ? { objectifies } : {}),
+    supertypes,
   };
 
   // A role spread over several columns (a composite foreign key) is read
@@ -285,7 +323,19 @@ function isTableAnnotation(v: unknown): v is TableAnnotation {
   return isRecord(v) && v["kind"] === "table" && isName(v["table"])
     && isName(v["entity"]) && isName(v["referenceMode"])
     && optionalString(v["definition"])
-    && (v["objectifies"] === undefined || isRelationship(v["objectifies"]));
+    && (v["objectifies"] === undefined || isRelationship(v["objectifies"]))
+    && (v["supertypes"] === undefined
+      || Array.isArray(v["supertypes"]) && v["supertypes"].every(isSupertypeLink));
+}
+
+function isSupertypeLink(v: unknown): v is SupertypeLink {
+  return isRecord(v) && isName(v["entity"])
+    && Array.isArray(v["columns"]) && v["columns"].length > 0 && v["columns"].every(isName)
+    && typeof v["providesIdentification"] === "boolean"
+    && typeof v["isExclusive"] === "boolean"
+    && typeof v["isExhaustive"] === "boolean"
+    && (v["definingRule"] === undefined
+      || isRecord(v["definingRule"]) && typeof v["definingRule"]["expression"] === "string");
 }
 
 function isFactTableAnnotation(v: unknown): v is FactTableAnnotation {
