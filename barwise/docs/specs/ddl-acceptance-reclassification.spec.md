@@ -25,15 +25,15 @@ the fix; reclassify it then."
 Every failing check in the 19 rows, measured on the 2026-10-07 small
 tier, by cause:
 
-| Cause                                                       | Checks | Disposition                                       |
-| ----------------------------------------------------------- | ------ | ------------------------------------------------- |
-| Element missing: a skin renames it, or never states the FK   | 44     | barwise-d60 (decision: grader mapping or feature) |
-| Deontic rule ("It is obligatory ...")                       | 7      | `not_expressible` for `ddl`                       |
-| Ring constraint (acyclic chain)                             | 7      | `not_expressible` for `ddl`                       |
-| "The combination of ... is unique across fact types"        | 5      | trial generator now writes the `UNIQUE`           |
-| Mandatory or uniqueness the import does not enforce         | 5      | per row, below                                    |
-| Subtype verbalization                                       | 2      | barwise-1078, already open                        |
-| Objectification wording                                     | 4      | per row, below                                    |
+| Cause                                                      | Checks | Disposition                                       |
+| ---------------------------------------------------------- | ------ | ------------------------------------------------- |
+| Element missing: a skin renames it, or never states the FK | 44     | barwise-d60 (decision: grader mapping or feature) |
+| Deontic rule ("It is obligatory ...")                      | 7      | `not_expressible` for `ddl`                       |
+| Ring constraint (acyclic chain)                            | 7      | `not_expressible` for `ddl`                       |
+| "The combination of ... is unique across fact types"       | 5      | trial generator now writes the `UNIQUE`           |
+| Mandatory or uniqueness the import does not enforce        | 5      | per row, below                                    |
+| Subtype verbalization                                      | 2      | barwise-1078, already open                        |
+| Objectification wording                                    | 4      | per row, below                                    |
 
 ## Scope
 
