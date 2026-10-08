@@ -33,7 +33,8 @@ const BARWISE = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // exited 0, and `check:beads` reported "no such file: --" (barwise-2lz).
 // Fixing it here rather than in each script covers every script at once,
 // including ones not written yet. The cost is that a script cannot receive
-// a literal leading `--` through this wrapper; none takes one.
+// a literal leading `--` through this wrapper
+// (docs/specs/at-root-argument-forwarding.spec.md).
 const [script, ...rawArgs] = process.argv.slice(2);
 const args = rawArgs[0] === "--" ? rawArgs.slice(1) : rawArgs;
 if (!script || script === "--help" || script === "-h") {
