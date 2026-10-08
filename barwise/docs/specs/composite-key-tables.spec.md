@@ -121,9 +121,13 @@ referenced.
    objectifications.
 7. For each shape both formats can state, the cli drift test shall
    import it as DDL and as the equivalent dbt project and shall fail when
-   the two disagree, for the fact types the rule builds, on role players,
-   internal uniquenesses or mandatory constraints, or on what is
-   objectified.
+   the two disagree on role players, internal and external uniquenesses
+   or mandatory constraints of the fact types the rule builds and of
+   every fact type the objectifier plays a role in -- its attributes,
+   its alternate identifier and its remaining foreign keys' relationships
+   (PR #620 review: a `supplier_id` one side dropped would otherwise
+   pass) -- or on what is objectified. Fact type names and readings are
+   not compared, since the two importers word them differently.
 
 ## Open decisions
 

@@ -98,7 +98,9 @@ in both directions) and an irregular plural (`people` does not match
 `INTEGER`), a length difference (`VARCHAR(10)` against `VARCHAR(12)`,
 inferred), an identity key (`INT IDENTITY` against `INT`, inferred), an
 unrecognised type on either side (not inferred), a type mismatch, a
-self-table match, the ambiguous case, the
+self-table match, a composite-key target `U` whose first key column's
+name and type match `X` (no inference: `U` has no single key column),
+the ambiguous case, the
 key-column case, a column with a declared foreign key whose name suggests
 another table (the declared reference wins, with no inference warning),
 and the flag absent; CLI tests that

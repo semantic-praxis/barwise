@@ -132,33 +132,50 @@ round-trips: the mapper writes exactly this shape for a subtype.
    never restated): whichever spec lands first creates it, with its own
    tests, and the second imports it (PR #620 review).
 2. When it does, the importer shall add a warning naming the table, the
-   supertype and both conditions.
+   supertype and both conditions. When the key column carries
+   shared-key foreign keys to two or more tables that each meet both
+   conditions, the importer shall import none of them as a supertype,
+   read the table as requirement 3 does, and warn naming every
+   candidate: which parent to choose is not the DDL's to say, and
+   taking the first would make the model depend on constraint order
+   (PR #620 review).
 3. When a table with a shared-key foreign key does not meet both
    naming and column conditions, or its key column's foreign key is not
    a shared-key foreign key, the importer shall
    read it exactly as before this spec (for a shared-key foreign key:
    the key imported, the reference not, and the existing warning).
-4. The DDL export shall write, on the table annotation of every entity
-   that is a subtype, an optional `supertypes` list with one entry per
-   subtype fact, each naming the supertype entity and the columns that
-   reference its table, and carrying the rest of the subtype fact as
-   core stores it -- `providesIdentification`, `isExclusive`,
-   `isExhaustive` and `definingRule` (`SubtypeFact.ts`), so the
-   annotated round trip loses none of them (PR #620 review) -- a list of columns, since a supertype keyed on
-   several columns is referenced through all of them, and a list of
-   entries, since an entity may have more than one supertype (PR #620
-   review). When a table's annotation carries `supertypes`, the
-   importer shall import each subtype fact from its entry --
-   identifying when its columns are exactly the table's primary key,
-   not identifying otherwise, the columns then imported as the subtype
-   link rather than as a relationship -- and shall not apply
-   requirements 1-3 to that table. When an annotated table has no
-   `supertypes` (an export from before this spec, or an entity that is
-   no subtype), requirements 1-3 apply to it as to an unannotated
-   table.
+4. The DDL export shall write a `supertypes` list on every table
+   annotation it writes -- empty for an entity that is no subtype, so
+   that absence means only "written before this spec" (PR #620 review).
+   Each entry is one subtype fact: the supertype entity, the columns
+   that reference its table (a list, since a supertype keyed on several
+   columns is referenced through all of them), and the subtype fact's
+   fields as core stores them -- `providesIdentification`,
+   `isExclusive`, `isExhaustive`, `definingRule` (`SubtypeFact.ts`).
+   An entity may have several entries, one per supertype.
+   4a. When a table's annotation carries `supertypes`, the importer shall
+   import each entry's subtype fact with the stored fields, never
+   re-deriving them: `providesIdentification` in particular cannot be
+   read off the columns, because the relational mapper writes an
+   identifying subtype fact as a non-key foreign key when an
+   objectification identifies the same entity
+   (`RelationalMapper.ts`, the objectification-precedence branch; PR
+   #620 review). The entry's columns locate the link and are checked
+   against the DDL: they must be a declared foreign key, in full, to the
+   table of the named supertype. An entry that fails the check is
+   dropped with a warning naming it, and the table is read by
+   requirements 1-3 -- an annotation is used only while it describes
+   the DDL (ddl-round-trip-fixed-point.spec.md). Columns of an entry
+   that passes are the subtype link, not a relationship. Requirements
+   1-3 do not apply to a table whose annotation carries `supertypes`,
+   empty or not: an empty list says barwise wrote the table and it is
+   no subtype, so the naming rule must not invent one.
+   4b. When a table's annotation has no `supertypes` (an export from
+   before this spec), requirements 1-3 apply to it as to an
+   unannotated table.
 5. Round trips (PR #620 review: the first wording asked an unannotated
    export to keep what only the annotation can carry):
-   - A subtype imported by requirement 4, exported with annotations and
+   - A subtype imported by requirement 4a, exported with annotations and
      imported again, shall give the same subtype facts. Without
      annotations nothing promises it survives: the names of
      `employee` and `person` say nothing of a subtype, which is the
@@ -204,7 +221,13 @@ round-trip test that a caught subtype re-exports unchanged; the
 identifying and a non-identifying subtype -- `employee-hierarchy`
 carries both -- a subtype whose supertype has a two-column key, an
 entity with two supertypes, a subtype fact with `isExclusive`,
-`isExhaustive` and a `definingRule` set, and a test that an annotation's `supertypes` wins over
+`isExhaustive` and a `definingRule` set, and a two-parent control for requirement 2 (both parents qualify, neither
+imported), an annotation whose columns no longer form the foreign key
+(dropped with a warning, the table read by requirements 1-3), an
+objectified entity whose identifying subtype fact is exported as a
+non-key foreign key (re-imported with `providesIdentification` true),
+an empty `supertypes` on a same-noun vertical partition (no subtype
+invented), and a test that an annotation's `supertypes` wins over
 a table name that fails the naming rule. The trial
 generator writing the extension tables' `FOREIGN KEY`, which its
 manifest already records (`trial/lib/generators/ddl.mjs`), with a
