@@ -263,8 +263,9 @@ export function generateDdl(doc, skin, { factor = 1, seed = 1, artifactId = "ddl
         );
       }
       // A skin whose schemas leave multi-column uniqueness to the application
-      // says so with `no_unique_constraints`.
-      if (!idioms.no_unique_constraints) {
+      // says so with `no_unique_constraints`. BigQuery has no UNIQUE
+      // constraint at all, so its tables never carry one (PR #601 review).
+      if (!idioms.no_unique_constraints && dialect !== "bigquery") {
         for (const u of t.uniques ?? []) {
           constraints.push(`  UNIQUE (${u.map((c) => q(ident(c, false))).join(", ")})`);
         }

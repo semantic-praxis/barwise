@@ -63,3 +63,21 @@ test("a table for a fact type of three or more roles is keyed on its uniqueness"
   const table = /CREATE TABLE[^;]*shipment_travels_leg_on_vehicle[^;]*/i.exec(text)?.[0] ?? "";
   assert.match(table, /PRIMARY KEY \(shipment_id, leg_id\)/);
 });
+
+test("no UNIQUE where the dialect has none or the rule is deontic", () => {
+  // BigQuery has no UNIQUE constraint; C07's subscriber combination would
+  // be an invalid clause there.
+  const bq = generateDdl(
+    load("C07-telecom/kernel.orm.yaml"),
+    load("C07-telecom/skins/bigquery-dwh.yaml"),
+  );
+  assert.doesNotMatch(bq.text, /^\s+UNIQUE \(/m);
+  // C12's Recipient-and-Program uniqueness is an obligation, not a rule
+  // the database may enforce; its alethic combinations still are.
+  const { text } = generateDdl(
+    load("C12-benefits/kernel.orm.yaml"),
+    load("C12-benefits/skins/postgres-modern.yaml"),
+  );
+  assert.doesNotMatch(text, /UNIQUE \(rcpt_id, prgm_id\)/);
+  assert.match(text, /UNIQUE \(case_nbr, ofc_id\)/);
+});

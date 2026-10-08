@@ -220,7 +220,9 @@ export function relationalView(doc) {
   }
   for (const ft of factTypes(doc)) {
     for (const c of ft.constraints ?? []) {
-      if (c.type !== "external_uniqueness") continue;
+      // A deontic uniqueness is an obligation a row may break: an enforced
+      // UNIQUE would reject what the model allows (PR #601 review).
+      if (c.type !== "external_uniqueness" || c.modality === "deontic") continue;
       const at = (c.roles ?? []).map((id) => columnOfRole.get(id));
       if (at.length < 2 || at.some((x) => !x) || at.some((x) => x.table !== at[0].table)) continue;
       at[0].table.uniques.push(at.map((x) => x.column));
