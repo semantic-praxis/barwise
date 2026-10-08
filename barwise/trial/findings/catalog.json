@@ -130,11 +130,11 @@
       "note": "Edit distance to acceptance on a DDL table whose every column is a role of one fact type: without a barwise line the import reads it as an entity with attributes, or as a relationship over its foreign keys alone, so the three-role fact type the persona checks for is not there (barwise-2z1). C05's \"Material is produced at Plant in Batch\", keyed on its batch alone, imports as an entity, so no fact type connects Material and Plant. C09's biostatistician also fails a subtype check, which is barwise-1078."
     },
     {
-      "id": "acceptance-skin-generator-objectification",
-      "issue": "barwise-rlv",
+      "id": "acceptance-subtype-key-reference",
+      "issue": "barwise-1078",
       "severity": "S5",
-      "step": "^acceptance:(policy-admin-dba:pc-ddl|ir-analyst:sis-ddl|registrar-data-steward:sis-ddl|sis-dba:sis-ddl|modernization-architect:modern-ddl|policy-analyst:modern-ddl)$",
-      "note": "Edit distance to acceptance on a skinned DDL artifact, graded with its names mapped through the skin (barwise-d60). What remains is the trial's generator: it writes an objectified fact type as two unlinked tables, so C10's Enrollment and C12's Determination are not where-readings and C03's PolicyNumber-and-Term uniqueness has no one table to sit in; and it names a self-reference column after its player, so C10's prerequisite table declares SCBCRSE_ID twice (barwise-rlv). C10's sis-dba fails because the file creates SPRIDEN twice, once for Person and once as a skin extra table, so the grader maps neither (PR #611 review). C10's ir-analyst also fails a subtype check, which is barwise-1078."
+      "step": "^acceptance:ir-analyst:sis-ddl$",
+      "note": "Edit distance to acceptance on C10's Banner DDL, graded with its names mapped through the skin (barwise-d60) and generated with one table per objectification (barwise-rlv). What remains is GRADUATE_SGBSTDN, keyed on SGBSTDN_ID referencing SGBSTDN: the import keeps the key and not the reference, so \"GraduateStudent is a subtype of Student.\" has nothing to verbalize (barwise-1078)."
     },
     {
       "id": "acceptance-no-foreign-keys",
