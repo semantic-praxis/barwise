@@ -55,9 +55,10 @@ Out of scope:
 and `env: BASE_SHA`, and with no docs-only guard: a Markdown change that
 closes an issue is exactly what it exists to catch (#616 closed
 barwise-a98 alongside a spec). On a push to `main` there is no pull
-request, so there is nothing to check. `ci-local.mjs` does not
-understand that condition and runs the step anyway, which is right
-locally, where every push is headed for a pull request.
+request, so there is nothing to check. WS1 teaches `shouldRun` in
+`lib/ci-gates.mjs` to read that condition as true locally, so
+`ci-local.mjs` runs the step before every push: every push from a branch
+is headed for a pull request.
 
 ## Alternatives considered
 
@@ -92,9 +93,10 @@ and assert the behavior:
   `main` after the base commit would appear in the diff as if the branch
   made it. The gate shares the detect step's base
   (`pull_request.base.sha`), so it shares that step's assumption that
-  the base is current. WS1 verifies the assumption on a real pull
-  request that merged `main`, and adds a sandbox test of a merge from a
-  moved base, before relying on it.
+  the base is current. WS1 adds a sandbox test of a merge from a
+  moved base, which passes. Verifying the assumption on a live pull
+  request that merged `main` is still open; until then this is the
+  gate's least certain point.
 
 ## Non-goals
 

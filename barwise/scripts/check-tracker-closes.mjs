@@ -53,9 +53,17 @@ function statuses(rev) {
     return refuse(`cannot read ${TRACKER} at ${rev}.`);
   }
   const out = new Map();
-  for (const line of text.split("\n")) {
+  for (const [i, line] of text.split("\n").entries()) {
     if (!line.trim()) continue;
-    const row = JSON.parse(line);
+    let row;
+    try {
+      row = JSON.parse(line);
+    } catch {
+      // A tracker that does not parse is one this gate cannot read, so it
+      // refuses rather than crashing with exit 1, which reads as a rule
+      // violation. check:beads owns reporting the bad line itself.
+      return refuse(`${TRACKER} at ${rev} line ${i + 1} is not valid JSON.`);
+    }
     if (row.id) out.set(row.id, row.status);
   }
   return out;

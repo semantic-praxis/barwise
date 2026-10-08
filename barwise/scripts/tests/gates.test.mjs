@@ -4194,6 +4194,22 @@ test("check-tracker-closes does not count a close made on main and merged in", (
   }
 });
 
+test("check-tracker-closes refuses a tracker that does not parse rather than crashing", () => {
+  // Exit 1 means "a close beside other changes"; an unreadable tracker is
+  // neither that nor clean, so it must be 2 (Copilot on #622).
+  const r = trackerRepo();
+  try {
+    writeFileSync(join(r.dir, ".beads", "issues.jsonl"), '{"id":"a","status":"open"}\n{not json\n');
+    r.commit("corrupt the tracker");
+    const out = r.run();
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /line 2 is not valid JSON/);
+    assert.doesNotMatch(out.stdout, /OK/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
 test("check-tracker-closes refuses with no base rather than reporting clean", () => {
   const r = trackerRepo();
   try {
