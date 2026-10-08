@@ -192,6 +192,40 @@ export function generateDdl(doc, skin, { factor = 1, seed = 1, artifactId = "ddl
 
   const namer = skinNamer(skin);
   const ident = (raw, isTable) => (isTable ? namer.table(raw) : namer.column(raw));
+  // The column a reference column points at, and the type it therefore has:
+  // a column of a composite reference names its key column, and takes that
+  // column's type, which may be a value's (C01's AdmissionDateTime).
+  const referencedColumn = (col) =>
+    col.refColumn ?? col.ref.pk[0] ?? `${columnName(col.ref.entity)}_id`;
+  // Each table's column identifiers, held apart after the skin's naming.
+  // relationalView names no two columns alike, but a skin's truncation can:
+  // C12 cuts to 8 characters, so supersedes_determination_case_id and its
+  // two siblings are all SUPERSED. A mainframe schema tool numbers the
+  // tail (SUPERSE2, SUPERSE3), and so does this. Settled before any table
+  // is written, since a reference in one table names another's columns.
+  const max = skin.naming?.max_identifier;
+  const columnIdents = new Map();
+  for (const t of base) {
+    const spelled = new Map();
+    const used = new Set();
+    for (const col of t.columns) {
+      const stem = ident(col.name, false);
+      let id = stem;
+      for (let n = 2; used.has(id.toLowerCase()); n++) {
+        id = (max ? stem.slice(0, max - String(n).length) : stem) + n;
+      }
+      used.add(id.toLowerCase());
+      spelled.set(col.name, id);
+    }
+    columnIdents.set(t, spelled);
+  }
+  const colIdent = (t, name) => columnIdents.get(t)?.get(name) ?? ident(name, false);
+  const columnType = (col) => {
+    if (!col.ref) return valueSqlType(col, types);
+    if (!col.refColumn) return types.id;
+    const target = col.ref.columns.find((c) => c.name === col.refColumn);
+    return target ? columnType(target) : types.id;
+  };
 
   const emit = (sql, meta) => {
     stmt++;
@@ -241,11 +275,9 @@ export function generateDdl(doc, skin, { factor = 1, seed = 1, artifactId = "ddl
       const fks = [];
       const checks = [];
       for (const col of t.columns) {
-        const cname = ident(col.name, false);
+        const cname = colIdent(t, col.name);
         colNames.push(cname);
-        let type;
-        if (col.ref) type = types.id;
-        else type = valueSqlType(col, types);
+        const type = columnType(col);
         const isPk = t.pk.includes(col.name);
         const nullness = isPk || !col.nullable
           ? "NOT NULL"
@@ -258,13 +290,19 @@ export function generateDdl(doc, skin, { factor = 1, seed = 1, artifactId = "ddl
           );
           checks.push(`  CHECK (${q(cname)} IN (${vals}))`);
         }
-        if (col.ref) {
-          const refName = tname(col.ref);
-          const refCol = ident(col.ref.pk[0] ?? `${columnName(col.ref.entity)}_id`, false);
-          fks.push({ column: cname, ref: refName, refColumn: refCol });
-        }
       }
-      const pkCols = t.pk.map((c) => ident(c, false));
+      // One FOREIGN KEY per reference, with as many columns as the table it
+      // references has key columns: an objectification is keyed on its roles
+      // (trial-generator-objectification.spec.md).
+      for (const fk of t.fks) {
+        const cols = fk.columns.map((n) => t.columns.find((c) => c.name === n));
+        fks.push({
+          columns: cols.map((c) => colIdent(t, c.name)),
+          ref: tname(fk.ref),
+          refColumns: cols.map((c) => colIdent(c.ref, referencedColumn(c))),
+        });
+      }
+      const pkCols = t.pk.map((c) => colIdent(t, c));
       const constraints = [];
       if (!(idioms.inline_pk && pkCols.length === 1) && pkCols.length) {
         constraints.push(
@@ -280,13 +318,15 @@ export function generateDdl(doc, skin, { factor = 1, seed = 1, artifactId = "ddl
       // constraint at all, so its tables never carry one (PR #601 review).
       if (!idioms.no_unique_constraints && dialect !== "bigquery") {
         for (const u of t.uniques ?? []) {
-          constraints.push(`  UNIQUE (${u.map((c) => q(ident(c, false))).join(", ")})`);
+          constraints.push(`  UNIQUE (${u.map((c) => q(colIdent(t, c))).join(", ")})`);
         }
       }
       if (!idioms.no_foreign_keys) {
         for (const fk of fks) {
           constraints.push(
-            `  FOREIGN KEY (${q(fk.column)}) REFERENCES ${schema}${q(fk.ref)} (${q(fk.refColumn)})`,
+            `  FOREIGN KEY (${fk.columns.map(q).join(", ")}) REFERENCES ${schema}${q(fk.ref)} (${
+              fk.refColumns.map(q).join(", ")
+            })`,
           );
         }
       }
@@ -333,6 +373,7 @@ export function generateDdl(doc, skin, { factor = 1, seed = 1, artifactId = "ddl
       }
     }
   }
+  const generated = new Set(manifest.tables.map((t) => t.name.toLowerCase()));
   for (const extra of skin.extra_tables ?? []) {
     // A statement that is not a CREATE TABLE -- a skin's CREATE TYPE -- is
     // context, not an expected entity. Both used to become `extra_N`, a name
@@ -342,6 +383,14 @@ export function generateDdl(doc, skin, { factor = 1, seed = 1, artifactId = "ddl
     const rawName = m
       ? m[1].split(".").pop().replace(/[`"\[\]]/g, "")
       : `extra_${manifest.tables.length}`;
+    // C10's skin added SPRIDEN, SFRSTCR and STVTERM beside the generated
+    // tables of those names, so the file created each twice and the import
+    // kept whichever came first (PR #611 review).
+    if (m && generated.has(rawName.toLowerCase())) {
+      throw new Error(
+        `generateDdl: the skin's extra table ${rawName} has the name of a generated table`,
+      );
+    }
     lines.push(extra.trim().replace(/;?\s*$/, "") + ";", "");
     manifest.tables.push({
       name: rawName,

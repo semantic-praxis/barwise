@@ -74,15 +74,18 @@ export function generateDbt(doc, skin, dir, { factor = 1, artifactId = "dbt" } =
       const dropKey = keyless < (skin.models_without_keys ?? 0) && t.entity;
       const cols = t.columns.map((c) => {
         const tests = [];
+        // A column of a composite key is not unique by itself; a test that
+        // said so would state a constraint the model does not have.
         const isPk = t.pk.includes(c.name);
-        if (isPk && !dropKey) tests.push("unique", "not_null");
+        if (isPk && t.pk.length === 1 && !dropKey) tests.push("unique", "not_null");
+        else if (isPk) tests.push("not_null");
         else if (!c.nullable) tests.push("not_null");
         if (c.check) tests.push({ accepted_values: { values: c.check.slice(0, 20).map(String) } });
         if (c.ref) {
           tests.push({
             relationships: {
               to: `ref('stg_${tableName(c.ref)}${sfx}')`,
-              field: c.ref.pk[0] ?? "id",
+              field: c.refColumn ?? c.ref.pk[0] ?? "id",
             },
           });
         }
