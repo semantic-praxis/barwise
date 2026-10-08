@@ -7,9 +7,10 @@ Tracking: barwise-1078
 
 In one sentence: an unannotated table whose single-column key also
 references another table imports as a subtype of that table when its
-name ends in the referenced table's head noun, and otherwise as a
-one-to-one fact type with it; either way the reference is no longer
-dropped, and each reading is reported.
+name ends in the referenced table's head noun and it repeats none of
+that table's other columns, with the inference reported; any other such
+table keeps today's reading until core can identify an entity through
+another entity, which is a follow-up.
 
 ## Principle
 
@@ -23,71 +24,75 @@ to do with a fact the schema does not give.
 
 ## What the shape means in the trial (measured 2026-10-08)
 
-| Table (customer)                                  | References         | Kernel                               | Last name word, theirs / parent's | Head-noun rule    |
-| ------------------------------------------------- | ------------------ | ------------------------------------ | --------------------------------- | ----------------- |
-| `GRADUATE_SGBSTDN` (C10)                          | `SGBSTDN`          | subtype of Student                   | SGBSTDN / SGBSTDN                 | subtype, right    |
-| `SCREEN_FAILED_SUBJECT`, `ENROLLED_SUBJECT` (C09) | `SUBJECT`          | subtypes of Subject                  | SUBJECT / SUBJECT                 | subtype, right    |
-| `RANDOMIZED_SUBJECT` (C09)                        | `ENROLLED_SUBJECT` | subtype of EnrolledSubject           | SUBJECT / SUBJECT                 | subtype, right    |
-| `SERIOUS_ADVERSE_EVENT` (C09)                     | `ADVERSE_EVENT`    | subtype of AdverseEvent              | EVENT / EVENT                     | subtype, right    |
-| `IN_PAT_ENC`, `OUT_PAT_ENC`, `ED_ENC` (C01)       | `ENC`              | subtypes of Encounter                | ENC / ENC                         | subtype, right    |
-| `TRAUMA_ENC` (C01)                                | `ED_ENC`           | subtype of EmergencyEncounter        | ENC / ENC                         | subtype, right    |
-| `MED_ORDER`, `LAB_ORDER` (C01)                    | `ORDER`            | subtypes of Order                    | ORDER / ORDER                     | subtype, right    |
-| `SGBSTDN`, `PEBEMPL` (C10)                        | `SPRIDEN`          | Student, Employee subtypes of Person | SGBSTDN, PEBEMPL / SPRIDEN        | one-to-one, miss  |
-| `SIBINST` (C10)                                   | `PEBEMPL`          | Faculty subtype of Employee          | SIBINST / PEBEMPL                 | one-to-one, miss  |
-| `PAT_2`, `PAT_3` (C01 extension tables)           | `PAT`              | the same entity, more columns        | 2, 3 / PAT                        | one-to-one, right |
-| `user_profiles` (barwise-1078's own example)      | `users`            | a one-to-one extension               | PROFILES / USERS                  | one-to-one, right |
+| Table (customer)                                    | References         | Kernel                               | Last name word, theirs / parent's | Rule result          |
+| --------------------------------------------------- | ------------------ | ------------------------------------ | --------------------------------- | -------------------- |
+| `GRADUATE_SGBSTDN` (C10)                            | `SGBSTDN`          | subtype of Student                   | SGBSTDN / SGBSTDN                 | subtype, right       |
+| `SCREEN_FAILED_SUBJECT`, `ENROLLED_SUBJECT` (C09)   | `SUBJECT`          | subtypes of Subject                  | SUBJECT / SUBJECT                 | subtype, right       |
+| `RANDOMIZED_SUBJECT` (C09)                          | `ENROLLED_SUBJECT` | subtype of EnrolledSubject           | SUBJECT / SUBJECT                 | subtype, right       |
+| `SERIOUS_ADVERSE_EVENT` (C09)                       | `ADVERSE_EVENT`    | subtype of AdverseEvent              | EVENT / EVENT                     | subtype, right       |
+| `IN_PAT_ENC`, `OUT_PAT_ENC`, `ED_ENC` (C01)         | `ENC`              | subtypes of Encounter                | ENC / ENC                         | subtype, right       |
+| `TRAUMA_ENC` (C01)                                  | `ED_ENC`           | subtype of EmergencyEncounter        | ENC / ENC                         | subtype, right       |
+| `MED_ORDER`, `LAB_ORDER` (C01)                      | `ORDER`            | subtypes of Order                    | ORDER / ORDER                     | subtype, right       |
+| `SGBSTDN`, `PEBEMPL` (C10)                          | `SPRIDEN`          | Student, Employee subtypes of Person | SGBSTDN, PEBEMPL / SPRIDEN        | not a subtype, miss  |
+| `SIBINST` (C10)                                     | `PEBEMPL`          | Faculty subtype of Employee          | SIBINST / PEBEMPL                 | not a subtype, miss  |
+| 42 extension tables, `PAT_2` to `LAB_ORDER_3` (C01) | their base table   | the same entity, more columns        | 2 or 3 / the base's               | not a subtype, right |
+| `user_profiles` (barwise-1078's own example)        | `users`            | a one-to-one extension               | PROFILES / USERS                  | not a subtype, right |
+| `LEGACY_ORDER`, a copy of `ORDER` (test control)    | `ORDER`            | not a subtype                        | ORDER / ORDER                     | not a subtype, right |
 
-The head-noun rule (subtype when the last word of the table's name
-equals the last word of the referenced table's, singular and plural
-alike) is right on 14 of 17 tables. Its false-positive rate is **not
-measured**: every same-head-noun table in this sample is a subtype, so
-the sample has no case on which the rule could be wrong that way (PR
-#620 review). The realistic risk is a prefix-qualified copy of a table -- `LEGACY_ORDER`, `ARCHIVED_ORDER` keyed on `ORDER`'s key -- which
-the rule would call a subtype. The tests carry such a control, and
-each inferred subtype is reported so a wrong one is seen. Its three misses are C10's vendor dictionary codes, where no
-name carries the noun; it reads them as one-to-one, which is still true
-of the data, just less specific. barwise's own DDL export writes this
-shape only for subtypes, with an annotation, which is read first and is
-unaffected.
+The rule has two conditions. **The table's name ends in the referenced
+table's head noun** (its last word, singular and plural alike), and
+**it repeats none of that table's non-key columns.** The head noun alone
+has a false positive the trial cannot show: a prefix-qualified copy --
+`LEGACY_ORDER`, `ARCHIVED_ORDER` keyed on `ORDER`'s key -- ends in the
+parent's noun and is not a kind of it (PR #620 review). A copy repeats
+its parent's columns and a subtype adds its own, so the second condition
+separates them. Measured over the three customers with this shape, no
+real subtype repeats a parent column (11 of 11), the 42 extension
+tables fail the head noun before the second condition is reached, and
+the control fails the second. The three misses are C10's vendor
+dictionary codes, where no name carries the noun; they keep today's
+reading. barwise's own DDL export writes this shape only for subtypes,
+with an annotation, which is read first and is unaffected.
 
 ## Options
 
-| Option                                       | C09/C10/C01 subtype checks                            | Extension tables                     | Cost                                        |
-| -------------------------------------------- | ----------------------------------------------------- | ------------------------------------ | ------------------------------------------- |
-| A. always a subtype                          | pass                                                  | wrong: `PAT_2` becomes a kind of PAT | simplest; asserts "is a" the DDL never said |
-| B. always a one-to-one fact type             | fail (declare not_expressible: DDL cannot say "is a") | right                                | honest; no inference at all                 |
-| C. head-noun rule, B otherwise (recommended) | pass except C10's three coded tables                  | right                                | a naming heuristic, reported per table      |
+| Option                                                             | Subtype checks                       | Extension tables, copies             | Cost                                        |
+| ------------------------------------------------------------------ | ------------------------------------ | ------------------------------------ | ------------------------------------------- |
+| A. always a subtype                                                | pass                                 | wrong: `PAT_2` becomes a kind of PAT | simplest; asserts "is a" the DDL never said |
+| B. never a subtype; declare subtype checks not_expressible         | out of reach                         | right                                | no inference at all                         |
+| C. the two-condition rule, today's reading otherwise (recommended) | pass except C10's three coded tables | right                                | a naming heuristic, reported per table      |
 
 Recommended: **C**, with every inferred subtype named in a warning
-("imported as a subtype of ENC because its name ends in ENC's head
-noun"), and every one-to-one reading names the table it could also be a
-subtype of, so the inference is visible and reversible by hand. B is the
-fallback if review judges any naming inference out of bounds; then the
-subtype checks are declared not_expressible for ddl with the reason
-that a subtype and a one-to-one extension have one relational shape.
+("imported as a subtype of ENC: its name ends in ENC's head noun and it
+repeats none of ENC's columns"), so the inference is visible and
+reversible by hand. B is the fallback if review judges any naming
+inference out of bounds, on the reason that a subtype and a one-to-one
+extension have one relational shape. A subtype read this way
+round-trips: the mapper writes exactly this shape for a subtype.
 
-## The one-to-one branch needs the mapper too (resolved: a core workstream)
+## The one-to-one reading is a follow-up (resolved: deferred)
 
-Importing the one-to-one reading is not enough on its own:
-`RelationalMapper` exports one column as both key and foreign key only
-for a subtype, so an entity identified through a one-to-one relationship
-re-exports a second foreign-key column the source never had
-(ddl-import-fidelity.spec.md, out-of-scope section; PR #620 review).
-Workstream 1 teaches the mapper that shape: an entity whose preferred
-identifier is the single role it plays in a one-to-one, mandatory
-binary with another entity is keyed on one column that is also the
-foreign key. The subtype branch already round-trips.
+Reading the other tables as a one-to-one relationship is three changes,
+not one. The mapper exports one column as both key and foreign key only
+for a subtype (ddl-import-fidelity.spec.md, out of scope); and the
+identification model it reads cannot express an entity identified
+through another entity: `preferredIdentifyingBinary` accepts only an
+entity-to-value binary, `identificationSources` would credit a preferred
+fact to both entity players, and `identificationGraph` has no edge for
+the dependency (`packages/core/src/model/identification.ts`; PR #620
+review). That is a metamodel change with its own cycle handling and
+diagnostics, so it is filed as its own issue (barwise-3pc). Until it lands, a table
+this rule does not read as a subtype keeps today's behaviour: the key is
+imported, the reference is not, and the warning says so.
 
 ## Scope
 
-In scope: the mapper change above (core), with a round-trip test that
-`user_profiles` exports with one `user_id` column; `DdlImportFormat`'s
-handling of a single-column key that is also a foreign key, its tests
-(one per table row above, plus the `LEGACY_ORDER` control), and the trial
-rows it moves (C10 ir-analyst; the C09 biostatistician subtype check;
-any check on C10's Student, Employee or Faculty subtypes is examined
-and, if it fails only because the code names nothing, reported as such).
+In scope: `DdlImportFormat`'s handling of a single-column key that is
+also a foreign key; tests for a caught subtype, a coded-name miss, an
+extension table, `user_profiles` and the `LEGACY_ORDER` control, and a
+round-trip test that a caught subtype re-exports unchanged; the trial
+rows it moves (C10 ir-analyst; the C09 biostatistician subtype check).
 
-Out of scope: a composite key that is also a set of foreign keys (that
-is composite-key-tables.spec.md); the dbt importer, whose relationships
-test has no key-is-reference form.
+Out of scope: the one-to-one reading (above, barwise-3pc); a composite key
+that is also a set of foreign keys (composite-key-tables.spec.md); the
+dbt importer, whose relationships test has no key-is-reference form.

@@ -52,10 +52,26 @@ is not counted as "the one other column": C04's OrderLine is then the
 ternary "Order includes ProductVariant in Quantity" objectified by an
 entity whose LineId is unique.
 
-Key columns may be foreign keys or plain values; a value key column is a
-value role (C08's IntervalTimestamp). A table that the rule reads as a
+Key columns may be foreign keys or plain values, with at least one
+foreign key among them; a value key column is a value role (C08's
+IntervalTimestamp). A table keyed on values alone keeps today's reading,
+an entity with an external uniqueness. A table that the rule reads as a
 fact type with no objectifier and that another table references is
 objectified after all, since only an object type can be referenced.
+
+**Every shape the rule produces must be one the relational mapper
+exports back** (PR #620 review). The mapper writes an n-ary fact type
+or a many-to-many between entities as its own table, and an objectified
+fact type as its entity's table keyed on its roles (#600), value roles
+included. It cannot write a _binary_ with a value player and a spanning
+uniqueness: it absorbs every entity-to-value binary into the entity's
+table as a column (`RelationalMapper.ts`, the value-player branch). So
+when the rule would read a binary over one foreign key and one value --
+a table keyed on `(meter_id, interval_timestamp)` with nothing else --
+that binary is objectified by an entity named after the table, which
+the mapper settles as a table keyed on both columns. Each row of the
+table above gets a round-trip test (import, export, re-import, no
+loss), so a shape the mapper cannot write fails there.
 
 ## Open decisions
 

@@ -42,6 +42,11 @@ key-reference-tables.spec.md, and one opt-in guess would feed a second,
 the subtype heuristic. Such a column is reported as a candidate and left
 alone.
 
+The flag is refused unless the format is `ddl` (`import model`) or the
+command is `import sql`: `import model` serves every text importer,
+and `--format openapi --infer-references` would otherwise appear to do
+something it did not (PR #620 review). The refusal has its own test.
+
 ## Scope
 
 In scope: the flag on the DDL and SQL importers (the SQL importer reads
