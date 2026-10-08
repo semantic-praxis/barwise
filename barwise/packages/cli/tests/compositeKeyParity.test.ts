@@ -174,6 +174,26 @@ const cases: { name: string; ddl: string; dbt: string; }[] = [
     }`,
   },
   {
+    // A plain key column whose name an entity already holds: both importers
+    // take a renamed value type for the role, as for any column (PR #621
+    // review). The DDL side used to refuse the reading here.
+    name: "a value role whose name an entity holds",
+    ddl: `CREATE TABLE meter (meter_id INT PRIMARY KEY);
+      CREATE TABLE channel (channel_id INT PRIMARY KEY);
+      CREATE TABLE meter_reading (
+        meter_id INT NOT NULL REFERENCES meter (meter_id),
+        channel VARCHAR(4) NOT NULL,
+        reading_value DECIMAL(12,3) NOT NULL,
+        PRIMARY KEY (meter_id, channel));`,
+    dbt: `models:\n${dbtModel("meter", "meter_id", "")}${dbtModel("channel", "channel_id", "")}${
+      keyed(
+        "meter_reading",
+        ["meter_id", "channel"],
+        ref("meter_id", "meter", "meter_id") + plain("channel") + plain("reading_value"),
+      )
+    }`,
+  },
+  {
     name: "several columns beside the key",
     ddl: `CREATE TABLE student (student_id INT PRIMARY KEY);
       CREATE TABLE section (crn INT PRIMARY KEY);

@@ -208,6 +208,9 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
       }
       const roleId = generateId();
       roles.push({ id: roleId, name: "is in", playerId });
+      // So reportColumnRenames can match the column to the mapper output, as
+      // it does for identifier and ordinary columns (PR #621 review).
+      ctx.columnRoleIdMap.set(`${m.name}::${colName}`, roleId);
       const accepted = rel
         ? undefined
         : col.tests.find((t): t is Extract<DbtTest, { type: "accepted_values"; }> =>

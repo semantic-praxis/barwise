@@ -291,6 +291,23 @@ describe("a composite-key table imports as the fact type it states", () => {
     expect(warnings.filter((w) => /reads as a fact type over its key/.test(w))).toEqual([]);
   });
 
+  it("a partly-inside foreign key keeps the older reading: whole foreign keys that make the key", () => {
+    // PRIMARY KEY (a_id, b_id) with FK(a_id), FK(b_id) and FK(b_id, c_id):
+    // the composite reading declines it, and the reading from before the
+    // spec -- an objectified relationship over the two whole foreign keys --
+    // must survive (requirement 4; PR #621 review).
+    const { model } = ddl.parse(`CREATE TABLE a (a_id INT PRIMARY KEY);
+      CREATE TABLE b (b_id INT PRIMARY KEY);
+      CREATE TABLE c (b_id INT, c_id INT, PRIMARY KEY (b_id, c_id));
+      CREATE TABLE link (
+        a_id INT NOT NULL REFERENCES a (a_id),
+        b_id INT NOT NULL REFERENCES b (b_id),
+        c_id INT NOT NULL,
+        PRIMARY KEY (a_id, b_id),
+        FOREIGN KEY (b_id, c_id) REFERENCES c (b_id, c_id));`);
+    expect(shape(model).objectified).toEqual(["Link"]);
+  });
+
   it("a key of values alone keeps today's reading: an entity with an external uniqueness", () => {
     const { model } = ddl.parse(`CREATE TABLE exchange_rate (
       currency VARCHAR(3) NOT NULL, rate_date DATE NOT NULL, rate DECIMAL(12,6) NOT NULL,

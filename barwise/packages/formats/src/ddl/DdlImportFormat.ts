@@ -228,8 +228,11 @@ export class DdlImportFormat implements ImportFormat {
       // or when its line says so: an objectified fact type keyed on a value
       // role as well (C01's Admission, on patient and time) has a key with
       // a plain column in it, and is still the relationship (barwise-c65).
+      // The older rule (a key made of two or more whole foreign keys) still
+      // applies when the composite reading declines a table: requirement 4
+      // keeps that table as it was read before (PR #621 review).
       const objectifies = reading !== undefined
-        || (annotation !== undefined && foreignKeysOfKey(table) !== undefined)
+        || foreignKeysOfKey(table) !== undefined
         || annotated?.objectifies !== undefined;
       const referenceMode = annotated && (table.primaryKey.length === 1 || objectifies)
         ? annotated.referenceMode
@@ -298,7 +301,7 @@ export class DdlImportFormat implements ImportFormat {
       if (built === undefined || typeof built === "string") {
         const guessed = this.guessedRelationship(model, table, entityMap, readings.get(table));
         built = guessed
-          ? this.buildRelationship(model, table, guessed, entityMap, entity)
+          ? this.buildRelationship(model, table, guessed, entityMap, entity, true)
           : "a referenced table is not an entity";
       }
       // A relationship that could not be built leaves the key to step 3,
@@ -314,7 +317,7 @@ export class DdlImportFormat implements ImportFormat {
     for (const table of plainFactTables) {
       const guessed = this.guessedRelationship(model, table, entityMap, readings.get(table));
       const built = guessed
-        ? this.buildRelationship(model, table, guessed, entityMap, undefined)
+        ? this.buildRelationship(model, table, guessed, entityMap, undefined, true)
         : "a referenced table is not an entity";
       if (typeof built !== "string") {
         consumed.set(tableKey(table.name), built);
@@ -1093,6 +1096,7 @@ export class DdlImportFormat implements ImportFormat {
     relationship: Relationship,
     entityMap: ReadonlyMap<string, string>,
     objectifier: ObjectType | undefined,
+    guessed = false,
   ): Map<string, Binary> | string {
     if (model.getFactTypeByName(relationship.factType)) {
       return `a fact type named "${relationship.factType}" already exists`;
@@ -1133,8 +1137,12 @@ export class DdlImportFormat implements ImportFormat {
       if (earlier && !sameColumnValues(earlier, column)) {
         return `two roles name "${role.player}" over columns of different types or values`;
       }
-      const claim = this.claimRoleValueType(model, objectifier, role.player, column);
-      if (claim.kind === "create" && claim.displaced) {
+      const claim = this.claimRoleValueType(model, objectifier, role.player, column, table);
+      // An annotation names the player, so a name another type holds means
+      // the line no longer describes the model. A guessed name is only the
+      // column's, and takes the renamed value type any column would, as the
+      // dbt importer does for the same table (PR #621 review).
+      if (claim.kind === "create" && claim.displaced && !guessed) {
         return `"${role.player}" is held by ${claim.displaced.kind} type "${claim.displaced.name}"`;
       }
       plannedValues.set(role.player, column);
@@ -1175,7 +1183,7 @@ export class DdlImportFormat implements ImportFormat {
       if (step.kind === "entity") {
         playerId = step.id;
       } else {
-        const claim = this.claimRoleValueType(model, objectifier, role.player, step.column);
+        const claim = this.claimRoleValueType(model, objectifier, role.player, step.column, table);
         playerId = claim.kind === "share"
           ? claim.valueType.id
           : model.addObjectType({
@@ -1211,17 +1219,23 @@ export class DdlImportFormat implements ImportFormat {
     );
   }
 
-  /** The sharing rule for a value role of a relationship, which names its own fact type. */
+  /**
+   * The sharing rule for a value role of a relationship, which names its
+   * own fact type. A name another type holds is prefixed with the
+   * objectifier's name, or the table's when nothing objectifies it, which
+   * is the name the dbt importer gives the same role (PR #621 review).
+   */
   private claimRoleValueType(
     model: OrmModel,
     objectifier: ObjectType | undefined,
     name: string,
     column: ParsedColumn,
+    table: ParsedTable,
   ) {
     return claimValueTypeName(
       model,
       objectifier?.id ?? "",
-      objectifier?.name ?? "",
+      objectifier?.name ?? toPascalCase(table.name),
       name,
       columnDataType(column),
       "attribute",

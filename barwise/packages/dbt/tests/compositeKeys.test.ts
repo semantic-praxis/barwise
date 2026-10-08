@@ -284,4 +284,28 @@ models:
     expect(model.objectifiedFactTypes).toEqual([]);
     expect(JSON.stringify(report)).not.toContain("Composite key (");
   });
+
+  it("reports a composite role column the export will rename", () => {
+    // Composite role columns were never registered for the rename report
+    // (PR #621 review).
+    const { report } = importDbtProject([`
+models:
+  - name: meter
+    columns:
+      - name: meter_id
+        data_tests: [unique, not_null]
+  - name: meter_reading
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [meter_id, readAt]
+    columns:
+      - name: meter_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('meter')", field: meter_id }
+      - name: readAt
+        data_tests: [not_null]
+`]);
+    expect(JSON.stringify(report)).toMatch(/Column \\"readAt\\" will export as/);
+  });
 });
