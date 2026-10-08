@@ -11,16 +11,28 @@ import { importDbtProject } from "@barwise/dbt";
 import { DdlImportFormat } from "@barwise/formats";
 import { describe, expect, it } from "vitest";
 
-/** The relationships a composite key reads as, and what objectifies them. */
+/**
+ * What the rule decides, compared without names or readings, which the two
+ * importers word differently: the fact types it builds (found by the
+ * "{0} and {1} have <table>" reading both give them) and every fact type
+ * an objectifier plays in -- its attributes, alternate identifier and
+ * remaining foreign keys' relationships (PR #620 review: a column one side
+ * dropped would otherwise pass) -- each by players, internal uniquenesses
+ * and mandatory roles; external uniquenesses over them; and what is
+ * objectified.
+ */
 function composite(model: OrmModel) {
   const name = (id: string) => model.getObjectType(id)?.name ?? "?";
-  // The fact types the rule builds, by the reading both importers give
-  // them ("{0} and {1} have <table>"). The references built beside them
-  // are named differently by each importer (from the column, or "X has
-  // Y"), which this rule does not decide.
-  const relationships = model.factTypes.filter((f) => / have /.test(f.readings[0]?.template ?? ""));
+  const objectifiers = new Set(model.objectifiedFactTypes.map((o) => o.objectTypeId));
+  const facts = model.factTypes.filter((f) =>
+    / have /.test(f.readings[0]?.template ?? "")
+    || f.roles.some((r) => objectifiers.has(r.playerId))
+  );
+  const playerOf = new Map(facts.flatMap((f) => f.roles.map((r) => [r.id, name(r.playerId)])));
+  const sorted = <T>(xs: T[]) =>
+    xs.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
   return {
-    relationships: relationships.map((f) => {
+    factTypes: sorted(facts.map((f) => {
       const index = new Map(f.roles.map((r, i) => [r.id, i]));
       return {
         players: f.roles.map((r) => name(r.playerId)),
@@ -29,7 +41,11 @@ function composite(model: OrmModel) {
         mandatory: f.constraints.filter((c) => c.type === "mandatory")
           .map((c) => index.get(c.roleId)).sort(),
       };
-    }).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+    })),
+    externalUniques: sorted(
+      facts.flatMap((f) => f.constraints).filter((c) => c.type === "external_uniqueness")
+        .map((c) => c.roleIds.map((id) => playerOf.get(id) ?? "?").sort()),
+    ),
     objectified: model.objectifiedFactTypes.map((o) => name(o.objectTypeId)).sort(),
   };
 }
@@ -117,6 +133,30 @@ const cases: { name: string; ddl: string; dbt: string; }[] = [
     }${dbtModel("waitlist", "waitlist_id", ref("course_id", "offering", "course_id"))}`,
   },
   {
+    // A remaining foreign key is a relationship of the objectifier on both
+    // sides (PR #620 review: the comparison must see it).
+    name: "a remaining foreign key beside the key",
+    ddl: `CREATE TABLE orders (order_id INT PRIMARY KEY);
+      CREATE TABLE item (item_id INT PRIMARY KEY);
+      CREATE TABLE supplier (supplier_id INT PRIMARY KEY);
+      CREATE TABLE order_item (
+        order_id INT NOT NULL REFERENCES orders (order_id),
+        item_id INT NOT NULL REFERENCES item (item_id),
+        supplier_id INT NOT NULL REFERENCES supplier (supplier_id),
+        quantity INT NOT NULL,
+        PRIMARY KEY (order_id, item_id));`,
+    dbt: `models:\n${dbtModel("orders", "order_id", "")}${dbtModel("item", "item_id", "")}${
+      dbtModel("supplier", "supplier_id", "")
+    }${
+      keyed(
+        "order_item",
+        ["order_id", "item_id"],
+        ref("order_id", "orders", "order_id") + ref("item_id", "item", "item_id")
+          + ref("supplier_id", "supplier", "supplier_id") + plain("quantity"),
+      )
+    }`,
+  },
+  {
     name: "several columns beside the key",
     ddl: `CREATE TABLE student (student_id INT PRIMARY KEY);
       CREATE TABLE section (crn INT PRIMARY KEY);
@@ -143,7 +183,7 @@ const cases: { name: string; ddl: string; dbt: string; }[] = [
         order_id INT NOT NULL REFERENCES orders (order_id),
         variant_id INT NOT NULL REFERENCES product_variant (variant_id),
         quantity INT NOT NULL,
-        line_id INT NOT NULL UNIQUE,
+        line_id INT UNIQUE,
         PRIMARY KEY (order_id, variant_id));`,
     dbt: `models:\n${dbtModel("orders", "order_id", "")}${
       dbtModel("product_variant", "variant_id", "")
@@ -156,6 +196,8 @@ const cases: { name: string; ddl: string; dbt: string; }[] = [
           // by convention (composite-key-tables.spec.md, decision 3), so the
           // equivalent of a UNIQUE beside a composite PRIMARY KEY is unique
           // alone; with not_null too, line_id would be the key.
+          // So the DDL side declares it nullable too: the wider comparison
+          // caught the NOT NULL it once had as a mandatory role dbt lacked.
           + plain("quantity") + plain("line_id", false, true),
       )
     }`,
@@ -184,7 +226,7 @@ describe("the DDL and dbt importers agree on a composite-key table", () => {
       const fromDbt = composite(importDbtProject([c.dbt]).model);
       expect(fromDbt).toEqual(fromDdl);
       // Not vacuous: each case states a relationship.
-      expect(fromDdl.relationships.length).toBeGreaterThan(0);
+      expect(fromDdl.factTypes.length).toBeGreaterThan(0);
     });
   }
 });
