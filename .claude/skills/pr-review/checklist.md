@@ -63,7 +63,8 @@ output specification for the PR body (spec:
 - A metamodel or serialization change bumps or handles
   `schemaVersion`.
 - **A new or widened validation rule checks a state construction could
-  refuse instead.** `structural.ts` and `population/structural.ts`
+  refuse instead.** `validation/rules/structural.ts` and
+  `validation/rules/population/structural.ts`
   carry fourteen rule ids re-checking what a stricter builder would
   rule out (`core-branching-load.spec.md`); a fifteenth is the same
   defect wearing a rule id, not more coverage. Ask whether the check
@@ -111,8 +112,8 @@ here, and none of them fails a build today.
   makes every reader test the flag and then the field, and lets a
   success carry no `ast`. `CalciteParseResponse` (`sql/types.ts`) has
   that shape, and `MergeValidationResult` (`diff/ModelMerge.ts`) pairs
-  `isValid: boolean` with `model: OrmModel | null`, so `merge.ts`
-  checks both for one fact. `MigrationPlan` (`schemaVersion.ts`) is
+  `isValid: boolean` with `model: OrmModel | null`, so
+  `cli/src/commands/merge.ts` checks both for one fact. `MigrationPlan` (`schemaVersion.ts`) is
   the shape to copy: `ok: true` carries `steps`, `ok: false` carries
   `reason`, and neither arm is optional. Authority: root `CLAUDE.md`,
   define errors out of existence; `closed-sets-as-unions.spec.md` for
@@ -184,8 +185,9 @@ now holds, guards, or learns that they did not have to.
   else had. A stale comment is trusted where a missing one is not.
   Authority: root `CLAUDE.md`, comments describe what the code cannot.
 - **A new name is free.** Grep for it first: `ModelBuilder` names a
-  planned WS1 class in one spec and an existing fixture builder under
-  `tests/helpers/`, and a recommendation built on the wrong one had to
+  planned WS1 class in one spec and an existing fixture builder
+  (`core/tests/helpers/ModelBuilder.ts`, copied into three other
+  packages), and a recommendation built on the wrong one had to
   be withdrawn. Authority: `docs/specs/model-graph-and-id-spaces.spec.md`,
   Open decisions, the withdrawal.
 - **Together or apart follows lifetime and question, not size.** Code
@@ -201,7 +203,7 @@ now holds, guards, or learns that they did not have to.
   configuration parameter, and it moves complexity up.** Ask who can
   choose the value better; if the answer is the callee, it decides and
   the parameter goes. Nearest instance, not yet a defect: `lenient`
-  travels from `cli/workspace/io.ts` and `mcp/workspace/resolve.ts`
+  travels from `cli/src/workspace/io.ts` and `mcp/src/workspace/resolve.ts`
   through `deserialize` to `addFactType` as `skipPlayerValidation`, so
   three layers carry a choice about reference checking that the loader
   could settle once (14 references; the WS3 spec's third open decision

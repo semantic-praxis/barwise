@@ -391,6 +391,12 @@
       "caught_by": "execution",
       "note": "Rescoring the committed 20260828-1647 round moved 13 of 115 payloads, all one legitimate ORM shape."
     },
+    "instruction-reference-check::dafdec52cc5a": {
+      "spec": "instruction-reference-check.spec.md",
+      "excerpt": "workstream 1 shipped as barwise/scripts/check-instruction-refs.mjs, the check:instruction-refs npm script and a ci.yml step with no if:. the open decisions were",
+      "caught_by": "execution",
+      "note": "Running the first port of the gate over the real corpus reported 21 ambiguous CLAUDE.md references the prototype had passed; the missing repo-root step was found by that run, not by reading the spec."
+    },
     "key-reference-tables::ecfcf44f880e": {
       "spec": "key-reference-tables.spec.md",
       "excerpt": "1. when an unannotated table's key column carries exactly one foreign key, that foreign key is a shared-key foreign key and it meets both conditions below (two ",

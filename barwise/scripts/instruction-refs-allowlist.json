@@ -1,0 +1,55 @@
+{
+  "$comment": "Mentions in instruction files of paths that are legitimately not tracked, for check-instruction-refs.mjs. Each row names the file, the exact backticked token and why it is right as written. A row that matches nothing fails the gate, so a fixed site forces its row out (docs/specs/instruction-reference-check.spec.md).",
+  "rows": [
+    {
+      "file": ".claude/skills/spec-writer/template.spec.md",
+      "token": "path/thing.ts",
+      "why": "a placeholder in the template's example Inventory row"
+    },
+    {
+      "file": "CLAUDE.md",
+      "token": ".vscode/settings.json",
+      "why": "a user's workspace settings file, named as where a key must not be written"
+    },
+    {
+      "file": "barwise/packages/vscode/CLAUDE.md",
+      "token": ".vscode/settings.json",
+      "why": "a user's workspace settings file, named as where a key must not be written"
+    },
+    {
+      "file": "barwise/optimizer/CLAUDE.md",
+      "token": "packages/cli/dist/index.js",
+      "why": "the built CLI the optimizer shells out to; a build output"
+    },
+    {
+      "file": "barwise/optimizer/CLAUDE.md",
+      "token": "report.json",
+      "why": "a file each optimizer run writes; a runtime artifact"
+    },
+    {
+      "file": "barwise/packages/vscode/CLAUDE.md",
+      "token": "dist/client/extension.js",
+      "why": "an esbuild output bundle"
+    },
+    {
+      "file": "barwise/packages/vscode/CLAUDE.md",
+      "token": "dist/server/OrmLanguageServer.js",
+      "why": "an esbuild output bundle"
+    },
+    {
+      "file": "barwise/packages/vscode/CLAUDE.md",
+      "token": "dist/mcp/index.js",
+      "why": "an esbuild output bundle"
+    },
+    {
+      "file": "barwise/packages/vscode/CLAUDE.md",
+      "token": "dist/tests/",
+      "why": "where tsconfig.test.json compiles the integration tests; a build output"
+    },
+    {
+      "file": ".claude/skills/pr-review/SKILL.md",
+      "token": "verbalize.ts",
+      "why": "names both surfaces' verbalize.ts (CLI and MCP) on purpose, in an example expectancy"
+    }
+  ]
+}
