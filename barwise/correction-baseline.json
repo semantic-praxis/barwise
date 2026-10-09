@@ -421,6 +421,24 @@
       "caught_by": "execution",
       "note": "Measured directly: the env var was dropped under strict env mode, so the run looked isolated and was not."
     },
+    "lockfile-gate-stale-install::017ba0d22acb": {
+      "spec": "lockfile-gate-stale-install.spec.md",
+      "excerpt": "the reverse walk was out of scope in the draft, on the premise that npm ls reports packages missing from the lockfile. copilot's review of pr #627 reproduced a ",
+      "caught_by": "execution",
+      "note": "Copilot review on PR #627 reproduced a declared package installed against a lockfile with no entry for it, which npm ls passes; the reverse walk moved into scope."
+    },
+    "lockfile-gate-stale-install::ca2e89741669": {
+      "spec": "lockfile-gate-stale-install.spec.md",
+      "excerpt": "the draft had no packages-map refusal and no npm link skip, and its refusal said the install \"predates\" the lockfile, which is wrong for an install newer than t",
+      "caught_by": "reasoning",
+      "note": "The code-review self-review found the missing packages-map refusal, the missing npm-link skip and the wrong \"predates\" wording by reading the diff."
+    },
+    "lockfile-gate-stale-install::d4397fd5a334": {
+      "spec": "lockfile-gate-stale-install.spec.md",
+      "excerpt": "the draft skipped only the root lockfile entry. a mutation run showed that skip was untested, and working out why it matters widened it to the workspaces: the d",
+      "caught_by": "execution",
+      "note": "A surviving mutant (removing the root-entry skip failed no test) showed the skip was untested; working out why widened it to the workspaces."
+    },
     "model-graph-and-id-spaces::1ca8e3cb770b": {
       "spec": "model-graph-and-id-spaces.spec.md",
       "excerpt": "its premise is false for most of its cases, and that is now measured rather than suspected (barwise-979). the draft below said \"once the graph is total, that pr",

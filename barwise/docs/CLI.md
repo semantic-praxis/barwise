@@ -341,6 +341,15 @@ Options:
 - `--format <ddl|openapi|norma>` -- source format (required)
 - `--output <file>` -- write .orm.yaml to file instead of stdout
 - `--name <name>` -- model name (defaults to filename)
+- `--infer-references` -- read a column with no declared foreign key
+  as a reference when it is named after exactly one other table's single
+  key column (`site_id`, `SiteId`, `site_site_id`; the table in either
+  number) and has that key's type. Each inference is a warning, so it can
+  be checked. A key column is never inferred, only reported, and a
+  column that matches two tables infers nothing. Off by default: it is
+  for warehouse schemas that write no FOREIGN KEY
+  (`docs/specs/reference-inference.spec.md`). Accepted with `--format ddl` only; any other
+  format is refused with exit 1.
 
 The import summary (element counts, confidence, warnings) goes to
 stderr, keeping stdout a clean pipe for the YAML.
@@ -393,6 +402,14 @@ Options:
 - `--dialect <dialect>` -- SQL dialect: `ansi`, `snowflake`,
   `bigquery`, `postgres`, `mysql`, `redshift`, or `databricks`. Any
   other value is refused with exit 1.
+- `--infer-references` -- read a column with no declared foreign key
+  as a reference when it is named after exactly one other table's single
+  key column (`site_id`, `SiteId`, `site_site_id`; the table in either
+  number) and has that key's type. Each inference is a warning, so it can
+  be checked. A key column is never inferred, only reported, and a
+  column that matches two tables infers nothing. Off by default: it is
+  for warehouse schemas that write no FOREIGN KEY
+  (`docs/specs/reference-inference.spec.md`).
 
 When the input declares tables, each `CREATE TABLE` becomes an entity,
 through the same reader as `import ddl`. A table the queries mention

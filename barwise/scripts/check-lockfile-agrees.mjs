@@ -19,12 +19,20 @@
  * was installed". That case, an absent npm, and output that cannot be
  * parsed all exit 2 instead.
  *
+ * `npm ls` reads the installed tree, which stands in for the lockfile only
+ * when it was installed from that lockfile. CI runs `npm ci` first; a local
+ * tree that predates a merge of main does not, and `npm ls` then either
+ * blames the ranges for an old version or passes a tree the lockfile does
+ * not describe (barwise-2d4). So the installed versions are compared with
+ * the lockfile first, and a difference is a refusal naming `npm ci`
+ * (docs/specs/lockfile-gate-stale-install.spec.md).
+ *
  * `--dir <path>` points the gate at another npm project; the tests use it
  * for fixtures. Without it the gate reads barwise/, anchored to the
  * repository root rather than the cwd.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 function refuse(message) {
@@ -46,6 +54,101 @@ if (dirFlag !== -1) {
 if (!existsSync(join(dir, "package.json"))) refuse(`no package.json in ${dir}.`);
 if (!existsSync(join(dir, "node_modules"))) {
   refuse(`no node_modules in ${dir}; run \`npm ci\` first.`);
+}
+
+// Each installed package against the lockfile entry at its path. Entries
+// outside node_modules are the root and the workspaces: their manifests are
+// source, so a version bump not yet followed by `npm install` is not a stale
+// install. Optional entries are absent by design (other platforms' builds;
+// 131 of them, measured 2026-10-08), so only a required one counts as
+// missing. A `link` entry is a workspace symlink, and a symlink the lockfile
+// does not mark as one is a local checkout put there on purpose
+// (`npm link`), which `npm ci` would undo.
+const lockPath = join(dir, "package-lock.json");
+if (existsSync(lockPath)) {
+  let lock;
+  try {
+    lock = JSON.parse(readFileSync(lockPath, "utf8"));
+  } catch {
+    refuse(`${lockPath} is not JSON.`);
+  }
+  // Without a v2/v3 `packages` map there is nothing to compare, and
+  // falling through to `npm ls` would pass a tree never checked against
+  // the lockfile -- the false green this comparison exists to remove.
+  if (lock === null || typeof lock.packages !== "object" || lock.packages === null) {
+    refuse(
+      `${lockPath} has no packages map (lockfileVersion 2 or later); run \`npm install\` with npm 7 or later.`,
+    );
+  }
+  const stale = [];
+  for (const [path, entry] of Object.entries(lock.packages)) {
+    if (!path.includes("node_modules/") || entry.link) continue;
+    const manifest = join(dir, path, "package.json");
+    if (!existsSync(manifest)) {
+      if (!entry.optional && !entry.devOptional) {
+        stale.push(`${path}: lockfile ${entry.version}, not installed`);
+      }
+      continue;
+    }
+    if (lstatSync(join(dir, path)).isSymbolicLink()) continue;
+    let installed;
+    try {
+      installed = JSON.parse(readFileSync(manifest, "utf8")).version;
+    } catch {
+      refuse(`${manifest} is not JSON.`);
+    }
+    if (installed !== entry.version) {
+      stale.push(`${path}: lockfile ${entry.version}, installed ${installed}`);
+    }
+  }
+  // The other direction: a package installed where the lockfile has no
+  // entry. `npm ls` judges extraneous packages by the manifests, not the
+  // lockfile, so a declared package installed against a lockfile that lost
+  // its entry passes `npm ls` (Copilot, PR #627). Walks the root's and each
+  // workspace's node_modules, scoped and nested.
+  const visit = (pkgDir, key) => {
+    if (lstatSync(pkgDir).isSymbolicLink()) return;
+    if (!(key in lock.packages)) {
+      let version = "unknown version";
+      try {
+        version = JSON.parse(readFileSync(join(pkgDir, "package.json"), "utf8")).version;
+      } catch {
+        // A directory with no readable manifest is still not the lockfile's.
+      }
+      stale.push(`${key}: installed ${version}, not in lockfile`);
+    }
+    walk(join(pkgDir, "node_modules"), `${key}/node_modules/`);
+  };
+  const walk = (nodeModules, prefix) => {
+    if (!existsSync(nodeModules)) return;
+    for (const name of readdirSync(nodeModules)) {
+      if (name.startsWith(".")) continue;
+      if (!name.startsWith("@")) {
+        visit(join(nodeModules, name), prefix + name);
+        continue;
+      }
+      for (const scoped of readdirSync(join(nodeModules, name))) {
+        visit(join(nodeModules, name, scoped), `${prefix}${name}/${scoped}`);
+      }
+    }
+  };
+  walk(join(dir, "node_modules"), "node_modules/");
+  for (const path of Object.keys(lock.packages)) {
+    if (path !== "" && !path.includes("node_modules/")) {
+      walk(join(dir, path, "node_modules"), `${path}/node_modules/`);
+    }
+  }
+
+  if (stale.length > 0) {
+    const shown = stale.slice(0, 10).map((s) => `  ${s}`).join("\n");
+    const more = stale.length > 10 ? `\n  ... and ${stale.length - 10} more` : "";
+    refuse(
+      `node_modules does not match package-lock.json (${stale.length} entries):\n${shown}${more}\n`
+        + "  node_modules was not installed from this lockfile, so the ranges cannot\n"
+        + "  be checked against it. Run `npm ci` in " + dir + ", with dev and peer\n"
+        + "  dependencies included as CI installs them, then rerun.",
+    );
+  }
 }
 
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";

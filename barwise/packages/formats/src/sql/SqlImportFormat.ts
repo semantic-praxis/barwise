@@ -55,6 +55,7 @@ function buildModel(
   patterns: readonly SqlPatternContext[],
   modelName: string,
   warnings: string[],
+  inferReferences: boolean,
 ): OrmModel {
   // A CREATE TABLE the reader cannot parse (PARTITION OF, AS SELECT) still
   // declares a table: the DDL importer names it, where pattern mining would
@@ -63,7 +64,7 @@ function buildModel(
   if (declared.tables.length === 0 && declared.unread.length === 0) {
     return buildModelFromPatterns(patterns, modelName, warnings);
   }
-  const ddl = new DdlImportFormat().parse(sql, { modelName });
+  const ddl = new DdlImportFormat().parse(sql, { modelName, inferReferences });
   warnings.push(...ddl.warnings);
   mergePatterns(ddl.model, patterns, warnings);
   return ddl.model;
@@ -377,7 +378,13 @@ export class SqlImportFormat implements ImportFormat {
     const fileResult = parseSqlWithSqlglot(input, "input.sql", dialect)
       ?? normalizeCascadeResult(parseSqlFile(input, "input.sql", dialect));
 
-    const model = buildModel(input, fileResult.patterns, modelName, warnings);
+    const model = buildModel(
+      input,
+      fileResult.patterns,
+      modelName,
+      warnings,
+      options?.["inferReferences"] === true,
+    );
     if (model.objectTypes.length === 0 && fileResult.patterns.length === 0) {
       warnings.push("No ORM-relevant patterns found in SQL input");
     }
@@ -434,7 +441,13 @@ export class SqlImportFormat implements ImportFormat {
 
     // Every file's CREATE TABLEs are read together, so a foreign key in
     // one file finds its target table in another.
-    const model = buildModel(sources.join("\n;\n"), allPatterns, modelName, warnings);
+    const model = buildModel(
+      sources.join("\n;\n"),
+      allPatterns,
+      modelName,
+      warnings,
+      options?.["inferReferences"] === true,
+    );
     if (model.objectTypes.length === 0 && allPatterns.length === 0) {
       warnings.push(`Found ${sqlFiles.length} SQL file(s) but no ORM-relevant patterns`);
     }

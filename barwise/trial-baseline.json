@@ -623,13 +623,6 @@
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
     },
-    "C07/small/6/acceptance:network-inventory-architect:bq-ddl": {
-      "severity": "S5",
-      "class": "acceptance-no-foreign-keys",
-      "issue": "barwise-c5f",
-      "note": "Edit distance to acceptance on C07's BigQuery DDL, graded with its names mapped through the skin (barwise-d60). The skin writes no FOREIGN KEY, so NETWORK_DEVICE.SITE_ID imports as an attribute and no fact type connects NetworkDevice and Site; whether the import should infer a reference from a key-named column is barwise-c5f.",
-      "detail": "2 of 10 persona checks fail: The model has no fact type connecting \"NetworkDevice\" and \"Site\".; Your model still allows what it should forbid: Rules out: a NetworkDevice that exists but never plays \"NetworkDevice is installed at Site\" -- e.g. NetworkDevice#1 appears in NetworkDevice has ManagementIp"
-    },
     "C07/small/6/release-bundle:gym-list": {
       "severity": "S3",
       "class": "bundle-gym-catalog",
