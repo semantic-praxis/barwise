@@ -23,7 +23,7 @@ fi
 projects=(examples/**/*.orm-project.yaml)
 
 # Standalone models live outside the project directories.
-models=(examples/models/*.orm.yaml examples/transcripts/*.orm.yaml)
+models=(examples/models/*.orm.yaml examples/transcripts/*.orm.yaml examples/getting-started/*.orm.yaml)
 
 targets=("${projects[@]}" "${models[@]}")
 if [[ ${#targets[@]} -eq 0 ]]; then
