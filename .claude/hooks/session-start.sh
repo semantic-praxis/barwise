@@ -155,8 +155,16 @@ fi
 # Non-fatal on purpose, against the `set -e` above: it is a linter, and a
 # bootstrap that dies on an apt hiccup costs the whole session rather than
 # one gate. A refusal is the correct reading when it is genuinely absent.
+#
+# A fresh container can start with an EMPTY apt index, and then the install
+# fails with "Unable to locate package" although the package exists -- so the
+# gate refused on every push of a session until someone ran the update by
+# hand (2026-10-12). The update runs only when the first install fails, so a
+# container with a warm index pays nothing for it.
 if ! command -v shellcheck >/dev/null 2>&1; then
   apt-get install -y --no-install-recommends shellcheck >/dev/null 2>&1 \
+    || { apt-get update -qq >/dev/null 2>&1 \
+      && apt-get install -y --no-install-recommends shellcheck >/dev/null 2>&1; } \
     || echo "session-start: shellcheck unavailable; check:shell will refuse (exit 2)." >&2
 fi
 

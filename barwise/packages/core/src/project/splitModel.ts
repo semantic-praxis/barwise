@@ -58,6 +58,12 @@ export interface SplitMappingFile {
 
 /** The complete output of a split. */
 export interface SplitResult {
+  /**
+   * Path of the manifest relative to the project root. Every surface
+   * that writes a split reads it from here, so the CLI and the MCP tool
+   * cannot name the manifest differently.
+   */
+  readonly manifestFileName: string;
   /** The `.orm-project.yaml` manifest content. */
   readonly manifestYaml: string;
   /** One entry per context, in config order. */
@@ -71,6 +77,31 @@ export interface SplitResult {
    */
   readonly warnings: readonly string[];
 }
+
+/** A file a split writes, with its path relative to the project root. */
+export interface SplitFile {
+  readonly path: string;
+  readonly content: string;
+}
+
+/**
+ * Every file a split writes, in write order: domains, then mappings, then
+ * the manifest last, so a write that fails partway never leaves a manifest
+ * naming files that are not there. Both writers of a split -- the CLI's
+ * `project split` and the MCP `split_model` tool -- check for existing
+ * files over this list and write this list, so they cannot disagree about
+ * which files a split produces or which ones block it.
+ */
+export function splitFiles(result: SplitResult): readonly SplitFile[] {
+  return [
+    ...result.domains.map((d) => ({ path: d.fileName, content: d.yaml })),
+    ...result.mappings.map((m) => ({ path: m.fileName, content: m.yaml })),
+    { path: result.manifestFileName, content: result.manifestYaml },
+  ];
+}
+
+/** Where a split's manifest sits, relative to the project root. */
+const MANIFEST_FILE_NAME = "project.orm-project.yaml";
 
 /** Error thrown when a model cannot be split. */
 export class ModelSplitError extends Error {
@@ -170,6 +201,20 @@ export function splitModel(modelYaml: string, config: SplitConfig): SplitResult 
     throw new ModelSplitError(
       "Split config must define at least two domains.",
     );
+  }
+  // A domain name becomes `domains/<name>.orm.yaml` and part of a
+  // mapping file name. A separator in it would place the file outside
+  // the directory the caller chose to write into, and a caller writing
+  // the result has no way to tell -- so the name is refused here, where
+  // it is turned into a path. Dot names are harmless: the suffix makes
+  // `..` the file `...orm.yaml`.
+  for (const ctx of contexts) {
+    if (ctx.trim().length === 0 || /[/\\]/.test(ctx)) {
+      throw new ModelSplitError(
+        `Domain name "${ctx}" cannot be used as a file name: it must be `
+          + "non-empty and must not contain '/' or '\\'.",
+      );
+    }
   }
 
   // Fail fast if the input is not a valid model.
@@ -414,7 +459,7 @@ export function splitModel(modelYaml: string, config: SplitConfig): SplitResult 
 
   const manifestYaml = new ProjectSerializer().serialize(project);
 
-  return { manifestYaml, domains, mappings, warnings };
+  return { manifestFileName: MANIFEST_FILE_NAME, manifestYaml, domains, mappings, warnings };
 }
 
 // ---------------------------------------------------------------------------

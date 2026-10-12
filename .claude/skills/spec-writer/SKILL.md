@@ -103,7 +103,13 @@ alongside this file.
    deviations from the spec (an edge case that forced a different tack,
    a mechanism that turned out not to exist); fold them into the spec's
    next revision so the next workstream starts from reality, not the
-   brief. When the last workstream lands, close the spec out: work
+   brief. A note that records what the draft got wrong is a correction
+   record, and `npm run audit:corrections -- --check` (a CI gate) fails
+   until it has a row saying what caught it: run
+   `node barwise/scripts/audit-corrections.mjs --write`, then set the
+   new row's `caught_by` and `note` before pushing. Without this line
+   the gate surfaced at pre-push, one push cycle late (2026-10-12).
+   When the last workstream lands, close the spec out: work
    `sensemaking` over its headline claims against the built system, then
    either set `Status: Implemented` or record what did not land and why.
    A spec whose end state is only ever asserted at design time is a

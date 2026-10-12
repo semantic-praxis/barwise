@@ -480,6 +480,53 @@
         }
       },
       {
+        "name": "barwise_split_model",
+        "displayName": "Split Barwise Model into a Project",
+        "toolReferenceName": "barwiseSplit",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(split-horizontal)",
+        "tags": [
+          "orm",
+          "project"
+        ],
+        "modelDescription": "Split one .orm.yaml model into a multi-domain project: a .orm-project.yaml manifest, one .orm.yaml per bounded context under domains/, and .map.yaml context mappings under mappings/ for object types two contexts share. This is how to create a .orm-project.yaml from an existing model. Get the entity names first (barwise_query_model, query \"entities\") and agree the assignment with the user. Call without outDir to preview: nothing is written, and the result lists each domain's entity types, the object types it shares, and every warning (inferred placements, dropped cross-domain constraints). Then call again with outDir to write. Refuses to overwrite existing files unless force is true. If no source is provided, automatically uses the .orm.yaml file open in the editor.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "description": "File path to the .orm.yaml model to split. Omit to use the currently open .orm.yaml file."
+            },
+            "projectName": {
+              "type": "string",
+              "description": "Project name written into the generated .orm-project.yaml"
+            },
+            "domains": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "description": "Each bounded-context name mapped to the entity type names it owns, e.g. { \"auctions\": [\"Auction\", \"Bid\"], \"parties\": [\"Customer\"] }. At least two contexts. Value types can be left out: each follows the fact types that use it. Anything that cannot be placed, and the glossary, go to the first context."
+            },
+            "outDir": {
+              "type": "string",
+              "description": "Directory to write the project into; a relative path resolves against the workspace folder. Omit to preview: nothing is written."
+            },
+            "force": {
+              "type": "boolean",
+              "description": "Overwrite target files that already exist (default false)"
+            }
+          },
+          "required": [
+            "projectName",
+            "domains"
+          ]
+        }
+      },
+      {
         "name": "barwise_export_model",
         "displayName": "Export Barwise Model",
         "toolReferenceName": "barwiseExport",

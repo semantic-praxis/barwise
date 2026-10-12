@@ -79,6 +79,7 @@ describe("ChatParticipant", () => {
         "barwise_export_model",
         "barwise_diff_models",
         "barwise_merge_models",
+        "barwise_split_model",
         "barwise_describe_domain",
         "barwise_review_model",
         "barwise_lineage_status",

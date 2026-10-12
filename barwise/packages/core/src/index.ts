@@ -140,6 +140,8 @@ export {
   scaffoldSplitConfig,
   type SplitConfig,
   type SplitDomainFile,
+  type SplitFile,
+  splitFiles,
   type SplitMappingFile,
   splitModel,
   type SplitResult,
