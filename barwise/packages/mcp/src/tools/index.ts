@@ -17,6 +17,7 @@ import { registerMergeTool } from "./merge.js";
 import { registerQueryModelTool } from "./queryModel.js";
 import { registerReviewTool } from "./review.js";
 import { registerSchemaTool } from "./schema.js";
+import { registerSplitTool } from "./split.js";
 import { registerValidateTool } from "./validate.js";
 import { registerVerbalizeTool } from "./verbalize.js";
 
@@ -29,6 +30,7 @@ export function registerTools(server: McpServer): void {
   registerImportTool(server);
   registerImportModelTool(server);
   registerMergeTool(server);
+  registerSplitTool(server);
   registerExportModelTool(server);
   registerDescribeDomainTool(server);
   registerQueryModelTool(server);

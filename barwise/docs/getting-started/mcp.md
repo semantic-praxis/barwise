@@ -197,12 +197,20 @@ mapping.
 
 `validate_model`, `verbalize_model`, `describe_domain`, `query_model`,
 `export_model` and `review_model` accept a `.orm-project.yaml` manifest as the
-`source`, with an optional `domain` to pick one context. Two limits: creating
-and splitting projects is a CLI task (`barwise project init`,
-`barwise project split`; see the
-[project guide](../ORM_PROJECT_GUIDE.md)), and `validate_model` checks each
-domain on its own, without the rules that span domains that the CLI's
-`validate` runs.
+`source`, with an optional `domain` to pick one context.
+
+`split_model` cuts one model into a project, the same split as
+`barwise project split`. Call it first without `outDir` to preview the
+assignment of entity types to contexts; nothing is written. Call it again with
+`outDir` to write the manifest, domain files and mappings:
+
+> List the entity types in big.orm.yaml, then preview splitting it into sales
+> and billing with split_model. Write it to ./project once I agree.
+
+Two limits remain. Starting an empty project is the CLI's
+`barwise project init`, and `validate_model` checks each domain on its own,
+without the rules that span domains that `barwise validate` runs. The
+[project guide](../ORM_PROJECT_GUIDE.md) covers the whole workflow.
 
 ## 8. Resources and prompts
 
@@ -217,8 +225,8 @@ Besides tools, the server offers:
 
 ## 9. What the MCP server does not do
 
-- There is no tool to create an empty model, show git history, or split a
-  project.
+- There is no tool to create an empty model or project, or to show git
+  history.
 - The modeling gym tools (`gym_list`, `gym_check`) work from a source build
   but not yet from the downloaded `.cjs` file, which cannot find the exercise
   catalog.
@@ -231,22 +239,23 @@ issues, in [the surface parity audit](../surface-parity-audit-2026-10-12.md).
 
 ## The tools
 
-| Tool                 | What it does                                           |
-| -------------------- | ------------------------------------------------------ |
-| `import_model`       | Imports DDL, SQL, OpenAPI, NORMA, dbt or code (no LLM) |
-| `import_transcript`  | Extracts a model from a transcript (LLM)               |
-| `analyze_repository` | Profiles a repository and imports it                   |
-| `validate_model`     | Checks the structural rules                            |
-| `verbalize_model`    | Reads the model back as sentences                      |
-| `query_model`        | Answers one structural question                        |
-| `describe_domain`    | Summarizes entities, fact types and constraints        |
-| `generate_diagram`   | Draws the diagram as SVG                               |
-| `generate_schema`    | Maps the model to tables (DDL or JSON)                 |
-| `export_model`       | Exports DDL, dbt, OpenAPI, Avro or NORMA               |
-| `diff_models`        | Compares two models                                    |
-| `merge_models`       | Merges one model into another (writes the base file)   |
-| `lineage_status`     | Lists stale exported artifacts                         |
-| `impact_analysis`    | Lists the artifacts built from one element             |
-| `review_model`       | Gives modeling advice (LLM)                            |
-| `gym_list`           | Lists the modeling-gym exercises                       |
-| `gym_check`          | Grades a model against an exercise                     |
+| Tool                 | What it does                                             |
+| -------------------- | -------------------------------------------------------- |
+| `import_model`       | Imports DDL, SQL, OpenAPI, NORMA, dbt or code (no LLM)   |
+| `import_transcript`  | Extracts a model from a transcript (LLM)                 |
+| `analyze_repository` | Profiles a repository and imports it                     |
+| `validate_model`     | Checks the structural rules                              |
+| `verbalize_model`    | Reads the model back as sentences                        |
+| `query_model`        | Answers one structural question                          |
+| `describe_domain`    | Summarizes entities, fact types and constraints          |
+| `generate_diagram`   | Draws the diagram as SVG                                 |
+| `generate_schema`    | Maps the model to tables (DDL or JSON)                   |
+| `export_model`       | Exports DDL, dbt, OpenAPI, Avro or NORMA                 |
+| `diff_models`        | Compares two models                                      |
+| `merge_models`       | Merges one model into another (writes the base file)     |
+| `split_model`        | Previews or writes a multi-domain project from one model |
+| `lineage_status`     | Lists stale exported artifacts                           |
+| `impact_analysis`    | Lists the artifacts built from one element               |
+| `review_model`       | Gives modeling advice (LLM)                              |
+| `gym_list`           | Lists the modeling-gym exercises                         |
+| `gym_check`          | Grades a model against an exercise                       |

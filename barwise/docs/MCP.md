@@ -67,7 +67,7 @@ the whole workflow, see
 
 ### Option 1: VS Code Extension (recommended)
 
-Install the **Barwise ORM Modeler** extension. Fourteen of the server's
+Install the **Barwise ORM Modeler** extension. Fifteen of the server's
 tools are registered with VS Code's Language Model Tool API and appear
 automatically in Copilot Chat -- no configuration needed. The gym tools and
 `analyze_repository` are not among them; repository analysis is the
@@ -89,6 +89,7 @@ You can reference any tool directly in Copilot Chat using `#`:
 - `#barwiseReview` -- LLM review of a model
 - `#barwiseLineage` -- check exported artifacts for staleness
 - `#barwiseImpact` -- list artifacts built from an element
+- `#barwiseSplit` -- split a model into a multi-domain project
 
 The extension also registers an MCP stdio server for external tools
 that discover MCP servers through VS Code.
@@ -251,18 +252,23 @@ The `review-model` prompt automates this sequence (see Prompts below).
 ### Work with a multi-domain project
 
 A model that has grown to span several bounded contexts can be split
-into a multi-file project. `validate_model`, `verbalize_model`,
-`describe_domain`, `query_model`, `export_model` and `review_model`
-accept a `.orm-project.yaml` manifest with an optional `domain`.
-`validate_model` checks each domain on its own; the rules that span
-domains run only in the CLI's `validate`. To scaffold or split a project,
-or to validate it with the cross-domain rules, use the barwise CLI:
+into a multi-file project:
 
-- `barwise project split <model> --config <config>` -- cut a monolithic
-  model into per-domain files
-- `barwise validate <project>` -- validate every domain plus the
-  cross-domain rules
-- `barwise diagram <project> --domain <context>` -- diagram one domain
+1. **query_model** (`entities`) -- list the entity types to assign.
+2. **split_model** without `outDir` -- preview the assignment. Nothing
+   is written; the result lists each domain's entity types, the object
+   types it shares with other domains, and the warnings to review.
+3. **split_model** with `outDir` -- write the manifest, domain files,
+   and mappings.
+4. **validate_model** on the manifest -- validate each domain. The
+   cross-domain project rules (mapping references, duplicate contexts)
+   run only in `barwise validate <manifest>` today (barwise-0wa).
+
+`validate_model`, `verbalize_model`, `describe_domain`, `query_model`,
+`export_model`, and `review_model` accept a `.orm-project.yaml` and a
+`domain` selector. To start an empty project or diagram one domain of a
+project, use the CLI: `barwise project init <name>`, `barwise diagram
+<project> --domain <context>`.
 
 See [ORM_PROJECT_GUIDE.md](ORM_PROJECT_GUIDE.md) for the full workflow.
 
@@ -527,6 +533,62 @@ before saving.
 merged model over that file** and reports the path in `writtenTo`. Pass the
 base as inline YAML to get the result without a write. The CLI's
 `barwise merge` differs: it never modifies its inputs.
+
+---
+
+### split_model
+
+Split one `.orm.yaml` model into a multi-domain project: a
+`project.orm-project.yaml` manifest, one `domains/<context>.orm.yaml`
+per bounded context, and a `mappings/<owner>-<user>.map.yaml` for each
+pair of contexts that share object types. The same split as `barwise
+project split`; see [ORM_PROJECT_GUIDE.md](ORM_PROJECT_GUIDE.md).
+
+| Parameter     | Type             | Required | Description                                                                                                                                                                |
+| ------------- | ---------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `source`      | string \| object | yes      | File path to the `.orm.yaml` model, or inline YAML; or a `{ path, content }` object                                                                                        |
+| `projectName` | string           | yes      | Name written into the manifest                                                                                                                                             |
+| `domains`     | object           | yes      | Context name to the entity type names it owns, e.g. `{ "auctions": ["Auction"], "parties": ["Customer"] }`. At least two. Value types follow the fact types that use them. |
+| `outDir`      | string           | no       | Directory to write the project into (relative to the server's working directory). Omit to preview: nothing is written.                                                     |
+| `force`       | boolean          | no       | Overwrite target files that already exist (default false)                                                                                                                  |
+
+**Returns** JSON. Without `outDir`, `written` is false and the result
+summarizes the split. Abridged, for `docs/auction.orm.yaml` split by
+`examples/auction-split.yaml`:
+
+```json
+{
+  "written": false,
+  "projectName": "Auction Semantic Model",
+  "manifest": "project.orm-project.yaml",
+  "domains": [
+    {
+      "context": "parties",
+      "file": "domains/parties.orm.yaml",
+      "entityTypes": ["Customer", "Organization", "Location", "..."],
+      "valueTypeCount": 3,
+      "sharedObjectTypes": [
+        { "name": "ARInvoice", "owner": "payments" },
+        { "name": "Agreement", "owner": "auctions" }
+      ],
+      "factTypeCount": 13
+    }
+  ],
+  "mappings": ["mappings/auctions-catalog.map.yaml", "..."],
+  "warnings": [
+    "Inferred a domain for 50 object type(s) not listed in the config: Asset_id -> catalog, ...",
+    "Dropped a \"subset\" constraint on fact type \"ListingIsPartOfAuction\" in domain \"auctions\": it references roles owned by another domain."
+  ]
+}
+```
+
+With `outDir`, `written` is true and `outDir` and `manifestPath` carry
+absolute paths. If any target file already exists and `force` is not
+true, nothing is written and the result is an `error` with the
+`existing` paths. Object types the config does not list are placed by
+inference from their fact types; anything that cannot be placed, and
+the glossary, go to the first context. A constraint whose roles span
+two contexts is dropped with a warning.
 
 ---
 

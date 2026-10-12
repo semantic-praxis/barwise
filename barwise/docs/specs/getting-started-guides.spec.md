@@ -118,9 +118,15 @@ This PR. It changes no runtime behaviour.
 
 ### 2. Close the divergences (provisional: one issue each, not designed here)
 
+This workstream is owned by barwise-0wa, not by this spec. The owner directed
+that MCP and VS Code mirror the CLI's toolset, and
+`docs/cli-surface-audit-2026-10-12.md` names the spec that will sequence the
+work (`surface-mirroring.spec.md`). The issues below feed it; each one that
+overlaps that audit says so in its notes.
+
 Ordered by harm: `merge_models` overwriting its base file (barwise-xjf);
 project validation that skips the cross-domain rules off the CLI
-(barwise-z1p); exports that record lineage only on the CLI (barwise-ace);
+(barwise-0wa.qh3); exports that record lineage only on the CLI (barwise-ace);
 importers that overwrite an existing model (barwise-pks); the shipped bundles'
 gym failure and v4 ids (barwise-fbi, barwise-vqc); deprecation notices that
 point at a missing format (barwise-zir); VS Code pickers driven from the
@@ -139,8 +145,10 @@ guide paragraph impossible to forget.
   once, add a docs-lane step that builds only `@barwise/cli` and runs its
   docs test; the build is the cost.
 - **Which divergences are deliberate.** The audit marks each finding as a
-  defect or as undecided. Deciding that a gap is deliberate is the reviewer's
-  call, recorded as a capability-matrix row; this spec decides none.
+  defect or as undecided, and this spec decides none. The owner's direction to
+  mirror the CLI (barwise-0wa) settles the default for gaps in reach; it does
+  not settle behavioral divergences such as merge write-back, which
+  `cli-surface-parity.spec.md` records as deliberate and barwise-xjf reopens.
 - **Whether the hub belongs at the repository root.** The request named
   `GETTING_STARTED.md`, and README is at the root, so that is where a visitor
   looks. The per-surface guides live under `barwise/docs/` with the other

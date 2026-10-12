@@ -10,6 +10,7 @@ import {
   parseSplitConfig,
   scaffoldProject,
   scaffoldSplitConfig,
+  splitFiles,
   splitModel,
 } from "@barwise/core";
 import type { Command } from "commander";
@@ -131,28 +132,29 @@ function registerSplit(projectCmd: Command): void {
           const result = splitModel(modelYaml, config);
 
           const root = resolve(opts.out);
-          const manifestPath = join(root, "project.orm-project.yaml");
-          if (existsSync(manifestPath) && !opts.force) {
+          const manifestPath = join(root, result.manifestFileName);
+          const files = splitFiles(result);
+
+          // Every target, not only the manifest: a hand-written domain
+          // file with no manifest beside it is still the user's work.
+          const existing = files
+            .map((f) => join(root, f.path))
+            .filter((path) => existsSync(path));
+          if (existing.length > 0 && !opts.force) {
             process.stderr.write(
-              `Error: ${manifestPath} already exists. Use --force to `
-                + "overwrite or --out to choose another directory.\n",
+              `Error: ${existing.length} target file(s) already exist:\n`
+                + existing.map((p) => `  ${p}\n`).join("")
+                + "Use --force to overwrite or --out to choose another directory.\n",
             );
             process.exitCode = 1;
             return;
           }
 
-          for (const domain of result.domains) {
-            const path = join(root, domain.fileName);
+          for (const file of files) {
+            const path = join(root, file.path);
             mkdirSync(dirname(path), { recursive: true });
-            writeFileSync(path, domain.yaml, "utf-8");
+            writeFileSync(path, file.content, "utf-8");
           }
-          for (const mapping of result.mappings) {
-            const path = join(root, mapping.fileName);
-            mkdirSync(dirname(path), { recursive: true });
-            writeFileSync(path, mapping.yaml, "utf-8");
-          }
-          mkdirSync(root, { recursive: true });
-          writeFileSync(manifestPath, result.manifestYaml, "utf-8");
 
           process.stderr.write(
             `Split ${source} into ${result.domains.length} domain(s) and `

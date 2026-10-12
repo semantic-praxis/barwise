@@ -167,8 +167,10 @@ semantic git history of a model.
 The extension checks a `.orm-project.yaml` manifest's structure as you edit.
 The rules that span domains, such as a mapping that names a domain the
 project does not have, run only in the CLI's `barwise validate`; `#barwiseValidate`
-checks each domain on its own. Creating and splitting projects is a CLI
-task (`barwise project init`, `barwise project split`); see the
+checks each domain on its own. In chat, `#barwiseSplit` splits the open model
+into a project: it previews the assignment of entity types to contexts first
+and writes the files only when asked to. Starting an empty project is the
+CLI's `barwise project init`; see the
 [project guide](../ORM_PROJECT_GUIDE.md). The chat tools that read a model,
 such as `#barwiseValidate`, `#barwiseDescribe` and `#barwiseExport`, accept a
 manifest and a domain name.
@@ -184,7 +186,8 @@ For MCP clients outside VS Code, see the [MCP guide](mcp.md).
 
 - The palette offers fewer import and export formats than the engine has;
   the rest need Copilot Chat.
-- There is no modeling gym, history view, or project split.
+- There is no modeling gym or history view, and splitting a project is a
+  chat tool with no palette command.
 - **Barwise: New Project** creates a model, not a project.
 
 These and the differences from the other surfaces are listed, with tracker

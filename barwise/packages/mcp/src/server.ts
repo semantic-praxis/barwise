@@ -55,6 +55,7 @@ export { executeMerge } from "./tools/merge.js";
 export { executeQueryModel } from "./tools/queryModel.js";
 export { executeReview, formatReview } from "./tools/review.js";
 export { executeSchema } from "./tools/schema.js";
+export { executeSplit } from "./tools/split.js";
 export { executeValidate } from "./tools/validate.js";
 export { executeVerbalize } from "./tools/verbalize.js";
 export { resolveSource, type SourceInput, sourcePath } from "./workspace/resolve.js";

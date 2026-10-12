@@ -75,7 +75,7 @@ table, or follow your surface's guide for the details.
 | Fold one model into another        | `barwise merge`                                    | `merge_models`                      | `#barwiseMerge`                                              |
 | Show a model's change history      | `barwise history`                                  | none                                | none                                                         |
 | Find stale or affected artifacts   | `barwise lineage status`, `barwise lineage impact` | `lineage_status`, `impact_analysis` | `#barwiseLineage`, `#barwiseImpact`                          |
-| Split a large model into a project | `barwise project split`                            | none                                | none                                                         |
+| Split a large model into a project | `barwise project split`                            | `split_model`                       | `#barwiseSplit`                                              |
 | Practice ORM with exercises        | `barwise gym list`                                 | `gym_list`, `gym_check`             | none                                                         |
 
 In VS Code, names in bold are Command Palette entries and `#` names are tools
@@ -107,6 +107,8 @@ depending on where you run it:
 
 The full list, with the evidence and a tracker issue for each, is in
 [the surface parity audit](barwise/docs/surface-parity-audit-2026-10-12.md).
+The option-by-option comparison, and the plan to make MCP and VS Code mirror
+the CLI, is in [the CLI surface audit](barwise/docs/cli-surface-audit-2026-10-12.md).
 Which surface is meant to reach which capability is recorded in the
 capability matrix in [CLAUDE.md](CLAUDE.md).
 

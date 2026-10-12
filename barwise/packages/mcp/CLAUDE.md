@@ -40,6 +40,7 @@ src/
     gym.ts              gym_list / gym_check tools (modeling gym)
     import.ts           import_transcript tool
     merge.ts            merge_models tool
+    split.ts            split_model tool (preview, or write a multi-domain project)
     review.ts           review_model tool (exports formatReview, shared with vscode)
     queryModel.ts       query_model tool
     lineageStatus.ts    lineage_status tool

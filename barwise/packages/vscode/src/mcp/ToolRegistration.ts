@@ -32,16 +32,19 @@ import {
   executeMerge,
   executeQueryModel,
   executeSchema,
+  executeSplit,
   executeValidate,
   executeVerbalize,
   formatReview,
   resolveSource,
   type SourceInput,
+  sourcePath,
 } from "@barwise/mcp";
 import * as vscode from "vscode";
 import { getAnthropicApiKey } from "../llm/anthropicKey.js";
 import { CopilotLlmClient } from "../llm/CopilotLlmClient.js";
 import { getOpenModelSource } from "./openModel.js";
+import { resolveWriteDir } from "./resolveModelSource.js";
 
 const serializer = new OrmYamlSerializer();
 
@@ -86,6 +89,14 @@ interface ImportTranscriptInput {
 interface MergeInput {
   base?: string;
   incoming: string;
+}
+
+interface SplitModelInput {
+  source?: string;
+  projectName: string;
+  domains: Record<string, string[]>;
+  outDir?: string;
+  force?: boolean;
 }
 
 interface ExportModelInput {
@@ -252,6 +263,25 @@ function runExportModel(input: ExportModelInput): vscode.LanguageModelToolResult
   return toToolResult(result);
 }
 
+/**
+ * split_model: a relative outDir is taken against the workspace folder
+ * holding the source (else the first folder), never the extension host's
+ * working directory -- resolveWriteDir says why.
+ */
+function runSplitModel(input: SplitModelInput): vscode.LanguageModelToolResult {
+  const source = resolveSourceParam(input.source);
+  let outDir: string | undefined;
+  if (input.outDir !== undefined && input.outDir.trim() !== "") {
+    const path = sourcePath(source);
+    const folder = (path ? vscode.workspace.getWorkspaceFolder(vscode.Uri.file(path)) : undefined)
+      ?? vscode.workspace.workspaceFolders?.[0];
+    outDir = resolveWriteDir(input.outDir, folder?.uri.fsPath);
+  }
+  return toToolResult(
+    executeSplit(source, input.projectName, input.domains, outDir, input.force),
+  );
+}
+
 /** review_model: LLM review via resolveLlmClient, formatted as Markdown. */
 async function runReviewModel(
   input: ReviewModelInput,
@@ -355,6 +385,13 @@ export function registerLanguageModelTools(context: vscode.ExtensionContext): vo
     "barwise_merge_models",
     (i) => toToolResult(executeMerge(resolveSourceParam(i.base), i.incoming)),
     "Merging Barwise models...",
+  );
+  register<SplitModelInput>(
+    context,
+    "barwise_split_model",
+    runSplitModel,
+    (i) =>
+      i.outDir ? `Writing Barwise project to ${i.outDir}...` : "Previewing Barwise model split...",
   );
   register<ExportModelInput>(
     context,

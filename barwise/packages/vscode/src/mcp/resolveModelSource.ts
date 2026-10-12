@@ -6,6 +6,7 @@
  */
 
 import type { SourceInput } from "@barwise/mcp";
+import { isAbsolute, resolve } from "node:path";
 
 export interface OpenModelContext {
   /** Paths of `.orm.yaml` files attached to the chat as references. */
@@ -49,4 +50,23 @@ export function openModelSource(
   if (path === undefined) return undefined;
   const content = liveContent(path);
   return content !== undefined ? { path, content } : { path };
+}
+
+/**
+ * Resolve a directory a tool will write into. The extension host's
+ * working directory is not the user's workspace, so a relative path
+ * resolved the Node way would put files somewhere the user never chose
+ * -- and silently, where a bad read at least fails with ENOENT. A
+ * relative path is therefore taken against the workspace folder, and
+ * refused when there is none.
+ */
+export function resolveWriteDir(dir: string, workspaceRoot: string | undefined): string {
+  if (isAbsolute(dir)) return dir;
+  if (workspaceRoot === undefined) {
+    throw new Error(
+      `"${dir}" is a relative path and no workspace folder is open to `
+        + "resolve it against. Pass an absolute path.",
+    );
+  }
+  return resolve(workspaceRoot, dir);
 }

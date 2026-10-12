@@ -320,7 +320,9 @@ Options:
 - `--out <dir>` -- directory to write the project into (default: `.`)
 - `--scaffold-config` -- print a starter config instead of splitting
 - `--domains <list>` -- comma-separated contexts (with `--scaffold-config`)
-- `--force` -- overwrite an existing manifest
+- `--force` -- overwrite target files that already exist. Without it the
+  split refuses, before writing anything, when the manifest or any domain
+  or mapping file it would write is already there.
 
 Object types not listed in the config are given a home by inference
 from the fact types that use them. The split reports every inferred

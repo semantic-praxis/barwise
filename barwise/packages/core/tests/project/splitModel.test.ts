@@ -7,7 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
-import { ModelSplitError, splitModel } from "../../src/project/splitModel.js";
+import { ModelSplitError, splitFiles, splitModel } from "../../src/project/splitModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { assembleProject, type ProjectFiles } from "../../src/serialization/projectAssembly.js";
 import { projectRules } from "../../src/validation/rules/projectRules.js";
@@ -80,6 +80,53 @@ describe("splitModel", () => {
         domains: { a: [], b: [] },
       })
     ).toThrow(ModelSplitError);
+  });
+
+  it("rejects a domain name that would place its file outside domains/", () => {
+    // The name becomes `domains/<name>.orm.yaml`; a caller writing the
+    // result under a chosen directory cannot see that `../x` escapes it.
+    for (const bad of ["../escape", "a/b", "a\\b", "  "]) {
+      expect(() =>
+        splitModel(SHOP_MODEL, {
+          projectName: "Shop",
+          domains: { [bad]: ["Customer"], billing: ["Invoice"] },
+        })
+      ).toThrow(/cannot be used as a file name/);
+    }
+  });
+
+  it("accepts dot names, which the .orm.yaml suffix keeps inside domains/", () => {
+    const result = splitModel(SHOP_MODEL, {
+      projectName: "Shop",
+      domains: { "..": ["Customer"], billing: ["Invoice"] },
+    });
+    expect(result.domains[0]?.fileName).toBe("domains/...orm.yaml");
+  });
+
+  it("names the manifest in the result, so no writer restates it", () => {
+    const result = splitModel(SHOP_MODEL, {
+      projectName: "Shop",
+      domains: { crm: ["Customer"], billing: ["Invoice"] },
+    });
+    expect(result.manifestFileName).toBe("project.orm-project.yaml");
+  });
+
+  it("lists every file a writer must check and write, manifest last", () => {
+    // The CLI and the MCP tool both write exactly this list; the manifest
+    // goes last so a write that fails partway never leaves a manifest
+    // naming files that are not there.
+    const result = splitModel(SHOP_MODEL, {
+      projectName: "Shop",
+      domains: { crm: ["Customer"], billing: ["Invoice"] },
+    });
+    expect(splitFiles(result).map((f) => f.path)).toEqual([
+      "domains/crm.orm.yaml",
+      "domains/billing.orm.yaml",
+      ...result.mappings.map((m) => m.fileName),
+      "project.orm-project.yaml",
+    ]);
+    expect(result.mappings.length).toBeGreaterThan(0);
+    expect(splitFiles(result).at(-1)?.content).toBe(result.manifestYaml);
   });
 
   it("produces one domain file per configured context", () => {
