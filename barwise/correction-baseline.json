@@ -607,6 +607,12 @@
       "caught_by": "not-a-correction",
       "note": "Adds an interview step and an implementation-notes convention; no draft corrected."
     },
+    "split-model-tool::a2e1404d0fb0": {
+      "spec": "split-model-tool.spec.md",
+      "excerpt": "- dot names needed no rule. the draft refused . and .. as domain names. splitmodel appends .orm.yaml, so .. becomes the file ...orm.yaml inside domains/; only a",
+      "caught_by": "reasoning",
+      "note": "Noticed while writing the check, by reading the path template domains/${ctx}.orm.yaml: the suffix turns '..' into a file name, so the dot rule guarded nothing. A test now pins '..' as accepted."
+    },
     "test-quality::7422006b91c7": {
       "spec": "test-quality.spec.md",
       "excerpt": "the draft said: build an arbitrary that makes exactly one invalid choice reachable per draw, and assert structuralrules reports that rule. the objection: an arb",
