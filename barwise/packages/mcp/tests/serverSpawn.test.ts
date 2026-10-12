@@ -56,6 +56,7 @@ describe("MCP server stdio spawn", () => {
       "merge_models",
       "query_model",
       "review_model",
+      "split_model",
       "validate_model",
       "verbalize_model",
     ]);

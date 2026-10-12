@@ -1,6 +1,6 @@
 # Let an agent split a model into a project: `split_model` on MCP and VS Code
 
-Status: Workstream 1 implemented (core and CLI); 2 and 3 not yet
+Status: Workstreams 1 and 2 implemented (core, CLI, MCP); 3 (VS Code) not yet
 
 Created: 2026-10-12
 Last-updated: 2026-10-12
@@ -27,15 +27,17 @@ to its base, `export_model` writes to `outputPath`), and splitting a
 model is a modelling operation, not a repository one. The gap is an
 omission recorded as intent, which is the failure barwise-988 named.
 
-## Should `project init` come along? (resolved: no)
+## Should `project init` come along? (resolved: not in this spec)
 
-`split` writes a complete manifest, so the user's request needs only
-`split`. `init` writes an empty manifest and two empty directories. A
-chat agent can do nothing further with that manifest, because no tool
-adds a domain to an existing manifest. `init` stays CLI-only and gets
-its own matrix row with that reason. `history` keeps "repository
-operations" (it shells out to git), which is the reason the shared row
-was written for.
+`split` writes a complete manifest, so the request that prompted this
+spec needs only `split`. `init` writes an empty manifest and two empty
+directories, and no tool can yet add a domain to an existing manifest,
+so on its own it gives an agent little to do. The owner has since
+directed that MCP and VS Code mirror the CLI's toolset; `init` is
+decided there, in the surface audit (barwise-0wa), with every other
+CLI-only row. Its matrix row says so rather than "deliberate".
+`history` keeps "repository operations" (it shells out to git) until
+the same audit.
 
 ## Scope
 
@@ -68,7 +70,7 @@ In scope:
 
 Out of scope:
 
-- `project init` on MCP or VS Code (see above).
+- `project init` on MCP or VS Code (barwise-0wa).
 - A tool equivalent of `--scaffold-config`. An agent gets the entity
   list from `query_model` (`entities`) and proposes the assignment
   itself; a scaffold that lists every entity under the first domain

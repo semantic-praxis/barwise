@@ -139,6 +139,17 @@ The split is deterministic: the same config always produces the same
 project. Treat the warnings as a to-do list and tighten the config
 until you are happy, rather than hand-editing the output.
 
+### From an agent
+
+The same split is the `split_model` MCP tool, and `barwise_split_model`
+for the `@barwise` chat participant in VS Code. It takes `projectName`
+and `domains` directly instead of a config file. Called without
+`outDir` it writes nothing and returns each domain's entity types, the
+object types it shares, and the warnings above, so an agent can agree
+the assignment with you before calling again with `outDir`. Both refuse
+to overwrite existing files unless forced, as the CLI does. See
+[MCP.md](MCP.md#split_model).
+
 ## The project manifest
 
 `project.orm-project.yaml` is the entry point. It lists the domain

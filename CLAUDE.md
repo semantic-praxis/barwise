@@ -231,7 +231,9 @@ it is qualified by `barwise.enableMcpServer`, which defaults on.
 | schema, diff, query, describe, lineage, impact        | yes | yes | yes     | none (VS Code as language-model tools)                        |
 | `merge`                                               | yes | yes | yes     | none (VS Code as a language-model tool)                       |
 | `gym`                                                 | yes | yes | no      | deliberate: the editor has no exercise surface                |
-| `project`, `history`                                  | yes | no  | no      | deliberate: repository operations                             |
+| `project split`                                       | yes | yes | no      | not yet: VS Code tool lands in barwise-knq.z9s workstream 3   |
+| `project init`                                        | yes | no  | no      | under review: the surface audit, barwise-0wa                  |
+| `history`                                             | yes | no  | no      | deliberate: repository operations (reads git)                 |
 | `prompt`                                              | yes | no  | no      | deliberate: dev tooling                                       |
 | `llm-usage`                                           | yes | no  | no      | deliberate: reads a local operator log                        |
 | prompt-artifact override (`--artifacts`)              | yes | no  | no      | deliberate: candidates are measured, not sent                 |
