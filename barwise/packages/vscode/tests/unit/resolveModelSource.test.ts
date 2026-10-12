@@ -3,8 +3,13 @@
  * Language Model Tools. No VS Code runtime: the policy is a function of
  * the editor/diagram context the glue gathers.
  */
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { openModelSource, resolveOpenModel } from "../../src/mcp/resolveModelSource.js";
+import {
+  openModelSource,
+  resolveOpenModel,
+  resolveWriteDir,
+} from "../../src/mcp/resolveModelSource.js";
 
 describe("resolveOpenModel", () => {
   it("prefers a chat-referenced model above everything else", () => {
@@ -72,5 +77,22 @@ describe("openModelSource", () => {
 
   it("returns undefined when there is no resolved path", () => {
     expect(openModelSource(undefined, () => "ignored")).toBeUndefined();
+  });
+});
+
+describe("resolveWriteDir", () => {
+  // The extension host's cwd is not the workspace: a relative outDir
+  // resolved against it writes the project somewhere nobody chose.
+  it("resolves a relative directory against the workspace folder", () => {
+    expect(resolveWriteDir("models/auction-project", "/work/repo"))
+      .toBe(join("/work/repo", "models/auction-project"));
+  });
+
+  it("keeps an absolute directory as given", () => {
+    expect(resolveWriteDir("/elsewhere/project", "/work/repo")).toBe("/elsewhere/project");
+  });
+
+  it("refuses a relative directory when no workspace folder is open", () => {
+    expect(() => resolveWriteDir("project", undefined)).toThrow(/no workspace folder/);
   });
 });

@@ -231,7 +231,7 @@ it is qualified by `barwise.enableMcpServer`, which defaults on.
 | schema, diff, query, describe, lineage, impact        | yes | yes | yes     | none (VS Code as language-model tools)                        |
 | `merge`                                               | yes | yes | yes     | none (VS Code as a language-model tool)                       |
 | `gym`                                                 | yes | yes | no      | deliberate: the editor has no exercise surface                |
-| `project split`                                       | yes | yes | no      | not yet: VS Code tool lands in barwise-knq.z9s workstream 3   |
+| `project split`                                       | yes | yes | yes     | none (VS Code as a language-model tool)                       |
 | `project init`                                        | yes | no  | no      | under review: the surface audit, barwise-0wa                  |
 | `history`                                             | yes | no  | no      | deliberate: repository operations (reads git)                 |
 | `prompt`                                              | yes | no  | no      | deliberate: dev tooling                                       |
@@ -271,8 +271,9 @@ change as incomplete until this table agrees with it.
 One name collision worth stating, because it looks like a gap and is
 not: VS Code's `barwise.newProject` scaffolds a `.orm.yaml` **model**,
 while the CLI's `project` command manages `.orm-project.yaml`
-**multi-domain projects** (`init`, `domains`, `mappings`, `split`).
-Different capabilities, similar names; the `project` row is correct.
+**multi-domain projects** (`init` and `split`; `domains/` and
+`mappings/` are the directories they create). Different capabilities,
+similar names; the `project` rows are correct.
 
 `llm-usage` reports over the JSONL call log under the operator's own
 state directory (`docs/specs/llm-call-observability.spec.md`). It stays

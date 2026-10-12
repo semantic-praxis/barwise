@@ -1,6 +1,6 @@
 # Let an agent split a model into a project: `split_model` on MCP and VS Code
 
-Status: Workstreams 1 and 2 implemented (core, CLI, MCP); 3 (VS Code) not yet
+Status: Implemented (all three workstreams); open decisions taken at their recommended defaults
 
 Created: 2026-10-12
 Last-updated: 2026-10-12

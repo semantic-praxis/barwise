@@ -256,8 +256,9 @@ into a multi-file project:
    types it shares with other domains, and the warnings to review.
 3. **split_model** with `outDir` -- write the manifest, domain files,
    and mappings.
-4. **validate_model** on the manifest -- validate every domain plus the
-   cross-domain rules.
+4. **validate_model** on the manifest -- validate each domain. The
+   cross-domain project rules (mapping references, duplicate contexts)
+   run only in `barwise validate <manifest>` today (barwise-0wa).
 
 `validate_model`, `verbalize_model`, `describe_domain`, `query_model`,
 `export_model`, and `review_model` accept a `.orm-project.yaml` and a
