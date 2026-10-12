@@ -1,7 +1,7 @@
 /**
  * Tests for the `barwise project` command group: init and split.
  */
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -147,6 +147,32 @@ describe("barwise project split", () => {
     expect(result.stdout).toContain("Customer");
   });
 
+  it("does not overwrite an existing domain file, even with no manifest beside it", async () => {
+    const dir = makeTmpDir();
+    writeFileSync(join(dir, "shop.orm.yaml"), SHOP_MODEL, "utf-8");
+    writeFileSync(join(dir, "split.yaml"), SPLIT_CONFIG, "utf-8");
+    const out = join(dir, "project");
+    mkdirSync(join(out, "domains"), { recursive: true });
+    const handWritten = join(out, "domains/crm.orm.yaml");
+    writeFileSync(handWritten, "# hand-written\n", "utf-8");
+
+    const result = await runCli([
+      "project",
+      "split",
+      join(dir, "shop.orm.yaml"),
+      "--config",
+      join(dir, "split.yaml"),
+      "--out",
+      out,
+    ]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("already exist");
+    expect(result.stderr).toContain(handWritten);
+    expect(readFileSync(handWritten, "utf-8")).toBe("# hand-written\n");
+    // Refused before anything was written.
+    expect(existsSync(join(out, "project.orm-project.yaml"))).toBe(false);
+  }, 15000);
+
   it("does not overwrite an existing manifest without --force", async () => {
     const dir = makeTmpDir();
     writeFileSync(join(dir, "shop.orm.yaml"), SHOP_MODEL, "utf-8");
@@ -165,7 +191,7 @@ describe("barwise project split", () => {
     expect((await runCli(args)).exitCode).toBe(0);
     const second = await runCli(args);
     expect(second.exitCode).toBe(1);
-    expect(second.stderr).toContain("already exists");
+    expect(second.stderr).toContain("already exist");
 
     const forced = await runCli([...args, "--force"]);
     expect(forced.exitCode).toBe(0);
