@@ -269,7 +269,7 @@ change as incomplete until this table agrees with it.
 One name collision worth stating, because it looks like a gap and is
 not: VS Code's `barwise.newProject` scaffolds a `.orm.yaml` **model**,
 while the CLI's `project` command manages `.orm-project.yaml`
-**multi-domain projects** (`init`, `domains`, `mappings`, `split`).
+**multi-domain projects** (`init`, `split`).
 Different capabilities, similar names; the `project` row is correct.
 
 `llm-usage` reports over the JSONL call log under the operator's own
