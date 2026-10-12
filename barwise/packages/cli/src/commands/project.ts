@@ -10,6 +10,7 @@ import {
   parseSplitConfig,
   scaffoldProject,
   scaffoldSplitConfig,
+  splitFiles,
   splitModel,
 } from "@barwise/core";
 import type { Command } from "commander";
@@ -132,17 +133,12 @@ function registerSplit(projectCmd: Command): void {
 
           const root = resolve(opts.out);
           const manifestPath = join(root, result.manifestFileName);
-          const files: Array<[string, string]> = [
-            ...result.domains.map((d): [string, string] => [d.fileName, d.yaml]),
-            ...result.mappings.map((m): [string, string] => [m.fileName, m.yaml]),
-            [result.manifestFileName, result.manifestYaml],
-          ];
+          const files = splitFiles(result);
 
           // Every target, not only the manifest: a hand-written domain
           // file with no manifest beside it is still the user's work.
-          // The MCP split_model tool refuses on the same rule.
           const existing = files
-            .map(([name]) => join(root, name))
+            .map((f) => join(root, f.path))
             .filter((path) => existsSync(path));
           if (existing.length > 0 && !opts.force) {
             process.stderr.write(
@@ -154,10 +150,10 @@ function registerSplit(projectCmd: Command): void {
             return;
           }
 
-          for (const [name, content] of files) {
-            const path = join(root, name);
+          for (const file of files) {
+            const path = join(root, file.path);
             mkdirSync(dirname(path), { recursive: true });
-            writeFileSync(path, content, "utf-8");
+            writeFileSync(path, file.content, "utf-8");
           }
 
           process.stderr.write(

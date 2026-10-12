@@ -78,6 +78,28 @@ export interface SplitResult {
   readonly warnings: readonly string[];
 }
 
+/** A file a split writes, with its path relative to the project root. */
+export interface SplitFile {
+  readonly path: string;
+  readonly content: string;
+}
+
+/**
+ * Every file a split writes, in write order: domains, then mappings, then
+ * the manifest last, so a write that fails partway never leaves a manifest
+ * naming files that are not there. Both writers of a split -- the CLI's
+ * `project split` and the MCP `split_model` tool -- check for existing
+ * files over this list and write this list, so they cannot disagree about
+ * which files a split produces or which ones block it.
+ */
+export function splitFiles(result: SplitResult): readonly SplitFile[] {
+  return [
+    ...result.domains.map((d) => ({ path: d.fileName, content: d.yaml })),
+    ...result.mappings.map((m) => ({ path: m.fileName, content: m.yaml })),
+    { path: result.manifestFileName, content: result.manifestYaml },
+  ];
+}
+
 /** Where a split's manifest sits, relative to the project root. */
 const MANIFEST_FILE_NAME = "project.orm-project.yaml";
 

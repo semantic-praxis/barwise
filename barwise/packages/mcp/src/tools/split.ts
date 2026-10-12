@@ -4,13 +4,19 @@
  * context mapping for each pair of contexts that share object types.
  *
  * The split is core's pure `splitModel`. This module adds the preview
- * summary and the write. The CLI's `project split` writes the same
- * `SplitResult` under the same refusal rule; it cannot import this module
- * (the CLI does not depend on `@barwise/mcp`), so the write loop is
- * parallel and every file name it writes is read from the result.
+ * summary and the write. The CLI's `project split` writes the same result;
+ * it cannot import this module (the CLI does not depend on `@barwise/mcp`),
+ * so the few lines of write loop are parallel, and the file list both
+ * loops check and write is core's `splitFiles`.
  */
 
-import { type OrmModel, OrmYamlSerializer, splitModel, type SplitResult } from "@barwise/core";
+import {
+  type OrmModel,
+  OrmYamlSerializer,
+  splitFiles,
+  splitModel,
+  type SplitResult,
+} from "@barwise/core";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -116,16 +122,12 @@ export function executeSplit(
   }
 
   const root = resolve(outDir);
-  const files: Array<[string, string]> = [
-    ...result.domains.map((d): [string, string] => [d.fileName, d.yaml]),
-    ...result.mappings.map((m): [string, string] => [m.fileName, m.yaml]),
-    [result.manifestFileName, result.manifestYaml],
-  ];
+  const files = splitFiles(result);
 
   // Checked before anything is written, so a refusal leaves the
   // directory exactly as it was.
   const existing = files
-    .map(([name]) => join(root, name))
+    .map((f) => join(root, f.path))
     .filter((path) => existsSync(path));
   if (existing.length > 0 && force !== true) {
     return json({
@@ -135,10 +137,10 @@ export function executeSplit(
     });
   }
 
-  for (const [name, content] of files) {
-    const path = join(root, name);
+  for (const file of files) {
+    const path = join(root, file.path);
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, content, "utf-8");
+    writeFileSync(path, file.content, "utf-8");
   }
 
   const manifestPath = join(root, result.manifestFileName);

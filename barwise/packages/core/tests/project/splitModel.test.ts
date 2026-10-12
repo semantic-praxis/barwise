@@ -7,7 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
-import { ModelSplitError, splitModel } from "../../src/project/splitModel.js";
+import { ModelSplitError, splitFiles, splitModel } from "../../src/project/splitModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { assembleProject, type ProjectFiles } from "../../src/serialization/projectAssembly.js";
 import { projectRules } from "../../src/validation/rules/projectRules.js";
@@ -109,6 +109,24 @@ describe("splitModel", () => {
       domains: { crm: ["Customer"], billing: ["Invoice"] },
     });
     expect(result.manifestFileName).toBe("project.orm-project.yaml");
+  });
+
+  it("lists every file a writer must check and write, manifest last", () => {
+    // The CLI and the MCP tool both write exactly this list; the manifest
+    // goes last so a write that fails partway never leaves a manifest
+    // naming files that are not there.
+    const result = splitModel(SHOP_MODEL, {
+      projectName: "Shop",
+      domains: { crm: ["Customer"], billing: ["Invoice"] },
+    });
+    expect(splitFiles(result).map((f) => f.path)).toEqual([
+      "domains/crm.orm.yaml",
+      "domains/billing.orm.yaml",
+      ...result.mappings.map((m) => m.fileName),
+      "project.orm-project.yaml",
+    ]);
+    expect(result.mappings.length).toBeGreaterThan(0);
+    expect(splitFiles(result).at(-1)?.content).toBe(result.manifestYaml);
   });
 
   it("produces one domain file per configured context", () => {

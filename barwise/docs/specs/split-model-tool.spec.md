@@ -90,7 +90,7 @@ Out of scope:
 
 | Module                                       | Current state                                    | Verdict                                                            |
 | -------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------ |
-| `core/src/project/splitModel.ts`             | Pure split; manifest name not part of the result | Add `manifestFileName` to `SplitResult`; reject separator names    |
+| `core/src/project/splitModel.ts`             | Pure split; manifest name not part of the result | Add `manifestFileName` and `splitFiles`; reject separator names    |
 | `cli/src/commands/project.ts`                | Hard-codes `project.orm-project.yaml`            | Read `result.manifestFileName`; refuse when any target exists      |
 | `mcp/src/tools/split.ts`                     | Does not exist                                   | New: `split_model` tool and `executeSplit`                         |
 | `mcp/src/tools/index.ts`, `server.ts`        | Register and re-export 17 tools                  | Register `split_model`; re-export `executeSplit`                   |
@@ -112,6 +112,8 @@ CLI uses them, for the config file this spec leaves out of the tool.
 @barwise/core   splitModel(yaml, { projectName, domains }) -> SplitResult
                   + manifestFileName ("project.orm-project.yaml")
                   + throws on an empty domain name or one with a separator
+                splitFiles(result) -> every file to check and write,
+                  manifest last
                   (pure; no fs)
 
 @barwise/cli    project split   reads the config file, calls splitModel,
@@ -128,9 +130,10 @@ barwise-vscode  barwise_split_model
 
 The write loop exists twice, in the CLI and in `executeSplit`, because
 the CLI cannot depend on `@barwise/mcp`. That is the DRY-secondary
-trade the root `CLAUDE.md` describes: about ten lines of parallel I/O,
-with every fact the two must agree on (file names, manifest name, file
-set) read from the one `SplitResult`.
+trade the root `CLAUDE.md` describes: a few lines of parallel I/O. The
+facts the two must agree on -- which files a split produces, in what
+order, and therefore which ones block it -- are not copied: both loops
+iterate core's `splitFiles(result)`.
 
 ## Alternatives considered
 
@@ -204,8 +207,10 @@ the docs.
 
 ## Risks and testing
 
-- The CLI split test and `examples/auction-project` guard that the
-  split output itself is unchanged; only the result gains a field.
+- The core tests that split the shop and auction models guard that the
+  split output itself is unchanged; the result only gains a field.
+  `examples/auction-project` is not checked against a fresh split by
+  anything.
 - The pinned tool lists fail until the matrix, `package.json` and both
   registrations agree.
 - Premortem: an agent writes the project into the extension host's
@@ -220,3 +225,20 @@ the docs.
 - No change to how `splitModel` assigns object types, infers homes,
   or builds mappings.
 - No editing of an existing manifest (adding or removing a domain).
+
+## Implementation notes
+
+- **Dot names needed no rule.** The draft refused `.` and `..` as
+  domain names. `splitModel` appends `.orm.yaml`, so `..` becomes the
+  file `...orm.yaml` inside `domains/`; only a separator escapes. The
+  check refuses empty names and separators, and a test pins that `..`
+  is accepted.
+- **The draft's write loops copied the file list.** Both writers built
+  "domains, mappings, manifest" themselves, kept in step by a comment.
+  The PR's own checklist pass caught it; `splitFiles` in core now owns
+  the list and its order.
+- **`validate_model` does not run the cross-domain project rules.**
+  The surface audit (barwise-0wa) found that only `barwise validate`
+  calls `projectRules`. The split tool's preview and docs say "validate
+  each domain" rather than claiming the cross-domain checks; closing
+  the gap is the audit's.
