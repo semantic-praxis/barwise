@@ -30,8 +30,14 @@ function refuse(message) {
   process.exit(2);
 }
 
+// The tracker passed execFileSync's default 1 MiB buffer on 2026-10-12, and
+// every `git show` of it then threw ENOBUFS, which reads as "cannot read".
 function git(args) {
-  return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  return execFileSync("git", args, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    maxBuffer: 64 * 1024 * 1024,
+  });
 }
 
 function resolveBase() {
