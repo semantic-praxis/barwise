@@ -4,6 +4,8 @@ Object-role modeling for data engineers and architects. Transform business conce
 
 Barwise is an [ORM 2](https://en.wikipedia.org/wiki/Object-role_modeling) modeling toolkit. It ships as a VS Code extension, a `barwise` CLI, and an MCP server, all backed by the same platform-independent `@barwise/core` library, so all model logic is testable without launching an editor.
 
+**New here? Start with [GETTING_STARTED.md](GETTING_STARTED.md)**, which walks the same workflow on each of the three surfaces.
+
 ## Learning ORM
 
 Barwise assumes familiarity with Object-Role Modeling. The definitive reference is Terry Halpin and Tony Morgan's _Information Modeling and Relational Databases_ (3rd ed., Morgan Kaufmann / Elsevier, 2024; ISBN 9780443237904) -- the text this project's metamodel is designed against. If you work with ORM, buy Dr. Halpin's book; it is the standard reference for the method, and no tool is a substitute for it. A spaced-repetition Anki deck that drills the concepts, with per-card pointers into the book, lives in [`barwise/docs/anki`](barwise/docs/anki); a transcript of the book's table of contents is in [`barwise/docs/halpin-morgan-3e-contents.md`](barwise/docs/halpin-morgan-3e-contents.md); and a reading guide that says which chapters to read in what order, and what each grounds in the tool, is [`barwise/docs/halpin-morgan-3e-reading-guide.md`](barwise/docs/halpin-morgan-3e-reading-guide.md).
@@ -14,7 +16,7 @@ Barwise assumes familiarity with Object-Role Modeling. The definitive reference 
 | ------- | ---------------------------------------------------- |
 | Node.js | the version in [`.nvmrc`](.nvmrc) (currently 26.7.0) |
 | npm     | >= 10                                                |
-| VS Code | >= 1.93                                              |
+| VS Code | >= 1.101                                             |
 
 `.nvmrc` is the authority, not this table -- `nvm use` in the repo root
 picks it up, and CI reads the same file. The pin is not a preference: V8
@@ -143,12 +145,13 @@ code --install-extension barwise-vscode-<version>.vsix
 
 After installing, open **Settings** and search for `barwise`. The key settings are:
 
-| Setting                      | Default                      | Description                                                   |
-| ---------------------------- | ---------------------------- | ------------------------------------------------------------- |
-| `barwise.llmProvider`        | `copilot`                    | `copilot` (uses your Copilot subscription) or `anthropic`     |
-| `barwise.anthropicApiKey`    | (empty)                      | Anthropic API key (falls back to `ANTHROPIC_API_KEY` env var) |
-| `barwise.anthropicModel`     | `claude-sonnet-4-5-20250929` | Model ID when using Anthropic directly                        |
-| `barwise.copilotModelFamily` | (empty)                      | Preferred Copilot model family (e.g. `claude-sonnet`)         |
+| Setting                      | Default                      | Description                                               |
+| ---------------------------- | ---------------------------- | --------------------------------------------------------- |
+| `barwise.llmProvider`        | `copilot`                    | `copilot` (uses your Copilot subscription) or `anthropic` |
+| `barwise.anthropicModel`     | `claude-sonnet-4-5-20250929` | Model ID when using Anthropic directly                    |
+| `barwise.copilotModelFamily` | (empty)                      | Preferred Copilot model family (e.g. `claude-sonnet`)     |
+
+With `anthropic`, run **Barwise: Set Anthropic API Key** to store the key in the OS keychain (an `ANTHROPIC_API_KEY` in the editor's environment also works). The `barwise.anthropicApiKey` setting is deprecated: a key in settings can be committed with `.vscode/settings.json`.
 
 ## Quick start
 
@@ -159,7 +162,7 @@ After installing, open **Settings** and search for `barwise`. The key settings a
 5. **Visualize:** run **Barwise: Show Diagram** to see the ORM diagram.
 6. **Verbalize:** run **Barwise: Verbalize Model** to generate natural-language readings of all fact types and constraints.
 
-The same capabilities are available from the terminal via the `barwise` CLI (see [`barwise/docs/CLI.md`](barwise/docs/CLI.md)) and to MCP clients via the MCP server (see [`barwise/docs/MCP.md`](barwise/docs/MCP.md)).
+Most of the same capabilities are available from the terminal via the `barwise` CLI (see [`barwise/docs/CLI.md`](barwise/docs/CLI.md)) and to MCP clients via the MCP server (see [`barwise/docs/MCP.md`](barwise/docs/MCP.md)). [GETTING_STARTED.md](GETTING_STARTED.md) maps each step across the three and lists where they differ.
 
 ## Project structure
 
