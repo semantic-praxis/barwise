@@ -61,7 +61,14 @@ npx tsc --noEmit            # type-check only
 ## Key Conventions
 
 - Each command is a separate module that registers itself on a
-  Commander program.
+  Commander program, and is loaded only when it runs. `cli.ts` reaches
+  every command through the `COMMANDS` table's dynamic `import()`, never
+  a static import, and the entry points (and `runCli`) register only the
+  command the first argument names, or all of them when it names none.
+  A new command is a new table entry; `tests/commandRouting.test.ts`
+  fails on a static import or a missing entry
+  (`docs/specs/cli-lazy-command-loading.spec.md`). A static import here
+  is what made `barwise validate` load all eighteen commands (barwise-8nx).
 - Commands read `.orm.yaml` files via the shared `loadModel()` helper.
 - Output goes to stdout by default. `--output` writes to a file.
 - `--format json` is available on most commands for machine-readable
