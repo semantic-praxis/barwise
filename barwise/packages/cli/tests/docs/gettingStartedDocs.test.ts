@@ -119,8 +119,10 @@ function unresolved(program: Command, text: string): string | undefined {
   return undefined;
 }
 
+// Every command, as `barwise --help` would see them.
+const program = await createProgram();
+
 describe("barwise invocations in the getting-started docs", () => {
-  const program = createProgram();
   const all = DOCS.flatMap(invocations);
 
   it("finds invocations in every scanned file", () => {

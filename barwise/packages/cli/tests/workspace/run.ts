@@ -2,12 +2,15 @@
  * Test helper for invoking the CLI program and capturing output.
  *
  * Creates a Commander program via createProgram(), overrides stdout
- * and stderr writes, and invokes parseAsync with the given args.
+ * and stderr writes, and invokes parseAsync with the given args. The
+ * program is built the way the bin entry builds it -- only the command the
+ * arguments name, or every command when they name none -- so each command
+ * test runs the command as production loads it.
  */
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { createProgram } from "../../src/cli.js";
+import { commandNameIn, createProgram } from "../../src/cli.js";
 
 // Mirror the bin entry: supply the real version so `--version` tests see
 // it (createProgram itself no longer reads package.json).
@@ -50,7 +53,7 @@ export async function runCli(args: string[]): Promise<RunResult> {
   }) as typeof process.stderr.write;
 
   try {
-    const program = createProgram(version);
+    const program = await createProgram(version, commandNameIn(args));
     // Prevent Commander from calling process.exit on errors.
     program.exitOverride();
     await program.parseAsync(["node", "barwise", ...args]);
