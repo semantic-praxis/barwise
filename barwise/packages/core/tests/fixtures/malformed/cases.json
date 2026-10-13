@@ -1,70 +1,49 @@
 {
-  "$comment": "One malformed object type per file, each carrying exactly one problem, scored by `measure-comparison.mjs malformed` (docs/specs/effect-comparison.spec.md, D2). The combined case is built in memory from these files, so it cannot drift from them. `name` is the object type as written; a blank one is identified by `id` alone.",
+  "$comment": "One malformed object type per file, each carrying exactly one problem, scored by `measure-comparison.mjs malformed` (docs/specs/effect-comparison.spec.md, D2). The combined case is built in memory from these files, so it cannot drift from them. Each object type's id and name are read from its file; only the field at fault is declared here, and `absent` marks a case whose problem is a missing field. scripts/tests/measure-comparison.test.mjs checks each declared field against its file.",
   "cases": [
     {
       "file": "value-with-reference-mode.orm.yaml",
-      "id": "ot-rating",
-      "name": "Rating",
       "field": "reference_mode"
     },
     {
       "file": "entity-without-reference-mode.orm.yaml",
-      "id": "ot-customer",
-      "name": "Customer",
-      "field": "reference_mode"
+      "field": "reference_mode",
+      "absent": true
     },
     {
       "file": "entity-with-data-type.orm.yaml",
-      "id": "ot-supplier",
-      "name": "Supplier",
       "field": "data_type"
     },
     {
       "file": "entity-with-value-constraint.orm.yaml",
-      "id": "ot-warehouse",
-      "name": "Warehouse",
       "field": "value_constraint"
     },
     {
       "file": "entity-with-default-value.orm.yaml",
-      "id": "ot-carrier",
-      "name": "Carrier",
       "field": "default_value"
     },
     {
       "file": "cardinality-max-below-min.orm.yaml",
-      "id": "ot-size",
-      "name": "Size",
       "field": "cardinality"
     },
     {
       "file": "cardinality-negative-min.orm.yaml",
-      "id": "ot-score",
-      "name": "Score",
       "field": "cardinality"
     },
     {
       "file": "empty-value-constraint.orm.yaml",
-      "id": "ot-colour",
-      "name": "Colour",
       "field": "value_constraint"
     },
     {
       "file": "blank-name.orm.yaml",
-      "id": "ot-blank-name",
-      "name": "  ",
       "field": "name"
     },
     {
       "file": "unknown-data-type.orm.yaml",
-      "id": "ot-weight",
-      "name": "Weight",
       "field": "data_type"
     },
     {
       "file": "excess-property.orm.yaml",
-      "id": "ot-height",
-      "name": "Height",
       "field": "colour"
     }
   ]

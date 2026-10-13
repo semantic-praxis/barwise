@@ -26,7 +26,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { cpus, tmpdir } from "node:os";
 import { join } from "node:path";
-import { combine, scoreDocument, summarize } from "./lib/malformed-score.mjs";
+import { caseProblem, combine, scoreDocument, summarize } from "./lib/malformed-score.mjs";
 import { REPO_ROOT } from "./lib/tracked.mjs";
 
 const BARWISE = join(REPO_ROOT, "barwise");
@@ -60,7 +60,11 @@ function git(args, cwd = REPO_ROOT) {
 
 function run(command, args, cwd = BARWISE) {
   const r = spawnSync(command, args, { cwd, stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" });
-  if (r.status !== 0) refuse(`\`${command} ${args.join(" ")}\` failed:\n${r.stderr.slice(-2000)}`);
+  // An executable that cannot start returns status null and no stderr.
+  if (r.error) refuse(`\`${command}\` could not be started: ${r.error.message}`);
+  if (r.status !== 0) {
+    refuse(`\`${command} ${args.join(" ")}\` failed:\n${(r.stderr ?? "").slice(-2000)}`);
+  }
 }
 
 function median(values) {
@@ -107,7 +111,13 @@ function timeOnce(args, env = process.env) {
 }
 
 function startup(args) {
-  const runs = Number(flag(args, "--runs") ?? 15);
+  const given = args.includes("--runs") ? flag(args, "--runs") : "15";
+  // Exit 1 means a measurement over the limit, so a count that measures
+  // nothing has to refuse rather than report a median of no samples.
+  if (!/^[1-9][0-9]*$/.test(given ?? "")) {
+    refuse(`--runs takes a positive integer, not ${given ?? "nothing"}.`);
+  }
+  const runs = Number(given);
   if (!args.includes("--no-build")) {
     run("npx", [
       "turbo",
@@ -209,7 +219,7 @@ async function malformed(args) {
   const read = (file) => readFileSync(join(MALFORMED_DIR, file), "utf8");
   const results = cases.map((c) => ({
     file: c.file,
-    ...scoreDocument(read(c.file), [{ ...c, index: 0 }], loader),
+    ...scoreDocument(read(c.file), [caseProblem(c, read(c.file)).problem], loader),
   }));
   const all = combine(cases, read);
   const combined = scoreDocument(all.yaml, all.problems, loader);
@@ -287,7 +297,12 @@ function trial(args) {
   let changed;
   try {
     git(["rev-parse", "--verify", `${base}^{commit}`], path);
-    changed = git(["diff", "--name-only", base, "--"], path).trim().split("\n").filter(Boolean);
+    // A trial runs in a worktree, so a file it ADDED and never committed is
+    // as much a change to the oracle as one it edited; `git diff` alone
+    // cannot see it.
+    const tracked = git(["diff", "--name-only", base, "--"], path);
+    const untracked = git(["ls-files", "--others", "--exclude-standard"], path);
+    changed = `${tracked}\n${untracked}`.trim().split("\n").filter(Boolean);
   } catch {
     refuse(`git could not diff ${path} against ${base}.`);
   }

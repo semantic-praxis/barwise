@@ -98,16 +98,35 @@ export function scoreDocument(yamlText, problems, loader) {
   return { outcome, messages, problems: scored, silentLosses };
 }
 
+/**
+ * The one object type a case's fixture holds, and the problem it carries.
+ *
+ * The id and name come from the fixture, not from the manifest: a copy of
+ * them in `cases.json` would be a second statement of the fixture that
+ * nothing checks, and an edited fixture would then be scored against the
+ * wrong object type. Only the field is declared, because it is the one
+ * thing the file cannot say about itself.
+ */
+export function caseProblem(c, yamlText, index = 0) {
+  const ots = parse(yamlText)?.model?.object_types ?? [];
+  if (ots.length !== 1) {
+    throw new Error(`${c.file}: a case fixture holds exactly one object type, found ${ots.length}`);
+  }
+  const ot = ots[0];
+  return {
+    problem: { id: String(ot.id), name: String(ot.name ?? ""), field: c.field, index },
+    objectType: ot,
+  };
+}
+
 /** One document holding every case's object type, in case order. */
 export function combine(cases, readCase) {
   const objectTypes = [];
   const problems = [];
   for (const c of cases) {
-    const ots = parse(readCase(c.file))?.model?.object_types ?? [];
-    for (const ot of ots) {
-      problems.push({ id: c.id, name: c.name, field: c.field, index: objectTypes.length });
-      objectTypes.push(ot);
-    }
+    const { problem, objectType } = caseProblem(c, readCase(c.file), objectTypes.length);
+    problems.push(problem);
+    objectTypes.push(objectType);
   }
   const yaml = stringify({
     orm_version: "2.0",

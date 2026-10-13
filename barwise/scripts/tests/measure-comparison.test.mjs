@@ -9,14 +9,17 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { parse } from "yaml";
 import { combine, lostKeys, scoreDocument } from "../lib/malformed-score.mjs";
 
-const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), "..", "measure-comparison.mjs");
+const HERE = dirname(fileURLToPath(import.meta.url));
+const SCRIPT = join(HERE, "..", "measure-comparison.mjs");
+const FIXTURES = join(HERE, "..", "..", "packages", "core", "tests", "fixtures", "malformed");
 
 const DOC = `orm_version: "2.0"
 model:
@@ -132,7 +135,53 @@ test("trial fails a branch that changed the held-out oracle and passes one that 
     );
     assert.equal(touched.status, 1, touched.stderr.toString());
     assert.match(touched.stdout.toString(), /x\.law\.test\.ts/);
+
+    // A file the trial added and never committed is a change too.
+    g("checkout", "-q", "--", ".");
+    writeFileSync(join(laws, "new.law.test.ts"), "added\n");
+    const added = spawnSync(process.execPath, [SCRIPT, "trial", "--base", "HEAD", "--path", repo], {
+      cwd: repo,
+    });
+    assert.equal(added.status, 1, added.stderr.toString());
+    assert.match(added.stdout.toString(), /new\.law\.test\.ts/);
   } finally {
     rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test("--runs that would measure nothing is refused, not reported as a failure", () => {
+  for (const runs of ["0", "-1", "nope", "1.5"]) {
+    const r = spawnSync(process.execPath, [SCRIPT, "startup", "--no-build", "--runs", runs]);
+    assert.equal(r.status, 2, `--runs ${runs}: ${r.stderr}`);
+  }
+  assert.equal(spawnSync(process.execPath, [SCRIPT, "startup", "--no-build", "--runs"]).status, 2);
+});
+
+test("a build tool that cannot start is a refusal, not a crash", () => {
+  // git stays on PATH (the script needs it to find the repository); npx does not.
+  const bin = mkdtempSync(join(tmpdir(), "measure-path-"));
+  try {
+    symlinkSync(execFileSync("which", ["git"], { encoding: "utf8" }).trim(), join(bin, "git"));
+    const r = spawnSync(process.execPath, [SCRIPT, "startup", "--runs", "1"], {
+      env: { PATH: bin },
+    });
+    assert.equal(r.status, 2, r.stderr.toString());
+    assert.match(r.stderr.toString(), /could not be started/);
+  } finally {
+    rmSync(bin, { recursive: true, force: true });
+  }
+});
+
+test("each malformed case declares the field its fixture actually gets wrong", () => {
+  const { cases } = JSON.parse(readFileSync(join(FIXTURES, "cases.json"), "utf8"));
+  assert.ok(cases.length > 0);
+  for (const c of cases) {
+    const ots = parse(readFileSync(join(FIXTURES, c.file), "utf8"))?.model?.object_types ?? [];
+    assert.equal(ots.length, 1, `${c.file} holds one object type`);
+    assert.equal(
+      c.field in ots[0],
+      !c.absent,
+      `${c.file}: ${c.field} is ${c.absent ? "absent" : "present"}`,
+    );
   }
 });
