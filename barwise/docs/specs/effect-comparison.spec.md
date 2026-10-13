@@ -210,10 +210,12 @@ cache helps the baseline more than the probe, so the cost is loading
 Effect's module graph, not compiling it. Bundling is the mitigation that
 works, and today only the release asset is bundled (it grew 209 KB).
 
-Where today's `barwise validate` spends its time, measured 2026-10-13 on
-the npm package against a 531-line example model (703 ms median of 15
-runs), by `node --cpu-prof` and by timing each import alone in a fresh
-process:
+Where today's `barwise validate` spends its time, measured 2026-10-13 at
+main `fdce28fa` on the npm package, Node 26.7.0, against
+`examples/models/learning-design.orm.yaml` (703 ms median of 15 runs), by
+`node --cpu-prof` and by timing each import alone in a fresh process.
+These are hand measurements and a snapshot; WS0's `startup` subcommand is
+where their commands and the module-count hook live from then on:
 
 | Part                                                | Time         |
 | --------------------------------------------------- | ------------ |
@@ -459,9 +461,14 @@ error text a malformed object type produces (D2).
    branch. Recommend: yes, pinned exactly at a 4.0.x release, never
    merged except through an adoption spec.
 3. **The startup limit (G4) -- resolved 2026-10-13: an absolute 1
-   second.** `barwise validate` on a typical model stays under 1 second,
-   median, on both the npm package and the release bundle; the slowdown
-   against today is reported and judges nothing. The draft recommended a
+   second.** `barwise validate examples/models/learning-design.orm.yaml`
+   stays under 1 second, median of 15, on both the npm package and the
+   release bundle; the slowdown against today is reported and judges
+   nothing. That model is the reference because it is the largest in
+   `examples/models/` (531 lines). An absolute limit depends on the machine,
+   so `startup` records the Node version, CPU model and commit with every
+   reading, both arms are read on one machine back to back, and the gate
+   is judged on that machine. The draft recommended a
    10% relative threshold, which would have rejected changes no user
    could notice: about 1 second is where a wait starts to interrupt a
    person's train of thought, and today's CLI sits near 0.7 s, inside
@@ -481,7 +488,7 @@ error text a malformed object type produces (D2).
   are measured, not merged, until WS4.
 - The byte-layout and enum tests land on `main` and stay: they guard
   today's serializer whatever the comparison decides.
-- Measurements are medians of 10 runs on one machine, taken back to back
+- Measurements are medians of 15 runs on one machine, taken back to back
   for both arms; a run-to-run spread wider than the difference between
   arms is reported as such, not averaged away.
 - `--force` on every build that feeds a measurement (barwise-r7j).
