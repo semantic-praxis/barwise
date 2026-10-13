@@ -218,14 +218,14 @@ process:
 | Part                                                | Time         |
 | --------------------------------------------------- | ------------ |
 | Node process start                                  | about 50 ms  |
-| Importing all 19 commands (568 modules, 3.8 MB)     | about 350 ms |
+| Importing all 18 commands (568 modules, 3.8 MB)     | about 350 ms |
 | -- of which `validate`'s own import chain           | about 150 ms |
 | Compiling the JSON Schema (`new SchemaValidator()`) | about 120 ms |
 | Parsing, validation rules, output                   | about 100 ms |
 
 The 1-second limit leaves about 300 ms. Two costs already in the CLI are
 each larger than the probe's 160 ms and unrelated to this comparison:
-the roughly 200 ms spent importing the 18 commands `validate` never runs
+the roughly 200 ms spent importing the 17 commands `validate` never runs
 (barwise-8nx), and the schema compile, paid on every model load in every
 short-lived process (barwise-aqa).
 
