@@ -191,6 +191,12 @@ reverse.
   shipped a gate of "no user-visible change" beside a required change to
   malformed-input errors, so no finished arm could have been eligible;
   review, not the draft's own passes, caught it.
+- **Every threshold says why that number**: a limit in a criterion
+  names the outcome it protects and why the value sits where it does --
+  root `CLAUDE.md`'s "stated relation to an outcome". The same spec
+  first gated startup at "no more than 10% slower", a number tied to
+  nothing a user experiences; the user's question replaced it with 1
+  second, where a wait starts to break a train of thought.
 - **Header block is current** -- `Status`, `Created`, `Last-updated`
   (bumped if this push revises an existing spec), `Tracking`.
 - **Parity check**: if the design introduces a copy that must agree
