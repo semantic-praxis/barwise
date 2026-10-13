@@ -423,9 +423,9 @@ same prompt but for the style line and a primer of similar length, both
 written in this workstream: an Effect 4 primer for the Effect arm, since
 the model's training predates 4.0, and the sealed-record conventions of
 `core-branching-load.spec.md` WS1 for the plain arm, so that context size
-is not the difference measured. First a pilot of three
-T1 runs on the plain arm to measure spread and cost; then T1 on both
-arms; then T2 only if T1 resolves or D1 and D2 split (Open decision 4).
+is not the difference measured. First a pilot of three T1 runs on the
+plain arm to measure spread and cost; then five T1 runs and two T2 runs
+on each arm (Open decision 4).
 T1 and T2 branches are thrown away.
 
 ### 4. Measure, decide, record
@@ -444,22 +444,23 @@ merge keeps `OrmModel.addObjectType` and `OrmYamlSerializer` signatures,
 so the radius beyond core is the id source (Open decision 1) and the
 error text a malformed object type produces (D2).
 
-## Open decisions (for review)
+## Open decisions (all resolved 2026-10-13)
 
-1. **The id source, in both arms.** barwise-e8m rules out "injected
-   effect ports" in core, and one has existed since 2026-07-25:
-   `setIdGenerator`, installed by every surface, read by every importer
-   but NORMA. The options are (a) both arms make it visible in their
+1. **The id source -- resolved 2026-10-13: both arms make it visible.**
+   barwise-e8m rules out "injected effect ports" in core, and one has
+   existed since 2026-07-25: `setIdGenerator`, installed by every surface,
+   read by every importer but NORMA. Each arm makes it visible in its own
    idiom -- a `newId` parameter in TypeScript, a declared requirement in
    Effect -- scoped to the slice's decoder, with `OrmModel` supplying the
-   installed generator as today; or (b) leave it out. Recommend (a): it is
+   installed generator as today. Chosen over leaving it out because it is
    the only place in converted code where the "effects in the signature"
    half of the claim can be tested, and it adds no port, it names one.
    barwise-e8m stands on `main` unless WS4 adopts.
-2. **Effect in core, on the arm branch.** `core/CLAUDE.md` allows `yaml`
-   and `ajv` "without discussion"; this spec is that discussion for one
-   branch. Recommend: yes, pinned exactly at a 4.0.x release, never
-   merged except through an adoption spec.
+2. **Effect in core, on the arm branch -- resolved 2026-10-13: yes, on
+   that branch only.** `core/CLAUDE.md` allows `yaml` and `ajv` "without
+   discussion"; this spec is that discussion for one branch. The
+   dependency is pinned exactly and never merged except through an
+   adoption spec.
 3. **The startup limit (G4) -- resolved 2026-10-13: an absolute 1
    second.** `barwise validate examples/models/learning-design.orm.yaml`
    stays under 1 second, median of 15, on both the npm package and the
@@ -474,13 +475,18 @@ error text a malformed object type produces (D2).
    person's train of thought, and today's CLI sits near 0.7 s, inside
    it. At the probe numbers the Effect arm passes with the
    `effect/Schema` import and fails with the full `effect` entry point.
-4. **Agent trial size.** Recommend a pilot of three T1 runs, then five T1
-   runs per arm, and two T2 runs per arm only if T1 resolves or D1 and D2
-   split. Each T2 run is about the size of WS1 step 1 (30 files), so T2
-   is the expensive part; the pilot measures the cost before committing.
-5. **Effect version.** Recommend 4.0.x, pinned exactly. 3.22 is mature
-   and better known to agents, but adopting it now means a forced major
-   migration later; the familiarity risk is what the D3 tripwire watches.
+4. **Agent trial size -- resolved 2026-10-13: full trials.** A pilot of
+   three T1 runs on the plain arm measures spread and cost first, then
+   five T1 runs and two T2 runs per arm, whatever the pilot shows. The
+   draft recommended running T2 only if T1 resolved or D1 and D2 split;
+   the full set was chosen so the agent claim is tested on the larger
+   task as well. Each T2 run is about the size of WS1 step 1 (30 files),
+   so T2 carries most of the cost; the pilot still sets the
+   resolvability bound D3 reports against.
+5. **Effect version -- resolved 2026-10-13: 4.0.x, pinned exactly.**
+   3.22 is mature and better known to agents, but adopting it now would
+   mean a forced major migration later; the familiarity risk is what the
+   D3 tripwire watches.
 
 ## Risks and testing
 
@@ -508,8 +514,10 @@ Given to both arms verbatim, with one line differing.
 > Starting from commit `<base>`, add a decoder for object types that
 > turns one parsed YAML object type into either an `ObjectType` or every
 > problem with it. Each problem names the object type (by name, or by id
-> when the name is the problem) and the field. Take the id source as
-> Open decision 1 resolves. `OrmModel.addObjectType` and
+> when the name is the problem) and the field. The decoder must not
+> reach the installed id generator itself: it takes the source of fresh
+> ids as your arm's line below says, and `OrmModel.addObjectType`
+> supplies today's installed generator. `OrmModel.addObjectType` and
 > `OrmYamlSerializer.deserialize` keep their signatures and route through
 > the decoder. For a model that loads today nothing visible changes: the
 > full suite, `validate:examples` and the promptlab drift test stay green,
@@ -518,10 +526,12 @@ Given to both arms verbatim, with one line differing.
 > requires. Unit tests of `createObjectType`, and tests that pin today's
 > first-error message, may change; list each one and say why.
 >
-> Plain arm: write it in TypeScript with no new dependency.
+> Plain arm: write it in TypeScript with no new dependency; the id
+> source is a `newId: () => string` parameter.
 >
 > Effect arm: write it with Effect 4.0.x Schema, pinned exactly in
-> `packages/core/package.json`.
+> `packages/core/package.json`; the id source is a declared requirement
+> of the decoding effect.
 
 ## Appendix B: agent task T1, add a field
 
