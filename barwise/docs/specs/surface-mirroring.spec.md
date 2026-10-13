@@ -39,7 +39,8 @@ does not qualify.
 | MCP gym session log (`--emit-misses`, `--no-state`) | Owner decision. The log is the learner's history, which the `gym-coach` skill reads, and an agent's checks through MCP would be counted as the learner's   |
 
 The owner also decided that `merge_models` keeps writing back to `base`
-by default. Workstream 2 adds an explicit output path beside it.
+by default; #637 made its tool description say so. Workstream 2 adds an
+explicit output path beside it.
 
 ### Corrections to the audit
 
@@ -80,7 +81,6 @@ In scope, as requirements:
 - When `npm run audit:surfaces -- --check` runs, the system shall fail on a CLI command or option that has no MCP or VS Code counterpart and no row in the baseline, and on a baseline row no longer detected. When a built surface it reads is missing, it shall exit 2.
 - When a VS Code language-model tool wraps an MCP tool, it shall declare every parameter that MCP tool declares, except parameters the baseline excludes with a reason.
 - When `import_model` or `merge_models` receives an output path, the system shall write the result there under the posture open decision 2 settles (barwise-pks).
-- When `merge_models` is described to a client, its description shall say that it writes back to `base` (barwise-xjf).
 - When `export_model` writes an artifact to disk, the system shall record it in the lineage manifest as `barwise export` does (barwise-ace).
 - When `barwise_import_transcript` runs in VS Code, it shall accept `base`, `alternatives`, `samples` and an output path, and read `transcript` from disk when given a file path (barwise-0wa.pte).
 - When `barwise_review_model` runs in VS Code, it shall accept a project manifest and a `domain`.
@@ -158,8 +158,8 @@ done: its rows disappear. The VS Code parameter pin in
 ### 2. Write paths (provisional)
 
 `import_model` and `merge_models` gain an output path on MCP and VS
-Code, and `merge_models` states its write-back in its description
-(barwise-xjf). An `export_model` write records lineage (barwise-ace),
+Code. `merge_models` already discloses its write-back in its
+description (#637, barwise-xjf). An `export_model` write records lineage (barwise-ace),
 so the lineage tools can see what the other surfaces export. A relative path in VS Code resolves through `resolveWriteDir`
 (from `split-model-tool.spec.md`). This is the failure the user hit:
 `@barwise` receives only barwise-tagged tools, so a tool that cannot
