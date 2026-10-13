@@ -230,19 +230,28 @@ it is qualified by `barwise.enableMcpServer`, which defaults on.
 | `review`                                              | yes | yes | yes     | none (VS Code as a language-model tool)                                                                    |
 | schema, diff, query, describe, lineage, impact        | yes | yes | yes     | none (VS Code as language-model tools)                                                                     |
 | `merge`                                               | yes | yes | yes     | deliberate: MCP and VS Code write back to the base file (editing tools); the CLI never modifies its inputs |
-| `gym`                                                 | yes | yes | no      | deliberate: the editor has no exercise surface                                                             |
+| `gym`                                                 | yes | yes | no      | not yet: surface-mirroring WS4-5 (barwise-fbi)                                                             |
+| gym session log (`--emit-misses`, `--no-state`)       | yes | no  | no      | deliberate (owner): the log is the learner's own history                                                   |
 | `project split`                                       | yes | yes | yes     | none (VS Code as a language-model tool)                                                                    |
-| `project init`                                        | yes | no  | no      | under review: the surface audit, barwise-0wa                                                               |
-| `history`                                             | yes | no  | no      | deliberate: repository operations (reads git)                                                              |
-| `prompt`                                              | yes | no  | no      | deliberate: dev tooling                                                                                    |
-| `llm-usage`                                           | yes | no  | no      | deliberate: reads a local operator log                                                                     |
+| `project init`                                        | yes | no  | no      | not yet: surface-mirroring WS5                                                                             |
+| `history`                                             | yes | no  | no      | not yet: surface-mirroring WS6                                                                             |
+| `prompt eval`, `prompt run`                           | yes | no  | no      | deliberate: a recorded score needs an attributable model                                                   |
+| `prompt schema`, `prompt artifact`                    | yes | no  | no      | not yet: surface-mirroring WS8                                                                             |
+| `prompt score`, `rescore`, `history`, `compare`       | yes | no  | no      | not yet: surface-mirroring WS8 (open decision 1)                                                           |
+| `import batch`                                        | yes | no  | no      | deliberate: an evaluation sweep, the prompt lane's job                                                     |
+| `llm-usage`                                           | yes | no  | no      | deliberate: only the CLI writes the call log                                                               |
 | prompt-artifact override (`--artifacts`)              | yes | no  | no      | deliberate: candidates are measured, not sent                                                              |
-| multi-sample import (`--samples`)                     | yes | yes | no      | deliberate: an editor wants one quick pass                                                                 |
-| thinking-budget override (`--thinking-budget`)        | yes | no  | no      | deliberate: an experiment dimension, recorded per history row                                              |
-| reference inference (`--infer-references`)            | yes | no  | no      | deliberate: a warehouse-import option, no use elsewhere yet                                                |
+| multi-sample import (`--samples`)                     | yes | yes | no      | not yet: surface-mirroring WS3                                                                             |
+| thinking-budget override (`--thinking-budget`)        | yes | no  | no      | deliberate: only on `prompt eval` and `prompt run`                                                         |
+| reference inference (`--infer-references`)            | yes | no  | no      | not yet: surface-mirroring WS7                                                                             |
 
-Every remaining gap is marked deliberate, which is the point: an
-unmarked gap is a bug.
+Every remaining gap is marked either deliberate, with a reason the
+owner approved, or not yet, with the workstream of
+`docs/specs/surface-mirroring.spec.md` that closes it; an unmarked gap
+is a bug. The table compares commands, so it cannot show option-level
+gaps under a row that reads "none": `docs/cli-surface-audit-2026-10-12.md`
+(section 2) lists those, and that spec's workstream 1 turns the list
+into a checked baseline.
 
 The `--artifacts` row hides a boundary the table's own axis cannot
 show, because it falls _within_ the CLI rather than between surfaces:
@@ -277,10 +286,11 @@ similar names; the `project` rows are correct.
 
 `llm-usage` reports over the JSONL call log under the operator's own
 state directory (`docs/specs/llm-call-observability.spec.md`). It stays
-CLI-only for a reason the other dev-tooling rows do not share: the log
-is written by whichever process made the calls, so a report from the
-MCP server or the editor would summarise that surface's own log and
-quietly answer a different question than the operator asked.
+CLI-only for a reason the other dev-tooling rows do not share: only the
+CLI writes the log (`withCallLog` wraps clients in `cli/src` alone), so
+a report from the MCP server or the editor would leave out that
+surface's own calls and quietly answer a different question than the
+operator asked.
 
 The `merge` and `review` rows were closed by
 `docs/specs/cli-surface-parity.spec.md`. Two audit findings remain open
