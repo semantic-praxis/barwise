@@ -91,22 +91,28 @@ Gates must hold in an arm for it to be eligible; they do not choose
 between arms. Deciders choose. Reported measures inform an adoption spec
 and decide nothing. Inventory gives each one's instrument and baseline.
 
-| #  | Criterion                    | Stands for                                 | Role                  |
-| -- | ---------------------------- | ------------------------------------------ | --------------------- |
-| G1 | Behavior preserved           | No user-visible change                     | gate                  |
-| G2 | YAML layout preserved        | Users' model diffs stay quiet              | gate                  |
-| G3 | No unchecked must-agree copy | Drift defects like barwise-5fg             | gate                  |
-| D1 | Change amplification         | Cost and drift risk of the next field      | decider               |
-| D2 | Malformed-input reporting    | Time to fix a bad model; no silent loss    | completion bar        |
-| D3 | Startup latency              | Paid by every CLI command and MCP start    | decider, threshold    |
-| D4 | Agent cost to correct code   | The claim that prompted this               | decider if resolvable |
-| R1 | Consumer radius              | Migration cost of the four remaining kinds | reported, tripwire    |
-| R2 | Bundle size                  | Shadow of D3                               | reported              |
-| R3 | Source size                  | Shadow of D1                               | reported              |
+| #  | Criterion                    | Stands for                                   | Role                  |
+| -- | ---------------------------- | -------------------------------------------- | --------------------- |
+| G1 | Valid input unchanged        | Nothing changes for a model that loads today | gate                  |
+| G2 | YAML layout preserved        | Users' model diffs stay quiet                | gate                  |
+| G3 | No unchecked must-agree copy | Drift defects like barwise-5fg               | gate                  |
+| D1 | Change amplification         | Cost and drift risk of the next field        | decider               |
+| D2 | Malformed-input reporting    | Time to fix a bad model; no silent loss      | completion bar        |
+| D3 | Startup latency              | Paid by every CLI command and MCP start      | decider, threshold    |
+| D4 | Agent cost to correct code   | The claim that prompted this                 | decider if resolvable |
+| R1 | Consumer radius              | Migration cost of the four remaining kinds   | reported, tripwire    |
+| R2 | Bundle size                  | Shadow of D3                                 | reported              |
+| R3 | Source size                  | Shadow of D1                                 | reported              |
 
 D2 is a completion bar, not a decider: Appendix A makes it part of the
 brief, so an arm is not finished until it clears it, and what the bar
 costs each arm shows up in D1, R3 and D4.
+
+G1 covers valid input only. D2 changes what malformed input produces --
+every problem, each naming the object type and the field, where today
+one plain `Error` names the first -- and that change is the point of the
+brief, not a breach of G1. A test that pins today's first-error message
+may be updated in either arm; each such edit is listed and counted.
 
 **Decision rule.** Recommend Effect for the rest of barwise-973 only if
 the Effect arm clears G1-G3, stays within the D3 threshold on both
@@ -390,9 +396,11 @@ Merges only if the rule adopts, and then through an adoption spec.
 ### 3. Agent trials (provisional: not yet grounded)
 
 Claude Code subagents, each in its own worktree, one pinned model, the
-same prompt but for the style line; the Effect prompt carries an Effect 4
-primer, written in this workstream, since the model's training predates
-4.0. First a pilot of three
+same prompt but for the style line and a primer of similar length, both
+written in this workstream: an Effect 4 primer for the Effect arm, since
+the model's training predates 4.0, and the sealed-record conventions of
+`core-branching-load.spec.md` WS1 for the plain arm, so that context size
+is not the difference measured. First a pilot of three
 T1 runs on the plain arm to measure spread and cost; then T1 on both
 arms; then T2 only if T1 resolves or D1 and D2 split (Open decision 4).
 T1 and T2 branches are thrown away.
@@ -410,7 +418,8 @@ None on `main` until WS4. WS0 adds two tests, a fixture directory and
 one script; the prerequisite tightens the loader and the JSON Schema for
 a document no example contains. The arms live on branches. Either arm's
 merge keeps `OrmModel.addObjectType` and `OrmYamlSerializer` signatures,
-so the radius beyond core is the id source alone (Open decision 1).
+so the radius beyond core is the id source (Open decision 1) and the
+error text a malformed object type produces (D2).
 
 ## Open decisions (for review)
 
@@ -458,7 +467,8 @@ so the radius beyond core is the id source alone (Open decision 1).
 
 ## Non-goals
 
-- No change to any surface, command, or file format.
+- No change to any surface, command, or file format on `main` before
+  WS4, beyond barwise-5fg's refusal of a document that loses data today.
 - No Effect anywhere on `main` before WS4 decides.
 - No conclusion about Effect in the outer packages; this tests only the
   sealed-record slice and the two agent tasks.
@@ -473,10 +483,12 @@ Given to both arms verbatim, with one line differing.
 > when the name is the problem) and the field. Take the id source as
 > Open decision 1 resolves. `OrmModel.addObjectType` and
 > `OrmYamlSerializer.deserialize` keep their signatures and route through
-> the decoder. Behavior visible outside core does not change: the full
-> suite, `validate:examples` and the promptlab drift test stay green, and
-> you may not edit the WS0 tests, the law tests or any golden file.
-> Unit tests of `createObjectType` may change; say which and why.
+> the decoder. For a model that loads today nothing visible changes: the
+> full suite, `validate:examples` and the promptlab drift test stay green,
+> and you may not edit the WS0 tests, the law tests or any golden file.
+> For malformed input the error a caller receives changes as this brief
+> requires. Unit tests of `createObjectType`, and tests that pin today's
+> first-error message, may change; list each one and say why.
 >
 > Plain arm: write it in TypeScript with no new dependency.
 >
