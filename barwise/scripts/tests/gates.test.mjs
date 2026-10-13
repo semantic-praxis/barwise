@@ -4367,6 +4367,30 @@ test("check-tracker-closes refuses a tracker that does not parse rather than cra
   }
 });
 
+test("check-tracker-closes reads a tracker larger than execFileSync's default 1 MiB buffer", () => {
+  // The real tracker crossed 1 MiB on 2026-10-12 (barwise-jk7), and from
+  // then on `git show` overflowed the default buffer and every run refused.
+  const r = trackerRepo();
+  try {
+    const pad = "x".repeat(4096);
+    const rows = Array.from({ length: 300 }, (_, i) => ({ id: `p${i}`, status: "open", pad }));
+    const write = (status) =>
+      writeFileSync(
+        join(r.dir, ".beads", "issues.jsonl"),
+        [{ id: "a", status }, ...rows].map((row) => JSON.stringify(row)).join("\n") + "\n",
+      );
+    write("open");
+    const bigBase = r.commit("grow the tracker past 1 MiB");
+    write("closed");
+    r.commit("close a");
+    const out = r.run({ BASE_SHA: bigBase });
+    assert.equal(out.status, 0, out.stderr);
+    assert.match(out.stdout, /1 close\(s\), tracker-only/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
 test("check-tracker-closes refuses with no base rather than reporting clean", () => {
   const r = trackerRepo();
   try {

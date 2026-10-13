@@ -28,6 +28,7 @@ flowchart LR
         GD["generate_diagram"]
         DM["diff_models"]
         MM["merge_models"]
+        EM["export_model"]
     end
 
     subgraph MCP_Outputs["MCP Outputs"]
@@ -38,12 +39,7 @@ flowchart LR
         SVGO["SVG diagram"]
         DF["Diff report\ndeltas and breaking levels"]
         MRG["Merged orm.yaml"]
-    end
-
-    subgraph CLI_Exports["CLI Exports"]
-        DBT["dbt project"]
-        AV["Avro schemas"]
-        OA["OpenAPI 3.0"]
+        ART["DDL, dbt, OpenAPI,\nAvro, NORMA"]
     end
 
     T --> IT --> F
@@ -54,17 +50,16 @@ flowchart LR
     F --> GD --> SVGO
     F --> DM --> DF
     DM -.-> MM --> MRG
-
-    F --> DBT
-    F --> AV
-    F --> OA
+    F --> EM --> ART
 ```
 
 **Typical flow**: start with a transcript or existing `.orm.yaml`,
 validate it, verbalize to confirm domain semantics, then generate
-artifacts. The MCP server produces DDL, JSON schema mappings, and SVG
-diagrams directly. For dbt, Avro, and OpenAPI output, use the barwise
-CLI (`barwise export <file> --format dbt|avro|openapi`).
+artifacts. `export_model` produces every registered export format (DDL,
+dbt, OpenAPI, Avro, NORMA); `generate_schema` and `generate_diagram`
+produce the relational mapping and the SVG diagram. For a walkthrough of
+the whole workflow, see
+[getting-started/mcp.md](getting-started/mcp.md).
 
 ---
 
@@ -72,9 +67,11 @@ CLI (`barwise export <file> --format dbt|avro|openapi`).
 
 ### Option 1: VS Code Extension (recommended)
 
-Install the **Barwise ORM Modeler** extension. All seven tools are
-registered with VS Code's Language Model Tool API and appear
-automatically in Copilot Chat -- no configuration needed.
+Install the **Barwise ORM Modeler** extension. Fifteen of the server's
+tools are registered with VS Code's Language Model Tool API and appear
+automatically in Copilot Chat -- no configuration needed. The gym tools and
+`analyze_repository` are not among them; repository analysis is the
+**ORM: Analyze Repository** palette command instead.
 
 You can reference any tool directly in Copilot Chat using `#`:
 
@@ -84,7 +81,15 @@ You can reference any tool directly in Copilot Chat using `#`:
 - `#barwiseDiff` -- compare two models
 - `#barwiseDiagram` -- generate an SVG diagram
 - `#barwiseImport` -- extract a model from a transcript
-- `#barwiseMerge` -- merge two models
+- `#barwiseMerge` -- merge two models (writes the base file)
+- `#barwiseExport` -- export to any registered format
+- `#barwiseDescribe` -- summarize entities and rules
+- `#barwiseQuery` -- run a structural query
+- `#barwiseImportModel` -- import DDL, SQL, OpenAPI, NORMA, dbt or code
+- `#barwiseReview` -- LLM review of a model
+- `#barwiseLineage` -- check exported artifacts for staleness
+- `#barwiseImpact` -- list artifacts built from an element
+- `#barwiseSplit` -- split a model into a multi-domain project
 
 The extension also registers an MCP stdio server for external tools
 that discover MCP servers through VS Code.
@@ -94,18 +99,20 @@ VS Code settings.
 
 **LLM provider for transcript import**: The VS Code extension uses your
 Copilot subscription by default -- no API key needed. To use Anthropic
-instead, set `barwise.llmProvider` to `"anthropic"` and configure
-`barwise.anthropicApiKey` in settings.
+instead, set `barwise.llmProvider` to `"anthropic"` and run
+**Barwise: Set Anthropic API Key**, which stores the key in the OS keychain.
 
 ### Option 2: Standalone (Claude Code, Claude Desktop, Cursor, etc.)
 
-For AI tools outside VS Code, run the MCP server via npx:
+For AI tools outside VS Code, download `barwise-mcp-<version>.cjs` from the
+[releases page](https://github.com/semantic-praxis/barwise/releases) and run
+it with Node. It is a single file with no dependencies. (From a clone,
+`npm run build` produces `packages/mcp/dist/index.js`, which works the same
+way.) The barwise packages are not published to npm, so `npx @barwise/mcp`
+does not work.
 
-```
-npx @barwise/mcp
-```
-
-No clone, no build, no extra dependencies.
+Every configuration below uses `node` and the file's absolute path; replace
+`/path/to/barwise-mcp.cjs` with yours.
 
 **LLM provider for transcript import**: The standalone server requires
 an LLM provider configured via environment variables:
@@ -118,15 +125,18 @@ required).
 
 #### Claude Code
 
-Add to `.claude/settings.json` (project) or
-`~/.claude/settings.json` (global):
+```sh
+claude mcp add --scope user barwise -- node /path/to/barwise-mcp.cjs
+```
+
+Or, for one project, a `.mcp.json` at the project root:
 
 ```json
 {
   "mcpServers": {
     "barwise": {
-      "command": "npx",
-      "args": ["@barwise/mcp"]
+      "command": "node",
+      "args": ["/path/to/barwise-mcp.cjs"]
     }
   }
 }
@@ -141,23 +151,23 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`
 {
   "mcpServers": {
     "barwise": {
-      "command": "npx",
-      "args": ["@barwise/mcp"]
+      "command": "node",
+      "args": ["/path/to/barwise-mcp.cjs"]
     }
   }
 }
 ```
 
-#### Cursor / Windsurf
+#### Cursor
 
-Add to `.cursor/mcp.json` or `.windsurf/mcp.json` in your project:
+Add to `.cursor/mcp.json` in your project:
 
 ```json
 {
   "mcpServers": {
     "barwise": {
-      "command": "npx",
-      "args": ["@barwise/mcp"]
+      "command": "node",
+      "args": ["/path/to/barwise-mcp.cjs"]
     }
   }
 }
@@ -173,8 +183,8 @@ If you prefer not to install the Barwise extension, add to
   "servers": {
     "barwise": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["@barwise/mcp"]
+      "command": "node",
+      "args": ["/path/to/barwise-mcp.cjs"]
     }
   }
 }
@@ -236,14 +246,8 @@ The `review-model` prompt automates this sequence (see Prompts below).
 - **generate_diagram** -- produces an SVG diagram with object types,
   fact types, constraints, and their relationships
 
-For additional export formats, use the barwise CLI:
-
-- `barwise export <file> --format dbt` -- generate a dbt project
-  (schema.yml + model SQL files)
-- `barwise export <file> --format avro` -- generate Avro schemas
-  (.avsc files)
-- `barwise export <file> --format openapi` -- generate an OpenAPI 3.0
-  spec
+- **export_model** with `format: "dbt"`, `"openapi"`, `"avro"` or
+  `"norma"` -- every other registered export format
 
 ### Work with a multi-domain project
 
@@ -525,6 +529,11 @@ The `yaml` field contains the merged model. If `valid` is false, the
 `diagnostics` array lists structural errors that should be resolved
 before saving.
 
+**When `base` is a file path and the merge is valid, the tool writes the
+merged model over that file** and reports the path in `writtenTo`. Pass the
+base as inline YAML to get the result without a write. The CLI's
+`barwise merge` differs: it never modifies its inputs.
+
 ---
 
 ### split_model
@@ -585,8 +594,8 @@ two contexts is dropped with a warning.
 
 ### export_model
 
-Export an ORM model to a registered format (DDL, OpenAPI, Avro, SQL,
-NORMA, dbt).
+Export an ORM model to a registered format (DDL, OpenAPI, Avro, NORMA,
+dbt).
 
 | Parameter    | Type             | Required | Description                                                                                                                                                                                                                               |
 | ------------ | ---------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -703,7 +712,9 @@ against the lineage manifest.
 **Returns** JSON staleness report: which exported artifacts are stale
 (out of date with the model) versus fresh (up to date). The manifest is
 looked up next to the model file when `source` is a path; for inline
-YAML it falls back to the server's working directory.
+YAML it falls back to the server's working directory. Only the CLI's
+`barwise export` records artifacts in the manifest; `export_model` does
+not, so artifacts exported through this server are not reported.
 
 ---
 

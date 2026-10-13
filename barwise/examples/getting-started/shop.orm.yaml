@@ -1,0 +1,111 @@
+orm_version: "2.0"
+model:
+  name: Shop
+  domain_context: shop
+  object_types:
+    - id: customer
+      name: Customer
+      kind: entity
+      reference_mode: customer_number
+      definition: A person or organization that buys from the shop.
+    - id: customer-number
+      name: CustomerNumber
+      kind: value
+      definition: The number the shop assigns to a customer when they first order.
+      data_type:
+        name: integer
+    - id: sales-order
+      name: SalesOrder
+      kind: entity
+      reference_mode: order_number
+      definition: A request by one customer for goods, from checkout to delivery.
+    - id: order-number
+      name: OrderNumber
+      kind: value
+      definition: The number printed on the order confirmation.
+      data_type:
+        name: integer
+    - id: order-status
+      name: OrderStatus
+      kind: value
+      definition: Where an order is in fulfillment.
+      data_type:
+        name: text
+        length: 10
+      value_constraint:
+        values: [pending, shipped, delivered]
+  fact_types:
+    - id: customer-has-number
+      name: Customer has CustomerNumber
+      roles:
+        - id: customer-has-number.customer
+          player: customer
+          role_name: has
+        - id: customer-has-number.number
+          player: customer-number
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [customer-has-number.number]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [customer-has-number.customer]
+        - type: mandatory
+          role: customer-has-number.customer
+    - id: order-has-number
+      name: SalesOrder has OrderNumber
+      roles:
+        - id: order-has-number.order
+          player: sales-order
+          role_name: has
+        - id: order-has-number.number
+          player: order-number
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [order-has-number.number]
+          is_preferred: true
+        - type: internal_uniqueness
+          roles: [order-has-number.order]
+        - type: mandatory
+          role: order-has-number.order
+    - id: customer-places-order
+      name: Customer places SalesOrder
+      roles:
+        - id: customer-places-order.customer
+          player: customer
+          role_name: places
+        - id: customer-places-order.order
+          player: sales-order
+          role_name: is placed by
+      readings:
+        - "{0} places {1}"
+        - "{1} is placed by {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [customer-places-order.order]
+        - type: mandatory
+          role: customer-places-order.order
+    - id: order-has-status
+      name: SalesOrder has OrderStatus
+      roles:
+        - id: order-has-status.order
+          player: sales-order
+          role_name: has
+        - id: order-has-status.status
+          player: order-status
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles: [order-has-status.order]
+        - type: mandatory
+          role: order-has-status.order

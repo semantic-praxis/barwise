@@ -59,7 +59,7 @@ This walkthrough uses `university-enrollment.md` but any transcript works.
 ### 1. Import a transcript
 
 1. Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`).
-2. Run **ORM: Import Transcript**.
+2. Run **Barwise: Import...** and choose **From Transcript**.
 3. Navigate to `examples/transcripts/` and select `university-enrollment.md`.
 4. When prompted for a model name, type `university-enrollment` (or accept the default).
 5. The extension calls the LLM to extract entity types, value types, fact types,
@@ -68,17 +68,17 @@ This walkthrough uses `university-enrollment.md` but any transcript works.
    An information message reports how many object types, fact types, and
    constraints were extracted.
 
-Check the **Output** panel (View > Output) and select **ORM Transcript Import**
+Check the **Output** panel (View > Output) and select **Barwise Transcript Import**
 from the dropdown. This channel shows any ambiguities the LLM flagged
 (e.g., terminology disagreements between stakeholders), extraction warnings,
 and constraints that were skipped along with the reason.
 
 ### 2. Validate the model
 
-1. With `university-enrollment.orm.yaml` open, run **ORM: Validate Model**.
+1. With `university-enrollment.orm.yaml` open, run **Barwise: Validate Model**.
 2. The validation engine checks structural rules (required fields, ID
    uniqueness, role-player consistency) and constraint consistency.
-3. Results appear in the **ORM Validation** output channel:
+3. Results appear in the **Barwise Validation** output channel:
    - Errors (structural problems that must be fixed)
    - Warnings (missing definitions, ambiguous readings)
 4. A toast notification summarizes the result. If errors are reported, fix
@@ -86,8 +86,8 @@ and constraints that were skipped along with the reason.
 
 ### 3. Verbalize the model
 
-1. With the `.orm.yaml` file open, run **ORM: Verbalize Model**.
-2. The **ORM Verbalization** output channel shows natural-language readings
+1. With the `.orm.yaml` file open, run **Barwise: Verbalize Model**.
+2. The **Barwise Verbalization** output channel shows natural-language readings
    for every fact type and constraint. For example:
 
    ```
@@ -104,7 +104,7 @@ and constraints that were skipped along with the reason.
 
 ### 4. View the diagram
 
-1. Run **ORM: Show Diagram**.
+1. Run **Barwise: Show Diagram**.
 2. A webview panel opens beside the editor showing the ORM diagram as SVG:
    - Entity types appear as rounded rectangles with solid borders.
    - Value types appear as ovals with dashed borders.
@@ -118,7 +118,7 @@ and constraints that were skipped along with the reason.
 After reviewing the diagram or verbalizations, you may want to refine the
 model by re-importing the same transcript (or an updated one):
 
-1. Run **ORM: Import Transcript** again, selecting the same or a revised transcript.
+1. Run **Barwise: Import...** > **From Transcript** again, selecting the same or a revised transcript.
 2. Because `university-enrollment.orm.yaml` already exists, the extension
    diffs the new extraction against the existing model.
 3. A multi-select dialog appears listing every added, modified, or removed
@@ -134,8 +134,9 @@ The extension supports two LLM providers.
 GitHub Copilot extension to be installed and signed in. No API key needed.
 
 **Anthropic (direct)** -- uses the Anthropic SDK. Set `barwise.llmProvider` to
-`"anthropic"` in VS Code settings and provide your key via `barwise.anthropicApiKey`
-or the `ANTHROPIC_API_KEY` environment variable.
+`"anthropic"` in VS Code settings and run **Barwise: Set Anthropic API Key**,
+which stores the key in the OS keychain (an `ANTHROPIC_API_KEY` in the editor's
+environment also works).
 
 ## Writing your own transcripts
 
