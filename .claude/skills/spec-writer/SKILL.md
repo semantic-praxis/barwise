@@ -185,6 +185,12 @@ reverse.
   landed as a deletion the draft never considered
   (`tracker-quick-wins.spec.md`, WS2). Before an Inventory row says
   "change X", ask what would make X run, and whether anything can.
+- **Criteria can all be met at once**: when a spec fixes decision
+  criteria or gates in advance, walk the outcome where everything goes
+  as intended and check it passes every gate. `effect-comparison.spec.md`
+  shipped a gate of "no user-visible change" beside a required change to
+  malformed-input errors, so no finished arm could have been eligible;
+  review, not the draft's own passes, caught it.
 - **Header block is current** -- `Status`, `Created`, `Last-updated`
   (bumped if this push revises an existing spec), `Tracking`.
 - **Parity check**: if the design introduces a copy that must agree
