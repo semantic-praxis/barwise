@@ -1,11 +1,14 @@
 /**
  * Tests for the merge_models tool.
  */
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { copyFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createServer } from "../../src/server.js";
 import { executeMerge } from "../../src/tools/merge.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -84,5 +87,20 @@ describe("merge_models tool", () => {
     const result = executeMerge(baseCopy, baseCopy);
     expect(result.content).toHaveLength(1);
     expect(result.content[0]!.type).toBe("text");
+  });
+});
+
+describe("merge_models registration", () => {
+  it("tells the caller that a file-path base is written back", async () => {
+    // The write-back is deliberate here (MCP and VS Code are editing tools)
+    // and absent from the CLI's `barwise merge`. An agent learns it only
+    // from this description, which used to tell it to write the result to a
+    // file itself (barwise-xjf).
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "merge-test", version: "0.0.0" });
+    await Promise.all([client.connect(clientTransport), createServer().connect(serverTransport)]);
+    const tool = (await client.listTools()).tools.find((t) => t.name === "merge_models");
+    await client.close();
+    expect(tool?.description).toMatch(/written back to that file/);
   });
 });

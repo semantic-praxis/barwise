@@ -90,7 +90,8 @@ depending on where you run it:
 
 - **Merging writes to different places.** `barwise merge` never changes either
   input file; the MCP tool and the VS Code chat tool write the merged model over
-  the base file.
+  the base file. That is by design: those two are editing tools, so a merge
+  lands in the model you are working on.
 - **Re-importing onto an existing file.** Transcript import merges into an
   existing model; the deterministic importers (DDL, dbt, SQL, code) overwrite
   it. Import to a new file and merge when you want to keep hand edits.
