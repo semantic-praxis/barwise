@@ -247,6 +247,12 @@
       "caught_by": "execution",
       "note": "Seven of the ten anchors behind the first-draft criteria were wrong or only partly right, and every one was caught by running something rather than by re-reading: mutations of the serializer and the JSON Schema showed which byte and enum drifts no test sees, a load of malformed YAML showed first-error-only reporting and a silent field drop (barwise-5fg), a scratch Effect probe showed array-index messages, and timing the CLI with an Effect import showed the startup cost no criterion had named. The one anchor not caught (agent-run spread) cannot be executed before the trials, and the spec says so."
     },
+    "effect-comparison::b2971af79a5b": {
+      "spec": "effect-comparison.spec.md",
+      "excerpt": "1. the id source, in both arms. barwise-e8m rules out \"injected effect ports\" in core, and one has existed since 2026-07-25: setidgenerator, installed by every ",
+      "caught_by": "reasoning",
+      "note": "Open decision 3 first recommended a 10% relative startup threshold. The user, reviewing it, said startup time was not a worry and asked what a person would notice; measuring today's CLI (barwise validate about 0.7 s) against the usual response-time thresholds (about 1 s before a wait interrupts a train of thought) showed the 10% rule would reject changes no user could perceive. Replaced by an absolute 1-second gate. Caught by a human review question and the reasoning it prompted; the measurement only supplied the number."
+    },
     "enterprise-trial::0bc207e81633": {
       "spec": "enterprise-trial.spec.md",
       "excerpt": "- the generator produces regular mess. a generator that emits 1,500 tables from a 60-type kernel emits 25 variations of each type; a real erp has 1,500 differen",

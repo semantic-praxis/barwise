@@ -16,9 +16,10 @@ builder of barwise-973, build the already-converted `ObjectType` slice to
 the same scope twice -- once in hand-written TypeScript as
 `core-branching-load.spec.md` intends, once with Effect -- measure both
 against criteria fixed here and tested before use, and let the result
-choose the style for the rest. Testing the criteria already found the
-cost most likely to decide it: one Effect Schema import adds 37% to the
-npm-installed CLI's startup (Open decision 3).
+choose the style for the rest. Testing the criteria found the cost that
+looked most likely to decide it, startup, and it does not: one Effect
+Schema import adds about 160 ms, and `barwise validate` takes about
+0.7 s today, inside the 1-second limit Open decision 3 settled on.
 
 ## Principle
 
@@ -60,7 +61,7 @@ code gets coding agents to correct code faster, because the type checker
 reports a missed failure or an unwired dependency before a test does.
 The evidence for it is adjacent (studies of type-error feedback to
 agents, in other languages) and none of it is specific to Effect, which
-is why D4 measures it rather than assumes it.
+is why D3 measures it rather than assumes it.
 
 ## Scope
 
@@ -96,17 +97,17 @@ and decide nothing. Inventory gives each one's instrument and baseline.
 | G1 | Valid input unchanged        | Nothing changes for a model that loads today | gate                  |
 | G2 | YAML layout preserved        | Users' model diffs stay quiet                | gate                  |
 | G3 | No unchecked must-agree copy | Drift defects like barwise-5fg               | gate                  |
+| G4 | Startup under 1 second       | Responsiveness of every CLI command          | gate                  |
 | D1 | Change amplification         | Cost and drift risk of the next field        | decider               |
 | D2 | Malformed-input reporting    | Time to fix a bad model; no silent loss      | completion bar        |
-| D3 | Startup latency              | Paid by every CLI command and MCP start      | decider, threshold    |
-| D4 | Agent cost to correct code   | The claim that prompted this                 | decider if resolvable |
+| D3 | Agent cost to correct code   | The claim that prompted this                 | decider if resolvable |
 | R1 | Consumer radius              | Migration cost of the four remaining kinds   | reported, tripwire    |
-| R2 | Bundle size                  | Shadow of D3                                 | reported              |
+| R2 | Bundle size                  | Shadow of G4                                 | reported              |
 | R3 | Source size                  | Shadow of D1                                 | reported              |
 
 D2 is a completion bar, not a decider: Appendix A makes it part of the
 brief, so an arm is not finished until it clears it, and what the bar
-costs each arm shows up in D1, R3 and D4.
+costs each arm shows up in D1, R3 and D3.
 
 G1 covers valid input only. D2 changes what malformed input produces --
 every problem, each naming the object type and the field, where today
@@ -115,16 +116,16 @@ brief, not a breach of G1. A test that pins today's first-error message
 may be updated in either arm; each such edit is listed and counted.
 
 **Decision rule.** Recommend Effect for the rest of barwise-973 only if
-the Effect arm clears G1-G3, stays within the D3 threshold on both
-distributions (a mitigation counts only if it ships in the arm and both
-arms are measured with it), is not resolvably worse on D4, and is better
-on D1 or resolvably better on D4. Otherwise resume barwise-973 in
-hand-written TypeScript, starting from the plain arm. A tie goes to
-TypeScript: the dependency is a cost no single criterion carries.
+the Effect arm clears G1-G4 (for G4, a mitigation counts only if it
+ships in the arm and both arms are measured with it), is not resolvably
+worse on D3, and is better on D1 or resolvably better on D3. Otherwise
+resume barwise-973 in hand-written TypeScript, starting from the plain
+arm. A tie goes to TypeScript: the dependency is a cost no single
+criterion carries.
 
-A D4 difference is resolvable when it exceeds twice the standard error
+A D3 difference is resolvable when it exceeds twice the standard error
 of the difference between arm means, computed from the runs. Below that,
-D4 casts no vote and the spec says so.
+D3 casts no vote and the spec says so.
 
 ## How each criterion was tested
 
@@ -186,7 +187,8 @@ cannot be tested without running the trials.
    "allow a port or not".
 9. **Bundle size stands in for what users feel -- a shadow, and the
    property is worse.** Measured directly in the table below. _Changed:_
-   startup (D3) decides; bundle size (R2) is reported.
+   startup is a gate with an absolute limit (Open decision 3); bundle
+   size (R2) is reported.
 10. **Agent runs vary less than the difference worth detecting --
     unverified.** It cannot be tested without runs. _Changed:_ a pilot
     measures spread first, and "unresolvable" is a stated outcome.
@@ -208,6 +210,25 @@ cache helps the baseline more than the probe, so the cost is loading
 Effect's module graph, not compiling it. Bundling is the mitigation that
 works, and today only the release asset is bundled (it grew 209 KB).
 
+Where today's `barwise validate` spends its time, measured 2026-10-13 on
+the npm package against a 531-line example model (703 ms median of 15
+runs), by `node --cpu-prof` and by timing each import alone in a fresh
+process:
+
+| Part                                                | Time         |
+| --------------------------------------------------- | ------------ |
+| Node process start                                  | about 50 ms  |
+| Importing all 19 commands (568 modules, 3.8 MB)     | about 350 ms |
+| -- of which `validate`'s own import chain           | about 150 ms |
+| Compiling the JSON Schema (`new SchemaValidator()`) | about 120 ms |
+| Parsing, validation rules, output                   | about 100 ms |
+
+The 1-second limit leaves about 300 ms. Two costs already in the CLI are
+each larger than the probe's 160 ms and unrelated to this comparison:
+the roughly 200 ms spent importing the 18 commands `validate` never runs
+(barwise-8nx), and the schema compile, paid on every model load in every
+short-lived process (barwise-aqa).
+
 ## Competing frames
 
 Three explanations for whatever the arms show, with the evidence that
@@ -215,10 +236,11 @@ tells them apart:
 
 - **F1, Effect pays for itself.** One definition removes copies, decoding
   collects problems for free, the id source shows in the type. Predicts:
-  Effect lower on D1, equal or better on D2, D4 not worse.
+  Effect lower on D1, equal or better on D2, D3 not worse.
 - **F2, hand-written TypeScript suffices.** A drift test per copy and a
   hand-written decoder reach the same D1 and D2 at no dependency or
-  startup cost. Predicts: D1 close, D3 favors TypeScript.
+  startup cost. Predicts: D1 close, and the slowdown G4 reports favors
+  TypeScript.
 - **F3, style is not where the cost is.** barwise-973's remaining cost is
   consumer migration, which is the same in both styles. Predicts: R1
   dwarfs any D1 difference. If F3 holds, the comparison cannot change
@@ -236,10 +258,10 @@ Assume the decision shipped and proved wrong. The likely stories:
   C) before running it.
 - **The comparison measured familiarity, not the approach.** Agents know
   Effect 3; 4.0.0 shipped 2026-10-01 with renamed APIs. Tripwire: if more
-  than a third of the Effect arm's red checks in D4 are API misuse
-  (classified by hand from transcripts), report D4 as measuring
+  than a third of the Effect arm's red checks in D3 are API misuse
+  (classified by hand from transcripts), report D3 as measuring
   familiarity and give it no vote.
-- **Startup regressed and nobody noticed.** D3 exists for this.
+- **Startup regressed and nobody noticed.** G4 exists for this.
 - **A field's YAML order changed and every user's model diff got noisy.**
   G2 exists for this.
 - **An agent passed by editing the tests.** The T1 and T2 scorer fails a
@@ -265,10 +287,10 @@ their locations are provisional until WS0 grounds them; the script is
 | G1 | Full suite, `validate:examples`, promptlab `referenceDrift.test.ts`    | green                                   |
 | G2 | New: `core/tests/serialization/objectTypeLayout.test.ts`               | missing; 5 of 10 optional fields pinned |
 | G3 | `audit:duplication -- --check`, `check:parity`; new enum drift test    | one unchecked copy (barwise-0lf)        |
+| G4 | New: script `startup`, `barwise validate`, median of 15, both builds   | `validate`: 703 ms npm, 566 ms bundle   |
 | D1 | New: script `diff` over passing T1 runs (Appendix B), median           | from the WS3 pilot                      |
 | D2 | New: fixtures in `core/tests/fixtures/malformed/`, script `malformed`  | first problem only; one silent loss     |
-| D3 | New: script `startup`, `barwise validate`, median of 10, both builds   | `--version`: 436 ms npm, 380 ms bundle  |
-| D4 | New: script `trial` -- oracle pass, tokens, tool calls, time, red runs | spread from the WS3 pilot               |
+| D3 | New: script `trial` -- oracle pass, tokens, tool calls, time, red runs | spread from the WS3 pilot               |
 | R1 | New: script `diff`, files outside `core/src/{model,serialization}`     | WS1 step 1 changed 30 files in all      |
 | R2 | New: script `bundles`, `--force` builds of the vscode and CLI bundles  | 8.21, 8.81, 1.25, 0.74 MB; CLI 7.92 MB  |
 | R3 | New: script `diff`, lines in the slice's files                         | 440 (332 + 108)                         |
@@ -349,8 +371,7 @@ The tests the criteria need, landed on `main` before anything is built,
 each proven by a deliberate break the way the grounding above proved the
 existing ones -- through `barwise/scripts/mutate.mjs`, not by hand, and
 with a `--force` rebuild after each restore wherever a bundle is read
-(barwise-r7j). The startup instrument comes first, because Open decision
-3 may end the experiment on its reading alone:
+(barwise-r7j):
 
 - `measure-comparison.mjs startup | bundles | malformed | diff | trial`, each
   exiting 2 when it cannot see its input. `startup` and `bundles` build
@@ -437,22 +458,22 @@ error text a malformed object type produces (D2).
    and `ajv` "without discussion"; this spec is that discussion for one
    branch. Recommend: yes, pinned exactly at a 4.0.x release, never
    merged except through an adoption spec.
-3. **The startup threshold (D3).** Recommend a 10% median regression on
-   `barwise validate`, on both distributions. At the measured probe
-   numbers the Effect arm exceeds that on the npm package (+37% for one
-   import) and sits at the line on the release bundle (+10%), so this
-   decision may settle the experiment by itself. The mitigation that
-   works is shipping the npm `bin` as a bundle, which would also speed up
-   today's CLI; under the rule it counts only if both arms are measured
-   with it. A reviewer who considers +37% decisive can stop after WS0's
-   startup instrument confirms it.
+3. **The startup limit (G4) -- resolved 2026-10-13: an absolute 1
+   second.** `barwise validate` on a typical model stays under 1 second,
+   median, on both the npm package and the release bundle; the slowdown
+   against today is reported and judges nothing. The draft recommended a
+   10% relative threshold, which would have rejected changes no user
+   could notice: about 1 second is where a wait starts to interrupt a
+   person's train of thought, and today's CLI sits near 0.7 s, inside
+   it. At the probe numbers the Effect arm passes with the
+   `effect/Schema` import and fails with the full `effect` entry point.
 4. **Agent trial size.** Recommend a pilot of three T1 runs, then five T1
    runs per arm, and two T2 runs per arm only if T1 resolves or D1 and D2
    split. Each T2 run is about the size of WS1 step 1 (30 files), so T2
    is the expensive part; the pilot measures the cost before committing.
 5. **Effect version.** Recommend 4.0.x, pinned exactly. 3.22 is mature
    and better known to agents, but adopting it now means a forced major
-   migration later; the familiarity risk is what the D4 tripwire watches.
+   migration later; the familiarity risk is what the D3 tripwire watches.
 
 ## Risks and testing
 
