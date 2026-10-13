@@ -6,6 +6,7 @@
     "beads-ids.test.mjs": 3,
     "ci-conditions.test.mjs": 13,
     "gates.test.mjs": 199,
+    "measure-comparison.test.mjs": 6,
     "python-uv-guard.test.mjs": 32,
     "session-start.test.mjs": 5
   }
