@@ -63,7 +63,7 @@ const { registerLanguageModelTools } = await import("../../src/mcp/ToolRegistrat
 const here = dirname(fileURLToPath(import.meta.url));
 const manifest = JSON.parse(
   readFileSync(join(here, "../../package.json"), "utf-8"),
-) as { contributes?: { languageModelTools?: { name: string; }[]; }; };
+) as { contributes?: { languageModelTools?: { name: string; modelDescription?: string; }[]; }; };
 
 function registerAll(): string[] {
   state.registered.length = 0;
@@ -107,6 +107,16 @@ describe("VS Code language-model tool registration", () => {
     const declared = (manifest.contributes?.languageModelTools ?? []).map((t) => t.name).sort();
     expect(declared.length, "package.json declares no languageModelTools").toBeGreaterThan(0);
     expect(registerAll()).toEqual(declared);
+  });
+
+  it("tells the model that the merge tool writes a file-path base back", () => {
+    // Deliberate on this surface (an editing tool) and absent from the CLI's
+    // `barwise merge`; the declaration is the only place a model learns it
+    // (barwise-xjf).
+    const merge = (manifest.contributes?.languageModelTools ?? []).find(
+      (t) => t.name === "barwise_merge_models",
+    );
+    expect(merge?.modelDescription).toMatch(/written back to disk/);
   });
 
   it("registers nothing when the MCP server is disabled", () => {

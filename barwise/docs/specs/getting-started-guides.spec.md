@@ -147,8 +147,9 @@ guide paragraph impossible to forget.
 - **Which divergences are deliberate.** The audit marks each finding as a
   defect or as undecided, and this spec decides none. The owner's direction to
   mirror the CLI (barwise-0wa) settles the default for gaps in reach; it does
-  not settle behavioral divergences such as merge write-back, which
-  `cli-surface-parity.spec.md` records as deliberate and barwise-xjf reopens.
+  not settle behavioral divergences. Merge write-back is settled: on 2026-10-13
+  the owner confirmed it, because MCP and VS Code are editing tools
+  (barwise-xjf), and the capability matrix now records it.
 - **Whether the hub belongs at the repository root.** The request named
   `GETTING_STARTED.md`, and README is at the root, so that is where a visitor
   looks. The per-surface guides live under `barwise/docs/` with the other

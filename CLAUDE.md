@@ -224,22 +224,22 @@ divergence that had not held for some time (barwise-988). Where a row's
 VS Code answer rests on the tool registration rather than the palette,
 it is qualified by `barwise.enableMcpServer`, which defaults on.
 
-| Capability                                            | CLI | MCP | VS Code | Divergence                                                    |
-| ----------------------------------------------------- | --- | --- | ------- | ------------------------------------------------------------- |
-| validate, verbalize, diagram, export, import, analyze | yes | yes | yes     | none                                                          |
-| `review`                                              | yes | yes | yes     | none (VS Code as a language-model tool)                       |
-| schema, diff, query, describe, lineage, impact        | yes | yes | yes     | none (VS Code as language-model tools)                        |
-| `merge`                                               | yes | yes | yes     | none (VS Code as a language-model tool)                       |
-| `gym`                                                 | yes | yes | no      | deliberate: the editor has no exercise surface                |
-| `project split`                                       | yes | yes | yes     | none (VS Code as a language-model tool)                       |
-| `project init`                                        | yes | no  | no      | under review: the surface audit, barwise-0wa                  |
-| `history`                                             | yes | no  | no      | deliberate: repository operations (reads git)                 |
-| `prompt`                                              | yes | no  | no      | deliberate: dev tooling                                       |
-| `llm-usage`                                           | yes | no  | no      | deliberate: reads a local operator log                        |
-| prompt-artifact override (`--artifacts`)              | yes | no  | no      | deliberate: candidates are measured, not sent                 |
-| multi-sample import (`--samples`)                     | yes | yes | no      | deliberate: an editor wants one quick pass                    |
-| thinking-budget override (`--thinking-budget`)        | yes | no  | no      | deliberate: an experiment dimension, recorded per history row |
-| reference inference (`--infer-references`)            | yes | no  | no      | deliberate: a warehouse-import option, no use elsewhere yet   |
+| Capability                                            | CLI | MCP | VS Code | Divergence                                                                                                 |
+| ----------------------------------------------------- | --- | --- | ------- | ---------------------------------------------------------------------------------------------------------- |
+| validate, verbalize, diagram, export, import, analyze | yes | yes | yes     | none                                                                                                       |
+| `review`                                              | yes | yes | yes     | none (VS Code as a language-model tool)                                                                    |
+| schema, diff, query, describe, lineage, impact        | yes | yes | yes     | none (VS Code as language-model tools)                                                                     |
+| `merge`                                               | yes | yes | yes     | deliberate: MCP and VS Code write back to the base file (editing tools); the CLI never modifies its inputs |
+| `gym`                                                 | yes | yes | no      | deliberate: the editor has no exercise surface                                                             |
+| `project split`                                       | yes | yes | yes     | none (VS Code as a language-model tool)                                                                    |
+| `project init`                                        | yes | no  | no      | under review: the surface audit, barwise-0wa                                                               |
+| `history`                                             | yes | no  | no      | deliberate: repository operations (reads git)                                                              |
+| `prompt`                                              | yes | no  | no      | deliberate: dev tooling                                                                                    |
+| `llm-usage`                                           | yes | no  | no      | deliberate: reads a local operator log                                                                     |
+| prompt-artifact override (`--artifacts`)              | yes | no  | no      | deliberate: candidates are measured, not sent                                                              |
+| multi-sample import (`--samples`)                     | yes | yes | no      | deliberate: an editor wants one quick pass                                                                 |
+| thinking-budget override (`--thinking-budget`)        | yes | no  | no      | deliberate: an experiment dimension, recorded per history row                                              |
+| reference inference (`--infer-references`)            | yes | no  | no      | deliberate: a warehouse-import option, no use elsewhere yet                                                |
 
 Every remaining gap is marked deliberate, which is the point: an
 unmarked gap is a bug.
