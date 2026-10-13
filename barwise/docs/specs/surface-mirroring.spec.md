@@ -4,7 +4,10 @@ Status: Draft -- no workstream implemented
 
 Created: 2026-10-13
 Last-updated: 2026-10-13
-Tracking: barwise-0wa. Source: `docs/cli-surface-audit-2026-10-12.md`.
+Tracking: barwise-0wa. Sources: `docs/cli-surface-audit-2026-10-12.md`
+(option by option) and `docs/surface-parity-audit-2026-10-12.md`
+(runtime behaviour, a separate same-day audit whose issues are mapped
+below).
 
 ## Principle
 
@@ -45,7 +48,7 @@ The audit is a dated record and is not edited in place. These supersede it:
 - It recommended keeping all eight `prompt` subcommands CLI-only. Six call no model, so they fail the test above; the owner chose to mirror them.
 - It gave `llm-usage`'s reason as "written by whichever process made the calls." The mechanism is narrower: only the CLI writes the log at all.
 - It said a gym session log is "per-person state a shared server should not write." A stdio MCP server runs as the user's own process, so that reason does not hold. The reason in the table above replaces it.
-- It found three bugs. A fourth, barwise-0wa.o8x, was found while grounding this spec: `gym_list` fails on the MCP server bundled with VS Code.
+- It found three bugs. The same-day surface-parity audit found more, among them barwise-fbi: the gym fails in every shipped bundle, the server VS Code embeds included. That was reproduced again while grounding this spec.
 
 Presentation flags (`--format text|json`, `--json`) are not mirrored.
 MCP and VS Code return JSON because an agent reads the result; the flag
@@ -76,12 +79,14 @@ In scope, as requirements:
 
 - When `npm run audit:surfaces -- --check` runs, the system shall fail on a CLI command or option that has no MCP or VS Code counterpart and no row in the baseline, and on a baseline row no longer detected. When a built surface it reads is missing, it shall exit 2.
 - When a VS Code language-model tool wraps an MCP tool, it shall declare every parameter that MCP tool declares, except parameters the baseline excludes with a reason.
-- When `import_model` or `merge_models` receives an output path, the system shall write the result there under the posture open decision 2 settles.
+- When `import_model` or `merge_models` receives an output path, the system shall write the result there under the posture open decision 2 settles (barwise-pks).
+- When `merge_models` is described to a client, its description shall say that it writes back to `base` (barwise-xjf).
+- When `export_model` writes an artifact to disk, the system shall record it in the lineage manifest as `barwise export` does (barwise-ace).
 - When `barwise_import_transcript` runs in VS Code, it shall accept `base`, `alternatives`, `samples` and an output path, and read `transcript` from disk when given a file path (barwise-0wa.pte).
 - When `barwise_review_model` runs in VS Code, it shall accept a project manifest and a `domain`.
 - When `barwise_export_model` runs in VS Code, it shall forward format options, `dialect` included.
 - When `validate_model` receives a project manifest, it shall report the cross-domain project rules the CLI reports (barwise-0wa.qh3).
-- When an MCP client calls `gym_list` or `gym_check` on the server bundled with VS Code, it shall get the same answer as from `packages/mcp` (barwise-0wa.o8x).
+- When an MCP client calls `gym_list` or `gym_check` on the server bundled with VS Code, it shall get the same answer as from `packages/mcp` (barwise-fbi).
 - When a CLI command in the audit's section 1 has no counterpart, the system shall gain one on both surfaces:
   - `project init`
   - `lineage show`
@@ -93,6 +98,11 @@ In scope, as requirements:
 
 Out of scope:
 
+- Issues from the same-day surface-parity audit that are not mirroring the CLI:
+  - barwise-c2e (starting a model from nothing) runs the other direction, from VS Code to the CLI.
+  - barwise-i22 is about palette pickers (below).
+  - barwise-vqc is about which id generator the bundles install.
+  - barwise-ntw is documentation; each workstream updates `docs/CLI.md` and `docs/MCP.md` for what it changes, which narrows that issue without closing it.
 - New options on deprecated tools (`generate_schema`, `generate_diagram`). barwise-0wa.ymj decides their future.
 - The audit's section 5, capabilities MCP or VS Code has and the CLI lacks. The owner's direction is one-way.
 - VS Code palette commands. The VS Code column counts a language-model tool as reach (`CLAUDE.md`, barwise-988), so palette parity is a separate question.
@@ -148,7 +158,9 @@ done: its rows disappear. The VS Code parameter pin in
 ### 2. Write paths (provisional)
 
 `import_model` and `merge_models` gain an output path on MCP and VS
-Code. A relative path in VS Code resolves through `resolveWriteDir`
+Code, and `merge_models` states its write-back in its description
+(barwise-xjf). An `export_model` write records lineage (barwise-ace),
+so the lineage tools can see what the other surfaces export. A relative path in VS Code resolves through `resolveWriteDir`
 (from `split-model-tool.spec.md`). This is the failure the user hit:
 `@barwise` receives only barwise-tagged tools, so a tool that cannot
 write its result leaves the agent unable to save it.
@@ -158,15 +170,16 @@ write its result leaves the agent unable to save it.
 `barwise_import_transcript` calls `executeImport` with the editor's
 client. That function already takes a client as its last argument, so
 this gains `base`, `alternatives`, `samples` (the `--samples` row) and
-an output path, and fixes barwise-0wa.pte. `barwise_review_model` calls
-`executeReview` and gains project input and `domain`. `barwise_export_model`
+an output path, and fixes barwise-0wa.pte (with barwise-6n8).
+`barwise_review_model` calls `executeReview` and gains project input and
+`domain` (barwise-rb4). `barwise_export_model`
 forwards `options`.
 
 ### 4. MCP correctness (provisional)
 
 - `validate_model` runs `projectRules` (barwise-0wa.qh3).
-- The bundled server finds the gym catalog (barwise-0wa.o8x), with a test that spawns `packages/vscode/dist/mcp/index.js`: the unit suites run on source and cannot see a bundle-only failure.
-- `generate_diagram`'s deprecation notice stops pointing at an exporter that does not exist (barwise-0wa.ymj).
+- Every shipped bundle finds the gym catalog (barwise-fbi), with a test that spawns `packages/vscode/dist/mcp/index.js`: the unit suites run on source and cannot see a bundle-only failure.
+- No surface's deprecation notice points at an exporter that does not exist (barwise-0wa.ymj for MCP, barwise-zir for the CLI).
 
 ### 5. New tools for the section-1 commands (provisional)
 
@@ -201,6 +214,7 @@ workstream 4) and `analyze_repository`.
 - **`@barwise/mcp`:** new tools and parameters, all additive. `merge_models` keeps its write-back default.
 - **`barwise-vscode`:** new tools, and new parameters on the transcript, review and export tools. The pinned tool lists and the capability matrix change in the same commit as each surface change.
 - **`@barwise/learn`:** a catalog the bundle can reach.
+- **`@barwise/cli`:** unchanged, unless open decision 2 takes its recommended option. Then `barwise import model --output` refuses an existing file without `--force`, a behaviour change for anyone who relied on the overwrite.
 - **Dependency graph:** unchanged, unless open decision 1 takes option A or C.
 - **CI:** one new step, `audit:surfaces -- --check`, plus its root forwarder (`check:root-scripts`).
 
@@ -210,9 +224,9 @@ workstream 4) and `analyze_repository`.
    - (A, recommended) Give promptlab a subpath export of its no-client functions (`loadSuite`, `scoreExtraction`, `readHistory`, `compareRows`, `rescoreDirectory`, `diffRescores`). Let MCP import only that subpath, and add a dependency-cruiser rule forbidding the root and `runSuite`. The guard stays structural: MCP still cannot reach the one function that takes a client. `@barwise/core`'s subpath exports are the precedent.
    - (B) Keep the four CLI-only, with the boundary as the reason.
    - (C) Split promptlab into a no-client package and a runner package. This is the cleanest boundary, but it adds a thirteenth package for four tools.
-2. **Overwrite posture for writes an agent asks for.**
-   - (Recommended) `import_model` and `merge_models` refuse an existing output file unless `force` is set, as `split_model` does. `import_transcript` keeps the CLI's merge-into-existing behaviour, which already never removes anything.
-   - (Alternative) Copy the CLI exactly. `barwise import model --output` overwrites without asking. That is ordinary for a path a person typed, and riskier for one an agent chose.
+2. **Overwrite posture for imports and merges onto an existing file.** barwise-pks asks for one rule on every surface, the CLI included: merge into the existing model, or refuse.
+   - (Recommended) Adopt pks's rule everywhere. Transcript import keeps merging into an existing model, which never removes anything. `import_model` and `merge_models` with an output path refuse an existing file unless `force` is set, as `split_model` and `barwise project split` already do. This changes the CLI: `barwise import model --output` stops overwriting silently.
+   - (Alternative) Refuse only on MCP and VS Code, and leave the CLI overwriting. An overwrite is ordinary for a path a person typed, and riskier for one an agent chose. This leaves pks open.
 3. **Where `history`'s git walk lives.**
    - (Recommended) Parallel the roughly 60-line walk in MCP, with a drift test that runs both against one fixture repository. `core` keeps the diff and stays pure.
    - (Alternative) Move the walk into a package both can import. No existing package fits without coupling: `code-analysis` does git I/O for a different concern, and a new package for one function is shallow.
@@ -223,7 +237,7 @@ workstream 4) and `analyze_repository`.
 ## Risks and testing
 
 - **The correspondence file is itself a copy that must agree with the code.** `audit:surfaces` fails on a CLI command with no correspondence entry, so a new command must be classified before it merges.
-- **Unit tests run on source; users run bundles.** barwise-0wa.o8x shipped because no test spawned the bundled server. Workstream 4's spawn test is the guard, and workstream 1 should read the bundled server too, not only `packages/mcp/dist`.
+- **Unit tests run on source; users run bundles.** barwise-fbi shipped because no test spawned a bundle. Workstream 4's spawn test is the guard, and workstream 1 should read the bundled server too, not only `packages/mcp/dist`.
 - **Every new guard is seen failing on its defect** through `scripts/mutate.mjs` before its workstream merges.
 - **Premortem: the check passes while a gap exists.** This happens if the option-to-parameter mapping maps a CLI option onto an unrelated parameter. Mapping rows name both sides explicitly, and a test plants an unmapped option and expects a failure.
 
