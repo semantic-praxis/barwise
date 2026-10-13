@@ -16,11 +16,16 @@ export function registerMergeTool(server: McpServer): void {
     "merge_models",
     {
       title: "Merge ORM Models",
+      // The write-back is deliberate (the owner, 2026-10-13: MCP and VS Code
+      // are editing tools, so a merge lands in the model being edited), and
+      // the CLI's `barwise merge` deliberately does not do it. Say so here:
+      // an agent reads this description, not MCP.md (barwise-xjf).
       description: "Merge an incoming ORM model into a base model. Accepts all "
         + "additions and modifications, rejects removals (non-interactive). "
-        + "Returns the full merged model as inline YAML plus validation "
-        + "results -- large for big models, so write it to a file rather "
-        + "than re-quoting it.",
+        + "When base is a file path and the merge is valid, the merged model "
+        + "is written back to that file (writtenTo in the result); pass base "
+        + "as inline YAML to get the result without writing. Returns the "
+        + "merged model as inline YAML plus validation results.",
       inputSchema: {
         base: sourceInputSchema("File path or inline YAML for the base model"),
         incoming: sourceInputSchema("File path or inline YAML for the incoming model"),

@@ -224,26 +224,26 @@ divergence that had not held for some time (barwise-988). Where a row's
 VS Code answer rests on the tool registration rather than the palette,
 it is qualified by `barwise.enableMcpServer`, which defaults on.
 
-| Capability                                            | CLI | MCP | VS Code | Divergence                                                  |
-| ----------------------------------------------------- | --- | --- | ------- | ----------------------------------------------------------- |
-| validate, verbalize, diagram, export, import, analyze | yes | yes | yes     | none                                                        |
-| `review`                                              | yes | yes | yes     | none (VS Code as a language-model tool)                     |
-| schema, diff, query, describe, lineage, impact        | yes | yes | yes     | none (VS Code as language-model tools)                      |
-| `merge`                                               | yes | yes | yes     | deliberate (owner): MCP writes back to `base` (barwise-xjf) |
-| `gym`                                                 | yes | yes | no      | not yet: surface-mirroring WS4-5 (barwise-fbi)              |
-| gym session log (`--emit-misses`, `--no-state`)       | yes | no  | no      | deliberate (owner): the log is the learner's own history    |
-| `project split`                                       | yes | yes | yes     | none (VS Code as a language-model tool)                     |
-| `project init`                                        | yes | no  | no      | not yet: surface-mirroring WS5                              |
-| `history`                                             | yes | no  | no      | not yet: surface-mirroring WS6                              |
-| `prompt eval`, `prompt run`                           | yes | no  | no      | deliberate: a recorded score needs an attributable model    |
-| `prompt schema`, `prompt artifact`                    | yes | no  | no      | not yet: surface-mirroring WS8                              |
-| `prompt score`, `rescore`, `history`, `compare`       | yes | no  | no      | not yet: surface-mirroring WS8 (open decision 1)            |
-| `import batch`                                        | yes | no  | no      | deliberate: an evaluation sweep, the prompt lane's job      |
-| `llm-usage`                                           | yes | no  | no      | deliberate: only the CLI writes the call log                |
-| prompt-artifact override (`--artifacts`)              | yes | no  | no      | deliberate: candidates are measured, not sent               |
-| multi-sample import (`--samples`)                     | yes | yes | no      | not yet: surface-mirroring WS3                              |
-| thinking-budget override (`--thinking-budget`)        | yes | no  | no      | deliberate: only on `prompt eval` and `prompt run`          |
-| reference inference (`--infer-references`)            | yes | no  | no      | not yet: surface-mirroring WS7                              |
+| Capability                                            | CLI | MCP | VS Code | Divergence                                                                                                 |
+| ----------------------------------------------------- | --- | --- | ------- | ---------------------------------------------------------------------------------------------------------- |
+| validate, verbalize, diagram, export, import, analyze | yes | yes | yes     | none                                                                                                       |
+| `review`                                              | yes | yes | yes     | none (VS Code as a language-model tool)                                                                    |
+| schema, diff, query, describe, lineage, impact        | yes | yes | yes     | none (VS Code as language-model tools)                                                                     |
+| `merge`                                               | yes | yes | yes     | deliberate: MCP and VS Code write back to the base file (editing tools); the CLI never modifies its inputs |
+| `gym`                                                 | yes | yes | no      | not yet: surface-mirroring WS4-5 (barwise-fbi)                                                             |
+| gym session log (`--emit-misses`, `--no-state`)       | yes | no  | no      | deliberate (owner): the log is the learner's own history                                                   |
+| `project split`                                       | yes | yes | yes     | none (VS Code as a language-model tool)                                                                    |
+| `project init`                                        | yes | no  | no      | not yet: surface-mirroring WS5                                                                             |
+| `history`                                             | yes | no  | no      | not yet: surface-mirroring WS6                                                                             |
+| `prompt eval`, `prompt run`                           | yes | no  | no      | deliberate: a recorded score needs an attributable model                                                   |
+| `prompt schema`, `prompt artifact`                    | yes | no  | no      | not yet: surface-mirroring WS8                                                                             |
+| `prompt score`, `rescore`, `history`, `compare`       | yes | no  | no      | not yet: surface-mirroring WS8 (open decision 1)                                                           |
+| `import batch`                                        | yes | no  | no      | deliberate: an evaluation sweep, the prompt lane's job                                                     |
+| `llm-usage`                                           | yes | no  | no      | deliberate: only the CLI writes the call log                                                               |
+| prompt-artifact override (`--artifacts`)              | yes | no  | no      | deliberate: candidates are measured, not sent                                                              |
+| multi-sample import (`--samples`)                     | yes | yes | no      | not yet: surface-mirroring WS3                                                                             |
+| thinking-budget override (`--thinking-budget`)        | yes | no  | no      | deliberate: only on `prompt eval` and `prompt run`                                                         |
+| reference inference (`--infer-references`)            | yes | no  | no      | not yet: surface-mirroring WS7                                                                             |
 
 Every remaining gap is marked either deliberate, with a reason the
 owner approved, or not yet, with the workstream of
