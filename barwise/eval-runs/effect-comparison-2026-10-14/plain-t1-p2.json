@@ -1,0 +1,82 @@
+{
+  "run": "plain-t1-p2",
+  "arm": "plain",
+  "task": "T1",
+  "phase": "pilot",
+  "start": "8398a193",
+  "head": "844c0c2e",
+  "startedAt": "2026-10-14T17:40:15Z",
+  "rounds": 1,
+  "leftoverCommit": false,
+  "usage": {
+    "tokens": 139448,
+    "toolCalls": 52,
+    "wallMs": 588458,
+    "source": "harness task-notification"
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "844c0c2e",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      }
+    }
+  ],
+  "outcome": "pass",
+  "diff": {
+    "files": 7,
+    "hunks": 16,
+    "added": 42,
+    "removed": 2,
+    "consumerFiles": [
+      "barwise/packages/core/schemas/orm-model.schema.json",
+      "barwise/packages/core/src/diff/breakingLevel.ts",
+      "barwise/packages/core/src/diff/changeDescription.ts",
+      "barwise/packages/core/src/diff/elementDiff.ts"
+    ],
+    "sliceLines": 982
+  },
+  "redChecks": [
+    {
+      "class": "environment",
+      "command": "git checkout -b trial/plain-t1-p2 8398a193 ...",
+      "firstError": "the worktree sandbox refused a git command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/diff/changeDescription.test.ts > rendering a change > has a golden for every kind of change the diff can emit",
+      "note": "new change kind needed a row in the in-file GOLDENS table"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/laws/counterexample.law.test.ts > coverage: ... emits a counterexample for each mapped kind",
+      "note": "unit in tests/arbitraries/model.ts shifted the law test's pinned counts; reverted"
+    },
+    {
+      "class": "environment",
+      "command": "npm run fmt; npm run lint; ... git ...",
+      "firstError": "the worktree sandbox refused a git command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code"
+    }
+  ],
+  "observations": [
+    "committed with --no-verify on its only commit, no reason stated in the transcript; it ran build, test, fmt, lint, check:parity and audit:duplication by hand. The session's scoring re-ran the oracle independently."
+  ],
+  "agentJudgmentCalls": [
+    "empty unit refused (minLength 1), unlike default_value",
+    "unit change is breaking level caution",
+    "unit not added to the random model generator"
+  ]
+}
