@@ -1,8 +1,8 @@
 # The pre-push run checks the commit being pushed, not the working tree
 
-Status: Workstreams 1 and 2 implemented 2026-10-14 (trial on the shared
-helpers, check:git-listing; --check names untracked specs); workstream 3
-not started
+Status: Workstreams 1, 2 and 3 implemented 2026-10-14. Decision (A) settled
+2026-10-14: the worktree shares Turbo's cache, not the cold build the first
+draft chose (see Implementation notes)
 Created: 2026-10-14
 Last-updated: 2026-10-14
 Tracking: barwise-vzf (this spec); barwise-qch (workstream 2)
@@ -67,7 +67,7 @@ lines that carry the mark.
 
 - When the pre-push hook runs, the system shall run the `ci.yml` gate
   list against a fresh `git worktree` of each distinct pushed commit (B),
-  with a fresh `npm ci` and a cold build (A), and remove the worktree
+  with a fresh `npm ci` and Turbo's cache as decision (A) sets, and remove the worktree
   afterwards whatever the outcome.
 - While a `--commit` run is in progress, the system shall hold the
   initiating checkout's lock (`node_modules/.ci-local.lock`) from before
@@ -196,7 +196,8 @@ current one.
 - **Share the Turbo cache with the worktree.** That build took 1 s
   instead of 23 s, measured. But Turbo's cache has already served a stale
   vscode bundle once (barwise-r7j), and CI builds cold. It is offered as
-  an open decision, defaulting to cold.
+  an open decision. (Workstream 3 found the cache is shared across
+  worktrees by default; see decision (A) and the Implementation notes.)
 - **Refuse the push when files are left behind.** See the resolved
   question above.
 - **Push-time checks only, in the PR skill.** A skill step runs when
@@ -239,7 +240,7 @@ asserts the line appears, for both audits. Independent of 1 and 3.
 - An unresolvable SHA, and a failing `npm ci` (a lockfile edited to
   disagree), each give exit 2 with the step named.
 - The worktree is gone after a pass, a fail, and a refusal.
-- The left-behind list names an untracked and a modified file and does
+- The left-behind list names an untracked, a modified and a deleted file and does
   not change the exit code, including when the pushed SHA is not the
   current `HEAD`.
 - A second `ci:local` started while a `--commit` run holds the lock
@@ -281,23 +282,31 @@ size the cost; workstream 3 measures the hook end to end.
   (`npm run check:root-scripts` enforces the pair) and a `ci.yml` step.
   `ci:local` picks the step up from `ci.yml` with no edit.
 - `expected-counts.json` gains rows for the new tests.
-- Push time rises. Measured components: `npm ci` 19 s, a cold build
-  23 s. A docs-only push skips the build, as CI does, and pays about
-  20 s. A source push pays about 45 s on top of today's 2 min 40 s.
-  Workstream 3 replaces these estimates with end-to-end readings.
+- Push time rises, measured end to end in workstream 3: with Turbo's
+  cache shared, as built, a source push took 203 to 218 s against 178 s
+  for the same commit in the working tree, about 30 s more, mostly
+  `npm ci`. A cold build, which recomputes `test:coverage` each time,
+  took 392 s.
 - `git push --no-verify` remains the escape hatch.
 
-## Open decisions (for review)
+## Decisions (settled in review)
 
 The Scope, architecture and workstreams are written against the
 recommended default of each. A requirement that depends on one carries
 its letter.
 
-- **(A) Turbo cache in the worktree: cold (recommended) or shared.** Cold
-  matches CI and avoids the stale-output failure barwise-r7j recorded,
-  at 22 s per source push. Shared is near-free and inherits whatever the
-  local cache holds. Recommend cold. The cost is a known number; the
-  cache's failure mode is the very thing this spec exists to stop.
+- **(A) Turbo cache in the worktree: shared (chosen by the maintainer,
+  2026-10-14) or cold.** Turbo shares its local cache across worktrees by default, so
+  the worktree reuses what this checkout has computed: measured at about
+  30 s per push over an in-tree run. A cold build (`--force`, or an empty
+  `TURBO_CACHE_DIR`) recomputes `test:coverage` every time: 392 s per
+  source push. The first draft recommended cold on an estimate of 22 s,
+  which left out `test:coverage`. Recommend shared. A cache hit is keyed
+  on the commit's own inputs, so it is not the stale `dist` this spec
+  exists to stop. barwise-r7j was an entry keyed on too few inputs, which
+  `turbo.json` has since narrowed (`dist/bundle` excluded from build
+  outputs, barwise-lh9), and 3 to 6 minutes on every push is out of
+  proportion to that risk.
 - **(B) Several refs in one push: one run per distinct SHA (recommended)
   or only the current branch.** One run per SHA is correct and normally
   means one run. Pushing two branches at different commits then costs
@@ -376,3 +385,69 @@ worth naming: the existing `audit-corrections` test asserted that `--check`
 did NOT mention an untracked draft. That pinned the blind spot this
 workstream removes, so the assertion now requires the
 `unchecked (untracked)` line instead. Exit codes are unchanged.
+
+**Workstream 3, 2026-10-14.** Built as sketched, with one simplification:
+cleanup deletes the worktree directory and runs `git worktree prune`
+instead of also calling `git worktree remove`. Mutation showed the remove
+call to be redundant: with it deleted, the tests still passed, and they fail
+when either of the remaining two steps is deleted.
+
+**The build is not cold, and the first cost reading was confounded.**
+Turbo shares its local cache across worktrees: a fresh worktree with no
+`.turbo/cache` of its own reported `LOCAL` cache hits (`turbo run build
+--dry=json`) for entries another worktree had written. So the worktree
+reuses whatever this checkout's cache holds, and decision (A)'s default,
+a cold build, is not what was built: as built it is the shared cache.
+
+The readings, on one machine with nothing else running:
+
+```
+ci-local --commit HEAD, first run of new code     392 s  (test:coverage 142 s,
+                                                          computed for the first time)
+ci-local, in the working tree, same commit        178 s  (test:coverage reused
+                                                          the entry the run above wrote)
+pre-push hook, --commit, later push               208 s  (npm ci 14 s; build and
+                                                          test:coverage from cache)
+```
+
+How each was taken, wall-clock seconds around one command, from `barwise/`:
+
+```
+s=$(date +%s); node scripts/ci-local.mjs --commit HEAD; echo $(( $(date +%s) - s ))
+    on adeee39e; the Turbo cache had no entry for that code's test:coverage
+s=$(date +%s); node scripts/ci-local.mjs; echo $(( $(date +%s) - s ))
+    on the same commit, straight after the run above
+s=$(date +%s); git push; echo $(( $(date +%s) - s ))
+    pushes of f1f29b92 and 159189ca, through the new hook, cache warm
+```
+
+To check that the cache is shared: `git worktree add --detach <tmp> HEAD`,
+`npm ci` in `<tmp>/barwise`, then `npx turbo run build --dry=json` there;
+each task reports `"status": "HIT", "source": "LOCAL"` while
+`<tmp>/barwise/.turbo/cache` does not exist.
+
+The first pair looked like a 3.5-minute penalty for the worktree, but only
+the first run had to compute coverage at all; the second reused its
+result. The steady-state cost is the third reading: about 30 s over an
+in-tree run, mostly `npm ci`. A truly cold build, which (A) recommended,
+would cost the 392 s on every source push. Decision (A) was reopened on
+these numbers, and the maintainer chose shared.
+
+The first timing run also caught a real defect: `fmt:check` failed in the
+worktree because these files had been committed without formatting. The
+in-tree hook could not have seen it, because the working copy was what the
+formatter had last touched.
+
+**Copilot's review of PR #648** found four things, all fixed there:
+
+- A held lock, and a temp directory that cannot be created, now exit 2
+  (could not check) rather than 1, so the hook never reports a setup
+  failure as "CI would fail"; the lock is released on every path.
+- A run killed with SIGKILL leaves its worktree, and `git worktree prune`
+  keeps a registration whose directory exists. Each run names its
+  worktree `barwise-commit-<pid>-*`, and the next run removes any whose
+  owner is no longer alive. A live owner is spared: another checkout of
+  the repository shares the worktree list but holds its own lock.
+- The hook peels each pushed sha to its commit before deduplicating, so a
+  branch and an annotated tag on one commit are checked once.
+- The timing commands above.

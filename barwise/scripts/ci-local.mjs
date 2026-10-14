@@ -48,9 +48,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { classify, committedPaths, uncommittedPaths } from "./lib/changed-class.mjs";
+import {
+  classify,
+  committedPaths,
+  pathsDifferingFrom,
+  uncommittedPaths,
+} from "./lib/changed-class.mjs";
 import { ciSteps, shouldRun } from "./lib/ci-gates.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -104,7 +109,7 @@ let held = false;
  * a lock is a flag people learn to pass by default, and then the lock
  * protects nothing.
  */
-function acquireLock() {
+function acquireLock(busyExit = 1) {
   for (let attempt = 0; attempt < 2; attempt++) {
     mkdirSync(dirname(LOCK), { recursive: true });
     let fd;
@@ -120,7 +125,7 @@ function acquireLock() {
         );
         console.error("so this one would report a tree it did not measure. Waiting is the fix.");
         console.error(`Lock: ${LOCK}`);
-        process.exit(1);
+        process.exit(busyExit);
       }
       rmSync(LOCK, { force: true });
       continue;
@@ -167,6 +172,187 @@ function changeClass() {
   } catch {
     return { cls: undefined, why: "no merge-base with origin/main" };
   }
+}
+
+/**
+ * `--commit <sha>`: run the gate list against that commit, not this tree.
+ *
+ * The pre-push hook's question is whether CI will pass the commit being
+ * pushed, and the working tree is not that commit. It holds build output a
+ * CI checkout lacks -- on PR #641 a script test loaded `@barwise/core` from a
+ * `dist` left by an earlier build, passed here, and failed in CI, which runs
+ * the script tests before the build -- and files the push leaves behind. A
+ * fresh worktree of the commit and a fresh `npm ci` are that commit's state
+ * by construction, where hiding each difference in turn would be a list of
+ * what a clone lacks, with nothing keeping it current
+ * (docs/specs/pushed-tree-verification.spec.md, workstream 3).
+ *
+ * The build is not cold: Turbo's local cache is shared across worktrees, so
+ * `build` and `test:coverage` replay entries this checkout already has. A
+ * replay is keyed on the commit's own inputs, so it is not the `dist` left
+ * over from some other tree that this exists to avoid; the spec's decision
+ * (A) on a truly cold build is open.
+ *
+ * The lock is this checkout's, held from before the worktree exists until
+ * after it is removed. The child run takes a lock in the worktree's own
+ * `node_modules`, which no other run can see, so without this one two
+ * pushes from one checkout would no longer exclude each other.
+ *
+ * Exit: the child's code (0 pass, 1 fail, 2 refused), or 2 when the commit
+ * cannot be resolved, checked out or installed -- the gates never ran, so
+ * nothing was found wrong and nothing was shown right.
+ */
+function runAtCommit(argv) {
+  const at = argv.indexOf("--commit");
+  const ref = argv[at + 1];
+  if (ref === undefined || ref.startsWith("--")) {
+    console.error("ci:local --commit needs a commit to check. Could not answer.");
+    return 2;
+  }
+  let sha;
+  let top;
+  try {
+    const git = (args) =>
+      execFileSync("git", args, {
+        cwd: ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    sha = git(["rev-parse", "--verify", `${ref}^{commit}`]);
+    top = git(["rev-parse", "--show-toplevel"]);
+  } catch {
+    console.error(`ci:local --commit: ${ref} does not name a commit here. Could not answer.`);
+    return 2;
+  }
+  const passThrough = argv.filter((a, i) => i !== at && i !== at + 1);
+
+  // Busy is "could not answer" here, not a failure: no gate ran, and the
+  // hook must not report that CI would fail.
+  acquireLock(2);
+  let tree;
+  const cleanup = () => {
+    // Delete, then prune: prune drops the registration of a worktree whose
+    // directory is gone.
+    // A directory that will not delete must not keep the lock: the next run
+    // reaps it once this process is gone.
+    try {
+      if (tree !== undefined) rmSync(tree, { recursive: true, force: true });
+    } catch {
+      console.error(`ci:local --commit: could not remove ${tree}; the next run will.`);
+    }
+    spawnSync("git", ["worktree", "prune"], { cwd: ROOT, stdio: "ignore" });
+    releaseLock();
+  };
+  for (const signal of ["SIGINT", "SIGTERM"]) {
+    process.on(signal, () => {
+      cleanup();
+      process.exit(130);
+    });
+  }
+
+  try {
+    // Inside the try, like every setup step: a worktree it cannot delete is
+    // a refusal with the lock released, not an uncaught exit 1.
+    reapAbandonedWorktrees();
+    // The owner's pid is in the name, so a later run can tell an abandoned
+    // worktree from a live one (reapAbandonedWorktrees).
+    tree = mkdtempSync(join(tmpdir(), `${WORKTREE_PREFIX}${process.pid}-`));
+    const left = [...new Set(pathsDifferingFrom(sha, ROOT))];
+    if (left.length > 0) {
+      console.log(
+        `Differs between this working tree and ${
+          sha.slice(0, 8)
+        }; the check reads the commit's copy, which is what is pushed:`,
+      );
+      for (const f of left) console.log(`  ${f}`);
+      console.log("");
+    }
+
+    const add = spawnSync("git", ["worktree", "add", "--detach", "--quiet", tree, sha], {
+      cwd: ROOT,
+      encoding: "utf8",
+    });
+    if (add.status !== 0) {
+      console.error(
+        `ci:local --commit: could not check out ${sha.slice(0, 8)}: ${(add.stderr ?? "").trim()}`,
+      );
+      return 2;
+    }
+    const checkout = join(tree, relative(top, ROOT));
+    console.log(
+      `Checking ${sha.slice(0, 8)} in a fresh worktree: npm ci, then the CI gate list.\n`,
+    );
+
+    const install = spawnSync("npm", ["ci", "--no-audit", "--no-fund"], {
+      cwd: checkout,
+      stdio: "inherit",
+    });
+    if (install.error || install.status !== 0) {
+      console.error(
+        `ci:local --commit: npm ci failed in the worktree (${
+          install.error?.code ?? `exit ${install.status}`
+        }). `
+          + "The gates did not run.",
+      );
+      return 2;
+    }
+
+    const run = spawnSync(process.execPath, [
+      join(checkout, "scripts", "ci-local.mjs"),
+      ...passThrough,
+    ], {
+      cwd: checkout,
+      stdio: "inherit",
+    });
+    if (run.error || run.status === null) {
+      console.error(
+        `ci:local --commit: the gate run did not finish (${run.error?.code ?? run.signal}).`,
+      );
+      return 2;
+    }
+    return run.status;
+  } catch (error) {
+    // Anything thrown before the gates ran -- a full or unwritable temp
+    // directory, git failing to list paths -- is a refusal, with the lock
+    // released by the finally below rather than left for the next run.
+    console.error(`ci:local --commit: could not set up the check: ${error?.message ?? error}`);
+    return 2;
+  } finally {
+    cleanup();
+  }
+}
+
+const WORKTREE_PREFIX = "barwise-commit-";
+
+/**
+ * Remove worktrees a killed `--commit` run left behind.
+ *
+ * SIGINT and SIGTERM clean up; SIGKILL cannot, and then both the directory
+ * and its registration survive -- `git worktree prune` keeps a registration
+ * whose directory still exists. Each run names its worktree with its pid, so
+ * a worktree whose owner is no longer alive is abandoned. A live owner is
+ * left alone even though this run holds the lock: the lock belongs to this
+ * checkout, and another checkout of the same repository has its own lock
+ * and shares the worktree list.
+ */
+function reapAbandonedWorktrees() {
+  const list = spawnSync("git", ["worktree", "list", "--porcelain"], {
+    cwd: ROOT,
+    encoding: "utf8",
+  });
+  if (list.status !== 0) return;
+  for (const line of list.stdout.split("\n")) {
+    if (!line.startsWith("worktree ")) continue;
+    const path = line.slice("worktree ".length);
+    const m = new RegExp(`/${WORKTREE_PREFIX}(\\d+)-[^/]*$`).exec(path);
+    if (m === null || alive(Number(m[1]))) continue;
+    rmSync(path, { recursive: true, force: true });
+  }
+  spawnSync("git", ["worktree", "prune"], { cwd: ROOT, stdio: "ignore" });
+}
+
+if (process.argv.includes("--commit")) {
+  process.exit(runAtCommit(process.argv.slice(2)));
 }
 
 const change = changeClass();

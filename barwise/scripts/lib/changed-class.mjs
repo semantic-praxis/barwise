@@ -89,6 +89,24 @@ export function uncommittedPaths(cwd = process.cwd()) {
 }
 
 /**
+ * Files in the working tree that differ from `sha`: tracked files whose
+ * content differs from that commit (`git diff <sha>` compares the working
+ * tree, staged or not, with the commit), plus untracked files git does not
+ * ignore. Repo-root-relative whatever the cwd.
+ *
+ * The question a push asks is "what is here that the pushed commit does not
+ * hold", and `uncommittedPaths` cannot answer it: it compares with `HEAD`,
+ * and a pushed ref need not be the one checked out
+ * (docs/specs/pushed-tree-verification.spec.md, workstream 3).
+ */
+export function pathsDifferingFrom(sha, cwd = process.cwd()) {
+  return [
+    ...gitPaths(["diff", "--name-only", sha, "--", ":/"], cwd),
+    ...gitPaths(["ls-files", "--others", "--exclude-standard", "--full-name", "--", ":/"], cwd),
+  ];
+}
+
+/**
  * `node scripts/lib/changed-class.mjs <base>` -- the detect step's entry.
  *
  * stdout carries only `key=value` lines, because the step appends it to
