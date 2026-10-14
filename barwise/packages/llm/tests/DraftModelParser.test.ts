@@ -135,6 +135,27 @@ describe("DraftModelParser", () => {
       );
     });
 
+    it("warns when it drops even an empty value_constraint from an entity type", () => {
+      const result = parseDraftModel(
+        makeResponse({
+          object_types: [
+            {
+              name: "Carrier",
+              kind: "entity",
+              reference_mode: "carrier_id",
+              value_constraint: { values: [] },
+              source_references: [],
+            },
+          ],
+        }),
+        "Test",
+      );
+      expect(result.model.getObjectTypeByName("Carrier")?.kind).toBe("entity");
+      expect(result.warnings).toContain(
+        'Dropped value_constraint from entity type "Carrier": an entity type takes these from its reference mode\'s value type.',
+      );
+    });
+
     it("creates value types with data_type", () => {
       const result = parseDraftModel(
         makeResponse({

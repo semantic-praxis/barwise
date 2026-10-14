@@ -78,6 +78,19 @@ describe("value-only fields", () => {
     });
   }
 
+  it("an entity with an empty value constraint is told it cannot have one", () => {
+    // The value-only check runs first; otherwise the emptiness check fires
+    // and tells the reader to add a value to a field they must remove.
+    expect(() =>
+      createObjectType({
+        name: "Carrier",
+        kind: "entity",
+        referenceMode: "carrier_id",
+        valueConstraint: { values: [] },
+      })
+    ).toThrow('Entity type "Carrier" cannot have a value constraint');
+  });
+
   it("a value type may still carry all of them", () => {
     const fields = Object.fromEntries(
       VALUE_ONLY_FIELDS.map(([f]) => [snake(f), SAMPLES[f]!.yaml]),

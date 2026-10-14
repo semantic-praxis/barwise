@@ -33,7 +33,9 @@ export function parseObjectTypes(
     if (isEntity) {
       const dropped = [
         ...(ext.data_type !== undefined ? ["data_type"] : []),
-        ...(ext.value_constraint?.values?.length ? ["value_constraint"] : []),
+        // Presence, not content: an empty constraint is dropped too, and
+        // must say so like any other.
+        ...(ext.value_constraint !== undefined ? ["value_constraint"] : []),
       ];
       if (dropped.length > 0) {
         warnings.push(
