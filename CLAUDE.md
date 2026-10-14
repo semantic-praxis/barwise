@@ -362,13 +362,15 @@ touches. Pre-push runs `npm run ci:local -- --commit <sha>` for each
 pushed commit: the CI gate list derived from `ci.yml`, with ci.yml's `if:`
 conditions applied through the same change classifier CI's detect step
 runs (`scripts/lib/changed-class.mjs`), in a fresh worktree of that
-commit with a fresh `npm ci` and a cold build. A working tree holds build
+commit with a fresh `npm ci`. Turbo's local cache is shared across
+worktrees, so the build and `test:coverage` reuse what this checkout has
+already computed. A working tree holds build
 output and unpushed files a CI checkout lacks, and on PR #641 a script test
 passed here because `dist` existed and failed in CI
 (`docs/specs/pushed-tree-verification.spec.md`). A docs-only change skips
-what CI skips, and `--all` runs everything. Measured 2026-10-14: 392s for a
-source change, against 178s for the same commit checked in the working
-tree, where Turbo serves `build` and `test:coverage` from cache. Plain
+what CI skips, and `--all` runs everything. Measured 2026-10-14: 208s for a push with source changes,
+about 30s more than checking the same commit in the working tree, most of
+it `npm ci`; 392s when `test:coverage` has to run for the first time. Plain
 `npm run ci:local` still checks the working tree, for use before a commit.
 The full list belongs at the push because a push is what makes CI run,
 and because the same list per commit is a hook people turn off. `git push

@@ -182,10 +182,16 @@ function changeClass() {
  * CI checkout lacks -- on PR #641 a script test loaded `@barwise/core` from a
  * `dist` left by an earlier build, passed here, and failed in CI, which runs
  * the script tests before the build -- and files the push leaves behind. A
- * fresh worktree of the commit, a fresh `npm ci` and a cold build are that
- * commit's state by construction, where hiding each difference in turn
- * would be a list of what a clone lacks, with nothing keeping it current
+ * fresh worktree of the commit and a fresh `npm ci` are that commit's state
+ * by construction, where hiding each difference in turn would be a list of
+ * what a clone lacks, with nothing keeping it current
  * (docs/specs/pushed-tree-verification.spec.md, workstream 3).
+ *
+ * The build is not cold: Turbo's local cache is shared across worktrees, so
+ * `build` and `test:coverage` replay entries this checkout already has. A
+ * replay is keyed on the commit's own inputs, so it is not the `dist` left
+ * over from some other tree that this exists to avoid; the spec's decision
+ * (A) on a truly cold build is open.
  *
  * The lock is this checkout's, held from before the worktree exists until
  * after it is removed. The child run takes a lock in the worktree's own

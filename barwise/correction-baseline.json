@@ -607,18 +607,6 @@
       "caught_by": "not-a-correction",
       "note": "The method block of the distill spec."
     },
-    "pushed-tree-verification::5895a7e8c4d4": {
-      "spec": "pushed-tree-verification.spec.md",
-      "excerpt": "the cost estimate was wrong, and decision (a) rested on it. measured on one commit with nothing else running:",
-      "caught_by": "execution",
-      "note": "Heading paragraph of the same correction as f40e4b61d08d: the workstream 3 cost estimate, falsified by timing the run end to end."
-    },
-    "pushed-tree-verification::f40e4b61d08d": {
-      "spec": "pushed-tree-verification.spec.md",
-      "excerpt": "the draft estimated about 45 s more than an in-tree run. it is about 3.5 minutes more, because the in-tree run takes test:coverage from the turbo cache, and a c",
-      "caught_by": "execution",
-      "note": "Timing ci-local --commit end to end (392 s) against an in-tree run of the same commit (178 s) showed the drafted 45 s overhead omitted test:coverage, which the in-tree run takes from the Turbo cache."
-    },
     "pushed-tree-verification::f803044cfe51": {
       "spec": "pushed-tree-verification.spec.md",
       "excerpt": "workstream 2, 2026-10-14. two deviations. the notice prints before the verdict, not after it as scope says: on a failing run the verdict is a long list, and a n",

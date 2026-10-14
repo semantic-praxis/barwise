@@ -1,7 +1,8 @@
 # The pre-push run checks the commit being pushed, not the working tree
 
-Status: Workstreams 1, 2 and 3 implemented 2026-10-14; decision (A) reopened
-on workstream 3's measured cost (see Implementation notes)
+Status: Workstreams 1, 2 and 3 implemented 2026-10-14. Workstream 3 shares
+Turbo's cache, not the cold build decision (A) chose; (A) is reopened (see
+Implementation notes)
 Created: 2026-10-14
 Last-updated: 2026-10-14
 Tracking: barwise-vzf (this spec); barwise-qch (workstream 2)
@@ -382,24 +383,30 @@ instead of also calling `git worktree remove`. Mutation showed the remove
 call to be redundant: with it deleted, the tests still passed, and they fail
 when either of the remaining two steps is deleted.
 
-**The cost estimate was wrong, and decision (A) rested on it.** Measured on
-one commit with nothing else running:
+**The build is not cold, and the first cost reading was confounded.**
+Turbo shares its local cache across worktrees: a fresh worktree with no
+`.turbo/cache` of its own reported `LOCAL` cache hits (`turbo run build
+--dry=json`) for entries another worktree had written. So the worktree
+reuses whatever this checkout's cache holds, and decision (A)'s default,
+a cold build, is not what was built: as built it is the shared cache.
+
+The readings, on one machine with nothing else running:
 
 ```
-node scripts/ci-local.mjs --commit HEAD   392 s  (npm ci 20 s; build 19 s;
-                                                   test:coverage 142 s;
-                                                   test:scripts 106 s)
-node scripts/ci-local.mjs                 178 s  (build and test:coverage
-                                                   from the Turbo cache)
+ci-local --commit HEAD, first run of new code     392 s  (test:coverage 142 s,
+                                                          computed for the first time)
+ci-local, in the working tree, same commit        178 s  (test:coverage reused
+                                                          the entry the run above wrote)
+pre-push hook, --commit, later push               208 s  (npm ci 14 s; build and
+                                                          test:coverage from cache)
 ```
 
-The draft estimated about 45 s more than an in-tree run. It is about
-3.5 minutes more, because the in-tree run takes `test:coverage` from the
-Turbo cache, and a cold worktree cannot. That is the cost of decision (A),
-cold, and it is reopened for the maintainer: cold at about 6.5 minutes per
-source push, or the shared cache at about 3 minutes, with barwise-r7j's
-stale-output risk. Until it is decided this workstream ships as built,
-cold, in a PR held for that call.
+The first pair looked like a 3.5-minute penalty for the worktree, but only
+the first run had to compute coverage at all; the second reused its
+result. The steady-state cost is the third reading: about 30 s over an
+in-tree run, mostly `npm ci`. A truly cold build, which (A) recommended,
+would cost the 392 s on every source push. Decision (A) is reopened on
+these numbers, with the build as it stands (shared) until it is decided.
 
 The first timing run also caught a real defect: `fmt:check` failed in the
 worktree because these files had been committed without formatting. The
