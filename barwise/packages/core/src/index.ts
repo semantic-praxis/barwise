@@ -98,13 +98,16 @@ export {
   createObjectType,
   type DataTypeDef,
   dataTypeOf,
+  type DecodeResult,
   type EntityType,
   isEntityType,
   isValueType,
   type ObjectType,
   type ObjectTypeBase,
   type ObjectTypeConfig,
+  ObjectTypeError,
   type ObjectTypeKind,
+  type ObjectTypeProblem,
   referenceModeOf,
   type ValueConstraintDef,
   valueConstraintOf,
@@ -169,6 +172,7 @@ export {
   SchemaValidator,
 } from "./serialization/SchemaValidator.js";
 export { CURRENT_ORM_VERSION, type OrmVersionMigration } from "./serialization/schemaVersion.js";
+export { decodeObjectType } from "./serialization/yaml/decodeObjectType.js";
 
 // Validation
 export {

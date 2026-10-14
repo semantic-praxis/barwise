@@ -1,5 +1,4 @@
-import { generateId } from "./id.js";
-import { requireName } from "./name.js";
+import { trimmedName } from "./name.js";
 
 /**
  * Whether the object type is an entity (identified by a reference scheme)
@@ -178,7 +177,7 @@ export interface ObjectTypeConfig {
  */
 export interface ObjectTypeBase {
   readonly id: string;
-  /** Trimmed and non-empty; `createObjectType` refuses anything else. */
+  /** Trimmed and non-empty; `objectTypeRuleProblems` refuses anything else. */
   readonly name: string;
   readonly definition?: string;
   readonly sourceContext?: string;
@@ -254,20 +253,94 @@ export const VALUE_ONLY_FIELDS = [
 ] as const;
 
 /**
- * Build an object type from a config, applying every default and refusing
- * every combination the old constructor threw for, plus the value-only
- * fields on an entity type, which it silently dropped (barwise-5fg).
+ * One thing wrong with one object type.
  *
- * Every check is a run-time check: `ObjectTypeConfig` is one broad type, so
- * the compiler lets a caller omit an entity's reference mode, give a value
- * type one, or put a value-only field on an entity, and the config is also
- * built from parsed YAML, where it has no say at all. The value-only fields
- * are checked first, so an entity carrying an empty value constraint is told
- * it cannot have one rather than that it needs a value.
+ * `objectType` is the name as written, or the id when the name is the
+ * problem ("" when the input has neither). `field` is the field at fault,
+ * spelled as the input spells it: `dataType` from `createObjectType`,
+ * `data_type` from `decodeObjectType`, which reads YAML. A problem inside a
+ * field is reported against the field that holds it; the message says where.
  */
+export interface ObjectTypeProblem {
+  readonly objectType: string;
+  readonly field: string;
+  readonly message: string;
+}
 
-export function createObjectType(config: ObjectTypeConfig): ObjectType {
-  const name = requireName(config.name);
+/** Either the object type, or every problem with it -- never both. */
+export type DecodeResult =
+  | { readonly ok: true; readonly value: ObjectType; }
+  | { readonly ok: false; readonly problems: readonly ObjectTypeProblem[]; };
+
+/**
+ * How problems identify one object type: by its name as written, by its id
+ * when the name is what is wrong, and by its kind when that is known.
+ * `subject` begins a sentence about the object type; `who` names it inside
+ * a sentence about one of its fields.
+ */
+export interface ObjectTypeIdentity {
+  readonly objectType: string;
+  readonly subject: string;
+  readonly who: string;
+}
+
+/** Identify an object type for its problems, from whatever it carries. */
+export function identifyObjectType(
+  name: unknown,
+  id: unknown,
+  kind: ObjectTypeKind | undefined,
+): ObjectTypeIdentity {
+  const named = trimmedName(name) !== undefined ? (name as string) : undefined;
+  const knownId = typeof id === "string" && id !== "" ? id : undefined;
+  const noun = kind === "entity" ? "Entity type" : kind === "value" ? "Value type" : "Object type";
+  if (named !== undefined) {
+    return { objectType: named, subject: `${noun} "${named}"`, who: `"${named}"` };
+  }
+  if (knownId !== undefined) {
+    return {
+      objectType: knownId,
+      subject: `${noun} with id "${knownId}"`,
+      who: `the object type with id "${knownId}"`,
+    };
+  }
+  return {
+    objectType: "",
+    subject: `${noun} with no name or id`,
+    who: "an object type with no name or id",
+  };
+}
+
+/**
+ * Every rule an object type config breaks, as problems against config
+ * fields -- the rules a typed config can still break, which are the ones
+ * the old constructor threw for, plus the value-only fields on an entity
+ * type, which it silently dropped (barwise-5fg).
+ *
+ * `ObjectTypeConfig` is one broad type, so the compiler lets a caller omit
+ * an entity's reference mode, give a value type one, or put a value-only
+ * field on an entity; those are checked here, at run time, for both entry
+ * points. What a typed config cannot get wrong -- a string where a number
+ * belongs, an unknown key -- is the decoder's to check, because only a
+ * file can carry it.
+ *
+ * `kind` may be undefined when the decoder could not read one; the rules
+ * that depend on it are then skipped. `unsound` names fields the decoder
+ * already reported, so a rule does not report the same field again as
+ * missing.
+ */
+export function objectTypeRuleProblems(
+  config: Omit<ObjectTypeConfig, "kind"> & { readonly kind?: ObjectTypeKind; },
+  unsound: ReadonlySet<keyof ObjectTypeConfig> = new Set(),
+): ObjectTypeProblem[] {
+  const { objectType, subject, who } = identifyObjectType(config.name, config.id, config.kind);
+  const problems: ObjectTypeProblem[] = [];
+  const report = (field: keyof ObjectTypeConfig, message: string) => {
+    problems.push({ objectType, field, message });
+  };
+
+  if (!unsound.has("name") && trimmedName(config.name) === undefined) {
+    report("name", `${subject} must have a non-empty name.`);
+  }
 
   if (config.kind === "entity") {
     // Refused rather than ignored. An entity type takes its data type, value
@@ -275,21 +348,29 @@ export function createObjectType(config: ObjectTypeConfig): ObjectType {
     // on the entity they mean nothing. Before this, the union dropped them
     // without a word, and a file that carried one lost it on the next save
     // (barwise-5fg, a regression from the one-class model, which stored them
-    // for either kind).
+    // for either kind). Checked before the value constraint's contents, so
+    // an entity carrying an empty one is told to remove it, not to fill it.
     for (const [field, label] of VALUE_ONLY_FIELDS) {
       if (config[field] !== undefined) {
-        throw new Error(
-          `Entity type "${name}" cannot have ${label}; it belongs on the value type its reference mode names.`,
+        report(
+          field,
+          `${subject} cannot have ${label}; it belongs on the value type its reference mode names.`,
         );
       }
     }
+    if (!unsound.has("referenceMode") && !config.referenceMode) {
+      report("referenceMode", `${subject} must have a reference mode.`);
+    }
+  } else if (config.kind === "value" && config.referenceMode) {
+    report("referenceMode", `${subject} should not have a reference mode.`);
   }
 
-  if (config.valueConstraint) {
+  if (config.kind !== "entity" && config.valueConstraint) {
     const { values, ranges } = config.valueConstraint;
     if (values.length === 0 && (ranges?.length ?? 0) === 0) {
-      throw new Error(
-        `Value constraint on "${name}" must have at least one value or range.`,
+      report(
+        "valueConstraint",
+        `Value constraint on ${who} must have at least one value or range.`,
       );
     }
   }
@@ -297,18 +378,28 @@ export function createObjectType(config: ObjectTypeConfig): ObjectType {
   if (config.cardinality) {
     const { min, max } = config.cardinality;
     if (min < 0) {
-      throw new Error(
-        `Cardinality on "${name}" must have a non-negative minimum.`,
-      );
-    }
-    if (max !== "unbounded" && max < min) {
-      throw new Error(`Cardinality on "${name}" must have max >= min.`);
+      report("cardinality", `Cardinality on ${who} must have a non-negative minimum.`);
+    } else if (max !== "unbounded" && max < min) {
+      report("cardinality", `Cardinality on ${who} must have max >= min.`);
     }
   }
 
+  return problems;
+}
+
+/**
+ * The object type a config describes, applying every default. Only for a
+ * config `objectTypeRuleProblems` passed: it checks nothing itself.
+ *
+ * `newId` mints the id when the config has none, and is called at most
+ * once. It is a parameter rather than a read of the installed generator so
+ * the id source shows at every call: `OrmModel.addObjectType` passes
+ * `generateId`, a test passes a counter.
+ */
+export function buildObjectType(config: ObjectTypeConfig, newId: () => string): ObjectType {
   const base = {
-    id: config.id ?? generateId(),
-    name,
+    id: config.id ?? newId(),
+    name: trimmedName(config.name)!,
     aliases: Object.freeze([...(config.aliases ?? [])]),
     independent: config.independent ?? false,
     ...(config.definition !== undefined ? { definition: config.definition } : {}),
@@ -316,16 +407,8 @@ export function createObjectType(config: ObjectTypeConfig): ObjectType {
     ...(config.note !== undefined ? { note: config.note } : {}),
     ...(config.cardinality !== undefined ? { cardinality: config.cardinality } : {}),
   };
-
   if (config.kind === "entity") {
-    if (!config.referenceMode) {
-      throw new Error(`Entity type "${name}" must have a reference mode.`);
-    }
-    return Object.freeze({ ...base, kind: "entity", referenceMode: config.referenceMode });
-  }
-
-  if (config.referenceMode) {
-    throw new Error(`Value type "${name}" should not have a reference mode.`);
+    return Object.freeze({ ...base, kind: "entity", referenceMode: config.referenceMode! });
   }
   return Object.freeze({
     ...base,
@@ -334,6 +417,35 @@ export function createObjectType(config: ObjectTypeConfig): ObjectType {
     ...(config.valueConstraint !== undefined ? { valueConstraint: config.valueConstraint } : {}),
     ...(config.defaultValue !== undefined ? { defaultValue: config.defaultValue } : {}),
   });
+}
+
+/**
+ * Every problem with one object type, thrown by the callers that cannot
+ * return them (`createObjectType`, and through it `OrmModel.addObjectType`).
+ *
+ * The message lists every problem, one per line, so a caller that prints
+ * only `message` still shows all of them; `problems` keeps them apart for
+ * a caller that reports each one.
+ */
+export class ObjectTypeError extends Error {
+  constructor(readonly problems: readonly ObjectTypeProblem[]) {
+    super(problems.map((p) => p.message).join("\n"));
+    this.name = "ObjectTypeError";
+  }
+}
+
+/**
+ * Build an object type from a config, or throw every problem with it.
+ *
+ * The same rules and the same construction `decodeObjectType` applies to a
+ * file's object type, minus the shape checks a typed config makes
+ * unnecessary, so a direct caller and a `.orm.yaml` cannot drift apart on
+ * what an object type may be.
+ */
+export function createObjectType(config: ObjectTypeConfig, newId: () => string): ObjectType {
+  const problems = objectTypeRuleProblems(config);
+  if (problems.length > 0) throw new ObjectTypeError(problems);
+  return buildObjectType(config, newId);
 }
 
 /**

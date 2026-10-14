@@ -1,6 +1,7 @@
 import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
 import { FactType, type FactTypeConfig } from "./FactType.js";
+import { generateId } from "./id.js";
 import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
 import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
 import { Population, type PopulationConfig } from "./Population.js";
@@ -92,8 +93,10 @@ export class OrmModel {
   }
 
   /**
-   * Add an object type to the model.
+   * Add an object type to the model, minting its id from the installed
+   * generator when the config has none.
    * @throws If an object type with the same name already exists.
+   * @throws {ObjectTypeError} With every problem the config has.
    */
   addObjectType(config: ObjectTypeConfig): ObjectType {
     const existing = this.getObjectTypeByName(config.name);
@@ -102,7 +105,7 @@ export class OrmModel {
         `Object type "${config.name}" already exists in model "${this._name}".`,
       );
     }
-    const ot = createObjectType(config);
+    const ot = createObjectType(config, generateId);
     this._objectTypes.set(ot.id, ot);
     return ot;
   }

@@ -14,23 +14,32 @@ import { createObjectType, isEntityType, isValueType } from "../../src/model/Obj
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 
+/** A fresh id per call: the id source the tests hand the constructor. */
+let minted = 0;
+const newId = () => `ot-${++minted}`;
+
 describe("ObjectType", () => {
   // The record does not extend ModelElement, so nothing else enforces the
   // naming rule on its behalf any more. Before WS1 these cases were covered
   // transitively by ModelElement's own tests and by nothing here: with the
   // `requireName` call deleted from `createObjectType`, the whole core
-  // suite still passed. It does not now.
+  // suite still passed. It does not now. The decoder shares the rule
+  // (`trimmedName`) but not `requireName`'s message, because its problem
+  // names the object type, by id when the name is what is wrong.
   describe("names", () => {
     it.each([
       ["empty", ""],
       ["whitespace only", "   "],
     ])("refuses a %s name", (_label, name) => {
-      expect(() => createObjectType({ name, kind: "value" }))
-        .toThrow("Model element name must be a non-empty string.");
+      expect(() => createObjectType({ id: "ot-x", name, kind: "value" }, newId))
+        .toThrow('Value type with id "ot-x" must have a non-empty name.');
     });
 
     it("stores the name trimmed", () => {
-      const ot = createObjectType({ name: "  Customer  ", kind: "entity", referenceMode: "id" });
+      const ot = createObjectType(
+        { name: "  Customer  ", kind: "entity", referenceMode: "id" },
+        newId,
+      );
       expect(ot.name).toBe("Customer");
     });
   });
@@ -41,7 +50,7 @@ describe("ObjectType", () => {
         name: "Customer",
         kind: "entity",
         referenceMode: "customer_id",
-      });
+      }, newId);
       expect(ot.name).toBe("Customer");
       expect(ot.kind).toBe("entity");
       expect(ot.referenceMode).toBe("customer_id");
@@ -51,7 +60,7 @@ describe("ObjectType", () => {
 
     it("throws if entity type has no reference mode", () => {
       expect(
-        () => createObjectType({ name: "Customer", kind: "entity" }),
+        () => createObjectType({ name: "Customer", kind: "entity" }, newId),
       ).toThrow("reference mode");
     });
 
@@ -61,7 +70,7 @@ describe("ObjectType", () => {
         kind: "entity",
         referenceMode: "customer_id",
         definition: "A person or org that has placed at least one order.",
-      });
+      }, newId);
       expect(ot.definition).toBe(
         "A person or org that has placed at least one order.",
       );
@@ -73,14 +82,14 @@ describe("ObjectType", () => {
         kind: "entity",
         referenceMode: "customer_id",
         sourceContext: "crm",
-      });
+      }, newId);
       expect(ot.sourceContext).toBe("crm");
     });
   });
 
   describe("value types", () => {
     it("creates a value type without a reference mode", () => {
-      const ot = createObjectType({ name: "Name", kind: "value" });
+      const ot = createObjectType({ name: "Name", kind: "value" }, newId);
       expect(ot.kind).toBe("value");
       expect(ot.referenceMode).toBeUndefined();
       expect(isValueType(ot)).toBe(true);
@@ -94,7 +103,7 @@ describe("ObjectType", () => {
             name: "Name",
             kind: "value",
             referenceMode: "name_id",
-          }),
+          }, newId),
       ).toThrow("should not have a reference mode");
     });
 
@@ -103,7 +112,7 @@ describe("ObjectType", () => {
         name: "Rating",
         kind: "value",
         valueConstraint: { values: ["A", "B", "C", "D", "F"] },
-      });
+      }, newId);
       expect(ot.valueConstraint).toBeDefined();
       expect(ot.valueConstraint!.values).toEqual(["A", "B", "C", "D", "F"]);
     });
@@ -113,7 +122,7 @@ describe("ObjectType", () => {
         name: "FirstName",
         kind: "value",
         dataType: { name: "text", length: 50 },
-      });
+      }, newId);
       expect(ot.dataType).toBeDefined();
       expect(ot.dataType!.name).toBe("text");
       expect(ot.dataType!.length).toBe(50);
@@ -125,14 +134,14 @@ describe("ObjectType", () => {
         name: "Price",
         kind: "value",
         dataType: { name: "decimal", length: 10, scale: 2 },
-      });
+      }, newId);
       expect(ot.dataType!.name).toBe("decimal");
       expect(ot.dataType!.length).toBe(10);
       expect(ot.dataType!.scale).toBe(2);
     });
 
     it("allows value type without data type", () => {
-      const ot = createObjectType({ name: "Name", kind: "value" });
+      const ot = createObjectType({ name: "Name", kind: "value" }, newId);
       expect(ot.dataType).toBeUndefined();
     });
 
@@ -143,7 +152,7 @@ describe("ObjectType", () => {
             name: "Rating",
             kind: "value",
             valueConstraint: { values: [] },
-          }),
+          }, newId),
       ).toThrow("at least one value");
     });
   });
@@ -155,7 +164,7 @@ describe("ObjectType", () => {
         kind: "entity",
         referenceMode: "customer_id",
         aliases: ["Client", "Account"],
-      });
+      }, newId);
       expect(ot.aliases).toEqual(["Client", "Account"]);
     });
 
@@ -194,7 +203,7 @@ describe("ObjectType", () => {
         kind: "entity",
         referenceMode: "customer_id",
         aliases: ["Client"],
-      });
+      }, newId);
       expect(() => {
         (ot.aliases as string[]).push("Account");
       }).toThrow();
@@ -205,7 +214,7 @@ describe("ObjectType", () => {
         name: "Rating",
         kind: "value",
         aliases: ["Grade", "Score"],
-      });
+      }, newId);
       expect(ot.aliases).toEqual(["Grade", "Score"]);
     });
   });
@@ -222,7 +231,7 @@ describe("ObjectType", () => {
         name: "Customer",
         kind: "entity",
         referenceMode: "customer_id",
-      });
+      }, newId);
 
       expect(() => {
         (ot as { definition?: string; }).definition = "Updated definition.";
@@ -234,7 +243,7 @@ describe("ObjectType", () => {
         name: "Customer",
         kind: "entity",
         referenceMode: "customer_id",
-      });
+      }, newId);
 
       const updated = { ...ot, definition: "Updated definition.", sourceContext: "billing" };
 
@@ -252,7 +261,7 @@ describe("ObjectType", () => {
         kind: "entity",
         referenceMode: "dept_id",
         cardinality: { min: 0, max: 50 },
-      });
+      }, newId);
       expect(ot.cardinality).toEqual({ min: 0, max: 50 });
     });
 
@@ -263,7 +272,7 @@ describe("ObjectType", () => {
           kind: "entity",
           referenceMode: "dept_id",
           cardinality: { min: -1, max: 50 },
-        })
+        }, newId)
       ).toThrow();
     });
 
@@ -274,7 +283,7 @@ describe("ObjectType", () => {
           kind: "entity",
           referenceMode: "dept_id",
           cardinality: { min: 10, max: 5 },
-        })
+        }, newId)
       ).toThrow();
     });
   });

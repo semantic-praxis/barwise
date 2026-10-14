@@ -11,9 +11,20 @@
  * let them drift apart silently.
  */
 export function requireName(name: string | undefined): string {
-  const trimmed = name?.trim();
-  if (!trimmed) {
+  const trimmed = trimmedName(name);
+  if (trimmed === undefined) {
     throw new Error("Model element name must be a non-empty string.");
   }
   return trimmed;
+}
+
+/**
+ * The name as stored, or undefined when it is not one: the rule
+ * `requireName` throws for, for a caller that reports rather than throws
+ * (the object type decoder collects every problem before it answers).
+ */
+export function trimmedName(name: unknown): string | undefined {
+  if (typeof name !== "string") return undefined;
+  const trimmed = name.trim();
+  return trimmed === "" ? undefined : trimmed;
 }

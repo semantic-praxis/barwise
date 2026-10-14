@@ -1,12 +1,18 @@
 import { parse, stringify } from "yaml";
+import type { ObjectType } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
-import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
+import {
+  type SchemaError,
+  type SchemaValidationResult,
+  SchemaValidator,
+} from "./SchemaValidator.js";
 import {
   applyMigrations,
   CURRENT_ORM_VERSION,
   type MigrationPlan,
   planMigration,
 } from "./schemaVersion.js";
+import { decodeObjectType } from "./yaml/decodeObjectType.js";
 import { deserializeDefinition, serializeDefinition } from "./yaml/definition.js";
 import { deserializeDiagramLayout, serializeDiagramLayout } from "./yaml/diagram.js";
 import type { OrmYamlDocument } from "./yaml/document.js";
@@ -15,7 +21,7 @@ import {
   deserializeObjectifiedFactType,
   serializeObjectifiedFactType,
 } from "./yaml/objectified.js";
-import { deserializeObjectType, serializeObjectType } from "./yaml/objectType.js";
+import { serializeObjectType } from "./yaml/objectType.js";
 import {
   deserializeFactInstance,
   deserializePopulation,
@@ -26,6 +32,10 @@ import { deserializeSubtypeFact, serializeSubtypeFact } from "./yaml/subtype.js"
 /**
  * Error thrown when deserialization fails due to schema validation
  * or model construction errors.
+ *
+ * `validationResult.errors` lists every problem found before construction,
+ * one per entry: the JSON Schema's, and each object type's problems from
+ * `decodeObjectType`, located by the same kind of JSON Pointer.
  */
 export class DeserializationError extends Error {
   constructor(
@@ -94,12 +104,13 @@ export class OrmYamlSerializer {
   /**
    * Deserialize a YAML string into an OrmModel.
    *
-   * The YAML is first validated against the JSON Schema. If validation
-   * fails, a DeserializationError is thrown with the validation errors.
+   * The YAML is first validated against the JSON Schema, and each object
+   * type is decoded by `decodeObjectType`. If either finds a problem, a
+   * DeserializationError is thrown listing all of them.
    *
-   * The model is then constructed from the validated document. Construction
-   * errors (e.g. referential integrity violations) are thrown as
-   * DeserializationError.
+   * The model is then constructed from the validated document. Other
+   * construction errors (e.g. referential integrity violations) are thrown
+   * as they occur, as before.
    */
   /**
    * @param yaml - The YAML string to deserialize.
@@ -128,17 +139,26 @@ export class OrmYamlSerializer {
     const migrated = this.migrateToCurrentVersion(raw);
 
     const result = this.validator.validateModel(migrated);
-    if (!result.valid) {
+    const objectTypes = decodeObjectTypes(migrated);
+    // The decoder checks everything the schema checks about an object type
+    // and reports it naming the object type and the field, so the schema's
+    // own errors inside an entry are dropped rather than reported twice.
+    // Before, the schema's errors stopped the load, and the constructor's
+    // checks on the same object types never ran (the D2 combined case in
+    // docs/specs/effect-comparison.spec.md).
+    const errors = [
+      ...result.errors.filter((e) => !OBJECT_TYPE_ENTRY.test(e.path)),
+      ...objectTypes.errors,
+    ];
+    if (errors.length > 0) {
       throw new DeserializationError(
-        `YAML does not conform to orm-model schema: ${
-          result.errors.map((e) => `${e.path}: ${e.message}`).join("; ")
-        }`,
-        result,
+        `YAML is not a valid ORM model: ${errors.map((e) => `${e.path}: ${e.message}`).join("; ")}`,
+        { valid: false, errors },
       );
     }
 
     const doc = migrated as OrmYamlDocument;
-    return this.fromDocument(doc, options);
+    return this.fromDocument(doc, objectTypes.values, options);
   }
 
   /**
@@ -228,6 +248,7 @@ export class OrmYamlSerializer {
 
   private fromDocument(
     doc: OrmYamlDocument,
+    objectTypes: readonly ObjectType[],
     options?: { lenient?: boolean; },
   ): OrmModel {
     const model = new OrmModel({
@@ -236,9 +257,11 @@ export class OrmYamlSerializer {
       note: doc.model.note,
     });
 
-    // Add object types first (fact types reference them).
-    for (const otDoc of doc.model.object_types ?? []) {
-      model.addObjectType(deserializeObjectType(otDoc));
+    // Add object types first (fact types reference them). A decoded record
+    // is a valid config, so `addObjectType` rebuilds it to an equal value;
+    // going through it keeps its duplicate-name check the only one.
+    for (const ot of objectTypes) {
+      model.addObjectType(ot);
     }
 
     // Add fact types.
@@ -288,4 +311,45 @@ export class OrmYamlSerializer {
 
     return model;
   }
+}
+
+/** A JSON Pointer at or inside one entry of `model.object_types`. */
+const OBJECT_TYPE_ENTRY = /^\/model\/object_types\/\d+(\/|$)/;
+
+const escapePointer = (segment: string) => segment.replace(/~/g, "~0").replace(/\//g, "~1");
+
+/**
+ * Decode every object type in a parsed document, collecting each entry's
+ * problems as errors located at the entry and field.
+ *
+ * Nothing is decoded when `object_types` is not a list; the schema reports
+ * that. A file names every id -- fact types refer to object types by it --
+ * so an entry without one is a problem here, where `addObjectType` would
+ * mint one. The decoder is still given an id source, and for such an entry
+ * may call it, but the load is refused before that id is used.
+ */
+function decodeObjectTypes(document: unknown): {
+  values: ObjectType[];
+  errors: SchemaError[];
+} {
+  const entries = (document as { model?: { object_types?: unknown; }; } | null)?.model
+    ?.object_types;
+  const values: ObjectType[] = [];
+  const errors: SchemaError[] = [];
+  if (!Array.isArray(entries)) return { values, errors };
+  entries.forEach((entry: unknown, i) => {
+    const at = (field: string) =>
+      `/model/object_types/${i}${field === "" ? "" : `/${escapePointer(field)}`}`;
+    if (typeof entry === "object" && entry !== null && !Array.isArray(entry) && !("id" in entry)) {
+      const name = (entry as { name?: unknown; }).name;
+      const who = typeof name === "string" && name.trim() !== ""
+        ? `Object type "${name}"`
+        : "An object type with no name";
+      errors.push({ path: at("id"), message: `${who} must have an id.` });
+    }
+    const result = decodeObjectType(entry, () => "");
+    if (result.ok) values.push(result.value);
+    else errors.push(...result.problems.map((p) => ({ path: at(p.field), message: p.message })));
+  });
+  return { values, errors };
 }

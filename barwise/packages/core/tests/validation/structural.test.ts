@@ -24,6 +24,10 @@ import {
 import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
+/** A fresh id per call: the id source the tests hand the constructor. */
+let minted = 0;
+const newId = () => `ot-${++minted}`;
+
 describe("structuralRules", () => {
   it("produces no diagnostics for a valid model", () => {
     const model = new ModelBuilder("Test")
@@ -68,7 +72,10 @@ describe("structuralRules", () => {
       // FactType does not validate playerIds -- it just stores them.
       // We create a fact type with a bogus playerId and inject it
       // into the model to trigger the structural rule.
-      const ot = createObjectType({ name: "Customer", kind: "entity", referenceMode: "cid" });
+      const ot = createObjectType(
+        { name: "Customer", kind: "entity", referenceMode: "cid" },
+        newId,
+      );
       const ft = new FactType({
         name: "Customer places Order",
         roles: [
@@ -110,8 +117,14 @@ describe("structuralRules", () => {
 
     it("detects duplicate object type names", () => {
       // OrmModel.addObjectType prevents duplicates, so we inject directly.
-      const ot1 = createObjectType({ name: "Customer", kind: "entity", referenceMode: "cid1" });
-      const ot2 = createObjectType({ name: "Customer", kind: "entity", referenceMode: "cid2" });
+      const ot1 = createObjectType(
+        { name: "Customer", kind: "entity", referenceMode: "cid1" },
+        newId,
+      );
+      const ot2 = createObjectType(
+        { name: "Customer", kind: "entity", referenceMode: "cid2" },
+        newId,
+      );
 
       const model = new OrmModel({ name: "Test" });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -128,7 +141,10 @@ describe("structuralRules", () => {
     });
 
     it("detects duplicate fact type names", () => {
-      const ot = createObjectType({ name: "Customer", kind: "entity", referenceMode: "cid" });
+      const ot = createObjectType(
+        { name: "Customer", kind: "entity", referenceMode: "cid" },
+        newId,
+      );
       const ft1 = new FactType({
         name: "Customer exists",
         roles: [{ name: "exists", playerId: ot.id }],

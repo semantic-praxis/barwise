@@ -14,6 +14,10 @@ import { describe, expect, it } from "vitest";
 import { createObjectType, VALUE_ONLY_FIELDS } from "../../src/model/ObjectType.js";
 import { SchemaValidator } from "../../src/serialization/SchemaValidator.js";
 
+/** A fresh id per call: the id source the tests hand the constructor. */
+let minted = 0;
+const newId = () => `ot-${++minted}`;
+
 const schema = JSON.parse(
   readFileSync(new URL("../../schemas/orm-model.schema.json", import.meta.url), "utf8"),
 ) as { definitions: { object_type: { then: { properties: Record<string, unknown>; }; }; }; };
@@ -52,6 +56,7 @@ describe("value-only fields", () => {
             referenceMode: "supplier_id",
             [field]: SAMPLES[field]!.model,
           } as Parameters<typeof createObjectType>[0],
+          newId,
         )
       ).toThrow(`Entity type "Supplier" cannot have ${label}`);
     });
@@ -87,7 +92,7 @@ describe("value-only fields", () => {
         kind: "entity",
         referenceMode: "carrier_id",
         valueConstraint: { values: [] },
-      })
+      }, newId)
     ).toThrow('Entity type "Carrier" cannot have a value constraint');
   });
 
