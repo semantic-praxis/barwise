@@ -1,8 +1,7 @@
 # The pre-push run checks the commit being pushed, not the working tree
 
-Status: Workstreams 1 and 2 implemented 2026-10-14 (trial on the shared
-helpers, check:git-listing; --check names untracked specs); workstream 3
-not started
+Status: Workstreams 1, 2 and 3 implemented 2026-10-14; decision (A) reopened
+on workstream 3's measured cost (see Implementation notes)
 Created: 2026-10-14
 Last-updated: 2026-10-14
 Tracking: barwise-vzf (this spec); barwise-qch (workstream 2)
@@ -376,3 +375,33 @@ worth naming: the existing `audit-corrections` test asserted that `--check`
 did NOT mention an untracked draft. That pinned the blind spot this
 workstream removes, so the assertion now requires the
 `unchecked (untracked)` line instead. Exit codes are unchanged.
+
+**Workstream 3, 2026-10-14.** Built as sketched, with one simplification:
+cleanup deletes the worktree directory and runs `git worktree prune`
+instead of also calling `git worktree remove`. Mutation showed the remove
+call to be redundant: with it deleted, the tests still passed, and they fail
+when either of the remaining two steps is deleted.
+
+**The cost estimate was wrong, and decision (A) rested on it.** Measured on
+one commit with nothing else running:
+
+```
+node scripts/ci-local.mjs --commit HEAD   392 s  (npm ci 20 s; build 19 s;
+                                                   test:coverage 142 s;
+                                                   test:scripts 106 s)
+node scripts/ci-local.mjs                 178 s  (build and test:coverage
+                                                   from the Turbo cache)
+```
+
+The draft estimated about 45 s more than an in-tree run. It is about
+3.5 minutes more, because the in-tree run takes `test:coverage` from the
+Turbo cache, and a cold worktree cannot. That is the cost of decision (A),
+cold, and it is reopened for the maintainer: cold at about 6.5 minutes per
+source push, or the shared cache at about 3 minutes, with barwise-r7j's
+stale-output risk. Until it is decided this workstream ships as built,
+cold, in a PR held for that call.
+
+The first timing run also caught a real defect: `fmt:check` failed in the
+worktree because these files had been committed without formatting. The
+in-tree hook could not have seen it, because the working copy was what the
+formatter had last touched.

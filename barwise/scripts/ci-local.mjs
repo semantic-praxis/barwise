@@ -48,9 +48,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { classify, committedPaths, uncommittedPaths } from "./lib/changed-class.mjs";
+import {
+  classify,
+  committedPaths,
+  pathsDifferingFrom,
+  uncommittedPaths,
+} from "./lib/changed-class.mjs";
 import { ciSteps, shouldRun } from "./lib/ci-gates.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -167,6 +172,130 @@ function changeClass() {
   } catch {
     return { cls: undefined, why: "no merge-base with origin/main" };
   }
+}
+
+/**
+ * `--commit <sha>`: run the gate list against that commit, not this tree.
+ *
+ * The pre-push hook's question is whether CI will pass the commit being
+ * pushed, and the working tree is not that commit. It holds build output a
+ * CI checkout lacks -- on PR #641 a script test loaded `@barwise/core` from a
+ * `dist` left by an earlier build, passed here, and failed in CI, which runs
+ * the script tests before the build -- and files the push leaves behind. A
+ * fresh worktree of the commit, a fresh `npm ci` and a cold build are that
+ * commit's state by construction, where hiding each difference in turn
+ * would be a list of what a clone lacks, with nothing keeping it current
+ * (docs/specs/pushed-tree-verification.spec.md, workstream 3).
+ *
+ * The lock is this checkout's, held from before the worktree exists until
+ * after it is removed. The child run takes a lock in the worktree's own
+ * `node_modules`, which no other run can see, so without this one two
+ * pushes from one checkout would no longer exclude each other.
+ *
+ * Exit: the child's code (0 pass, 1 fail, 2 refused), or 2 when the commit
+ * cannot be resolved, checked out or installed -- the gates never ran, so
+ * nothing was found wrong and nothing was shown right.
+ */
+function runAtCommit(argv) {
+  const at = argv.indexOf("--commit");
+  const ref = argv[at + 1];
+  if (ref === undefined || ref.startsWith("--")) {
+    console.error("ci:local --commit needs a commit to check. Could not answer.");
+    return 2;
+  }
+  let sha;
+  let top;
+  try {
+    const git = (args) =>
+      execFileSync("git", args, {
+        cwd: ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    sha = git(["rev-parse", "--verify", `${ref}^{commit}`]);
+    top = git(["rev-parse", "--show-toplevel"]);
+  } catch {
+    console.error(`ci:local --commit: ${ref} does not name a commit here. Could not answer.`);
+    return 2;
+  }
+  const passThrough = argv.filter((a, i) => i !== at && i !== at + 1);
+
+  acquireLock();
+  const tree = mkdtempSync(join(tmpdir(), "barwise-commit-"));
+  const cleanup = () => {
+    // Delete, then prune: prune drops the registration of any worktree whose
+    // directory is gone, which is also what recovers a run killed mid-way.
+    rmSync(tree, { recursive: true, force: true });
+    spawnSync("git", ["worktree", "prune"], { cwd: ROOT, stdio: "ignore" });
+    releaseLock();
+  };
+  for (const signal of ["SIGINT", "SIGTERM"]) {
+    process.on(signal, () => {
+      cleanup();
+      process.exit(130);
+    });
+  }
+
+  try {
+    const left = [...new Set(pathsDifferingFrom(sha, ROOT))];
+    if (left.length > 0) {
+      console.log(
+        `In this working tree but not in ${sha.slice(0, 8)}, so neither checked nor pushed:`,
+      );
+      for (const f of left) console.log(`  ${f}`);
+      console.log("");
+    }
+
+    const add = spawnSync("git", ["worktree", "add", "--detach", "--quiet", tree, sha], {
+      cwd: ROOT,
+      encoding: "utf8",
+    });
+    if (add.status !== 0) {
+      console.error(
+        `ci:local --commit: could not check out ${sha.slice(0, 8)}: ${(add.stderr ?? "").trim()}`,
+      );
+      return 2;
+    }
+    const checkout = join(tree, relative(top, ROOT));
+    console.log(
+      `Checking ${sha.slice(0, 8)} in a fresh worktree: npm ci, then the CI gate list.\n`,
+    );
+
+    const install = spawnSync("npm", ["ci", "--no-audit", "--no-fund"], {
+      cwd: checkout,
+      stdio: "inherit",
+    });
+    if (install.error || install.status !== 0) {
+      console.error(
+        `ci:local --commit: npm ci failed in the worktree (${
+          install.error?.code ?? `exit ${install.status}`
+        }). `
+          + "The gates did not run.",
+      );
+      return 2;
+    }
+
+    const run = spawnSync(process.execPath, [
+      join(checkout, "scripts", "ci-local.mjs"),
+      ...passThrough,
+    ], {
+      cwd: checkout,
+      stdio: "inherit",
+    });
+    if (run.error || run.status === null) {
+      console.error(
+        `ci:local --commit: the gate run did not finish (${run.error?.code ?? run.signal}).`,
+      );
+      return 2;
+    }
+    return run.status;
+  } finally {
+    cleanup();
+  }
+}
+
+if (process.argv.includes("--commit")) {
+  process.exit(runAtCommit(process.argv.slice(2)));
 }
 
 const change = changeClass();

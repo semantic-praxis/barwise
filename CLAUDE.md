@@ -358,16 +358,22 @@ file that asked.
 
 **The hooks split by cost, not by preference.** Pre-commit is the fast
 path: staged-file linting, a build, and the tests of packages a change
-touches. Pre-push runs `npm run ci:local`, which is the CI gate list
-derived from `ci.yml`, with ci.yml's `if:` conditions applied through
-the same change classifier CI's detect step runs
-(`scripts/lib/changed-class.mjs`): a docs-only change skips what CI
-skips, and `--all` runs everything. About 30s warm and 2m40s once a
-source file changed, of which `test:coverage` alone is 109s. That belongs at
-the push because a push is what makes CI run, and because the same list
-per commit is a hook people turn off. `git push --no-verify` is the
-escape hatch for work in progress; a red push is the thing it is worth
-30 seconds to avoid.
+touches. Pre-push runs `npm run ci:local -- --commit <sha>` for each
+pushed commit: the CI gate list derived from `ci.yml`, with ci.yml's `if:`
+conditions applied through the same change classifier CI's detect step
+runs (`scripts/lib/changed-class.mjs`), in a fresh worktree of that
+commit with a fresh `npm ci` and a cold build. A working tree holds build
+output and unpushed files a CI checkout lacks, and on PR #641 a script test
+passed here because `dist` existed and failed in CI
+(`docs/specs/pushed-tree-verification.spec.md`). A docs-only change skips
+what CI skips, and `--all` runs everything. Measured 2026-10-14: 392s for a
+source change, against 178s for the same commit checked in the working
+tree, where Turbo serves `build` and `test:coverage` from cache. Plain
+`npm run ci:local` still checks the working tree, for use before a commit.
+The full list belongs at the push because a push is what makes CI run,
+and because the same list per commit is a hook people turn off. `git push
+--no-verify` is the escape hatch for work in progress; a red push is the
+thing the wait exists to avoid.
 
 ## Versioning and Releases
 
