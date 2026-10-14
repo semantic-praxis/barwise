@@ -1,0 +1,268 @@
+{
+  "run": "effect-t1-m5",
+  "turns": 52,
+  "inputProcessed": 5575786,
+  "finalContext": 128910,
+  "perTurn": [
+    {
+      "input": 2,
+      "cacheRead": 0,
+      "cacheCreation": 62311
+    },
+    {
+      "input": 2,
+      "cacheRead": 62311,
+      "cacheCreation": 4916
+    },
+    {
+      "input": 2,
+      "cacheRead": 67227,
+      "cacheCreation": 1128
+    },
+    {
+      "input": 2,
+      "cacheRead": 68355,
+      "cacheCreation": 6409
+    },
+    {
+      "input": 2,
+      "cacheRead": 74764,
+      "cacheCreation": 1047
+    },
+    {
+      "input": 2,
+      "cacheRead": 75811,
+      "cacheCreation": 6050
+    },
+    {
+      "input": 2,
+      "cacheRead": 81861,
+      "cacheCreation": 1156
+    },
+    {
+      "input": 2,
+      "cacheRead": 83017,
+      "cacheCreation": 2970
+    },
+    {
+      "input": 2,
+      "cacheRead": 85987,
+      "cacheCreation": 1184
+    },
+    {
+      "input": 2,
+      "cacheRead": 87171,
+      "cacheCreation": 1449
+    },
+    {
+      "input": 2,
+      "cacheRead": 88620,
+      "cacheCreation": 1428
+    },
+    {
+      "input": 2,
+      "cacheRead": 90048,
+      "cacheCreation": 1872
+    },
+    {
+      "input": 2,
+      "cacheRead": 91920,
+      "cacheCreation": 3302
+    },
+    {
+      "input": 2,
+      "cacheRead": 95222,
+      "cacheCreation": 1775
+    },
+    {
+      "input": 2,
+      "cacheRead": 96997,
+      "cacheCreation": 2793
+    },
+    {
+      "input": 2,
+      "cacheRead": 99790,
+      "cacheCreation": 1873
+    },
+    {
+      "input": 2,
+      "cacheRead": 101663,
+      "cacheCreation": 1873
+    },
+    {
+      "input": 2,
+      "cacheRead": 103536,
+      "cacheCreation": 845
+    },
+    {
+      "input": 2,
+      "cacheRead": 104381,
+      "cacheCreation": 1472
+    },
+    {
+      "input": 2,
+      "cacheRead": 105853,
+      "cacheCreation": 815
+    },
+    {
+      "input": 2,
+      "cacheRead": 106668,
+      "cacheCreation": 1014
+    },
+    {
+      "input": 2,
+      "cacheRead": 107682,
+      "cacheCreation": 947
+    },
+    {
+      "input": 2,
+      "cacheRead": 108629,
+      "cacheCreation": 386
+    },
+    {
+      "input": 2,
+      "cacheRead": 109015,
+      "cacheCreation": 998
+    },
+    {
+      "input": 2,
+      "cacheRead": 110013,
+      "cacheCreation": 424
+    },
+    {
+      "input": 2,
+      "cacheRead": 110437,
+      "cacheCreation": 790
+    },
+    {
+      "input": 2,
+      "cacheRead": 111227,
+      "cacheCreation": 445
+    },
+    {
+      "input": 2,
+      "cacheRead": 111672,
+      "cacheCreation": 396
+    },
+    {
+      "input": 2,
+      "cacheRead": 112068,
+      "cacheCreation": 3047
+    },
+    {
+      "input": 2,
+      "cacheRead": 115115,
+      "cacheCreation": 414
+    },
+    {
+      "input": 2,
+      "cacheRead": 115529,
+      "cacheCreation": 170
+    },
+    {
+      "input": 2,
+      "cacheRead": 115699,
+      "cacheCreation": 388
+    },
+    {
+      "input": 2,
+      "cacheRead": 116087,
+      "cacheCreation": 528
+    },
+    {
+      "input": 4,
+      "cacheRead": 116615,
+      "cacheCreation": 385
+    },
+    {
+      "input": 2,
+      "cacheRead": 117000,
+      "cacheCreation": 632
+    },
+    {
+      "input": 2,
+      "cacheRead": 117632,
+      "cacheCreation": 445
+    },
+    {
+      "input": 2,
+      "cacheRead": 118077,
+      "cacheCreation": 1376
+    },
+    {
+      "input": 2,
+      "cacheRead": 119453,
+      "cacheCreation": 598
+    },
+    {
+      "input": 2,
+      "cacheRead": 120051,
+      "cacheCreation": 803
+    },
+    {
+      "input": 2,
+      "cacheRead": 120854,
+      "cacheCreation": 415
+    },
+    {
+      "input": 4,
+      "cacheRead": 121269,
+      "cacheCreation": 373
+    },
+    {
+      "input": 2,
+      "cacheRead": 121642,
+      "cacheCreation": 190
+    },
+    {
+      "input": 4,
+      "cacheRead": 121832,
+      "cacheCreation": 1878
+    },
+    {
+      "input": 2,
+      "cacheRead": 123710,
+      "cacheCreation": 1323
+    },
+    {
+      "input": 2,
+      "cacheRead": 125033,
+      "cacheCreation": 765
+    },
+    {
+      "input": 2,
+      "cacheRead": 125798,
+      "cacheCreation": 380
+    },
+    {
+      "input": 4,
+      "cacheRead": 126178,
+      "cacheCreation": 377
+    },
+    {
+      "input": 2,
+      "cacheRead": 126555,
+      "cacheCreation": 237
+    },
+    {
+      "input": 2,
+      "cacheRead": 126792,
+      "cacheCreation": 585
+    },
+    {
+      "input": 2,
+      "cacheRead": 127377,
+      "cacheCreation": 737
+    },
+    {
+      "input": 2,
+      "cacheRead": 128114,
+      "cacheCreation": 295
+    },
+    {
+      "input": 2,
+      "cacheRead": 128409,
+      "cacheCreation": 499
+    }
+  ]
+}

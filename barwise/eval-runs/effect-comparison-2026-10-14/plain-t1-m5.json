@@ -1,0 +1,122 @@
+{
+  "run": "plain-t1-m5",
+  "arm": "plain",
+  "task": "T1",
+  "phase": "main",
+  "pair": 5,
+  "start": "8398a193",
+  "head": "e8ed18c0",
+  "startedAt": "2026-10-14T21:15:29Z",
+  "rounds": 2,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "usage": {
+    "inputProcessed": 6956809,
+    "turns": 58,
+    "finalContext": 153178,
+    "source": "measure:comparison -- usage over the run's transcript, both rounds; per turn in plain-t1-m5.usage.json",
+    "harness": {
+      "tokens": 154170,
+      "toolCalls": 94,
+      "wallMs": 1249909,
+      "note": "cumulative over both rounds"
+    }
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "d8f0c609",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 11,
+        "of": 13,
+        "failed": [
+          "an empty unit in a file is refused, or kept and diffed like any value",
+          "an empty unit from code is refused, or kept and diffed like any value"
+        ]
+      },
+      "harnessAfterRound": {
+        "tokens": 144746,
+        "toolCalls": 79,
+        "wallMs": 816906
+      },
+      "sentBack": "held-out empty-unit cases"
+    },
+    {
+      "round": 2,
+      "head": "e8ed18c0",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 13,
+        "of": 13
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      }
+    }
+  ],
+  "diff": {
+    "files": 7,
+    "hunks": 15,
+    "added": 42,
+    "removed": 1,
+    "consumerFiles": [
+      "barwise/packages/core/schemas/orm-model.schema.json",
+      "barwise/packages/core/src/diff/breakingLevel.ts",
+      "barwise/packages/core/src/diff/changeDescription.ts",
+      "barwise/packages/core/src/diff/elementDiff.ts"
+    ],
+    "sliceLines": 984
+  },
+  "redChecks": [
+    {
+      "class": "environment",
+      "command": "git ... / compound shell command",
+      "firstError": "the worktree sandbox refused a command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code (2 times)"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/laws/counterexample.law.test.ts > coverage: the law reaches every constraint kind that has a generator > emits a counterexample for each m...",
+      "note": "a newly drawn unit in tests/arbitraries/model.ts shifted the seeded samples; the unit is now picked from the type's position, so the stream did not move"
+    },
+    {
+      "class": "task logic",
+      "command": "npx tsc --noEmit -p tsconfig.test.json",
+      "firstError": "error TS5058: The specified path does not exist: 'tsconfig.test.json'.",
+      "note": "a tooling slip, not the code"
+    },
+    {
+      "class": "environment",
+      "command": "npm test (round 1)",
+      "firstError": "formats BarwiseAnnotation.test.ts 'every annotated element reads back as it was written' timed out at 30 s under load",
+      "note": "alone it passed 14/14; second full run passed 24/24; session full suite passed"
+    },
+    {
+      "class": "task logic",
+      "command": "session scoring: measure:comparison -- heldout",
+      "firstError": "empty-unit cases (file and code) failed: kept, but diffed as absent",
+      "note": "round 2 refused an empty unit in the shared rule and the JSON Schema"
+    }
+  ],
+  "observations": [
+    "the second plain main run in a row not to edit the protected layout test in round 1"
+  ],
+  "agentJudgmentCalls": [
+    "empty unit refused, in the shared rule (round 2)",
+    "unit written after data_type",
+    "unit change is breaking level caution",
+    "unit picked from the type's position in the random model generator, so the seeded law samples did not move and the serialization law covers it"
+  ]
+}

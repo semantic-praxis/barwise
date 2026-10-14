@@ -1,0 +1,122 @@
+{
+  "run": "effect-t1-m5",
+  "arm": "effect",
+  "task": "T1",
+  "phase": "main",
+  "pair": 5,
+  "start": "8d36e4fc",
+  "head": "95aea736",
+  "startedAt": "2026-10-14T21:15:29Z",
+  "rounds": 2,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "usage": {
+    "inputProcessed": 5575786,
+    "turns": 52,
+    "finalContext": 128910,
+    "source": "measure:comparison -- usage over the run's transcript, both rounds; per turn in effect-t1-m5.usage.json",
+    "harness": {
+      "tokens": 129773,
+      "toolCalls": 50,
+      "wallMs": 1229781,
+      "note": "cumulative over both rounds"
+    }
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "629e2fcc",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 11,
+        "of": 13,
+        "failed": [
+          "an empty unit in a file is refused, or kept and diffed like any value",
+          "an empty unit from code is refused, or kept and diffed like any value"
+        ]
+      },
+      "harnessAfterRound": {
+        "tokens": 123365,
+        "toolCalls": 41,
+        "wallMs": 815865
+      },
+      "sentBack": "held-out empty-unit cases"
+    },
+    {
+      "round": 2,
+      "head": "95aea736",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 13,
+        "of": 13
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      }
+    }
+  ],
+  "diff": {
+    "files": 7,
+    "hunks": 11,
+    "added": 34,
+    "removed": 1,
+    "consumerFiles": [
+      "barwise/packages/core/schemas/orm-model.schema.json",
+      "barwise/packages/core/src/diff/breakingLevel.ts",
+      "barwise/packages/core/src/diff/changeDescription.ts",
+      "barwise/packages/core/src/diff/elementDiff.ts"
+    ],
+    "sliceLines": 631
+  },
+  "redChecks": [
+    {
+      "class": "environment",
+      "command": "git ... / compound shell command",
+      "firstError": "the worktree sandbox refused a command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code (1 time)"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/diff/changeDescription.test.ts > rendering a change > has a golden for every kind of change the diff can emit",
+      "note": "the agreement test asked for the new change kind's rendering; added"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/laws/counterexample.law.test.ts > coverage: the law reaches every constraint kind that has a generator > emits a counterexample for each m...",
+      "note": "unit in tests/arbitraries/model.ts shifted the law test's pinned counts; reverted"
+    },
+    {
+      "class": "environment",
+      "command": "npm test (round 1 and round 2)",
+      "firstError": "formats BarwiseAnnotation.test.ts and cli tests (importFormats, prompt, promptEvalOffline) timed out at 30 s under load",
+      "note": "each passed alone; cli alone 463/463; session full suite passed"
+    },
+    {
+      "class": "task logic",
+      "command": "session scoring: measure:comparison -- heldout",
+      "firstError": "empty-unit cases (file and code) failed: accepted, diffed as absent",
+      "note": "round 2 refused an empty unit in the value-type schema and the JSON Schema"
+    }
+  ],
+  "observations": [
+    "committed with --no-verify in both rounds and ran the hook's steps by hand, as the run reports"
+  ],
+  "agentJudgmentCalls": [
+    "empty unit refused (round 2)",
+    "unit written after default_value",
+    "unit change is breaking level caution",
+    "unit not added to the random model generator"
+  ]
+}
