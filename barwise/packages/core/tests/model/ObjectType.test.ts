@@ -25,8 +25,12 @@ describe("ObjectType", () => {
       ["empty", ""],
       ["whitespace only", "   "],
     ])("refuses a %s name", (_label, name) => {
+      // The decoder names the object type in every problem, and by its id
+      // when the name is the problem; with neither, it says so.
       expect(() => createObjectType({ name, kind: "value" }))
-        .toThrow("Model element name must be a non-empty string.");
+        .toThrow("Value type with no name or id must have a non-empty name.");
+      expect(() => createObjectType({ name, id: "ot-1", kind: "value" }))
+        .toThrow('Value type with id "ot-1" must have a non-empty name.');
     });
 
     it("stores the name trimmed", () => {

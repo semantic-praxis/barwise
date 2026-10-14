@@ -1,16 +1,16 @@
+import { isEntityType, isValueType, type ObjectType } from "../../model/ObjectType.js";
+import type { KeysAgree, ObjectTypeYamlCodec } from "../../model/objectTypeSchema.js";
 import {
-  type ConceptualDataTypeName,
-  isEntityType,
-  isValueType,
-  type ObjectType,
-  type ObjectTypeConfig,
-} from "../../model/ObjectType.js";
-import {
-  deserializeValueConstraintBody,
   type OrmYamlValueConstraintBody,
   serializeValueConstraintBody,
 } from "./valueConstraint.js";
 
+/**
+ * An object type as a file spells it, for the serializer to build. Reading
+ * one is the decoder's job (`ObjectTypeYamlCodec` in
+ * `model/objectTypeSchema.ts`). The keys are held to the decoder's at compile
+ * time (`_yamlKeysAgree` below) and the values by the round-trip laws.
+ */
 export interface OrmYamlObjectType {
   id: string;
   name: string;
@@ -26,6 +26,8 @@ export interface OrmYamlObjectType {
   note?: string;
   cardinality?: { min: number; max: number | "unbounded"; };
 }
+
+const _yamlKeysAgree: KeysAgree<OrmYamlObjectType, typeof ObjectTypeYamlCodec.Encoded> = true;
 
 export function serializeObjectType(ot: ObjectType): OrmYamlObjectType {
   const result: OrmYamlObjectType = {
@@ -79,30 +81,4 @@ export function serializeObjectType(ot: ObjectType): OrmYamlObjectType {
   }
 
   return result;
-}
-
-export function deserializeObjectType(otDoc: OrmYamlObjectType): ObjectTypeConfig {
-  return {
-    id: otDoc.id,
-    name: otDoc.name,
-    kind: otDoc.kind,
-    referenceMode: otDoc.reference_mode,
-    definition: otDoc.definition,
-    sourceContext: otDoc.source_context,
-    valueConstraint: otDoc.value_constraint
-      ? deserializeValueConstraintBody(otDoc.value_constraint)
-      : undefined,
-    dataType: otDoc.data_type
-      ? {
-        name: otDoc.data_type.name as ConceptualDataTypeName,
-        length: otDoc.data_type.length,
-        scale: otDoc.data_type.scale,
-      }
-      : undefined,
-    aliases: otDoc.aliases,
-    independent: otDoc.independent,
-    defaultValue: otDoc.default_value,
-    note: otDoc.note,
-    cardinality: otDoc.cardinality,
-  };
 }
