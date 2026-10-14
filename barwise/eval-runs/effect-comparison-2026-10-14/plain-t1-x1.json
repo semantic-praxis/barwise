@@ -1,0 +1,102 @@
+{
+  "run": "plain-t1-x1",
+  "arm": "plain",
+  "task": "T1",
+  "phase": "primer-check",
+  "variant": "primer without the phrase \"which the byte-layout test pins\"",
+  "pooled": false,
+  "start": "8398a193",
+  "head": "e4275376",
+  "startedAt": "2026-10-14T21:50:28Z",
+  "rounds": 1,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "usage": {
+    "inputProcessed": 7150285,
+    "turns": 58,
+    "finalContext": 153557,
+    "rounds": [
+      {
+        "round": 1,
+        "turns": 58,
+        "inputProcessed": 7150285
+      }
+    ],
+    "source": "measure:comparison -- usage over the run's transcript; per turn in plain-t1-x1.usage.json"
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "e4275376",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 13,
+        "of": 13
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      },
+      "harness": {
+        "tokens": 156076,
+        "toolCalls": 81,
+        "wallMs": 850578
+      }
+    }
+  ],
+  "diff": {
+    "files": 7,
+    "hunks": 15,
+    "added": 43,
+    "removed": 1,
+    "consumerFiles": [
+      "barwise/packages/core/schemas/orm-model.schema.json",
+      "barwise/packages/core/src/diff/breakingLevel.ts",
+      "barwise/packages/core/src/diff/changeDescription.ts",
+      "barwise/packages/core/src/diff/elementDiff.ts"
+    ],
+    "sliceLines": 985
+  },
+  "redChecks": [
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/model/valueOnlyFields.test.ts > value-only fields > the schema rejects unit on an entity type, naming the type and the field",
+      "note": "the agreement test asked for the JSON Schema's entity refusal; added"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/diff/changeDescription.test.ts > rendering a change > has a golden for every kind of change the diff can emit",
+      "note": "the agreement test asked for the new change kind's rendering; added"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/laws/counterexample.law.test.ts > coverage: the law reaches every constraint kind that has a generator > emits a counterexample for each m...",
+      "note": "unit in tests/arbitraries/model.ts shifted the law test's pinned counts; reverted"
+    },
+    {
+      "class": "environment",
+      "command": "npm test",
+      "firstError": "cli prompt.test.ts and promptEvalOffline.test.ts timed out at 30 s under load",
+      "note": "cli alone passed 463/463; session full suite passed"
+    }
+  ],
+  "observations": [
+    "did not edit the protected layout test",
+    "passed every scoring check in its first round, the first main-trial or check run in either arm to do so"
+  ],
+  "agentJudgmentCalls": [
+    "empty unit refused, in the shared rule (round 1)",
+    "unit written after data_type",
+    "unit change is breaking level caution",
+    "unit not added to the random model generator"
+  ]
+}
