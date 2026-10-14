@@ -3,203 +3,255 @@
   "turns": 40,
   "inputProcessed": 4285904,
   "finalContext": 131873,
+  "rounds": [
+    {
+      "round": 1,
+      "turns": 30,
+      "inputProcessed": 3004365
+    },
+    {
+      "round": 2,
+      "turns": 10,
+      "inputProcessed": 1281539
+    }
+  ],
   "perTurn": [
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 35769,
       "cacheCreation": 26536
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 62305,
       "cacheCreation": 4913
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 67218,
       "cacheCreation": 1028
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 68246,
       "cacheCreation": 8446
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 76692,
       "cacheCreation": 2942
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 79634,
       "cacheCreation": 7147
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 86781,
       "cacheCreation": 1233
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 88014,
       "cacheCreation": 622
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 88636,
       "cacheCreation": 1878
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 90514,
       "cacheCreation": 3323
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 93837,
       "cacheCreation": 3041
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 96878,
       "cacheCreation": 2234
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 99112,
       "cacheCreation": 1959
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 101071,
       "cacheCreation": 1641
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 102712,
       "cacheCreation": 1744
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 104456,
       "cacheCreation": 382
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 104838,
       "cacheCreation": 684
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 105522,
       "cacheCreation": 2074
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 107596,
       "cacheCreation": 2735
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 110331,
       "cacheCreation": 901
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 111232,
       "cacheCreation": 909
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 112141,
       "cacheCreation": 436
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 112577,
       "cacheCreation": 1850
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 114427,
       "cacheCreation": 388
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 114815,
       "cacheCreation": 615
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 115430,
       "cacheCreation": 507
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 115937,
       "cacheCreation": 702
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 116639,
       "cacheCreation": 998
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 117637,
       "cacheCreation": 1567
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 119204,
       "cacheCreation": 669
     },
     {
+      "round": 2,
       "input": 4,
       "cacheRead": 119873,
       "cacheCreation": 1964
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 121837,
       "cacheCreation": 4207
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 126044,
       "cacheCreation": 872
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 126916,
       "cacheCreation": 549
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 127465,
       "cacheCreation": 472
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 127937,
       "cacheCreation": 445
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 128382,
       "cacheCreation": 856
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 129238,
       "cacheCreation": 939
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 130177,
       "cacheCreation": 1473
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 131650,
       "cacheCreation": 221

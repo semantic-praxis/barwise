@@ -3,228 +3,285 @@
   "turns": 45,
   "inputProcessed": 4737159,
   "finalContext": 127998,
+  "rounds": [
+    {
+      "round": 1,
+      "turns": 36,
+      "inputProcessed": 3603843
+    },
+    {
+      "round": 2,
+      "turns": 9,
+      "inputProcessed": 1133316
+    }
+  ],
   "perTurn": [
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 0,
       "cacheCreation": 62305
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 62305,
       "cacheCreation": 2037
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 64342,
       "cacheCreation": 3391
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 67733,
       "cacheCreation": 898
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 68631,
       "cacheCreation": 6306
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 74937,
       "cacheCreation": 1495
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 76432,
       "cacheCreation": 5740
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 82172,
       "cacheCreation": 2647
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 84819,
       "cacheCreation": 650
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 85469,
       "cacheCreation": 2765
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 88234,
       "cacheCreation": 3924
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 92158,
       "cacheCreation": 688
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 92846,
       "cacheCreation": 1418
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 94264,
       "cacheCreation": 3120
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 97384,
       "cacheCreation": 1222
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 98606,
       "cacheCreation": 301
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 98907,
       "cacheCreation": 965
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 99872,
       "cacheCreation": 1671
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 101543,
       "cacheCreation": 548
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 102091,
       "cacheCreation": 6027
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 108118,
       "cacheCreation": 303
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 108421,
       "cacheCreation": 2160
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 110581,
       "cacheCreation": 835
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 111416,
       "cacheCreation": 1359
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 112775,
       "cacheCreation": 2247
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 115022,
       "cacheCreation": 724
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 115746,
       "cacheCreation": 382
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 116128,
       "cacheCreation": 881
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 117009,
       "cacheCreation": 366
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 117375,
       "cacheCreation": 514
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 117889,
       "cacheCreation": 1094
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 118983,
       "cacheCreation": 272
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 119255,
       "cacheCreation": 522
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 119777,
       "cacheCreation": 414
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 120191,
       "cacheCreation": 688
     },
     {
+      "round": 1,
       "input": 2,
       "cacheRead": 120879,
       "cacheCreation": 582
     },
     {
+      "round": 2,
       "input": 4,
       "cacheRead": 121461,
       "cacheCreation": 1844
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 123305,
       "cacheCreation": 984
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 124289,
       "cacheCreation": 652
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 124941,
       "cacheCreation": 584
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 125525,
       "cacheCreation": 672
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 126197,
       "cacheCreation": 502
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 126699,
       "cacheCreation": 224
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 126923,
       "cacheCreation": 498
     },
     {
+      "round": 2,
       "input": 2,
       "cacheRead": 127421,
       "cacheCreation": 575
