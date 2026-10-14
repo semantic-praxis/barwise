@@ -1,0 +1,233 @@
+{
+  "run": "effect-t1-m3",
+  "turns": 45,
+  "inputProcessed": 4737159,
+  "finalContext": 127998,
+  "perTurn": [
+    {
+      "input": 2,
+      "cacheRead": 0,
+      "cacheCreation": 62305
+    },
+    {
+      "input": 2,
+      "cacheRead": 62305,
+      "cacheCreation": 2037
+    },
+    {
+      "input": 2,
+      "cacheRead": 64342,
+      "cacheCreation": 3391
+    },
+    {
+      "input": 2,
+      "cacheRead": 67733,
+      "cacheCreation": 898
+    },
+    {
+      "input": 2,
+      "cacheRead": 68631,
+      "cacheCreation": 6306
+    },
+    {
+      "input": 2,
+      "cacheRead": 74937,
+      "cacheCreation": 1495
+    },
+    {
+      "input": 2,
+      "cacheRead": 76432,
+      "cacheCreation": 5740
+    },
+    {
+      "input": 2,
+      "cacheRead": 82172,
+      "cacheCreation": 2647
+    },
+    {
+      "input": 2,
+      "cacheRead": 84819,
+      "cacheCreation": 650
+    },
+    {
+      "input": 2,
+      "cacheRead": 85469,
+      "cacheCreation": 2765
+    },
+    {
+      "input": 2,
+      "cacheRead": 88234,
+      "cacheCreation": 3924
+    },
+    {
+      "input": 2,
+      "cacheRead": 92158,
+      "cacheCreation": 688
+    },
+    {
+      "input": 2,
+      "cacheRead": 92846,
+      "cacheCreation": 1418
+    },
+    {
+      "input": 2,
+      "cacheRead": 94264,
+      "cacheCreation": 3120
+    },
+    {
+      "input": 2,
+      "cacheRead": 97384,
+      "cacheCreation": 1222
+    },
+    {
+      "input": 2,
+      "cacheRead": 98606,
+      "cacheCreation": 301
+    },
+    {
+      "input": 2,
+      "cacheRead": 98907,
+      "cacheCreation": 965
+    },
+    {
+      "input": 2,
+      "cacheRead": 99872,
+      "cacheCreation": 1671
+    },
+    {
+      "input": 2,
+      "cacheRead": 101543,
+      "cacheCreation": 548
+    },
+    {
+      "input": 2,
+      "cacheRead": 102091,
+      "cacheCreation": 6027
+    },
+    {
+      "input": 2,
+      "cacheRead": 108118,
+      "cacheCreation": 303
+    },
+    {
+      "input": 2,
+      "cacheRead": 108421,
+      "cacheCreation": 2160
+    },
+    {
+      "input": 2,
+      "cacheRead": 110581,
+      "cacheCreation": 835
+    },
+    {
+      "input": 2,
+      "cacheRead": 111416,
+      "cacheCreation": 1359
+    },
+    {
+      "input": 2,
+      "cacheRead": 112775,
+      "cacheCreation": 2247
+    },
+    {
+      "input": 2,
+      "cacheRead": 115022,
+      "cacheCreation": 724
+    },
+    {
+      "input": 2,
+      "cacheRead": 115746,
+      "cacheCreation": 382
+    },
+    {
+      "input": 2,
+      "cacheRead": 116128,
+      "cacheCreation": 881
+    },
+    {
+      "input": 2,
+      "cacheRead": 117009,
+      "cacheCreation": 366
+    },
+    {
+      "input": 2,
+      "cacheRead": 117375,
+      "cacheCreation": 514
+    },
+    {
+      "input": 2,
+      "cacheRead": 117889,
+      "cacheCreation": 1094
+    },
+    {
+      "input": 2,
+      "cacheRead": 118983,
+      "cacheCreation": 272
+    },
+    {
+      "input": 2,
+      "cacheRead": 119255,
+      "cacheCreation": 522
+    },
+    {
+      "input": 2,
+      "cacheRead": 119777,
+      "cacheCreation": 414
+    },
+    {
+      "input": 2,
+      "cacheRead": 120191,
+      "cacheCreation": 688
+    },
+    {
+      "input": 2,
+      "cacheRead": 120879,
+      "cacheCreation": 582
+    },
+    {
+      "input": 4,
+      "cacheRead": 121461,
+      "cacheCreation": 1844
+    },
+    {
+      "input": 2,
+      "cacheRead": 123305,
+      "cacheCreation": 984
+    },
+    {
+      "input": 2,
+      "cacheRead": 124289,
+      "cacheCreation": 652
+    },
+    {
+      "input": 2,
+      "cacheRead": 124941,
+      "cacheCreation": 584
+    },
+    {
+      "input": 2,
+      "cacheRead": 125525,
+      "cacheCreation": 672
+    },
+    {
+      "input": 2,
+      "cacheRead": 126197,
+      "cacheCreation": 502
+    },
+    {
+      "input": 2,
+      "cacheRead": 126699,
+      "cacheCreation": 224
+    },
+    {
+      "input": 2,
+      "cacheRead": 126923,
+      "cacheCreation": 498
+    },
+    {
+      "input": 2,
+      "cacheRead": 127421,
+      "cacheCreation": 575
+    }
+  ]
+}

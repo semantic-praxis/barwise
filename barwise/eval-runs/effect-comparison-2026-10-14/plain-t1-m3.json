@@ -1,0 +1,129 @@
+{
+  "run": "plain-t1-m3",
+  "arm": "plain",
+  "task": "T1",
+  "phase": "main",
+  "pair": 3,
+  "start": "8398a193",
+  "head": "4247e9e4",
+  "startedAt": "2026-10-14T20:16:12Z",
+  "rounds": 2,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "usage": {
+    "inputProcessed": 6438280,
+    "turns": 54,
+    "finalContext": 153549,
+    "source": "measure:comparison -- usage over the run's transcript, both rounds; per turn in plain-t1-m3.usage.json",
+    "harness": {
+      "tokens": 154593,
+      "toolCalls": 75,
+      "wallMs": 1172644,
+      "note": "cumulative over both rounds"
+    }
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "74481b79",
+      "trial": {
+        "exit": 1,
+        "protectedTouched": [
+          "barwise/packages/core/tests/serialization/objectTypeLayout.test.ts"
+        ]
+      },
+      "heldout": {
+        "passed": 12,
+        "of": 13,
+        "failed": [
+          "an empty unit from code is refused, or kept and diffed like any value"
+        ]
+      },
+      "harnessAfterRound": {
+        "tokens": 143627,
+        "toolCalls": 58,
+        "wallMs": 797630
+      },
+      "sentBack": "edited a protected WS0 test; held-out empty unit from code"
+    },
+    {
+      "round": 2,
+      "head": "4247e9e4",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 13,
+        "of": 13
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      }
+    }
+  ],
+  "diff": {
+    "files": 7,
+    "hunks": 16,
+    "added": 43,
+    "removed": 2,
+    "consumerFiles": [
+      "barwise/packages/core/schemas/orm-model.schema.json",
+      "barwise/packages/core/src/diff/breakingLevel.ts",
+      "barwise/packages/core/src/diff/changeDescription.ts",
+      "barwise/packages/core/src/diff/elementDiff.ts"
+    ],
+    "sliceLines": 983
+  },
+  "redChecks": [
+    {
+      "class": "environment",
+      "command": "git ... / compound shell command",
+      "firstError": "the worktree sandbox refused a command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code (3 times)"
+    },
+    {
+      "class": "task logic",
+      "command": "npx tsc --noEmit && npx vitest run (packages/core)",
+      "firstError": "FAIL tests/model/valueOnlyFields.test.ts > value-only fields > the schema rejects unit on an entity type, naming the type and the field",
+      "note": "the agreement test asked for the new field's entry; added"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/diff/changeDescription.test.ts > rendering a change > has a golden for every kind of change the diff can emit",
+      "note": "the agreement test asked for the new change kind's rendering; added"
+    },
+    {
+      "class": "environment",
+      "command": "npm test (round 1 and round 2)",
+      "firstError": "cli tests (prompt, promptEvalOffline, importFormats) timed out at 30 s under load",
+      "note": "cli alone passed 463/463; session full suite passed"
+    },
+    {
+      "class": "task logic",
+      "command": "session scoring: measure:comparison -- trial",
+      "firstError": "protectedTouched: objectTypeLayout.test.ts",
+      "note": "round 2 restored it"
+    },
+    {
+      "class": "task logic",
+      "command": "session scoring: measure:comparison -- heldout",
+      "firstError": "empty unit from code accepted while a file refused it",
+      "note": "round 2 moved the refusal into the rule both entry points share"
+    }
+  ],
+  "observations": [
+    "the run flagged its own layout-test edit as a judgement call in its round 1 report"
+  ],
+  "agentJudgmentCalls": [
+    "empty unit refused, in the shared rule (round 2)",
+    "unit written after data_type",
+    "unit change is breaking level caution",
+    "unit added to the decoder test's generated cases"
+  ]
+}
