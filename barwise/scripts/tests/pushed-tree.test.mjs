@@ -410,14 +410,24 @@ test("--commit's run in the fresh worktree is not pointed at the pushing checkou
       'import { execFileSync } from "node:child_process";\n'
         + 'import { resolve } from "node:path";\n'
         + 'const top = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" });\n'
-        + 'process.exitCode = top.trim() === resolve(process.cwd(), "..") ? 0 : 1;\n',
+        + "const alternates = process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES;\n"
+        + "const shared = alternates === process.env.EXPECTED_ALTERNATES;\n"
+        + 'process.exitCode = top.trim() === resolve(process.cwd(), "..") && shared ? 0 : 1;\n',
     );
     repo.git("commit", "-qam", "probe checks the top of the tree");
 
     const r = spawnSync(process.execPath, [repo.script, "--commit", "HEAD"], {
       cwd: repo.root,
       encoding: "utf8",
-      env: { ...process.env, GIT_DIR: join(repo.dir, ".git"), GIT_WORK_TREE: repo.dir },
+      env: {
+        ...process.env,
+        GIT_DIR: join(repo.dir, ".git"),
+        GIT_WORK_TREE: repo.dir,
+        // The shared object store is the repository's, not the checkout's:
+        // the run must keep it, or a commit that lives only there is lost.
+        GIT_ALTERNATE_OBJECT_DIRECTORIES: join(repo.dir, ".git", "objects"),
+        EXPECTED_ALTERNATES: join(repo.dir, ".git", "objects"),
+      },
     });
     assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
   } finally {

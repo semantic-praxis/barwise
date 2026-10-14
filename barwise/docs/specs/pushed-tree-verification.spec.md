@@ -454,11 +454,12 @@ formatter had last touched.
 
 **Linked worktrees (barwise-hud, 2026-10-14).** A git hook in a linked
 worktree runs with `GIT_DIR` set and `GIT_WORK_TREE` unset or relative
-(`.`). Both hooks `cd barwise` first, so every git command they start took
+(`.`). Both hooks `cd barwise`, so every git command after the `cd` took
 `barwise/` for the top of the tree, and `check:secrets` refused every
 commit made from a worktree, since it looks for `.gitleaks.toml` at the
 top. Each hook now pins an absolute `GIT_WORK_TREE` before the `cd`. The
 same variables would also point the run in the fresh worktree at the
-pushing checkout, so `--commit` removes them from that run's environment.
+pushing checkout, so `--commit` removes them from that run's environment,
+keeping the two that name the shared object store.
 `pushed-tree.test.mjs` runs both hooks from a real linked worktree, and
 runs `--commit` with the variables set.

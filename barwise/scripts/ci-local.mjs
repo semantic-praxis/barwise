@@ -335,7 +335,10 @@ const WORKTREE_PREFIX = "barwise-commit-";
  * pushing checkout's index and tree instead of the commit's (barwise-hud).
  * Not `git rev-parse --local-env-vars`: that list also holds GIT_CONFIG_COUNT
  * and GIT_CONFIG_PARAMETERS, which carry `-c` settings the environment can
- * depend on, such as a proxy's CA bundle, and say nothing about location.
+ * depend on, such as a proxy's CA bundle, and say nothing about location;
+ * and GIT_OBJECT_DIRECTORY and GIT_ALTERNATE_OBJECT_DIRECTORIES, which name
+ * the object store every worktree of the repository shares. Where they are
+ * set, the commit may live only there, so the fresh worktree keeps them.
  */
 const REPO_LOCATION_VARS = [
   "GIT_DIR",
@@ -344,8 +347,6 @@ const REPO_LOCATION_VARS = [
   "GIT_INDEX_FILE",
   "GIT_PREFIX",
   "GIT_COMMON_DIR",
-  "GIT_OBJECT_DIRECTORY",
-  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
 ];
 
 /** This process's environment, minus what would point git at this checkout. */
