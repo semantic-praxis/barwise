@@ -592,8 +592,11 @@ How a run is held to the same conditions as the others:
   session's scoring sends back to the agent, is counted and classified
   by hand: API misuse (a name or signature the installed version does
   not have), task logic, or the environment.
-- **Evidence kept.** Before a run's worktree and branch are deleted, its
-  record is committed under `barwise/eval-runs/effect-comparison-<date>/`:
+- **Evidence kept.** Before a run's worktree and branch are deleted, this
+  session (never the run) commits its record on the session's own working
+  branch, the one place every run's record collects, which reaches `main`
+  by pull request. The trial branch holds none of it. The record goes
+  under `barwise/eval-runs/effect-comparison-<date>/`:
   `<run>.patch` (the run's diff against its arm head) and `<run>.json`
   (arm, task, start and head commits, rounds, tokens, tool calls, wall
   time, each scoring result, and each red check with its class, the
@@ -661,8 +664,10 @@ error text a malformed object type produces (D2).
    draft recommended running T2 only if T1 resolved or D1 and D2 split;
    the full set was chosen so the agent claim is tested on the larger
    task as well. Each T2 run is about the size of WS1 step 1 (30 files),
-   so T2 carries most of the cost; the pilot still sets the
-   resolvability bound D3 reports against.
+   so T2 carries most of the cost. (Amended 2026-10-14, when WS3 was
+   grounded: the pilot does not set D3's resolvability bound, which needs
+   both arms; it states the smallest difference five runs per arm could
+   resolve, and resolvability comes from the main trials. See WS3.)
 5. **Effect version -- resolved 2026-10-13: 4.0.x, pinned exactly.**
    3.22 is mature and better known to agents, but adopting it now would
    mean a forced major migration later; the familiarity risk is what the

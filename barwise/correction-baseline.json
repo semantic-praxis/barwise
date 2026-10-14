@@ -241,17 +241,17 @@
       "caught_by": "execution",
       "note": "Re-reading the live API after the merge. The first draft asserted GitHub's releases-list sort key was 'measurably neither created_at nor published_at', on the pre-merge reading alone. Running it again after the tag moved showed created_at DID follow the tag (2026-06-14T21:45:35Z -> 2026-09-22T18:40:50Z) while published_at stayed frozen, and the position changed with it -- so the causal chain does run through created_at and the original phrasing overstated the negative. The correction narrows the claim to the chain rather than the full sort rule, because the historical ordering still is not explained by created_at desc alone. Caught by executing the same query twice, not by rethinking it."
     },
-    "effect-comparison::0828ad1ecf1b": {
-      "spec": "effect-comparison.spec.md",
-      "excerpt": "1. the id source -- resolved 2026-10-13: both arms make it visible. barwise-e8m rules out \"injected effect ports\" in core, and one has existed since 2026-07-25:",
-      "caught_by": "reasoning",
-      "note": "Open decision 3 first recommended a 10% relative startup threshold. The user, reviewing it, said startup time was not a worry and asked what a person would notice; measuring today's CLI (barwise validate about 0.7 s) against the usual response-time thresholds (about 1 s before a wait interrupts a train of thought) showed the 10% rule would reject changes no user could perceive. Replaced by an absolute 1-second gate. Caught by a human review question and the reasoning it prompted; the measurement only supplied the number."
-    },
     "effect-comparison::149864007d79": {
       "spec": "effect-comparison.spec.md",
       "excerpt": "the table above is what survived testing; this is the log of that testing. each criterion stands in for a property through some mechanism, and diverges from it ",
       "caught_by": "execution",
       "note": "Seven of the ten anchors behind the first-draft criteria were wrong or only partly right, and every one was caught by running something rather than by re-reading: mutations of the serializer and the JSON Schema showed which byte and enum drifts no test sees, a load of malformed YAML showed first-error-only reporting and a silent field drop (barwise-5fg), a scratch Effect probe showed array-index messages, and timing the CLI with an Effect import showed the startup cost no criterion had named. The one anchor not caught (agent-run spread) cannot be executed before the trials, and the spec says so."
+    },
+    "effect-comparison::e91a7620f1d7": {
+      "spec": "effect-comparison.spec.md",
+      "excerpt": "1. the id source -- resolved 2026-10-13: both arms make it visible. barwise-e8m rules out \"injected effect ports\" in core, and one has existed since 2026-07-25:",
+      "caught_by": "reasoning",
+      "note": "Open decision 3 first recommended a 10% relative startup threshold. The user, reviewing it, said startup time was not a worry and asked what a person would notice; measuring today's CLI (barwise validate about 0.7 s) against the usual response-time thresholds (about 1 s before a wait interrupts a train of thought) showed the 10% rule would reject changes no user could perceive. Replaced by an absolute 1-second gate. Caught by a human review question and the reasoning it prompted; the measurement only supplied the number. The same paragraph now also carries Open decision 4's amendment: it said the plain-arm pilot sets D3's resolvability bound, which needs both arms. Copilot's review of PR #652 caught it by reading the definition against the pilot, before any run."
     },
     "enterprise-trial::0bc207e81633": {
       "spec": "enterprise-trial.spec.md",
