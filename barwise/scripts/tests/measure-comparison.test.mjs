@@ -437,6 +437,18 @@ test("usage sums each turn's input once, and reports the last turn's context", (
     const truncated = spawnSync(process.execPath, [SCRIPT, "usage", file], { encoding: "utf8" });
     assert.equal(truncated.status, 2, truncated.stdout);
     assert.match(truncated.stderr, /run\.jsonl:2 is not a JSON record/);
+    // Valid JSON with a counter that is not a count: refused, not summed.
+    const bad = (usage) => {
+      writeFileSync(file, JSON.stringify({ message: { role: "assistant", id: "m1", usage } }));
+      return spawnSync(process.execPath, [SCRIPT, "usage", file], { encoding: "utf8" });
+    };
+    const missing = bad({ cache_read_input_tokens: 10 });
+    assert.equal(missing.status, 2, missing.stdout);
+    assert.match(missing.stderr, /input_tokens is undefined/);
+    const text = bad({ input_tokens: "5", cache_read_input_tokens: 10 });
+    assert.equal(text.status, 2, text.stdout);
+    assert.match(text.stderr, /input_tokens is "5"/);
+    assert.equal(bad({ input_tokens: 5, cache_read_input_tokens: -1 }).status, 2, "negative");
     writeFileSync(file, "{}\n");
     assert.equal(spawnSync(process.execPath, [SCRIPT, "usage", file]).status, 2, "no turns");
   } finally {

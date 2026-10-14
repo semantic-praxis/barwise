@@ -570,8 +570,21 @@ function usage(args) {
     }
     const message = entry?.message;
     if (message?.role !== "assistant" || !message.usage) continue;
+    // A counter that is missing, a string or negative would add a wrong
+    // number to the total and still exit 0 (Copilot, PR #654): refused.
+    const u = message.usage;
+    const counter = (name, required) => {
+      const value = u[name];
+      if (value === undefined && !required) return;
+      if (!Number.isInteger(value) || value < 0) {
+        refuse(`${file}:${index + 1}: ${name} is ${JSON.stringify(value)}, not a count of tokens.`);
+      }
+    };
+    counter("input_tokens", true);
+    counter("cache_read_input_tokens", false);
+    counter("cache_creation_input_tokens", false);
     const id = message.id ?? `line-${turns.size}`;
-    if (!turns.has(id)) turns.set(id, message.usage);
+    if (!turns.has(id)) turns.set(id, u);
   }
   if (turns.size === 0) refuse(`${file} holds no assistant turn with a usage record.`);
   const contextOf = (u) =>
