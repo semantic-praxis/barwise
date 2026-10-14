@@ -1,7 +1,9 @@
 # Effect against hand-written sealed records: a measured comparison before the rest of barwise-973
 
 Status: WS0 implemented 2026-10-13 (instruments and baseline); the
-barwise-5fg prerequisite implemented 2026-10-14; WS1-WS4 not started
+barwise-5fg prerequisite implemented 2026-10-14; WS1 and WS2 built
+2026-10-14 on their branches (see Arms as built); WS3 grounded
+2026-10-14, not yet run; WS4 not started
 Created: 2026-10-13
 Last-updated: 2026-10-14
 Tracking: barwise-cu0 (this spec); barwise-973 (WS1 of
@@ -295,6 +297,53 @@ than `validate` (402 ms), because routing loads every command when the
 first argument is not a command name
 (`cli-lazy-command-loading.spec.md`). It is left as it is.
 
+## Arms as built (WS1 and WS2, 2026-10-14)
+
+Both arms were built by Claude Code subagents from `4f7b447d` and the
+Appendix A brief, each in its own git worktree, running at the same time.
+Neither could read the other's branch. Each passed the full pre-push gate
+list before it was pushed.
+
+|                            | Plain arm                                                                                        | Effect arm                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| Branch and head            | `experiment/effect-comparison-plain`, `8398a193`                                                 | `experiment/effect-comparison-effect`, `8d36e4fc`                                 |
+| D2 (`malformed`)           | 11 of 11 reported, 11 named, 0 silent losses                                                     | 11 of 11 reported, 11 named, 0 silent losses                                      |
+| Lines (`git diff --stat`)  | +1,137 / -119 in 11 files                                                                        | +1,278 / -329 in 13 files                                                         |
+| Existing test files edited | 3 (two only gained the `newId` argument)                                                         | 1                                                                                 |
+| New dependency             | none                                                                                             | `effect@4.0.4`, exact, no transitive dependencies                                 |
+| JSON Schema                | hand-written; the decoder's verdict is compared with the schema's over about 430 generated cases | hand-written; compared with the schema Effect generates, three differences listed |
+
+These are the arms as delivered, not WS4's measurements: G4, D1, R1-R3
+are taken back to back in WS4.
+
+**Both arms made the same judgment call, independently.** A config built
+in code is held to the rules `createObjectType` applied before, and a
+parsed file to the stricter checks the JSON Schema states. The brief did
+not ask for it. Both found that `lineage/generate.test.ts` builds a value
+type with data type `"Text"`, which the file checks refuse and the
+brief does not let either arm edit. The brief's "routes through the
+decoder" is therefore met by the rules, not by the file shape, in both
+arms; WS4 should read their D1 and R3 with that in mind.
+
+**Two process slips, neither of which reached the arms' content.** The
+pre-commit hook could not run from a linked worktree, so the plain arm
+could not commit until barwise-hud was fixed (PR #650). And both agents
+wrote their commit messages to one shared scratch file, so the plain
+arm's commit briefly carried the Effect arm's message; it was restored
+from the plain agent's own transcript before the push. The transcripts
+show the Effect agent overwrote that file without reading it. Every
+trial run in WS3 gets its own scratch directory for this reason.
+
+**A timing reading to watch.** Two CLI tests that score recorded
+payloads timed out at 30 s in the plain arm's full coverage run twice,
+once under heavy load and once on the pre-push run, and passed on the
+next run. Alone, they take about 6 s under coverage on the plain arm and
+on main alike. The Effect arm's runs never hit it. It is attributed to the plain arm
+only if a controlled reproduction shows it there and not elsewhere: the
+CLI package's full coverage run on an idle machine, alternating the plain
+arm, the Effect arm and main, three runs each. Otherwise it is recorded
+as environment noise.
+
 ## Competing frames
 
 Three explanations for whatever the arms show, with the evidence that
@@ -474,31 +523,93 @@ Refuse an entity type carrying `data_type`, `value_constraint` or
 `default_value`, in the loader and the JSON Schema. Its own PR, merged
 before the arms branch, so both start from a base that loses nothing.
 
-### 1. Plain arm (provisional: grounded when WS0 lands)
+### 1. Plain arm (built 2026-10-14; see Arms as built)
 
 On `experiment/effect-comparison-plain`, from the agreed base: a
 hand-written `decodeObjectType` collecting every problem, the id source
 per Open decision 1, messages that name the element and the field. If
 TypeScript wins, this branch is barwise-973 progress and merges.
 
-### 2. Effect arm (provisional: grounded when WS0 lands)
+### 2. Effect arm (built 2026-10-14; see Arms as built)
 
 On `experiment/effect-comparison-effect`, from the same base and brief:
 the slice as one Schema definition, decoded with `errors: "all"`, the id
 source a declared requirement, messages customized to clear the D2 bar.
 Merges only if the rule adopts, and then through an adoption spec.
 
-### 3. Agent trials (provisional: not yet grounded)
+### 3. Agent trials (grounded 2026-10-14 for T1; T2 still provisional)
 
-Claude Code subagents, each in its own worktree, one pinned model, the
-same prompt but for the style line and a primer of similar length, both
-written in this workstream: an Effect 4 primer for the Effect arm, since
-the model's training predates 4.0, and the sealed-record conventions of
-`core-branching-load.spec.md` WS1 for the plain arm, so that context size
-is not the difference measured. First a pilot of three T1 runs on the
-plain arm to measure spread and cost; then five T1 runs and two T2 runs
-on each arm (Open decision 4).
-T1 and T2 branches are thrown away.
+Claude Code subagents, each in its own worktree, one model for every
+run, the same prompt (Appendix D) but for the style line and a primer of
+similar length: the plain arm's primer (Appendix E) gives the
+sealed-record conventions of `core-branching-load.spec.md` WS1, and the
+Effect arm's (Appendix F) the Effect 4.0 API, since the model's training
+predates 4.0. The primers are about 295 words each, counted without the
+quote markers, so context size is not the difference measured. First a pilot of three T1 runs on the plain
+arm to measure spread and cost; then five T1 runs and two T2 runs on each
+arm (Open decision 4). T1 and T2 branches are thrown away.
+
+How a run is held to the same conditions as the others:
+
+- **Start.** Each run gets a fresh worktree at its arm's head
+  (`experiment/effect-comparison-plain` or `-effect`), its own scratch
+  directory, and a local branch `trial/<arm>-<task>-<n>` that is never
+  pushed. It may not read the other arm's branch or any other worktree.
+- **Model.** Every run uses the session's configured model, and the run
+  log records the model that actually served each run. The log is kept
+  with the session, not in this repository, which names no model.
+- **Load.** The pilot runs one at a time. The main trials run in pairs,
+  one run per arm at once, so machine load falls on both arms alike.
+  Wall time under load is still noisy, which is why tokens, not wall
+  time, are D3's primary measure.
+- **A run is driven to correct code.** When the agent reports done, this
+  session scores the run (below). A run that fails goes back to the
+  same agent with the failing output, for at most two more rounds. A run
+  that still fails after the third round is a failed run. This is the
+  claim D3 tests -- that one style gets an agent to correct code more
+  cheaply -- and it is how an agent is used in practice.
+- **Scoring.** Before scoring, this session commits whatever the run
+  left uncommitted or untracked, as one commit marked as such, so the
+  run's head is the tree that was scored and `diff` measures what
+  `trial` checked. Then: the full suite, `validate:examples` and the
+  promptlab drift test on that head, and `measure:comparison -- trial
+  --base <arm head>`, which fails a run that touched a protected file.
+  D1 and R3 come from `measure:comparison -- diff <arm head> <run head>`
+  over the passing runs.
+- **D3, pre-registered.** The primary measure is total tokens per run,
+  summed over its rounds, from the harness's own usage report rather
+  than the agent's. Tool calls and wall time are reported beside it and
+  never vote. Every run counts, so a cheap early failure cannot make an
+  arm look cheap: a failed run is charged the largest total any run of
+  the same task reached in either arm, and the number of failed runs per
+  arm is reported with it. Resolvability is computed per task from the
+  main trials alone, as the decision rule states: the difference between
+  the two arms' mean totals against twice its standard error,
+  `sqrt(s1^2/n1 + s2^2/n2)`. With two runs per arm, T2 will seldom
+  resolve, and the spec says so rather than pooling it with T1.
+- **Red checks.** For the familiarity tripwire, every failing build,
+  type-check or test run in a run's transcript, and every failure this
+  session's scoring sends back to the agent, is counted and classified
+  by hand: API misuse (a name or signature the installed version does
+  not have), task logic, or the environment.
+- **Evidence kept.** Before a run's worktree and branch are deleted, this
+  session (never the run) commits its record on the session's own working
+  branch, the one place every run's record collects, which reaches `main`
+  by pull request. The trial branch holds none of it. The record goes
+  under `barwise/eval-runs/effect-comparison-<date>/`:
+  `<run>.patch` (the run's diff against its arm head) and `<run>.json`
+  (arm, task, start and head commits, rounds, tokens, tool calls, wall
+  time, each scoring result, and each red check with its class, the
+  failing command and its first error line). Transcripts are not
+  committed; the red-check entries carry what an auditor needs from
+  them, and the patch is the run's diff itself.
+- **The pilot.** Three T1 runs on the plain arm, run and scored as
+  above. It does not set D3's bound, which needs both arms. It measures
+  the spread of one arm's totals and the cost per run, so the spec can
+  state, before the main trials, the smallest difference five runs per
+  arm could resolve at that spread (`2 * sqrt(2/5) * s`). Its runs are
+  not pooled into the main trials. A pilot run that fails is a reading,
+  not a reason to stop.
 
 ### 4. Measure, decide, record
 
@@ -553,8 +664,10 @@ error text a malformed object type produces (D2).
    draft recommended running T2 only if T1 resolved or D1 and D2 split;
    the full set was chosen so the agent claim is tested on the larger
    task as well. Each T2 run is about the size of WS1 step 1 (30 files),
-   so T2 carries most of the cost; the pilot still sets the
-   resolvability bound D3 reports against.
+   so T2 carries most of the cost. (Amended 2026-10-14, when WS3 was
+   grounded: the pilot does not set D3's resolvability bound, which needs
+   both arms; it states the smallest difference five runs per arm could
+   resolve, and resolvability comes from the main trials. See WS3.)
 5. **Effect version -- resolved 2026-10-13: 4.0.x, pinned exactly.**
    3.22 is mature and better known to agents, but adopting it now would
    mean a forced major migration later; the familiarity risk is what the
@@ -624,3 +737,112 @@ common future change to this slice, and its diff is D1's measurement.
 Re-scope before running if the Effect arm would need a schema for every
 constraint kind (the first premortem tripwire); `SubtypeFact` (114 lines,
 10 importing files) is the fallback.
+
+## Appendix D: the trial prompt
+
+Given to every run verbatim, with `<arm>`, `<head>`, `<scratch>`, the
+task text (Appendix B or C), the style line and the primer filled in.
+
+> You are working in a git worktree of the barwise monorepo. First run
+> `git checkout -b trial/<arm>-<task>-<n> <head>`, then `npm ci` and
+> `npm run build` in `barwise/`. Use `<scratch>` for any temporary
+> file. Do not read, fetch or diff any other branch or worktree.
+>
+> The task: <task text>
+>
+> <style line>
+>
+> You may not edit the WS0 tests, the law tests or any golden file. Read
+> the root `CLAUDE.md` and `barwise/packages/core/CLAUDE.md` first.
+> Commit your work on the branch when you are done; do not push. Report
+> what you changed and which of the done checks you ran and how they
+> came out.
+>
+> <primer>
+
+The two style lines:
+
+- Plain arm: "This code base states object types as hand-written
+  TypeScript sealed records. Follow its existing style; the conventions
+  are below."
+- Effect arm: "This code base states object types as one Effect 4.0
+  Schema definition. Follow its existing style; the Effect 4.0 API it
+  uses is summarized below."
+
+## Appendix E: plain arm primer (sealed-record conventions)
+
+> Object types are sealed records, not classes. `ObjectType` is the
+> union `EntityType | ValueType`, discriminated by `kind`, and both
+> extend `ObjectTypeBase`. A field only one kind may carry lives on that
+> kind's record; a field either kind may carry lives on the base. There
+> are no methods and no setters: a function that belongs to the data sits
+> beside the type in its module, and an operation that exists because a
+> capability exists (serialize, diff, verbalize) lives in that
+> capability's module and switches on `kind`.
+>
+> Defaults are applied once, at construction (an empty alias list,
+> `independent: false`). Config types keep `id?`; records carry
+> `id: string`, and the id comes from the `newId` argument, never from
+> the process-wide generator.
+>
+> Construction collects every problem rather than throwing on the first.
+> `decodeObjectType(doc, newId)` in
+> `serialization/yaml/decodeObjectType.ts` returns either the record or
+> a list of `ObjectTypeProblem`, each naming the object type (by name, or
+> by id when the name is the problem), the field, and a message. The
+> rules live in one place and serve both a parsed file and a config
+> built in code.
+>
+> Anything that must agree with another copy is held by a test, not a
+> comment. The YAML field table must equal the JSON Schema's
+> `object_type` properties; the decoder's verdict is compared with the
+> schema's over generated cases; `VALUE_ONLY_FIELDS` is the one list of
+> fields an entity may not carry. Adding a field means adding it to each
+> copy and letting those tests confirm they agree.
+>
+> YAML is snake_case and the record is camelCase; the serializer writes
+> fields in a fixed order, which the byte-layout test pins. Run
+> `npx vitest run` in `packages/core` while you work, and `npm run
+> build` from `barwise/` before type-checking another package, because
+> a package type-checks against its dependencies' built output.
+
+## Appendix F: Effect arm primer (the Effect 4.0 API in use)
+
+> This code base uses Effect 4.0.4, released 2026-10-01, whose API
+> differs from Effect 3. Before using a name, confirm it in
+> `node_modules/effect/dist`'s `.d.ts` files; a name you remember from
+> Effect 3 may not exist.
+>
+> Import only from subpaths: `import * as Schema from "effect/Schema"`,
+> and likewise `effect/Effect`, `effect/Context`, `effect/Result` and
+> `effect/SchemaIssue`. Never import the `effect` barrel: it costs CLI
+> startup time.
+>
+> Structs are `Schema.Struct({ ... })`. An optional key is
+> `Schema.optionalKey(S)`; a key with a default applied on decode is
+> `Schema.withDecodingDefaultKey(...)`. Literals are `Schema.Literal("a")`
+> and `Schema.Literals([...])`; a union takes an array,
+> `Schema.Union([A, B])`. A refinement is `S.check(Schema.makeFilter(pred,
+> { message }))`, or a built-in check such as
+> `Schema.isGreaterThanOrEqualTo(0)`. The record is camelCase and the
+> YAML snake_case; `Schema.encodeKeys({ ... })` maps one to the other.
+>
+> `Schema.decodeUnknownEffect(schema, { errors: "all", onExcessProperty:
+> "error" })` returns a function from input to an `Effect`. Wrapped in
+> `Effect.result` and run with `Effect.runSync`, it gives a `Result`;
+> `Result.isFailure` tells you which. A failure holds an issue tree, which
+> this code walks itself to report one problem per entry; the default
+> formatter returns a single string. Issues on a decoded struct are
+> reported at the decoded camelCase key, not the YAML key.
+>
+> A requirement is a service: `class IdSource extends
+> Context.Service<IdSource, Shape>()("key") {}`, read with
+> `IdSource.useSync(...)` and supplied with `Effect.provideService`. The
+> decoder's id source is one, so its type names it.
+>
+> The record types are the schema's decoded types: `Schema.Type<typeof
+> S>` is the type a schema decodes to, and `EntityType` and `ValueType`
+> are defined that way, so a field added to a struct appears on its record
+> without a second edit. The JSON Schema is hand-written, and a drift test
+> compares it with the schema Effect generates. Adding a field means adding it to the schema and letting
+> those tests confirm the copies agree.
