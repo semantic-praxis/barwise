@@ -420,6 +420,16 @@ async function heldout(args) {
     }
   };
 
+  /** Refused by `make`, or accepted and then kept by a save and a load and seen by the diff. */
+  const emptyUnitIsRefusedOrOrdinary = (make) => {
+    if (throws(() => make({ unit: "" }))) return true;
+    const kept = yaml.deserialize(yaml.serialize(make({ unit: "" }))).objectTypes[0].unit === "";
+    const kindOf = (a, b) =>
+      diffModels(make(a), make(b)).deltas.find((d) => d.elementType === "object_type")?.kind;
+    return kept && kindOf({}, { unit: "" }) === "modified"
+      && kindOf({ unit: "" }, {}) === "modified";
+  };
+
   const cases = [
     // Values, not text: `unit: "kg"` is as correct as `unit: kg`, and a text
     // check would send a correct run back for a round it did not need.
@@ -478,30 +488,27 @@ async function heldout(args) {
       "the diff reports nothing for an unchanged unit",
       () => weightDelta({ unit: "kg" }, { unit: "kg" })?.kind === "unchanged",
     ],
-    // The task leaves an empty unit open. Either answer is acceptable; what
-    // is not is accepting it and then failing to see it come or go. Asked of
-    // each way in separately: a run that refuses it in a file can still
-    // accept it from code and diff it as absent (Copilot, PR #653).
+    // The task leaves an empty unit open, so either answer passes. What does
+    // not is half an answer. Stated once, for each way in: refused, or
+    // accepted and then an ordinary value -- kept through a save and a load,
+    // and seen arriving and leaving by the diff. Each review of PR #653 found
+    // another half-answer the cases had let through (blind diff, then a
+    // refusal in one way in only, then a save that drops it); one rule asked
+    // of both ways in closes the family rather than the instance. A model
+    // built in code that the file format then refuses fails here too: it
+    // cannot be saved and loaded.
     [
-      "an empty unit in a file is refused, or its arrival and removal are reported",
-      () =>
-        throws(() => load({ unit: "" }))
-        || (weightDelta({}, { unit: "" })?.kind === "modified"
-          && weightDelta({ unit: "" }, {})?.kind === "modified"),
+      "an empty unit in a file is refused, or kept and diffed like any value",
+      () => emptyUnitIsRefusedOrOrdinary((fields) => load(fields)),
     ],
     [
-      "an empty unit from code is refused, or its arrival and removal are reported",
-      () => {
-        const built = (fields) => {
+      "an empty unit from code is refused, or kept and diffed like any value",
+      () =>
+        emptyUnitIsRefusedOrOrdinary((fields) => {
           const m = new OrmModel({ name: "Heldout" });
           m.addObjectType({ name: "Weight", kind: "value", ...fields });
           return m;
-        };
-        if (throws(() => built({ unit: "" }))) return true;
-        const kindOf = (a, b) =>
-          diffModels(built(a), built(b)).deltas.find((d) => d.elementType === "object_type")?.kind;
-        return kindOf({}, { unit: "" }) === "modified" && kindOf({ unit: "" }, {}) === "modified";
-      },
+        }),
     ],
   ].map(([name, check]) => {
     try {

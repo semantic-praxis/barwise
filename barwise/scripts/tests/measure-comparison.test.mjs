@@ -206,11 +206,18 @@ test("heldout refuses rather than reads when it has no task, no tree, or no buil
  * use, small enough to read, so the cases themselves are under test rather
  * than a real build. JSON stands in for YAML, which it is a subset of.
  * Each way an empty unit arrives is set apart: `fileEmpty` and `codeEmpty`
- * are "refuse" or "accept", and `diffBlind` diffs it as if absent. Pilot
- * run p1 accepted it both ways and diffed it blind.
+ * are "refuse" or "accept", `diffBlind` diffs it as if absent, and
+ * `lossySave` drops a falsy unit when saving. Pilot run p1 accepted it both
+ * ways and diffed it blind.
  */
 function fakeCore(
-  { fileEmpty = "refuse", codeEmpty = "refuse", diffBlind = false, diffThrows = false } = {},
+  {
+    fileEmpty = "refuse",
+    codeEmpty = "refuse",
+    diffBlind = false,
+    lossySave = false,
+    diffThrows = false,
+  } = {},
 ) {
   const dir = mkdtempSync(join(tmpdir(), "heldout-core-"));
   const core = join(dir, "barwise", "packages", "core");
@@ -239,7 +246,12 @@ export class OrmYamlSerializer {
     };
   }
   serialize(m) {
-    return JSON.stringify({ orm_version: "2.0", model: { name: m.name, object_types: m.objectTypes } });
+    const objectTypes = m.objectTypes.map((o) => {
+      if (!${JSON.stringify(lossySave)}) return o;
+      const { unit, ...rest } = o;
+      return unit ? { ...rest, unit } : rest;
+    });
+    return JSON.stringify({ orm_version: "2.0", model: { name: m.name, object_types: objectTypes } });
   }
 }
 export class SchemaValidator {
@@ -290,9 +302,9 @@ function heldout(path, cwd) {
   };
 }
 
-const EMPTY_IN_FILE = "an empty unit in a file is refused, or its arrival and removal are reported";
-const EMPTY_FROM_CODE =
-  "an empty unit from code is refused, or its arrival and removal are reported";
+const EMPTY_IN_FILE = "an empty unit in a file is refused, or kept and diffed like any value";
+const EMPTY_FROM_CODE = "an empty unit from code is refused, or kept and diffed like any value";
+const failedNames = (r) => r.report.cases.filter((c) => !c.ok).map((c) => c.name);
 
 test("heldout passes a correct core, case by case, with a relative --path", () => {
   const dir = fakeCore();
@@ -334,6 +346,29 @@ test("heldout fails an empty unit refused in a file but accepted from code and d
     const r = heldout(dir);
     assert.equal(r.status, 1);
     assert.deepEqual(r.report.cases.filter((c) => !c.ok).map((c) => c.name), [EMPTY_FROM_CODE]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("heldout passes a core that accepts an empty unit and treats it as an ordinary value", () => {
+  // Accepting is a legitimate answer; the rule must not quietly demand refusal.
+  const dir = fakeCore({ fileEmpty: "accept", codeEmpty: "accept" });
+  try {
+    const r = heldout(dir);
+    assert.equal(r.status, 0, JSON.stringify(failedNames(r)));
+    assert.equal(r.report.passed, 13);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("heldout fails a core that accepts an empty unit and drops it on save", () => {
+  const dir = fakeCore({ fileEmpty: "accept", codeEmpty: "accept", lossySave: true });
+  try {
+    const r = heldout(dir);
+    assert.equal(r.status, 1);
+    assert.deepEqual(failedNames(r), [EMPTY_IN_FILE, EMPTY_FROM_CODE]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

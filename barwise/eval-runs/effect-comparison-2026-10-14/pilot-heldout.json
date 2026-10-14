@@ -6,8 +6,8 @@
       "passed": 11,
       "failed": 2,
       "failedCases": [
-        "an empty unit in a file is refused, or its arrival and removal are reported",
-        "an empty unit from code is refused, or its arrival and removal are reported"
+        "an empty unit in a file is refused, or kept and diffed like any value",
+        "an empty unit from code is refused, or kept and diffed like any value"
       ]
     },
     "plain-t1-p2": {
