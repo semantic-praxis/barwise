@@ -1,7 +1,8 @@
 # The pre-push run checks the commit being pushed, not the working tree
 
-Status: Workstream 1 implemented 2026-10-14 (trial on the shared helpers,
-check:git-listing); workstreams 2 and 3 not started
+Status: Workstreams 1 and 2 implemented 2026-10-14 (trial on the shared
+helpers, check:git-listing; --check names untracked specs); workstream 3
+not started
 Created: 2026-10-14
 Last-updated: 2026-10-14
 Tracking: barwise-vzf (this spec); barwise-qch (workstream 2)
@@ -363,3 +364,9 @@ its letter.
   failed on line 6. This is workstream 3's defect in miniature: a check
   run before the commit saw a different tree from the one pushed.
   The comment no longer spells the command.
+
+**Workstream 2, 2026-10-14.** As specified, with one test change worth
+naming: the existing `audit-corrections` test asserted that `--check`
+did NOT mention an untracked draft. That pinned the blind spot this
+workstream removes, so the assertion now requires the
+`unchecked (untracked)` line instead. Exit codes are unchanged.
