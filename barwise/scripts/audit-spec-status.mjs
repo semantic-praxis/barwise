@@ -49,7 +49,12 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { mergeBaselineRows, mergeSummary, readExistingRows } from "./lib/baseline-merge.mjs";
-import { refuseUntrackedInput, REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
+import {
+  noteUntrackedInput,
+  refuseUntrackedInput,
+  REPO_ROOT,
+  trackedFiles,
+} from "./lib/tracked.mjs";
 
 /**
  * `--at <commit>` runs the same audit against a historical tree. It is
@@ -158,9 +163,15 @@ function specFiles() {
   const files = AT === undefined
     ? trackedFiles()
     : git("ls-tree", "-r", "--name-only", AT).split("\n");
-  return files.filter((f) =>
-    f.startsWith(SPEC_DIR) && f.endsWith(".spec.md") && !f.includes("/archive/")
-  );
+  return files.filter(IN_CORPUS);
+}
+
+/**
+ * What this audit reads: specs, archived ones excepted. One rule for the
+ * corpus and for the untracked files it reports or refuses.
+ */
+function IN_CORPUS(f) {
+  return f.startsWith(SPEC_DIR) && f.endsWith(".spec.md") && !f.includes("/archive/");
 }
 
 const readSpec = (file) =>
@@ -348,6 +359,7 @@ if (!check) {
   refuseUntrackedInput({
     pathspec: "barwise/docs/specs",
     suffix: ".spec.md",
+    include: IN_CORPUS,
     gate: "audit-spec-status",
   });
 
@@ -379,6 +391,15 @@ if (!check) {
   for (const id of counts.dropped) console.log(`  dropped (no longer stale): ${id}`);
   process.exit(0);
 }
+
+// --check from here. Its corpus is the tracked tree; name the specs it did
+// not read, so an OK while one is being written does not claim to cover it.
+noteUntrackedInput({
+  pathspec: "barwise/docs/specs",
+  suffix: ".spec.md",
+  include: IN_CORPUS,
+  gate: "audit-spec-status",
+});
 
 const baseline = JSON.parse(readFileSync(BASELINE, "utf8")).specs;
 const failures = [];
