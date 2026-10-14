@@ -4,18 +4,19 @@
   "runs": {
     "plain-t1-p1": {
       "passed": 11,
-      "failed": 1,
+      "failed": 2,
       "failedCases": [
-        "an empty unit is refused, or its arrival and removal are reported"
+        "an empty unit in a file is refused, or its arrival and removal are reported",
+        "an empty unit from code is refused, or its arrival and removal are reported"
       ]
     },
     "plain-t1-p2": {
-      "passed": 12,
+      "passed": 13,
       "failed": 0,
       "failedCases": []
     },
     "plain-t1-p3": {
-      "passed": 12,
+      "passed": 13,
       "failed": 0,
       "failedCases": []
     }
@@ -23,11 +24,12 @@
   "armHeads": {
     "8398a193 (plain, no unit)": {
       "passed": 4,
-      "failed": 8
+      "failed": 9
     },
     "8d36e4fc (effect, no unit)": {
-      "passed": 5,
+      "passed": 6,
       "failed": 7
     }
-  }
+  },
+  "cases": 13
 }

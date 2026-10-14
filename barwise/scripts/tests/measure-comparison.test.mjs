@@ -205,14 +205,19 @@ test("heldout refuses rather than reads when it has no task, no tree, or no buil
  * A stand-in for a run's built core: just the surface the held-out cases
  * use, small enough to read, so the cases themselves are under test rather
  * than a real build. JSON stands in for YAML, which it is a subset of.
- * `emptyUnit` is how the empty unit is handled -- "refuse", or "blind",
- * pilot run p1's defect: accepted, and diffed as if absent.
+ * Each way an empty unit arrives is set apart: `fileEmpty` and `codeEmpty`
+ * are "refuse" or "accept", and `diffBlind` diffs it as if absent. Pilot
+ * run p1 accepted it both ways and diffed it blind.
  */
-function fakeCore({ emptyUnit = "refuse", diffThrows = false } = {}) {
+function fakeCore(
+  { fileEmpty = "refuse", codeEmpty = "refuse", diffBlind = false, diffThrows = false } = {},
+) {
   const dir = mkdtempSync(join(tmpdir(), "heldout-core-"));
   const core = join(dir, "barwise", "packages", "core");
   mkdirSync(join(core, "dist", "diff"), { recursive: true });
   writeFileSync(join(core, "package.json"), JSON.stringify({ type: "module" }));
+  const refuseFile = JSON.stringify(fileEmpty === "refuse");
+  const refuseCode = JSON.stringify(codeEmpty === "refuse");
   writeFileSync(
     join(core, "dist", "index.js"),
     `
@@ -226,9 +231,7 @@ export class OrmYamlSerializer {
       name: doc.model.name,
       objectTypes: doc.model.object_types.map((o) => {
         refuseEntityUnit(o);
-        if (o.unit === "" && ${
-      JSON.stringify(emptyUnit)
-    } === "refuse") throw new Error("empty unit");
+        if (o.unit === "" && ${refuseFile}) throw new Error("empty unit");
         const r = { id: o.id, name: o.name, kind: o.kind };
         if (o.unit !== undefined) r.unit = o.unit;
         return r;
@@ -246,14 +249,21 @@ export class SchemaValidator {
 }
 export class OrmModel {
   constructor(config) { this.name = config.name; this.objectTypes = []; }
-  addObjectType(config) { refuseEntityUnit(config); const r = { ...config }; this.objectTypes.push(r); return r; }
+  addObjectType(config) {
+    refuseEntityUnit(config);
+    if (config.unit === "" && ${refuseCode}) throw new Error("empty unit");
+    const r = { ...config };
+    this.objectTypes.push(r);
+    return r;
+  }
 }
 `,
   );
+  const same = diffBlind ? "(a, b) => (a ?? '') === (b ?? '')" : "(a, b) => a === b";
   writeFileSync(
     join(core, "dist", "diff", "index.js"),
     `
-const same = ${emptyUnit === "blind" ? "(a, b) => (a ?? '') === (b ?? '')" : "(a, b) => a === b"};
+const same = ${same};
 export function diffModels(a, b) {
   if (${diffThrows}) throw new Error("diff exploded");
   return {
@@ -280,7 +290,9 @@ function heldout(path, cwd) {
   };
 }
 
-const EMPTY_UNIT_CASE = "an empty unit is refused, or its arrival and removal are reported";
+const EMPTY_IN_FILE = "an empty unit in a file is refused, or its arrival and removal are reported";
+const EMPTY_FROM_CODE =
+  "an empty unit from code is refused, or its arrival and removal are reported";
 
 test("heldout passes a correct core, case by case, with a relative --path", () => {
   const dir = fakeCore();
@@ -291,9 +303,9 @@ test("heldout passes a correct core, case by case, with a relative --path", () =
     const cwd = dirname(dirname(SCRIPT));
     const r = heldout(relative(cwd, dir), cwd);
     assert.equal(r.status, 0, r.stderr);
-    assert.equal(r.report.cases.length, 12);
+    assert.equal(r.report.cases.length, 13);
     assert.deepEqual(r.report.cases.filter((c) => !c.ok), []);
-    assert.equal(r.report.passed, 12);
+    assert.equal(r.report.passed, 13);
     assert.equal(r.report.failed, 0);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -301,12 +313,27 @@ test("heldout passes a correct core, case by case, with a relative --path", () =
 });
 
 test("heldout fails pilot run p1's defect: an empty unit accepted and diffed as absent", () => {
-  const dir = fakeCore({ emptyUnit: "blind" });
+  const dir = fakeCore({ fileEmpty: "accept", codeEmpty: "accept", diffBlind: true });
   try {
     const r = heldout(dir);
     assert.equal(r.status, 1);
-    assert.deepEqual(r.report.cases.filter((c) => !c.ok).map((c) => c.name), [EMPTY_UNIT_CASE]);
-    assert.equal(r.report.failed, 1);
+    assert.deepEqual(r.report.cases.filter((c) => !c.ok).map((c) => c.name), [
+      EMPTY_IN_FILE,
+      EMPTY_FROM_CODE,
+    ]);
+    assert.equal(r.report.failed, 2);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("heldout fails an empty unit refused in a file but accepted from code and diffed as absent", () => {
+  // Refusing it in a file proves nothing about the other way in.
+  const dir = fakeCore({ fileEmpty: "refuse", codeEmpty: "accept", diffBlind: true });
+  try {
+    const r = heldout(dir);
+    assert.equal(r.status, 1);
+    assert.deepEqual(r.report.cases.filter((c) => !c.ok).map((c) => c.name), [EMPTY_FROM_CODE]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

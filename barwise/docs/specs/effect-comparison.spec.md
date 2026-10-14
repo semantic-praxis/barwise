@@ -576,7 +576,7 @@ How a run is held to the same conditions as the others:
   promptlab drift test on that head; `measure:comparison -- trial
   --base <arm head>`, which fails a run that touched a protected file;
   and, for T1, `measure:comparison -- heldout --task t1 --path <run tree>`,
-  twelve checks of what the task asked for that the run never sees (added
+  thirteen checks of what the task asked for that the run never sees (added
   after the pilot; see Pilot results). A failed held-out case goes back to
   the agent like any other failure, named as the requirement it checks.
   D1 and R3 come from `measure:comparison -- diff <arm head> <run head>`
@@ -660,8 +660,8 @@ What the pilot shows besides the numbers:
   scoring could not see it: the suite it runs is the run's own, and checks
   only what the run's tests check. The held-out check now added to the
   scoring confirms it, run on each pilot patch afterwards: p1 passes 11 of
-  12 and fails exactly that case; p2 and p3 pass all 12; each arm's head,
-  without the field, fails 7 or 8. The pilot's records keep their original
+  13, failing the empty-unit case both in a file and from code; p2 and p3
+  pass all 13; each arm's head, without the field, fails 7 or 9. The pilot's records keep their original
   scoring (`pilot-heldout.json` holds these readings). Under the amended
   scoring p1 would have gone back for a second round, so its token count
   understates what a correct p1 cost; the pilot is not pooled into the

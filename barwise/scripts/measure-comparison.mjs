@@ -479,13 +479,29 @@ async function heldout(args) {
       () => weightDelta({ unit: "kg" }, { unit: "kg" })?.kind === "unchanged",
     ],
     // The task leaves an empty unit open. Either answer is acceptable; what
-    // is not is accepting it and then failing to see it come or go.
+    // is not is accepting it and then failing to see it come or go. Asked of
+    // each way in separately: a run that refuses it in a file can still
+    // accept it from code and diff it as absent (Copilot, PR #653).
     [
-      "an empty unit is refused, or its arrival and removal are reported",
+      "an empty unit in a file is refused, or its arrival and removal are reported",
       () =>
         throws(() => load({ unit: "" }))
         || (weightDelta({}, { unit: "" })?.kind === "modified"
           && weightDelta({ unit: "" }, {})?.kind === "modified"),
+    ],
+    [
+      "an empty unit from code is refused, or its arrival and removal are reported",
+      () => {
+        const built = (fields) => {
+          const m = new OrmModel({ name: "Heldout" });
+          m.addObjectType({ name: "Weight", kind: "value", ...fields });
+          return m;
+        };
+        if (throws(() => built({ unit: "" }))) return true;
+        const kindOf = (a, b) =>
+          diffModels(built(a), built(b)).deltas.find((d) => d.elementType === "object_type")?.kind;
+        return kindOf({}, { unit: "" }) === "modified" && kindOf({ unit: "" }, {}) === "modified";
+      },
     ],
   ].map(([name, check]) => {
     try {
