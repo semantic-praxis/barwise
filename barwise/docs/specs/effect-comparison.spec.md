@@ -3,7 +3,8 @@
 Status: WS0 implemented 2026-10-13 (instruments and baseline); the
 barwise-5fg prerequisite implemented 2026-10-14; WS1 and WS2 built
 2026-10-14 on their branches (see Arms as built); WS3 grounded
-2026-10-14, not yet run; WS4 not started
+2026-10-14, pilot run 2026-10-14 (see WS3), main trials not yet run; WS4 not
+started
 Created: 2026-10-13
 Last-updated: 2026-10-14
 Tracking: barwise-cu0 (this spec); barwise-973 (WS1 of
@@ -572,8 +573,12 @@ How a run is held to the same conditions as the others:
   left uncommitted or untracked, as one commit marked as such, so the
   run's head is the tree that was scored and `diff` measures what
   `trial` checked. Then: the full suite, `validate:examples` and the
-  promptlab drift test on that head, and `measure:comparison -- trial
-  --base <arm head>`, which fails a run that touched a protected file.
+  promptlab drift test on that head; `measure:comparison -- trial
+  --base <arm head>`, which fails a run that touched a protected file;
+  and, for T1, `measure:comparison -- heldout --task t1 --path <run tree>`,
+  thirteen checks of what the task asked for that the run never sees (added
+  after the pilot; see Pilot results). A failed held-out case goes back to
+  the agent like any other failure, named as the requirement it checks.
   D1 and R3 come from `measure:comparison -- diff <arm head> <run head>`
   over the passing runs.
 - **D3, pre-registered.** The primary measure is total tokens per run,
@@ -610,6 +615,57 @@ How a run is held to the same conditions as the others:
   arm could resolve at that spread (`2 * sqrt(2/5) * s`). Its runs are
   not pooled into the main trials. A pilot run that fails is a reading,
   not a reason to stop.
+
+**Pilot results (2026-10-14).** Three T1 runs on the plain arm, one at a
+time, scored as above. Records: `barwise/eval-runs/effect-comparison-2026-10-14/`.
+
+| Run | Rounds | Outcome | Tokens  | Tool calls | Wall time | Source lines (+/-) | Red checks                  |
+| --- | ------ | ------- | ------- | ---------- | --------- | ------------------ | --------------------------- |
+| p1  | 1      | pass    | 143,020 | 77         | 539 s     | +32 / -1           | 2 task logic                |
+| p2  | 1      | pass    | 139,448 | 52         | 588 s     | +42 / -2           | 2 task logic, 2 environment |
+| p3  | 1      | pass    | 136,006 | 51         | 609 s     | +43 / -1           | 1 environment               |
+
+| Measure          | Mean    | Standard deviation       | Smallest difference five runs per arm resolve |
+| ---------------- | ------- | ------------------------ | --------------------------------------------- |
+| Tokens (primary) | 139,491 | 3,507 (2.5% of the mean) | about 4,400 (3.2%)                            |
+| Tool calls       | 60.0    | 14.7 (25%)               | about 19 (31%)                                |
+| Wall time        | 579 s   | 36 s (6.2%)              | about 45 s (7.8%)                             |
+
+The last column is `2 * sqrt(2/5) * s` at the pilot's spread. It assumes
+the Effect arm spreads about as much; three runs estimate a spread only
+roughly, and D3's verdict is computed from the main trials whatever the
+pilot said.
+
+What the pilot shows besides the numbers:
+
+- **Every run passed in its first round**, so no failure was sent back.
+  T1 on this arm is within one agent pass; whether it is on the Effect
+  arm is part of what the main trials measure.
+- **No red check was API misuse.** Four were task logic and three were
+  the worktree sandbox refusing a git command it could not verify, which
+  says nothing about the code.
+- **The law tests constrain the model generator.** Two of three runs
+  added the field to `tests/arbitraries/model.ts`, which shifted the
+  pinned counts in `counterexample.law.test.ts`; one reworked its draw,
+  one reverted. The Effect arm meets the same test.
+- **The runs made different design calls the task left open.** Two
+  refused an empty unit and one accepted it; two wrote the field after
+  `data_type` and one after `default_value`. These are the task's
+  ambiguity, not the arm's, and D1 reads them as such.
+- **One run committed with `--no-verify`** and gave no reason. Its own
+  checks and this session's scoring were both green.
+- **Passing the scoring was not the same as doing the task.** Copilot's
+  review of PR #653 found that p1 accepts `unit: ""` and diffs an absent
+  unit as `""`, so adding or removing that value reports no change. The
+  scoring could not see it: the suite it runs is the run's own, and checks
+  only what the run's tests check. The held-out check now added to the
+  scoring confirms it, run on each pilot patch afterwards: p1 passes 11 of
+  13, failing the empty-unit case both in a file and from code; p2 and p3
+  pass all 13; each arm's head, without the field, fails 7 or 9. The pilot's records keep their original
+  scoring (`pilot-heldout.json` holds these readings). Under the amended
+  scoring p1 would have gone back for a second round, so its token count
+  understates what a correct p1 cost; the pilot is not pooled into the
+  main trials, so D3 is unaffected.
 
 ### 4. Measure, decide, record
 

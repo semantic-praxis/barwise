@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
@@ -182,6 +182,213 @@ test("an object type missing after the round trip is reported field by field", (
 test("an unknown subcommand and an unresolvable ref are refusals, not readings", () => {
   assert.equal(spawnSync(process.execPath, [SCRIPT, "nonesuch"]).status, 2);
   assert.equal(spawnSync(process.execPath, [SCRIPT, "diff", "no-such-ref-anywhere"]).status, 2);
+});
+
+test("heldout refuses rather than reads when it has no task, no tree, or no built core", () => {
+  // A run whose core was never built must not read as eight failed cases:
+  // that would charge the agent for the scorer's own missing step.
+  const run = (...args) =>
+    spawnSync(process.execPath, [SCRIPT, "heldout", ...args], { encoding: "utf8" });
+  assert.equal(run("--path", "/").status, 2, "no --task");
+  assert.equal(run("--task", "t1").status, 2, "no --path");
+  const empty = mkdtempSync(join(tmpdir(), "heldout-"));
+  try {
+    const r = run("--task", "t1", "--path", empty);
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, /no built core/);
+  } finally {
+    rmSync(empty, { recursive: true, force: true });
+  }
+});
+
+/**
+ * A stand-in for a run's built core: just the surface the held-out cases
+ * use, small enough to read, so the cases themselves are under test rather
+ * than a real build. JSON stands in for YAML, which it is a subset of.
+ * Each way an empty unit arrives is set apart: `fileEmpty` and `codeEmpty`
+ * are "refuse" or "accept", `diffBlind` diffs it as if absent, and
+ * `lossySave` drops a falsy unit when saving. Pilot run p1 accepted it both
+ * ways and diffed it blind.
+ */
+function fakeCore(
+  {
+    fileEmpty = "refuse",
+    codeEmpty = "refuse",
+    diffBlind = false,
+    lossySave = false,
+    diffThrows = false,
+  } = {},
+) {
+  const dir = mkdtempSync(join(tmpdir(), "heldout-core-"));
+  const core = join(dir, "barwise", "packages", "core");
+  mkdirSync(join(core, "dist", "diff"), { recursive: true });
+  writeFileSync(join(core, "package.json"), JSON.stringify({ type: "module" }));
+  const refuseFile = JSON.stringify(fileEmpty === "refuse");
+  const refuseCode = JSON.stringify(codeEmpty === "refuse");
+  writeFileSync(
+    join(core, "dist", "index.js"),
+    `
+const refuseEntityUnit = (o) => {
+  if (o.kind === "entity" && "unit" in o) throw new Error("an entity type cannot have a unit");
+};
+export class OrmYamlSerializer {
+  deserialize(text) {
+    const doc = JSON.parse(text);
+    return {
+      name: doc.model.name,
+      objectTypes: doc.model.object_types.map((o) => {
+        refuseEntityUnit(o);
+        if (o.unit === "" && ${refuseFile}) throw new Error("empty unit");
+        const r = { id: o.id, name: o.name, kind: o.kind };
+        if (o.unit !== undefined) r.unit = o.unit;
+        return r;
+      }),
+    };
+  }
+  serialize(m) {
+    const objectTypes = m.objectTypes.map((o) => {
+      if (!${JSON.stringify(lossySave)}) return o;
+      const { unit, ...rest } = o;
+      return unit ? { ...rest, unit } : rest;
+    });
+    return JSON.stringify({ orm_version: "2.0", model: { name: m.name, object_types: objectTypes } });
+  }
+}
+export class SchemaValidator {
+  validateModel(doc) {
+    return { valid: !doc.model.object_types.some((o) => o.kind === "entity" && "unit" in o) };
+  }
+}
+export class OrmModel {
+  constructor(config) { this.name = config.name; this.objectTypes = []; }
+  addObjectType(config) {
+    refuseEntityUnit(config);
+    if (config.unit === "" && ${refuseCode}) throw new Error("empty unit");
+    const r = { ...config };
+    this.objectTypes.push(r);
+    return r;
+  }
+}
+`,
+  );
+  const same = diffBlind ? "(a, b) => (a ?? '') === (b ?? '')" : "(a, b) => a === b";
+  writeFileSync(
+    join(core, "dist", "diff", "index.js"),
+    `
+const same = ${same};
+export function diffModels(a, b) {
+  if (${diffThrows}) throw new Error("diff exploded");
+  return {
+    deltas: a.objectTypes.map((ot, i) => ({
+      elementType: "object_type",
+      kind: same(ot.unit, b.objectTypes[i].unit) ? "unchanged" : "modified",
+    })),
+  };
+}
+`,
+  );
+  return dir;
+}
+
+function heldout(path, cwd) {
+  const r = spawnSync(process.execPath, [SCRIPT, "heldout", "--task", "t1", "--path", path], {
+    cwd,
+    encoding: "utf8",
+  });
+  return {
+    status: r.status,
+    stderr: r.stderr,
+    report: r.status === 2 ? null : JSON.parse(r.stdout),
+  };
+}
+
+const EMPTY_IN_FILE = "an empty unit in a file is refused, or kept and diffed like any value";
+const EMPTY_FROM_CODE = "an empty unit from code is refused, or kept and diffed like any value";
+const failedNames = (r) => r.report.cases.filter((c) => !c.ok).map((c) => c.name);
+
+test("heldout passes a correct core, case by case, with a relative --path", () => {
+  const dir = fakeCore();
+  try {
+    // Relative to the caller's directory (which the script needs inside the
+    // repository), not to the script's own: a `../` path from here reaches
+    // the fixture only if it is resolved against cwd.
+    const cwd = dirname(dirname(SCRIPT));
+    const r = heldout(relative(cwd, dir), cwd);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.report.cases.length, 13);
+    assert.deepEqual(r.report.cases.filter((c) => !c.ok), []);
+    assert.equal(r.report.passed, 13);
+    assert.equal(r.report.failed, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("heldout fails pilot run p1's defect: an empty unit accepted and diffed as absent", () => {
+  const dir = fakeCore({ fileEmpty: "accept", codeEmpty: "accept", diffBlind: true });
+  try {
+    const r = heldout(dir);
+    assert.equal(r.status, 1);
+    assert.deepEqual(r.report.cases.filter((c) => !c.ok).map((c) => c.name), [
+      EMPTY_IN_FILE,
+      EMPTY_FROM_CODE,
+    ]);
+    assert.equal(r.report.failed, 2);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("heldout fails an empty unit refused in a file but accepted from code and diffed as absent", () => {
+  // Refusing it in a file proves nothing about the other way in.
+  const dir = fakeCore({ fileEmpty: "refuse", codeEmpty: "accept", diffBlind: true });
+  try {
+    const r = heldout(dir);
+    assert.equal(r.status, 1);
+    assert.deepEqual(r.report.cases.filter((c) => !c.ok).map((c) => c.name), [EMPTY_FROM_CODE]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("heldout passes a core that accepts an empty unit and treats it as an ordinary value", () => {
+  // Accepting is a legitimate answer; the rule must not quietly demand refusal.
+  const dir = fakeCore({ fileEmpty: "accept", codeEmpty: "accept" });
+  try {
+    const r = heldout(dir);
+    assert.equal(r.status, 0, JSON.stringify(failedNames(r)));
+    assert.equal(r.report.passed, 13);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("heldout fails a core that accepts an empty unit and drops it on save", () => {
+  const dir = fakeCore({ fileEmpty: "accept", codeEmpty: "accept", lossySave: true });
+  try {
+    const r = heldout(dir);
+    assert.equal(r.status, 1);
+    assert.deepEqual(failedNames(r), [EMPTY_IN_FILE, EMPTY_FROM_CODE]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("heldout counts a case that throws as failed, with the error, not as a crash", () => {
+  const dir = fakeCore({ diffThrows: true });
+  try {
+    const r = heldout(dir);
+    assert.equal(r.status, 1);
+    const thrown = r.report.cases.filter((c) => c.error);
+    assert.ok(thrown.length >= 4, "every diff case reports the throw");
+    for (const c of thrown) {
+      assert.equal(c.ok, false);
+      assert.equal(c.error, "diff exploded");
+    }
+    assert.equal(r.report.failed, thrown.length);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("trial fails a branch that changed the held-out oracle and passes one that did not", () => {
