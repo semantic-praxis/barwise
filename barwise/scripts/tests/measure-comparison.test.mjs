@@ -393,7 +393,7 @@ test("heldout counts a case that throws as failed, with the error, not as a cras
 
 test("usage sums each turn's input once, and reports the last turn's context", () => {
   // Two records share one message id, as a turn streamed in parts does; a
-  // tool result and a malformed line carry no usage and are skipped.
+  // tool result carries no usage and a blank line nothing, so both are skipped.
   const dir = mkdtempSync(join(tmpdir(), "usage-"));
   const file = join(dir, "run.jsonl");
   const turn = (id, input, read, create) =>
@@ -415,7 +415,7 @@ test("usage sums each turn's input once, and reports the last turn's context", (
       turn("m1", 10, 0, 1000),
       turn("m1", 10, 0, 1000),
       JSON.stringify({ message: { role: "user", content: [{ type: "tool_result" }] } }),
-      "not json",
+      "",
       turn("m2", 5, 1000, 200),
     ].join("\n"),
   );
@@ -428,6 +428,15 @@ test("usage sums each turn's input once, and reports the last turn's context", (
     assert.equal(got.finalContext, 1205);
 
     assert.equal(spawnSync(process.execPath, [SCRIPT, "usage"]).status, 2, "no file");
+    assert.equal(spawnSync(process.execPath, [SCRIPT, "usage", dir]).status, 2, "a directory");
+    // A complete turn and then a truncated one: refused, not a smaller total.
+    writeFileSync(
+      file,
+      [turn("m1", 10, 0, 1000), turn("m2", 5, 1000, 200).slice(0, 40)].join("\n"),
+    );
+    const truncated = spawnSync(process.execPath, [SCRIPT, "usage", file], { encoding: "utf8" });
+    assert.equal(truncated.status, 2, truncated.stdout);
+    assert.match(truncated.stderr, /run\.jsonl:2 is not a JSON record/);
     writeFileSync(file, "{}\n");
     assert.equal(spawnSync(process.execPath, [SCRIPT, "usage", file]).status, 2, "no turns");
   } finally {

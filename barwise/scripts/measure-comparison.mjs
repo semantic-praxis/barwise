@@ -550,13 +550,23 @@ function usage(args) {
   const [file] = args;
   if (!file) refuse("usage needs a transcript: usage <transcript.jsonl>.");
   if (!existsSync(file)) refuse(`no transcript at ${file}.`);
+  let text;
+  try {
+    text = readFileSync(file, "utf8");
+  } catch (error) {
+    refuse(`could not read ${file}: ${error?.message ?? error}`);
+  }
+  // A record that does not parse is refused, not skipped: a truncated last
+  // line would otherwise drop that turn and report a smaller total as a
+  // reading (Copilot, PR #654). Blank lines carry nothing and are skipped.
   const turns = new Map();
-  for (const line of readFileSync(file, "utf8").split("\n")) {
+  for (const [index, line] of text.split("\n").entries()) {
+    if (line.trim() === "") continue;
     let entry;
     try {
       entry = JSON.parse(line);
     } catch {
-      continue;
+      refuse(`${file}:${index + 1} is not a JSON record; the transcript may be truncated.`);
     }
     const message = entry?.message;
     if (message?.role !== "assistant" || !message.usage) continue;
