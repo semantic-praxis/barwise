@@ -435,9 +435,37 @@ test("usage sums each turn's input once, and reports the last turn's context", (
     assert.equal(withTurns.status, 0, withTurns.stderr);
     const perTurn = JSON.parse(withTurns.stdout).perTurn;
     assert.deepEqual(perTurn, [
-      { input: 10, cacheRead: 0, cacheCreation: 1000 },
-      { input: 5, cacheRead: 1000, cacheCreation: 200 },
+      { round: 1, input: 10, cacheRead: 0, cacheCreation: 1000 },
+      { round: 1, input: 5, cacheRead: 1000, cacheCreation: 200 },
     ]);
+    assert.deepEqual(got.rounds, [{ round: 1, turns: 2, inputProcessed: 2215 }]);
+    // Feedback from the coordinator starts a new round; one that arrives
+    // before any turn closes nothing, and feedback in words alone (a user
+    // record with no coordinator origin) is not a round marker.
+    const coordinator = JSON.stringify({
+      origin: { kind: "coordinator" },
+      message: { role: "user", content: "Scoring found failures" },
+    });
+    writeFileSync(
+      file,
+      [
+        coordinator,
+        turn("m1", 10, 0, 1000),
+        JSON.stringify({ message: { role: "user", content: "Scoring found failures" } }),
+        turn("m2", 5, 1000, 200),
+        coordinator,
+        turn("m3", 1, 2000, 0),
+      ].join("\n"),
+    );
+    const split = JSON.parse(
+      spawnSync(process.execPath, [SCRIPT, "usage", "--turns", file], { encoding: "utf8" }).stdout,
+    );
+    assert.deepEqual(split.rounds, [
+      { round: 1, turns: 2, inputProcessed: 2215 },
+      { round: 2, turns: 1, inputProcessed: 2001 },
+    ]);
+    assert.equal(split.inputProcessed, 2215 + 2001, "rounds sum to the run's total");
+    assert.deepEqual(split.perTurn.map((p) => p.round), [1, 1, 2]);
     assert.equal(
       perTurn.reduce((n, p) => n + p.input + p.cacheRead + p.cacheCreation, 0),
       got.inputProcessed,

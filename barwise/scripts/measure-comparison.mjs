@@ -553,6 +553,14 @@ async function heldout(args) {
  * The transcript itself is not committable -- it holds the prompts, the
  * tool output and the served model -- so the per-turn counts are what lets a
  * reader recompute inputProcessed without it.
+ *
+ * A run sent back for another round receives that feedback as a user record
+ * whose `origin.kind` is "coordinator"; each one starts a new round. The
+ * per-round totals are reported because a reading that drops a round (the
+ * primer check's adjusted D3) cannot be recomputed from the totals alone,
+ * and the harness's per-round figure is the final context, not the input
+ * the round read (Copilot, PR #659). The marker is the record's structure,
+ * not the feedback's wording, so rewording the feedback cannot move it.
  */
 function usage(args) {
   const withTurns = args.includes("--turns");
@@ -570,6 +578,8 @@ function usage(args) {
   // line would otherwise drop that turn and report a smaller total as a
   // reading (Copilot, PR #654). Blank lines carry nothing and are skipped.
   const turns = new Map();
+  let round = 1;
+  let turnsThisRound = 0;
   for (const [index, line] of text.split("\n").entries()) {
     if (line.trim() === "") continue;
     let entry;
@@ -579,6 +589,13 @@ function usage(args) {
       refuse(`${file}:${index + 1} is not a JSON record; the transcript may be truncated.`);
     }
     const message = entry?.message;
+    // Feedback before the round has any turn (none so far) is not a new
+    // round: there is nothing yet to close.
+    if (message?.role === "user" && entry?.origin?.kind === "coordinator" && turnsThisRound > 0) {
+      round += 1;
+      turnsThisRound = 0;
+      continue;
+    }
     if (message?.role !== "assistant" || !message.usage) continue;
     // A counter that is missing, a string or negative would add a wrong
     // number to the total and still exit 0 (Copilot, PR #654): refused.
@@ -594,20 +611,34 @@ function usage(args) {
     counter("cache_read_input_tokens", false);
     counter("cache_creation_input_tokens", false);
     const id = message.id ?? `line-${turns.size}`;
-    if (!turns.has(id)) turns.set(id, u);
+    if (!turns.has(id)) {
+      turns.set(id, { u, round });
+      turnsThisRound += 1;
+    }
   }
   if (turns.size === 0) refuse(`${file} holds no assistant turn with a usage record.`);
   const contextOf = (u) =>
     (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
-  const contexts = [...turns.values()].map(contextOf);
+  const counted = [...turns.values()];
+  const contexts = counted.map(({ u }) => contextOf(u));
+  const rounds = [];
+  for (const [i, { round: r }] of counted.entries()) {
+    const last = rounds.at(-1);
+    if (last?.round === r) {
+      last.turns += 1;
+      last.inputProcessed += contexts[i];
+    } else rounds.push({ round: r, turns: 1, inputProcessed: contexts[i] });
+  }
   const result = {
     file,
     turns: turns.size,
     inputProcessed: contexts.reduce((a, b) => a + b, 0),
     finalContext: contexts.at(-1),
+    rounds,
   };
   if (withTurns) {
-    result.perTurn = [...turns.values()].map((u) => ({
+    result.perTurn = counted.map(({ u, round: r }) => ({
+      round: r,
       input: u.input_tokens,
       cacheRead: u.cache_read_input_tokens ?? 0,
       cacheCreation: u.cache_creation_input_tokens ?? 0,

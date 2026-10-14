@@ -623,7 +623,10 @@ How a run is held to the same conditions as the others:
   `<run>.usage.json`, written by `measure:comparison -- usage --turns`:
   the three input counters of every counted turn and nothing else (no
   prompt, tool output or model name), which sum back to the
-  `inputProcessed` its record reports.
+  `inputProcessed` its record reports. Each turn also carries its round,
+  and `rounds` gives each round's turns and input processed: a round
+  starts at each feedback message the run receives, found by the
+  message's origin rather than its wording.
 - **The pilot.** Three T1 runs on the plain arm, run and scored as
   above. It does not set D3's bound, which needs both arms. It measures
   the spread of one arm's totals and the cost per run, so the spec can
@@ -702,8 +705,8 @@ What the pilot shows besides the numbers:
 
 **The primer check (barwise-hno, defined 2026-10-14 after the five main
 pairs).** In round 1 the plain runs of main pairs 1, 2 and 3 edited the
-protected WS0 test `objectTypeLayout.test.ts`; the plain runs of pairs 4
-and 5, and no Effect run, did not. Appendix E tells the plain arm that the
+protected WS0 test `objectTypeLayout.test.ts`, and the plain runs of
+pairs 4 and 5 did not. No Effect run edited it. Appendix E tells the plain arm that the
 serializer's field order is something "the byte-layout test pins", and
 Appendix F has no comparable line. If that phrase invites a run to pin the
 new field there, part of the plain arm's round-2 cost belongs to the
@@ -743,7 +746,9 @@ so the five main pairs pool. This check is kept out of them.
   primer is credited, WS4 states
   the plain arm's D3 twice: as scored, and with the rounds a layout-test
   edit alone sent back (pairs 1 and 2) replaced by their first round's
-  input processed, read from the transcript up to the feedback message.
+  input processed. That figure is the round-1 entry of `rounds` in each
+  run's committed `<run>.usage.json`, so the adjusted reading can be
+  recomputed from the records as the original can.
   Pair 3's round 2 also fixed an empty-unit case, so it stays as scored
   either way.
 
