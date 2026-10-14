@@ -45,7 +45,12 @@ export class SchemaValidator {
     const errors: SchemaError[] = (this.validate.errors ?? []).map(
       (err: ErrorObject) => ({
         path: err.instancePath || "/",
-        message: err.message ?? "Unknown validation error",
+        // A `false` property schema forbids a field outright (an entity
+        // type's `data_type`); ajv's own wording, "boolean schema is false",
+        // describes the schema rather than the document.
+        message: err.keyword === "false schema"
+          ? "is not allowed here"
+          : (err.message ?? "Unknown validation error"),
       }),
     );
 

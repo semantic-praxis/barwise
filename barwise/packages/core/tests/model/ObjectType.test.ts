@@ -98,6 +98,25 @@ describe("ObjectType", () => {
       ).toThrow("should not have a reference mode");
     });
 
+    // barwise-5fg: these fields belong on the value type a reference mode
+    // names. The union used to drop them without a word.
+    it.each(
+      [
+        ["dataType", { dataType: { name: "integer" } }, "a data type"],
+        ["valueConstraint", { valueConstraint: { values: ["A"] } }, "a value constraint"],
+        ["defaultValue", { defaultValue: "A" }, "a default value"],
+      ] as const,
+    )("refuses an entity type carrying %s, naming the type", (_field, extra, label) => {
+      expect(() =>
+        createObjectType({
+          name: "Supplier",
+          kind: "entity",
+          referenceMode: "supplier_id",
+          ...extra,
+        })
+      ).toThrow(`Entity type "Supplier" cannot have ${label}`);
+    });
+
     it("accepts a value constraint", () => {
       const ot = createObjectType({
         name: "Rating",

@@ -248,6 +248,13 @@ export function isValueType(ot: ObjectType): ot is ValueType {
  * `ObjectTypeConfig` is also built from parsed YAML, where the compiler
  * has no say.
  */
+/** The config fields only a value type may carry, with the words a message uses for each. */
+const VALUE_ONLY_FIELDS = [
+  ["dataType", "a data type"],
+  ["valueConstraint", "a value constraint"],
+  ["defaultValue", "a default value"],
+] as const;
+
 export function createObjectType(config: ObjectTypeConfig): ObjectType {
   const name = requireName(config.name);
 
@@ -286,6 +293,19 @@ export function createObjectType(config: ObjectTypeConfig): ObjectType {
   if (config.kind === "entity") {
     if (!config.referenceMode) {
       throw new Error(`Entity type "${name}" must have a reference mode.`);
+    }
+    // Refused rather than ignored. An entity type takes its data type, value
+    // constraint and default from the value type its reference mode names;
+    // on the entity they mean nothing. Before this, the union dropped them
+    // without a word, and a file that carried one lost it on the next save
+    // (barwise-5fg, a regression from the one-class model, which stored them
+    // for either kind).
+    for (const [field, label] of VALUE_ONLY_FIELDS) {
+      if (config[field] !== undefined) {
+        throw new Error(
+          `Entity type "${name}" cannot have ${label}; it belongs on the value type its reference mode names.`,
+        );
+      }
     }
     return Object.freeze({ ...base, kind: "entity", referenceMode: config.referenceMode });
   }

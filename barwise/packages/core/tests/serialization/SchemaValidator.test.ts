@@ -169,6 +169,55 @@ describe("SchemaValidator", () => {
       expect(result.valid).toBe(false);
     });
 
+    it.each([
+      ["data_type", { name: "integer" }],
+      ["value_constraint", { values: ["A"] }],
+      ["default_value", "A"],
+    ])("rejects an entity type carrying %s, at that field's path", (field, value) => {
+      // barwise-5fg: the schema used to accept these, and the loader then
+      // dropped them. "is not allowed here" replaces ajv's wording for a
+      // `false` schema, which describes the schema rather than the file.
+      const doc = {
+        orm_version: "2.0",
+        model: {
+          name: "Test",
+          object_types: [
+            {
+              id: "ot-1",
+              name: "Supplier",
+              kind: "entity",
+              reference_mode: "supplier_id",
+              [field]: value,
+            },
+          ],
+        },
+      };
+      const result = validator.validateModel(doc);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        path: `/model/object_types/0/${field}`,
+        message: "is not allowed here",
+      });
+    });
+
+    it("still accepts those fields on a value type", () => {
+      const doc = {
+        orm_version: "2.0",
+        model: {
+          name: "Test",
+          object_types: [{
+            id: "ot-1",
+            name: "Rating",
+            kind: "value",
+            data_type: { name: "integer" },
+            value_constraint: { values: ["1"] },
+            default_value: "1",
+          }],
+        },
+      };
+      expect(validator.validateModel(doc)).toEqual({ valid: true, errors: [] });
+    });
+
     it("rejects an entity type without reference_mode", () => {
       const doc = {
         orm_version: "2.0",

@@ -109,6 +109,32 @@ describe("DraftModelParser", () => {
       expect(result.warnings.length).toBeGreaterThan(0);
     });
 
+    it("drops data_type and value_constraint from an entity type, with a warning", () => {
+      // Core refuses them on an entity (barwise-5fg). Passing them through
+      // would lose the entity, and every fact type naming it, to one field.
+      const result = parseDraftModel(
+        makeResponse({
+          object_types: [
+            {
+              name: "Supplier",
+              kind: "entity",
+              reference_mode: "supplier_id",
+              data_type: { name: "integer" },
+              value_constraint: { values: ["A"] },
+              source_references: [],
+            },
+          ],
+        }),
+        "Test",
+      );
+
+      const ot = result.model.getObjectTypeByName("Supplier");
+      expect(ot?.kind).toBe("entity");
+      expect(result.warnings).toContain(
+        'Dropped data_type and value_constraint from entity type "Supplier": an entity type takes these from its reference mode\'s value type.',
+      );
+    });
+
     it("creates value types with data_type", () => {
       const result = parseDraftModel(
         makeResponse({

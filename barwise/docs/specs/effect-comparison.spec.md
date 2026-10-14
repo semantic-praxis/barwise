@@ -1,9 +1,9 @@
 # Effect against hand-written sealed records: a measured comparison before the rest of barwise-973
 
 Status: WS0 implemented 2026-10-13 (instruments and baseline); the
-barwise-5fg prerequisite and WS1-WS4 not started
+barwise-5fg prerequisite implemented 2026-10-14; WS1-WS4 not started
 Created: 2026-10-13
-Last-updated: 2026-10-13
+Last-updated: 2026-10-14
 Tracking: barwise-cu0 (this spec); barwise-973 (WS1 of
 `core-branching-load.spec.md`, held until WS4 here decides its style);
 barwise-5fg (a regression the grounding found, fixed before either arm
@@ -270,10 +270,18 @@ D2 case by case, today's loader:
 | excess property                | refused | no       | no      |                    |
 
 The three silent losses are barwise-5fg, whose fix lands before either
-arm starts; the excess property is refused with "must NOT have additional
+arm starts (see "After barwise-5fg" below); the excess property is refused with "must NOT have additional
 properties", which names neither the object type nor the property. In
 the combined file the JSON Schema check reports its four by array
 position and stops, so the constructor's checks never run.
+
+**After barwise-5fg (2026-10-14), the base both arms start from.** Singly:
+all 11 refused, 10 of 11 reported, 2 by name, 0 silent losses. Combined:
+7 of 11, 0 by name. The three entity cases are now refused by the JSON
+Schema at the field's path (`/model/object_types/0/data_type: is not
+allowed here`), which names the field and the position but not the
+object type; naming it is the arms' D2 work. `createObjectType` refuses
+the same three by name for a caller that skips the schema.
 
 One reading outside the criteria: `barwise --version` (412 ms) is slower
 than `validate` (402 ms), because routing loads every command when the

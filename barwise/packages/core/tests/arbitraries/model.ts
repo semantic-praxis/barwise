@@ -452,13 +452,20 @@ function toObjectTypes(raws: readonly RawObjectType[]): ObjectTypeConfig[] {
       ...(raw.definition !== null ? { definition: raw.definition } : {}),
       ...(raw.sourceContext !== null ? { sourceContext: raw.sourceContext } : {}),
       ...(raw.note !== null ? { note: raw.note } : {}),
-      ...(toValueConstraint(raw.values, raw.range) !== undefined
+      // Value-only fields go on value types only: core refuses them on an
+      // entity (barwise-5fg). Before that it dropped them, so this generator
+      // handed entities fields that vanished at construction -- and the
+      // serialization law, comparing a built model with its round trip,
+      // could not see the loss, because both sides had already lost them.
+      ...(!raw.entity && toValueConstraint(raw.values, raw.range) !== undefined
         ? { valueConstraint: toValueConstraint(raw.values, raw.range) }
         : {}),
-      ...(toDataType(raw.dataType) !== undefined ? { dataType: toDataType(raw.dataType) } : {}),
+      ...(!raw.entity && toDataType(raw.dataType) !== undefined
+        ? { dataType: toDataType(raw.dataType) }
+        : {}),
       ...(raw.aliases.length > 0 ? { aliases: [...raw.aliases] } : {}),
       independent: raw.independent,
-      ...(raw.defaultValue !== null ? { defaultValue: raw.defaultValue } : {}),
+      ...(!raw.entity && raw.defaultValue !== null ? { defaultValue: raw.defaultValue } : {}),
       ...(toCardinality(raw.cardinality) !== undefined
         ? { cardinality: toCardinality(raw.cardinality) }
         : {}),
