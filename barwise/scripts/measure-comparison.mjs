@@ -27,6 +27,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs
 import { cpus, tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { committedPaths, uncommittedPaths } from "./lib/changed-class.mjs";
 import {
   ambiguityReport,
   caseProblem,
@@ -338,12 +339,12 @@ function trial(args) {
   let changed;
   try {
     git(["rev-parse", "--verify", `${base}^{commit}`], path);
-    // A trial runs in a worktree, so a file it ADDED and never committed is
-    // as much a change to the oracle as one it edited; `git diff` alone
-    // cannot see it.
-    const tracked = git(["diff", "--name-only", base, "--"], path);
-    const untracked = git(["ls-files", "--others", "--exclude-standard"], path);
-    changed = `${tracked}\n${untracked}`.trim().split("\n").filter(Boolean);
+    // A trial commits some of its work and leaves some uncommitted, and a
+    // file it ADDED and never committed is as much a change to the oracle as
+    // one it edited. The same union ci-local classifies a change by, from
+    // the module that owns it: a hand-written copy here once missed
+    // untracked files entirely (check:git-listing keeps it from coming back).
+    changed = [...new Set([...committedPaths(base, path), ...uncommittedPaths(path)])];
   } catch {
     refuse(`git could not diff ${path} against ${base}.`);
   }

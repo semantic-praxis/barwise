@@ -111,6 +111,7 @@ const ROOT_DEPENDENT_GATES = [
   "check-secrets.mjs",
   "audit-corrections.mjs",
   "check-lockfile-agrees.mjs",
+  "check-git-listing.mjs",
 ];
 
 for (const script of ROOT_DEPENDENT_GATES) {
@@ -542,6 +543,63 @@ test("check-lockfile-agrees refuses with exit 2 when nothing is installed", () =
     assert.equal(r.status, 2, `expected refusal, got ${r.status}:\n${r.stdout}${r.stderr}`);
     assert.match(r.stderr, /no node_modules/);
     assert.doesNotMatch(r.stdout, /OK/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-git-listing fails on a script that lists untracked files itself", () => {
+  // The spelling trial used before PR #641's fix, in a script outside lib/.
+  const dir = tempRepo();
+  try {
+    stage(dir, "barwise/scripts/fine.mjs", "export const x = 1;\n");
+    stage(dir, "barwise/scripts/lib/changed-class.mjs", 'git(["ls-files", "--others"]);\n');
+    stage(dir, "barwise/scripts/tests/probe.test.mjs", 'git(["ls-files", "--others"]);\n');
+    const green = gate("check-git-listing.mjs", dir);
+    assert.equal(green.status, 0, `lib/ and tests/ are out of scope:\n${green.stderr}`);
+
+    stage(
+      dir,
+      "barwise/scripts/rolled.mjs",
+      'const a = 1;\nconst u = git(["ls-files", "--others", "--exclude-standard"], path);\n',
+    );
+    const red = gate("check-git-listing.mjs", dir);
+    assert.equal(red.status, 1, red.stdout);
+    assert.match(red.stderr, /barwise\/scripts\/rolled\.mjs:2/);
+    assert.match(red.stderr, /uncommittedPaths/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-git-listing refuses a script it cannot read, and skips a deleted one", () => {
+  const dir = tempRepo();
+  try {
+    stage(dir, "barwise/scripts/fine.mjs", "export const x = 1;\n");
+    stage(dir, "barwise/scripts/gone.mjs", "export const y = 1;\n");
+    rmSync(join(dir, "barwise/scripts/gone.mjs"));
+    assert.equal(gate("check-git-listing.mjs", dir).status, 0, "a deleted script is skipped");
+
+    // A directory where a tracked script was: readFileSync throws EISDIR.
+    rmSync(join(dir, "barwise/scripts/fine.mjs"));
+    mkdirSync(join(dir, "barwise/scripts/fine.mjs"));
+    const r = gate("check-git-listing.mjs", dir);
+    assert.equal(r.status, 2, r.stdout);
+    assert.match(r.stderr, /could not read barwise\/scripts\/fine\.mjs \(EISDIR\)/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-git-listing refuses when no script is in scope", () => {
+  // A layout change that empties the filter would otherwise print OK over
+  // nothing (barwise-905's shape).
+  const dir = tempRepo();
+  try {
+    stage(dir, "README.md", "x\n");
+    const r = gate("check-git-listing.mjs", dir);
+    assert.equal(r.status, 2, r.stdout);
+    assert.match(r.stderr, /no tracked \.mjs files under barwise\/scripts/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

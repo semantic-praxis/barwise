@@ -180,6 +180,13 @@ jobs:
       # eslint and oxlint all accept NUL, so nothing else catches it.
       - run: npm run check:no-nul
 
+      # One owner lists untracked files: uncommittedPaths in
+      # scripts/lib/changed-class.mjs. Each hand-written copy has shipped
+      # its own defect -- the cwd's siblings missed, a newline-bearing path
+      # split in two (PR #602), untracked files left out entirely (PR #641)
+      # (docs/specs/pushed-tree-verification.spec.md).
+      - run: npm run check:git-listing
+
       # npm ci installs what the lockfile says without checking it against
       # each package.json. Dependabot PR #542 declared vitest ^5.0.1 while
       # its lockfile kept 4.1.11 in all twelve packages (the coverage
