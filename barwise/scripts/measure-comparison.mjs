@@ -33,6 +33,7 @@ import {
   scoreDocument,
   summarize,
 } from "./lib/malformed-score.mjs";
+import { median } from "./lib/median.mjs";
 import { REPO_ROOT } from "./lib/tracked.mjs";
 
 const BARWISE = join(REPO_ROOT, "barwise");
@@ -44,13 +45,23 @@ const COUNT_HOOK = join(BARWISE, "scripts/lib/module-count-hook.mjs");
 /** G4: the limit, and why -- about where a wait starts to break a train of thought. */
 const LIMIT_MS = 1000;
 
-/** Paths a trial branch may not change: the oracle it is scored against. */
+/**
+ * Paths a trial branch may not change: the oracle it is scored against,
+ * and the instruments that score it. The arm brief forbids "the WS0 tests,
+ * the law tests or any golden file"; a golden is matched by name anywhere
+ * under a package's tests, because they live in four layouts today (a
+ * `golden/` directory, `goldens/`, `*.golden.txt`, `*.golden.test.ts`)
+ * and a list of directories would miss the next one.
+ */
 const PROTECTED = [
+  /^barwise\/scripts\/measure-comparison\.mjs$/,
+  /^barwise\/scripts\/lib\/(malformed-score|module-count-hook)\.mjs$/,
+  /^barwise\/scripts\/tests\/measure-comparison\.test\.mjs$/,
   /^barwise\/packages\/core\/tests\/serialization\/objectTypeLayout\.test\.ts$/,
   /^barwise\/packages\/core\/tests\/serialization\/schemaDataTypes\.test\.ts$/,
   /^barwise\/packages\/core\/tests\/fixtures\/malformed\//,
   /^barwise\/packages\/core\/tests\/laws\//,
-  /^barwise\/packages\/cli\/tests\/characterization\/golden\//,
+  /^barwise\/packages\/[^/]+\/tests\/(.*\/)?[^/]*golden/i,
   /^barwise\/packages\/promptlab\/tests\/referenceDrift\.test\.ts$/,
   /\.reference\.orm\.yaml$/,
 ];
@@ -71,11 +82,6 @@ function run(command, args, cwd = BARWISE) {
   if (r.status !== 0) {
     refuse(`\`${command} ${args.join(" ")}\` failed:\n${(r.stderr ?? "").slice(-2000)}`);
   }
-}
-
-function median(values) {
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)];
 }
 
 function environment() {
@@ -99,9 +105,17 @@ function environment() {
   };
 }
 
+/**
+ * The value after `name`, or undefined when the flag is absent. A flag given
+ * with no value refuses: `trial --base HEAD --path` used to measure the
+ * repository root instead of the worktree the caller meant.
+ */
 function flag(args, name) {
   const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
+  if (i < 0) return undefined;
+  const value = args[i + 1];
+  if (value === undefined || value.startsWith("--")) refuse(`${name} needs a value.`);
+  return value;
 }
 
 // -- startup ---------------------------------------------------------------

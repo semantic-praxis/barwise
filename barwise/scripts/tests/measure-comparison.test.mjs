@@ -16,6 +16,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 import { ambiguityReport, combine, lostKeys, scoreDocument } from "../lib/malformed-score.mjs";
+import { median } from "../lib/median.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(HERE, "..", "measure-comparison.mjs");
@@ -195,6 +196,12 @@ test("trial fails a branch that changed the held-out oracle and passes one that 
     mkdirSync(laws, { recursive: true });
     writeFileSync(join(laws, "x.law.test.ts"), "a\n");
     writeFileSync(join(repo, "README.md"), "a\n");
+    const instruments = join(repo, "barwise/scripts/tests");
+    mkdirSync(instruments, { recursive: true });
+    writeFileSync(join(instruments, "measure-comparison.test.mjs"), "a\n");
+    const goldens = join(repo, "barwise/packages/llm/tests/fixtures/prompts");
+    mkdirSync(goldens, { recursive: true });
+    writeFileSync(join(goldens, "review-default.golden.txt"), "a\n");
     g("init", "-q");
     g("add", ".");
     g("commit", "-q", "-m", "base");
@@ -213,6 +220,22 @@ test("trial fails a branch that changed the held-out oracle and passes one that 
     );
     assert.equal(touched.status, 1, touched.stderr.toString());
     assert.match(touched.stdout.toString(), /x\.law\.test\.ts/);
+
+    // The WS0 instruments and every golden are oracle too, not only the
+    // CLI's golden directory.
+    for (
+      const f of [
+        join(instruments, "measure-comparison.test.mjs"),
+        join(goldens, "review-default.golden.txt"),
+      ]
+    ) {
+      g("checkout", "-q", "--", ".");
+      writeFileSync(f, "b\n");
+      const r = spawnSync(process.execPath, [SCRIPT, "trial", "--base", "HEAD", "--path", repo], {
+        cwd: repo,
+      });
+      assert.equal(r.status, 1, `${f}: ${r.stderr}`);
+    }
 
     // A file the trial added and never committed is a change too.
     g("checkout", "-q", "--", ".");
@@ -233,6 +256,19 @@ test("--runs that would measure nothing is refused, not reported as a failure", 
     assert.equal(r.status, 2, `--runs ${runs}: ${r.stderr}`);
   }
   assert.equal(spawnSync(process.execPath, [SCRIPT, "startup", "--no-build", "--runs"]).status, 2);
+});
+
+test("a flag given with no value is refused, not read as absent", () => {
+  // Before, `--path` with no value measured the repository root silently.
+  const r = spawnSync(process.execPath, [SCRIPT, "trial", "--base", "HEAD", "--path"]);
+  assert.equal(r.status, 2, r.stderr.toString());
+  assert.match(r.stderr.toString(), /--path needs a value/);
+  assert.equal(spawnSync(process.execPath, [SCRIPT, "trial", "--base", "--path", "x"]).status, 2);
+});
+
+test("the median of an even count is the mean of the middle two", () => {
+  assert.equal(median([400, 380, 420]), 400);
+  assert.equal(median([380, 400, 420, 900]), 410);
 });
 
 test("a build tool that cannot start is a refusal, not a crash", () => {
