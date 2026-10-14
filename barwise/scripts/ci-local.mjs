@@ -260,7 +260,9 @@ function runAtCommit(argv) {
     const left = [...new Set(pathsDifferingFrom(sha, ROOT))];
     if (left.length > 0) {
       console.log(
-        `In this working tree but not in ${sha.slice(0, 8)}, so neither checked nor pushed:`,
+        `Differs between this working tree and ${
+          sha.slice(0, 8)
+        }; the check reads the commit's copy, which is what is pushed:`,
       );
       for (const f of left) console.log(`  ${f}`);
       console.log("");

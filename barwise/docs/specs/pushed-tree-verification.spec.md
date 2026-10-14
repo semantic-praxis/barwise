@@ -240,7 +240,7 @@ asserts the line appears, for both audits. Independent of 1 and 3.
 - An unresolvable SHA, and a failing `npm ci` (a lockfile edited to
   disagree), each give exit 2 with the step named.
 - The worktree is gone after a pass, a fail, and a refusal.
-- The left-behind list names an untracked and a modified file and does
+- The left-behind list names an untracked, a modified and a deleted file and does
   not change the exit code, including when the pushed SHA is not the
   current `HEAD`.
 - A second `ci:local` started while a `--commit` run holds the lock

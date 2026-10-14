@@ -114,7 +114,7 @@ test("--commit checks the commit, not a working tree holding build output", () =
     // The left-behind list names what the push will not carry.
     assert.match(
       commit.stdout,
-      /not in [0-9a-f]{8}, so neither checked nor pushed:\n {2}barwise\/dist\/marker/,
+      /Differs between this working tree and [0-9a-f]{8}; the check reads the commit's copy, which is what is pushed:\n {2}barwise\/dist\/marker/,
     );
     assert.equal(worktrees(repo).length, 1, "the worktree is removed after a failing run");
   } finally {
@@ -132,7 +132,7 @@ test("--commit passes a commit that holds what its gates need, and cleans up", (
 
     const r = ciLocal(repo, "--commit", "HEAD");
     assert.equal(r.status, 0, r.all);
-    assert.doesNotMatch(r.stdout, /neither checked nor pushed/, "nothing is left behind");
+    assert.doesNotMatch(r.stdout, /Differs between this working tree/, "nothing is left behind");
     assert.equal(worktrees(repo).length, 1, "the worktree is removed after a passing run");
   } finally {
     rmSync(repo.dir, { recursive: true, force: true });
@@ -142,15 +142,20 @@ test("--commit passes a commit that holds what its gates need, and cleans up", (
 test("the left-behind list compares with the pushed commit, not HEAD", () => {
   // Pushing a ref that is not checked out: the working tree matches HEAD, so
   // `uncommittedPaths` would report nothing, yet probe.mjs differs from the
-  // commit being checked.
+  // commit being checked. A tracked file deleted from the working tree is
+  // listed too: the commit still holds it, so the check reads it and the
+  // push carries it -- which is why the message says "differs", not "left
+  // behind".
   const repo = commitRepo();
   try {
     const base = repo.git("rev-parse", "HEAD").trim();
     writeFileSync(join(repo.root, "scripts", "probe.mjs"), "process.exitCode = 0;\n");
     repo.git("commit", "-qam", "probe always passes");
+    rmSync(join(repo.dir, ".gitignore"));
 
     const r = ciLocal(repo, "--commit", base);
     assert.match(r.stdout, / {2}barwise\/scripts\/probe\.mjs/);
+    assert.match(r.stdout, /^ {2}\.gitignore$/m, "a deletion is a difference too");
     assert.equal(r.status, 1, "the base's probe still needs dist/");
   } finally {
     rmSync(repo.dir, { recursive: true, force: true });
