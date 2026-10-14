@@ -365,8 +365,14 @@ its letter.
   run before the commit saw a different tree from the one pushed.
   The comment no longer spells the command.
 
-**Workstream 2, 2026-10-14.** As specified, with one test change worth
-naming: the existing `audit-corrections` test asserted that `--check`
+**Workstream 2, 2026-10-14.** Two deviations. The notice prints before
+the verdict, not after it as Scope says: on a failing run the verdict is
+a long list, and a notice after it is the line a reader scrolls past, while
+before it the notice is visible on a passing run, the case that matters.
+And the listing applies each audit's own corpus rule, so an untracked spec
+under `archive/`, which neither audit reads even once tracked, is neither
+named nor a reason to refuse a write (Copilot, PR #646). One test change is
+worth naming: the existing `audit-corrections` test asserted that `--check`
 did NOT mention an untracked draft. That pinned the blind spot this
 workstream removes, so the assertion now requires the
 `unchecked (untracked)` line instead. Exit codes are unchanged.

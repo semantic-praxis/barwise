@@ -2593,6 +2593,20 @@ test("audit-corrections refuses to WRITE a baseline while a spec is untracked", 
       check.stdout,
       /audit-corrections: unchecked \(untracked\): barwise\/docs\/specs\/draft\.spec\.md/,
     );
+
+    // An archived spec is outside the corpus even once tracked, so it is
+    // neither named as unchecked nor a reason to refuse a write.
+    mkdirSync(join(dir, "barwise/docs/specs/archive"), { recursive: true });
+    writeFileSync(join(dir, "barwise/docs/specs/archive/old.spec.md"), A_CORRECTION);
+    const withArchive = gate("audit-corrections.mjs", dir, "--check");
+    assert.doesNotMatch(withArchive.stdout, /archive\/old\.spec\.md/);
+    rmSync(join(dir, "barwise/docs/specs/draft.spec.md"));
+    const archiveOnly = gate("audit-corrections.mjs", dir, "--write");
+    assert.equal(
+      archiveOnly.status,
+      0,
+      `an archived draft alone must not block --write:\n${archiveOnly.stderr}`,
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -2628,6 +2642,14 @@ test("audit-spec-status refuses to WRITE a baseline while a spec is untracked", 
     assert.match(
       check.stdout,
       /audit-spec-status: unchecked \(untracked\): barwise\/docs\/specs\/draft\.spec\.md/,
+    );
+
+    // Archived specs are outside this audit's corpus too.
+    mkdirSync(join(dir, "barwise/docs/specs/archive"), { recursive: true });
+    writeFileSync(join(dir, "barwise/docs/specs/archive/old.spec.md"), A_CORRECTION);
+    assert.doesNotMatch(
+      gate("audit-spec-status.mjs", dir, "--check").stdout,
+      /archive\/old\.spec\.md/,
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });

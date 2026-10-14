@@ -143,8 +143,8 @@ export function trackedFiles() {
  * @param {string} args.suffix Only files ending in this count as input.
  * @param {string} args.gate Name used in the refusal message.
  */
-export function refuseUntrackedInput({ pathspec, suffix, gate }) {
-  const untracked = untrackedInputs({ pathspec, suffix });
+export function refuseUntrackedInput({ pathspec, suffix, include, gate }) {
+  const untracked = untrackedInputs({ pathspec, suffix, include });
   if (untracked.length === 0) return;
 
   process.stderr.write(
@@ -166,9 +166,13 @@ export function refuseUntrackedInput({ pathspec, suffix, gate }) {
  * @param {object} args
  * @param {string} args.pathspec Root-relative directory to inspect.
  * @param {string} args.suffix Only files ending in this count as input.
+ * @param {(path: string) => boolean} [args.include] The caller's own corpus
+ *   rule, applied to each root-relative path. Without it, an untracked file
+ *   the gate would skip even once tracked -- an archived spec -- would be
+ *   named as unchecked, or refused, for no reason (Copilot, PR #646).
  * @returns {string[]}
  */
-export function untrackedInputs({ pathspec, suffix }) {
+export function untrackedInputs({ pathspec, suffix, include = () => true }) {
   return execFileSync(
     "git",
     ["status", "--porcelain", "--untracked-files=all", "--", pathspec],
@@ -176,7 +180,8 @@ export function untrackedInputs({ pathspec, suffix }) {
   )
     .split("\n")
     .filter((l) => l.startsWith("?? ") && l.endsWith(suffix))
-    .map((l) => l.slice(3));
+    .map((l) => l.slice(3))
+    .filter(include);
 }
 
 /**
@@ -194,8 +199,8 @@ export function untrackedInputs({ pathspec, suffix }) {
  * @param {string} args.suffix Only files ending in this count as input.
  * @param {string} args.gate Name used in the notice.
  */
-export function noteUntrackedInput({ pathspec, suffix, gate }) {
-  for (const file of untrackedInputs({ pathspec, suffix })) {
+export function noteUntrackedInput({ pathspec, suffix, include, gate }) {
+  for (const file of untrackedInputs({ pathspec, suffix, include })) {
     console.log(`${gate}: unchecked (untracked): ${file}`);
   }
 }

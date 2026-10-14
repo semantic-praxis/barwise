@@ -163,9 +163,15 @@ function specFiles() {
   const files = AT === undefined
     ? trackedFiles()
     : git("ls-tree", "-r", "--name-only", AT).split("\n");
-  return files.filter((f) =>
-    f.startsWith(SPEC_DIR) && f.endsWith(".spec.md") && !f.includes("/archive/")
-  );
+  return files.filter(IN_CORPUS);
+}
+
+/**
+ * What this audit reads: specs, archived ones excepted. One rule for the
+ * corpus and for the untracked files it reports or refuses.
+ */
+function IN_CORPUS(f) {
+  return f.startsWith(SPEC_DIR) && f.endsWith(".spec.md") && !f.includes("/archive/");
 }
 
 const readSpec = (file) =>
@@ -353,6 +359,7 @@ if (!check) {
   refuseUntrackedInput({
     pathspec: "barwise/docs/specs",
     suffix: ".spec.md",
+    include: IN_CORPUS,
     gate: "audit-spec-status",
   });
 
@@ -390,6 +397,7 @@ if (!check) {
 noteUntrackedInput({
   pathspec: "barwise/docs/specs",
   suffix: ".spec.md",
+  include: IN_CORPUS,
   gate: "audit-spec-status",
 });
 
