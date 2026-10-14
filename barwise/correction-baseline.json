@@ -607,6 +607,12 @@
       "caught_by": "not-a-correction",
       "note": "The method block of the distill spec."
     },
+    "pushed-tree-verification::f803044cfe51": {
+      "spec": "pushed-tree-verification.spec.md",
+      "excerpt": "workstream 2, 2026-10-14. two deviations. the notice prints before the verdict, not after it as scope says: on a failing run the verdict is a long list, and a n",
+      "caught_by": "reasoning",
+      "note": "Copilot's review of PR #646: the archive exclusion was missing from the untracked listing, and the notice printed before the verdict where Scope said after. Both found by reading the diff against the spec, not by running anything."
+    },
     "recorded-evidence-commands::d67a46537382": {
       "spec": "recorded-evidence-commands.spec.md",
       "excerpt": "--a and --b take row indices, not a selector. the spec left the selector shape open by not specifying it; indices against prompt history turned out to be enough",
