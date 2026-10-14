@@ -563,6 +563,11 @@ How a run is held to the same conditions as the others:
   one run per arm at once, so machine load falls on both arms alike.
   Wall time under load is still noisy, which is why tokens, not wall
   time, are D3's primary measure.
+  This session's own scoring is load too: the full suite runs only once
+  both runs of a pair have stopped, and only the cheap checks (`trial`,
+  `heldout`) run while either is still working. Pair 1 broke this, and
+  three CLI tests in the Effect run's second-round suite timed out while
+  the plain run was being scored; its record says so.
 - **A run is driven to correct code.** When the agent reports done, this
   session scores the run (below). A run that fails goes back to the
   same agent with the failing output, for at most two more rounds. A run
@@ -581,10 +586,15 @@ How a run is held to the same conditions as the others:
   the agent like any other failure, named as the requirement it checks.
   D1 and R3 come from `measure:comparison -- diff <arm head> <run head>`
   over the passing runs.
-- **D3, pre-registered.** The primary measure is total tokens per run,
-  summed over its rounds, from the harness's own usage report rather
-  than the agent's. Tool calls and wall time are reported beside it and
-  never vote. Every run counts, so a cheap early failure cannot make an
+- **D3, pre-registered.** The primary measure is the input tokens a
+  run processed: every turn's input (uncached, cache read and cache
+  written) summed over all its turns in all its rounds, read from its
+  transcript by `measure:comparison -- usage`, not from the agent's
+  report. Turns, the harness's token figure, tool calls and wall time are
+  reported beside it and never vote. (Amended 2026-10-14, after main pair
+  1's first round and before any arm mean was computed: the measure first
+  named here was the harness's token figure, which is the agent's final
+  context, not what it processed; see Pilot results.) Every run counts, so a cheap early failure cannot make an
   arm look cheap: a failed run is charged the largest total any run of
   the same task reached in either arm, and the number of failed runs per
   arm is reported with it. Resolvability is computed per task from the
@@ -619,17 +629,34 @@ How a run is held to the same conditions as the others:
 **Pilot results (2026-10-14).** Three T1 runs on the plain arm, one at a
 time, scored as above. Records: `barwise/eval-runs/effect-comparison-2026-10-14/`.
 
-| Run | Rounds | Outcome | Tokens  | Tool calls | Wall time | Source lines (+/-) | Red checks                  |
-| --- | ------ | ------- | ------- | ---------- | --------- | ------------------ | --------------------------- |
-| p1  | 1      | pass    | 143,020 | 77         | 539 s     | +32 / -1           | 2 task logic                |
-| p2  | 1      | pass    | 139,448 | 52         | 588 s     | +42 / -2           | 2 task logic, 2 environment |
-| p3  | 1      | pass    | 136,006 | 51         | 609 s     | +43 / -1           | 1 environment               |
+| Run | Rounds | Outcome | Input processed | Turns | Harness tokens | Tool calls | Wall time | Source lines (+/-) | Red checks                  |
+| --- | ------ | ------- | --------------- | ----- | -------------- | ---------- | --------- | ------------------ | --------------------------- |
+| p1  | 1      | pass    | 6,217,250       | 54    | 143,020        | 77         | 539 s     | +32 / -1           | 2 task logic                |
+| p2  | 1      | pass    | 5,298,939       | 48    | 139,448        | 52         | 588 s     | +42 / -2           | 2 task logic, 2 environment |
+| p3  | 1      | pass    | 4,690,099       | 44    | 136,006        | 51         | 609 s     | +43 / -1           | 1 environment               |
 
-| Measure          | Mean    | Standard deviation       | Smallest difference five runs per arm resolve |
-| ---------------- | ------- | ------------------------ | --------------------------------------------- |
-| Tokens (primary) | 139,491 | 3,507 (2.5% of the mean) | about 4,400 (3.2%)                            |
-| Tool calls       | 60.0    | 14.7 (25%)               | about 19 (31%)                                |
-| Wall time        | 579 s   | 36 s (6.2%)              | about 45 s (7.8%)                             |
+| Measure                   | Mean      | Standard deviation          | Smallest difference five runs per arm resolve |
+| ------------------------- | --------- | --------------------------- | --------------------------------------------- |
+| Input processed (primary) | 5,402,096 | 768,784 (14.2% of the mean) | about 972,000 (18.0%)                         |
+| Turns                     | 49        | 5 (10.3%)                   | about 6 (13.1%)                               |
+| Harness tokens            | 139,491   | 3,507 (2.5%)                | about 4,400 (3.2%)                            |
+| Tool calls                | 60.0      | 14.7 (25%)                  | about 19 (31%)                                |
+| Wall time                 | 579 s     | 36 s (6.2%)                 | about 45 s (7.8%)                             |
+
+**The measure first reported as primary measured the wrong thing.** The
+pilot recorded the harness's token figure and found it tight, 2.5%. It
+is the agent's final context: for main-trial run plain-t1-m1 the figure
+was 130,146 and the transcript's last turn read 129,365. What a run
+costs is what every turn reads, and those turns read 4 to 6 million
+tokens a run, because each turn rereads the context so far. The figure
+is cumulative too, so WS3's rule to sum it over rounds would have
+counted a first round twice. Found when that run's second round
+reported a total barely above its first. Under the corrected measure
+the pilot's spread is 14%, not 2.5%, and five runs per arm resolve a
+difference of about 18% rather than 3%. Output tokens are not reported:
+the transcript records them as each turn starts, a few per turn, and a
+short count would mislead. `pilot-usage.json` holds these readings;
+the pilot's own records are left as scored.
 
 The last column is `2 * sqrt(2/5) * s` at the pilot's spread. It assumes
 the Effect arm spreads about as much; three runs estimate a spread only

@@ -12,6 +12,8 @@
  *                                       oracle alone
  *   heldout   --task t1 --path P        D3: what the task asked for, checked
  *                                       against a run's built core
+ *   usage     <transcript.jsonl>        D3: input tokens a run processed, from
+ *                                       its own transcript
  *
  * Exit codes follow the gate-refusal contract
  * (docs/specs/gate-refusal-contract.spec.md): 0 measured (and, for
@@ -525,8 +527,81 @@ async function heldout(args) {
   return failed === 0 ? 0 : 1;
 }
 
+// -- usage -----------------------------------------------------------------
+
+/**
+ * What a run cost in input, read from its transcript.
+ *
+ * The harness reports one token figure per agent, and the pilot recorded it
+ * as D3's measure. It is not the run's cost: it equals the agent's final
+ * context, about 129,400 against a reported 130,146 for main-trial run
+ * plain-t1-m1, while the same run's turns read 4.09 million input tokens
+ * between them. And it is cumulative, so summing it over rounds -- as WS3
+ * said to -- counts the first round twice.
+ *
+ * Each assistant turn's usage record carries the input it read (uncached,
+ * cache read, cache written), which is known before the turn generates and
+ * so is complete. Output counts are not: they are captured when the stream
+ * starts, a few tokens per turn, and are left out rather than reported short.
+ * A turn split across several records shares one message id and is counted
+ * once.
+ */
+function usage(args) {
+  const [file] = args;
+  if (!file) refuse("usage needs a transcript: usage <transcript.jsonl>.");
+  if (!existsSync(file)) refuse(`no transcript at ${file}.`);
+  let text;
+  try {
+    text = readFileSync(file, "utf8");
+  } catch (error) {
+    refuse(`could not read ${file}: ${error?.message ?? error}`);
+  }
+  // A record that does not parse is refused, not skipped: a truncated last
+  // line would otherwise drop that turn and report a smaller total as a
+  // reading (Copilot, PR #654). Blank lines carry nothing and are skipped.
+  const turns = new Map();
+  for (const [index, line] of text.split("\n").entries()) {
+    if (line.trim() === "") continue;
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      refuse(`${file}:${index + 1} is not a JSON record; the transcript may be truncated.`);
+    }
+    const message = entry?.message;
+    if (message?.role !== "assistant" || !message.usage) continue;
+    // A counter that is missing, a string or negative would add a wrong
+    // number to the total and still exit 0 (Copilot, PR #654): refused.
+    const u = message.usage;
+    const counter = (name, required) => {
+      const value = u[name];
+      if (value === undefined && !required) return;
+      if (!Number.isInteger(value) || value < 0) {
+        refuse(`${file}:${index + 1}: ${name} is ${JSON.stringify(value)}, not a count of tokens.`);
+      }
+    };
+    counter("input_tokens", true);
+    counter("cache_read_input_tokens", false);
+    counter("cache_creation_input_tokens", false);
+    const id = message.id ?? `line-${turns.size}`;
+    if (!turns.has(id)) turns.set(id, u);
+  }
+  if (turns.size === 0) refuse(`${file} holds no assistant turn with a usage record.`);
+  const contextOf = (u) =>
+    (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
+  const contexts = [...turns.values()].map(contextOf);
+  const result = {
+    file,
+    turns: turns.size,
+    inputProcessed: contexts.reduce((a, b) => a + b, 0),
+    finalContext: contexts.at(-1),
+  };
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  return 0;
+}
+
 const [command, ...rest] = process.argv.slice(2);
-const commands = { startup, bundles, malformed, diff, trial, heldout };
+const commands = { startup, bundles, malformed, diff, trial, heldout, usage };
 if (!commands[command]) {
   refuse(`unknown subcommand ${command ?? "(none)"}; one of ${Object.keys(commands).join(", ")}.`);
 }

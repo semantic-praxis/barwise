@@ -1,0 +1,98 @@
+{
+  "run": "plain-t1-m1",
+  "arm": "plain",
+  "task": "T1",
+  "phase": "main",
+  "pair": 1,
+  "start": "8398a193",
+  "head": "68e1d537",
+  "startedAt": "2026-10-14T19:13:05Z",
+  "rounds": 2,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "usage": {
+    "inputProcessed": 4090466,
+    "turns": 38,
+    "finalContext": 129365,
+    "source": "measure:comparison -- usage over the run's transcript, both rounds",
+    "harness": {
+      "tokens": 130146,
+      "toolCalls": 43,
+      "wallMs": 968588,
+      "note": "cumulative over both rounds, as reported after round 2"
+    }
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "e1a6920d",
+      "trial": {
+        "exit": 1,
+        "protectedTouched": [
+          "barwise/packages/core/tests/serialization/objectTypeLayout.test.ts"
+        ]
+      },
+      "heldout": {
+        "passed": 13,
+        "of": 13
+      },
+      "harnessAfterRound": {
+        "tokens": 126662,
+        "toolCalls": 36,
+        "wallMs": 639888
+      },
+      "sentBack": "edited a protected WS0 test"
+    },
+    {
+      "round": 2,
+      "head": "68e1d537",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 13,
+        "of": 13
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      }
+    }
+  ],
+  "diff": {
+    "files": 7,
+    "hunks": 17,
+    "added": 38,
+    "removed": 3,
+    "consumerFiles": [
+      "barwise/packages/core/schemas/orm-model.schema.json",
+      "barwise/packages/core/src/diff/breakingLevel.ts",
+      "barwise/packages/core/src/diff/changeDescription.ts",
+      "barwise/packages/core/src/diff/elementDiff.ts"
+    ],
+    "sliceLines": 978
+  },
+  "redChecks": [
+    {
+      "class": "task logic",
+      "command": "npx tsc --noEmit && npx vitest run (packages/core)",
+      "firstError": "FAIL tests/diff/changeDescription.test.ts > rendering a change > has a golden for every kind of change the diff can emit",
+      "note": "new change kind needed a row in the in-file GOLDENS table"
+    },
+    {
+      "class": "task logic",
+      "command": "session scoring: measure:comparison -- trial",
+      "firstError": "protectedTouched: objectTypeLayout.test.ts",
+      "note": "edited a WS0 test after reading its history and judging it not protected; restored in round 2"
+    }
+  ],
+  "agentJudgmentCalls": [
+    "empty unit refused (minLength 1) in the rules and the schema",
+    "unit change is breaking level caution",
+    "unit written after data_type"
+  ]
+}
