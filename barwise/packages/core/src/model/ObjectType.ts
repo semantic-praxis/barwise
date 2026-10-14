@@ -238,22 +238,33 @@ export function isValueType(ot: ObjectType): ot is ValueType {
 }
 
 /**
- * Build an object type from a config, applying every default and refusing
- * every combination the old constructor threw for.
+ * The config fields only a value type may carry, with the words a message
+ * uses for each.
  *
- * The refusals are unchanged in wording and in what they reject; what
- * changes is that two of them are now unreachable from typed code, since
- * a caller with an `EntityTypeConfig` cannot omit the reference mode and
- * one with a `ValueTypeConfig` cannot supply it. They stay because
- * `ObjectTypeConfig` is also built from parsed YAML, where the compiler
- * has no say.
+ * The one list of them. The JSON Schema forbids the same fields under its
+ * entity branch, in their YAML spelling, and
+ * `tests/model/valueOnlyFields.test.ts` derives the schema's list from this
+ * one, so the two cannot disagree about what a file and a direct caller may
+ * put on an entity.
  */
-/** The config fields only a value type may carry, with the words a message uses for each. */
-const VALUE_ONLY_FIELDS = [
+export const VALUE_ONLY_FIELDS = [
   ["dataType", "a data type"],
   ["valueConstraint", "a value constraint"],
   ["defaultValue", "a default value"],
 ] as const;
+
+/**
+ * Build an object type from a config, applying every default and refusing
+ * every combination the old constructor threw for, plus the value-only
+ * fields on an entity type, which it silently dropped (barwise-5fg).
+ *
+ * The old refusals are unchanged in wording and in what they reject; two of
+ * them are now unreachable from typed code, since a caller with an
+ * `EntityTypeConfig` cannot omit the reference mode and one with a
+ * `ValueTypeConfig` cannot supply it. They stay, as the new ones are
+ * needed, because `ObjectTypeConfig` is also built from parsed YAML, where
+ * the compiler has no say.
+ */
 
 export function createObjectType(config: ObjectTypeConfig): ObjectType {
   const name = requireName(config.name);

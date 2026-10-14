@@ -253,7 +253,7 @@ shown to fail on its defect with `scripts/mutate.mjs`.
 | R2 | Bytes: vscode client 8.21 M, mcp 8.81 M, server 1.25 M, webview 0.74 M; CLI bundle 8.01 M           |
 | R3 | 440 lines (`ObjectType.ts` 332, `yaml/objectType.ts` 108)                                           |
 
-D2 case by case, today's loader:
+D2 case by case, the loader before barwise-5fg (d3a168cf):
 
 | Case                           | Outcome | Reported | By name | Silent loss        |
 | ------------------------------ | ------- | -------- | ------- | ------------------ |
@@ -276,12 +276,19 @@ the combined file the JSON Schema check reports its four by array
 position and stops, so the constructor's checks never run.
 
 **After barwise-5fg (2026-10-14), the base both arms start from.** Singly:
-all 11 refused, 10 of 11 reported, 2 by name, 0 silent losses. Combined:
-7 of 11, 0 by name. The three entity cases are now refused by the JSON
-Schema at the field's path (`/model/object_types/0/data_type: is not
-allowed here`), which names the field and the position but not the
-object type; naming it is the arms' D2 work. `createObjectType` refuses
-the same three by name for a caller that skips the schema.
+all 11 refused, 10 of 11 reported, 9 by name, 0 silent losses. Combined:
+7 of 11 reported, all 7 by name. Two changes did this. The three entity
+cases are refused by the JSON Schema at the field's path instead of being
+dropped. And every schema error now carries the name of the nearest model
+element (`/model/object_types/0/data_type: is not allowed here (in
+"Supplier")`), which Copilot asked for on PR #645 because barwise-5fg's
+acceptance criteria required it. That second change raises the floor the
+D2 bar is measured from, and it was a deliberate trade: the name helps
+every user now, rather than only after WS4. What is left for the arms:
+the excess property (the message now names the object type, but still
+not the property), the blank name
+(nothing to name), and the combined file, where the schema check stops
+the load before the constructor's checks run, so 4 of 11 go unreported.
 
 One reading outside the criteria: `barwise --version` (412 ms) is slower
 than `validate` (402 ms), because routing loads every command when the
