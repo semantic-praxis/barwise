@@ -3,7 +3,8 @@
 Status: WS0 implemented 2026-10-13 (instruments and baseline); the
 barwise-5fg prerequisite implemented 2026-10-14; WS1 and WS2 built
 2026-10-14 on their branches (see Arms as built); WS3 grounded
-2026-10-14, pilot run 2026-10-14 (see WS3), main trials not yet run; WS4 not
+2026-10-14, pilot run 2026-10-14 (see WS3), five main T1 pairs run
+2026-10-14; the primer check (barwise-hno) defined, not yet run; WS4 not
 started
 Created: 2026-10-13
 Last-updated: 2026-10-14
@@ -698,6 +699,53 @@ What the pilot shows besides the numbers:
   scoring p1 would have gone back for a second round, so its token count
   understates what a correct p1 cost; the pilot is not pooled into the
   main trials, so D3 is unaffected.
+
+**The primer check (barwise-hno, defined 2026-10-14 after the five main
+pairs).** In round 1 the plain runs of main pairs 1, 2 and 3 edited the
+protected WS0 test `objectTypeLayout.test.ts`; the plain runs of pairs 4
+and 5, and no Effect run, did not. Appendix E tells the plain arm that the
+serializer's field order is something "the byte-layout test pins", and
+Appendix F has no comparable line. If that phrase invites a run to pin the
+new field there, part of the plain arm's round-2 cost belongs to the
+primer, not the code style. The primers stayed as written through pair 5,
+so the five main pairs pool. This check is kept out of them.
+
+- **Variants.** Two, both run, because each tests the phrase from one
+  side. _Plain without the phrase_: Appendix E's sentence "YAML is
+  snake_case and the record is camelCase; the serializer writes fields in
+  a fixed order, which the byte-layout test pins." becomes "YAML is
+  snake_case and the record is camelCase; the serializer writes fields in
+  a fixed order." _Effect with the phrase_: Appendix F's sentence "The
+  record is camelCase and the YAML snake_case; `Schema.encodeKeys({ ...
+  })` maps one to the other." is followed by "The serializer writes
+  fields in a fixed order, which the byte-layout test pins." Both
+  statements are true of both arms: the WS0 layout test is shared. Nothing
+  else in either prompt changes.
+- **Runs.** Two per variant, run in pairs (one of each at once), on T1,
+  started, driven and scored exactly as the main trials, with the same
+  feedback wording. Records go in the same directory as `plain-t1-x1`,
+  `plain-t1-x2`, `effect-t1-x1` and `effect-t1-x2`: record, patch and
+  per-turn usage.
+- **Not pooled.** No x run enters D3 or any other criterion. They answer
+  one question, about the primer, and WS4 reports the answer beside the
+  verdict.
+- **The reading, fixed before the runs.** Two runs a variant show a
+  direction, not a rate. With the phrase, the main plain runs edited the
+  test in round 1 in 3 of 5 and the Effect runs, without it, in 0 of 5.
+  The primer is credited with the plain arm's layout-test edits when
+  neither plain-without-phrase run edits the test and at least one
+  Effect-with-phrase run does. The edits are read as the plain arm's, as
+  scored, when at least one plain-without-phrase run edits it and neither
+  Effect-with-phrase run does. Anything else is reported as
+  inconclusive; the plain runs of pairs 4 and 5 already did not edit it
+  with the phrase present, so a plain-without-phrase result of 0 of 2 is
+  weak on its own, which is why the Effect variant is run too. When the
+  primer is credited, WS4 states
+  the plain arm's D3 twice: as scored, and with the rounds a layout-test
+  edit alone sent back (pairs 1 and 2) replaced by their first round's
+  input processed, read from the transcript up to the feedback message.
+  Pair 3's round 2 also fixed an empty-unit case, so it stays as scored
+  either way.
 
 ### 4. Measure, decide, record
 
