@@ -2584,10 +2584,15 @@ test("audit-corrections refuses to WRITE a baseline while a spec is untracked", 
     assert.match(write.stderr, /draft\.spec\.md/);
     assert.doesNotMatch(write.stdout, /wrote/);
 
-    // --check is unaffected: the untracked draft is simply out of scope.
+    // --check keeps its verdict and exit code -- the untracked draft is out
+    // of its corpus -- but names the draft as unchecked, so the verdict does
+    // not read as covering it (barwise-qch).
     const check = gate("audit-corrections.mjs", dir, "--check");
     assert.equal(check.status, 1, "the tracked probe is still unclassified, so --check finds it");
-    assert.doesNotMatch(`${check.stdout}${check.stderr}`, /draft\.spec\.md/);
+    assert.match(
+      check.stdout,
+      /audit-corrections: unchecked \(untracked\): barwise\/docs\/specs\/draft\.spec\.md/,
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -2616,6 +2621,14 @@ test("audit-spec-status refuses to WRITE a baseline while a spec is untracked", 
       `expected refusal (2), got ${write.status}:\n${write.stdout}${write.stderr}`,
     );
     assert.match(write.stderr, /draft\.spec\.md/);
+
+    // --check names it as unchecked and keeps its own verdict (barwise-qch).
+    const check = gate("audit-spec-status.mjs", dir, "--check");
+    assert.equal(check.status, 0, `${check.stdout}${check.stderr}`);
+    assert.match(
+      check.stdout,
+      /audit-spec-status: unchecked \(untracked\): barwise\/docs\/specs\/draft\.spec\.md/,
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

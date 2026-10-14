@@ -37,7 +37,12 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { mergeBaselineRows, mergeSummary, readExistingRows } from "./lib/baseline-merge.mjs";
-import { refuseUntrackedInput, REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
+import {
+  noteUntrackedInput,
+  refuseUntrackedInput,
+  REPO_ROOT,
+  trackedFiles,
+} from "./lib/tracked.mjs";
 
 const BASELINE = resolve(REPO_ROOT, "barwise", "correction-baseline.json");
 
@@ -231,6 +236,14 @@ function main() {
     for (const r of found) console.log(`  ${r.id}\n    ${r.excerpt.slice(0, 110)}`);
     return;
   }
+
+  // The verdict below covers the tracked corpus only; say which specs it
+  // did not read, so an OK during authoring is not read as covering them.
+  noteUntrackedInput({
+    pathspec: "barwise/docs/specs",
+    suffix: ".spec.md",
+    gate: "audit-corrections",
+  });
 
   const baseline = JSON.parse(readFileSync(BASELINE, "utf8"));
   const known = baseline.records ?? {};

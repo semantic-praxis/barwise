@@ -49,7 +49,12 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { mergeBaselineRows, mergeSummary, readExistingRows } from "./lib/baseline-merge.mjs";
-import { refuseUntrackedInput, REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
+import {
+  noteUntrackedInput,
+  refuseUntrackedInput,
+  REPO_ROOT,
+  trackedFiles,
+} from "./lib/tracked.mjs";
 
 /**
  * `--at <commit>` runs the same audit against a historical tree. It is
@@ -379,6 +384,14 @@ if (!check) {
   for (const id of counts.dropped) console.log(`  dropped (no longer stale): ${id}`);
   process.exit(0);
 }
+
+// --check from here. Its corpus is the tracked tree; name the specs it did
+// not read, so an OK while one is being written does not claim to cover it.
+noteUntrackedInput({
+  pathspec: "barwise/docs/specs",
+  suffix: ".spec.md",
+  gate: "audit-spec-status",
+});
 
 const baseline = JSON.parse(readFileSync(BASELINE, "utf8")).specs;
 const failures = [];
