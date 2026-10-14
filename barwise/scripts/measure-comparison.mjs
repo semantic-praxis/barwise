@@ -25,7 +25,8 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { cpus, tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   ambiguityReport,
   caseProblem,
@@ -53,14 +54,32 @@ const LIMIT_MS = 1000;
  * `golden/` directory, `goldens/`, `*.golden.txt`, `*.golden.test.ts`)
  * and a list of directories would miss the next one.
  */
+/**
+ * The `scripts/lib` modules this script runs: every one it imports, and the
+ * hook it loads by path. Read from this file's own source rather than
+ * listed, because a listed set was left behind twice -- `malformed-score`
+ * missing from the first version, `median` from the next (Copilot, PR #641).
+ * An import added here is protected without anyone remembering to.
+ */
+const INSTRUMENT_LIBS = [
+  ...[
+    ...readFileSync(fileURLToPath(import.meta.url), "utf8").matchAll(
+      /from "\.\/lib\/([\w-]+\.mjs)"/g,
+    ),
+  ]
+    .map((m) => m[1]),
+  basename(COUNT_HOOK),
+];
+
 const PROTECTED = [
   /^barwise\/scripts\/measure-comparison\.mjs$/,
-  /^barwise\/scripts\/lib\/(malformed-score|module-count-hook)\.mjs$/,
+  ...INSTRUMENT_LIBS.map((f) => new RegExp(`^barwise/scripts/lib/${f.replace(".", "\\.")}$`)),
   /^barwise\/scripts\/tests\/measure-comparison\.test\.mjs$/,
   /^barwise\/packages\/core\/tests\/serialization\/objectTypeLayout\.test\.ts$/,
   /^barwise\/packages\/core\/tests\/serialization\/schemaDataTypes\.test\.ts$/,
   /^barwise\/packages\/core\/tests\/fixtures\/malformed\//,
-  /^barwise\/packages\/core\/tests\/laws\//,
+  /^barwise\/packages\/[^/]+\/tests\/laws\//,
+  /\.law\.test\.[cm]?[jt]s$/,
   /^barwise\/packages\/[^/]+\/tests\/(.*\/)?[^/]*golden/i,
   /^barwise\/packages\/promptlab\/tests\/referenceDrift\.test\.ts$/,
   /\.reference\.orm\.yaml$/,

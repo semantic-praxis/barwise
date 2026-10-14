@@ -199,6 +199,21 @@ test("trial fails a branch that changed the held-out oracle and passes one that 
     const instruments = join(repo, "barwise/scripts/tests");
     mkdirSync(instruments, { recursive: true });
     writeFileSync(join(instruments, "measure-comparison.test.mjs"), "a\n");
+    const diagramLaws = join(repo, "barwise/packages/diagram/tests/laws");
+    mkdirSync(diagramLaws, { recursive: true });
+    writeFileSync(join(diagramLaws, "layout.law.test.ts"), "a\n");
+    // Every scripts/lib module the script imports, read from its source the
+    // way the script reads it, plus the hook it loads by path.
+    const libs = [
+      ...[...readFileSync(SCRIPT, "utf8").matchAll(/from "\.\/lib\/([\w-]+\.mjs)"/g)].map((m) =>
+        m[1]
+      ),
+      "module-count-hook.mjs",
+    ];
+    assert.ok(libs.includes("median.mjs") && libs.includes("malformed-score.mjs"));
+    const lib = join(repo, "barwise/scripts/lib");
+    mkdirSync(lib, { recursive: true });
+    for (const f of libs) writeFileSync(join(lib, f), "a\n");
     const goldens = join(repo, "barwise/packages/llm/tests/fixtures/prompts");
     mkdirSync(goldens, { recursive: true });
     writeFileSync(join(goldens, "review-default.golden.txt"), "a\n");
@@ -227,6 +242,8 @@ test("trial fails a branch that changed the held-out oracle and passes one that 
       const f of [
         join(instruments, "measure-comparison.test.mjs"),
         join(goldens, "review-default.golden.txt"),
+        join(diagramLaws, "layout.law.test.ts"),
+        ...libs.map((f) => join(lib, f)),
       ]
     ) {
       g("checkout", "-q", "--", ".");
