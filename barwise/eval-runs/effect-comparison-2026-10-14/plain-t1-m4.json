@@ -1,0 +1,128 @@
+{
+  "run": "plain-t1-m4",
+  "arm": "plain",
+  "task": "T1",
+  "phase": "main",
+  "pair": 4,
+  "start": "8398a193",
+  "head": "99be1f37",
+  "startedAt": "2026-10-14T20:47:44Z",
+  "rounds": 2,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "usage": {
+    "inputProcessed": 6392260,
+    "turns": 52,
+    "finalContext": 154588,
+    "source": "measure:comparison -- usage over the run's transcript, both rounds; per turn in plain-t1-m4.usage.json",
+    "harness": {
+      "tokens": 155587,
+      "toolCalls": 63,
+      "wallMs": 1143384,
+      "note": "cumulative over both rounds"
+    }
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "1e80301c",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 11,
+        "of": 13,
+        "failed": [
+          "an empty unit in a file is refused, or kept and diffed like any value",
+          "an empty unit from code is refused, or kept and diffed like any value"
+        ]
+      },
+      "harnessAfterRound": {
+        "tokens": 147565,
+        "toolCalls": 48,
+        "wallMs": 742643
+      },
+      "sentBack": "held-out empty-unit cases"
+    },
+    {
+      "round": 2,
+      "head": "99be1f37",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 13,
+        "of": 13
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      }
+    }
+  ],
+  "diff": {
+    "files": 7,
+    "hunks": 16,
+    "added": 42,
+    "removed": 2,
+    "consumerFiles": [
+      "barwise/packages/core/schemas/orm-model.schema.json",
+      "barwise/packages/core/src/diff/breakingLevel.ts",
+      "barwise/packages/core/src/diff/changeDescription.ts",
+      "barwise/packages/core/src/diff/elementDiff.ts"
+    ],
+    "sliceLines": 982
+  },
+  "redChecks": [
+    {
+      "class": "environment",
+      "command": "git ... / compound shell command",
+      "firstError": "the worktree sandbox refused a command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code (2 times)"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/diff/changeDescription.test.ts > rendering a change > has a golden for every kind of change the diff can emit",
+      "note": "the agreement test asked for the new change kind's rendering; added"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/laws/counterexample.law.test.ts > coverage: the law reaches every constraint kind that has a generator > emits a count",
+      "note": "a newly drawn unit in tests/arbitraries/model.ts shifted the seeded samples; the unit is now derived from an already-drawn value"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/laws/serialization.law.test.ts > law: serialization is lossless > every object type and fact type projects back to the",
+      "note": "same generator change; resolved with it"
+    },
+    {
+      "class": "environment",
+      "command": "npm test (round 1 and round 2)",
+      "firstError": "cli tests (prompt, promptEvalOffline, importFormats) timed out at 30 s under load",
+      "note": "cli alone passed 463/463; session full suite passed"
+    },
+    {
+      "class": "task logic",
+      "command": "session scoring: measure:comparison -- heldout",
+      "firstError": "empty-unit cases (file and code) failed: kept, but diffed as absent",
+      "note": "round 2 refused an empty unit in the shared rule and the JSON Schema"
+    }
+  ],
+  "observations": [
+    "the first plain main run not to edit the protected layout test in round 1"
+  ],
+  "agentJudgmentCalls": [
+    "empty unit refused, in the shared rule (round 2)",
+    "unit written after data_type",
+    "unit change is breaking level caution",
+    "unit derived from an already-drawn value in the random model generator, so the seeded law samples did not move and the serialization law covers it"
+  ]
+}
