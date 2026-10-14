@@ -391,6 +391,50 @@ test("heldout counts a case that throws as failed, with the error, not as a cras
   }
 });
 
+test("usage sums each turn's input once, and reports the last turn's context", () => {
+  // Two records share one message id, as a turn streamed in parts does; a
+  // tool result and a malformed line carry no usage and are skipped.
+  const dir = mkdtempSync(join(tmpdir(), "usage-"));
+  const file = join(dir, "run.jsonl");
+  const turn = (id, input, read, create) =>
+    JSON.stringify({
+      message: {
+        role: "assistant",
+        id,
+        usage: {
+          input_tokens: input,
+          cache_read_input_tokens: read,
+          cache_creation_input_tokens: create,
+          output_tokens: 7,
+        },
+      },
+    });
+  writeFileSync(
+    file,
+    [
+      turn("m1", 10, 0, 1000),
+      turn("m1", 10, 0, 1000),
+      JSON.stringify({ message: { role: "user", content: [{ type: "tool_result" }] } }),
+      "not json",
+      turn("m2", 5, 1000, 200),
+    ].join("\n"),
+  );
+  try {
+    const r = spawnSync(process.execPath, [SCRIPT, "usage", file], { encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    const got = JSON.parse(r.stdout);
+    assert.equal(got.turns, 2);
+    assert.equal(got.inputProcessed, 1010 + 1205);
+    assert.equal(got.finalContext, 1205);
+
+    assert.equal(spawnSync(process.execPath, [SCRIPT, "usage"]).status, 2, "no file");
+    writeFileSync(file, "{}\n");
+    assert.equal(spawnSync(process.execPath, [SCRIPT, "usage", file]).status, 2, "no turns");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("trial fails a branch that changed the held-out oracle and passes one that did not", () => {
   const repo = mkdtempSync(join(tmpdir(), "measure-trial-"));
   try {
