@@ -1,0 +1,123 @@
+{
+  "run": "plain-t1-m2",
+  "arm": "plain",
+  "task": "T1",
+  "phase": "main",
+  "pair": 2,
+  "start": "8398a193",
+  "head": "7871060f",
+  "startedAt": "2026-10-14T19:43:12Z",
+  "rounds": 2,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "usage": {
+    "inputProcessed": 8325780,
+    "turns": 66,
+    "finalContext": 159279,
+    "source": "measure:comparison -- usage over the run's transcript, both rounds",
+    "harness": {
+      "tokens": 160111,
+      "toolCalls": 97,
+      "wallMs": 1373377,
+      "note": "cumulative over both rounds"
+    }
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "b9af23be",
+      "trial": {
+        "exit": 1,
+        "protectedTouched": [
+          "barwise/packages/core/tests/serialization/objectTypeLayout.test.ts"
+        ]
+      },
+      "heldout": {
+        "passed": 13,
+        "of": 13
+      },
+      "harnessAfterRound": {
+        "tokens": 154548,
+        "toolCalls": 85,
+        "wallMs": 1070954
+      },
+      "sentBack": "edited a protected WS0 test"
+    },
+    {
+      "round": 2,
+      "head": "7871060f",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 13,
+        "of": 13
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      }
+    }
+  ],
+  "diff": {
+    "files": 7,
+    "hunks": 15,
+    "added": 41,
+    "removed": 1,
+    "consumerFiles": [
+      "barwise/packages/core/schemas/orm-model.schema.json",
+      "barwise/packages/core/src/diff/breakingLevel.ts",
+      "barwise/packages/core/src/diff/changeDescription.ts",
+      "barwise/packages/core/src/diff/elementDiff.ts"
+    ],
+    "sliceLines": 983
+  },
+  "redChecks": [
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "Test Files  1 failed | 124 passed (125)",
+      "note": "unit in tests/arbitraries/model.ts shifted the law test's pinned counts; reverted"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/laws/counterexample.law.test.ts > coverage: ... emits a counterexample for each mapped kind",
+      "note": "unit in tests/arbitraries/model.ts shifted the law test's pinned counts; reverted"
+    },
+    {
+      "class": "environment",
+      "command": "git ...",
+      "firstError": "the worktree sandbox refused a git command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code"
+    },
+    {
+      "class": "environment",
+      "command": "git ...",
+      "firstError": "the worktree sandbox refused a git command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code"
+    },
+    {
+      "class": "environment",
+      "command": "git commit (pre-commit hook, round 1)",
+      "firstError": "cli tests/commands/importFormats.test.ts 'imports a single SQL file (text path)' timed out at 30 s",
+      "note": "passed alone 19/19; the retried hook passed 24/24"
+    },
+    {
+      "class": "task logic",
+      "command": "session scoring: measure:comparison -- trial",
+      "firstError": "protectedTouched: objectTypeLayout.test.ts",
+      "note": "extended the layout test's fixture with unit; restored in round 2"
+    }
+  ],
+  "agentJudgmentCalls": [
+    "empty unit refused in the shared rule and the schema (minLength 1)",
+    "unit written after data_type",
+    "unit change is breaking level caution",
+    "unit not added to the random model generator"
+  ]
+}

@@ -617,7 +617,12 @@ How a run is held to the same conditions as the others:
   time, each scoring result, and each red check with its class, the
   failing command and its first error line). Transcripts are not
   committed; the red-check entries carry what an auditor needs from
-  them, and the patch is the run's diff itself.
+  them, and the patch is the run's diff itself. D3's figure is the one
+  thing a reader could not otherwise check, so each run also gets
+  `<run>.usage.json`, written by `measure:comparison -- usage --turns`:
+  the three input counters of every counted turn and nothing else (no
+  prompt, tool output or model name), which sum back to the
+  `inputProcessed` its record reports.
 - **The pilot.** Three T1 runs on the plain arm, run and scored as
   above. It does not set D3's bound, which needs both arms. It measures
   the spread of one arm's totals and the cost per run, so the spec can

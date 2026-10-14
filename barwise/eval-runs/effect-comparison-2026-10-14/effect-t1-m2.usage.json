@@ -1,0 +1,228 @@
+{
+  "run": "effect-t1-m2",
+  "turns": 44,
+  "inputProcessed": 4784781,
+  "finalContext": 134205,
+  "perTurn": [
+    {
+      "input": 2,
+      "cacheRead": 0,
+      "cacheCreation": 62305
+    },
+    {
+      "input": 2,
+      "cacheRead": 62305,
+      "cacheCreation": 4878
+    },
+    {
+      "input": 2,
+      "cacheRead": 67183,
+      "cacheCreation": 928
+    },
+    {
+      "input": 2,
+      "cacheRead": 68111,
+      "cacheCreation": 10726
+    },
+    {
+      "input": 2,
+      "cacheRead": 78837,
+      "cacheCreation": 1016
+    },
+    {
+      "input": 2,
+      "cacheRead": 79853,
+      "cacheCreation": 3863
+    },
+    {
+      "input": 2,
+      "cacheRead": 83716,
+      "cacheCreation": 3490
+    },
+    {
+      "input": 2,
+      "cacheRead": 87206,
+      "cacheCreation": 611
+    },
+    {
+      "input": 2,
+      "cacheRead": 87817,
+      "cacheCreation": 645
+    },
+    {
+      "input": 2,
+      "cacheRead": 88462,
+      "cacheCreation": 3039
+    },
+    {
+      "input": 2,
+      "cacheRead": 91501,
+      "cacheCreation": 509
+    },
+    {
+      "input": 2,
+      "cacheRead": 92010,
+      "cacheCreation": 4538
+    },
+    {
+      "input": 2,
+      "cacheRead": 96548,
+      "cacheCreation": 702
+    },
+    {
+      "input": 2,
+      "cacheRead": 97250,
+      "cacheCreation": 2622
+    },
+    {
+      "input": 2,
+      "cacheRead": 99872,
+      "cacheCreation": 3774
+    },
+    {
+      "input": 2,
+      "cacheRead": 103646,
+      "cacheCreation": 1690
+    },
+    {
+      "input": 2,
+      "cacheRead": 105336,
+      "cacheCreation": 1761
+    },
+    {
+      "input": 2,
+      "cacheRead": 107097,
+      "cacheCreation": 1813
+    },
+    {
+      "input": 2,
+      "cacheRead": 108910,
+      "cacheCreation": 2865
+    },
+    {
+      "input": 2,
+      "cacheRead": 111775,
+      "cacheCreation": 976
+    },
+    {
+      "input": 2,
+      "cacheRead": 112751,
+      "cacheCreation": 610
+    },
+    {
+      "input": 2,
+      "cacheRead": 113361,
+      "cacheCreation": 472
+    },
+    {
+      "input": 2,
+      "cacheRead": 113833,
+      "cacheCreation": 355
+    },
+    {
+      "input": 2,
+      "cacheRead": 114188,
+      "cacheCreation": 324
+    },
+    {
+      "input": 2,
+      "cacheRead": 114512,
+      "cacheCreation": 556
+    },
+    {
+      "input": 2,
+      "cacheRead": 115068,
+      "cacheCreation": 634
+    },
+    {
+      "input": 2,
+      "cacheRead": 115702,
+      "cacheCreation": 945
+    },
+    {
+      "input": 2,
+      "cacheRead": 116647,
+      "cacheCreation": 2031
+    },
+    {
+      "input": 2,
+      "cacheRead": 118678,
+      "cacheCreation": 391
+    },
+    {
+      "input": 2,
+      "cacheRead": 119069,
+      "cacheCreation": 1806
+    },
+    {
+      "input": 2,
+      "cacheRead": 120875,
+      "cacheCreation": 298
+    },
+    {
+      "input": 2,
+      "cacheRead": 121173,
+      "cacheCreation": 584
+    },
+    {
+      "input": 2,
+      "cacheRead": 121757,
+      "cacheCreation": 423
+    },
+    {
+      "input": 2,
+      "cacheRead": 122180,
+      "cacheCreation": 708
+    },
+    {
+      "input": 2,
+      "cacheRead": 122888,
+      "cacheCreation": 405
+    },
+    {
+      "input": 4,
+      "cacheRead": 123293,
+      "cacheCreation": 1938
+    },
+    {
+      "input": 2,
+      "cacheRead": 125231,
+      "cacheCreation": 4146
+    },
+    {
+      "input": 2,
+      "cacheRead": 129377,
+      "cacheCreation": 805
+    },
+    {
+      "input": 2,
+      "cacheRead": 130182,
+      "cacheCreation": 690
+    },
+    {
+      "input": 2,
+      "cacheRead": 130872,
+      "cacheCreation": 1148
+    },
+    {
+      "input": 2,
+      "cacheRead": 132020,
+      "cacheCreation": 539
+    },
+    {
+      "input": 2,
+      "cacheRead": 132559,
+      "cacheCreation": 499
+    },
+    {
+      "input": 2,
+      "cacheRead": 133058,
+      "cacheCreation": 721
+    },
+    {
+      "input": 2,
+      "cacheRead": 133779,
+      "cacheCreation": 424
+    }
+  ]
+}

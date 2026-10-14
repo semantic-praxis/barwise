@@ -13,7 +13,10 @@
  *   heldout   --task t1 --path P        D3: what the task asked for, checked
  *                                       against a run's built core
  *   usage     <transcript.jsonl>        D3: input tokens a run processed, from
- *                                       its own transcript
+ *             [--turns]                 its own transcript; --turns adds each
+ *                                       turn's counts, and nothing else, so
+ *                                       the figure can be checked from a
+ *                                       committed record
  *
  * Exit codes follow the gate-refusal contract
  * (docs/specs/gate-refusal-contract.spec.md): 0 measured (and, for
@@ -545,10 +548,17 @@ async function heldout(args) {
  * starts, a few tokens per turn, and are left out rather than reported short.
  * A turn split across several records shares one message id and is counted
  * once.
+ *
+ * `--turns` adds the three input counters of every counted turn, in order.
+ * The transcript itself is not committable -- it holds the prompts, the
+ * tool output and the served model -- so the per-turn counts are what lets a
+ * reader recompute inputProcessed without it.
  */
 function usage(args) {
-  const [file] = args;
-  if (!file) refuse("usage needs a transcript: usage <transcript.jsonl>.");
+  const withTurns = args.includes("--turns");
+  const [file, ...extra] = args.filter((a) => a !== "--turns");
+  if (!file) refuse("usage needs a transcript: usage <transcript.jsonl> [--turns].");
+  if (extra.length > 0) refuse(`usage takes one transcript, not ${extra.length + 1}.`);
   if (!existsSync(file)) refuse(`no transcript at ${file}.`);
   let text;
   try {
@@ -596,6 +606,13 @@ function usage(args) {
     inputProcessed: contexts.reduce((a, b) => a + b, 0),
     finalContext: contexts.at(-1),
   };
+  if (withTurns) {
+    result.perTurn = [...turns.values()].map((u) => ({
+      input: u.input_tokens,
+      cacheRead: u.cache_read_input_tokens ?? 0,
+      cacheCreation: u.cache_creation_input_tokens ?? 0,
+    }));
+  }
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   return 0;
 }
