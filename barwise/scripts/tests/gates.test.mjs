@@ -572,6 +572,25 @@ test("check-git-listing fails on a script that lists untracked files itself", ()
   }
 });
 
+test("check-git-listing refuses a script it cannot read, and skips a deleted one", () => {
+  const dir = tempRepo();
+  try {
+    stage(dir, "barwise/scripts/fine.mjs", "export const x = 1;\n");
+    stage(dir, "barwise/scripts/gone.mjs", "export const y = 1;\n");
+    rmSync(join(dir, "barwise/scripts/gone.mjs"));
+    assert.equal(gate("check-git-listing.mjs", dir).status, 0, "a deleted script is skipped");
+
+    // A directory where a tracked script was: readFileSync throws EISDIR.
+    rmSync(join(dir, "barwise/scripts/fine.mjs"));
+    mkdirSync(join(dir, "barwise/scripts/fine.mjs"));
+    const r = gate("check-git-listing.mjs", dir);
+    assert.equal(r.status, 2, r.stdout);
+    assert.match(r.stderr, /could not read barwise\/scripts\/fine\.mjs \(EISDIR\)/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("check-git-listing refuses when no script is in scope", () => {
   // A layout change that empties the filter would otherwise print OK over
   // nothing (barwise-905's shape).

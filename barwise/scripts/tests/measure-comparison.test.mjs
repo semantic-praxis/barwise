@@ -275,6 +275,18 @@ test("trial fails a branch that changed the held-out oracle and passes one that 
     );
     assert.equal(committed.status, 1, committed.stderr.toString());
     assert.match(committed.stdout.toString(), /x\.law\.test\.ts/);
+
+    // And it stays touched when the working tree puts the base contents
+    // back: the commit still changed it. The old listing (working tree
+    // against the base) saw nothing here and passed.
+    writeFileSync(join(laws, "x.law.test.ts"), "a\n");
+    const restored = spawnSync(
+      process.execPath,
+      [SCRIPT, "trial", "--base", base, "--path", repo],
+      { cwd: repo },
+    );
+    assert.equal(restored.status, 1, restored.stderr.toString());
+    assert.match(restored.stdout.toString(), /x\.law\.test\.ts/);
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }

@@ -47,8 +47,14 @@ for (const file of scripts) {
   let source;
   try {
     source = readFileSync(resolve(REPO_ROOT, file), "utf8");
-  } catch {
-    continue; // deleted in the working tree; not this gate's business
+  } catch (error) {
+    // Deleted in the working tree is not this gate's business. Anything
+    // else -- a directory where the file was, no permission -- is a script
+    // the gate could not read, and passing over it would print OK about a
+    // file it never saw.
+    if (error?.code === "ENOENT") continue;
+    console.error(`check-git-listing: could not read ${file} (${error?.code ?? error}).`);
+    process.exit(2);
   }
   const m = HAND_ROLLED.exec(source);
   if (m) {
