@@ -59,22 +59,39 @@ with `--no-verify`. The hook names the files and lets the push proceed.
 
 In scope:
 
+Three requirements follow the recommended default of an open decision,
+marked (A), (B) or (C); choosing the alternative in review changes the
+lines that carry the mark.
+
 - When the pre-push hook runs, the system shall run the `ci.yml` gate
-  list against a fresh `git worktree` of each pushed commit, with a
-  fresh `npm ci` and no shared build cache, and remove the worktree
+  list against a fresh `git worktree` of each distinct pushed commit (B),
+  with a fresh `npm ci` and a cold build (A), and remove the worktree
   afterwards whatever the outcome.
-- When the working tree holds files that differ from the pushed commit
-  (untracked and not ignored, or modified), the system shall list them
-  before the gates run, without failing the push.
-- When the worktree cannot be created or `npm ci` fails, the system
+- While a `--commit` run is in progress, the system shall hold the
+  initiating checkout's lock (`node_modules/.ci-local.lock`) from before
+  the worktree is created until after it is removed, so a second
+  `ci:local` from that checkout stops, as `local-ci-isolation.spec.md`
+  requires. Each worktree's own lock does not see the others.
+- When the working tree holds files that differ from a pushed commit --
+  compared with that commit, not with the current `HEAD` -- the system
+  shall list them before the gates run, without failing the push.
+- When the worktree cannot be created or `npm ci` fails, `ci:local`
   shall exit 2 and name the step, rather than report the gates as
   passed or failed.
-- When a script outside `scripts/lib/` lists untracked files itself
-  (spells `ls-files --others`), `npm run check:git-listing` shall fail
-  and name the shared helper to use instead.
+- When `ci:local --commit` exits 2, the hook shall say the commit could
+  not be checked, not that CI would fail, and block the push. Exit 1 keeps
+  today's message. Today the hook maps every nonzero status to one
+  message, so a refusal reads as a failure.
+- When a tracked `.mjs` file under `barwise/scripts/` outside
+  `scripts/lib/` lists untracked files itself (spells
+  `ls-files --others`), `npm run check:git-listing` shall fail and name
+  the shared helper to use instead. Shell scripts and hooks are out of
+  the rule: they cannot import the helper, and none of the eleven tracked
+  today lists untracked files.
 - When `audit:corrections --check` or `audit:specs --check` runs while
   an untracked `.spec.md` exists under `docs/specs`, the system shall
-  print each such file as unchecked beside the verdict (barwise-qch).
+  print each such file as unchecked beside the verdict (barwise-qch), and
+  keep its exit code (C).
 
 Out of scope:
 
@@ -93,16 +110,16 @@ Out of scope:
 
 ## Inventory
 
-| Module                                                           | Current state                                            | Verdict                                                                                          |
-| ---------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `barwise/.husky/pre-push`                                        | runs `npm run ci:local` in `barwise/`                    | passes each pushed SHA: `ci:local --commit <sha>`                                                |
-| `barwise/scripts/ci-local.mjs`                                   | runs the gates in the current tree                       | gains `--commit <sha>`: worktree, `npm ci`, re-run itself there, remove; lists files left behind |
-| `barwise/scripts/lib/changed-class.mjs`                          | `uncommittedPaths(cwd)`, `committedPaths(base, cwd)`     | unchanged; supplies the left-behind list and `trial`'s listing                                   |
-| `barwise/scripts/measure-comparison.mjs` (`trial`)               | spells `diff --name-only` and `ls-files --others` itself | uses `committedPaths` + `uncommittedPaths`                                                       |
-| `barwise/scripts/check-git-listing.mjs`                          | does not exist                                           | new gate; `check:git-listing` script, root forwarder, `ci.yml` step                              |
-| `barwise/scripts/lib/tracked.mjs`                                | `refuseUntrackedInput` lists and refuses in one function | split: `untrackedInputs()` lists; `refuseUntrackedInput` and the two notices call it             |
-| `barwise/scripts/audit-corrections.mjs`, `audit-spec-status.mjs` | `--check` silent about untracked specs                   | print the unchecked files                                                                        |
-| `CLAUDE.md` "The hooks split by cost"                            | quotes about 30 s and 2 min 40 s                         | updated with the measured cost                                                                   |
+| Module                                                           | Current state                                            | Verdict                                                                                 |
+| ---------------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `barwise/.husky/pre-push`                                        | runs `npm run ci:local`; any nonzero exit is one message | one `ci:local --commit <sha>` per distinct SHA; separate messages for exit 1 and exit 2 |
+| `barwise/scripts/ci-local.mjs`                                   | runs the gates in the current tree, under a lock         | gains `--commit <sha>`: lock, worktree, `npm ci`, re-run itself there, remove, unlock   |
+| `barwise/scripts/lib/changed-class.mjs`                          | `uncommittedPaths(cwd)` compares with `HEAD` only        | gains `pathsDifferingFrom(sha, cwd)`; existing helpers supply `trial`'s listing         |
+| `barwise/scripts/measure-comparison.mjs` (`trial`)               | spells `diff --name-only` and `ls-files --others` itself | uses `committedPaths` + `uncommittedPaths`                                              |
+| `barwise/scripts/check-git-listing.mjs`                          | does not exist                                           | new gate; `check:git-listing` script, root forwarder, `ci.yml` step                     |
+| `barwise/scripts/lib/tracked.mjs`                                | `refuseUntrackedInput` lists and refuses in one function | split: `untrackedInputs()` lists; `refuseUntrackedInput` and the two notices call it    |
+| `barwise/scripts/audit-corrections.mjs`, `audit-spec-status.mjs` | `--check` silent about untracked specs                   | print the unchecked files                                                               |
+| `CLAUDE.md` "The hooks split by cost"                            | quotes about 30 s and 2 min 40 s                         | updated with the measured cost                                                          |
 
 Raw git file listing outside `scripts/lib/` today, checked against the
 proposed rule:
@@ -128,8 +145,15 @@ that enumerates untracked files, and the one that has gone wrong.
   for each pushed (local ref, sha), sha not all zeros:
     npm run ci:local -- --commit <sha>
 
+.husky/pre-push (status handling)
+  exit 1 -> "CI would fail on this push"
+  exit 2 -> "this push could not be checked: <step>"   both block the push
+
 ci-local.mjs --commit <sha>
-  1. left behind = uncommittedPaths(ROOT)            print, do not fail
+  0. take this checkout's lock; held through step 5
+  1. left behind = pathsDifferingFrom(sha, ROOT)     print, do not fail
+       = git diff --name-only <sha> (working tree vs sha)
+         + untracked, not ignored
   2. git worktree add --detach <tmp> <sha>           fail -> exit 2
   3. npm ci in <tmp>/barwise                         fail -> exit 2
   4. node <tmp>/barwise/scripts/ci-local.mjs         same gate list, same
@@ -138,7 +162,7 @@ ci-local.mjs --commit <sha>
   5. finally: git worktree remove --force <tmp>      always, on SIGINT too
 
 check-git-listing.mjs
-  tracked scripts/*.mjs outside scripts/lib/
+  tracked barwise/scripts/**/*.mjs outside scripts/lib/
   fail on "ls-files" ... "--others" in one call; exit 2 on an empty listing
 
 tracked.mjs
@@ -148,9 +172,13 @@ tracked.mjs
 ```
 
 Step 4 re-runs the existing script rather than adding a second runner:
-the gate list, conditions, lock and per-run coverage directory from
-`local-ci-isolation.spec.md` all apply unchanged, and the lock lands in
-the worktree's own `node_modules`.
+the gate list, conditions and per-run coverage directory from
+`local-ci-isolation.spec.md` all apply unchanged. The child takes a lock
+in the worktree's own `node_modules`, which no other run can see, so the
+lock that keeps two runs from one checkout apart is the one step 0 takes
+in the initiating checkout. `uncommittedPaths` is not reused for step 1
+because it compares with `HEAD`, and a pushed ref need not be the
+current one.
 
 ## Alternatives considered
 
@@ -210,12 +238,38 @@ asserts the line appears, for both audits. Independent of 1 and 3.
   disagree), each give exit 2 with the step named.
 - The worktree is gone after a pass, a fail, and a refusal.
 - The left-behind list names an untracked and a modified file and does
-  not change the exit code.
+  not change the exit code, including when the pushed SHA is not the
+  current `HEAD`.
+- A second `ci:local` started while a `--commit` run holds the lock
+  stops with the lock message.
+- The hook itself, run with ref lines on stdin and a stub `npm` on
+  `PATH`: two refs at distinct SHAs give two runs, the same SHA twice
+  gives one, a deletion gives none, and a child exit of 1 and of 2 each
+  block the push with their own message.
 
 The cost is measured with a source change and with a docs-only change,
 and the CLAUDE.md paragraph is updated with the readings. This goes last
 because it changes every contributor's push. Workstreams 1 and 2 do not
 depend on it.
+
+### How the numbers were taken
+
+On commit 16820341, 2026-10-14, in this session's container (Node
+v26.7.0, Intel Xeon 2.80 GHz x4). Times are wall-clock seconds from one
+run each:
+
+```
+git worktree add --detach <tmp> HEAD                      under 1 s
+(cd <tmp>/barwise && npm ci --no-audit --no-fund)         19 s
+npx turbo run build --cache-dir=<repo>/barwise/.turbo/cache   1 s (warm shared cache)
+npx turbo run build --cache-dir=<new empty directory>         23 s (cold)
+du -sh <tmp>                                              543 MB
+```
+
+The reproduction of the CI failure was `git worktree add --detach <tmp>
+7dd1081d`, then `npm ci` and `npm run test:scripts` in `<tmp>/barwise`,
+with no build: exit 1, "1 failing of 282". One run each is enough to
+size the cost; workstream 3 measures the hook end to end.
 
 ## API and migration impact
 
@@ -233,16 +287,20 @@ depend on it.
 
 ## Open decisions (for review)
 
-- **Turbo cache in the worktree: cold (recommended) or shared.** Cold
+The Scope, architecture and workstreams are written against the
+recommended default of each. A requirement that depends on one carries
+its letter.
+
+- **(A) Turbo cache in the worktree: cold (recommended) or shared.** Cold
   matches CI and avoids the stale-output failure barwise-r7j recorded,
   at 22 s per source push. Shared is near-free and inherits whatever the
   local cache holds. Recommend cold. The cost is a known number; the
   cache's failure mode is the very thing this spec exists to stop.
-- **Several refs in one push: one run per distinct SHA (recommended) or
-  only the current branch.** One run per SHA is correct and normally
+- **(B) Several refs in one push: one run per distinct SHA (recommended)
+  or only the current branch.** One run per SHA is correct and normally
   means one run. Pushing two branches at different commits then costs
   two runs. Recommend one per distinct SHA.
-- **Where the untracked-file notice goes: `--check` output
+- **(C) Where the untracked-file notice goes: `--check` output
   (recommended), or a refusal.** barwise-qch allows either. A refusal
   would block the authoring-time run, which is the one run that sees an
   untracked spec at all, since the pre-push run no longer can.
