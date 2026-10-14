@@ -1,0 +1,392 @@
+diff --git a/barwise/packages/core/schemas/orm-model.schema.json b/barwise/packages/core/schemas/orm-model.schema.json
+index db7add58..6ae4bd31 100644
+--- a/barwise/packages/core/schemas/orm-model.schema.json
++++ b/barwise/packages/core/schemas/orm-model.schema.json
+@@ -137,6 +137,11 @@
+           "$ref": "#/definitions/data_type_def",
+           "description": "Conceptual data type for value types (e.g. text, integer, decimal)."
+         },
++        "unit": {
++          "type": "string",
++          "minLength": 1,
++          "description": "Unit of measure for a value type's values (e.g. \"kg\", \"USD\"). Not allowed on entity types."
++        },
+         "aliases": {
+           "type": "array",
+           "items": {
+@@ -176,7 +181,8 @@
+         "properties": {
+           "data_type": false,
+           "value_constraint": false,
+-          "default_value": false
++          "default_value": false,
++          "unit": false
+         }
+       }
+     },
+diff --git a/barwise/packages/core/src/diff/breakingLevel.ts b/barwise/packages/core/src/diff/breakingLevel.ts
+index 4f9dc403..4eaf24c5 100644
+--- a/barwise/packages/core/src/diff/breakingLevel.ts
++++ b/barwise/packages/core/src/diff/breakingLevel.ts
+@@ -57,6 +57,9 @@ const CHANGE_LEVEL = {
+   cardinality: "caution",
+   independent: "caution",
+   defaultValue: "caution",
++  // A unit changes what every stored value means without changing its
++  // type: 5 read as kg or as lb is the same column holding a different fact.
++  unit: "caution",
+   dataTypeChanged: "caution",
+   dataTypeAdded: "caution",
+   dataTypeRemoved: "caution",
+diff --git a/barwise/packages/core/src/diff/changeDescription.ts b/barwise/packages/core/src/diff/changeDescription.ts
+index ddeb02e0..21e3e016 100644
+--- a/barwise/packages/core/src/diff/changeDescription.ts
++++ b/barwise/packages/core/src/diff/changeDescription.ts
+@@ -78,6 +78,7 @@ export type ChangeDescription =
+   }
+   | { readonly change: "independent"; readonly from: boolean; readonly to: boolean; }
+   | { readonly change: "defaultValue"; readonly from?: string; readonly to?: string; }
++  | { readonly change: "unit"; readonly from?: string; readonly to?: string; }
+   | {
+     readonly change: "aliases";
+     readonly from: readonly string[];
+@@ -214,6 +215,8 @@ export function describeChange(change: ChangeDescription): string {
+       return `independent: ${change.from} -> ${change.to}`;
+     case "defaultValue":
+       return `default value: "${change.from ?? NONE}" -> "${change.to ?? NONE}"`;
++    case "unit":
++      return `unit: "${change.from ?? NONE}" -> "${change.to ?? NONE}"`;
+     case "aliases":
+       return "aliases changed";
+     case "dataTypeChanged":
+diff --git a/barwise/packages/core/src/diff/elementDiff.ts b/barwise/packages/core/src/diff/elementDiff.ts
+index 3806bc20..8157f189 100644
+--- a/barwise/packages/core/src/diff/elementDiff.ts
++++ b/barwise/packages/core/src/diff/elementDiff.ts
+@@ -90,6 +90,10 @@ export function diffObjectType(
+     });
+   }
+ 
++  if ((aValue?.unit ?? "") !== (bValue?.unit ?? "")) {
++    changes.push({ change: "unit", from: aValue?.unit, to: bValue?.unit });
++  }
++
+   // Aliases comparison (order-insensitive).
+   const aAliases = a.aliases.slice().sort().join(",");
+   const bAliases = b.aliases.slice().sort().join(",");
+diff --git a/barwise/packages/core/src/model/ObjectType.ts b/barwise/packages/core/src/model/ObjectType.ts
+index 20c3a9f1..cbab812a 100644
+--- a/barwise/packages/core/src/model/ObjectType.ts
++++ b/barwise/packages/core/src/model/ObjectType.ts
+@@ -129,6 +129,11 @@ export interface ObjectTypeConfig {
+   readonly valueConstraint?: ValueConstraintDef;
+   /** Conceptual data type for value types (e.g. text, integer, decimal). */
+   readonly dataType?: DataTypeDef;
++  /**
++   * Unit of measure for a value type's values (e.g. "kg", "USD", "ms").
++   * Free text: the model records the unit, it does not convert between units.
++   */
++  readonly unit?: string;
+   /** Alternative names for this object type (synonyms from different stakeholders or contexts). */
+   readonly aliases?: readonly string[];
+   /**
+@@ -215,6 +220,7 @@ export interface EntityType extends ObjectTypeBase {
+ export interface ValueType extends ObjectTypeBase {
+   readonly kind: "value";
+   readonly dataType?: DataTypeDef;
++  readonly unit?: string;
+   readonly valueConstraint?: ValueConstraintDef;
+   readonly defaultValue?: string;
+ }
+@@ -250,6 +256,7 @@ export const VALUE_ONLY_FIELDS = [
+   ["dataType", "a data type"],
+   ["valueConstraint", "a value constraint"],
+   ["defaultValue", "a default value"],
++  ["unit", "a unit"],
+ ] as const;
+ 
+ /**
+@@ -344,7 +351,7 @@ export function objectTypeRuleProblems(
+ 
+   if (config.kind === "entity") {
+     // Refused rather than ignored. An entity type takes its data type, value
+-    // constraint and default from the value type its reference mode names;
++    // constraint, default and unit from the value type its reference mode names;
+     // on the entity they mean nothing. Before this, the union dropped them
+     // without a word, and a file that carried one lost it on the next save
+     // (barwise-5fg, a regression from the one-class model, which stored them
+@@ -375,6 +382,14 @@ export function objectTypeRuleProblems(
+     }
+   }
+ 
++  // Refused rather than kept: an empty unit states nothing, and kept it would
++  // be a value the diff cannot tell from no unit at all. One rule here, so a
++  // file and a direct caller are refused alike; the schema's `minLength`
++  // says the same for a file.
++  if (config.kind !== "entity" && config.unit === "") {
++    report("unit", `Unit on ${who} must not be empty; omit it for no unit.`);
++  }
++
+   if (config.cardinality) {
+     const { min, max } = config.cardinality;
+     if (min < 0) {
+@@ -414,6 +429,7 @@ export function buildObjectType(config: ObjectTypeConfig, newId: () => string):
+     ...base,
+     kind: "value",
+     ...(config.dataType !== undefined ? { dataType: config.dataType } : {}),
++    ...(config.unit !== undefined ? { unit: config.unit } : {}),
+     ...(config.valueConstraint !== undefined ? { valueConstraint: config.valueConstraint } : {}),
+     ...(config.defaultValue !== undefined ? { defaultValue: config.defaultValue } : {}),
+   });
+diff --git a/barwise/packages/core/src/serialization/yaml/decodeObjectType.ts b/barwise/packages/core/src/serialization/yaml/decodeObjectType.ts
+index 48ca8e49..48f67653 100644
+--- a/barwise/packages/core/src/serialization/yaml/decodeObjectType.ts
++++ b/barwise/packages/core/src/serialization/yaml/decodeObjectType.ts
+@@ -37,6 +37,7 @@ export const OBJECT_TYPE_YAML_FIELDS = {
+   aliases: "aliases",
+   independent: "independent",
+   defaultValue: "default_value",
++  unit: "unit",
+   note: "note",
+   cardinality: "cardinality",
+ } as const satisfies Record<keyof ObjectTypeConfig, string>;
+@@ -218,6 +219,7 @@ export function decodeObjectType(doc: unknown, newId: () => string): DecodeResul
+       valueOnly.valueConstraint = decodeValueConstraint(doc.value_constraint, r);
+     }
+     valueOnly.defaultValue = optionalString("defaultValue");
++    valueOnly.unit = optionalString("unit");
+   }
+ 
+   const config = {
+diff --git a/barwise/packages/core/src/serialization/yaml/objectType.ts b/barwise/packages/core/src/serialization/yaml/objectType.ts
+index 09e02cf3..9f08fc14 100644
+--- a/barwise/packages/core/src/serialization/yaml/objectType.ts
++++ b/barwise/packages/core/src/serialization/yaml/objectType.ts
+@@ -13,6 +13,7 @@ export interface OrmYamlObjectType {
+   source_context?: string;
+   value_constraint?: OrmYamlValueConstraintBody;
+   data_type?: { name: string; length?: number; scale?: number; };
++  unit?: string;
+   aliases?: string[];
+   independent?: boolean;
+   default_value?: string;
+@@ -55,6 +56,11 @@ export function serializeObjectType(ot: ObjectType): OrmYamlObjectType {
+     if (value.dataType.scale !== undefined) dt.scale = value.dataType.scale;
+     result.data_type = dt;
+   }
++  // Beside the data type it qualifies. Written whenever present, even empty,
++  // so the round trip is lossless.
++  if (value?.unit !== undefined) {
++    result.unit = value.unit;
++  }
+   if (ot.aliases.length > 0) {
+     result.aliases = [...ot.aliases];
+   }
+diff --git a/barwise/packages/core/tests/arbitraries/model.ts b/barwise/packages/core/tests/arbitraries/model.ts
+index ea939873..154c553f 100644
+--- a/barwise/packages/core/tests/arbitraries/model.ts
++++ b/barwise/packages/core/tests/arbitraries/model.ts
+@@ -422,6 +422,20 @@ function toDataType(raw: RawObjectType["dataType"]): DataTypeDef | undefined {
+   };
+ }
+ 
++/**
++ * A unit, derived from the data type's length rather than drawn. Drawing it
++ * would add a field to the record arbitrary and shift every value sampled
++ * after it, and `counterexample.law.test.ts` ratchets on what one fixed seed
++ * samples: the models it checks would change under it for a field it never
++ * reads. Present on roughly half the value types that have a data type, so
++ * the serialization law still round-trips it.
++ */
++const UNITS = ["kg", "m", "USD", "ms"] as const;
++function toUnit(raw: RawObjectType["dataType"]): string | undefined {
++  if (raw === null || raw.length === null) return undefined;
++  return UNITS[raw.length % UNITS.length];
++}
++
+ function toCardinality(raw: RawObjectType["cardinality"]): CardinalityRange | undefined {
+   if (raw === null) return undefined;
+   return { min: raw.min, max: raw.span === null ? "unbounded" : raw.min + raw.span };
+@@ -466,6 +480,7 @@ function toObjectTypes(raws: readonly RawObjectType[]): ObjectTypeConfig[] {
+       ...(raw.aliases.length > 0 ? { aliases: [...raw.aliases] } : {}),
+       independent: raw.independent,
+       ...(!raw.entity && raw.defaultValue !== null ? { defaultValue: raw.defaultValue } : {}),
++      ...(!raw.entity && toUnit(raw.dataType) !== undefined ? { unit: toUnit(raw.dataType) } : {}),
+       ...(toCardinality(raw.cardinality) !== undefined
+         ? { cardinality: toCardinality(raw.cardinality) }
+         : {}),
+diff --git a/barwise/packages/core/tests/diff/ModelDiff.test.ts b/barwise/packages/core/tests/diff/ModelDiff.test.ts
+index 8acf2ddf..78cac398 100644
+--- a/barwise/packages/core/tests/diff/ModelDiff.test.ts
++++ b/barwise/packages/core/tests/diff/ModelDiff.test.ts
+@@ -1420,6 +1420,36 @@ describe("diffModels", () => {
+     expect(delta!.breakingLevel).toBe("caution");
+   });
+ 
++  it("detects an object-type unit change, and a unit added or removed", () => {
++    const make = (unit?: string) => {
++      const m = new OrmModel({ name: "Test" });
++      m.addObjectType({
++        id: "ot-weight",
++        name: "Weight",
++        kind: "value",
++        dataType: { name: "decimal" },
++        ...(unit !== undefined ? { unit } : {}),
++      });
++      return m;
++    };
++    const changed = diffModels(make("kg"), make("lb"));
++    const delta = changed.deltas.find((d) => d.kind === "modified" && d.name === "Weight");
++    expect(delta).toBeDefined();
++    expect(delta!.changes).toEqual([{ change: "unit", from: "kg", to: "lb" }]);
++    expect(delta!.changeDescriptions).toEqual(['unit: "kg" -> "lb"']);
++    // The same number now means a different quantity.
++    expect(delta!.breakingLevel).toBe("caution");
++
++    const added = diffModels(make(), make("kg"));
++    expect(added.deltas.find((d) => d.name === "Weight")!.changeDescriptions)
++      .toEqual(['unit: "(none)" -> "kg"']);
++    const removed = diffModels(make("kg"), make());
++    expect(removed.deltas.find((d) => d.name === "Weight")!.changeDescriptions)
++      .toEqual(['unit: "kg" -> "(none)"']);
++    expect(diffModels(make("kg"), make("kg")).deltas.every((d) => d.kind === "unchanged"))
++      .toBe(true);
++  });
++
+   // Found while grounding barwise-934: the value-constraint comparison read
+   // `values` and never `ranges`, so a narrowed range was invisible for the
+   // same reason and with a worse consequence -- it changes what the model
+diff --git a/barwise/packages/core/tests/diff/changeDescription.test.ts b/barwise/packages/core/tests/diff/changeDescription.test.ts
+index 5607bf20..21570d8b 100644
+--- a/barwise/packages/core/tests/diff/changeDescription.test.ts
++++ b/barwise/packages/core/tests/diff/changeDescription.test.ts
+@@ -65,6 +65,10 @@ const GOLDENS: ReadonlyArray<{ sample: ChangeDescription; text: string; }> = [
+     sample: { change: "defaultValue", from: "0", to: undefined },
+     text: `default value: "0" -> "(none)"`,
+   },
++  {
++    sample: { change: "unit", from: "kg", to: "lb" },
++    text: `unit: "kg" -> "lb"`,
++  },
+   { sample: { change: "aliases", from: ["Buyer"], to: [] }, text: "aliases changed" },
+   {
+     sample: {
+diff --git a/barwise/packages/core/tests/model/valueOnlyFields.test.ts b/barwise/packages/core/tests/model/valueOnlyFields.test.ts
+index f3915972..f8a1ac40 100644
+--- a/barwise/packages/core/tests/model/valueOnlyFields.test.ts
++++ b/barwise/packages/core/tests/model/valueOnlyFields.test.ts
+@@ -29,6 +29,7 @@ const SAMPLES: Record<string, { model: unknown; yaml: unknown; }> = {
+   dataType: { model: { name: "integer" }, yaml: { name: "integer" } },
+   valueConstraint: { model: { values: ["A"] }, yaml: { values: ["A"] } },
+   defaultValue: { model: "A", yaml: "A" },
++  unit: { model: "kg", yaml: "kg" },
+ };
+ 
+ describe("value-only fields", () => {
+diff --git a/barwise/packages/core/tests/serialization/OrmYamlSerializer.test.ts b/barwise/packages/core/tests/serialization/OrmYamlSerializer.test.ts
+index ec97f65a..7cbb1798 100644
+--- a/barwise/packages/core/tests/serialization/OrmYamlSerializer.test.ts
++++ b/barwise/packages/core/tests/serialization/OrmYamlSerializer.test.ts
+@@ -14,6 +14,7 @@ import {
+   DeserializationError,
+   OrmYamlSerializer,
+ } from "../../src/serialization/OrmYamlSerializer.js";
++import { decodeObjectType } from "../../src/serialization/yaml/decodeObjectType.js";
+ import { ModelBuilder } from "../helpers/ModelBuilder.js";
+ 
+ describe("OrmYamlSerializer", () => {
+@@ -194,6 +195,82 @@ describe("OrmYamlSerializer", () => {
+       expect(restored.getObjectTypeByName("Status")!.defaultValue).toBe("active");
+     });
+ 
++    it("round-trips a value type unit, written beside its data type", () => {
++      const model = new OrmModel({ name: "Test" });
++      model.addObjectType({
++        id: "ot-weight",
++        name: "Weight",
++        kind: "value",
++        dataType: { name: "decimal", length: 8, scale: 2 },
++        unit: "kg",
++        aliases: ["Mass"],
++      });
++
++      const yaml = serializer.serialize(model);
++      // The object type layout test predates the field, so its position is
++      // pinned here: after `data_type`, before `aliases`.
++      expect(yaml).toContain(
++        "      data_type:\n        name: decimal\n        length: 8\n        scale: 2\n"
++          + "      unit: kg\n      aliases:\n",
++      );
++
++      const restored = serializer.deserialize(yaml);
++      const weight = restored.getObjectTypeByName("Weight")!;
++      expect(weight).toEqual(model.getObjectTypeByName("Weight"));
++      expect(weight.kind === "value" && weight.unit).toBe("kg");
++      expect(serializer.serialize(restored)).toBe(yaml);
++    });
++
++    it("leaves `unit` out of a value type that has none", () => {
++      const model = new OrmModel({ name: "Test" });
++      model.addObjectType({ name: "Label", kind: "value", dataType: { name: "text" } });
++      const yaml = serializer.serialize(model);
++      expect(yaml).not.toContain("unit");
++      const label = serializer.deserialize(yaml).getObjectTypeByName("Label")!;
++      expect("unit" in label).toBe(false);
++    });
++
++    it("refuses an empty unit, from a file and from code alike", () => {
++      const yaml = `orm_version: "2.0"
++model:
++  name: Test
++  object_types:
++    - id: ot-1
++      name: Weight
++      kind: value
++      unit: ""
++`;
++      expect(() => serializer.deserialize(yaml)).toThrow(/Weight/);
++      expect(decodeObjectType({ id: "ot-1", name: "Weight", kind: "value", unit: "" }, () => "x"))
++        .toEqual({
++          ok: false,
++          problems: [{
++            objectType: "Weight",
++            field: "unit",
++            message: 'Unit on "Weight" must not be empty; omit it for no unit.',
++          }],
++        });
++
++      const model = new OrmModel({ name: "Test" });
++      expect(() => model.addObjectType({ name: "Weight", kind: "value", unit: "" }))
++        .toThrow('Unit on "Weight" must not be empty; omit it for no unit.');
++      expect(model.getObjectTypeByName("Weight")).toBeUndefined();
++    });
++
++    it("refuses a unit on an entity type, naming the type and the field", () => {
++      const yaml = `orm_version: "2.0"
++model:
++  name: Test
++  object_types:
++    - id: ot-1
++      name: Parcel
++      kind: entity
++      reference_mode: parcel_id
++      unit: kg
++`;
++      expect(() => serializer.deserialize(yaml)).toThrow(/unit[\s\S]*Parcel|Parcel[\s\S]*unit/);
++    });
++
+     it("round-trips free-text notes on the model, object types, and fact types", () => {
+       const model = new OrmModel({ name: "Test", note: "TODO: review scope." });
+       const customer = model.addObjectType({
+diff --git a/barwise/packages/core/tests/serialization/decodeObjectType.test.ts b/barwise/packages/core/tests/serialization/decodeObjectType.test.ts
+index 4fbc2ba0..4e421b8a 100644
+--- a/barwise/packages/core/tests/serialization/decodeObjectType.test.ts
++++ b/barwise/packages/core/tests/serialization/decodeObjectType.test.ts
+@@ -72,6 +72,7 @@ const VALUE: Doc = {
+     ranges: [{ min: "1", max: "5", min_inclusive: false, max_inclusive: true }],
+   },
+   data_type: { name: "decimal", length: 4, scale: 1 },
++  unit: "stars",
+   aliases: ["Grade"],
+   independent: false,
+   default_value: "A",
