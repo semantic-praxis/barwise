@@ -338,8 +338,11 @@ trial run in WS3 gets its own scratch directory for this reason.
 payloads timed out at 30 s in the plain arm's full coverage run twice,
 once under heavy load and once on the pre-push run, and passed on the
 next run. Alone, they take about 6 s under coverage on the plain arm and
-on main alike. The Effect arm's runs never hit it. If WS4's runs hit it
-again on the plain arm, it is a finding about that arm, not noise.
+on main alike. The Effect arm's runs never hit it. It is attributed to the plain arm
+only if a controlled reproduction shows it there and not elsewhere: the
+CLI package's full coverage run on an idle machine, alternating the plain
+arm, the Effect arm and main, three runs each. Otherwise it is recorded
+as environment noise.
 
 ## Competing frames
 
@@ -520,14 +523,14 @@ Refuse an entity type carrying `data_type`, `value_constraint` or
 `default_value`, in the loader and the JSON Schema. Its own PR, merged
 before the arms branch, so both start from a base that loses nothing.
 
-### 1. Plain arm (provisional: grounded when WS0 lands)
+### 1. Plain arm (built 2026-10-14; see Arms as built)
 
 On `experiment/effect-comparison-plain`, from the agreed base: a
 hand-written `decodeObjectType` collecting every problem, the id source
 per Open decision 1, messages that name the element and the field. If
 TypeScript wins, this branch is barwise-973 progress and merges.
 
-### 2. Effect arm (provisional: grounded when WS0 lands)
+### 2. Effect arm (built 2026-10-14; see Arms as built)
 
 On `experiment/effect-comparison-effect`, from the same base and brief:
 the slice as one Schema definition, decoded with `errors: "all"`, the id
@@ -557,23 +560,53 @@ How a run is held to the same conditions as the others:
   with the session, not in this repository, which names no model.
 - **Load.** The pilot runs one at a time. The main trials run in pairs,
   one run per arm at once, so machine load falls on both arms alike.
-  Wall time under load is still noisy, which is why D3 reports tokens
-  and tool calls beside it.
-- **What is measured.** Tokens, tool calls and wall time come from the
-  harness's own usage report for the run, not from the agent. Pass or
-  fail is decided afterwards by this session, not by the agent: the full
-  suite, `validate:examples` and the promptlab drift test on the run's
-  final tree, and `measure:comparison -- trial --base <arm head>`, which
-  fails a run that touched a protected file. D1 and R3 come from
-  `measure:comparison -- diff <arm head> <run head>` over the passing
-  runs.
+  Wall time under load is still noisy, which is why tokens, not wall
+  time, are D3's primary measure.
+- **A run is driven to correct code.** When the agent reports done, this
+  session scores the run (below). A run that fails goes back to the
+  same agent with the failing output, for at most two more rounds. A run
+  that still fails after the third round is a failed run. This is the
+  claim D3 tests -- that one style gets an agent to correct code more
+  cheaply -- and it is how an agent is used in practice.
+- **Scoring.** Before scoring, this session commits whatever the run
+  left uncommitted or untracked, as one commit marked as such, so the
+  run's head is the tree that was scored and `diff` measures what
+  `trial` checked. Then: the full suite, `validate:examples` and the
+  promptlab drift test on that head, and `measure:comparison -- trial
+  --base <arm head>`, which fails a run that touched a protected file.
+  D1 and R3 come from `measure:comparison -- diff <arm head> <run head>`
+  over the passing runs.
+- **D3, pre-registered.** The primary measure is total tokens per run,
+  summed over its rounds, from the harness's own usage report rather
+  than the agent's. Tool calls and wall time are reported beside it and
+  never vote. Every run counts, so a cheap early failure cannot make an
+  arm look cheap: a failed run is charged the largest total any run of
+  the same task reached in either arm, and the number of failed runs per
+  arm is reported with it. Resolvability is computed per task from the
+  main trials alone, as the decision rule states: the difference between
+  the two arms' mean totals against twice its standard error,
+  `sqrt(s1^2/n1 + s2^2/n2)`. With two runs per arm, T2 will seldom
+  resolve, and the spec says so rather than pooling it with T1.
 - **Red checks.** For the familiarity tripwire, every failing build,
-  type-check or test run inside a run's transcript is counted and
-  classified by hand: API misuse (a name or signature the installed
-  version does not have), task logic, or the environment.
-- **Pilot outputs.** The spread of tokens and wall time over the three
-  pilot runs sets the bound D3 reports against. A pilot run that fails
-  is a reading, not a reason to stop.
+  type-check or test run in a run's transcript, and every failure this
+  session's scoring sends back to the agent, is counted and classified
+  by hand: API misuse (a name or signature the installed version does
+  not have), task logic, or the environment.
+- **Evidence kept.** Before a run's worktree and branch are deleted, its
+  record is committed under `barwise/eval-runs/effect-comparison-<date>/`:
+  `<run>.patch` (the run's diff against its arm head) and `<run>.json`
+  (arm, task, start and head commits, rounds, tokens, tool calls, wall
+  time, each scoring result, and each red check with its class, the
+  failing command and its first error line). Transcripts are not
+  committed; the red-check entries carry what an auditor needs from
+  them, and the patch is the run's diff itself.
+- **The pilot.** Three T1 runs on the plain arm, run and scored as
+  above. It does not set D3's bound, which needs both arms. It measures
+  the spread of one arm's totals and the cost per run, so the spec can
+  state, before the main trials, the smallest difference five runs per
+  arm could resolve at that spread (`2 * sqrt(2/5) * s`). Its runs are
+  not pooled into the main trials. A pilot run that fails is a reading,
+  not a reason to stop.
 
 ### 4. Measure, decide, record
 
