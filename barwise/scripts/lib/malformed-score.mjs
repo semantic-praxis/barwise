@@ -42,11 +42,16 @@ export function namesField(message, field) {
 /**
  * How a message identifies an object type: by its name or id, which a
  * person can act on, or only by its position in the file.
+ *
+ * A position is read in both path spellings the arms produce: a JSON
+ * pointer (`object_types/1`, today's schema check) and a bracketed path
+ * (`object_types[1]` or `["object_types"][1]`, Effect Schema's). Knowing
+ * only the first would score the Effect arm lower for its punctuation.
  */
 export function identifies(message, { id, name, index }) {
   const byName = name.trim() !== "" && message.includes(name);
   const byId = message.includes(id);
-  const byIndex = new RegExp(`object_types(/|\\[)${index}(\\b|\\])`).test(message);
+  const byIndex = new RegExp(`object_types"?\\]?(/|\\[)${index}(\\b|\\])`).test(message);
   return { readable: byName || byId, any: byName || byId || byIndex };
 }
 
@@ -72,6 +77,14 @@ export function lostKeys(inputYaml, outputYaml) {
  * type -- by name, id or position, or trivially when the document holds
  * one problem. It is reported readably when that message names the object
  * type by name or id.
+ *
+ * `ambiguous` lists every message credited to more than one problem. The
+ * scorer cannot tell such a message from a report that lists every problem
+ * in one block of text -- Effect Schema's default formatter does exactly
+ * that -- and crediting the block would count each problem whose field and
+ * object type appear anywhere in it, in unrelated parts. A loader is scored
+ * one message per problem; the caller refuses a reading with an ambiguous
+ * message rather than report the inflated count.
  */
 export function scoreDocument(yamlText, problems, loader) {
   let messages = [];
@@ -95,7 +108,15 @@ export function scoreDocument(yamlText, problems, loader) {
       namesElement: attributed.some((m) => identifies(m, p).readable),
     };
   });
-  return { outcome, messages, problems: scored, silentLosses };
+  const ambiguous = messages
+    .map((m) => ({
+      message: m,
+      ids: problems
+        .filter((p) => namesField(m, p.field) && (problems.length === 1 || identifies(m, p).any))
+        .map((p) => p.id),
+    }))
+    .filter((a) => a.ids.length > 1);
+  return { outcome, messages, problems: scored, silentLosses, ambiguous };
 }
 
 /**
@@ -133,6 +154,19 @@ export function combine(cases, readCase) {
     model: { name: "Malformed", object_types: objectTypes },
   });
   return { yaml, problems };
+}
+
+/**
+ * Why a set of readings cannot be reported, or null when it can: the text
+ * `measure-comparison malformed` refuses with when any message is ambiguous
+ * (see `scoreDocument`).
+ */
+export function ambiguityReport(readings) {
+  const ambiguous = readings.flatMap((r) => r.ambiguous);
+  if (ambiguous.length === 0) return null;
+  return "a message is credited to more than one problem, so the count would be inflated:\n"
+    + ambiguous.map((a) => `  [${a.ids.join(", ")}] ${a.message.split("\n")[0]}\n`).join("")
+    + "  Report problems as a list (`problems` or `validationResult.errors`), one per entry.";
 }
 
 /** Totals over a scored document, for the summary line. */

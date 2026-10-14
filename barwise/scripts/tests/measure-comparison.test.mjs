@@ -15,7 +15,7 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
-import { combine, lostKeys, scoreDocument } from "../lib/malformed-score.mjs";
+import { ambiguityReport, combine, lostKeys, scoreDocument } from "../lib/malformed-score.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(HERE, "..", "measure-comparison.mjs");
@@ -88,6 +88,57 @@ test("a schema path credits only the object type at that index", () => {
     ["ot-a", false, false],
     ["ot-b", true, false],
   ]);
+});
+
+test("one message listing several problems is flagged, not credited to each", () => {
+  // Effect Schema's default formatter reports every problem in one block of
+  // text. Read as one message, it would name each field and each object
+  // type somewhere, and every problem would be credited.
+  const cases = [
+    { file: "a", field: "data_type" },
+    { file: "b", field: "reference_mode" },
+  ];
+  const read = (f) =>
+    `orm_version: "2.0"\nmodel:\n  name: M\n  object_types:\n    - id: ot-${f}\n      name: Type${f.toUpperCase()}\n      kind: value\n`;
+  const { problems } = combine(cases, read);
+  const blob = {
+    deserialize: () => {
+      throw new Error(
+        'Malformed\n└─ ["object_types"]\n   ├─ TypeA: reference_mode is not allowed\n   └─ TypeB: data_type is not allowed',
+      );
+    },
+    serialize: () => "",
+  };
+  const r = scoreDocument("unused", problems, blob);
+  assert.deepEqual(r.ambiguous.map((a) => a.ids), [["ot-a", "ot-b"]]);
+  assert.match(ambiguityReport([r]), /\[ot-a, ot-b\] Malformed/);
+});
+
+test("a bracketed path credits the object type at that index, as a JSON pointer does", () => {
+  const cases = [
+    { file: "a", field: "data_type" },
+    { file: "b", field: "data_type" },
+  ];
+  const read = (f) =>
+    `orm_version: "2.0"\nmodel:\n  name: M\n  object_types:\n    - id: ot-${f}\n      name: X\n      kind: value\n`;
+  const { problems } = combine(cases, read);
+  const effectStyle = {
+    deserialize: () => {
+      throw Object.assign(new Error("schema"), {
+        problems: ['["model"]["object_types"][1]["data_type"]["name"]: Expected a known type'],
+      });
+    },
+    serialize: () => "",
+  };
+  const r = scoreDocument("unused", problems, effectStyle);
+  assert.deepEqual(r.problems.map((p) => [p.id, p.reported]), [["ot-a", false], ["ot-b", true]]);
+  assert.deepEqual(r.ambiguous, []);
+});
+
+test("today's loader reports one problem per message, so its reading is not refused", () => {
+  const r = spawnSync(process.execPath, [SCRIPT, "malformed"]);
+  assert.equal(r.status, 0, r.stderr.toString());
+  assert.equal(ambiguityReport([{ ambiguous: [] }]), null);
 });
 
 test("an object type missing after the round trip is reported field by field", () => {

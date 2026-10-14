@@ -443,7 +443,13 @@ with a `--force` rebuild after each restore wherever a bundle is read
   records problems reported, silent losses (a round trip that drops a
   field) and whether each message names the element and the field. It
   measures rather than asserts, because today fails by design; its own
-  test plants a silent loss and checks the scorer reports it.
+  test plants a silent loss and checks the scorer reports it. Each arm
+  reports problems as a list, one per entry: a message credited to more
+  than one problem makes `malformed` refuse (exit 2), because one block
+  of text naming every problem -- Effect Schema's default formatter --
+  would otherwise be credited with all of them. A position is read in
+  both path spellings (`object_types/1` and `["object_types"][1]`), so
+  neither arm is scored on punctuation.
 - The baseline run of each, recorded in this spec in a Baseline section
   that WS0 adds.
 

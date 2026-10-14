@@ -26,7 +26,13 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { cpus, tmpdir } from "node:os";
 import { join } from "node:path";
-import { caseProblem, combine, scoreDocument, summarize } from "./lib/malformed-score.mjs";
+import {
+  ambiguityReport,
+  caseProblem,
+  combine,
+  scoreDocument,
+  summarize,
+} from "./lib/malformed-score.mjs";
 import { REPO_ROOT } from "./lib/tracked.mjs";
 
 const BARWISE = join(REPO_ROOT, "barwise");
@@ -223,6 +229,8 @@ async function malformed(args) {
   }));
   const all = combine(cases, read);
   const combined = scoreDocument(all.yaml, all.problems, loader);
+  const ambiguity = ambiguityReport([...results, combined]);
+  if (ambiguity) refuse(ambiguity);
 
   if (args.includes("--json")) {
     process.stdout.write(
