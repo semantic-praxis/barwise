@@ -184,6 +184,23 @@ test("an unknown subcommand and an unresolvable ref are refusals, not readings",
   assert.equal(spawnSync(process.execPath, [SCRIPT, "diff", "no-such-ref-anywhere"]).status, 2);
 });
 
+test("heldout refuses rather than reads when it has no task, no tree, or no built core", () => {
+  // A run whose core was never built must not read as eight failed cases:
+  // that would charge the agent for the scorer's own missing step.
+  const run = (...args) =>
+    spawnSync(process.execPath, [SCRIPT, "heldout", ...args], { encoding: "utf8" });
+  assert.equal(run("--path", "/").status, 2, "no --task");
+  assert.equal(run("--task", "t1").status, 2, "no --path");
+  const empty = mkdtempSync(join(tmpdir(), "heldout-"));
+  try {
+    const r = run("--task", "t1", "--path", empty);
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, /no built core/);
+  } finally {
+    rmSync(empty, { recursive: true, force: true });
+  }
+});
+
 test("trial fails a branch that changed the held-out oracle and passes one that did not", () => {
   const repo = mkdtempSync(join(tmpdir(), "measure-trial-"));
   try {

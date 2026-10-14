@@ -1,0 +1,33 @@
+{
+  "$comment": "Held-out T1 checks (measure:comparison -- heldout --task t1), run after the pilot on each run's patch applied to 8398a193 with core rebuilt. Added after Copilot's review of PR #653 found that p1 passed the recorded scoring while missing a T1 case. The pilot's own records (plain-t1-p*.json) are left as scored.",
+  "takenAt": "2026-10-14",
+  "runs": {
+    "plain-t1-p1": {
+      "passed": 11,
+      "failed": 1,
+      "failedCases": [
+        "an empty unit is refused, or its arrival and removal are reported"
+      ]
+    },
+    "plain-t1-p2": {
+      "passed": 12,
+      "failed": 0,
+      "failedCases": []
+    },
+    "plain-t1-p3": {
+      "passed": 12,
+      "failed": 0,
+      "failedCases": []
+    }
+  },
+  "armHeads": {
+    "8398a193 (plain, no unit)": {
+      "passed": 4,
+      "failed": 8
+    },
+    "8d36e4fc (effect, no unit)": {
+      "passed": 5,
+      "failed": 7
+    }
+  }
+}

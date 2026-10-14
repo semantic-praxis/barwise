@@ -10,6 +10,8 @@
  *   diff      <base> [<head>]           D1, R1, R3: what a change touched
  *   trial     --base <ref> [--path P]   D3: a trial branch left the held-out
  *                                       oracle alone
+ *   heldout   --task t1 --path P        D3: what the task asked for, checked
+ *                                       against a run's built core
  *
  * Exit codes follow the gate-refusal contract
  * (docs/specs/gate-refusal-contract.spec.md): 0 measured (and, for
@@ -357,8 +359,143 @@ function trial(args) {
   return touched.length === 0 ? 0 : 1;
 }
 
+// -- heldout ---------------------------------------------------------------
+
+/**
+ * The task's own requirements, checked against a run's built `@barwise/core`.
+ *
+ * The oracle a run is scored by is the suite as the run left it, so it
+ * checks only what the run's own tests check. Pilot run plain-t1-p1 passed
+ * it while accepting `unit: ""` and diffing an absent unit as `""`, so
+ * adding or removing that value reported no change (Copilot, PR #653). These
+ * cases are held out: they live here, outside both arm branches, and a run
+ * never sees them.
+ *
+ * Arm-neutral by construction: only the surface the brief keeps the same in
+ * both arms -- YAML load and save, the JSON Schema validator,
+ * `OrmModel.addObjectType`, `diffModels` -- and outcomes rather than names,
+ * so a change kind may be called anything as long as a change is reported.
+ */
+async function heldout(args) {
+  const task = flag(args, "--task");
+  const path = flag(args, "--path");
+  if (task !== "t1") refuse("heldout needs --task t1 (the only task with held-out cases).");
+  if (!path) refuse("heldout needs --path <worktree of the run>.");
+  const dist = join(path, "barwise/packages/core/dist");
+  if (!existsSync(join(dist, "index.js"))) {
+    refuse(`no built core at ${dist}; run npm run build in the run's tree first.`);
+  }
+  let core;
+  let diffModule;
+  try {
+    core = await import(join(dist, "index.js"));
+    diffModule = await import(join(dist, "diff/index.js"));
+  } catch (error) {
+    refuse(`could not load the run's built core: ${error?.message ?? error}`);
+  }
+  const { OrmModel, OrmYamlSerializer, SchemaValidator } = core;
+  const { diffModels } = diffModule;
+  const yaml = new OrmYamlSerializer();
+
+  const doc = (fields) => ({
+    orm_version: "2.0",
+    model: {
+      name: "Heldout",
+      object_types: [{ id: "ot-1", name: "Weight", kind: "value", ...fields }],
+    },
+  });
+  const toYaml = (fields) => yaml.serialize(yaml.deserialize(JSON.stringify(doc(fields))));
+  const load = (fields) => yaml.deserialize(JSON.stringify(doc(fields)));
+  const weightDelta = (a, b) =>
+    diffModels(load(a), load(b)).deltas.find((d) => d.elementType === "object_type");
+  const throws = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+
+  const cases = [
+    ["a value type's unit survives a save and a load", () => {
+      const once = load({ unit: "kg" });
+      const text = yaml.serialize(once);
+      const twice = yaml.deserialize(text);
+      return once.objectTypes[0].unit === "kg" && /\bunit: kg\b/.test(text)
+        && twice.objectTypes[0].unit === "kg";
+    }],
+    ["a value type without a unit writes none", () => !/\bunit:/.test(toYaml({}))],
+    [
+      "a file's entity type carrying a unit is refused",
+      () => throws(() => load({ kind: "entity", reference_mode: "weight_id", unit: "kg" })),
+    ],
+    [
+      "the JSON Schema allows a unit on a value type",
+      () => new SchemaValidator().validateModel(doc({ unit: "kg" })).valid === true,
+    ],
+    ["the JSON Schema forbids a unit on an entity type", () =>
+      new SchemaValidator().validateModel(
+        doc({ kind: "entity", reference_mode: "weight_id", unit: "kg" }),
+      ).valid === false],
+    [
+      "construction keeps a value type's unit",
+      () =>
+        new OrmModel({ name: "Heldout" }).addObjectType({
+          name: "Weight",
+          kind: "value",
+          unit: "kg",
+        })
+          .unit === "kg",
+    ],
+    [
+      "construction refuses an entity type's unit",
+      () =>
+        throws(() =>
+          new OrmModel({ name: "Heldout" }).addObjectType({
+            name: "Weight",
+            kind: "entity",
+            referenceMode: "weight_id",
+            unit: "kg",
+          })
+        ),
+    ],
+    [
+      "the diff reports a changed unit",
+      () => weightDelta({ unit: "kg" }, { unit: "lb" })?.kind === "modified",
+    ],
+    ["the diff reports an added unit", () => weightDelta({}, { unit: "kg" })?.kind === "modified"],
+    ["the diff reports a removed unit", () => weightDelta({ unit: "kg" }, {})?.kind === "modified"],
+    [
+      "the diff reports nothing for an unchanged unit",
+      () => weightDelta({ unit: "kg" }, { unit: "kg" })?.kind === "unchanged",
+    ],
+    // The task leaves an empty unit open. Either answer is acceptable; what
+    // is not is accepting it and then failing to see it come or go.
+    [
+      "an empty unit is refused, or its arrival and removal are reported",
+      () =>
+        throws(() => load({ unit: "" }))
+        || (weightDelta({}, { unit: "" })?.kind === "modified"
+          && weightDelta({ unit: "" }, {})?.kind === "modified"),
+    ],
+  ].map(([name, check]) => {
+    try {
+      return { name, ok: check() === true };
+    } catch (error) {
+      return { name, ok: false, error: String(error?.message ?? error).split("\n")[0] };
+    }
+  });
+
+  const failed = cases.filter((c) => !c.ok).length;
+  process.stdout.write(
+    `${JSON.stringify({ task, path, passed: cases.length - failed, failed, cases }, null, 2)}\n`,
+  );
+  return failed === 0 ? 0 : 1;
+}
+
 const [command, ...rest] = process.argv.slice(2);
-const commands = { startup, bundles, malformed, diff, trial };
+const commands = { startup, bundles, malformed, diff, trial, heldout };
 if (!commands[command]) {
   refuse(`unknown subcommand ${command ?? "(none)"}; one of ${Object.keys(commands).join(", ")}.`);
 }
