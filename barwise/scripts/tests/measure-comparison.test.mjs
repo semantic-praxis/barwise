@@ -426,6 +426,24 @@ test("usage sums each turn's input once, and reports the last turn's context", (
     assert.equal(got.turns, 2);
     assert.equal(got.inputProcessed, 1010 + 1205);
     assert.equal(got.finalContext, 1205);
+    assert.equal(got.perTurn, undefined, "per-turn counts only when asked");
+    // --turns adds each counted turn's counters and nothing that identifies
+    // the run's content: they sum back to inputProcessed.
+    const withTurns = spawnSync(process.execPath, [SCRIPT, "usage", "--turns", file], {
+      encoding: "utf8",
+    });
+    assert.equal(withTurns.status, 0, withTurns.stderr);
+    const perTurn = JSON.parse(withTurns.stdout).perTurn;
+    assert.deepEqual(perTurn, [
+      { input: 10, cacheRead: 0, cacheCreation: 1000 },
+      { input: 5, cacheRead: 1000, cacheCreation: 200 },
+    ]);
+    assert.equal(
+      perTurn.reduce((n, p) => n + p.input + p.cacheRead + p.cacheCreation, 0),
+      got.inputProcessed,
+    );
+    const two = spawnSync(process.execPath, [SCRIPT, "usage", file, file]);
+    assert.equal(two.status, 2, "two transcripts");
 
     assert.equal(spawnSync(process.execPath, [SCRIPT, "usage"]).status, 2, "no file");
     assert.equal(spawnSync(process.execPath, [SCRIPT, "usage", dir]).status, 2, "a directory");
