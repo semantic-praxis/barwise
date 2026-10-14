@@ -1,0 +1,61 @@
+{
+  "run": "plain-t1-p3",
+  "arm": "plain",
+  "task": "T1",
+  "phase": "pilot",
+  "start": "8398a193",
+  "head": "2b4d62d5",
+  "startedAt": "2026-10-14T17:57:45Z",
+  "rounds": 1,
+  "leftoverCommit": false,
+  "usage": {
+    "tokens": 136006,
+    "toolCalls": 51,
+    "wallMs": 609301,
+    "source": "harness task-notification"
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "2b4d62d5",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      }
+    }
+  ],
+  "outcome": "pass",
+  "diff": {
+    "files": 7,
+    "hunks": 15,
+    "added": 43,
+    "removed": 1,
+    "consumerFiles": [
+      "barwise/packages/core/schemas/orm-model.schema.json",
+      "barwise/packages/core/src/diff/breakingLevel.ts",
+      "barwise/packages/core/src/diff/changeDescription.ts",
+      "barwise/packages/core/src/diff/elementDiff.ts"
+    ],
+    "sliceLines": 985
+  },
+  "redChecks": [
+    {
+      "class": "environment",
+      "command": "git checkout -b trial/plain-t1-p3 8398a193 ...",
+      "firstError": "the worktree sandbox refused a git command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code"
+    }
+  ],
+  "agentJudgmentCalls": [
+    "empty unit refused (minLength 1)",
+    "unit written between default_value and note",
+    "unit change is breaking level caution"
+  ]
+}
