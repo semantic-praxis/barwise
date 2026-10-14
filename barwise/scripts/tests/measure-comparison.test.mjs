@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
@@ -198,6 +198,134 @@ test("heldout refuses rather than reads when it has no task, no tree, or no buil
     assert.match(r.stderr, /no built core/);
   } finally {
     rmSync(empty, { recursive: true, force: true });
+  }
+});
+
+/**
+ * A stand-in for a run's built core: just the surface the held-out cases
+ * use, small enough to read, so the cases themselves are under test rather
+ * than a real build. JSON stands in for YAML, which it is a subset of.
+ * `emptyUnit` is how the empty unit is handled -- "refuse", or "blind",
+ * pilot run p1's defect: accepted, and diffed as if absent.
+ */
+function fakeCore({ emptyUnit = "refuse", diffThrows = false } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "heldout-core-"));
+  const core = join(dir, "barwise", "packages", "core");
+  mkdirSync(join(core, "dist", "diff"), { recursive: true });
+  writeFileSync(join(core, "package.json"), JSON.stringify({ type: "module" }));
+  writeFileSync(
+    join(core, "dist", "index.js"),
+    `
+const refuseEntityUnit = (o) => {
+  if (o.kind === "entity" && "unit" in o) throw new Error("an entity type cannot have a unit");
+};
+export class OrmYamlSerializer {
+  deserialize(text) {
+    const doc = JSON.parse(text);
+    return {
+      name: doc.model.name,
+      objectTypes: doc.model.object_types.map((o) => {
+        refuseEntityUnit(o);
+        if (o.unit === "" && ${
+      JSON.stringify(emptyUnit)
+    } === "refuse") throw new Error("empty unit");
+        const r = { id: o.id, name: o.name, kind: o.kind };
+        if (o.unit !== undefined) r.unit = o.unit;
+        return r;
+      }),
+    };
+  }
+  serialize(m) {
+    return JSON.stringify({ orm_version: "2.0", model: { name: m.name, object_types: m.objectTypes } });
+  }
+}
+export class SchemaValidator {
+  validateModel(doc) {
+    return { valid: !doc.model.object_types.some((o) => o.kind === "entity" && "unit" in o) };
+  }
+}
+export class OrmModel {
+  constructor(config) { this.name = config.name; this.objectTypes = []; }
+  addObjectType(config) { refuseEntityUnit(config); const r = { ...config }; this.objectTypes.push(r); return r; }
+}
+`,
+  );
+  writeFileSync(
+    join(core, "dist", "diff", "index.js"),
+    `
+const same = ${emptyUnit === "blind" ? "(a, b) => (a ?? '') === (b ?? '')" : "(a, b) => a === b"};
+export function diffModels(a, b) {
+  if (${diffThrows}) throw new Error("diff exploded");
+  return {
+    deltas: a.objectTypes.map((ot, i) => ({
+      elementType: "object_type",
+      kind: same(ot.unit, b.objectTypes[i].unit) ? "unchanged" : "modified",
+    })),
+  };
+}
+`,
+  );
+  return dir;
+}
+
+function heldout(path, cwd) {
+  const r = spawnSync(process.execPath, [SCRIPT, "heldout", "--task", "t1", "--path", path], {
+    cwd,
+    encoding: "utf8",
+  });
+  return {
+    status: r.status,
+    stderr: r.stderr,
+    report: r.status === 2 ? null : JSON.parse(r.stdout),
+  };
+}
+
+const EMPTY_UNIT_CASE = "an empty unit is refused, or its arrival and removal are reported";
+
+test("heldout passes a correct core, case by case, with a relative --path", () => {
+  const dir = fakeCore();
+  try {
+    // Relative to the caller's directory (which the script needs inside the
+    // repository), not to the script's own: a `../` path from here reaches
+    // the fixture only if it is resolved against cwd.
+    const cwd = dirname(dirname(SCRIPT));
+    const r = heldout(relative(cwd, dir), cwd);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.report.cases.length, 12);
+    assert.deepEqual(r.report.cases.filter((c) => !c.ok), []);
+    assert.equal(r.report.passed, 12);
+    assert.equal(r.report.failed, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("heldout fails pilot run p1's defect: an empty unit accepted and diffed as absent", () => {
+  const dir = fakeCore({ emptyUnit: "blind" });
+  try {
+    const r = heldout(dir);
+    assert.equal(r.status, 1);
+    assert.deepEqual(r.report.cases.filter((c) => !c.ok).map((c) => c.name), [EMPTY_UNIT_CASE]);
+    assert.equal(r.report.failed, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("heldout counts a case that throws as failed, with the error, not as a crash", () => {
+  const dir = fakeCore({ diffThrows: true });
+  try {
+    const r = heldout(dir);
+    assert.equal(r.status, 1);
+    const thrown = r.report.cases.filter((c) => c.error);
+    assert.ok(thrown.length >= 4, "every diff case reports the throw");
+    for (const c of thrown) {
+      assert.equal(c.ok, false);
+      assert.equal(c.error, "diff exploded");
+    }
+    assert.equal(r.report.failed, thrown.length);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

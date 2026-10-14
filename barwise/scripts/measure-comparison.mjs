@@ -27,8 +27,8 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { cpus, tmpdir } from "node:os";
-import { basename, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { committedPaths, uncommittedPaths } from "./lib/changed-class.mjs";
 import {
   ambiguityReport,
@@ -381,15 +381,18 @@ async function heldout(args) {
   const path = flag(args, "--path");
   if (task !== "t1") refuse("heldout needs --task t1 (the only task with held-out cases).");
   if (!path) refuse("heldout needs --path <worktree of the run>.");
-  const dist = join(path, "barwise/packages/core/dist");
+  // Resolved once, against the caller's directory, and imported by URL: a
+  // bare relative path is checked against cwd but imported as a package
+  // specifier, or against this script's own directory (Copilot, PR #653).
+  const dist = join(resolve(path), "barwise/packages/core/dist");
   if (!existsSync(join(dist, "index.js"))) {
     refuse(`no built core at ${dist}; run npm run build in the run's tree first.`);
   }
   let core;
   let diffModule;
   try {
-    core = await import(join(dist, "index.js"));
-    diffModule = await import(join(dist, "diff/index.js"));
+    core = await import(pathToFileURL(join(dist, "index.js")).href);
+    diffModule = await import(pathToFileURL(join(dist, "diff/index.js")).href);
   } catch (error) {
     refuse(`could not load the run's built core: ${error?.message ?? error}`);
   }
@@ -418,14 +421,19 @@ async function heldout(args) {
   };
 
   const cases = [
+    // Values, not text: `unit: "kg"` is as correct as `unit: kg`, and a text
+    // check would send a correct run back for a round it did not need.
     ["a value type's unit survives a save and a load", () => {
       const once = load({ unit: "kg" });
-      const text = yaml.serialize(once);
-      const twice = yaml.deserialize(text);
-      return once.objectTypes[0].unit === "kg" && /\bunit: kg\b/.test(text)
-        && twice.objectTypes[0].unit === "kg";
+      const twice = yaml.deserialize(yaml.serialize(once));
+      return once.objectTypes[0].unit === "kg" && twice.objectTypes[0].unit === "kg";
     }],
-    ["a value type without a unit writes none", () => !/\bunit:/.test(toYaml({}))],
+    // A key written for every value type would change every existing file
+    // (G2), so absence is checked in the text as well as in the value.
+    ["a value type without a unit writes none", () => {
+      const text = toYaml({});
+      return !/\bunit\b/.test(text) && yaml.deserialize(text).objectTypes[0].unit === undefined;
+    }],
     [
       "a file's entity type carrying a unit is refused",
       () => throws(() => load({ kind: "entity", reference_mode: "weight_id", unit: "kg" })),
