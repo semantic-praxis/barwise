@@ -1,6 +1,7 @@
 # The pre-push run checks the commit being pushed, not the working tree
 
-Status: Draft -- no workstream implemented
+Status: Workstream 1 implemented 2026-10-14 (trial on the shared helpers,
+check:git-listing); workstreams 2 and 3 not started
 Created: 2026-10-14
 Last-updated: 2026-10-14
 Tracking: barwise-vzf (this spec); barwise-qch (workstream 2)
@@ -334,3 +335,31 @@ its letter.
 - Does not change what CI runs or the order it runs in.
 - Does not make plain `npm run ci:local` slower.
 - Does not address flaky tests, the Node version, or shallow clones.
+
+## Implementation notes
+
+**Workstream 1, 2026-10-14.**
+
+- **The gate also skips `scripts/tests/`.** The Scope said "outside
+  `scripts/lib/`". Tests build scratch repositories and inspect them
+  with raw `git` on purpose, to check what the helpers report, so a test
+  that spells the command is not a second owner of the listing. Caught
+  while writing the gate's own test, which plants exactly that case.
+- **`trial`'s new union is a superset of the old listing.** The old
+  code diffed the working tree against the base; the new one unions
+  `committedPaths(base, path)` (base to `HEAD`) with
+  `uncommittedPaths(path)`. A file changed in a commit and reverted in
+  the working tree now counts as touched where it did not before. For a
+  check that protects an oracle, over-reporting is the safe direction.
+  A new case covers work committed on top of the base, which no test
+  reached before; removing either half of the union turns a test red.
+- **First reading of the gate, before the fix:** exit 1 naming
+  `measure-comparison.mjs:345` and nothing else. After: exit 0 over 33
+  scripts.
+- **The gate passed by hand and failed at pre-push, on itself.** Its
+  header comment quoted the command it looks for. Run by hand, the gate
+  was still untracked, so `trackedFiles()` could not see it, and it read
+  OK over 33 scripts. Once committed, the pre-push run counted 34 and
+  failed on line 6. This is workstream 3's defect in miniature: a check
+  run before the commit saw a different tree from the one pushed.
+  The comment no longer spells the command.

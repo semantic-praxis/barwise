@@ -262,6 +262,19 @@ test("trial fails a branch that changed the held-out oracle and passes one that 
     });
     assert.equal(added.status, 1, added.stderr.toString());
     assert.match(added.stdout.toString(), /new\.law\.test\.ts/);
+
+    // So is one the trial COMMITTED on top of the base, with a clean tree.
+    rmSync(join(laws, "new.law.test.ts"));
+    const base = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim();
+    writeFileSync(join(laws, "x.law.test.ts"), "committed\n");
+    g("commit", "-q", "-am", "trial work");
+    const committed = spawnSync(
+      process.execPath,
+      [SCRIPT, "trial", "--base", base, "--path", repo],
+      { cwd: repo },
+    );
+    assert.equal(committed.status, 1, committed.stderr.toString());
+    assert.match(committed.stdout.toString(), /x\.law\.test\.ts/);
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }
