@@ -109,7 +109,7 @@ let held = false;
  * a lock is a flag people learn to pass by default, and then the lock
  * protects nothing.
  */
-function acquireLock() {
+function acquireLock(busyExit = 1) {
   for (let attempt = 0; attempt < 2; attempt++) {
     mkdirSync(dirname(LOCK), { recursive: true });
     let fd;
@@ -125,7 +125,7 @@ function acquireLock() {
         );
         console.error("so this one would report a tree it did not measure. Waiting is the fix.");
         console.error(`Lock: ${LOCK}`);
-        process.exit(1);
+        process.exit(busyExit);
       }
       rmSync(LOCK, { force: true });
       continue;
@@ -226,12 +226,15 @@ function runAtCommit(argv) {
   }
   const passThrough = argv.filter((a, i) => i !== at && i !== at + 1);
 
-  acquireLock();
-  const tree = mkdtempSync(join(tmpdir(), "barwise-commit-"));
+  // Busy is "could not answer" here, not a failure: no gate ran, and the
+  // hook must not report that CI would fail.
+  acquireLock(2);
+  reapAbandonedWorktrees();
+  let tree;
   const cleanup = () => {
-    // Delete, then prune: prune drops the registration of any worktree whose
-    // directory is gone, which is also what recovers a run killed mid-way.
-    rmSync(tree, { recursive: true, force: true });
+    // Delete, then prune: prune drops the registration of a worktree whose
+    // directory is gone.
+    if (tree !== undefined) rmSync(tree, { recursive: true, force: true });
     spawnSync("git", ["worktree", "prune"], { cwd: ROOT, stdio: "ignore" });
     releaseLock();
   };
@@ -243,6 +246,9 @@ function runAtCommit(argv) {
   }
 
   try {
+    // The owner's pid is in the name, so a later run can tell an abandoned
+    // worktree from a live one (reapAbandonedWorktrees).
+    tree = mkdtempSync(join(tmpdir(), `${WORKTREE_PREFIX}${process.pid}-`));
     const left = [...new Set(pathsDifferingFrom(sha, ROOT))];
     if (left.length > 0) {
       console.log(
@@ -295,9 +301,44 @@ function runAtCommit(argv) {
       return 2;
     }
     return run.status;
+  } catch (error) {
+    // Anything thrown before the gates ran -- a full or unwritable temp
+    // directory, git failing to list paths -- is a refusal, with the lock
+    // released by the finally below rather than left for the next run.
+    console.error(`ci:local --commit: could not set up the check: ${error?.message ?? error}`);
+    return 2;
   } finally {
     cleanup();
   }
+}
+
+const WORKTREE_PREFIX = "barwise-commit-";
+
+/**
+ * Remove worktrees a killed `--commit` run left behind.
+ *
+ * SIGINT and SIGTERM clean up; SIGKILL cannot, and then both the directory
+ * and its registration survive -- `git worktree prune` keeps a registration
+ * whose directory still exists. Each run names its worktree with its pid, so
+ * a worktree whose owner is no longer alive is abandoned. A live owner is
+ * left alone even though this run holds the lock: the lock belongs to this
+ * checkout, and another checkout of the same repository has its own lock
+ * and shares the worktree list.
+ */
+function reapAbandonedWorktrees() {
+  const list = spawnSync("git", ["worktree", "list", "--porcelain"], {
+    cwd: ROOT,
+    encoding: "utf8",
+  });
+  if (list.status !== 0) return;
+  for (const line of list.stdout.split("\n")) {
+    if (!line.startsWith("worktree ")) continue;
+    const path = line.slice("worktree ".length);
+    const m = new RegExp(`/${WORKTREE_PREFIX}(\\d+)-[^/]*$`).exec(path);
+    if (m === null || alive(Number(m[1]))) continue;
+    rmSync(path, { recursive: true, force: true });
+  }
+  spawnSync("git", ["worktree", "prune"], { cwd: ROOT, stdio: "ignore" });
 }
 
 if (process.argv.includes("--commit")) {

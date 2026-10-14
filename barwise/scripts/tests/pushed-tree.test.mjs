@@ -15,7 +15,15 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
@@ -185,10 +193,52 @@ test("--commit holds this checkout's lock, so a second run stops", () => {
       JSON.stringify({ pid: process.pid, started: "test" }),
     );
     const r = ciLocal(repo, "--commit", "HEAD");
-    assert.equal(r.status, 1, r.all);
+    // 2, not 1: no gate ran, so the hook must say "could not be checked".
+    assert.equal(r.status, 2, r.all);
     assert.match(r.stderr, /ci:local is already running: pid \d+/);
     assert.equal(worktrees(repo).length, 1, "no worktree is created while the lock is held");
   } finally {
+    rmSync(repo.dir, { recursive: true, force: true });
+  }
+});
+
+test("--commit refuses (exit 2) when it cannot make a temp directory, and frees the lock", () => {
+  const repo = commitRepo();
+  try {
+    const r = spawnSync(process.execPath, [repo.script, "--commit", "HEAD"], {
+      cwd: repo.root,
+      encoding: "utf8",
+      env: { ...process.env, TMPDIR: join(repo.dir, "no-such-dir") },
+    });
+    assert.equal(r.status, 2, `${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /could not set up the check/);
+    assert.equal(
+      existsSync(join(repo.root, "node_modules", ".ci-local.lock")),
+      false,
+      "the lock is released, not left for the next run",
+    );
+  } finally {
+    rmSync(repo.dir, { recursive: true, force: true });
+  }
+});
+
+test("--commit removes a worktree a killed run left behind, and spares a live one", () => {
+  const repo = commitRepo();
+  // A pid that has certainly exited: a child we waited for.
+  const dead = spawnSync(process.execPath, ["-e", ""]).pid;
+  const abandoned = join(tmpdir(), `barwise-commit-${dead}-abandoned`);
+  const live = join(tmpdir(), `barwise-commit-${process.pid}-live`);
+  try {
+    repo.git("worktree", "add", "--detach", "--quiet", abandoned, "HEAD");
+    repo.git("worktree", "add", "--detach", "--quiet", live, "HEAD");
+    ciLocal(repo, "--commit", "HEAD");
+    const paths = worktrees(repo).join("\n");
+    assert.doesNotMatch(paths, /-abandoned/, "a dead owner's worktree is removed");
+    assert.equal(existsSync(abandoned), false);
+    assert.match(paths, /-live/, "a live owner's worktree is left alone");
+  } finally {
+    rmSync(abandoned, { recursive: true, force: true });
+    rmSync(live, { recursive: true, force: true });
     rmSync(repo.dir, { recursive: true, force: true });
   }
 });
@@ -199,10 +249,11 @@ test("--commit holds this checkout's lock, so a second run stops", () => {
  * Run the real pre-push hook with ref lines on stdin and a stub `npm` that
  * records its arguments and exits with `exit`.
  */
-function hook(lines, exit) {
+function hook(lines, exit, setup) {
   const dir = mkdtempSync(join(tmpdir(), "barwise-hook-"));
   try {
     mkdirSync(join(dir, "barwise"));
+    if (setup) lines = setup(dir);
     const bin = join(dir, "bin");
     mkdirSync(bin);
     const log = join(dir, "npm.log");
@@ -248,6 +299,30 @@ test("the hook checks each distinct pushed commit once, and skips a deletion", (
   const deletion = hook([ref(ZERO)], 0);
   assert.equal(deletion.status, 0);
   assert.deepEqual(deletion.calls, []);
+});
+
+test("the hook checks a branch and an annotated tag on one commit once", () => {
+  // git hands the hook the TAG object's sha for an annotated tag; peeled, it
+  // is the same commit as the branch, and one tree is checked once.
+  let commit;
+  const r = hook([], 0, (dir) => {
+    const git = (...a) =>
+      execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...a], {
+        cwd: dir,
+        encoding: "utf8",
+      }).trim();
+    writeFileSync(join(dir, "barwise", "x"), "x\n");
+    git("init", "-q");
+    git("add", ".");
+    git("commit", "-qm", "base");
+    git("tag", "-a", "v1", "-m", "release");
+    commit = git("rev-parse", "HEAD");
+    const tagObject = git("rev-parse", "v1");
+    assert.notEqual(tagObject, commit, "an annotated tag is its own object");
+    return [ref(commit, "refs/heads/main"), ref(tagObject, "refs/tags/v1")];
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(r.calls, [`run ci:local -- --commit ${commit}`]);
 });
 
 test("the hook blocks a failing commit and a refused one, each with its own message", () => {

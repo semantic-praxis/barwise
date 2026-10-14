@@ -7,7 +7,7 @@
     "ci-conditions.test.mjs": 13,
     "gates.test.mjs": 204,
     "measure-comparison.test.mjs": 14,
-    "pushed-tree.test.mjs": 7,
+    "pushed-tree.test.mjs": 10,
     "python-uv-guard.test.mjs": 32,
     "session-start.test.mjs": 5
   }

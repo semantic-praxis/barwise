@@ -401,6 +401,22 @@ pre-push hook, --commit, later push               208 s  (npm ci 14 s; build and
                                                           test:coverage from cache)
 ```
 
+How each was taken, wall-clock seconds around one command, from `barwise/`:
+
+```
+s=$(date +%s); node scripts/ci-local.mjs --commit HEAD; echo $(( $(date +%s) - s ))
+    on adeee39e; the Turbo cache had no entry for that code's test:coverage
+s=$(date +%s); node scripts/ci-local.mjs; echo $(( $(date +%s) - s ))
+    on the same commit, straight after the run above
+s=$(date +%s); git push; echo $(( $(date +%s) - s ))
+    pushes of f1f29b92 and 159189ca, through the new hook, cache warm
+```
+
+To check that the cache is shared: `git worktree add --detach <tmp> HEAD`,
+`npm ci` in `<tmp>/barwise`, then `npx turbo run build --dry=json` there;
+each task reports `"status": "HIT", "source": "LOCAL"` while
+`<tmp>/barwise/.turbo/cache` does not exist.
+
 The first pair looked like a 3.5-minute penalty for the worktree, but only
 the first run had to compute coverage at all; the second reused its
 result. The steady-state cost is the third reading: about 30 s over an
@@ -412,3 +428,17 @@ The first timing run also caught a real defect: `fmt:check` failed in the
 worktree because these files had been committed without formatting. The
 in-tree hook could not have seen it, because the working copy was what the
 formatter had last touched.
+
+**Copilot's review of PR #648** found four things, all fixed there:
+
+- A held lock, and a temp directory that cannot be created, now exit 2
+  (could not check) rather than 1, so the hook never reports a setup
+  failure as "CI would fail"; the lock is released on every path.
+- A run killed with SIGKILL leaves its worktree, and `git worktree prune`
+  keeps a registration whose directory exists. Each run names its
+  worktree `barwise-commit-<pid>-*`, and the next run removes any whose
+  owner is no longer alive. A live owner is spared: another checkout of
+  the repository shares the worktree list but holds its own lock.
+- The hook peels each pushed sha to its commit before deduplicating, so a
+  branch and an annotated tag on one commit are checked once.
+- The timing commands above.

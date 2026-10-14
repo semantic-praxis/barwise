@@ -19,14 +19,18 @@
 # git feeds one line per ref: <local ref> <local sha> <remote ref> <remote sha>.
 # An all-zero local sha is a branch DELETION -- there is nothing to
 # validate, and pruning a merged branch should not cost three minutes.
-# Each distinct commit is checked once: two refs at one sha are one tree.
+# Each distinct commit is checked once: two refs at one commit are one tree.
+# An annotated tag arrives as the tag object's sha, so each sha is peeled to
+# its commit before comparing -- a release push of a branch and its tag
+# would otherwise run the whole gate list twice over one tree.
 shas=""
 while read -r _local_ref local_sha _remote_ref _remote_sha; do
   case "${local_sha}" in
     *[!0]*)
+      commit=$(git rev-parse --verify --quiet "${local_sha}^{commit}" 2>/dev/null) || commit="${local_sha}"
       case " ${shas} " in
-        *" ${local_sha} "*) ;;
-        *) shas="${shas} ${local_sha}" ;;
+        *" ${commit} "*) ;;
+        *) shas="${shas} ${commit}" ;;
       esac
       ;;
   esac
