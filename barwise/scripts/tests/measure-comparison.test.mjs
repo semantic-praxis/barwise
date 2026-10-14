@@ -136,9 +136,36 @@ test("a bracketed path credits the object type at that index, as a JSON pointer 
 });
 
 test("today's loader reports one problem per message, so its reading is not refused", () => {
-  const r = spawnSync(process.execPath, [SCRIPT, "malformed"]);
-  assert.equal(r.status, 0, r.stderr.toString());
-  assert.equal(ambiguityReport([{ ambiguous: [] }]), null);
+  // The six messages today's loader gives for the combined file, as
+  // recorded by `measure-comparison malformed --json` on 78b52f5b. Held as
+  // text because script tests run before the build in CI, so @barwise/core
+  // cannot be loaded here.
+  const messages = [
+    "/model/object_types/1: must have required property 'reference_mode'",
+    '/model/object_types/1: must match "then" schema',
+    "/model/object_types/6/cardinality/min: must be >= 0",
+    "/model/object_types/7/value_constraint/values: must NOT have fewer than 1 items",
+    "/model/object_types/9/data_type/name: must be equal to one of the allowed values",
+    "/model/object_types/10: must NOT have additional properties",
+  ];
+  const { cases } = JSON.parse(readFileSync(join(FIXTURES, "cases.json"), "utf8"));
+  const { problems } = combine(cases, (f) => readFileSync(join(FIXTURES, f), "utf8"));
+  const todays = {
+    deserialize: () => {
+      throw Object.assign(new Error("schema"), {
+        validationResult: {
+          errors: messages.map((m) => ({
+            path: m.split(": ")[0],
+            message: m.split(": ").slice(1).join(": "),
+          })),
+        },
+      });
+    },
+    serialize: () => "",
+  };
+  const r = scoreDocument("unused", problems, todays);
+  assert.equal(ambiguityReport([r]), null);
+  assert.equal(r.problems.filter((p) => p.reported).length, 4);
 });
 
 test("an object type missing after the round trip is reported field by field", () => {
