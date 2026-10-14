@@ -4,8 +4,8 @@ Status: WS0 implemented 2026-10-13 (instruments and baseline); the
 barwise-5fg prerequisite implemented 2026-10-14; WS1 and WS2 built
 2026-10-14 on their branches (see Arms as built); WS3 grounded
 2026-10-14, pilot run 2026-10-14 (see WS3), five main T1 pairs run
-2026-10-14; the primer check (barwise-hno) defined, not yet run; WS4 not
-started
+2026-10-14; the primer check (barwise-hno) run 2026-10-14, inconclusive
+(see WS3); WS4 not started
 Created: 2026-10-13
 Last-updated: 2026-10-14
 Tracking: barwise-cu0 (this spec); barwise-973 (WS1 of
@@ -751,6 +751,48 @@ so the five main pairs pool. This check is kept out of them.
   recomputed from the records as the original can.
   Pair 3's round 2 also fixed an empty-unit case, so it stays as scored
   either way.
+
+**Primer check results (2026-10-14).** Two pairs, run and scored as
+above. Records: `plain-t1-x1`, `plain-t1-x2`, `effect-t1-x1` and
+`effect-t1-x2` in the same directory.
+
+| Run          | Variant            | Edited the layout test in round 1 | Rounds | Input processed (round 1 + round 2) |
+| ------------ | ------------------ | --------------------------------- | ------ | ----------------------------------- |
+| plain-t1-x1  | without the phrase | no                                | 1      | 7,150,285                           |
+| plain-t1-x2  | without the phrase | no                                | 1      | 4,638,706                           |
+| effect-t1-x1 | with the phrase    | no                                | 2      | 6,200,062 (5,152,288 + 1,047,774)   |
+| effect-t1-x2 | with the phrase    | no                                | 2      | 4,436,465 (3,537,734 + 898,731)     |
+
+**The reading, as written: inconclusive.** Neither plain run without the
+phrase edited the test, and neither Effect run with it did, which is
+neither of the two outcomes the rule names. The primer is therefore not
+credited, and WS4 states the plain arm's D3 as scored, without the
+adjusted figure.
+
+What the four runs show besides the reading:
+
+- **Adding the phrase did not make an Effect run edit the test.** That
+  was the side of the check that could have shown the phrase inducing
+  the edit, and it did not, in 2 of 2.
+- **Both plain runs without the phrase passed in their first round**,
+  the only two of the fourteen T1 runs since the held-out check was added
+  to do so. Each passed every held-out case in round 1 and left the
+  layout test alone; among the main plain runs, pairs 1 and 2 passed the
+  held-out cases but edited the test, and pairs 3 to 5 missed an
+  empty-unit case. That is a difference from the main plain runs, but not
+  one the phrase explains on this evidence: pairs 4 and 5 also left the
+  test alone with the phrase present, and two runs a variant cannot
+  separate the phrase from run-to-run variation.
+- **The Effect runs behaved as every main Effect run did**: no protected
+  file touched, both empty-unit cases missed in round 1, passed in round
+  2.
+- **The two x2 runs' logs collided.** Both wrote logs such as
+  `test.log` to the session scratchpad's root rather than the directory
+  each prompt named, and the Effect run read the plain run's failing log
+  before rerunning in its own directory. Each run's scoring rests on its
+  committed branch and this session's own checks, so neither result
+  depends on the other's logs. The prompt names a directory; it does not
+  stop a run writing beside it.
 
 ### 4. Measure, decide, record
 
