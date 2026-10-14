@@ -5,11 +5,11 @@
 # its list from ci.yml, so it cannot drift out of agreement with what
 # will run remotely.
 #
-# Pre-PUSH and not pre-commit, measured rather than assumed: the gate
-# list costs ~30s warm but 2m40s once a source file changes, of which
-# `test:coverage` alone is 109s. Per commit that is a hook people
-# disable, and disabled is worse than absent. Per push it runs once for
-# the whole stack, at the boundary where CI is about to run anyway.
+# Pre-PUSH and not pre-commit: the full list takes minutes once a source
+# file changes (measured in docs/specs/pushed-tree-verification.spec.md,
+# rather than copied here to go stale). Per commit that is a hook people
+# disable, and disabled is worse than absent. Per push it runs once per
+# distinct pushed commit, at the boundary where CI is about to run anyway.
 #
 # Deliberately duplicates some of pre-commit's work (build, tests).
 # Turbo caches what has not changed, and the overlap is the point: the

@@ -229,12 +229,17 @@ function runAtCommit(argv) {
   // Busy is "could not answer" here, not a failure: no gate ran, and the
   // hook must not report that CI would fail.
   acquireLock(2);
-  reapAbandonedWorktrees();
   let tree;
   const cleanup = () => {
     // Delete, then prune: prune drops the registration of a worktree whose
     // directory is gone.
-    if (tree !== undefined) rmSync(tree, { recursive: true, force: true });
+    // A directory that will not delete must not keep the lock: the next run
+    // reaps it once this process is gone.
+    try {
+      if (tree !== undefined) rmSync(tree, { recursive: true, force: true });
+    } catch {
+      console.error(`ci:local --commit: could not remove ${tree}; the next run will.`);
+    }
     spawnSync("git", ["worktree", "prune"], { cwd: ROOT, stdio: "ignore" });
     releaseLock();
   };
@@ -246,6 +251,9 @@ function runAtCommit(argv) {
   }
 
   try {
+    // Inside the try, like every setup step: a worktree it cannot delete is
+    // a refusal with the lock released, not an uncaught exit 1.
+    reapAbandonedWorktrees();
     // The owner's pid is in the name, so a later run can tell an abandoned
     // worktree from a live one (reapAbandonedWorktrees).
     tree = mkdtempSync(join(tmpdir(), `${WORKTREE_PREFIX}${process.pid}-`));

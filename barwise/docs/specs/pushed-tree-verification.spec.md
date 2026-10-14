@@ -67,7 +67,7 @@ lines that carry the mark.
 
 - When the pre-push hook runs, the system shall run the `ci.yml` gate
   list against a fresh `git worktree` of each distinct pushed commit (B),
-  with a fresh `npm ci` and a cold build (A), and remove the worktree
+  with a fresh `npm ci` and Turbo's cache as decision (A) sets, and remove the worktree
   afterwards whatever the outcome.
 - While a `--commit` run is in progress, the system shall hold the
   initiating checkout's lock (`node_modules/.ci-local.lock`) from before
@@ -196,7 +196,8 @@ current one.
 - **Share the Turbo cache with the worktree.** That build took 1 s
   instead of 23 s, measured. But Turbo's cache has already served a stale
   vscode bundle once (barwise-r7j), and CI builds cold. It is offered as
-  an open decision, defaulting to cold.
+  an open decision. (Workstream 3 found the cache is shared across
+  worktrees by default; see decision (A) and the Implementation notes.)
 - **Refuse the push when files are left behind.** See the resolved
   question above.
 - **Push-time checks only, in the PR skill.** A skill step runs when
@@ -281,10 +282,11 @@ size the cost; workstream 3 measures the hook end to end.
   (`npm run check:root-scripts` enforces the pair) and a `ci.yml` step.
   `ci:local` picks the step up from `ci.yml` with no edit.
 - `expected-counts.json` gains rows for the new tests.
-- Push time rises. Measured components: `npm ci` 19 s, a cold build
-  23 s. A docs-only push skips the build, as CI does, and pays about
-  20 s. A source push pays about 45 s on top of today's 2 min 40 s.
-  Workstream 3 replaces these estimates with end-to-end readings.
+- Push time rises, measured end to end in workstream 3: with Turbo's
+  cache shared, as built, a source push took 203 to 218 s against 178 s
+  for the same commit in the working tree, about 30 s more, mostly
+  `npm ci`. A cold build, which recomputes `test:coverage` each time,
+  took 392 s.
 - `git push --no-verify` remains the escape hatch.
 
 ## Open decisions (for review)
@@ -293,11 +295,18 @@ The Scope, architecture and workstreams are written against the
 recommended default of each. A requirement that depends on one carries
 its letter.
 
-- **(A) Turbo cache in the worktree: cold (recommended) or shared.** Cold
-  matches CI and avoids the stale-output failure barwise-r7j recorded,
-  at 22 s per source push. Shared is near-free and inherits whatever the
-  local cache holds. Recommend cold. The cost is a known number; the
-  cache's failure mode is the very thing this spec exists to stop.
+- **(A) Turbo cache in the worktree: shared (recommended, as built) or
+  cold.** Turbo shares its local cache across worktrees by default, so
+  the worktree reuses what this checkout has computed: measured at about
+  30 s per push over an in-tree run. A cold build (`--force`, or an empty
+  `TURBO_CACHE_DIR`) recomputes `test:coverage` every time: 392 s per
+  source push. The first draft recommended cold on an estimate of 22 s,
+  which left out `test:coverage`. Recommend shared. A cache hit is keyed
+  on the commit's own inputs, so it is not the stale `dist` this spec
+  exists to stop. barwise-r7j was an entry keyed on too few inputs, which
+  `turbo.json` has since narrowed (`dist/bundle` excluded from build
+  outputs, barwise-lh9), and 3 to 6 minutes on every push is out of
+  proportion to that risk.
 - **(B) Several refs in one push: one run per distinct SHA (recommended)
   or only the current branch.** One run per SHA is correct and normally
   means one run. Pushing two branches at different commits then costs
