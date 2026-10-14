@@ -563,6 +563,11 @@ How a run is held to the same conditions as the others:
   one run per arm at once, so machine load falls on both arms alike.
   Wall time under load is still noisy, which is why tokens, not wall
   time, are D3's primary measure.
+  This session's own scoring is load too: the full suite runs only once
+  both runs of a pair have stopped, and only the cheap checks (`trial`,
+  `heldout`) run while either is still working. Pair 1 broke this, and
+  three CLI tests in the Effect run's second-round suite timed out while
+  the plain run was being scored; its record says so.
 - **A run is driven to correct code.** When the agent reports done, this
   session scores the run (below). A run that fails goes back to the
   same agent with the failing output, for at most two more rounds. A run

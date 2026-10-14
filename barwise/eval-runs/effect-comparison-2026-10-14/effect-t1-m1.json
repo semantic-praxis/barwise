@@ -1,0 +1,134 @@
+{
+  "run": "effect-t1-m1",
+  "arm": "effect",
+  "task": "T1",
+  "phase": "main",
+  "pair": 1,
+  "start": "8d36e4fc",
+  "head": "4517ba1a",
+  "startedAt": "2026-10-14T19:13:05Z",
+  "rounds": 2,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "usage": {
+    "inputProcessed": 4285904,
+    "turns": 40,
+    "finalContext": 131873,
+    "source": "measure:comparison -- usage over the run's transcript, both rounds",
+    "harness": {
+      "tokens": 132730,
+      "toolCalls": 53,
+      "wallMs": 1370966,
+      "note": "cumulative over both rounds, as reported after round 2"
+    }
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "47e7008f",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 11,
+        "of": 13,
+        "failed": [
+          "an empty unit in a file is refused, or kept and diffed like any value",
+          "an empty unit from code is refused, or kept and diffed like any value"
+        ]
+      },
+      "harnessAfterRound": {
+        "tokens": 121650,
+        "toolCalls": 39,
+        "wallMs": 870866
+      },
+      "sentBack": "held-out empty-unit cases"
+    },
+    {
+      "round": 2,
+      "head": "4517ba1a",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 13,
+        "of": 13
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      }
+    }
+  ],
+  "diff": {
+    "files": 7,
+    "hunks": 11,
+    "added": 34,
+    "removed": 1,
+    "consumerFiles": [
+      "barwise/packages/core/schemas/orm-model.schema.json",
+      "barwise/packages/core/src/diff/breakingLevel.ts",
+      "barwise/packages/core/src/diff/changeDescription.ts",
+      "barwise/packages/core/src/diff/elementDiff.ts"
+    ],
+    "sliceLines": 632
+  },
+  "redChecks": [
+    {
+      "class": "environment",
+      "command": "git ... (round 1 setup)",
+      "firstError": "the worktree sandbox refused a git command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/diff/changeDescription.test.ts > rendering a change > has a golden for every kind of change the diff can emit",
+      "note": "new change kind needed a row in the in-file GOLDENS table"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/laws/counterexample.law.test.ts > coverage: ... emits a counterexample for each mapped kind",
+      "note": "unit in tests/arbitraries/model.ts shifted the law test's pinned counts; reverted"
+    },
+    {
+      "class": "environment",
+      "command": "git ...",
+      "firstError": "the worktree sandbox refused a git command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code"
+    },
+    {
+      "class": "environment",
+      "command": "npm test (round 1)",
+      "firstError": "Tasks: 22 successful, 24 total; cli promptEvalOffline.test.ts timed out after 30 s",
+      "note": "passed alone in 13 s; the second npm test passed 24 of 24"
+    },
+    {
+      "class": "environment",
+      "command": "npm test (round 2)",
+      "firstError": "three cli tests (importFormats, prompt, promptEvalOffline) timed out after about 32 s",
+      "note": "ran while this session scored plain-t1-m1's round 2 on the same machine; the cli package alone passed 463 of 463 and a second npm test passed 24 of 24"
+    },
+    {
+      "class": "task logic",
+      "command": "session scoring: measure:comparison -- heldout",
+      "firstError": "empty-unit cases (file and code) failed: accepted, diffed as absent",
+      "note": "round 2 refused an empty unit in the schema and the JSON Schema"
+    }
+  ],
+  "observations": [
+    "the round-2 cli timeouts coincided with this session's own scoring load; they cost the run turns, so this run's input total includes some load the plain run's did not"
+  ],
+  "agentJudgmentCalls": [
+    "empty unit refused (round 2)",
+    "unit change is breaking level caution",
+    "unit written after data_type",
+    "unit not added to the random model generator"
+  ]
+}
