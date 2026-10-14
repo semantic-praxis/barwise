@@ -1,3 +1,13 @@
+# In a linked worktree git runs this hook with GIT_DIR set and GIT_WORK_TREE
+# unset or relative ("."). After the cd below, every git command would then
+# take barwise/ for the top of the tree: check:secrets looked for
+# barwise/.gitleaks.toml and refused every commit made from a worktree
+# (barwise-hud). The hook starts at the top of the tree, so pin it here.
+if [ -n "${GIT_DIR-}" ]; then
+  GIT_WORK_TREE=$(pwd)
+  export GIT_WORK_TREE
+fi
+
 # `|| exit` because every step below assumes this worked; without it a
 # failed cd runs lint-staged and the build against the repo root.
 cd barwise || exit 1

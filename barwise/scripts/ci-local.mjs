@@ -283,8 +283,10 @@ function runAtCommit(argv) {
       `Checking ${sha.slice(0, 8)} in a fresh worktree: npm ci, then the CI gate list.\n`,
     );
 
+    const env = envForWorktree();
     const install = spawnSync("npm", ["ci", "--no-audit", "--no-fund"], {
       cwd: checkout,
+      env,
       stdio: "inherit",
     });
     if (install.error || install.status !== 0) {
@@ -302,6 +304,7 @@ function runAtCommit(argv) {
       ...passThrough,
     ], {
       cwd: checkout,
+      env,
       stdio: "inherit",
     });
     if (run.error || run.status === null) {
@@ -323,6 +326,35 @@ function runAtCommit(argv) {
 }
 
 const WORKTREE_PREFIX = "barwise-commit-";
+
+/**
+ * The variables by which git tells a command which repository it is in. A
+ * hook in a linked worktree runs with GIT_DIR, and from our hooks an absolute
+ * GIT_WORK_TREE, naming the PUSHING checkout. Inherited by the install and
+ * the run in the fresh worktree, every git command there would read the
+ * pushing checkout's index and tree instead of the commit's (barwise-hud).
+ * Not `git rev-parse --local-env-vars`: that list also holds GIT_CONFIG_COUNT
+ * and GIT_CONFIG_PARAMETERS, which carry `-c` settings the environment can
+ * depend on, such as a proxy's CA bundle, and say nothing about location;
+ * and GIT_OBJECT_DIRECTORY and GIT_ALTERNATE_OBJECT_DIRECTORIES, which name
+ * the object store every worktree of the repository shares. Where they are
+ * set, the commit may live only there, so the fresh worktree keeps them.
+ */
+const REPO_LOCATION_VARS = [
+  "GIT_DIR",
+  "GIT_WORK_TREE",
+  "GIT_IMPLICIT_WORK_TREE",
+  "GIT_INDEX_FILE",
+  "GIT_PREFIX",
+  "GIT_COMMON_DIR",
+];
+
+/** This process's environment, minus what would point git at this checkout. */
+function envForWorktree() {
+  const env = { ...process.env };
+  for (const name of REPO_LOCATION_VARS) delete env[name];
+  return env;
+}
 
 /**
  * Remove worktrees a killed `--commit` run left behind.

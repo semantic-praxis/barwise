@@ -39,6 +39,16 @@ if [ -z "${shas}" ]; then
   exit 0
 fi
 
+# In a linked worktree git runs this hook with GIT_DIR set and GIT_WORK_TREE
+# unset or relative ("."). After the cd below, every git command would then
+# take barwise/ for the top of the tree: check:secrets looked for
+# barwise/.gitleaks.toml and refused every commit made from a worktree
+# (barwise-hud). The hook starts at the top of the tree, so pin it here.
+if [ -n "${GIT_DIR-}" ]; then
+  GIT_WORK_TREE=$(pwd)
+  export GIT_WORK_TREE
+fi
+
 cd barwise || exit 1
 
 # Checked as CI will see it: a fresh worktree of the pushed commit, not this
