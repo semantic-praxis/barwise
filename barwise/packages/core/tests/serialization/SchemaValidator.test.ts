@@ -169,6 +169,51 @@ describe("SchemaValidator", () => {
       expect(result.valid).toBe(false);
     });
 
+    // The value-only fields on an entity: tests/model/valueOnlyFields.test.ts,
+    // generated from the one list rather than restated here.
+
+    describe("naming the element an error is in", () => {
+      it("adds the name of the nearest model element to the message", () => {
+        const result = validator.validateModel({
+          orm_version: "2.0",
+          model: {
+            name: "Test",
+            object_types: [
+              { id: "ot-1", name: "Weight", kind: "value", data_type: { name: "furlongs" } },
+            ],
+          },
+        });
+        // The data type's own `name` ("furlongs") is a field, not an
+        // element: the message names the object type.
+        expect(result.errors).toContainEqual({
+          path: "/model/object_types/0/data_type/name",
+          message: 'must be equal to one of the allowed values (in "Weight")',
+        });
+      });
+
+      it("adds nothing when the element has no name, or the error is on the model", () => {
+        const unnamed = validator.validateModel({
+          orm_version: "2.0",
+          model: {
+            name: "Test",
+            object_types: [{ id: "ot-1", name: "  ", kind: "value", colour: 1 }],
+          },
+        });
+        expect(unnamed.errors).toContainEqual({
+          path: "/model/object_types/0",
+          message: "must NOT have additional properties",
+        });
+        const top = validator.validateModel({
+          orm_version: "2.0",
+          model: { name: "Test", colour: 1 },
+        });
+        expect(top.errors).toContainEqual({
+          path: "/model",
+          message: "must NOT have additional properties",
+        });
+      });
+    });
+
     it("rejects an entity type without reference_mode", () => {
       const doc = {
         orm_version: "2.0",

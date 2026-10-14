@@ -238,18 +238,52 @@ export function isValueType(ot: ObjectType): ot is ValueType {
 }
 
 /**
- * Build an object type from a config, applying every default and refusing
- * every combination the old constructor threw for.
+ * The config fields only a value type may carry, with the words a message
+ * uses for each.
  *
- * The refusals are unchanged in wording and in what they reject; what
- * changes is that two of them are now unreachable from typed code, since
- * a caller with an `EntityTypeConfig` cannot omit the reference mode and
- * one with a `ValueTypeConfig` cannot supply it. They stay because
- * `ObjectTypeConfig` is also built from parsed YAML, where the compiler
- * has no say.
+ * The one list of them. The JSON Schema forbids the same fields under its
+ * entity branch, in their YAML spelling, and
+ * `tests/model/valueOnlyFields.test.ts` derives the schema's list from this
+ * one, so the two cannot disagree about what a file and a direct caller may
+ * put on an entity.
  */
+export const VALUE_ONLY_FIELDS = [
+  ["dataType", "a data type"],
+  ["valueConstraint", "a value constraint"],
+  ["defaultValue", "a default value"],
+] as const;
+
+/**
+ * Build an object type from a config, applying every default and refusing
+ * every combination the old constructor threw for, plus the value-only
+ * fields on an entity type, which it silently dropped (barwise-5fg).
+ *
+ * Every check is a run-time check: `ObjectTypeConfig` is one broad type, so
+ * the compiler lets a caller omit an entity's reference mode, give a value
+ * type one, or put a value-only field on an entity, and the config is also
+ * built from parsed YAML, where it has no say at all. The value-only fields
+ * are checked first, so an entity carrying an empty value constraint is told
+ * it cannot have one rather than that it needs a value.
+ */
+
 export function createObjectType(config: ObjectTypeConfig): ObjectType {
   const name = requireName(config.name);
+
+  if (config.kind === "entity") {
+    // Refused rather than ignored. An entity type takes its data type, value
+    // constraint and default from the value type its reference mode names;
+    // on the entity they mean nothing. Before this, the union dropped them
+    // without a word, and a file that carried one lost it on the next save
+    // (barwise-5fg, a regression from the one-class model, which stored them
+    // for either kind).
+    for (const [field, label] of VALUE_ONLY_FIELDS) {
+      if (config[field] !== undefined) {
+        throw new Error(
+          `Entity type "${name}" cannot have ${label}; it belongs on the value type its reference mode names.`,
+        );
+      }
+    }
+  }
 
   if (config.valueConstraint) {
     const { values, ranges } = config.valueConstraint;

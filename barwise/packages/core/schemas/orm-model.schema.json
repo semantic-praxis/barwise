@@ -172,7 +172,12 @@
       "then": {
         "required": [
           "reference_mode"
-        ]
+        ],
+        "properties": {
+          "data_type": false,
+          "value_constraint": false,
+          "default_value": false
+        }
       }
     },
     "role_path_def": {

@@ -23,18 +23,41 @@ export function parseObjectTypes(
       continue;
     }
 
+    const kind = ext.kind ?? "entity";
+    // An entity type takes its data type and value constraint from its
+    // reference mode's value type, and core refuses them on the entity
+    // (barwise-5fg). A model that attaches one anyway has still described a
+    // real entity: drop the field and say so, rather than lose the entity
+    // and every fact type that names it.
+    const isEntity = kind === "entity";
+    if (isEntity) {
+      const dropped = [
+        ...(ext.data_type !== undefined ? ["data_type"] : []),
+        // Presence, not content: an empty constraint is dropped too, and
+        // must say so like any other.
+        ...(ext.value_constraint !== undefined ? ["value_constraint"] : []),
+      ];
+      if (dropped.length > 0) {
+        warnings.push(
+          `Dropped ${
+            dropped.join(" and ")
+          } from entity type "${ext.name}": an entity type takes these from its reference mode's value type.`,
+        );
+      }
+    }
+
     try {
       model.addObjectType({
         name: ext.name,
-        kind: ext.kind ?? "entity",
+        kind,
         referenceMode: ext.kind === "entity"
           ? (ext.reference_mode ?? `${camelCase(ext.name)}_id`)
           : undefined,
         definition: ext.definition,
-        valueConstraint: ext.value_constraint?.values?.length
+        valueConstraint: !isEntity && ext.value_constraint?.values?.length
           ? { values: [...ext.value_constraint.values] }
           : undefined,
-        dataType: resolveDataType(ext.data_type, ext.name, warnings),
+        dataType: isEntity ? undefined : resolveDataType(ext.data_type, ext.name, warnings),
         aliases: ext.aliases?.length ? [...ext.aliases] : undefined,
       });
 
