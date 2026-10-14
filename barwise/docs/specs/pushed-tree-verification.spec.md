@@ -1,8 +1,8 @@
 # The pre-push run checks the commit being pushed, not the working tree
 
-Status: Workstreams 1, 2 and 3 implemented 2026-10-14. Workstream 3 shares
-Turbo's cache, not the cold build decision (A) chose; (A) is reopened (see
-Implementation notes)
+Status: Workstreams 1, 2 and 3 implemented 2026-10-14. Decision (A) settled
+2026-10-14: the worktree shares Turbo's cache, not the cold build the first
+draft chose (see Implementation notes)
 Created: 2026-10-14
 Last-updated: 2026-10-14
 Tracking: barwise-vzf (this spec); barwise-qch (workstream 2)
@@ -289,14 +289,14 @@ size the cost; workstream 3 measures the hook end to end.
   took 392 s.
 - `git push --no-verify` remains the escape hatch.
 
-## Open decisions (for review)
+## Decisions (settled in review)
 
 The Scope, architecture and workstreams are written against the
 recommended default of each. A requirement that depends on one carries
 its letter.
 
-- **(A) Turbo cache in the worktree: shared (recommended, as built) or
-  cold.** Turbo shares its local cache across worktrees by default, so
+- **(A) Turbo cache in the worktree: shared (chosen by the maintainer,
+  2026-10-14) or cold.** Turbo shares its local cache across worktrees by default, so
   the worktree reuses what this checkout has computed: measured at about
   30 s per push over an in-tree run. A cold build (`--force`, or an empty
   `TURBO_CACHE_DIR`) recomputes `test:coverage` every time: 392 s per
@@ -430,8 +430,8 @@ The first pair looked like a 3.5-minute penalty for the worktree, but only
 the first run had to compute coverage at all; the second reused its
 result. The steady-state cost is the third reading: about 30 s over an
 in-tree run, mostly `npm ci`. A truly cold build, which (A) recommended,
-would cost the 392 s on every source push. Decision (A) is reopened on
-these numbers, with the build as it stands (shared) until it is decided.
+would cost the 392 s on every source push. Decision (A) was reopened on
+these numbers, and the maintainer chose shared.
 
 The first timing run also caught a real defect: `fmt:check` failed in the
 worktree because these files had been committed without formatting. The
