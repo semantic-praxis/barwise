@@ -32,6 +32,7 @@
     "test:optimizer": "uv run --frozen --extra dev pytest -q",
     "audit:duplication": "node scripts/audit-duplication.mjs",
     "mutate": "node scripts/mutate.mjs",
+    "measure:comparison": "node scripts/measure-comparison.mjs",
     "fault-matrix": "node scripts/fault-matrix.mjs",
     "test:cli-checks": "bash test-plan/cli-checks.sh",
     "test:mcp-checks": "node test-plan/mcp-checks.mjs",
@@ -79,7 +80,8 @@
     "publint": "^0.3.24",
     "turbo": "^2.10.13",
     "typescript": "^5.7.0",
-    "typescript-eslint": "^8.70.0"
+    "typescript-eslint": "^8.70.0",
+    "yaml": "^2.9.1"
   },
   "lint-staged": {
     "*.ts": [

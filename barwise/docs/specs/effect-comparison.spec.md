@@ -1,6 +1,7 @@
 # Effect against hand-written sealed records: a measured comparison before the rest of barwise-973
 
-Status: Draft -- no workstream implemented
+Status: WS0 implemented 2026-10-13 (instruments and baseline); the
+barwise-5fg prerequisite and WS1-WS4 not started
 Created: 2026-10-13
 Last-updated: 2026-10-13
 Tracking: barwise-cu0 (this spec); barwise-973 (WS1 of
@@ -231,6 +232,54 @@ the roughly 200 ms spent importing the 17 commands `validate` never runs
 (barwise-8nx), and the schema compile, paid on every model load in every
 short-lived process (barwise-aqa).
 
+## Baseline (WS0, 2026-10-13)
+
+Taken at `d3a168cf` with only WS0's own files uncommitted (no source
+change), Node v26.7.0, Intel Xeon 2.80 GHz x4, by `npm run
+measure:comparison -- <subcommand>` with `--force` builds. These are the
+readings the arms are compared against; every instrument behind them was
+shown to fail on its defect with `scripts/mutate.mjs`.
+
+| #  | Reading                                                                                             |
+| -- | --------------------------------------------------------------------------------------------------- |
+| G1 | Full suite and `validate:examples` green; promptlab reference drift green                           |
+| G2 | `objectTypeLayout.test.ts` green; two reorderings and a dropped field each caught                   |
+| G3 | `schemaDataTypes.test.ts` green; `"other"` dropped from either side caught                          |
+| G4 | `validate` median of 15: 402 ms npm, 475 ms bundle -- pass. 302 modules, 1.46 MB loaded             |
+| D1 | From the WS3 pilot                                                                                  |
+| D2 | Singly: 8 of 11 reported, 2 by name, 3 silent losses. Combined: 4 of 11, 0 by name                  |
+| D3 | From the WS3 pilot. `trial` fails a branch that touches the oracle (tested on a scratch repository) |
+| R1 | WS1 step 1 (`diff 522ef4b2^ 522ef4b2`): 20 source files, 14 outside the slice, 87 hunks             |
+| R2 | Bytes: vscode client 8.21 M, mcp 8.81 M, server 1.25 M, webview 0.74 M; CLI bundle 8.01 M           |
+| R3 | 440 lines (`ObjectType.ts` 332, `yaml/objectType.ts` 108)                                           |
+
+D2 case by case, today's loader:
+
+| Case                           | Outcome | Reported | By name | Silent loss        |
+| ------------------------------ | ------- | -------- | ------- | ------------------ |
+| value with `reference_mode`    | refused | yes      | yes     |                    |
+| entity without one             | refused | yes      | no      |                    |
+| entity with `data_type`        | loaded  | no       | no      | `data_type`        |
+| entity with `value_constraint` | loaded  | no       | no      | `value_constraint` |
+| entity with `default_value`    | loaded  | no       | no      | `default_value`    |
+| cardinality `max < min`        | refused | yes      | yes     |                    |
+| negative `min`                 | refused | yes      | no      |                    |
+| empty value constraint         | refused | yes      | no      |                    |
+| blank name                     | refused | yes      | no      |                    |
+| unknown data type              | refused | yes      | no      |                    |
+| excess property                | refused | no       | no      |                    |
+
+The three silent losses are barwise-5fg, whose fix lands before either
+arm starts; the excess property is refused with "must NOT have additional
+properties", which names neither the object type nor the property. In
+the combined file the JSON Schema check reports its four by array
+position and stops, so the constructor's checks never run.
+
+One reading outside the criteria: `barwise --version` (412 ms) is slower
+than `validate` (402 ms), because routing loads every command when the
+first argument is not a command name
+(`cli-lazy-command-loading.spec.md`). It is left as it is.
+
 ## Competing frames
 
 Three explanations for whatever the arms show, with the evidence that
@@ -280,22 +329,24 @@ Assume the decision shipped and proved wrong. The likely stories:
 
 ## Inventory
 
-How each criterion is measured. Rows marked new are built by WS0, and
-their locations are provisional until WS0 grounds them; the script is
-`barwise/scripts/measure-comparison.mjs`.
+How each criterion is measured. Rows marked new were built by WS0; the
+script is `barwise/scripts/measure-comparison.mjs`, run as `npm run
+measure:comparison -- <subcommand>`. The last column is the reading
+taken while grounding the criteria; WS0's recorded readings are under
+Baseline.
 
-| #  | Instrument                                                             | Baseline, main `8d2f526b`               |
-| -- | ---------------------------------------------------------------------- | --------------------------------------- |
-| G1 | Full suite, `validate:examples`, promptlab `referenceDrift.test.ts`    | green                                   |
-| G2 | New: `core/tests/serialization/objectTypeLayout.test.ts`               | missing; 5 of 10 optional fields pinned |
-| G3 | `audit:duplication -- --check`, `check:parity`; new enum drift test    | one unchecked copy (barwise-0lf)        |
-| G4 | New: script `startup`, `barwise validate`, median of 15, both builds   | `validate`: 703 ms npm, 566 ms bundle   |
-| D1 | New: script `diff` over passing T1 runs (Appendix B), median           | from the WS3 pilot                      |
-| D2 | New: fixtures in `core/tests/fixtures/malformed/`, script `malformed`  | first problem only; one silent loss     |
-| D3 | New: script `trial` -- oracle pass, tokens, tool calls, time, red runs | spread from the WS3 pilot               |
-| R1 | New: script `diff`, files outside `core/src/{model,serialization}`     | WS1 step 1 changed 30 files in all      |
-| R2 | New: script `bundles`, `--force` builds of the vscode and CLI bundles  | 8.21, 8.81, 1.25, 0.74 MB; CLI 7.92 MB  |
-| R3 | New: script `diff`, lines in the slice's files                         | 440 (332 + 108)                         |
+| #  | Instrument                                                            | Baseline, main `8d2f526b`               |
+| -- | --------------------------------------------------------------------- | --------------------------------------- |
+| G1 | Full suite, `validate:examples`, promptlab `referenceDrift.test.ts`   | green                                   |
+| G2 | New: `core/tests/serialization/objectTypeLayout.test.ts`              | missing; 5 of 10 optional fields pinned |
+| G3 | `audit:duplication -- --check`, `check:parity`; new enum drift test   | one unchecked copy (barwise-0lf)        |
+| G4 | New: script `startup`, `barwise validate`, median of 15, both builds  | `validate`: 703 ms npm, 566 ms bundle   |
+| D1 | New: script `diff` over passing T1 runs (Appendix B), median          | from the WS3 pilot                      |
+| D2 | New: fixtures in `core/tests/fixtures/malformed/`, script `malformed` | first problem only; three silent losses |
+| D3 | New: script `trial` (oracle untouched); tokens, calls, time from WS3  | spread from the WS3 pilot               |
+| R1 | New: script `diff`, files outside `core/src/{model,serialization}`    | WS1 step 1: 14 of 20 source files       |
+| R2 | New: script `bundles`, `--force` builds of the vscode and CLI bundles | 8.21, 8.81, 1.25, 0.74 MB; CLI 7.92 MB  |
+| R3 | New: script `diff`, lines in the slice's files                        | 440 (332 + 108)                         |
 
 One script with subcommands rather than five, so the measurement has one
 home and the gate-refusal contract (exit 2 when it cannot see its input)
@@ -392,7 +443,13 @@ with a `--force` rebuild after each restore wherever a bundle is read
   records problems reported, silent losses (a round trip that drops a
   field) and whether each message names the element and the field. It
   measures rather than asserts, because today fails by design; its own
-  test plants a silent loss and checks the scorer reports it.
+  test plants a silent loss and checks the scorer reports it. Each arm
+  reports problems as a list, one per entry: a message credited to more
+  than one problem makes `malformed` refuse (exit 2), because one block
+  of text naming every problem -- Effect Schema's default formatter --
+  would otherwise be credited with all of them. A position is read in
+  both path spellings (`object_types/1` and `["object_types"][1]`), so
+  neither arm is scored on punctuation.
 - The baseline run of each, recorded in this spec in a Baseline section
   that WS0 adds.
 
