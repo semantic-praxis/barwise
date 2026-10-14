@@ -340,3 +340,87 @@ test("the hook blocks a failing commit and a refused one, each with its own mess
   assert.match(refused.stderr, /a{40} could not be checked/);
   assert.doesNotMatch(refused.stderr, /CI would fail/);
 });
+
+// --- linked worktrees (barwise-hud) --------------------------------------
+
+test("both hooks see the worktree's root when run from a linked worktree", () => {
+  // git runs a hook in a linked worktree with GIT_DIR set and GIT_WORK_TREE
+  // relative ("."). Each hook then cds into barwise/, and without a pin every
+  // git command it starts took barwise/ for the top of the tree -- which is
+  // how check:secrets refused every commit made from a worktree.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-linked-"));
+  const tree = join(dir, "linked");
+  try {
+    const main = join(dir, "main");
+    mkdirSync(join(main, "barwise"), { recursive: true });
+    writeFileSync(join(main, "barwise", "x"), "x\n");
+    const git = (...a) =>
+      execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...a], {
+        cwd: main,
+        encoding: "utf8",
+      }).trim();
+    git("init", "-q");
+    git("add", ".");
+    git("commit", "-qm", "base");
+    git("worktree", "add", "--detach", "--quiet", tree, "HEAD");
+    const gitDir = join(main, ".git", "worktrees", "linked");
+
+    const bin = join(dir, "bin");
+    mkdirSync(bin);
+    const log = join(dir, "top.log");
+    for (const stub of ["npm", "npx"]) {
+      writeFileSync(
+        join(bin, stub),
+        `#!/bin/sh\ngit rev-parse --show-toplevel >> "${log}"\nexit 0\n`,
+      );
+      chmodSync(join(bin, stub), 0o755);
+    }
+
+    for (const name of ["pre-commit", "pre-push"]) {
+      rmSync(log, { force: true });
+      const r = spawnSync("sh", [join(dirname(HOOK), name)], {
+        cwd: tree,
+        input: `refs/heads/x ${A} refs/heads/x ${ZERO}\n`,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH ?? ""}`,
+          GIT_DIR: gitDir,
+          GIT_WORK_TREE: ".",
+        },
+      });
+      assert.equal(r.status, 0, `${name}:\n${r.stdout}${r.stderr}`);
+      const tops = readFileSync(log, "utf8").trim().split("\n");
+      assert.ok(tops.length > 0, `${name} ran no stubbed command`);
+      for (const top of tops) assert.equal(top, tree, `${name} saw ${top} as the root`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--commit's run in the fresh worktree is not pointed at the pushing checkout", () => {
+  // The hook pins an absolute GIT_WORK_TREE for its own commands. Passed on to
+  // the run in the fresh worktree, it would make every git command there read
+  // the pushing checkout instead of the commit.
+  const repo = commitRepo();
+  try {
+    writeFileSync(
+      join(repo.root, "scripts", "probe.mjs"),
+      'import { execFileSync } from "node:child_process";\n'
+        + 'import { resolve } from "node:path";\n'
+        + 'const top = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" });\n'
+        + 'process.exitCode = top.trim() === resolve(process.cwd(), "..") ? 0 : 1;\n',
+    );
+    repo.git("commit", "-qam", "probe checks the top of the tree");
+
+    const r = spawnSync(process.execPath, [repo.script, "--commit", "HEAD"], {
+      cwd: repo.root,
+      encoding: "utf8",
+      env: { ...process.env, GIT_DIR: join(repo.dir, ".git"), GIT_WORK_TREE: repo.dir },
+    });
+    assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+  } finally {
+    rmSync(repo.dir, { recursive: true, force: true });
+  }
+});
