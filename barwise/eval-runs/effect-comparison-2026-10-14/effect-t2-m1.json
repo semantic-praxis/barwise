@@ -69,7 +69,7 @@
       "note": "harness isolation, not the code (2 times)"
     },
     {
-      "class": "type",
+      "class": "task logic",
       "command": "npx tsc --noEmit (packages/core)",
       "firstError": "src/diff/ModelMerge.ts(24,10): error TS2724: '\"../model/SubtypeFact.js\"' has no exported member named 'toSubtypeFactConfig'",
       "note": "a caller of the deleted helper; ModelMerge now spreads the record"
