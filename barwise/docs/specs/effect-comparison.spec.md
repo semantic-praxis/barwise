@@ -451,6 +451,21 @@ head's copy, which predates the T2 grounding and says nothing about how
 T2 is scored; the other three did not. The first series' records gain
 `readSpec` here.
 
+D3 by that split, mean input processed per run:
+
+| Series | Arm    | Read the spec              | Did not                   |
+| ------ | ------ | -------------------------- | ------------------------- |
+| first  | plain  | 2 runs, 6,674,535 (m4, m5) | 3 runs, 6,284,842 (m1-m3) |
+| first  | Effect | 5 runs, 4,912,522          | none                      |
+| second | plain  | none                       | 5 runs, 5,460,843         |
+| second | Effect | none                       | 5 runs, 4,310,596         |
+
+The empty cells carry the reading. In the first series no Effect run
+skipped the spec and the plain arm splits two against three, so reading
+the spec and the arm cannot be told apart, which is why that series
+does not decide D3. In the second series no run of either arm read it,
+which is the comparison the amendment set out to get.
+
 **The primer check (barwise-hno), answered.** None of the plain arm's
 round-1 layout-test edits is attributed to the primer. With the primer
 unchanged and the protected files named in the prompt, no plain run in
@@ -461,9 +476,13 @@ the primer's phrase.
 **What this does not settle.** T2 ran on `SubtypeFact`, which has no
 nested union, so the risk the first premortem story names -- the
 16-kind `Constraint` union inside `FactType` -- is untested, and the
-adoption spec has to start there. D3's spread was close to the
-pilot's: five runs per arm resolve about a fifth of a run's cost, and
-the second series' difference sits just under that.
+adoption spec has to start there. Nor could these runs have resolved a
+modest D3 difference: the second series' bound, 1,911,232, is 35.0% of
+the plain arm's mean, against the pilot's projected 18.0%, because the
+spread of both arms came out wider than the pilot's. The 21.1%
+difference is well under it. A difference in agent cost smaller than
+about a third of a run is beyond what this experiment can see, and the
+adoption spec should not read D3's silence as evidence of no difference.
 
 ## Competing frames
 
