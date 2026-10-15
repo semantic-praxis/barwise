@@ -396,11 +396,20 @@ test("heldout counts a case that throws as failed, with the error, not as a cras
  * base's shape (a class instance carrying a derived name and an undefined
  * rule); `ruleUnchecked` accepts from code a defining rule the file refuses,
  * as the base does. `dropRule` loses a defining rule built in code, and
- * `mutableFileRule` leaves a loaded one unfrozen. With none, it is a correct
- * conversion.
+ * `mutableFileRule` leaves a loaded one unfrozen. `kindUnchecked` checks a
+ * rule's storage and expression from code but not its kind, and
+ * `valueEndpoint` lets a value type stand at either end. With none, it is a
+ * correct conversion.
  */
 function fakeSubtypeCore(
-  { asClass = false, ruleUnchecked = false, dropRule = false, mutableFileRule = false } = {},
+  {
+    asClass = false,
+    ruleUnchecked = false,
+    dropRule = false,
+    mutableFileRule = false,
+    kindUnchecked = false,
+    valueEndpoint = false,
+  } = {},
 ) {
   const dir = mkdtempSync(join(tmpdir(), "heldout-t2-"));
   const core = join(dir, "barwise", "packages", "core");
@@ -410,12 +419,13 @@ function fakeSubtypeCore(
     join(core, "dist", "index.js"),
     `
 let next = 0;
-const ruleOk = (r) => r === undefined
-  || (typeof r.expression === "string" && ["derive_on_request", "derived_and_stored", undefined].includes(r.storage));
+const ruleOk = (r, checkKind = true) => r === undefined
+  || (typeof r.expression === "string" && ["derive_on_request", "derived_and_stored", undefined].includes(r.storage)
+    && (!checkKind || ["derived", "semiderived"].includes(r.kind)));
 class Legacy { constructor(c) { Object.assign(this, c); this._name = "subtype:" + c.subtypeId; } }
 const make = (c, checkRule, fromFile = false) => {
   if (c.subtypeId === c.supertypeId) throw new Error("subtype of itself");
-  if (checkRule && !ruleOk(c.definingRule)) throw new Error("bad defining rule");
+  if (checkRule && !ruleOk(c.definingRule, fromFile || !${kindUnchecked})) throw new Error("bad defining rule");
   const r = {
     id: c.id ?? "sf-" + ++next,
     subtypeId: c.subtypeId,
@@ -436,6 +446,10 @@ export class OrmModel {
   addSubtypeFact(c) {
     const ids = this.objectTypes.map((o) => o.id);
     if (!ids.includes(c.subtypeId) || !ids.includes(c.supertypeId)) throw new Error("absent type");
+    const kindOf = (id) => this.objectTypes.find((o) => o.id === id).kind;
+    if (!${valueEndpoint} && (kindOf(c.subtypeId) === "value" || kindOf(c.supertypeId) === "value")) {
+      throw new Error("a subtype fact relates entity types");
+    }
     if (this.subtypeFacts.some((s) => s.subtypeId === c.subtypeId && s.supertypeId === c.supertypeId)) {
       throw new Error("duplicate");
     }
@@ -514,11 +528,13 @@ test("heldout t2 passes a converted SubtypeFact and fails the base's class and i
     fakeSubtypeCore({ ruleUnchecked: true }),
     fakeSubtypeCore({ dropRule: true }),
     fakeSubtypeCore({ mutableFileRule: true }),
+    fakeSubtypeCore({ kindUnchecked: true }),
+    fakeSubtypeCore({ valueEndpoint: true }),
   ];
   try {
     const good = run(dirs[0]);
     assert.equal(good.status, 0, JSON.stringify(failedNames(good)));
-    assert.equal(good.report.cases.length, 15);
+    assert.equal(good.report.cases.length, 17);
     // The base's shape: not a plain record, a derived name, a rule key set to
     // undefined. Each record case fails; the behaviour it kept still passes.
     const legacy = run(dirs[1]);
@@ -540,6 +556,15 @@ test("heldout t2 passes a converted SubtypeFact and fails the base's class and i
         "a subtype fact's defining rule is kept and frozen, from code and from a file",
       ]);
     }
+    // A rule kind left unchecked from code, and a value type at either end,
+    // each fail their own case and nothing else (Copilot, PR #662).
+    assert.deepEqual(failedNames(run(dirs[5])), [
+      "a defining rule a file would refuse is refused from code too",
+    ]);
+    assert.deepEqual(failedNames(run(dirs[6])), [
+      "construction refuses a value type as the subtype",
+      "construction refuses a value type as the supertype",
+    ]);
     // A task with no cases is refused, not read as zero cases passed -- and
     // so is an inherited name, which a plain lookup would accept.
     for (const task of ["t3", "toString", "constructor"]) {

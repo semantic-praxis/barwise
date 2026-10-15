@@ -663,6 +663,18 @@ function t2Cases({ OrmModel, OrmYamlSerializer, diffModels }) {
       m.addSubtypeFact({ subtypeId: b.id, supertypeId: a.id });
       return throws(() => m.addSubtypeFact({ subtypeId: b.id, supertypeId: a.id }));
     }],
+    // A subtype relation is between entity types; the base refuses a value
+    // type at either end, and the task keeps the refusals (Copilot, PR #662).
+    ["construction refuses a value type as the subtype", () => {
+      const { m, a } = twoTypes();
+      const v = m.addObjectType({ name: "Code", kind: "value" });
+      return throws(() => m.addSubtypeFact({ subtypeId: v.id, supertypeId: a.id }));
+    }],
+    ["construction refuses a value type as the supertype", () => {
+      const { m, a } = twoTypes();
+      const v = m.addObjectType({ name: "Code", kind: "value" });
+      return throws(() => m.addSubtypeFact({ subtypeId: a.id, supertypeId: v.id }));
+    }],
     // Text, unlike T1's values: the task keeps the YAML layout, so a file
     // written before the conversion must come back exactly as it was.
     ["a subtype fact with every field survives a save and a load unchanged", () => {
@@ -704,8 +716,14 @@ function t2Cases({ OrmModel, OrmYamlSerializer, diffModels }) {
     [
       "a defining rule a file would refuse is refused from code too",
       () =>
-        throws(() => built({ definingRule: { kind: "derived", storage: "nope", expression: "e" } }))
-        && throws(() => built({ definingRule: { kind: "derived" } })),
+        // Each field the file schema constrains: storage, expression, kind
+        // (required, and one of two values).
+        [
+          { kind: "derived", storage: "nope", expression: "e" },
+          { kind: "derived" },
+          { expression: "e" },
+          { kind: "nope", expression: "e" },
+        ].every((definingRule) => throws(() => built({ definingRule }))),
     ],
   ];
 }
