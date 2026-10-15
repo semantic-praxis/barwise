@@ -10,7 +10,7 @@
  *   diff      <base> [<head>]           D1, R1, R3: what a change touched
  *   trial     --base <ref> [--path P]   D3: a trial branch left the held-out
  *                                       oracle alone
- *   heldout   --task t1 --path P        D3: what the task asked for, checked
+ *   heldout   --task t1|t2 --path P     D3: what the task asked for, checked
  *                                       against a run's built core
  *   usage     <transcript.jsonl>        D3: input tokens a run processed, from
  *             [--turns]                 its own transcript; --turns adds each
@@ -384,7 +384,9 @@ function trial(args) {
 async function heldout(args) {
   const task = flag(args, "--task");
   const path = flag(args, "--path");
-  if (task !== "t1") refuse("heldout needs --task t1 (the only task with held-out cases).");
+  if (!HELD_OUT[task]) {
+    refuse(`heldout needs --task ${Object.keys(HELD_OUT).join(" or ")}, not ${task ?? "(none)"}.`);
+  }
   if (!path) refuse("heldout needs --path <worktree of the run>.");
   // Resolved once, against the caller's directory, and imported by URL: a
   // bare relative path is checked against cwd but imported as a package
@@ -401,8 +403,34 @@ async function heldout(args) {
   } catch (error) {
     refuse(`could not load the run's built core: ${error?.message ?? error}`);
   }
-  const { OrmModel, OrmYamlSerializer, SchemaValidator } = core;
-  const { diffModels } = diffModule;
+  const cases = HELD_OUT[task]({ ...core, diffModels: diffModule.diffModels }).map(
+    ([name, check]) => {
+      try {
+        return { name, ok: check() === true };
+      } catch (error) {
+        return { name, ok: false, error: String(error?.message ?? error).split("\n")[0] };
+      }
+    },
+  );
+
+  const failed = cases.filter((c) => !c.ok).length;
+  process.stdout.write(
+    `${JSON.stringify({ task, path, passed: cases.length - failed, failed, cases }, null, 2)}\n`,
+  );
+  return failed === 0 ? 0 : 1;
+}
+
+const throws = (fn) => {
+  try {
+    fn();
+    return false;
+  } catch {
+    return true;
+  }
+};
+
+/** T1, add an optional `unit` to value types (Appendix B). */
+function t1Cases({ OrmModel, OrmYamlSerializer, SchemaValidator, diffModels }) {
   const yaml = new OrmYamlSerializer();
 
   const doc = (fields) => ({
@@ -416,14 +444,6 @@ async function heldout(args) {
   const load = (fields) => yaml.deserialize(JSON.stringify(doc(fields)));
   const weightDelta = (a, b) =>
     diffModels(load(a), load(b)).deltas.find((d) => d.elementType === "object_type");
-  const throws = (fn) => {
-    try {
-      fn();
-      return false;
-    } catch {
-      return true;
-    }
-  };
 
   /** Refused by `make`, or accepted and then kept by a save and a load and seen by the diff. */
   const emptyUnitIsRefusedOrOrdinary = (make) => {
@@ -435,7 +455,7 @@ async function heldout(args) {
       && kindOf({ unit: "" }, {}) === "modified";
   };
 
-  const cases = [
+  return [
     // Values, not text: `unit: "kg"` is as correct as `unit: kg`, and a text
     // check would send a correct run back for a round it did not need.
     ["a value type's unit survives a save and a load", () => {
@@ -515,20 +535,171 @@ async function heldout(args) {
           return m;
         }),
     ],
-  ].map(([name, check]) => {
-    try {
-      return { name, ok: check() === true };
-    } catch (error) {
-      return { name, ok: false, error: String(error?.message ?? error).split("\n")[0] };
-    }
-  });
-
-  const failed = cases.filter((c) => !c.ok).length;
-  process.stdout.write(
-    `${JSON.stringify({ task, path, passed: cases.length - failed, failed, cases }, null, 2)}\n`,
-  );
-  return failed === 0 ? 0 : 1;
+  ];
 }
+
+/**
+ * T2, convert `SubtypeFact` to a sealed record (Appendix C).
+ *
+ * "Sealed record" is checked as both arms already built `ObjectType`: a
+ * plain object, frozen, carrying only its declared fields -- not as either
+ * arm spells it. The rest holds what the base already does (defaults,
+ * refusals, the YAML layout, the diff) so a conversion that loses one fails
+ * here, plus the one rule the task adds: code refuses what a file refuses.
+ * The base accepts `definingRule: { storage: "nope" }` from code, writes it,
+ * and then refuses the file it wrote.
+ */
+const BASE_SUBTYPE_YAML = [
+  "subtype_facts:",
+  "    - id: sf-1",
+  "      subtype: ot-b",
+  "      supertype: ot-a",
+  "      provides_identification: false",
+  "      is_exclusive: true",
+  "      is_exhaustive: true",
+  "      defining_rule:",
+  "        kind: semiderived",
+  "        expression: e",
+  "        storage: derived_and_stored",
+  "",
+].join("\n");
+
+function t2Cases({ OrmModel, OrmYamlSerializer, diffModels }) {
+  const yaml = new OrmYamlSerializer();
+  const FIELDS = new Set([
+    "id",
+    "subtypeId",
+    "supertypeId",
+    "providesIdentification",
+    "isExclusive",
+    "isExhaustive",
+    "definingRule",
+  ]);
+  const doc = (subtypeFact) => ({
+    orm_version: "2.0",
+    model: {
+      name: "Heldout",
+      object_types: [
+        { id: "ot-a", name: "Person", kind: "entity", reference_mode: "person_id" },
+        { id: "ot-b", name: "Employee", kind: "entity", reference_mode: "employee_id" },
+      ],
+      subtype_facts: [{ id: "sf-1", subtype: "ot-b", supertype: "ot-a", ...subtypeFact }],
+    },
+  });
+  const load = (subtypeFact = {}) => yaml.deserialize(JSON.stringify(doc(subtypeFact)));
+  const twoTypes = () => {
+    const m = new OrmModel({ name: "Heldout" });
+    const a = m.addObjectType({ name: "Person", kind: "entity", referenceMode: "person_id" });
+    const b = m.addObjectType({ name: "Employee", kind: "entity", referenceMode: "employee_id" });
+    return { m, a, b };
+  };
+  const built = (config = {}) => {
+    const { m, a, b } = twoTypes();
+    return m.addSubtypeFact({ subtypeId: b.id, supertypeId: a.id, ...config });
+  };
+  const RULE = {
+    kind: "derived",
+    storage: "derived_and_stored",
+    expression: "each Employee is a Person who is employed",
+  };
+  const isRecord = (sf) =>
+    Object.getPrototypeOf(sf) === Object.prototype && Object.isFrozen(sf)
+    && Object.keys(sf).every((k) => FIELDS.has(k));
+  const subtypeDelta = (a, b) =>
+    diffModels(load(a), load(b)).deltas.find((d) => d.elementType === "subtype_fact");
+
+  return [
+    [
+      "a subtype fact built in code is a plain, frozen record of its fields",
+      () => isRecord(built({ definingRule: RULE })),
+    ],
+    [
+      "a subtype fact loaded from a file is a plain, frozen record of its fields",
+      () => isRecord(load({ defining_rule: { kind: "derived", expression: "e" } }).subtypeFacts[0]),
+    ],
+    [
+      "a subtype fact's defining rule is frozen with it",
+      () => Object.isFrozen(built({ definingRule: RULE }).definingRule),
+    ],
+    [
+      "a subtype fact without a defining rule carries no definingRule key",
+      () => !("definingRule" in built()) && !("definingRule" in load().subtypeFacts[0]),
+    ],
+    ["defaults: provides identification, not exclusive, not exhaustive", () => {
+      const fromCode = built();
+      const fromFile = load().subtypeFacts[0];
+      return [fromCode, fromFile].every((sf) =>
+        sf.providesIdentification === true && sf.isExclusive === false
+        && sf.isExhaustive === false
+      );
+    }],
+    [
+      "an explicit id is kept, and one is made when absent",
+      () =>
+        built({ id: "sf-9" }).id === "sf-9" && typeof built().id === "string"
+        && built().id.length > 0,
+    ],
+    ["construction refuses a subtype of itself", () => {
+      const { m, a } = twoTypes();
+      return throws(() => m.addSubtypeFact({ subtypeId: a.id, supertypeId: a.id }));
+    }],
+    ["construction refuses a subtype fact naming an absent type", () => {
+      const { m, a } = twoTypes();
+      return throws(() => m.addSubtypeFact({ subtypeId: "missing", supertypeId: a.id }));
+    }],
+    ["construction refuses a duplicate subtype fact", () => {
+      const { m, a, b } = twoTypes();
+      m.addSubtypeFact({ subtypeId: b.id, supertypeId: a.id });
+      return throws(() => m.addSubtypeFact({ subtypeId: b.id, supertypeId: a.id }));
+    }],
+    // Text, unlike T1's values: the task keeps the YAML layout, so a file
+    // written before the conversion must come back exactly as it was.
+    ["a subtype fact with every field survives a save and a load unchanged", () => {
+      const text = yaml.serialize(load({
+        provides_identification: false,
+        is_exclusive: true,
+        is_exhaustive: true,
+        defining_rule: { kind: "semiderived", expression: "e", storage: "derived_and_stored" },
+      }));
+      const back = yaml.deserialize(text).subtypeFacts[0];
+      return yaml.serialize(yaml.deserialize(text)) === text
+        && back.providesIdentification === false
+        && back.isExclusive === true && back.isExhaustive === true
+        && back.definingRule?.storage === "derived_and_stored";
+    }],
+    // The layout itself, which the round trip above cannot see: a run that
+    // reorders or renames keys agrees with itself. Both arm heads write
+    // exactly this (2026-10-15); G2's layout test covers object types only.
+    ["a subtype fact is written as the base writes it", () => {
+      const text = yaml.serialize(load({
+        provides_identification: false,
+        is_exclusive: true,
+        is_exhaustive: true,
+        defining_rule: { kind: "semiderived", expression: "e", storage: "derived_and_stored" },
+      }));
+      return text.slice(text.lastIndexOf("subtype_facts:")) === BASE_SUBTYPE_YAML;
+    }],
+    ["a file's subtype of itself is refused", () => throws(() => load({ supertype: "ot-b" }))],
+    [
+      "the diff reports a changed subtype fact",
+      () => subtypeDelta({}, { is_exclusive: true })?.kind === "modified",
+    ],
+    [
+      "the diff reports nothing for an unchanged subtype fact",
+      () => subtypeDelta({ is_exclusive: true }, { is_exclusive: true })?.kind === "unchanged",
+    ],
+    // The one rule the task adds. A rule the file format refuses, from code:
+    // refused there too, or the model saves a file it cannot load.
+    [
+      "a defining rule a file would refuse is refused from code too",
+      () =>
+        throws(() => built({ definingRule: { kind: "derived", storage: "nope", expression: "e" } }))
+        && throws(() => built({ definingRule: { kind: "derived" } })),
+    ],
+  ];
+}
+
+const HELD_OUT = { t1: t1Cases, t2: t2Cases };
 
 // -- usage -----------------------------------------------------------------
 

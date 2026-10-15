@@ -391,6 +391,155 @@ test("heldout counts a case that throws as failed, with the error, not as a cras
   }
 });
 
+/**
+ * A stand-in core for T2's cases: subtype facts only. `asClass` returns the
+ * base's shape (a class instance carrying a derived name and an undefined
+ * rule); `ruleUnchecked` accepts from code a defining rule the file refuses,
+ * as the base does. With neither, it is a correct conversion.
+ */
+function fakeSubtypeCore({ asClass = false, ruleUnchecked = false } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "heldout-t2-"));
+  const core = join(dir, "barwise", "packages", "core");
+  mkdirSync(join(core, "dist", "diff"), { recursive: true });
+  writeFileSync(join(core, "package.json"), JSON.stringify({ type: "module" }));
+  writeFileSync(
+    join(core, "dist", "index.js"),
+    `
+let next = 0;
+const ruleOk = (r) => r === undefined
+  || (typeof r.expression === "string" && ["derive_on_request", "derived_and_stored", undefined].includes(r.storage));
+class Legacy { constructor(c) { Object.assign(this, c); this._name = "subtype:" + c.subtypeId; } }
+const make = (c, checkRule) => {
+  if (c.subtypeId === c.supertypeId) throw new Error("subtype of itself");
+  if (checkRule && !ruleOk(c.definingRule)) throw new Error("bad defining rule");
+  const r = {
+    id: c.id ?? "sf-" + ++next,
+    subtypeId: c.subtypeId,
+    supertypeId: c.supertypeId,
+    providesIdentification: c.providesIdentification ?? true,
+    isExclusive: c.isExclusive ?? false,
+    isExhaustive: c.isExhaustive ?? false,
+  };
+  if (${asClass}) return new Legacy({ ...r, definingRule: c.definingRule });
+  if (c.definingRule) r.definingRule = Object.freeze({ ...c.definingRule });
+  return Object.freeze(r);
+};
+export class OrmModel {
+  constructor(c) { this.name = c.name; this.objectTypes = []; this.subtypeFacts = []; }
+  addObjectType(c) { const o = { id: "ot-" + ++next, ...c }; this.objectTypes.push(o); return o; }
+  addSubtypeFact(c) {
+    const ids = this.objectTypes.map((o) => o.id);
+    if (!ids.includes(c.subtypeId) || !ids.includes(c.supertypeId)) throw new Error("absent type");
+    if (this.subtypeFacts.some((s) => s.subtypeId === c.subtypeId && s.supertypeId === c.supertypeId)) {
+      throw new Error("duplicate");
+    }
+    const sf = make(c, !${ruleUnchecked});
+    this.subtypeFacts.push(sf);
+    return sf;
+  }
+}
+export class OrmYamlSerializer {
+  deserialize(text) {
+    const d = JSON.parse(text.split("\\n#\\n")[0]).model;
+    const m = new OrmModel({ name: d.name });
+    m.objectTypes = d.object_types;
+    m.subtypeFacts = (d.subtype_facts ?? []).map((s) => {
+      const r = s.defining_rule;
+      if (!ruleOk(r)) throw new Error("bad defining rule");
+      return make({
+        id: s.id, subtypeId: s.subtype, supertypeId: s.supertype,
+        providesIdentification: s.provides_identification, isExclusive: s.is_exclusive,
+        isExhaustive: s.is_exhaustive, definingRule: r,
+      }, true);
+    });
+    return m;
+  }
+  serialize(m) {
+    const subtype_facts = m.subtypeFacts.map((s) => ({
+      id: s.id, subtype: s.subtypeId, supertype: s.supertypeId,
+      ...(s.providesIdentification ? {} : { provides_identification: false }),
+      ...(s.isExclusive ? { is_exclusive: true } : {}),
+      ...(s.isExhaustive ? { is_exhaustive: true } : {}),
+      ...(s.definingRule ? { defining_rule: s.definingRule } : {}),
+    }));
+    // JSON to load back, then the subtype facts as YAML lines, the part the
+    // layout case reads.
+    const lines = ["subtype_facts:"];
+    for (const f of subtype_facts) {
+      const { defining_rule, ...flat } = f;
+      Object.entries(flat).forEach(([k, v], i) => lines.push((i === 0 ? "    - " : "      ") + k + ": " + v));
+      if (defining_rule) {
+        lines.push("      defining_rule:");
+        for (const [k, v] of Object.entries(defining_rule)) lines.push("        " + k + ": " + v);
+      }
+    }
+    return JSON.stringify({ orm_version: "2.0", model: { name: m.name, object_types: m.objectTypes, subtype_facts } })
+      + "\\n#\\n" + lines.join("\\n") + "\\n";
+  }
+}
+`,
+  );
+  writeFileSync(
+    join(core, "dist", "diff", "index.js"),
+    `
+export function diffModels(a, b) {
+  return {
+    deltas: a.subtypeFacts.map((s, i) => ({
+      elementType: "subtype_fact",
+      kind: JSON.stringify(s) === JSON.stringify(b.subtypeFacts[i]) ? "unchanged" : "modified",
+    })),
+  };
+}
+`,
+  );
+  return dir;
+}
+
+test("heldout t2 passes a converted SubtypeFact and fails the base's class and its unchecked rule", () => {
+  const run = (dir) => {
+    const r = spawnSync(process.execPath, [SCRIPT, "heldout", "--task", "t2", "--path", dir], {
+      encoding: "utf8",
+    });
+    return { status: r.status, stderr: r.stderr, report: JSON.parse(r.stdout) };
+  };
+  const dirs = [
+    fakeSubtypeCore(),
+    fakeSubtypeCore({ asClass: true }),
+    fakeSubtypeCore({ ruleUnchecked: true }),
+  ];
+  try {
+    const good = run(dirs[0]);
+    assert.equal(good.status, 0, JSON.stringify(failedNames(good)));
+    assert.equal(good.report.cases.length, 15);
+    // The base's shape: not a plain record, a derived name, a rule key set to
+    // undefined. Each record case fails; the behaviour it kept still passes.
+    const legacy = run(dirs[1]);
+    assert.equal(legacy.status, 1);
+    assert.deepEqual(failedNames(legacy), [
+      "a subtype fact built in code is a plain, frozen record of its fields",
+      "a subtype fact loaded from a file is a plain, frozen record of its fields",
+      "a subtype fact's defining rule is frozen with it",
+      "a subtype fact without a defining rule carries no definingRule key",
+    ]);
+    const unchecked = run(dirs[2]);
+    assert.deepEqual(failedNames(unchecked), [
+      "a defining rule a file would refuse is refused from code too",
+    ]);
+    // A task with no cases is refused, not read as zero cases passed.
+    const none = spawnSync(
+      process.execPath,
+      [SCRIPT, "heldout", "--task", "t3", "--path", dirs[0]],
+      {
+        encoding: "utf8",
+      },
+    );
+    assert.equal(none.status, 2, none.stdout);
+    assert.match(none.stderr, /t1 or t2/);
+  } finally {
+    for (const d of dirs) rmSync(d, { recursive: true, force: true });
+  }
+});
+
 test("usage sums each turn's input once, and reports the last turn's context", () => {
   // Two records share one message id, as a turn streamed in parts does; a
   // tool result carries no usage and a blank line nothing, so both are skipped.

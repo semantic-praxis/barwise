@@ -5,7 +5,8 @@ barwise-5fg prerequisite implemented 2026-10-14; WS1 and WS2 built
 2026-10-14 on their branches (see Arms as built); WS3 grounded
 2026-10-14, pilot run 2026-10-14 (see WS3), five main T1 pairs run
 2026-10-14; the primer check (barwise-hno) run 2026-10-14, inconclusive
-(see WS3); WS4 not started
+(see WS3); T2 re-scoped to `SubtypeFact` and grounded 2026-10-15, not yet run;
+WS4 not started
 Created: 2026-10-13
 Last-updated: 2026-10-14
 Tracking: barwise-cu0 (this spec); barwise-973 (WS1 of
@@ -539,7 +540,7 @@ the slice as one Schema definition, decoded with `errors: "all"`, the id
 source a declared requirement, messages customized to clear the D2 bar.
 Merges only if the rule adopts, and then through an adoption spec.
 
-### 3. Agent trials (grounded 2026-10-14 for T1; T2 still provisional)
+### 3. Agent trials (grounded 2026-10-14 for T1, 2026-10-15 for T2)
 
 Claude Code subagents, each in its own worktree, one model for every
 run, the same prompt (Appendix D) but for the style line and a primer of
@@ -794,6 +795,68 @@ What the four runs show besides the reading:
   depends on the other's logs. The prompt names a directory; it does not
   stop a run writing beside it.
 
+**T2, grounded 2026-10-15: re-scoped to `SubtypeFact`.** The first
+premortem tripwire fired for `FactType`, so T2 takes Appendix C's
+fallback, as the maintainer chose. The evidence, read from both arm
+heads:
+
+- **`FactType` is not the same task in both arms.** A fact type's
+  constraints are stored inside it (`OrmYamlFactType.constraints`),
+  decoded per fact type through the 16-kind `deserializeConstraint`. In
+  the Effect arm's style the record type is the schema's decoded type, so
+  a `FactType` schema needs either 16 constraint schemas or an escape
+  hatch around the existing decoder; the plain arm can type the field as
+  the existing `Constraint` interface and is not pushed to write 16
+  decoders.
+- **A faithful `FactType` conversion edits a protected file.**
+  `tests/laws/serialization.law.test.ts` imports and calls
+  `toFactTypeConfig` and reads `arity`; WS1 step 1 deleted the
+  equivalent `toObjectTypeConfig` and edited this same file. A run would
+  have to edit a law test or keep shims, the T1 collision made certain.
+- **Its radius is several times T1's.** `addConstraint` alone has 136
+  calls in 34 files across five packages; an estimate of 40 to 80 files
+  against 11 to 13 for `ObjectType`.
+- **`SubtypeFact` is symmetric and collides with nothing.** Stored at
+  model level, decoded with one nested `DerivationRule` (four fields),
+  no constraints, roles or readings; 11 importing files, `new
+  SubtypeFact(` only in `OrmModel` and two test files. The law test reads
+  only `supertypeId`, which survives.
+
+What the re-scope gives up: `SubtypeFact` has no nested union, so T2 no
+longer tests the premortem's first story, that the slice does not
+predict the rest. WS4 says that question is still open.
+
+How T2 runs:
+
+- **Task.** Appendix C, verbatim, in Appendix D's prompt with the same
+  primers as the main T1 trials (Appendices E and F as written). Two runs
+  per arm, in pairs, named `plain-t2-m1`, `plain-t2-m2`,
+  `effect-t2-m1`, `effect-t2-m2`, each with its own scratch directory.
+- **Scoring.** As T1: the trial scorer's protected list unchanged, the
+  full suite after both runs in a pair stop, `validate:examples`, the
+  promptlab drift test, up to two feedback rounds in the same wording,
+  and `measure:comparison -- heldout --task t2`. Records, patches and
+  per-turn usage go in the same directory.
+- **Held-out cases (15).** "Sealed record" is checked as both arms
+  already built `ObjectType`: a plain object, frozen, carrying only its
+  declared fields, an absent optional field absent rather than
+  `undefined`, from code and from a file. The rest holds what the base
+  does -- the defaults, the three refusals in `addSubtypeFact`, a file's
+  self-subtype refused, the round trip, the diff, and the YAML text both
+  heads write for a fully populated subtype fact (the layout, which G2's
+  object-type test does not cover) -- plus the one rule the task adds.
+  Each arm's head passes 10 and fails 5: the four record cases and that
+  rule.
+- **The rule the task adds is a defect the base has.** `addSubtypeFact`
+  accepts a defining rule with `storage: "nope"` or no `expression`,
+  writes it, and the file it wrote is refused on load. The task states
+  the rule (code refuses what a file refuses) so a correct run is not
+  judged against something it was never asked, and T1's empty unit,
+  which the task left open, is not repeated.
+- **D3 for T2.** Reported per run as for T1. With two runs per arm it
+  will seldom resolve a difference (Open decision 4), and WS4 says so
+  rather than reading it as a vote.
+
 ### 4. Measure, decide, record
 
 Fill the criteria table, apply the rule as written, record the result
@@ -912,14 +975,20 @@ Given to both arms verbatim, with one line differing.
 Synthetic and never merged; chosen because adding a field is the most
 common future change to this slice, and its diff is D1's measurement.
 
-## Appendix C: agent task T2, convert `FactType` (provisional)
+## Appendix C: agent task T2, convert `SubtypeFact`
 
-> Convert `FactType` to a sealed record as `core-branching-load.spec.md`
-> WS1 describes, keeping `OrmModel.addFactType` and the YAML layout.
+> Convert `SubtypeFact` to a sealed record, as `ObjectType` already is
+> here and `core-branching-load.spec.md` WS1 describes: a plain,
+> immutable record with no class, no methods and no derived name, where an
+> optional field is absent rather than undefined. `OrmModel.addSubtypeFact`
+> builds it and keeps its refusals, and a subtype fact built in code is
+> refused exactly when the same subtype fact in a file would be. Keep the
+> YAML layout. Done when the full suite, `validate:examples` and the
+> promptlab drift test pass.
 
-Re-scope before running if the Effect arm would need a schema for every
-constraint kind (the first premortem tripwire); `SubtypeFact` (114 lines,
-10 importing files) is the fallback.
+Re-scoped 2026-10-15 from "convert `FactType`, keeping
+`OrmModel.addFactType` and the YAML layout", because the first premortem
+tripwire fired; the evidence is in WS3.
 
 ## Appendix D: the trial prompt
 
