@@ -174,16 +174,19 @@ why the spike reads both heads back to back).
 
 Added after the gates above were fixed, so they change no pass or fail
 rule. They inform the adoption decision as the comparison's R-measures
-did. Each is taken on the spike's own head and on `main`, on one
-machine, with the same definitions.
+did. M1 to M4 are read on the spike's own head. `main` has no Effect
+schemas or derived values, so its M1 to M4 baselines are not applicable.
+M5's baseline on `main` is the hand-written count. Every reading is taken
+on one machine, with the same definitions.
 
 - **M1, derivation.** `Arbitrary.schema` returns a generator for the
   kind's Schema, and for the whole union. Reads yes or no, and on a no,
   the construct it names. Derivation is marked unstable in the pinned
   Effect version, so each yes is reported with that version.
-- **M2, validity.** The share of derived values that the same Schema
-  encodes. A generator that produces values the class refuses tests the
-  wrong class.
+- **M2, encodability (self-consistency).** The share of derived values
+  that the same Schema encodes. It shows the generator stays inside the
+  Schema's own domain. It does not show the values are valid for the
+  class: only M4 does that.
 - **M3, round trip.** The share of derived values for which encoding and
   then decoding gives back the same value, with object keys compared
   unordered. Key order is pinned separately, by S2.
@@ -192,12 +195,21 @@ machine, with the same definitions.
   `SchemaValidator`. This is the only measure whose answer key does not
   come from the Schema under test.
 - **M5, replaced lines.** The lines of hand-written generator in
-  `core/tests/arbitraries/model.ts` that derived generators replace, by
-  kind. See the Inventory paragraph for which lines count.
+  `core/tests/arbitraries/model.ts` that a demonstrated derived generator
+  replaces, by kind. A replacement counts only if it keeps reference
+  coordination and shrinking (below). Adapter code is reported separately
+  and is not netted against the lines it serves.
+- **Shrinking, reported with M5.** For each replaced generator, whether a
+  failing value still shrinks to a small failing value that the Schema
+  accepts. The hand-written generators depend on this: the `arbRange`
+  default on line 250 exists so the shrinker never produces a range the
+  model would reject. A derived generator's shrinking is unmeasured until
+  the spike reads it.
 
-Refusal cases stay out of M2 to M4. A derived generator produces valid
-values. The refusal cases come from the S4 fixtures and the frozen
-reference, not from the Schema being measured.
+Refusal cases stay out of M2 to M4, and out of every property. A derived
+generator produces values the Schema accepts. The refusal cases come from
+the S4 fixtures and the frozen reference, not from the Schema being
+measured.
 
 ## How this spec weighs D1
 
@@ -234,12 +246,15 @@ nowhere else:
 | Downstream packages                                   | no `effect` dependency                             | WS2: version-agreement test; declare on first use |
 
 `core/tests/arbitraries/model.ts` (1,010 lines) is the suite's hand-written
-whole-model generator. Lines 242 to 319, 78 lines of element-level
-generators, are the part a Schema could describe, and they are what M5
-counts. The whole-model generator wires cross-references between elements
-(a role's player must exist, a constraint's roles must belong to its fact
-type), and no single element's Schema describes that, so M5 does not count
-it. Nothing in it changes on `main` before the spike passes.
+whole-model generator. Lines 242 to 319, 78 lines, are the candidate
+inventory for M5: element-level generators a Schema might describe. The
+range is not all element data. Lines 297 to 308 hold reference-coordination
+fields (`playerPicks`, `ownerPick`, `rolePicks`) that the materializers at
+lines 487 to 552 use to wire roles to object types and fact types. No
+element Schema supplies those, so a replacement must keep them, and any
+adapter code that does is reported separately. Only demonstrated
+replacements count toward M5. Nothing in the file changes on `main` before
+the spike passes.
 
 `ModelGraph`, validation, verbalization and mapping read records, not
 decoders, so they are untouched by the style as long as S3 holds; that
@@ -420,10 +435,12 @@ the run count and seed recorded:
   compared unordered (M3).
 - P3, every encoded value passes the hand-written JSON Schema (M4).
 
-P3 is the independent check. P1 and P2 test the Schema against itself,
-so a Schema that is wrong the same way on both sides passes them. The
-spike adds no property whose expected answer comes from the Schema alone.
-A refusal property would be that kind, so refusals stay with the fixtures.
+P3 is the only independent check. P1 and P2 are self-consistency checks:
+their expected answer comes from the Schema alone, by design. They show
+the generator and the Schema agree, and they say nothing about validity for
+the class. A Schema that is wrong the same way on both sides passes them.
+Refusal expectations are never generated from the Schema. They stay with
+the S4 fixtures.
 
 Two constraints from the grounding below. A derived schema may not
 contain `Schema.declare` unless the declaration carries an arbitrary
@@ -574,5 +591,6 @@ entry only records that it follows.
   dependency where a package imports a core decoder.
 - No new capability: this restyles how core holds and decodes a model,
   not what it accepts or serializes.
-- The spike deletes no hand-written generator and adds no property whose
-  expected answer comes from the Schema under test alone.
+- The spike deletes no hand-written generator. Its only properties whose
+  expected answer comes from the Schema alone are the self-consistency
+  checks P1 and P2, and no refusal expectation is generated from the Schema.
