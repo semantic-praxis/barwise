@@ -395,9 +395,13 @@ test("heldout counts a case that throws as failed, with the error, not as a cras
  * A stand-in core for T2's cases: subtype facts only. `asClass` returns the
  * base's shape (a class instance carrying a derived name and an undefined
  * rule); `ruleUnchecked` accepts from code a defining rule the file refuses,
- * as the base does. With neither, it is a correct conversion.
+ * as the base does. `dropRule` loses a defining rule built in code, and
+ * `mutableFileRule` leaves a loaded one unfrozen. With none, it is a correct
+ * conversion.
  */
-function fakeSubtypeCore({ asClass = false, ruleUnchecked = false } = {}) {
+function fakeSubtypeCore(
+  { asClass = false, ruleUnchecked = false, dropRule = false, mutableFileRule = false } = {},
+) {
   const dir = mkdtempSync(join(tmpdir(), "heldout-t2-"));
   const core = join(dir, "barwise", "packages", "core");
   mkdirSync(join(core, "dist", "diff"), { recursive: true });
@@ -409,7 +413,7 @@ let next = 0;
 const ruleOk = (r) => r === undefined
   || (typeof r.expression === "string" && ["derive_on_request", "derived_and_stored", undefined].includes(r.storage));
 class Legacy { constructor(c) { Object.assign(this, c); this._name = "subtype:" + c.subtypeId; } }
-const make = (c, checkRule) => {
+const make = (c, checkRule, fromFile = false) => {
   if (c.subtypeId === c.supertypeId) throw new Error("subtype of itself");
   if (checkRule && !ruleOk(c.definingRule)) throw new Error("bad defining rule");
   const r = {
@@ -421,7 +425,9 @@ const make = (c, checkRule) => {
     isExhaustive: c.isExhaustive ?? false,
   };
   if (${asClass}) return new Legacy({ ...r, definingRule: c.definingRule });
-  if (c.definingRule) r.definingRule = Object.freeze({ ...c.definingRule });
+  if (c.definingRule && !(${dropRule} && !fromFile)) {
+    r.definingRule = ${mutableFileRule} && fromFile ? { ...c.definingRule } : Object.freeze({ ...c.definingRule });
+  }
   return Object.freeze(r);
 };
 export class OrmModel {
@@ -450,7 +456,7 @@ export class OrmYamlSerializer {
         id: s.id, subtypeId: s.subtype, supertypeId: s.supertype,
         providesIdentification: s.provides_identification, isExclusive: s.is_exclusive,
         isExhaustive: s.is_exhaustive, definingRule: r,
-      }, true);
+      }, true, true);
     });
     return m;
   }
@@ -506,6 +512,8 @@ test("heldout t2 passes a converted SubtypeFact and fails the base's class and i
     fakeSubtypeCore(),
     fakeSubtypeCore({ asClass: true }),
     fakeSubtypeCore({ ruleUnchecked: true }),
+    fakeSubtypeCore({ dropRule: true }),
+    fakeSubtypeCore({ mutableFileRule: true }),
   ];
   try {
     const good = run(dirs[0]);
@@ -518,23 +526,36 @@ test("heldout t2 passes a converted SubtypeFact and fails the base's class and i
     assert.deepEqual(failedNames(legacy), [
       "a subtype fact built in code is a plain, frozen record of its fields",
       "a subtype fact loaded from a file is a plain, frozen record of its fields",
-      "a subtype fact's defining rule is frozen with it",
+      "a subtype fact's defining rule is kept and frozen, from code and from a file",
       "a subtype fact without a defining rule carries no definingRule key",
     ]);
     const unchecked = run(dirs[2]);
     assert.deepEqual(failedNames(unchecked), [
       "a defining rule a file would refuse is refused from code too",
     ]);
-    // A task with no cases is refused, not read as zero cases passed.
-    const none = spawnSync(
-      process.execPath,
-      [SCRIPT, "heldout", "--task", "t3", "--path", dirs[0]],
-      {
+    // A rule dropped from code, or loaded and left mutable, fails the rule
+    // case alone: a freeze check alone passed both (Copilot, PR #662).
+    for (const dir of [dirs[3], dirs[4]]) {
+      assert.deepEqual(failedNames(run(dir)), [
+        "a subtype fact's defining rule is kept and frozen, from code and from a file",
+      ]);
+    }
+    // A task with no cases is refused, not read as zero cases passed -- and
+    // so is an inherited name, which a plain lookup would accept.
+    for (const task of ["t3", "toString", "constructor"]) {
+      const none = spawnSync(process.execPath, [
+        SCRIPT,
+        "heldout",
+        "--task",
+        task,
+        "--path",
+        dirs[0],
+      ], {
         encoding: "utf8",
-      },
-    );
-    assert.equal(none.status, 2, none.stdout);
-    assert.match(none.stderr, /t1 or t2/);
+      });
+      assert.equal(none.status, 2, task + ": " + none.stdout);
+      assert.match(none.stderr, /t1 or t2/);
+    }
   } finally {
     for (const d of dirs) rmSync(d, { recursive: true, force: true });
   }

@@ -384,7 +384,9 @@ function trial(args) {
 async function heldout(args) {
   const task = flag(args, "--task");
   const path = flag(args, "--path");
-  if (!HELD_OUT[task]) {
+  // Own keys only: `toString` or `constructor` would otherwise pass this
+  // check and fail as a scored run, exit 1, not as a refusal (Copilot, PR #662).
+  if (!Object.hasOwn(HELD_OUT, task ?? "")) {
     refuse(`heldout needs --task ${Object.keys(HELD_OUT).join(" or ")}, not ${task ?? "(none)"}.`);
   }
   if (!path) refuse("heldout needs --path <worktree of the run>.");
@@ -617,9 +619,18 @@ function t2Cases({ OrmModel, OrmYamlSerializer, diffModels }) {
       "a subtype fact loaded from a file is a plain, frozen record of its fields",
       () => isRecord(load({ defining_rule: { kind: "derived", expression: "e" } }).subtypeFacts[0]),
     ],
+    // Its values first: `Object.isFrozen(undefined)` is true, so a freeze
+    // check alone passes a run that drops the rule (Copilot, PR #662).
     [
-      "a subtype fact's defining rule is frozen with it",
-      () => Object.isFrozen(built({ definingRule: RULE }).definingRule),
+      "a subtype fact's defining rule is kept and frozen, from code and from a file",
+      () => {
+        const fileRule = { kind: "derived", expression: "e", storage: "derived_and_stored" };
+        const keptFrozen = (r, want) =>
+          r !== undefined && Object.isFrozen(r) && r.kind === want.kind
+          && r.expression === want.expression && r.storage === want.storage;
+        return keptFrozen(built({ definingRule: RULE }).definingRule, RULE)
+          && keptFrozen(load({ defining_rule: fileRule }).subtypeFacts[0].definingRule, fileRule);
+      },
     ],
     [
       "a subtype fact without a defining rule carries no definingRule key",
