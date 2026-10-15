@@ -850,8 +850,12 @@ const HELD_OUT = { t1: t1Cases, t2: t2Cases };
  * tool output and the served model -- so the per-turn counts are what lets a
  * reader recompute inputProcessed without it.
  *
- * A run sent back for another round receives that feedback as a user record
- * whose `origin.kind` is "coordinator"; each one starts a new round. The
+ * A run sent back for another round receives that feedback with
+ * `origin.kind` "coordinator", in one of two records: a user record when
+ * the run had stopped, or a `queued_command` attachment when it was still
+ * busy (a background job of its own running), which carries the origin on
+ * the attachment. Each starts a new round. Reading only the first form
+ * folded effect-t1-r3's two rounds into one. The
  * per-round totals are reported because a reading that drops a round (the
  * primer check's adjusted D3) cannot be recomputed from the totals alone,
  * and the harness's per-round figure is the final context, not the input
@@ -887,7 +891,10 @@ function usage(args) {
     const message = entry?.message;
     // Feedback before the round has any turn (none so far) is not a new
     // round: there is nothing yet to close.
-    if (message?.role === "user" && entry?.origin?.kind === "coordinator" && turnsThisRound > 0) {
+    const fromCoordinator = (message?.role === "user" && entry?.origin?.kind === "coordinator")
+      || (entry?.type === "attachment" && entry.attachment?.type === "queued_command"
+        && entry.attachment.origin?.kind === "coordinator");
+    if (fromCoordinator && turnsThisRound > 0) {
       round += 1;
       turnsThisRound = 0;
       continue;

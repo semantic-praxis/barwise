@@ -627,7 +627,10 @@ How a run is held to the same conditions as the others:
   `inputProcessed` its record reports. Each turn also carries its round,
   and `rounds` gives each round's turns and input processed: a round
   starts at each feedback message the run receives, found by the
-  message's origin rather than its wording.
+  message's origin rather than its wording. The origin arrives on a user
+  record when the run had stopped, or on a queued attachment when it was
+  still busy; reading only the first folded effect-t1-r3's two rounds
+  into one until both were read.
 - **The pilot.** Three T1 runs on the plain arm, run and scored as
   above. It does not set D3's bound, which needs both arms. It measures
   the spread of one arm's totals and the cost per run, so the spec can
