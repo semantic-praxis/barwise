@@ -12,7 +12,7 @@ Result)
 Created: 2026-10-13
 Last-updated: 2026-10-15
 Tracking: barwise-cu0 (this spec; closed after WS4 merges); barwise-jo5
-(the adoption spec WS4 opens); barwise-jsi (an instrument defect WS4
+(the adoption spec WS4 opens, `effect-adoption.spec.md`); barwise-jsi (an instrument defect WS4
 found); barwise-973 (WS1 of `core-branching-load.spec.md`, held until
 the adoption spec decides); barwise-5fg (a regression the grounding
 found, fixed before either arm starts); barwise-0lf (an unchecked copy
