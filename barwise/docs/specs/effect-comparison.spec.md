@@ -795,6 +795,36 @@ What the four runs show besides the reading:
   depends on the other's logs. The prompt names a directory; it does not
   stop a run writing beside it.
 
+**Prompt amended and T1 rerun (2026-10-15).** The prompt said a run
+"may not edit the WS0 tests" without saying which files those are; only
+this spec defines the term. A run that wanted to know had to find out,
+and 14 of 17 runs did, by searching this spec for "WS0". Among the ten
+plain runs the split is exact: the seven that searched (the pilot,
+main pairs 4 and 5, both primer-check runs) never edited the protected
+layout test, and the three that did not (main pairs 1 to 3) all did. So
+the primer phrase is not the likeliest cause of those edits -- the
+missing definition is -- and three of the five plain runs in the first
+series paid a second round for a fact the prompt left out. The search
+also showed runs parts of this spec, which states what the comparison is
+for; how much each saw is in its transcript. What is done about it,
+fixed before any run under the new prompt:
+
+- **The prompt names the protected files** (Appendix D), path for path
+  as the trial scorer checks them, and no longer says "WS0".
+- **T1 runs again: a second series of five pairs**, `plain-t1-r1` to
+  `-r5` and `effect-t1-r1` to `-r5`, under the amended prompt and
+  otherwise exactly as the first: the same primers (Appendices E and F
+  as written), heads, scoring, feedback wording and records.
+- **D3's verdict comes from the second series.** The first series
+  (`m1` to `m5`) is reported beside it and not pooled, since its two
+  arms faced a prompt that cost them differently. The pilot and the
+  primer check stay as recorded; the primer check's reading
+  (inconclusive) is left as it was computed, with this confound named
+  beside it.
+- **WS4 records, per run, whether the run read this spec**, counted from
+  its transcript, and reports D3 with that split for both series.
+- **T2 runs under the amended prompt.**
+
 **T2, grounded 2026-10-15: re-scoped to `SubtypeFact`.** The first
 premortem tripwire fired for `FactType`, so T2 takes Appendix C's
 fallback, as the maintainer chose. The evidence, read from both arm
@@ -998,6 +1028,11 @@ tripwire fired; the evidence is in WS3.
 
 Given to every run verbatim, with `<arm>`, `<head>`, `<scratch>`, the
 task text (Appendix B or C), the style line and the primer filled in.
+Amended 2026-10-15 (see WS3): until then the protected-files sentence
+read "You may not edit the WS0 tests, the law tests or any golden file."
+The pilot, the first T1 series (`m1` to `m5`) and the primer check ran
+with that sentence; the second T1 series (`r1` to `r5`) and T2 run with
+this one. The list is the trial scorer's protected set, path for path.
 
 > You are working in a git worktree of the barwise monorepo. First run
 > `git checkout -b trial/<arm>-<task>-<n> <head>`, then `npm ci` and
@@ -1008,7 +1043,14 @@ task text (Appendix B or C), the style line and the primer filled in.
 >
 > <style line>
 >
-> You may not edit the WS0 tests, the law tests or any golden file. Read
+> You may not edit these files: `barwise/packages/core/tests/serialization/objectTypeLayout.test.ts`,
+> `barwise/packages/core/tests/serialization/schemaDataTypes.test.ts`,
+> anything under `barwise/packages/core/tests/fixtures/malformed/`, any
+> law test (anything under a package's `tests/laws/`, or named
+> `*.law.test.ts`), any golden file (anything under a package's `tests/`
+> whose path contains "golden"), `barwise/packages/promptlab/tests/referenceDrift.test.ts`,
+> any `*.reference.orm.yaml`, and `barwise/scripts/measure-comparison.mjs`
+> with its test and the `barwise/scripts/lib` modules it imports. Read
 > the root `CLAUDE.md` and `barwise/packages/core/CLAUDE.md` first.
 > Commit your work on the branch when you are done; do not push. Report
 > what you changed and which of the done checks you ran and how they
