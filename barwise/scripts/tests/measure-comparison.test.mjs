@@ -408,6 +408,8 @@ test("heldout counts a case that throws as failed, with the error, not as a cras
  * schema allows, and `dropDefaultStorage` drops `storage: derive_on_request`
  * at construction. `dropFalseFormal` drops an explicit `isFormal: false` from
  * code, and `hiddenName` keeps a derived name as a non-enumerable property.
+ * `nullAsAbsent` reads a null flag from code as absent, and `unfrozenBare`
+ * ("code" or "file") leaves a record with no defining rule unfrozen.
  * With none, it is a correct conversion.
  */
 function fakeSubtypeCore(
@@ -428,6 +430,8 @@ function fakeSubtypeCore(
     dropDefaultStorage = false,
     dropFalseFormal = false,
     hiddenName = false,
+    nullAsAbsent = false,
+    unfrozenBare = false,
   } = {},
 ) {
   const dir = mkdtempSync(join(tmpdir(), "heldout-t2-"));
@@ -446,6 +450,10 @@ const flagsOk = (c) => ["providesIdentification", "isExclusive", "isExhaustive"]
   .every((k) => [undefined, true, false].includes(c[k]));
 class Legacy { constructor(c) { Object.assign(this, c); this._name = "subtype:" + c.subtypeId; } }
 const make = (c, checkRule, fromFile = false) => {
+  if (${nullAsAbsent} && !fromFile) {
+    c = { ...c };
+    for (const k of ["providesIdentification", "isExclusive", "isExhaustive"]) if (c[k] === null) delete c[k];
+  }
   if (c.subtypeId === c.supertypeId) throw new Error("subtype of itself");
   if (checkRule && !ruleOk(c.definingRule, fromFile || !${kindUnchecked})) throw new Error("bad defining rule");
   if ((fromFile || !${typesUnchecked}) && !flagsOk(c)) throw new Error("a flag is not a boolean");
@@ -474,6 +482,7 @@ const make = (c, checkRule, fromFile = false) => {
   if (${hiddenName} && !fromFile) {
     Object.defineProperty(r, "name", { get: () => "subtype:" + r.subtypeId, enumerable: false });
   }
+  if (!r.definingRule && ${JSON.stringify(unfrozenBare)} === (fromFile ? "file" : "code")) return r;
   return Object.freeze(r);
 };
 export class OrmModel {
@@ -583,13 +592,18 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
       "a subtype fact without a defining rule carries no definingRule key",
     ]],
     [{ ruleUnchecked: true }, [
+      R + "defining_rule is null",
       R + "defining_rule is not an object",
       R + "defining_rule.expression is missing",
+      R + "defining_rule.expression is null",
       R + "defining_rule.expression is not a string",
+      R + "defining_rule.is_formal is null",
       R + "defining_rule.is_formal is not a boolean",
       R + "defining_rule.kind is missing",
+      R + "defining_rule.kind is null",
       R + "defining_rule.kind is not a string",
       R + "defining_rule.kind is outside its enum",
+      R + "defining_rule.storage is null",
       R + "defining_rule.storage is not a string",
       R + "defining_rule.storage is outside its enum",
     ]],
@@ -610,6 +624,7 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
     ]],
     [{ kindUnchecked: true }, [
       R + "defining_rule.kind is missing",
+      R + "defining_rule.kind is null",
       R + "defining_rule.kind is not a string",
       R + "defining_rule.kind is outside its enum",
     ]],
@@ -640,8 +655,11 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
       K + ".provides_identification = false",
     ]],
     [{ typesUnchecked: true }, [
+      R + "is_exclusive is null",
       R + "is_exclusive is not a boolean",
+      R + "is_exhaustive is null",
       R + "is_exhaustive is not a boolean",
+      R + "provides_identification is null",
       R + "provides_identification is not a boolean",
     ]],
     [{ dropDerivedOnSave: true }, [
@@ -665,7 +683,19 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
     [{ hiddenName: true }, [
       "a subtype fact built in code is a plain, frozen record of its fields",
     ]],
+    [{ nullAsAbsent: true }, [
+      R + "is_exclusive is null",
+      R + "is_exhaustive is null",
+      R + "provides_identification is null",
+    ]],
+    [{ unfrozenBare: "code" }, [
+      "a subtype fact built in code is a plain, frozen record of its fields",
+    ]],
+    [{ unfrozenBare: "file" }, [
+      "a subtype fact loaded from a file is a plain, frozen record of its fields",
+    ]],
     [{ idUnchecked: true }, [
+      R + "id is null",
       R + "id is not a string",
       R + "id is empty",
     ]],
@@ -681,7 +711,7 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
   try {
     const r = run(good);
     assert.equal(r.status, 0, JSON.stringify(failedNames(r)));
-    assert.equal(r.report.cases.length, 50);
+    assert.equal(r.report.cases.length, 61);
     for (const [defect, expected] of DEFECTS) {
       const dir = fakeSubtypeCore(defect);
       dirs.push(dir);
@@ -689,6 +719,31 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
       assert.equal(got.status, 1, JSON.stringify(defect));
       assert.deepEqual(failedNames(got), expected, JSON.stringify(defect));
     }
+    // The schema is the scorer's own, whatever the cwd: run from inside a
+    // checkout whose schema drops a required field, the case list is the
+    // same (Copilot, PR #662).
+    const other = mkdtempSync(join(tmpdir(), "heldout-cwd-"));
+    dirs.push(other);
+    spawnSync("git", ["init", "-q", other]);
+    const schemaPath = join(SCRIPT, "../../packages/core/schemas/orm-model.schema.json");
+    const edited = JSON.parse(readFileSync(schemaPath, "utf8"));
+    edited.definitions.subtype_fact.required = edited.definitions.subtype_fact.required
+      .filter((k) => k !== "subtype");
+    mkdirSync(join(other, "barwise/packages/core/schemas"), { recursive: true });
+    writeFileSync(
+      join(other, "barwise/packages/core/schemas/orm-model.schema.json"),
+      JSON.stringify(edited),
+    );
+    const fromOther = spawnSync(
+      process.execPath,
+      [SCRIPT, "heldout", "--task", "t2", "--path", good],
+      { cwd: other, encoding: "utf8" },
+    );
+    assert.equal(fromOther.status, 0, fromOther.stderr);
+    assert.deepEqual(
+      JSON.parse(fromOther.stdout).cases.map((c) => c.name),
+      r.report.cases.map((c) => c.name),
+    );
     // A task with no cases is refused, not read as zero cases passed -- and
     // so is an inherited name, which a plain lookup would accept.
     for (const task of ["t3", "toString", "constructor"]) {
@@ -772,15 +827,17 @@ test("the schema case generator refuses a schema it cannot account for", async (
   // One refusal per constraint, and none for a field code may omit.
   const r = refusals(schema({ type: "boolean", default: false }), "thing", KEYS, { base });
   assert.deepEqual(r.map((c) => `${c.path} ${c.why}`), [
+    "thing.flag is null",
     "thing.flag is not a boolean",
     "thing.name is missing",
+    "thing.name is null",
     "thing.name is not a string",
     "thing.name is empty",
   ]);
   assert.deepEqual(
     refusals(schema({ type: "boolean" }), "thing", KEYS, { base, codeOptional: ["thing.name"] })
       .map((c) => c.why),
-    ["is not a boolean", "is not a string", "is empty"],
+    ["is null", "is not a boolean", "is null", "is not a string", "is empty"],
   );
   // A required nested object is a constraint too: making one required adds
   // a "missing" case rather than nothing (Copilot, PR #662).
@@ -798,7 +855,13 @@ test("the schema case generator refuses a schema it cannot account for", async (
     refusals(nested, "thing", { inner: ["inner", { v: "v" }] }, {
       base: { thing: { inner: {} }, "thing.inner": {} },
     }).map((c) => `${c.path} ${c.why}`),
-    ["thing.inner is missing", "thing.inner is not an object", "thing.inner.v is not a string"],
+    [
+      "thing.inner is missing",
+      "thing.inner is null",
+      "thing.inner is not an object",
+      "thing.inner.v is null",
+      "thing.inner.v is not a string",
+    ],
   );
   // A string with no minLength is kept empty as well as not.
   assert.deepEqual(

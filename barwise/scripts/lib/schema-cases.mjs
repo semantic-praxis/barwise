@@ -114,6 +114,9 @@ export function refusals(schema, defName, keys, { base, codeOptional = [], root 
         const { [f.configKey]: _omitted, ...rest } = levelBase;
         out.push({ path: f.path, why: "is missing", config: wrap(rest) });
       }
+      // Null is outside every type the schema names, and is the value a
+      // `??` default quietly reads as absent (Copilot, PR #662).
+      put(null, "is null");
       if (f.isRef) {
         put("nope", "is not an object");
         const nestedBase = base[f.path];

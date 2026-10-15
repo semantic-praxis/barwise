@@ -47,6 +47,9 @@ import { keeps, preservations, refusals } from "./lib/schema-cases.mjs";
 import { REPO_ROOT } from "./lib/tracked.mjs";
 
 const BARWISE = join(REPO_ROOT, "barwise");
+const SCORER_SCHEMA = fileURLToPath(
+  new URL("../packages/core/schemas/orm-model.schema.json", import.meta.url),
+);
 const CLI_DIST = join(BARWISE, "packages/cli/dist/index.js");
 const CLI_BUNDLE = join(BARWISE, "packages/cli/dist/bundle/index.cjs");
 const REFERENCE_MODEL = join(BARWISE, "examples/models/learning-design.orm.yaml");
@@ -408,12 +411,14 @@ async function heldout(args) {
   }
   // The file schema the generated cases are derived from: this checkout's,
   // fixed when the task was grounded, not the run's, which the run could edit.
+  // Found from this script's own path, not REPO_ROOT: that follows the
+  // caller's cwd, so a scorer run from inside a trial worktree would read the
+  // trial's schema, and a constraint deleted there would delete its case
+  // without touching a protected file (Copilot, PR #662).
   // A schema the generator cannot account for is a refusal, not fewer cases.
   let caseList;
   try {
-    const schema = JSON.parse(
-      readFileSync(join(REPO_ROOT, "barwise/packages/core/schemas/orm-model.schema.json"), "utf8"),
-    );
+    const schema = JSON.parse(readFileSync(SCORER_SCHEMA, "utf8"));
     caseList = HELD_OUT[task]({ ...core, diffModels: diffModule.diffModels, schema });
   } catch (error) {
     refuse(`could not build the held-out cases: ${error?.message ?? error}`);
@@ -695,11 +700,15 @@ function t2Cases({ OrmModel, OrmYamlSerializer, diffModels, schema }) {
   return [
     [
       "a subtype fact built in code is a plain, frozen record of its fields",
-      () => isRecord(built({ definingRule: RULE })),
+      // With a rule and without: a conversion that freezes only one path is
+      // not sealed (Copilot, PR #662).
+      () => isRecord(built({ definingRule: RULE })) && isRecord(built()),
     ],
     [
       "a subtype fact loaded from a file is a plain, frozen record of its fields",
-      () => isRecord(load({ defining_rule: { kind: "derived", expression: "e" } }).subtypeFacts[0]),
+      () =>
+        isRecord(load({ defining_rule: { kind: "derived", expression: "e" } }).subtypeFacts[0])
+        && isRecord(load().subtypeFacts[0]),
     ],
     // Its values first: `Object.isFrozen(undefined)` is true, so a freeze
     // check alone passes a run that drops the rule (Copilot, PR #662).
