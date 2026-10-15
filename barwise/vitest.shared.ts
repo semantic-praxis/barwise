@@ -70,6 +70,14 @@ export interface PackageTestShape {
   readonly thresholds: CoverageFloors;
   /** Defaults to `["tests/**\/*.test.ts"]`. */
   readonly testInclude?: readonly string[];
+  /**
+   * Type-level tests (`*.test-d.ts`) run by vitest's typecheck, and the
+   * tsconfig that compiles them. The tsconfig is required, not defaulted:
+   * a package's own tsconfig excludes `tests/`, and vitest given a
+   * tsconfig that does not include a type test reports it as passing
+   * without having compiled it.
+   */
+  readonly typecheck?: { readonly include: readonly string[]; readonly tsconfig: string; };
 }
 
 /**
@@ -117,6 +125,15 @@ export function barwiseVitestConfig(pkg: string, shape: PackageTestShape) {
       // runner. One number for all of them, because the reason is the
       // runner rather than anything a package chose.
       testTimeout: 30_000,
+      ...(shape.typecheck
+        ? {
+          typecheck: {
+            enabled: true,
+            include: [...shape.typecheck.include],
+            tsconfig: shape.typecheck.tsconfig,
+          },
+        }
+        : {}),
       coverage: {
         provider: "v8" as const,
         ...coverageFiles,

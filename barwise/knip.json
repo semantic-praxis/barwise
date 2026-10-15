@@ -14,6 +14,7 @@
       ]
     },
     "packages/core": {
+      "entry": ["tests/types/*.test-d.ts"],
       "ignore": ["scripts/**", "vitest.mutation.config.ts"]
     },
     "packages/diagram": {},
